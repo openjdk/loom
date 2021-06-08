@@ -44,6 +44,7 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 public class VThreadNotifyFramePopTest {
     private static final String agentLib = "VThreadNotifyFramePopTest";
@@ -80,7 +81,8 @@ public class VThreadNotifyFramePopTest {
 
     void runTest() throws Exception {
         enableEvents(Thread.currentThread(), VThreadNotifyFramePopTest.class, URL.class);
-        try (var executor = Executors.newVirtualThreadExecutor()) {
+        ThreadFactory factory = Thread.ofVirtual().factory();
+        try (var executor = Executors.newThreadPerTaskExecutor()) {
             executor.submit(VThreadNotifyFramePopTest::run);
             System.out.println("submit done");
         }

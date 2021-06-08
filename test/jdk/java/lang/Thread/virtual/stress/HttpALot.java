@@ -58,7 +58,8 @@ public class HttpALot {
         // the requests to GET /hello. It uses virtual threads.
         InetAddress lb = InetAddress.getLoopbackAddress();
         HttpServer server = HttpServer.create(new InetSocketAddress(lb, 0), 1024);
-        server.setExecutor(Executors.newVirtualThreadExecutor());
+        ThreadFactory factory = Thread.ofVirtual().factory();
+        server.setExecutor(Executors.newThreadPerTaskExecutor(factory));
         server.createContext("/hello", e -> {
             byte[] response = "Hello".getBytes("UTF-8");
             e.sendResponseHeaders(200, response.length);
@@ -75,8 +76,8 @@ public class HttpALot {
         // go
         server.start();
         try {
-            ThreadFactory factory = Thread.ofVirtual().name("fetcher-", 0).factory();
-            try (var executor = Executors.newThreadExecutor(factory)) {
+            factory = Thread.ofVirtual().name("fetcher-", 0).factory();
+            try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
                 for (int i = 1; i <= requests; i++) {
                     executor.submit(() -> fetch(url)).get();
                 }

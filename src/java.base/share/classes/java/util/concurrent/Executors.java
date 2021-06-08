@@ -253,7 +253,7 @@ public class Executors {
      * @throws NullPointerException if threadFactory is null
      * @since 99
      */
-    public static ExecutorService newThreadExecutor(ThreadFactory threadFactory) {
+    public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
         return new ThreadPerTaskExecutor(threadFactory);
     }
 
@@ -261,16 +261,17 @@ public class Executors {
      * Creates an Executor that starts a new virtual Thread for each task.
      * The number of threads created by the Executor is unbounded.
      *
-     * <p> This method is equivalent to creating an Executor with the {@link
-     * #newThreadExecutor(ThreadFactory)} method and specifying a ThreadFactory
-     * created with {@code Thread.ofVirtual().factory()}.
+     * @apiNote
+     * This method will probably be removed so that newThreadPerTaskExecutor
+     * is the only method to create a thread-per-task executor for
+     * unstructured usages.
      *
      * @return a newly created executor
      * @since 99
      */
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return newThreadExecutor(factory);
+        return newThreadPerTaskExecutor(factory);
     }
 
     /**

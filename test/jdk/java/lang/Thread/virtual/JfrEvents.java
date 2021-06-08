@@ -61,7 +61,8 @@ public class JfrEvents {
 
             // execute 100 tasks, each in their own virtual thread
             recording.start();
-            try (var executor = Executors.newVirtualThreadExecutor()) {
+            ThreadFactory factory = Thread.ofVirtual().factory();
+            try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
                 for (int i = 0; i < 100; i++) {
                     executor.submit(() -> { });
                 }
@@ -91,7 +92,8 @@ public class JfrEvents {
 
             // execute task in a virtual thread, carrier thread is pinned 3 times.
             recording.start();
-            try (var executor = Executors.newVirtualThreadExecutor()) {
+            ThreadFactory factory = Thread.ofVirtual().factory();
+            try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
                 executor.submit(() -> {
                     Object lock = new Object();
                     synchronized (lock) {

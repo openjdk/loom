@@ -81,8 +81,8 @@ public class ThreadPerTaskExecutorTest {
         var defaultThreadFactory = Executors.defaultThreadFactory();
         var virtualThreadFactory = Thread.ofVirtual().factory();
         return new Object[][] {
-            { Executors.newThreadExecutor(defaultThreadFactory), },
-            { Executors.newThreadExecutor(virtualThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(defaultThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
             { Executors.newStructuredThreadExecutor(defaultThreadFactory), },
             { Executors.newStructuredThreadExecutor(virtualThreadFactory), },
         };
@@ -110,7 +110,7 @@ public class ThreadPerTaskExecutorTest {
         };
 
         var futures = new ArrayList<Future<Integer>>();
-        ExecutorService executor = Executors.newThreadExecutor(wrapper);
+        ExecutorService executor = Executors.newThreadPerTaskExecutor(wrapper);
         try (executor) {
             for (int i=0; i<NUM_TASKS; i++) {
                 int result = i;
@@ -126,22 +126,9 @@ public class ThreadPerTaskExecutorTest {
             assertEquals((int) future.get(), i);
         }
     }
-
+    
     /**
-     * Test that newVirtualThreadExecutor creates virtual threads
-     */
-    @Test
-    public void testVirtualThreadExecutor() {
-        var ref = new AtomicReference<Thread>();
-        try (ExecutorService executor = Executors.newVirtualThreadExecutor()) {
-            executor.submit(() -> ref.set(Thread.currentThread()));
-        }
-        Thread thread = ref.get();
-        assertTrue(thread.isVirtual());
-    }
-
-    /**
-     * Test that newThreadExecutor uses the specified thread factory.
+     * Test that newThreadPerTaskExecutor uses the specified thread factory.
      */
     @Test
     public void testThreadFactory() throws Exception {
@@ -153,7 +140,7 @@ public class ThreadPerTaskExecutorTest {
             ref1.set(thread);
             return thread;
         };
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.submit(() -> ref2.set(Thread.currentThread()));
         }
         Thread thread1 = ref1.get();   // Thread created by thread factory
@@ -347,19 +334,19 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testSubmitNulls1(ThreadFactory factory) {
-        var executor = Executors.newThreadExecutor(factory);
+        var executor = Executors.newThreadPerTaskExecutor(factory);
         executor.submit((Runnable) null);
     }
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testSubmitNulls2(ThreadFactory factory) {
-        var executor = Executors.newThreadExecutor(factory);
+        var executor = Executors.newThreadPerTaskExecutor(factory);
         executor.submit((Callable<String>) null);
     }
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testSubmitNulls3(ThreadFactory factory) {
-        var executor = Executors.newThreadExecutor(factory);
+        var executor = Executors.newThreadPerTaskExecutor(factory);
         executor.submit((Collection<? extends Callable<String>>) null);
     }
 
@@ -626,7 +613,7 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(dataProvider = "factories", expectedExceptions = { IllegalArgumentException.class })
     public void testInvokeAnyEmpty1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.invokeAny(Set.of());
         }
     }
@@ -636,7 +623,7 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(dataProvider = "factories", expectedExceptions = { IllegalArgumentException.class })
     public void testInvokeAnyEmpty2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.invokeAny(Set.of(), 1, TimeUnit.MINUTES);
         }
     }
@@ -646,7 +633,7 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAnyNull1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.invokeAny(null);
         }
     }
@@ -656,7 +643,7 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAnyNull2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             List<Callable<String>> list = new ArrayList<>();
             list.add(() -> "foo");
             list.add(null);
@@ -1072,14 +1059,14 @@ public class ThreadPerTaskExecutorTest {
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull1(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.invokeAll(null);
         }
     }
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull2(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(() -> "foo");
             tasks.add(null);
@@ -1089,14 +1076,14 @@ public class ThreadPerTaskExecutorTest {
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull3(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.invokeAll(null, 1, TimeUnit.SECONDS);
         }
     }
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull4(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             Callable<String> task = () -> "foo";
             executor.invokeAll(List.of(task), 1, null);
         }
@@ -1104,7 +1091,7 @@ public class ThreadPerTaskExecutorTest {
 
     @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
     public void testInvokeAllNull5(ThreadFactory factory) throws Exception {
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             List<Callable<String>> tasks = new ArrayList<>();
             tasks.add(() -> "foo");
             tasks.add(null);
@@ -1117,31 +1104,31 @@ public class ThreadPerTaskExecutorTest {
      */
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads1() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        ExecutorService executor = Executors.newThreadPerTaskExecutor(task -> null);
         executor.execute(() -> { });
     }
 
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads2() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        ExecutorService executor = Executors.newThreadPerTaskExecutor(task -> null);
         executor.submit(() -> "foo");
     }
 
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads3() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        ExecutorService executor = Executors.newThreadPerTaskExecutor(task -> null);
         executor.invokeAll(List.of(() -> "foo"));
     }
 
     @Test(expectedExceptions = { RejectedExecutionException.class })
     public void testNoThreads4() throws Exception {
-        ExecutorService executor = Executors.newThreadExecutor(task -> null);
+        ExecutorService executor = Executors.newThreadPerTaskExecutor(task -> null);
         executor.invokeAny(List.of(() -> "foo"));
     }
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testNull() {
-        Executors.newThreadExecutor(null);
+        Executors.newThreadPerTaskExecutor(null);
     }
 
     // -- supporting classes --
