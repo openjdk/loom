@@ -82,7 +82,7 @@ public class VThreadNotifyFramePopTest {
     void runTest() throws Exception {
         enableEvents(Thread.currentThread(), VThreadNotifyFramePopTest.class, URL.class);
         ThreadFactory factory = Thread.ofVirtual().factory();
-        try (var executor = Executors.newThreadPerTaskExecutor()) {
+        try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
             executor.submit(VThreadNotifyFramePopTest::run);
             System.out.println("submit done");
         }
