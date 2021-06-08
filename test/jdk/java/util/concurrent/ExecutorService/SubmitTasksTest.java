@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -307,10 +306,10 @@ public class SubmitTasksTest {
 
             Thread.currentThread().interrupt();
             try {
-                stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
-                assertTrue(false);
-            } catch (CancellationException e) {
-                // interrupt status should be set
+                long count = stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
+                assertTrue(count == 2);
+
+                // interrupt status should not be cleared
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {
                 Thread.interrupted(); // clear interrupt
@@ -352,9 +351,9 @@ public class SubmitTasksTest {
             // schedule main thread to be interrupted
             scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(1));
             try {
-                stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
-                assertTrue(false);
-            } catch (CancellationException e) {
+                long count = stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
+                assertTrue(count == 2);
+
                 // interrupt status should be set
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {
