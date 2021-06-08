@@ -371,8 +371,8 @@ void Thaw<ConfigT>::patch_chunk_pd(intptr_t* sp) {
 template <typename ConfigT>
 inline void Thaw<ConfigT>::prefetch_chunk_pd(void* start, int size) {
   size <<= LogBytesPerWord;
-  Prefetch::read_streaming(start, size);
-  Prefetch::read_streaming(start, size - 64);
+  Prefetch::read(start, size);
+  Prefetch::read(start, size - 64);
 }
 
 template <typename ConfigT>

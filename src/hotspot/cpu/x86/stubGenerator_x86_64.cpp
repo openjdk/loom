@@ -7163,18 +7163,10 @@ RuntimeStub* generate_cont_doYield() {
 
     if (!return_barrier) {
       __ pop(c_rarg3); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
-      // __ lea(rsp, Address(rsp, wordSize)); // pop return address. if we don't do this, we get a drift, where the bottom-most frozen frame continuously grows
     } else {
       __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-      // __ subptr(rsp, wordSize); // return address
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #ifdef ASSERT
-  //   __ lea(rcx, Address(rsp, wordSize));
-  //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #endif
-
-    Label thaw_success;
 
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // preserve possible return value from a method returning to the return barrier
@@ -7196,11 +7188,10 @@ RuntimeStub* generate_cont_doYield() {
   //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
   // #endif
 
+    Label thaw_success;
     __ testq(rbx, rbx);           // rbx contains the size of the frames to thaw, 0 if overflow or no more frames
     __ jcc(Assembler::notZero, thaw_success);
-
     __ jump(ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
-
     __ bind(thaw_success);
 
     __ subq(rsp, rbx);             // make room for the thawed frames
@@ -7214,7 +7205,7 @@ RuntimeStub* generate_cont_doYield() {
     if (ContPerfTest > 112) {
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
     }
-    __ movptr(rbx, rax); // rbx is now the sp of the yielding frame
+    __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)

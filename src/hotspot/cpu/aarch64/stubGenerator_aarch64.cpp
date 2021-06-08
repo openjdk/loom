@@ -6083,8 +6083,7 @@ RuntimeStub* generate_cont_doYield() {
 
     Label pinned;
 
-    __ cmp(r0, zr);
-    __ br(Assembler::NE, pinned);
+    __ cbnz(r0, pinned);
 
     __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
     __ mov(sp, rscratch1);
@@ -6141,8 +6140,80 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-    // TODO LOOM AARCH64
-    __ stop("LOOM AARCH64 generate_cont_thaw");
+    if (return_barrier) {
+      __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+      __ mov(sp, rscratch1);
+    }
+    assert_asm(_masm, (__ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset())), __ cmp(sp, rscratch1)), Assembler::EQ, "incorrect sp");
+
+    if (return_barrier) {
+      // preserve possible return value from a method returning to the return barrier
+      __ fmovd(rscratch1, v0);
+      __ stp(rscratch1, r0, Address(__ pre(sp, -2 * wordSize)));
+    }
+
+    __ movw(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), rthread, c_rarg1);
+    __ mov(rscratch2, r0); // r0 contains the size of the frames to thaw, 0 if overflow or no more frames
+
+    if (return_barrier) {
+      // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
+      __ ldp(rscratch1, r0, Address(__ post(sp, 2 * wordSize)));
+      __ fmovd(v0, rscratch1);
+    }
+    assert_asm(_masm, (__ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset())), __ cmp(sp, rscratch1)), Assembler::EQ, "incorrect sp");
+
+
+    Label thaw_success;
+    // rscratch2 contains the size of the frames to thaw, 0 if overflow or no more frames
+    __ cbnz(rscratch2, thaw_success);
+    __ lea(rscratch1, ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
+    __ br(rscratch1);
+    __ bind(thaw_success);
+    
+    // make room for the thawed frames
+    __ sub(rscratch1, sp, rscratch2);
+    __ andw(rscratch1, rscratch1, (uint64_t)-16); // align
+    __ mov(sp, rscratch1);        
+    
+    if (return_barrier) {
+      // save original return value -- again
+      __ fmovd(rscratch1, v0);
+      __ stp(rscratch1, r0, Address(__ pre(sp, -2 * wordSize)));
+    }
+
+    __ movw(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), rthread, c_rarg1);
+    __ mov(rscratch2, r0); // r0 is the sp of the yielding frame
+
+    if (return_barrier) {
+      // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
+      __ ldp(rscratch1, r0, Address(__ post(sp, 2 * wordSize)));
+      __ fmovd(v0, rscratch1);
+    } else {
+      __ mov(r0, zr); // return 0 (success) from doYield
+    }
+
+    // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
+    __ sub(sp, rscratch2, 2*wordSize); // now pointing to rfp spill
+    __ mov(rfp, sp);
+
+    if (exception) {
+      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
+      __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
+
+      // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
+
+      __ mov(rscratch2, r0); // the exception handler
+      __ mov(r0, r19); // restore return value contaning the exception oop
+      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ br(rscratch2); // the exception handler
+    }
+
+    // We're "returning" into the topmost thawed frame; see Thaw::push_return_frame
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6213,8 +6284,7 @@ RuntimeStub* generate_cont_doYield() {
   static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
     __ reset_last_Java_frame(false);
     Label null_jobject;
-    __ cmp(r0, zr);
-    __ br(Assembler::EQ, null_jobject);
+    __ cbz(r0, null_jobject);
     DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
     BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
     bs->load_at(_masm, decorators, T_OBJECT, r0, Address(r0, 0), rscratch1, rthread);

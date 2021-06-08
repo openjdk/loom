@@ -1007,6 +1007,10 @@ public:
 
   void should_not_reach_here()                   { stop("should not reach here"); }
 
+  void _assert_asm(Condition cc, const char* msg);
+#define assert_asm0(cc, msg) _assert_asm(cc, FILE_AND_LINE ": " msg)
+#define assert_asm(masm, command, cc, msg) DEBUG_ONLY(command; (masm)->_assert_asm(cc, FILE_AND_LINE ": " #command " " #cc ": " msg))
+
   // Stack overflow checking
   void bang_stack_with_offset(int offset) {
     // stack grows down, caller passes positive offset

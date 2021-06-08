@@ -2083,6 +2083,7 @@ static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
 }
 
 // make room on the stack for thaw
+// returns the size in bytes, or 0 on failure
 JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier))
   log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
 

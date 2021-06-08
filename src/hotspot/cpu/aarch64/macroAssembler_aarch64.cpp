@@ -2308,6 +2308,15 @@ void MacroAssembler::unimplemented(const char* what) {
   stop(buf);
 }
 
+void MacroAssembler::_assert_asm(Assembler::Condition cc, const char* msg) {
+#ifdef ASSERT
+  Label OK;
+  br(cc, OK);
+  stop(msg);
+  bind(OK);
+#endif
+}
+
 // If a constant does not fit in an immediate field, generate some
 // number of MOV instructions and then perform the operation.
 void MacroAssembler::wrap_add_sub_imm_insn(Register Rd, Register Rn, unsigned imm,
