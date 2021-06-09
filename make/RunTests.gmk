@@ -593,6 +593,9 @@ define SetupRunMicroTestBody
   # Set library path for native dependencies
   $1_JMH_JVM_ARGS := -Djava.library.path=$$(TEST_IMAGE_DIR)/micro/native
 
+  # Allow preview features in microbenchmarks
+  $1_JMH_JVM_ARGS += --enable-preview
+
   ifneq ($$(MICRO_VM_OPTIONS)$$(MICRO_JAVA_OPTIONS), )
     $1_JMH_JVM_ARGS += $$(MICRO_VM_OPTIONS) $$(MICRO_JAVA_OPTIONS)
   endif
