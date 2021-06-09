@@ -1237,24 +1237,50 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   fill_continuation_entry(masm); // kills rax
 
+  __ cmp(c_rarg2, (u1)0);
+  __ br(Assembler::NE, call_thaw);
+  
   address mark = __ pc();
-  
-  __ stop("LOOM AARCH64 gen_continuation_enter");
-
-  //__ call(resolve);
-  // __ mov(r13, sp);
-  // __ blr(c_rarg4);
-  
+  __ relocate(resolve.rspec());
+  //if (!far_branches()) {
+  __ bl(resolve.target());
   oop_maps->add_gc_map(__ pc() - start, map);
   __ post_call_nop();
 
+  __ b(exit);
+
+  __ bind(call_thaw);
+
+  rt_call(masm, CAST_FROM_FN_PTR(address, StubRoutines::cont_thaw()));
   oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
   ContinuationEntry::return_pc_offset = __ pc() - start;
   __ post_call_nop();
 
   __ bind(exit);
   continuation_enter_cleanup(masm);
- 
+  __ leave();
+  __ ret(lr);
+
+  /// exception handling
+
+  exception_offset = __ pc() - start;
+
+  {
+      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
+      __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
+
+      // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
+
+      __ mov(rscratch2, r0); // the exception handler
+      __ mov(r0, r19); // restore return value contaning the exception oop
+      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ br(rscratch2); // the exception handler
+  }
+
+  continuation_enter_cleanup(masm);
+  __ stop("not implemented");
+
   CodeBuffer* cbuf = masm->code_section()->outer();
   address stub = CompiledStaticCall::emit_to_interp_stub(*cbuf, mark);
 }
