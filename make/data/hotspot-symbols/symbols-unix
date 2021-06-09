@@ -203,7 +203,6 @@ JVM_SupportsCX8
 JVM_SuspendThread
 JVM_TotalMemory
 JVM_UnloadLibrary
-JVM_UnsafeSetInheritableScopeLocalBindings
 JVM_WaitForReferencePendingList
 JVM_Yield
 
