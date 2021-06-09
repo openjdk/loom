@@ -250,9 +250,6 @@ JNIEXPORT void JNICALL
 JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
 JNIEXPORT void JNICALL
-JVM_UnsafeSetInheritableScopeLocalBindings(JNIEnv *env, jclass threadClass, jobject theThing);
-
-JNIEXPORT void JNICALL
 JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
 
 JNIEXPORT jint JNICALL

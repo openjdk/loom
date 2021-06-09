@@ -35,8 +35,6 @@
 
 package java.util.concurrent;
 
-import jdk.internal.misc.Unsafe;
-
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
@@ -433,12 +431,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     /** The number of pending tasks until completion */
     volatile int pending;
 
-    private final ScopeLocal.Snapshot snapshot = ScopeLocal.snapshot();
-
-    // Unsafe mechanics
-    private static final Unsafe U = Unsafe.getUnsafe();
-    private static final long INHERITABLESCOPELOCALBINDINGS
-            = U.objectFieldOffset(Thread.class, "inheritableScopeLocalBindings");
+    private ScopeLocal.Snapshot snapshot = ScopeLocal.snapshot();
 
     /**
      * Creates a new CountedCompleter with the given completer
@@ -760,17 +753,8 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      */
     @Override
     protected final boolean exec() {
-        ScopeLocal.Snapshot prev = ScopeLocal.snapshot();
-        if (snapshot != prev) {
-            Thread currentThread = Thread.currentThread();
-            try {
-                // U.putReference(currentThread, INHERITABLESCOPELOCALBINDINGS, snapshot);
-                U.setInheritableScopeLocalBindings(snapshot);
-                compute();
-            } finally {
-                // U.putReference(currentThread, INHERITABLESCOPELOCALBINDINGS, bindings);
-                U.setInheritableScopeLocalBindings(prev);
-            }
+        if (snapshot != ScopeLocal.snapshot()) {
+            ScopeLocal.runWithSnapshot(this::compute, snapshot);
         } else {
             compute();
         }

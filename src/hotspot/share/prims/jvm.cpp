@@ -3109,12 +3109,6 @@ JVM_ENTRY(void, JVM_SetScopeLocalCache(JNIEnv* env, jclass threadClass,
   thread->set_scopeLocalCache(objs);
 JVM_END
 
-JVM_ENTRY(void, JVM_UnsafeSetInheritableScopeLocalBindings(JNIEnv* env, jclass threadClass,
-                                   jobject theThing))
-  thread->set_scopeLocalCache(NULL);
-  thread->set_inheritableScopeLocalBindings(JNIHandles::resolve(theThing));
-JVM_END
-
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
   oop theThread = thread->vthread();
   assert (theThread != (oop)NULL, "no current thread!");

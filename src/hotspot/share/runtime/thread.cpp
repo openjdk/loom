@@ -828,11 +828,6 @@ void JavaThread::set_scopeLocalCache(oop p) {
   _scopeLocalCache.replace(p);
 }
 
-void JavaThread::set_inheritableScopeLocalBindings(oop obj) {
-  threadObj()->obj_field_put(java_lang_Thread::inheritableScopeLocalBindings_offset(), obj);
-  set_scopeLocalCache(NULL);
-}
-
 OopStorage* JavaThread::thread_oop_storage() {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   return _thread_oop_storage;

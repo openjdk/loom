@@ -1101,7 +1101,6 @@ private:
   void set_vthread(oop p);
   oop scopeLocalCache() const;
   void set_scopeLocalCache(oop p);
-  void set_inheritableScopeLocalBindings(oop obj);
   oop mounted_vthread() const                    { return _mounted_vthread; }
   void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
 

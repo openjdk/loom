@@ -237,7 +237,6 @@ class LibraryCallKit : public GraphKit {
   bool inline_native_scopeLocalCache();
   Node* scopeLocalCache_helper();
   bool inline_native_setScopeLocalCache();
-  bool inline_native_unsafeSetInheritableScopeLocalBindings();
   bool inline_native_currentThread();
   bool inline_native_setCurrentThread();
 
