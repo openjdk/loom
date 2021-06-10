@@ -441,7 +441,8 @@ public final class ScopeLocal<T> {
      * @throws Exception if the operation completes with an exception
      */
     public static <T, U> U where(ScopeLocal<T> key, T value, Callable<U> op) throws Exception {
-        // This could be made more efficient by not creating the Carrier instance.
+        // This could be made more efficient by not creating the Carrier instance,
+        // but there isn't much in it.
         return where(key, value).call(op);
     }
 
@@ -454,31 +455,9 @@ public final class ScopeLocal<T> {
      * @param op the operation to run
      */
     public static <T> void where(ScopeLocal<T> key, T value, Runnable op) {
+        // This could be made more efficient by not creating the Carrier instance,
+        // but there isn't much in it.
         where(key, value).run(op);
-    }
-
-    /**
-     * Runs a value-returning operation with a snapshot of inheritable
-     * scoped variables.
-     *
-     * @param op the operation to run
-     * @param s the Snapshot. May be null.
-     * @param <R> the type of the result of the function
-     * @return the result
-     * @throws Exception if the operation completes with an exception
-     */
-    public static <R> R callWithSnapshot(Callable<R> op, Snapshot s) throws Exception {
-        return s.call(op);
-    }
-
-    /**
-     * Runs an operation with this snapshot of inheritable scoped variables.
-     *
-     * @param op the operation to run
-     * @param s the Snapshot. May be null.
-     */
-    public static void runWithSnapshot(Runnable op, Snapshot s) {
-        s.run(op);
     }
 
     private ScopeLocal(Class<? super T> type, boolean isInheritable) {
