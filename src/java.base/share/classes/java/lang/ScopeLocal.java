@@ -153,7 +153,6 @@ public final class ScopeLocal<T> {
          * Runs an operation with this snapshot of inheritable scoped variables.
          *
          * @param op the operation to run
-         * @param s the Snapshot. May be null.
          */
         public void run(Runnable op) {
             var prev = Thread.currentThread().inheritableScopeLocalBindings;
@@ -177,7 +176,6 @@ public final class ScopeLocal<T> {
          * scoped variables.
          *
          * @param op the operation to run
-         * @param s the Snapshot. May be null.
          * @param <R> the type of the result of the function
          * @return the result
          * @throws Exception if the operation completes with an exception
