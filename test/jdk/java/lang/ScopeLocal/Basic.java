@@ -412,7 +412,7 @@ public class Basic {
 
     private <R> R callWithSnapshot(ScopeLocal.Snapshot snapshot, Callable<R> c) {
         try {
-            return ScopeLocal.callWithSnapshot(c, snapshot);
+            return snapshot.call(c);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

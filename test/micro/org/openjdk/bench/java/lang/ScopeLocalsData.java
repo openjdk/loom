@@ -59,15 +59,17 @@ public class ScopeLocalsData {
         }
     }
 
+    static final ScopeLocal.Carrier VALUES = ScopeLocal
+            .where(sl1, 42).where(sl2, 2).where(sl3, 3)
+            .where(sl4, 4).where(sl5, 5).where(sl6, 6);
+
     public static void run(Runnable action) {
         try {
             tl1.set(42); tl2.set(2); tl3.set(3); tl4.set(4); tl5.set(5); tl6.set(6);
             tl_atomicInt.set(new AtomicInteger());
-            ScopeLocal.where(sl1, 42).where(sl2, 2).where(sl3, 3)
-                    .where(sl4, 4).where(sl5, 5).where(sl6, 6)
-                    .where(sl_atomicInt, new AtomicInteger())
-                    .where(sl_atomicRef, new AtomicReference<>())
-                    .run(action);
+            VALUES.where(sl_atomicInt, new AtomicInteger())
+                  .where(sl_atomicRef, new AtomicReference<>())
+                  .run(action);
         } finally {
             tl1.remove(); tl2.remove(); tl3.remove(); tl4.remove(); tl5.remove(); tl6.remove();
             tl_atomicInt.remove();

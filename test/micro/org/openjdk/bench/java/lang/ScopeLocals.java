@@ -73,16 +73,16 @@ public class ScopeLocals {
     }
 
     @Benchmark
-    public int sixValues_ScopeLocal(Blackhole bh) throws Exception {
+    public int sixValues_ScopeLocal() throws Exception {
         int result = 0;
         for (int i = 0 ; i < 166; i++) {
-            result = combine(result, tl1.get(), tl2.get(), tl3.get(), tl4.get(), tl5.get(), tl6.get());
+            result = combine(result, sl1.get(), sl2.get(), sl3.get(), sl4.get(), sl5.get(), sl6.get());
         }
         return result;
     }
 
     @Benchmark
-    public int sixValues_ThreadLocal(Blackhole bh) throws Exception {
+    public int sixValues_ThreadLocal() throws Exception {
         int result = 0;
         for (int i = 0 ; i < 166; i++) {
             result = combine(result, tl1.get(), tl2.get(), tl3.get(), tl4.get(), tl5.get(), tl6.get());
@@ -171,7 +171,7 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void counter_ThreadLocal() {
-        // Very slow
+        // Very slow:
         // tl1.set(tl1.get() + 1);
         var ctr = tl_atomicInt.get();
         ctr.setPlain(ctr.getPlain() + 1);
@@ -193,8 +193,7 @@ public class ScopeLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public Object
-    callWithSnapshot_ScopeLocal() throws Exception{
+    public Object callWithSnapshot_ScopeLocal() throws Exception{
         return aSnapshot.call(() -> getClass());
     }
 
