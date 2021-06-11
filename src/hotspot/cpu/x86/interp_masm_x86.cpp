@@ -1170,6 +1170,8 @@ void InterpreterMacroAssembler::remove_activation(
       push(state);
       mov(robj, rmon);   // nop if robj and rmon are the same
       unlock_object(robj);
+      NOT_LP64(get_thread(rthread);)
+      dec_held_monitor_count(rthread);
       pop(state);
 
       if (install_monitor_exception) {
