@@ -142,7 +142,6 @@ JvmtiEnv::Deallocate(unsigned char* mem) {
 } /* end Deallocate */
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // data - NULL is a valid value, must be checked
 jvmtiError
 JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
@@ -179,7 +178,6 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
 } /* end SetThreadLocalStorage */
 
 
-// thread - NOT protected by ThreadsListHandle and NOT pre-checked
 // data_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
@@ -888,7 +886,6 @@ JvmtiEnv::GetCarrierThread(jthread vthread, jthread* thread_ptr) {
   // Thread functions
   //
 
-// thread - NOT protected by ThreadsListHandle and NOT pre-checked
 // thread_state_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
@@ -976,7 +973,6 @@ JvmtiEnv::GetAllThreads(jint* threads_count_ptr, jthread** threads_ptr) {
 } /* end GetAllThreads */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
 jvmtiError
 JvmtiEnv::SuspendThread(jthread thread) {
   JavaThread* java_thread = NULL;
@@ -1041,7 +1037,6 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
 } /* end SuspendThreadList */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
 jvmtiError
 JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list) {
   jvmtiError err = JvmtiEnvBase::check_thread_list(except_count, except_list);
@@ -1208,7 +1203,6 @@ JvmtiEnv::StopThread(JavaThread* java_thread, jobject exception) {
 } /* end StopThread */
 
 
-// thread - NOT protected by ThreadsListHandle and NOT pre-checked
 jvmtiError
 JvmtiEnv::InterruptThread(jthread thread) {
   JavaThread* current_thread  = JavaThread::current();
@@ -1253,7 +1247,6 @@ JvmtiEnv::InterruptThread(jthread thread) {
 } /* end InterruptThread */
 
 
-// thread - NOT protected by ThreadsListHandle and NOT pre-checked
 // info_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
@@ -1347,7 +1340,6 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // owned_monitor_count_ptr - pre-checked for NULL
 // owned_monitors_ptr - pre-checked for NULL
 jvmtiError
@@ -1425,7 +1417,6 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // monitor_info_count_ptr - pre-checked for NULL
 // monitor_info_ptr - pre-checked for NULL
 jvmtiError
@@ -1504,7 +1495,6 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // monitor_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
@@ -1554,7 +1544,6 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
 } /* end GetCurrentContendedMonitor */
 
 
-// thread - NOT protected by ThreadsListHandle and NOT pre-checked
 // proc - pre-checked for NULL
 // arg - NULL is a valid value, must be checked
 jvmtiError
@@ -1721,7 +1710,6 @@ JvmtiEnv::GetThreadGroupChildren(jthreadGroup group, jint* thread_count_ptr, jth
   //
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // max_frame_count - pre-checked to be greater than or equal to 0
 // frame_buffer - pre-checked for NULL
 // count_ptr - pre-checked for NULL
@@ -1845,7 +1833,6 @@ JvmtiEnv::GetThreadListStackTraces(jint thread_count, const jthread* thread_list
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // count_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
@@ -1918,7 +1905,6 @@ JvmtiEnv::PopFrame(JavaThread* java_thread) {
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // method_ptr - pre-checked for NULL
 // location_ptr - pre-checked for NULL
@@ -1965,7 +1951,6 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
 
 
 // Threads_lock NOT held, java_thread not protected by lock
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 jvmtiError
 JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
@@ -2240,7 +2225,6 @@ JvmtiEnv::IterateOverInstancesOfClass(oop k_mirror, jvmtiHeapObjectFilter object
   //
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
@@ -2281,7 +2265,6 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
 } /* end GetLocalObject */
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value - pre-checked for NULL
 jvmtiError
@@ -2323,7 +2306,6 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
@@ -2365,7 +2347,6 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
@@ -2407,7 +2388,6 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
@@ -2449,7 +2429,6 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
 
 
 // Threads_lock NOT held
-// thread - protected by ThreadsListHandle and pre-checked
 // depth - pre-checked as non-negative
 // value_ptr - pre-checked for NULL
 jvmtiError
