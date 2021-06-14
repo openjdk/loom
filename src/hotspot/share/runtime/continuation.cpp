@@ -1866,7 +1866,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
   assert (current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
-  assert (!preempt || current->thread_state() == _thread_blocked
+  assert (!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked
           /*|| current->thread_state() == _thread_in_native*/,
           "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
@@ -1907,7 +1907,6 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   Freeze<ConfigT> fr(current, cont, preempt);
 
   if (UNLIKELY(preempt)) {
-    assert (current->thread_state() == _thread_blocked, "");
     freeze_result res = fr.freeze_slow();
     cont.set_preempted(true);
     return freeze_epilog(current, cont, res);

@@ -1718,12 +1718,10 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
   }
 
   if (is_cont_force_yield()) {
-    log_develop_trace(jvmcont)("handle_special_runtime_exit_condition is_cont_force_yield: %d check_asyncs: %d", is_cont_force_yield(), check_asyncs);
+    log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
     set_cont_preempt(false);
-    if (true || check_asyncs) { // TODO: we should probably be even more selective than that
-      // we need this only for interpreted frames -- for compiled frames we install a return barrier on the safepoint stub in Continuation::try_force_yield
-      StubRoutines::cont_jump_from_sp_C()();
-    }
+    assert(thread_state() == _thread_in_Java, "can only continue from Java state");
+    StubRoutines::cont_jump_from_sp_C()();
   }
 
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)
@@ -2209,6 +2207,7 @@ void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
   st->print(", stack(" PTR_FORMAT "," PTR_FORMAT ")",
             p2i(stack_end()), p2i(stack_base()));
   st->print("]");
+  print_owned_locks_on(st);
 
   ThreadsSMRSupport::print_info_on(this, st);
   return;
@@ -2358,13 +2357,13 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
-// Rebind JVMTI thread state from carrier to virtual or from virtual to carrier. 
+// Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_mounted_vthread(thread_oop);
 
   // unbind current JvmtiThreadState from JavaThread
   jvmti_thread_state()->unbind_from(this);
-    
+
   // bind new JvmtiThreadState to JavaThread
   java_lang_Thread::jvmti_thread_state(thread_oop)->bind_to(this);
 
@@ -2507,7 +2506,7 @@ javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
 Klass* JavaThread::security_get_caller_class(int depth) {
   ResetNoHandleMark rnhm;
   HandleMark hm(Thread::current());
-  
+
   vframeStream vfst(this);
   vfst.security_get_caller_frame(depth);
   if (!vfst.at_end()) {
@@ -3967,7 +3966,6 @@ void Threads::print_threads_compiling(outputStream* st, char* buf, int buflen, b
     }
   }
 }
-
 
 // Ad-hoc mutual exclusion primitives: SpinLock
 //
