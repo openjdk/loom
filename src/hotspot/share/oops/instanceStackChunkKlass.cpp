@@ -1024,14 +1024,15 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   if (closure._cb != nullptr && closure._cb->is_compiled()) {
     assert (chunk->argsize() == (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord,
       "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(), (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
-  } else {
-    assert (chunk->argsize() == 0, "");
-  }
+  } 
+  // else {
+  //   assert (chunk->argsize() == 0, "");
+  // }
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 
   if (!concurrent) {
     assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: %ld start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
-    assert (chunk->argsize() == (closure._callee_interpreted ? 0 : closure._argsize), "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d", chunk->argsize(), closure._argsize, closure._callee_interpreted);
+    assert (chunk->argsize() == closure._argsize, "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d", chunk->argsize(), closure._argsize, closure._callee_interpreted);
 
     int max_size = closure._size + closure._num_i2c * align_wiggle();
     assert (chunk->max_size() == max_size, "max_size(): %d max_size: %d argsize: %d num_i2c: %d", chunk->max_size(), max_size, closure._argsize, closure._num_i2c);

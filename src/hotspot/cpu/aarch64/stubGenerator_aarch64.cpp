@@ -6173,8 +6173,8 @@ RuntimeStub* generate_cont_doYield() {
     
     // make room for the thawed frames
     __ sub(rscratch1, sp, rscratch2);
-    __ andw(rscratch1, rscratch1, (uint64_t)-16); // align
-    __ mov(sp, rscratch1);        
+    __ andr(rscratch1, rscratch1, -16); // align
+    __ mov(sp, rscratch1);
     
     if (return_barrier) {
       // save original return value -- again

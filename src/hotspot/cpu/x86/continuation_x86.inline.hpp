@@ -131,17 +131,6 @@ inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool
   return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
 }
 
-template <bool relative>
-inline int Interpreted::stack_argsize(const frame& f) { // exclusive; this will not be copied with the frame
-  int diff = (int)(f.at(frame::interpreter_frame_locals_offset) - f.at(frame::interpreter_frame_sender_sp_offset) + sizeof(intptr_t));
-  // tty->print_cr(">>>> Interpreted::stack_argsize: %ld -- %ld relative: %d", f.at(frame::interpreter_frame_locals_offset), f.at(frame::interpreter_frame_sender_sp_offset), relative);
-  if (!relative) diff >>= LogBytesPerWord;
-  // assert (!Interpreter::contains(Interpreted::return_pc(f)) || diff >= 0, "diff: %d", diff); -- -1 has been observed
-  assert (!CodeCache::find_blob(Interpreted::return_pc(f))->is_compiled() || diff <= 0, "diff: %d", diff);
-  if (diff < 0) diff = 0;
-  return diff;
-}
-
 template<typename FKind, typename RegisterMapT>
 inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));

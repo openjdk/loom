@@ -406,6 +406,11 @@ int Interpreted::size(const frame&f) {
   return Interpreted::frame_bottom<true>(f) - Interpreted::frame_top(f);
 }
 
+template <bool relative>
+inline int Interpreted::stack_argsize(const frame& f) {
+  return f.interpreter_frame_method()->size_of_parameters();
+}
+
 inline int Interpreted::expression_stack_size(const frame &f, InterpreterOopMap* mask) {
   int size = mask->expression_stack_size();
   assert (size <= f.interpreter_frame_expression_stack_size(), "size1: %d size2: %d", size, f.interpreter_frame_expression_stack_size());
@@ -1362,10 +1367,13 @@ public:
         StackChunkFrameStream<true> last(chunk);
         unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
       }
-      if (argsize > 0 && FKind::interpreted == top_interpreted) {
+      if (FKind::interpreted == top_interpreted) {
         overlap = argsize;
       }
     }
+    // else if (FKind::interpreted) {
+    //   argsize = 0;
+    // }
 
     log_develop_trace(jvmcont)("finalize _size: %d overlap: %d unextended_sp: %d", _size, overlap, unextended_sp);
 
@@ -2467,7 +2475,7 @@ public:
     log_develop_trace(jvmcont)("sub max_size: %d -- %d (unextended_sp: " INTPTR_FORMAT " orig unextended_sp: " INTPTR_FORMAT ")", delta, chunk->max_size() - delta, p2i(_stream.unextended_sp()), p2i(_top_unextended_sp));
     chunk->set_max_size(chunk->max_size() - delta);
 
-    assert (!_stream.is_done() || chunk->parent() != nullptr || argsize == 0, "");
+    // assert (!_stream.is_done() || chunk->parent() != nullptr || argsize == 0, "");
     _cont.set_argsize(FKind::interpreted ? 0 : argsize);
     log_develop_trace(jvmcont)("setting entry argsize: %d (bottom interpreted: %d)", _cont.argsize(), FKind::interpreted);
   

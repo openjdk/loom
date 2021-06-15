@@ -131,17 +131,6 @@ inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool
   return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
 }
 
-template <bool relative>
-inline int Interpreted::stack_argsize(const frame& f) { // exclusive; this will not be copied with the frame
-  int diff = (int)(f.at(frame::interpreter_frame_locals_offset) - f.at(frame::interpreter_frame_sender_sp_offset) + sizeof(intptr_t));
-  // tty->print_cr(">>>> Interpreted::stack_argsize: %ld -- %ld relative: %d", f.at(frame::interpreter_frame_locals_offset), f.at(frame::interpreter_frame_sender_sp_offset), relative);
-  if (!relative) diff >>= LogBytesPerWord;
-  assert (!Interpreter::contains(Interpreted::return_pc(f)) || diff >= 0, "diff: %d", diff);
-  assert (!CodeCache::find_blob(Interpreted::return_pc(f))->is_compiled() || diff <= 0, "diff: %d", diff);
-  if (diff < 0) diff = 0; // happens when caller is compiled
-  return diff;
-}
-
 template<typename FKind, typename RegisterMapT>
 inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
@@ -354,6 +343,9 @@ intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
 
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
+
+  sp = align_down(sp, 16);
+  assert((intptr_t)sp % 16 == 0, "");
 
   sp -= ContinuationHelper::frame_metadata;
   *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
