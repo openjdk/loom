@@ -1242,6 +1242,8 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
       __ bind(unlock);
       __ unlock_object(regmon);
+      NOT_LP64(__ get_thread(thread);)
+      __ dec_held_monitor_count(thread);
     }
     __ bind(L);
   }

@@ -1467,6 +1467,8 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     assert(!this->has_pending_exception(), "release_monitors should have cleared");
   }
 
+  assert(this->held_monitor_count() == 0, "held monitor count should be zero");
+
   // These things needs to be done while we are still a Java Thread. Make sure that thread
   // is in a consistent state, in case GC happens
   JFR_ONLY(Jfr::on_thread_exit(this);)
