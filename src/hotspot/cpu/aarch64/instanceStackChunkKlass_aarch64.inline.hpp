@@ -145,46 +145,6 @@ inline void stackChunkOopDesc::derelativize_frame_pd(frame& fr) const {
   if (fr.is_interpreted_frame()) fr.set_fp(derelativize_address(fr.offset_fp()));
 }
 
-inline void InstanceStackChunkKlass::relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
-  assert (*(hfp + offset) == *(vfp + offset), "vaddr: " INTPTR_FORMAT " *vaddr: " INTPTR_FORMAT " haddr: " INTPTR_FORMAT " *haddr: " INTPTR_FORMAT, p2i(vfp + offset) , *(vfp + offset), p2i(hfp + offset) , *(hfp + offset));
-  intptr_t* addr = hfp + offset;
-  intptr_t value = *(intptr_t**)addr - vfp;
-  // tty->print_cr(">>>> relativize offset: %d fp: %p delta: %ld derel: %p", offset, vfp, value, *(intptr_t**)addr);
-  *addr = value;
-}
-
-inline void InstanceStackChunkKlass::derelativize(intptr_t* const fp, int offset) {
-  intptr_t* addr = fp + offset;
-  // tty->print_cr(">>>> derelativize offset: %d fp: %p delta: %ld derel: %p", offset, fp, *addr, fp + *addr);
-  *addr = (intptr_t)(fp + *addr);
-}
-
-inline void InstanceStackChunkKlass::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
-  intptr_t* vfp = f.fp();
-  intptr_t* hfp = hf.fp();
-  assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-  assert (f.fp() > (intptr_t*)f.at<false>(frame::interpreter_frame_initial_sp_offset), "");
-
-  // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
-  *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
-  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
-  relativize(vfp, hfp, frame::interpreter_frame_locals_offset);
-
-  assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
-  assert (hf.unextended_sp() == (intptr_t*)hf.at<true>(frame::interpreter_frame_last_sp_offset), "");
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            >  (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            <= (intptr_t*)hf.at<true>(frame::interpreter_frame_locals_offset), "");
-}
-
-inline void InstanceStackChunkKlass::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
-  intptr_t* vfp = f.fp();
-  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
-  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
-  derelativize(vfp, frame::interpreter_frame_locals_offset);
-}
-
 template<>
 template<>
 inline void StackChunkFrameStream<true>::update_reg_map_pd(RegisterMap* map) {

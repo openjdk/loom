@@ -658,7 +658,7 @@ void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEnt
 }
 
 void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
-  address   pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
   assert (pc != nullptr, "");
 
   JavaFrameAnchor* anchor = thread->frame_anchor();
@@ -900,8 +900,9 @@ private:
   inline void set_top_frame_metadata_pd(const frame& hf);
   template <typename FKind, bool bottom> inline void patch_pd(frame& callee, const frame& caller);
   inline void patch_chunk_pd(intptr_t* vsp, intptr_t* hsp);
-  template<typename FKind> frame new_hframe(frame& f, frame& caller, int num_oops);
+  template<typename FKind> frame new_hframe(frame& f, frame& caller);
   inline intptr_t* align_bottom(intptr_t* vsp, int argsize);
+  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
   template<typename FKind> static inline frame sender(const frame& f);
 
@@ -1507,7 +1508,9 @@ public:
     
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
     const int argsize = Interpreted::stack_argsize(f);
-    const int fsize = Interpreted::frame_bottom<false>(f) - vsp;
+    const int locals = f.interpreter_frame_method()->max_locals();
+    assert (Interpreted::frame_bottom<false>(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, ""); // equal on x86
+    const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
 
 #ifdef ASSERT
   {
@@ -1515,7 +1518,7 @@ public:
     InterpreterOopMap mask;
     f.interpreted_frame_oop_map(&mask);
     assert (vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT, p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
-    assert (fsize >= Interpreted::size(f, &mask), "fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask));
+    assert (fsize + 1 >= Interpreted::size(f, &mask), "fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask)); // add 1 for possible alignment padding
     if (fsize > Interpreted::size(f, &mask) + 1) {
       log_develop_trace(jvmcont)("III fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask));
       log_develop_trace(jvmcont)("    vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT, p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
@@ -1534,15 +1537,19 @@ public:
 
     DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, bottom);)
 
-    frame hf = new_hframe<Interpreted>(f, caller, 0);
+    frame hf = new_hframe<Interpreted>(f, caller);
 
     // tty->print_cr(">>> INTERPRETED bottom: %d argsize: %d callee_argsize: %d callee_interpreted: %d caller_interpreted: %d", bottom, argsize, callee_argsize, callee_interpreted, caller.is_interpreted_frame());
 
     intptr_t* hsp = Interpreted::frame_top(hf, callee_argsize, callee_interpreted);
-    copy_to_chunk<false>(vsp, hsp, fsize);
+    assert (Interpreted::frame_bottom<true>(hf) == hsp + fsize, "");
+
+    // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
+    copy_to_chunk<false>(Interpreted::frame_bottom<false>(f) - locals, Interpreted::frame_bottom<true>(hf) - locals, locals); // copy locals
+    copy_to_chunk<false>(vsp, hsp, fsize - locals); // copy rest
     assert (!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
-    InstanceStackChunkKlass::relativize_interpreted_frame_metadata(f, hf);
+    relativize_interpreted_frame_metadata(f, hf);
 
     patch<Interpreted>(f, hf, caller, bottom);
 
@@ -1570,7 +1577,7 @@ public:
 
     DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, bottom);)
 
-    frame hf = new_hframe<Compiled>(f, caller, 0);
+    frame hf = new_hframe<Compiled>(f, caller);
 
     intptr_t* hsp = Compiled::frame_top(hf, callee_argsize, callee_interpreted);
 
@@ -1621,7 +1628,7 @@ public:
     assert (!caller.is_interpreted_frame(), "");
 
     DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
-    frame hf = new_hframe<StubF>(f, caller, 0);
+    frame hf = new_hframe<StubF>(f, caller);
     intptr_t* hsp = StubF::frame_top(hf, 0, 0);
     copy_to_chunk<false>(vsp, hsp, fsize);
     DEBUG_ONLY(after_freeze_java_frame(hf, false);)
@@ -1654,6 +1661,14 @@ public:
     }
 
     assert(_cont.chunk_invariant(), "");
+  }
+
+  static inline void relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
+    assert (*(hfp + offset) == *(vfp + offset), "vaddr: " INTPTR_FORMAT " *vaddr: " INTPTR_FORMAT " haddr: " INTPTR_FORMAT " *haddr: " INTPTR_FORMAT, p2i(vfp + offset) , *(vfp + offset), p2i(hfp + offset) , *(hfp + offset));
+    intptr_t* addr = hfp + offset;
+    intptr_t value = *(intptr_t**)addr - vfp;
+    // tty->print_cr(">>>> relativize offset: %d fp: %p delta: %ld derel: %p", offset, vfp, value, *(intptr_t**)addr);
+    *addr = value;
   }
 
   stackChunkOop allocate_chunk(int size) {
@@ -2147,13 +2162,15 @@ private:
   DEBUG_ONLY(int _frames;)
 
   inline frame new_entry_frame();
-  template<typename FKind> frame new_frame(const frame& hf, intptr_t* vsp, frame& caller);
+  template<typename FKind> frame new_frame(const frame& hf, frame& caller, bool bottom);
   template<typename FKind, bool bottom> inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom);
   void patch_chunk_pd(intptr_t* sp);
   inline intptr_t* align_chunk(intptr_t* vsp);
   inline void prefetch_chunk_pd(void* start, int size_words);
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
+  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
+  static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
 
   bool should_deoptimize() { return true; /* _thread->is_interp_only_mode(); */ } // TODO PERF
 
@@ -2379,7 +2396,6 @@ public:
     
     frame f;
     thaw(hf, f, num_frames, true);
-    intptr_t* sp = f.sp();
 
     finish_thaw(f); // f is now the topmost thawed frame
 
@@ -2391,6 +2407,8 @@ public:
     assert(_cont.chunk_invariant(), "");
     _thread->set_cont_fastpath(_fastpath);
 
+    intptr_t* sp = f.sp();
+    
   #ifdef ASSERT
     {
       log_develop_debug(jvmcont)("Jumping to frame (thaw): [%ld]", java_tid(_thread));
@@ -2530,21 +2548,26 @@ public:
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
 
-    intptr_t* hsp = hf.unextended_sp();
-    int fsize = Interpreted::frame_bottom<true>(hf) - hsp;
-    intptr_t* vsp = caller.unextended_sp() - fsize;
+    frame f = new_frame<Interpreted>(hf, caller, bottom);
+    intptr_t* const vsp = f.sp();
+    intptr_t* const hsp = hf.unextended_sp();
+    intptr_t* const frame_bottom = Interpreted::frame_bottom<false>(f);
+
+    const int fsize = Interpreted::frame_bottom<true>(hf) - hsp;
     log_develop_trace(jvmcont)("fsize: %d", fsize);
 
-    if (bottom) {
-      assert (vsp + fsize >= _cont.entrySP() - 2, "");
-      assert (vsp + fsize <= _cont.entrySP(), "");
-    }
-    copy_from_chunk<false>(hsp, vsp, fsize);
+    assert (!bottom || vsp + fsize >= _cont.entrySP() - 2, "");
+    assert (!bottom || vsp + fsize <= _cont.entrySP(), "");
 
-    frame f = new_frame<Interpreted>(hf, vsp, caller);
+    assert (Interpreted::frame_bottom<false>(f) == vsp + fsize, "");
 
-    InstanceStackChunkKlass::derelativize_interpreted_frame_metadata(hf, f);
+    // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
+    const int locals = hf.interpreter_frame_method()->max_locals();
+    copy_from_chunk<false>(Interpreted::frame_bottom<true>(hf) - locals, Interpreted::frame_bottom<false>(f) - locals, locals); // copy locals
+    copy_from_chunk<false>(hsp, vsp, fsize - locals); // copy rest
 
+    set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
+    derelativize_interpreted_frame_metadata(hf, f);
     bottom ? patch<Interpreted, true>(f, caller) : patch<Interpreted, false>(f, caller);
 
     DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) print_frame_layout<false>(f);)
@@ -2580,37 +2603,24 @@ public:
       _align_size += ContinuationHelper::align_wiggle; // we add one whether or not we've aligned because we add it in freeze_interpreted_frame
     }
 
-    int fsize = Compiled::size(hf);
-    log_develop_trace(jvmcont)("fsize: %d", fsize);
-
-    intptr_t* hsp = hf.unextended_sp();
-    intptr_t* vsp = caller.unextended_sp() - fsize;
+    frame f = new_frame<Compiled>(hf, caller, bottom);
+    intptr_t* const vsp = f.sp();
+    intptr_t* const hsp = hf.unextended_sp();
     log_develop_trace(jvmcont)("vsp: " INTPTR_FORMAT, p2i(vsp));
-
-    if (bottom || caller.is_interpreted_frame()) {
-      log_develop_trace(jvmcont)("thaw_compiled_frame add argsize: fsize: %d argsize: %d fsize: %d", fsize, hf.compiled_frame_stack_argsize(), fsize + hf.compiled_frame_stack_argsize());
-      int argsize = hf.compiled_frame_stack_argsize();
-
-      fsize += argsize;
-      vsp   -= argsize;
-
-      caller.set_sp(caller.sp() - argsize);
-      assert (caller.sp() == vsp + (fsize-argsize), "");
-
-      vsp = align(hf, vsp, caller, bottom);
-    }
-
     log_develop_trace(jvmcont)("hsp: %d ", _cont.tail()->to_offset(hsp));
 
-    frame f = new_frame<Compiled>(hf, vsp, caller);
+    int fsize = Compiled::size(hf);
+    log_develop_trace(jvmcont)("fsize: %d", fsize);
+    fsize += (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
+    assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d %ld", fsize, caller.unextended_sp() - f.unextended_sp());
 
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
     intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
     int sz = fsize + ContinuationHelper::frame_metadata;
-    if (bottom) {
-      assert (_cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP(), "");
-      assert (hf.compiled_frame_stack_argsize() != 0 || to + sz && to + sz == _cont.entrySP(), "");
-    }
+
+    assert (!bottom || _cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP(), "");
+    assert (!bottom || hf.compiled_frame_stack_argsize() != 0 || to + sz && to + sz == _cont.entrySP(), "");
+
     copy_from_chunk(from, to, sz);
 
     bottom ? patch<Compiled, true>(f, caller) : patch<Compiled, false>(f, caller);
@@ -2669,15 +2679,14 @@ public:
 
     int fsize = StubF::size(hf);
     log_develop_trace(jvmcont)("fsize: %d", fsize);
-
+    
+    frame f = new_frame<StubF>(hf, caller, false);
+    intptr_t* vsp = f.sp();
     intptr_t* hsp = hf.sp();
-    intptr_t* vsp = caller.unextended_sp() - fsize;
-    log_develop_trace(jvmcont)("vsp: " INTPTR_FORMAT, p2i(vsp));
     log_develop_trace(jvmcont)("hsp: %d ", _cont.tail()->to_offset(hsp));
+    log_develop_trace(jvmcont)("vsp: " INTPTR_FORMAT, p2i(vsp));
 
     copy_from_chunk(hsp - ContinuationHelper::frame_metadata, vsp - ContinuationHelper::frame_metadata, fsize + ContinuationHelper::frame_metadata);
-
-    frame f = new_frame<StubF>(hf, vsp, caller);
 
     { // can only fix caller once this frame is thawed (due to callee saved regs)
       RegisterMap map(nullptr, true, false, false); // map.clear();
@@ -2708,6 +2717,10 @@ public:
     }
     assert (chunk->is_empty() == (chunk->max_size() == 0), "chunk->is_empty: %d chunk->max_size: %d", chunk->is_empty(), chunk->max_size());
 
+    if ((intptr_t)f.sp() % 16 != 0) {
+      assert (f.is_interpreted_frame(), "");
+      f.set_sp(f.sp() - 1);
+    }
     push_return_frame(f);
     InstanceStackChunkKlass::fix_thawed_frame(chunk, f, SmallRegisterMap::instance); // can only fix caller after push_return_frame (due to callee saved regs)
 
@@ -2733,6 +2746,12 @@ public:
     ContinuationHelper::push_pd(f);
 
     assert(Frame::assert_frame_laid_out(f), "");
+  }
+
+  static inline void derelativize(intptr_t* const fp, int offset) {
+    intptr_t* addr = fp + offset;
+    // tty->print_cr(">>>> derelativize offset: %d fp: %p delta: %ld derel: %p", offset, fp, *addr, fp + *addr);
+    *addr = (intptr_t)(fp + *addr);
   }
 
   static void JVMTI_continue_cleanup(JavaThread* thread) {
@@ -2788,7 +2807,8 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 #endif
 
   Thaw<ConfigT> thw(thread, cont);
-  intptr_t* sp = thw.thaw(kind);
+  intptr_t* const sp = thw.thaw(kind);
+  assert ((intptr_t)sp % 16 == 0, "");
 
   thread->reset_held_monitor_count();
 

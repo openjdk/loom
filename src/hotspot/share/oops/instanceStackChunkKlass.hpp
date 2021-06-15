@@ -146,9 +146,6 @@ public:
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
-  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
-  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
-
 private:
   static int bitmap_size_in_bits(int stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
   void build_bitmap(stackChunkOop chunk);
@@ -181,9 +178,6 @@ private:
 
   template <bool mixed, typename RegisterMapT>
   static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
-
-  static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
-  static inline void derelativize(intptr_t* const fp, int offset);
   
   typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
   static void resolve_memcpy_functions();
