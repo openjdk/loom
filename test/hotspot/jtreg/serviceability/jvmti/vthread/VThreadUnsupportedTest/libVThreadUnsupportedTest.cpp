@@ -108,65 +108,13 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
   LOG("test_unsupported_jvmti_functions: finished\n");
 }
 
-static jthread find_vthread(JNIEnv *jni) {
-  jvmtiError err = JVMTI_ERROR_NONE;
-  jint threads_count = 0;
-  jthread *threads = NULL;
-  jthread vthread = NULL;
-
-  jthread cur_thread = get_current_thread(jvmti, jni);
-
-  err = jvmti->GetAllThreads(&threads_count, &threads);
-  check_jvmti_status(jni, err, "GetAllThreads");
-
-  for (int thread_idx = 0; thread_idx < (int) threads_count; thread_idx++) {
-    jthread thread = threads[thread_idx];
-
-    if (jni->IsSameObject(cur_thread, thread) == JNI_TRUE) {
-      continue;
-    }
-
-    err = jvmti->SuspendThread(thread);
-    if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
-      continue;
-    }
-    check_jvmti_status(jni, err, "SuspendThread");
-
-    err = GetVirtualThread(jvmti, jni, thread, &vthread);
-    if (err == JVMTI_ERROR_THREAD_NOT_SUSPENDED) {
-      // Some system threads might not fully suspended. so just skip them
-      err = jvmti->ResumeThread(thread);
-      check_jvmti_status(jni, err, "ResumeThread");
-      continue;
-    }
-    check_jvmti_status(jni, err, "JVMTI extension GetVirtualThread");
-
-    if (vthread != NULL) {
-      char* tname = get_thread_name(jvmti, jni, thread);
-      LOG("\n#### Found carrier thread: %s\n", tname);
-      deallocate(jvmti, jni, (void*)tname);
-    }
-    err = jvmti->ResumeThread(thread);
-    check_jvmti_status(jni, err, "ResumeThread");
-  }
-  return vthread;
-}
-
 JNIEXPORT jboolean JNICALL
-Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj) {
+Java_VThreadUnsupportedTest_testJvmtiFunctionsInJNICall(JNIEnv *jni, jobject obj, jthread vthread) {
   jvmtiError err = JVMTI_ERROR_NONE;
-  jthread vthread = NULL;
 
   LOG("testJvmtiFunctionsInJNICall: started\n");
 
-  while (vthread == NULL) {
-    vthread = find_vthread(jni);
-  }
   test_unsupported_jvmti_functions(jvmti, jni, vthread);
-
-  // test JVMTI InterruptThread
-  err = jvmti->InterruptThread(vthread);
-  check_jvmti_status(jni, err, "InterruptThread");
 
   LOG("testJvmtiFunctionsInJNICall: finished\n");
 
