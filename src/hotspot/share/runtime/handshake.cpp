@@ -406,6 +406,7 @@ HandshakeState::HandshakeState(JavaThread* target) :
   _queue(),
   _lock(Monitor::leaf, "HandshakeState", Mutex::_allow_vm_block_flag, Monitor::_safepoint_check_never),
   _active_handshaker(),
+  _caller(nullptr),
   _suspended(false),
   _async_suspend_handshake(false)
 {
@@ -608,7 +609,7 @@ void HandshakeState::do_self_suspend() {
   assert(_lock.owned_by_self(), "Lock must be held");
   assert(!_handshakee->has_last_Java_frame() || _handshakee->frame_anchor()->walkable(), "should have walkable stack");
   JavaThreadState jts = _handshakee->thread_state();
-  while (is_suspended()) {
+  while (is_suspended_or_frozen()) {
     _handshakee->set_thread_state(_thread_blocked);
     log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " suspended", p2i(_handshakee));
     _lock.wait_without_safepoint_check();
@@ -630,7 +631,7 @@ class ThreadSelfSuspensionHandshake : public AsyncHandshakeClosure {
   }
 };
 
-bool HandshakeState::suspend_with_handshake() {
+bool HandshakeState::suspend_with_handshake(JavaThread* caller) {
   if (_handshakee->is_exiting() ||
      _handshakee->threadObj() == NULL) {
     log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " exiting", p2i(_handshakee));
@@ -641,11 +642,14 @@ bool HandshakeState::suspend_with_handshake() {
       // Target is already suspended.
       log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " already suspended", p2i(_handshakee));
       return false;
+    } else if (is_frozen()) {
+      log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " already frozen", p2i(_handshakee));
+      return false;
     } else {
       // Target is going to wake up and leave suspension.
       // Let's just stop the thread from doing that.
       log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " re-suspended", p2i(_handshakee));
-      set_suspended(true);
+      set_suspended_or_frozen(caller);
       return true;
     }
   }
@@ -653,7 +657,7 @@ bool HandshakeState::suspend_with_handshake() {
   assert(!is_suspended(), "cannot be suspended without a suspend request");
   // Thread is safe, so it must execute the request, thus we can count it as suspended
   // from this point.
-  set_suspended(true);
+  set_suspended_or_frozen(caller);
   set_async_suspend_handshake(true);
   log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " suspended, arming ThreadSuspension", p2i(_handshakee));
   ThreadSelfSuspensionHandshake* ts = new ThreadSelfSuspensionHandshake();
@@ -663,24 +667,26 @@ bool HandshakeState::suspend_with_handshake() {
 
 // This is the closure that synchronously honors the suspend request.
 class SuspendThreadHandshake : public HandshakeClosure {
-  bool _did_suspend;
+  JavaThread* _caller;
+  bool        _did_suspend;
 public:
-  SuspendThreadHandshake() : HandshakeClosure("SuspendThread"), _did_suspend(false) {}
+  SuspendThreadHandshake(JavaThread* caller) : HandshakeClosure("SuspendThread"), _caller(caller), _did_suspend(false) {}
   void do_thread(Thread* thr) {
     JavaThread* target = thr->as_Java_thread();
-    _did_suspend = target->handshake_state()->suspend_with_handshake();
+    _did_suspend = target->handshake_state()->suspend_with_handshake(_caller);
   }
   bool did_suspend() { return _did_suspend; }
 };
 
-bool HandshakeState::suspend() {
-  SuspendThreadHandshake st;
+bool HandshakeState::suspend(JavaThread* caller) {
+  SuspendThreadHandshake st(caller);
   Handshake::execute(&st, _handshakee);
-  return st.did_suspend();
+  bool suspended = st.did_suspend();
+  return suspended;
 }
 
-bool HandshakeState::resume() {
-  if (!is_suspended()) {
+bool HandshakeState::resume(JavaThread* caller) {
+  if (!is_suspended_or_frozen()) {
     return false;
   }
   MutexLocker ml(&_lock, Mutex::_no_safepoint_check_flag);
@@ -688,6 +694,12 @@ bool HandshakeState::resume() {
     assert(!_handshakee->is_suspended(), "cannot be suspended without a suspend request");
     return false;
   }
+
+  // If caller is non-null only resume frozen thread if it's the caller
+  if (caller_thread() == caller) {
+    set_caller_thread(nullptr); // !is_frozen()
+  }
+
   // Resume the thread.
   set_suspended(false);
   _lock.notify();
