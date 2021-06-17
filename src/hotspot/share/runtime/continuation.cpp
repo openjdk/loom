@@ -542,18 +542,16 @@ private:
   short _e_num_interpreted_frames;
   short _e_num_frames;
 
-  bool  _is_preempt;
-
 public:
   inline void post_safepoint(Handle conth);
-  stackChunkOop allocate_stack_chunk(int stack_size);
+  stackChunkOop allocate_stack_chunk(int stack_size, bool is_preempt);
 
 private:
   ContMirror(const ContMirror& cont); // no copy constructor
 
 public:
   // does not automatically read the continuation object
-  ContMirror(JavaThread* thread, oop cont, bool is_preempt = false);
+  ContMirror(JavaThread* thread, oop cont);
   ContMirror(oop cont);
   ContMirror(const RegisterMap* map);
 
@@ -696,13 +694,12 @@ oop ContinuationHelper::get_continuation(JavaThread* thread) {
   return java_lang_Thread::continuation(thread->threadObj());
 }
 
-ContMirror::ContMirror(JavaThread* thread, oop cont, bool is_preempt)
+ContMirror::ContMirror(JavaThread* thread, oop cont)
  : _thread(thread), _entry(thread->last_continuation()), _cont(cont),
 #ifndef PRODUCT
   _tail(nullptr),
 #endif
-  _e_size(0),
-  _is_preempt(is_preempt) {
+  _e_size(0) {
 
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
   assert (_cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: "
@@ -1681,7 +1678,7 @@ public:
 
   stackChunkOop allocate_chunk(int size) {
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
-    stackChunkOop chunk = _cont.allocate_stack_chunk(size);
+    stackChunkOop chunk = _cont.allocate_stack_chunk(size, _preempt);
     if (chunk == nullptr) { // OOM
       return nullptr;
     }
@@ -1890,7 +1887,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert (ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
   assert (verify_continuation<1>(oopCont), "");
-  ContMirror cont(current, oopCont, preempt);
+  ContMirror cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   JVMTI_yield_VTMT_cleanup(current);
@@ -3207,13 +3204,13 @@ inline void ContMirror::post_safepoint(Handle conth) {
 
 /* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
  * method. In the later case we might have done a safepoint and need to reload our oops */
-stackChunkOop ContMirror::allocate_stack_chunk(int stack_size) {
+stackChunkOop ContMirror::allocate_stack_chunk(int stack_size, bool is_preempt) {
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   int size_in_words = klass->instance_size(stack_size);
 
   assert (!UseG1GC || !G1CollectedHeap::is_humongous(size_in_words), "size_in_words: %d", size_in_words);
-  assert(_is_preempt || _thread == JavaThread::current(), "should be current");
-  JavaThread* current = _is_preempt ? JavaThread::current() : _thread;
+  assert(is_preempt || _thread == JavaThread::current(), "should be current");
+  JavaThread* current = is_preempt ? JavaThread::current() : _thread;
 
   StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
   HeapWord* start = current->tlab().allocate(size_in_words);
