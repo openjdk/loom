@@ -5105,7 +5105,9 @@ class C2 extends C1 implements I2 {
     <intro>
       <b>
         These functions and data types were introduced in the original
-        <jvmti/> version 1.0 and have been superseded by more
+        <jvmti/> version 1.0. They are deprecated and will be changed 
+        to return an error in a future release. They were superseded in
+        <jvmti/> version 1.2 (Java SE 6) by more 
       </b>
       <internallink id="Heap"><b>powerful and flexible versions</b></internallink>
       <b>
@@ -15331,6 +15333,9 @@ typedef void (JNICALL *jvmtiEventVMInit)
       Minor update for new class file PermittedSubclasses attribute:
         - Specify that RedefineClasses and RetransformClasses are not allowed
           to change the class file PermittedSubclasses attribute.
+  </change>
+  <change date="8 June 2021" version="17.0.0">
+      Minor update to deprecate Heap functions 1.0.
   </change>
 </changehistory>
 

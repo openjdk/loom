@@ -132,6 +132,7 @@
   template(java_io_FileInputStream,                   "java/io/FileInputStream")                  \
   template(java_io_ByteArrayInputStream,              "java/io/ByteArrayInputStream")             \
   template(java_io_Serializable,                      "java/io/Serializable")                     \
+  template(java_nio_Buffer,                           "java/nio/Buffer")                          \
   template(java_util_Arrays,                          "java/util/Arrays")                         \
   template(java_util_Objects,                         "java/util/Objects")                        \
   template(java_util_Properties,                      "java/util/Properties")                     \
@@ -520,6 +521,7 @@
   template(use_unaligned_access_name,                 "UNALIGNED_ACCESS")                         \
   template(data_cache_line_flush_size_name,           "DATA_CACHE_LINE_FLUSH_SIZE")               \
   template(during_unsafe_access_name,                 "during_unsafe_access")                     \
+  template(checkIndex_name,                           "checkIndex")                               \
   template(scoped_cache_shift_name,                   "SCOPED_CACHE_SHIFT")                       \
   template(scopeLocalSnapshot_name,                   "Ljava/lang/ScopeLocal$Snapshot;")          \
                                                                                                   \

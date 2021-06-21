@@ -2397,6 +2397,16 @@ public final class System {
                 return c.getClassData();
             }
 
+            @Override
+            public long findNative(ClassLoader loader, String entry) {
+                return ClassLoader.findNative(loader, entry);
+            }
+
+            @Override
+            public void exit(int statusCode) {
+                Shutdown.exit(statusCode);
+            }
+            
             public Thread[] getAllThreads() {
                 return Thread.getAllThreads();
             }
