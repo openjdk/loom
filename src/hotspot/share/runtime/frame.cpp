@@ -925,6 +925,11 @@ void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool quer
   oops_interpreted_do0<relative>(f, map, m, bci, mask);
 }
 
+// Initialize explicitly so that these can be used only with definitions.
+// TODO: Rectify as Loom stabilizes...
+template void frame::oops_interpreted_do<true> (OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
+template void frame::oops_interpreted_do<false>(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
+
 template <bool relative>
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const {
   Thread *thread = Thread::current();
