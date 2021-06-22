@@ -26,10 +26,7 @@ package jdk.test.failurehandler;
 import jdk.test.failurehandler.action.ActionHelper;
 import jdk.test.failurehandler.value.InvalidValueException;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.PrintWriter;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
@@ -68,5 +65,4 @@ public final class GathererFactory {
             throw new IllegalStateException("can't create tool kit", e);
         }
     }
-
 }
