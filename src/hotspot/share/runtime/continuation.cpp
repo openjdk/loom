@@ -1832,7 +1832,9 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preem
   assert (!cont.is_empty(), "");
 
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks
-  StackWatermarkSet::after_unwind(thread, !preempt);
+  if (!preempt) {
+    StackWatermarkSet::after_unwind(thread);
+  }
 
   thread->set_cont_yield(false);
 

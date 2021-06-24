@@ -87,15 +87,13 @@ void StackWatermarkSet::before_unwind(JavaThread* jt) {
   SafepointMechanism::update_poll_values(jt);
 }
 
-void StackWatermarkSet::after_unwind(JavaThread* jt, bool is_current_thread) {
+void StackWatermarkSet::after_unwind(JavaThread* jt) {
   verify_processing_context();
   assert(jt->has_last_Java_frame(), "must have a Java frame");
   for (StackWatermark* current = head(jt); current != NULL; current = current->next()) {
     current->after_unwind();
   }
-  if (is_current_thread) {
-    SafepointMechanism::update_poll_values(jt);
-  }
+  SafepointMechanism::update_poll_values(jt);
 }
 
 void StackWatermarkSet::on_iteration(JavaThread* jt, const frame& fr) {

@@ -1721,6 +1721,7 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
     log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
     set_cont_preempt(false);
     assert(thread_state() == _thread_in_Java, "can only continue from Java state");
+    StackWatermarkSet::after_unwind(this);
     StubRoutines::cont_jump_from_sp_C()();
   }
 
