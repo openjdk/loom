@@ -330,7 +330,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     assert ((intptr_t)f.fp() % 16 == 0, "");
     return f;
   } else {
-    int fsize = Compiled::size(hf);
+    int fsize = FKind::size(hf);
     intptr_t* vsp = caller.unextended_sp() - fsize;
     if (bottom || caller.is_interpreted_frame()) {
       int argsize = hf.compiled_frame_stack_argsize();
