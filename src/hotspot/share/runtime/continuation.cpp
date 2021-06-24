@@ -1826,13 +1826,13 @@ static inline bool can_freeze_fast(JavaThread* thread) {
 }
 
 
-static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
+static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preempt) {
   assert (verify_continuation<2>(cont.mirror()), "");
 
   assert (!cont.is_empty(), "");
 
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible to stack walks
-  StackWatermarkSet::after_unwind(thread);
+  StackWatermarkSet::after_unwind(thread, !preempt);
 
   thread->set_cont_yield(false);
 
@@ -1841,7 +1841,7 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
   return 0;
 }
 
-static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res) {
+static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res, bool preempt) {
   if (UNLIKELY(res != freeze_ok)) {
     assert (verify_continuation<11>(cont.mirror()), "");
     return early_return(res, thread);
@@ -1850,7 +1850,7 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
   cont.post_jfr_event(&event, thread);
 #endif
   JVMTI_yield_cleanup(thread, cont); // can safepoint
-  return freeze_epilog(thread, cont);
+  return freeze_epilog(thread, cont, preempt);
 }
 
 // returns the continuation yielding (based on context), or nullptr for failure (due to pinning)
@@ -1906,7 +1906,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   if (UNLIKELY(preempt)) {
     freeze_result res = fr.freeze_slow();
     cont.set_preempted(true);
-    return freeze_epilog(current, cont, res);
+    return freeze_epilog(current, cont, res, preempt);
   }
 
   if (fast && fr.is_chunk_available(sp)) {
@@ -1918,7 +1918,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   #endif
 
     // if (UNLIKELY(preempt)) cont.set_preempted(true);
-    return freeze_epilog(current, cont);
+    return freeze_epilog(current, cont, preempt);
   }
 
   // if (current->held_monitor_count() > 0) {
@@ -1930,7 +1930,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
     freeze_result res = fast ? fr.try_freeze_fast(sp, false) : fr.freeze_slow();
-    return freeze_epilog(current, cont, res);
+    return freeze_epilog(current, cont, res, preempt);
   JRT_BLOCK_END
 }
 
@@ -2417,7 +2417,7 @@ public:
     _thread->set_cont_fastpath(_fastpath);
 
     intptr_t* sp = f.sp();
-    
+
   #ifdef ASSERT
     {
       log_develop_debug(jvmcont)("Jumping to frame (thaw): [%ld]", java_tid(_thread));
@@ -2688,7 +2688,7 @@ public:
 
     int fsize = StubF::size(hf);
     log_develop_trace(jvmcont)("fsize: %d", fsize);
-    
+
     frame f = new_frame<StubF>(hf, caller, false);
     intptr_t* vsp = f.sp();
     intptr_t* hsp = hf.sp();

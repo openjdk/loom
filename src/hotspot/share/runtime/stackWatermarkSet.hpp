@@ -68,7 +68,7 @@ public:
   static void before_unwind(JavaThread* jt);
 
   // Called when a thread just unwound a frame
-  static void after_unwind(JavaThread* jt);
+  static void after_unwind(JavaThread* jt, bool is_current_thread = true);
 
   // Called by stack walkers when walking into a frame
   static void on_iteration(JavaThread* jt, const frame& fr);
