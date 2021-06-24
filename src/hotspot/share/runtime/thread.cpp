@@ -2208,7 +2208,7 @@ void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
   st->print(", stack(" PTR_FORMAT "," PTR_FORMAT ")",
             p2i(stack_end()), p2i(stack_base()));
   st->print("]");
-  print_owned_locks_on(st);
+  DEBUG_ONLY(print_owned_locks_on(st);)
 
   ThreadsSMRSupport::print_info_on(this, st);
   return;
