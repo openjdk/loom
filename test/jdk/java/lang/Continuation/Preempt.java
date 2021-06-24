@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -28,14 +28,13 @@
 * @run testng/othervm/timeout=60 -Xint Preempt
 * @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 * @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+* @run testng/othervm -XX:-UseTLAB -Xint Preempt
 */
 
 // * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 
 // TODO:
 // - Add tests for failed preemptions
-// - Add tests for additional safepoint types
-// - Add tests with -XX:-ThreadLocalHandshakes
 
 import java.util.ArrayList;
 import java.util.Arrays;
