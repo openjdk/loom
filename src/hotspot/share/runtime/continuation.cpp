@@ -3214,7 +3214,7 @@ stackChunkOop ContMirror::allocate_stack_chunk(int stack_size, bool is_preempt) 
   assert(is_preempt || _thread == JavaThread::current(), "should be current");
   JavaThread* current = is_preempt ? JavaThread::current() : _thread;
 
-  StackChunkAllocator allocator(klass, size_in_words, stack_size, _thread);
+  StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
     return (stackChunkOop)allocator.initialize(start);
