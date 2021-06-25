@@ -594,7 +594,7 @@ jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
 }
 
 void StackWalk::setContinuation(Handle stackStream, jlong magic, objArrayHandle frames_array, Handle cont, TRAPS) {
-  JavaThread* jt = THREAD->as_Java_thread();
+  JavaThread* jt = JavaThread::cast(THREAD);
 
   if (frames_array.is_null()) {
     THROW_MSG(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL");

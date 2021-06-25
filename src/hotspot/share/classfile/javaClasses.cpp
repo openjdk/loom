@@ -2268,7 +2268,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     }
 
     void do_thread(Thread* th) {
-      JavaThread* thread = th->as_Java_thread();
+      JavaThread* thread = JavaThread::cast(th);
 
       if (!thread->has_last_Java_frame()) {
         return;

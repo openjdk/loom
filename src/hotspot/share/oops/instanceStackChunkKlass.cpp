@@ -997,7 +997,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
   bool check_deopt = false;
   if (Thread::current()->is_Java_thread() && !SafepointSynchronize::is_at_safepoint()) {
-    if (Thread::current()->as_Java_thread()->cont_fastpath_thread_state())
+    if (JavaThread::cast(Thread::current())->cont_fastpath_thread_state())
       check_deopt = true;
   }
 

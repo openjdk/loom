@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ void JfrThreadLocal::on_start(Thread* t) {
   if (JfrRecorder::is_recording()) {
     JfrCheckpointManager::write_checkpoint(t);
     if (t->is_Java_thread()) {
-      send_java_thread_start_event(t->as_Java_thread(), NULL);
+      send_java_thread_start_event(JavaThread::cast(t), NULL);
     }
   }
   if (t->jfr_thread_local()->has_cached_stack_trace()) {
@@ -180,7 +180,7 @@ void JfrThreadLocal::on_exit(Thread* t) {
   JfrThreadLocal * const tl = t->jfr_thread_local();
   assert(!tl->is_dead(), "invariant");
   if (t->is_Java_thread()) {
-    JavaThread* const jt = t->as_Java_thread();
+    JavaThread* const jt = JavaThread::cast(t);
     send_java_thread_end_event(jt, JfrThreadLocal::thread_id(jt));
     JfrThreadCPULoadEvent::send_event_for_thread(jt);
   }
@@ -271,7 +271,7 @@ traceid JfrThreadLocal::thread_id(const Thread* t, bool* is_virtual) {
   if (is_impersonating(t)) {
     return t->jfr_thread_local()->_thread_id_alias;
   }
-  return t->is_Java_thread() ? JfrJavaThread::contextual_thread_id(t->as_Java_thread(), is_virtual) : vm_thread_id(t);
+  return t->is_Java_thread() ? JfrJavaThread::contextual_thread_id(JavaThread::cast(t), is_virtual) : vm_thread_id(t);
 }
 
 traceid JfrThreadLocal::virtual_thread_id(const Thread* t, oop vthread) {

@@ -163,7 +163,7 @@ traceid JfrStackTraceRepository::record(Thread* current_thread, int skip /* 0 */
   }
   assert(frames != NULL, "invariant");
   assert(tl->stackframes() == frames, "invariant");
-  return instance().record(current_thread->as_Java_thread(), skip, frames, tl->stackdepth());
+  return instance().record(JavaThread::cast(current_thread), skip, frames, tl->stackdepth());
 }
 
 traceid JfrStackTraceRepository::record(JavaThread* current_thread, int skip, JfrStackFrame *frames, u4 max_frames) {

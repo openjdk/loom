@@ -27,6 +27,7 @@
  * @summary Test has_previous_versions flag and processing during class unloading.
  * @requires vm.jvmti
  * @requires vm.opt.final.ClassUnloading
+ * @requires vm.flagless
  * @library /test/lib
  * @modules java.base/jdk.internal.misc
  * @modules java.compiler
