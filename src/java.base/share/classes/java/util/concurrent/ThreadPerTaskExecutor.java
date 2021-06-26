@@ -384,7 +384,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             boolean cancelled = super.cancel(mayInterruptIfRunning);
-            if (mayInterruptIfRunning)
+            if (cancelled && mayInterruptIfRunning)
                 thread.interrupt();
             return cancelled;
         }
