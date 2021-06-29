@@ -75,23 +75,11 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
 
     /**
      * Constructs a thread-per-task executor that creates threads using the given
-     * factory. The executor is optionally tracked.
-     */
-    ThreadPerTaskExecutor(ThreadFactory factory, boolean tracked) {
-        this.factory = Objects.requireNonNull(factory);
-        if (tracked) {
-            this.registrationKey = ThreadContainers.registerSharedContainer(this);
-        } else {
-            this.registrationKey = null;
-        }
-    }
-
-    /**
-     * Constructs a thread-per-task executor that creates threads using the given
-     * factory. The executor is tracked.
+     * factory
      */
     ThreadPerTaskExecutor(ThreadFactory factory) {
-        this(factory, true);
+        this.factory = Objects.requireNonNull(factory);
+        this.registrationKey = ThreadContainers.registerSharedContainer(this);
     }
 
     /**
@@ -99,7 +87,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
      * RuntimePermission("modifyThread").
      */
     @SuppressWarnings("removal")
-    void checkPermission() {
+    private void checkPermission() {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(MODIFY_THREAD);
@@ -144,7 +132,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
      * Attempts to shutdown and terminate the executor.
      * If interruptThreads is true then all running threads are interrupted.
      */
-    void tryShutdownAndTerminate(boolean interruptThreads) {
+    private void tryShutdownAndTerminate(boolean interruptThreads) {
         if (STATE.compareAndSet(this, RUNNING, SHUTDOWN))
             tryTerminate();
         if (interruptThreads) {
@@ -208,7 +196,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
     /**
      * Waits for executor to terminate.
      */
-    void awaitTermination() {
+    private void awaitTermination() {
         boolean terminated = isTerminated();
         if (!terminated) {
             tryShutdownAndTerminate(false);
@@ -238,7 +226,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
     /**
      * Creates a thread to run the given task.
      */
-    Thread newThread(Runnable task) {
+    private Thread newThread(Runnable task) {
         Thread thread = factory.newThread(task);
         if (thread == null)
             throw new RejectedExecutionException();

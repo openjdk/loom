@@ -83,8 +83,6 @@ public class ThreadPerTaskExecutorTest {
         return new Object[][] {
             { Executors.newThreadPerTaskExecutor(defaultThreadFactory), },
             { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
-            { Executors.newStructuredThreadExecutor(defaultThreadFactory), },
-            { Executors.newStructuredThreadExecutor(virtualThreadFactory), },
         };
     }
     
