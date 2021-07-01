@@ -57,7 +57,6 @@
 #include "oops/oop.inline.hpp"
 #include "oops/symbol.hpp"
 #include "prims/jvmtiExport.hpp"
-#include "runtime/biasedLocking.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/flags/flagSetting.hpp"
@@ -248,7 +247,7 @@ void print_statistics() {
     os::print_statistics();
   }
 
-  if (PrintLockStatistics || PrintPreciseBiasedLockingStatistics || PrintPreciseRTMLockingStatistics) {
+  if (PrintLockStatistics || PrintPreciseRTMLockingStatistics) {
     OptoRuntime::print_named_counters();
   }
 #ifdef ASSERT
@@ -334,10 +333,6 @@ void print_statistics() {
     Method::print_touched_methods(tty);
   }
 
-  if (PrintBiasedLockingStatistics) {
-    BiasedLocking::print_counters();
-  }
-
   // Native memory tracking data
   if (PrintNMTStatistics) {
     MemTracker::final_report(tty);
@@ -380,13 +375,10 @@ void print_statistics() {
   }
 
 #ifdef COMPILER2
-  if (PrintPreciseBiasedLockingStatistics || PrintPreciseRTMLockingStatistics) {
+  if (PrintPreciseRTMLockingStatistics) {
     OptoRuntime::print_named_counters();
   }
 #endif
-  if (PrintBiasedLockingStatistics) {
-    BiasedLocking::print_counters();
-  }
 
   // Native memory tracking data
   if (PrintNMTStatistics) {

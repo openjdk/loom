@@ -19,6 +19,8 @@ NashornProfile.txt
 **/JTreport/**
 **/JTwork/**
 /src/utils/LogCompilation/target/
+/.project/
+/.settings/
 /src/utils/hsdis/build/
 /test/micro/.idea/
 /test/micro/bench.iml

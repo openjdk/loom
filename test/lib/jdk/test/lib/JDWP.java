@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,19 +19,34 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_GC_G1_SPARSEPRT_INLINE_HPP
-#define SHARE_GC_G1_SPARSEPRT_INLINE_HPP
+package jdk.test.lib;
 
-#include "gc/g1/sparsePRT.hpp"
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-#include "gc/g1/g1CollectedHeap.hpp"
+public class JDWP {
 
-inline bool SparsePRT::contains_card(RegionIdx_t region_id, CardIdx_t card_index) const {
-  return _table->contains_card(region_id, card_index);
+    public record ListenAddress(String transport, String address) {
+    }
+
+    // lazy initialized
+    private static Pattern listenRegexp;
+
+    /**
+     * Parses debuggee output to get listening transport and address.
+     * Returns null if the string specified does not contain required info.
+     */
+    public static ListenAddress parseListenAddress(String debuggeeOutput) {
+        if (listenRegexp == null) {
+            listenRegexp = Pattern.compile("Listening for transport \\b(.+)\\b at address: \\b(.+)\\b");
+        }
+        Matcher m = listenRegexp.matcher(debuggeeOutput);
+        if (m.find()) {
+            return new ListenAddress(m.group(1), m.group(2));
+        }
+        return null;
+    }
+
 }
-
-
-#endif // SHARE_GC_G1_SPARSEPRT_INLINE_HPP

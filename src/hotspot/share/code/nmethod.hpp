@@ -277,17 +277,13 @@ class nmethod : public CompiledMethod {
   volatile uint8_t _is_unloading_state;
 
   // These are used for compiled synchronized native methods to
-  // locate the owner and stack slot for the BasicLock so that we can
-  // properly revoke the bias of the owner if necessary. They are
+  // locate the owner and stack slot for the BasicLock. They are
   // needed because there is no debug information for compiled native
   // wrappers and the oop maps are insufficient to allow
   // frame::retrieve_receiver() to work. Currently they are expected
   // to be byte offsets from the Java stack pointer for maximum code
-  // sharing between platforms. Note that currently biased locking
-  // will never cause Class instances to be biased but this code
-  // handles the static synchronized case as well.
-  // JVMTI's GetLocalInstance() also uses these offsets to find the receiver
-  // for non-static native wrapper frames.
+  // sharing between platforms. JVMTI's GetLocalInstance() uses these
+  // offsets to find the receiver for non-static native wrapper frames.
   ByteSize _native_receiver_sp_offset;
   ByteSize _native_basic_lock_sp_offset;
 
@@ -747,7 +743,7 @@ public:
   // is it ok to patch at address?
   bool is_patchable_at(address instr_address);
 
-  // UseBiasedLocking support
+  // JVMTI's GetLocalInstance() support
   ByteSize native_receiver_sp_offset() {
     return _native_receiver_sp_offset;
   }
