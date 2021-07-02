@@ -51,14 +51,14 @@ public class GetOwnedMonitorStackDepthInfoTest {
 
 
     public static void main(String[] args) throws Exception {
-
-        new GetOwnedMonitorStackDepthInfoTest().runTest();
-
+        new GetOwnedMonitorStackDepthInfoTest().runTest(true);
+        new GetOwnedMonitorStackDepthInfoTest().runTest(false);
     }
 
-    public void runTest() throws Exception {
+    public void runTest(boolean isVirtual) throws Exception {
+        var threadFactory = isVirtual ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
         final Object lock1 = new Lock1();
-        Thread t1 = new Thread(() -> {
+        Thread t1 = threadFactory.newThread(() -> {
             synchronized (lock1) {
                 System.out.println("Thread in sync section 1: "
                         + Thread.currentThread().getName());
@@ -97,4 +97,3 @@ public class GetOwnedMonitorStackDepthInfoTest {
 
     }
 }
-
