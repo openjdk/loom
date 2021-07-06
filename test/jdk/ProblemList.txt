@@ -880,3 +880,6 @@ java/awt/AppContext/ApplicationThreadsStop/ApplicationThreadsStop.java 8264674 g
 sun/awt/AppContext/8012933/Test8012933.java                            8264674 generic-all
 javax/swing/plaf/metal/MetalUtils/bug6190373.java                      8264674 generic-all
 javax/swing/system/6799345/TestShutdown.java                           8264674 generic-all
+
+#Test times out intermitently in JDK, need to re-check in loom, probably need even more time
+java/foreign/TestUpcall.java                                           8269281 generic-all
