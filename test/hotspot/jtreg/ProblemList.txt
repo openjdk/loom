@@ -175,6 +175,9 @@ compiler/whitebox/ForceNMethodSweepTest.java                                  82
 runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
 runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
 
+runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
+runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
+
 serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
 serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
