@@ -6225,9 +6225,8 @@ RuntimeStub* generate_cont_doYield() {
 
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
 
-      // Reinitialize the ptrue predicate register, in case the external runtime
-      // call clobbers ptrue reg, as we may return to SVE compiled code.
-      __ reinitialize_ptrue();
+      // Reinitialize the ptrue predicate register, in case the external runtime call clobbers ptrue reg, as we may return to SVE compiled code.
+      // __ reinitialize_ptrue();
 
       // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
 
@@ -6235,7 +6234,6 @@ RuntimeStub* generate_cont_doYield() {
       __ mov(r0, r19); // restore return value contaning the exception oop
       __ verify_oop(r0);
 
-      // __ stop("EEE 1");
       __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
       __ br(r1); // the exception handler
     }

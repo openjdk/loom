@@ -1281,12 +1281,12 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
       __ mov(rscratch2, r0); // the exception handler
       __ mov(r0, r19); // restore return value contaning the exception oop
+
+      continuation_enter_cleanup(masm);
+      __ mov(sp, rfp);
       __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
       __ br(rscratch2); // the exception handler
   }
-
-  continuation_enter_cleanup(masm);
-  __ stop("not implemented");
 
   CodeBuffer* cbuf = masm->code_section()->outer();
   address stub = CompiledStaticCall::emit_to_interp_stub(*cbuf, mark);
