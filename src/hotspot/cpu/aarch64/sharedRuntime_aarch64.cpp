@@ -1237,12 +1237,12 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
-  OopMap* map = continuation_enter_setup(masm, stack_slots);  // kills rax
+  OopMap* map = continuation_enter_setup(masm, stack_slots);
 
   // Frame is now completed as far as size and linkage.
   frame_complete =__ pc() - start;
 
-  fill_continuation_entry(masm); // kills rax
+  fill_continuation_entry(masm);
 
   __ cmp(c_rarg2, (u1)0);
   __ br(Assembler::NE, call_thaw);
@@ -1271,7 +1271,6 @@ static void gen_continuation_enter(MacroAssembler* masm,
   /// exception handling
 
   exception_offset = __ pc() - start;
-
   {
       __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
       __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
@@ -1279,13 +1278,14 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
       // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
 
-      __ mov(rscratch2, r0); // the exception handler
+      __ mov(r1, r0); // the exception handler
       __ mov(r0, r19); // restore return value contaning the exception oop
+      __ verify_oop(r0);
 
       continuation_enter_cleanup(masm);
       __ mov(sp, rfp);
       __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
-      __ br(rscratch2); // the exception handler
+      __ br(r1); // the exception handler
   }
 
   CodeBuffer* cbuf = masm->code_section()->outer();

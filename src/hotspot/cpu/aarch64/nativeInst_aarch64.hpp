@@ -701,6 +701,7 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
+    assert (instr != NULL, "");
     return ((*instr) & 0xFF) == 0xd4 && 
       ((*(instr+1)) & 0xFF) == 0x20 &&
       ((*(instr+2)) & 0xFF) == 0x00 &&
