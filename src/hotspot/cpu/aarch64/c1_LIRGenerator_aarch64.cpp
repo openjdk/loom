@@ -361,7 +361,12 @@ void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
   // signature.append(T_INT);
   CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
 
-  // TODO LOOM AARCH64
+  const LIR_Opr result_reg = result_register_for(x->type());
+  address entry = StubRoutines::cont_doYield();
+  LIR_Opr result = rlock_result(x);
+  CodeEmitInfo* info = state_for(x, x->state());
+  __ call_runtime(entry, LIR_OprFact::illegalOpr, result_reg, cc->args(), info);
+  __ move(result_reg, result);
 }
 
 void LIRGenerator::do_NegateOp(NegateOp* x) {
