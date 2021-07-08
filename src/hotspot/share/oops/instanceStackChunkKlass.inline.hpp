@@ -627,7 +627,7 @@ template <typename RegisterMapT>
 inline void* StackChunkFrameStream<mixed>::reg_to_loc(VMReg reg, const RegisterMapT* map) const {
   assert (!is_done(), "");
   return reg->is_reg() ? (void*)map->location(reg, sp()) // see frame::update_map_with_saved_link(&map, link_addr);
-                        : (void*)((address)unextended_sp() + (reg->reg2stack() * VMRegImpl::stack_slot_size));
+                       : (void*)((address)unextended_sp() + (reg->reg2stack() * VMRegImpl::stack_slot_size));
 }
 
 template<>
