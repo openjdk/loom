@@ -353,6 +353,8 @@ class StubGenerator: public StubCodeGenerator {
     }
 #endif
 
+    __ pop_cont_fastpath(rthread);
+
     // restore callee-save registers
     __ ldpd(v15, v14,  d15_save);
     __ ldpd(v13, v12,  d13_save);
