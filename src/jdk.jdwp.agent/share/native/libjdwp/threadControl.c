@@ -1579,9 +1579,9 @@ threadControl_suspendCount(jthread thread, jint *count)
         node = findThread(&runningVThreads, thread);
     } else {
         node = findThread(&runningThreads, thread);
-        if (node == NULL) {
-            node = findThread(&otherThreads, thread);
-        }
+    }
+    if (node == NULL) {
+        node = findThread(&otherThreads, thread);
     }
 
     error = JVMTI_ERROR_NONE;
@@ -1592,8 +1592,22 @@ threadControl_suspendCount(jthread thread, jint *count)
          * If the node is in neither list, the debugger never suspended
          * this thread, so the suspend count is 0.
          */
-        // vthread fixme: use suspendAllCount if vthread has started
+      if (is_vthread) {
+          jint vthread_state = 0;
+          jvmtiError error = threadState(thread, &vthread_state);
+          if (error != JVMTI_ERROR_NONE) {
+              EXIT_ERROR(error, "getting thread state");
+          }
+          if (vthread_state == 0) {
+              // If state == 0, then this is a new vthread that has not been started yet.
+              *count = 0;
+          } else {
+              // This is a started vthread that we are not tracking. Use suspendAllCount.
+              *count = suspendAllCount;
+          }
+      } else {
         *count = 0;
+      }
     }
 
     debugMonitorExit(threadLock);
