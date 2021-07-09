@@ -65,6 +65,15 @@ sun/util/resources/cldr/TimeZoneNamesTest.java                                  
 # Failed because of known bug but reproduced only in loom-tier3 with wrapper only now
 java/lang/invoke/MethodHandles/CatchExceptionTest.java                                          8146623 generic-all
 
+####
+## Tests failing because of issues with testng import in jtreg with wrapper.
+java/foreign/handles/Driver.java
+java/lang/ModuleTests/addXXX/Driver.java
+java/lang/invoke/MethodHandles/privateLookupIn/Driver.java
+java/lang/invoke/modules/Driver.java
+java/lang/invoke/modules/Driver1.java
+
+
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
 #
