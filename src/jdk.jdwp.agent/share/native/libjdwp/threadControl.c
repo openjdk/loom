@@ -1762,6 +1762,29 @@ resumeHelper(JNIEnv *env, ThreadNode *node, void *ignored)
     return resumeThreadByNode(node);
 }
 
+static jvmtiError
+excludeCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    JDI_ASSERT(node->is_vthread);
+    if (node->suspendCount > 0) {
+        jint *counter = (jint *)arg;
+        (*counter)++;
+    }
+    return JVMTI_ERROR_NONE;
+}
+
+static jvmtiError
+excludeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    JDI_ASSERT(node->is_vthread);
+    if (node->suspendCount > 0) {
+        jthread **listPtr = (jthread **)arg;
+        **listPtr = node->thread;
+        (*listPtr)++;
+    }
+    return JVMTI_ERROR_NONE;
+}
+
 jvmtiError
 threadControl_resumeAll(void)
 {
@@ -1780,9 +1803,31 @@ threadControl_resumeAll(void)
 
     if (gdata->vthreadsSupported) {
         if (suspendAllCount == 1) {
-            /* Tell JVMTI to resume all virtual threads. */
+            jint excludeCnt = 0;
+            jthread *excludeList = NULL;
+            /*
+             * Tell JVMTI to resume all virtual threads except for those we
+             * are tracking separately. The commonResumeList() call below will
+             * resume any vthread with a suspendCount == 1, and we want to ignore
+             * vthreads with a suspendCount > 0. Therefor we don't want
+             * ResumeAllVirtualThreads resuming these vthreads. We must first
+             * build a list of them to pass to as the exclude list.
+             */
+            enumerateOverThreadList(env, &runningVThreads, excludeCountHelper,
+                                    &excludeCnt);
+            if (excludeCnt > 0) {
+                excludeList = newArray(excludeCnt, sizeof(jthread));
+                if (excludeList == NULL) {
+                    EXIT_ERROR(AGENT_ERROR_OUT_OF_MEMORY,"exclude list");
+                }
+                {
+                    jthread *excludeListPtr = excludeList;
+                    enumerateOverThreadList(env, &runningVThreads, excludeCopyHelper,
+                                            &excludeListPtr);
+                }
+            }
             error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
-                    (gdata->jvmti, 0, NULL);
+                    (gdata->jvmti, excludeCnt, excludeList);
             if (error != JVMTI_ERROR_NONE) {
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }
