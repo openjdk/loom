@@ -1591,7 +1591,6 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
     }
     java_thread->clear_thread_suspended();
   }
-  assert(java_thread != current, "sanity check");
   assert(!java_thread->is_in_VTMT(), "sanity check");
   if (is_virtual || thread_h() == java_thread->vthread()) {
     assert(single_suspend || is_virtual, "ResumeAllVirtualThreads should never resume non-virtual threads");
