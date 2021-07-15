@@ -2338,6 +2338,10 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
          * to precede thread start for some VM implementations.
          */
         if (evinfo->is_vthread) {
+          /* fiber fixme: don't add the vthread if this is an EI_THREAD_START or
+             EI_THREAD_EXIT event. Otherwise we end up adding every vthread. This
+             is an issue when notifyVThreads is true, which is the default.
+          */
             node = insertThread(env, &runningVThreads, thread);
         } else {
             node = insertThread(env, &runningThreads, thread);
