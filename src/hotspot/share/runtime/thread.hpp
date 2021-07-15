@@ -809,8 +809,8 @@ class JavaThread: public Thread {
     //       when the sign-bit is used, and sometimes incorrectly - see CR 6398077
     _has_async_exception    = 0x00000001U, // there is a pending async exception
     _trace_flag             = 0x00000004U, // call tracing backend
-    _obj_deopt              = 0x00000008U,  // suspend for object reallocation and relocking for JVMTI agent
-    _cthread_pending_suspend = 0x00000010U // carrier thread is suspended while vthread is mounted
+    _obj_deopt              = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
+    _thread_suspended       = 0x00000010U  // non-virtual thread is externally suspended
   };
 
   // various suspension related flags - atomically updated
@@ -933,6 +933,8 @@ class JavaThread: public Thread {
                                                          // never locked) when throwing an exception. Used by interpreter only.
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
+  bool                  _hide_over_cont_yield;   // thread is in a mode to hide activity around Continuation.yield
+                                                 // from JVMTI (set at unmount and cleared at mount)
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -1219,17 +1221,23 @@ private:
   // current thread, i.e. reverts optimizations based on escape analysis.
   void wait_for_object_deoptimization();
 
-  inline void set_cthread_pending_suspend();
-  inline void clear_cthread_pending_suspend();
+  inline void set_thread_suspended();
+  inline void clear_thread_suspended();
  
-  bool is_cthread_pending_suspend() const {
-    return (_suspend_flags & _cthread_pending_suspend) != 0;
+  bool is_thread_suspended() const {
+    return (_suspend_flags & _thread_suspended) != 0;
   }
  
-  bool is_in_VTMT() const                        { return _is_in_VTMT; }
-  void set_is_in_VTMT(bool val)                  { _is_in_VTMT = val; }
   bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
-  void set_is_VTMT_disabler(bool val)            { _is_VTMT_disabler = val; }
+  bool is_in_VTMT() const                        { return _is_in_VTMT; }
+  bool hide_over_cont_yield() const              { return _hide_over_cont_yield; }
+  bool disable_jvmti_events() const {
+    return is_in_VTMT() || hide_over_cont_yield();
+  }
+
+  void set_is_in_VTMT(bool val);
+  void set_is_VTMT_disabler(bool val);
+  void set_hide_over_cont_yield(bool val)        { _hide_over_cont_yield = val; }
 
   bool is_cont_force_yield() { return cont_preempt(); }
 

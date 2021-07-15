@@ -1009,6 +1009,7 @@ JavaThread::JavaThread() :
   _do_not_unlock_if_synchronized(false),
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
+  _hide_over_cont_yield(false),
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1760,6 +1761,17 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   this->interrupt();
 }
 
+void JavaThread::set_is_in_VTMT(bool val) {
+  _is_in_VTMT = val;
+  if (val) {
+    assert(JvmtiVTMTDisabler::VTMT_disable_count() == 0, "must be 0");
+  }
+}
+
+void JavaThread::set_is_VTMT_disabler(bool val) {
+  _is_VTMT_disabler = val;
+  assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
+}
 
 // External suspension mechanism.
 //
@@ -1768,8 +1780,9 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
-  // A JavaThread disabling VTMT can't be suspended without deadlock.
-  assert(!is_VTMT_disabler(), "sanity check");
+  // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
+  assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
+  assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {

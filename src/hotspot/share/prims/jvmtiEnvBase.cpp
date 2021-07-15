@@ -610,9 +610,9 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 }
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame* jvf) {
   // The second condition is needed to hide notification methods. 
-  if (!is_in_VTMT && !jvf->method()->jvmti_mount_transition()) {
+  if (!disable_jvmti_events && !jvf->method()->jvmti_mount_transition()) {
     return jvf; // no frames to skip
   }
   javaVFrame* jvf_saved = jvf;
@@ -636,7 +636,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
+  jvf = check_and_skip_hidden_frames(jt->disable_jvmti_events(), jvf);
   return jvf;
 }
 
@@ -646,7 +646,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   if (state == NULL) {
     return jvf; // nothing to skip
   }
-  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
+  jvf = check_and_skip_hidden_frames(state->hide_over_cont_yield(), jvf);
   return jvf;
 }
 
@@ -707,14 +707,10 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
     // We have a JavaThread* so add more state bits.
     JavaThreadState jts = jt->thread_state();
 
-    if (jt->is_cthread_pending_suspend()) {
-      // Suspended carrier thread with a mounted virtual thread.
+    if (jt->is_thread_suspended() ||
+        (jt->vthread() == thread_oop && jt->is_suspended())) {
+      // Suspended non-virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
-    }
-    if (jt->is_suspended()) {
-      if (jt->vthread() == NULL || jt->vthread() == thread_oop) {
-        state |= JVMTI_THREAD_STATE_SUSPENDED;
-      }
     }
     if (jts == _thread_in_native) {
       state |= JVMTI_THREAD_STATE_IN_NATIVE;
@@ -730,7 +726,7 @@ jint
 JvmtiEnvBase::get_vthread_state(oop thread_oop) {
   jshort vt_state = java_lang_VirtualThread::state(thread_oop);
   jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vt_state);
-  bool ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
+  bool ext_suspended = JvmtiVTSuspender::is_vthread_suspended(thread_oop);
 
   if (ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
     state &= ~java_lang_VirtualThread::RUNNING;
@@ -1490,16 +1486,20 @@ JvmtiEnvBase::is_in_thread_list(jint count, const jthread* list, oop jt_oop) {
 jvmtiError
 JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                              int* need_safepoint_p) {
-  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+  JavaThread* current = JavaThread::current();
+  HandleMark hm(current);
+  Handle thread_h(current, thread_oop);
+  bool is_virtual = java_lang_VirtualThread::is_instance(thread_h());
+
+  if (is_virtual) {
     if (single_suspend) {
-      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
-      if (vthread_ext_suspended) {
+      if (JvmtiVTSuspender::is_vthread_suspended(thread_h())) {
         return JVMTI_ERROR_THREAD_SUSPENDED;
       }
-      JvmtiVTSuspender::register_vthread_suspend(thread_oop);
+      JvmtiVTSuspender::register_vthread_suspend(thread_h());
       // Check if virtual thread is mounted and there is a java_thread.
       // A non-NULL java_thread is always passed in the !single_suspend case.
-      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
+      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_h());
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
     // The java_thread can be still blocked in VTMT transition after a previous JVMTI resume call.
@@ -1516,52 +1516,62 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
-  {
-    oop mounted_vt = java_thread->vthread();
-
-    if (single_suspend && !java_lang_VirtualThread::is_instance(thread_oop) &&
-        mounted_vt != thread_oop) {
-      // A case of a carrier thread executing a mounted virtual thread.
-      assert(java_lang_VirtualThread::is_instance(mounted_vt), "sanity check");
-      if (java_thread->is_cthread_pending_suspend()) {
-        return JVMTI_ERROR_THREAD_SUSPENDED;
-      }
-      java_thread->set_cthread_pending_suspend();
-      return JVMTI_ERROR_NONE;
-    }
-    if (java_thread->is_suspended()) {
+  // A case of non-virtual thread.
+  if (!is_virtual) {
+    // Thread.suspend() is used in some tests. It sets jt->is_suspended() only.
+    if (java_thread->is_thread_suspended() ||
+        (thread_h() == java_thread->vthread() && java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }
+    java_thread->set_thread_suspended();
   }
-  assert(java_thread != JavaThread::current(), "sanity check");
-  if (!JvmtiSuspendControl::suspend(java_thread)) {
-    // Either the thread is already suspended or
-    // it was in the process of exiting.
-    if (java_thread->is_exiting()) { // thread is in the process of exiting
-      return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
+  assert(!java_thread->is_in_VTMT(), "sanity check");
+
+  if (java_thread == current) {
+    assert(single_suspend, "sanity check");
+    // java_thread will be suspended in the ~JvmtiVTMTDisabler.
+    return JVMTI_ERROR_NONE;
+  }
+  assert((!is_virtual && java_thread->is_thread_suspended()) ||
+          (is_virtual && JvmtiVTSuspender::is_vthread_suspended(thread_h())),
+         "sanity check");
+
+  if (is_virtual || thread_h() == java_thread->vthread()) {
+    assert(single_suspend || is_virtual, "SuspendAllVirtualThreads should never suspend non-virtual threads");
+    // Case of mounted virtual or attached carrier thread.
+    if (!JvmtiSuspendControl::suspend(java_thread)) {
+      // Thread is already suspended or in process of exiting.
+      if (java_thread->is_exiting()) {
+        // The thread was in the process of exiting.
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
     }
-    return JVMTI_ERROR_THREAD_SUSPENDED;
   }
   return JVMTI_ERROR_NONE;
 }
 
 jvmtiError
 JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend) {
-  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+  JavaThread* current = JavaThread::current();
+  HandleMark hm(current);
+  Handle thread_h(current, thread_oop);
+  bool is_virtual = java_lang_VirtualThread::is_instance(thread_h());
+
+  if (is_virtual) {
     if (single_suspend) {
-      bool vthread_ext_suspended = JvmtiVTSuspender::vthread_is_ext_suspended(thread_oop);
-      if (!vthread_ext_suspended) {
+      if (!JvmtiVTSuspender::is_vthread_suspended(thread_h())) {
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
       }
-      JvmtiVTSuspender::register_vthread_resume(thread_oop);
+      JvmtiVTSuspender::register_vthread_resume(thread_h());
       // Check if virtual thread is mounted and there is a java_thread.
       // A non-NULL java_thread is always passed in the !single_suspend case.
-      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
+      oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_h());
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
     // The java_thread can be still blocked in VTMT transition after a previous JVMTI suspend call.
     // There is no need to resume the java_thread in this case. After vthread unblocking,
-    // it will check for ext_suspend request and remain resumed if necessary.
+    // it will check for is_vthread_suspended request and remain resumed if necessary.
     if (java_thread == NULL || !java_thread->is_suspended()) {
       // We are done if the virtual thread is unmounted or
       // the java_thread is not externally suspended.
@@ -1573,17 +1583,23 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
-  // A case of a carrier thread executing a mounted virtual thread.
-  if (java_thread->is_cthread_pending_suspend() &&
-      !java_lang_VirtualThread::is_instance(thread_oop)) {
-    java_thread->clear_cthread_pending_suspend();
-    return JVMTI_ERROR_NONE;
+  // A case of a non-virtual thread.
+  if (!is_virtual) {
+    if (!java_thread->is_thread_suspended() &&
+        (thread_h() == java_thread->vthread() && !java_thread->is_suspended())) {
+      return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
+    }
+    java_thread->clear_thread_suspended();
   }
-  if (!java_thread->is_suspended()) {
-    return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
-  }
-  if (!JvmtiSuspendControl::resume(java_thread)) {
-    return JVMTI_ERROR_INTERNAL;
+  assert(java_thread != current, "sanity check");
+  assert(!java_thread->is_in_VTMT(), "sanity check");
+  if (is_virtual || thread_h() == java_thread->vthread()) {
+    assert(single_suspend || is_virtual, "ResumeAllVirtualThreads should never resume non-virtual threads");
+    if (java_thread->is_suspended()) {
+      if (!JvmtiSuspendControl::resume(java_thread)) {
+        return JVMTI_ERROR_INTERNAL;
+      }
+    }
   }
   return JVMTI_ERROR_NONE;
 }

@@ -122,11 +122,11 @@ inline void JavaThread::clear_obj_deopt_flag() {
   clear_suspend_flag(_obj_deopt);
 }
 
-inline void JavaThread::set_cthread_pending_suspend() {
-  set_suspend_flag(_cthread_pending_suspend);
+inline void JavaThread::set_thread_suspended() {
+  set_suspend_flag(_thread_suspended);
 }
-inline void JavaThread::clear_cthread_pending_suspend() {
-  clear_suspend_flag(_cthread_pending_suspend);
+inline void JavaThread::clear_thread_suspended() {
+  clear_suspend_flag(_thread_suspended);
 }
 
 inline void JavaThread::set_pending_async_exception(oop e) {

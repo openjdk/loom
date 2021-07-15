@@ -1735,14 +1735,17 @@ int early_return(int res, JavaThread* thread) {
 
 static void JVMTI_yield_VTMT_cleanup(JavaThread* thread) {
 #if INCLUDE_JVMTI
-  // this is to hide JVMTI events when in VTMT transition
+  // this is to hide JVMTI events when in VTMT or over continuation yield transitions
   oop vt_oop = thread->vthread();
   JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
   assert(state == NULL || !state->is_in_VTMT(), "VTMT sanity check");
+  assert(state == NULL || !state->hide_over_cont_yield(), "VTMT sanity check");
   if (state != NULL && state->is_virtual()) {
     state->set_is_in_VTMT(thread->is_in_VTMT());
+    state->set_hide_over_cont_yield(thread->hide_over_cont_yield());
   }
   thread->set_is_in_VTMT(false);
+  thread->set_hide_over_cont_yield(false);
 #endif // INCLUDE_JVMTI
 }
 
@@ -2767,13 +2770,16 @@ public:
 
   static void JVMTI_continue_cleanup(JavaThread* thread) {
   #if INCLUDE_JVMTI
-    // this is to hide JVMTI events when in VTMT transition
+    // this is to hide JVMTI events when in VTMT or over continuation yield transitions
     oop vt_oop = thread->vthread();
     JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    assert(!thread->hide_over_cont_yield(), "VTMT sanity check");
     if (state != NULL && state->is_virtual()) {
       thread->set_is_in_VTMT(state->is_in_VTMT());
       state->set_is_in_VTMT(false);
+      thread->set_hide_over_cont_yield(state->hide_over_cont_yield());
+      // state->set_hide_over_cont_yield(false);
     }
     invalidate_JVMTI_stack(thread);
   #endif // INCLUDE_JVMTI

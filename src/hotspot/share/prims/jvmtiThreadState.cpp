@@ -81,6 +81,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   _jvmti_event_queue = NULL;
   _is_in_VTMT = false;
+  _hide_over_cont_yield = false;
   _is_virtual = false;
 
   _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
@@ -235,6 +236,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
   while (_VTMT_count > 0) {
     ml.wait();
   }
+  assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
   thread->set_is_VTMT_disabler(true);
 }
 
@@ -256,16 +258,26 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
 
-  ThreadBlockInVM tbivm(thread);
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  // Do not allow suspends inside VTMT transitions.
+  // Block while transitions are disabled or there are suspend requests.
+  while (true) {
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  // block while transitions are disabled
-  while (_VTMT_disable_count > 0 ||
-         JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
-    ml.wait();
+    // block while transitions are disabled or there are suspend requests
+    if (_VTMT_disable_count > 0 ||
+        thread->is_suspended() ||
+        thread->is_thread_suspended() ||
+        JvmtiVTSuspender::is_vthread_suspended(vth())
+    ) {
+      ml.wait(10);
+      continue; // ~ThreadBlockInVM has handshake-based suspend point
+    }
+    assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    thread->set_is_in_VTMT(true);
+    _VTMT_count++;
+    break;
   }
-  _VTMT_count++;
-  thread->set_is_in_VTMT(true);
 }
 
 void
@@ -280,14 +292,8 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
     if (_VTMT_disable_count > 0) {
       ml.notify_all();
     }
+    assert(thread->is_in_VTMT(), "sanity check");
     thread->set_is_in_VTMT(false);
-  }
-  if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
-    if (thread->is_cthread_pending_suspend()) {
-      thread->clear_cthread_pending_suspend();
-      // TBD: Need sync here.
-      JvmtiSuspendControl::suspend(thread);
-    }
   }
 }
 
@@ -410,7 +416,7 @@ JvmtiVTSuspender::register_vthread_resume(oop vt) {
 }
 
 bool
-JvmtiVTSuspender::vthread_is_ext_suspended(oop vt) {
+JvmtiVTSuspender::is_vthread_suspended(oop vt) {
   bool suspend_is_needed =
    (_vthread_suspend_mode == vthread_suspend_all && !_vthread_resume_list->contains(vt)) ||
    (_vthread_suspend_mode == vthread_suspend_ind && _vthread_suspend_list->contains(vt));

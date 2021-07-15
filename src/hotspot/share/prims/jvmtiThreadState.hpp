@@ -96,6 +96,8 @@ class JvmtiVTMTDisabler {
   void set_self_suspend() { _self_suspend = true; }
   static void start_VTMT(jthread vthread, int callsite_tag);
   static void finish_VTMT(jthread vthread, int callsite_tag);
+  static int  VTMT_disable_count() { return _VTMT_disable_count; };
+  static int  VTMT_count() { return _VTMT_count; }
 };
 
 ///////////////////////////////////////////////////////////////
@@ -138,7 +140,7 @@ class JvmtiVTSuspender {
   static void register_all_vthreads_resume();
   static bool register_vthread_suspend(oop vt);
   static bool register_vthread_resume(oop vt);
-  static bool vthread_is_ext_suspended(oop vt);
+  static bool is_vthread_suspended(oop vt);
 };
 
 ///////////////////////////////////////////////////////////////
@@ -155,7 +157,8 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
-  bool              _is_in_VTMT; // saved at unmound to restore at mount
+  bool              _is_in_VTMT; // saved JavaThread.is_in_VTMT()
+  bool              _hide_over_cont_yield; // saved JavaThread.hide_over_cont_yield()
   bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
   bool              _pending_step_for_popframe;
@@ -266,9 +269,12 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void set_thread(JavaThread* thread);
   oop get_thread_oop();
 
-  // The java_thread.is_in_VTMT() value is saved at unmount to restore at mount.
-  inline void set_is_in_VTMT(bool val) { _is_in_VTMT = val; }
+  // The JavaThread is_in_VTMT() and hide_over_cont_yield() bits
+  // saved at unmount to restore at mount.
   inline bool is_in_VTMT() { return _is_in_VTMT; }
+  inline bool hide_over_cont_yield() { return _hide_over_cont_yield; }
+  inline void set_is_in_VTMT(bool val) { _is_in_VTMT = val; }
+  inline void set_hide_over_cont_yield(bool val) { _hide_over_cont_yield = val; }
   inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }
