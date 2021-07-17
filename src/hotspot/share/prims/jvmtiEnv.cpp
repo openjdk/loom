@@ -1059,7 +1059,6 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
           elist->append(except_list[idx]);
       }
     }
-    JvmtiVTSuspender::register_all_vthreads_suspend();
 
     for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
       oop jt_oop = java_thread->threadObj();
@@ -1080,6 +1079,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
                        NULL);
       }
     }
+    JvmtiVTSuspender::register_all_vthreads_suspend();
 
     // Restore resumed state for threads from except list that were resumed before.
     for (int idx = 0; idx < elist->length(); idx++) {

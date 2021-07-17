@@ -2779,7 +2779,7 @@ public:
       thread->set_is_in_VTMT(state->is_in_VTMT());
       state->set_is_in_VTMT(false);
       thread->set_hide_over_cont_yield(state->hide_over_cont_yield());
-      // state->set_hide_over_cont_yield(false);
+      state->set_hide_over_cont_yield(false);
     }
     invalidate_JVMTI_stack(thread);
   #endif // INCLUDE_JVMTI
