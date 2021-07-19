@@ -6280,11 +6280,15 @@ RuntimeStub* generate_cont_doYield() {
       // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
       // see InterpreterMacroAssembler::restore_bcp/restore_locals
 
-      __ mov(rfp, sp);
-      __ leave();
+      assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
+      __ leave(); // we're now on last thawed frame
 
       __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize));
       __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize));
+
+      // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
+      __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+      __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
 
       __ ret(lr);
 

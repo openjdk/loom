@@ -409,7 +409,7 @@ inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
 template <typename ConfigT>
 intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   address pc = StubRoutines::cont_interpreter_forced_preempt_return();
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  intptr_t* fp = sp - frame::sender_sp_offset;
 
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
 

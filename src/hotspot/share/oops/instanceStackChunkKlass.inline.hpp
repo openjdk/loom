@@ -732,8 +732,9 @@ inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClo
     
     intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), map);
     intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), map); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
-    assert (is_in_frame(base_loc), "");
-    assert (is_in_frame(derived_loc), "");
+
+    assert ((_has_stub && _index == 1) || is_in_frame(base_loc), "");
+    assert ((_has_stub && _index == 1) || is_in_frame(derived_loc), "");
     assert (derived_loc != base_loc, "Base and derived in same location");
     assert (is_in_oops(base_loc, map), "not found: " INTPTR_FORMAT, p2i(base_loc));
     assert (!is_in_oops(derived_loc, map), "found: " INTPTR_FORMAT, p2i(derived_loc));
