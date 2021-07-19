@@ -254,6 +254,10 @@ public:
   virtual void do_oop(narrowOop* p) {
     ShouldNotReachHere();
   }
+
+  virtual void do_nmethod(nmethod* nm) {
+    nm->run_nmethod_entry_barrier();
+  }
 };
 
 void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {

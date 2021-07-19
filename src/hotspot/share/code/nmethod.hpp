@@ -31,6 +31,7 @@ class DepChange;
 class DirectiveSet;
 class DebugInformationRecorder;
 class JvmtiThreadState;
+class OopIterateClosure;
 
 // nmethods (native methods) are the compiled code versions of Java methods.
 //
@@ -607,6 +608,9 @@ public:
   // All-in-one claiming of nmethods: returns true if the caller successfully claimed that
   // nmethod.
   bool oops_do_try_claim();
+
+  // Loom support for following nmethods on the stack
+  void follow_nmethod(OopIterateClosure* cl);
 
   // Class containing callbacks for the oops_do_process_weak/strong() methods
   // below.

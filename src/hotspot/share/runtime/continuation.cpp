@@ -2639,7 +2639,7 @@ public:
 
     bottom ? patch<Compiled, true>(f, caller) : patch<Compiled, false>(f, caller);
 
-    if (f.cb()->is_nmethod() && BarrierSet::barrier_set()->barrier_set_nmethod()->is_armed(f.cb()->as_nmethod())) {
+    if (f.cb()->is_nmethod()) {
       f.cb()->as_nmethod()->run_nmethod_entry_barrier();
     }
 

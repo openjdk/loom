@@ -740,6 +740,8 @@ public:
 
   void do_oop(oop* p)       { do_oop_work(p); }
   void do_oop(narrowOop* p) { do_oop_work(p); }
+  void do_method(Method* m) {}
+  void do_nmethod(nmethod* nm) {}
 };
 
 class ShenandoahAdjustPointersObjectClosure : public ObjectClosure {

@@ -103,6 +103,8 @@ class OopIterateClosure : public OopClosure {
   virtual bool do_metadata() = 0;
   virtual void do_klass(Klass* k) = 0;
   virtual void do_cld(ClassLoaderData* cld) = 0;
+  virtual void do_method(Method* m) = 0;
+  virtual void do_nmethod(nmethod* nm) = 0;
 };
 
 // An OopIterateClosure that can be used when there's no need to visit the Metadata.
@@ -113,6 +115,8 @@ public:
   virtual bool do_metadata() { return false; }
   virtual void do_klass(Klass* k) { ShouldNotReachHere(); }
   virtual void do_cld(ClassLoaderData* cld) { ShouldNotReachHere(); }
+  virtual void do_method(Method* m) { ShouldNotReachHere(); }
+  virtual void do_nmethod(nmethod* nm) { ShouldNotReachHere(); }
 };
 
 enum class derived_pointer : intptr_t;
@@ -169,6 +173,8 @@ class ClaimMetadataVisitingOopIterateClosure : public OopIterateClosure {
   virtual bool do_metadata() { return true; }
   virtual void do_klass(Klass* k);
   virtual void do_cld(ClassLoaderData* cld);
+  virtual void do_method(Method* m);
+  virtual void do_nmethod(nmethod* nm);
 };
 
 // The base class for all concurrent marking closures,

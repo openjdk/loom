@@ -403,11 +403,16 @@ public:
 
     // if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
 
-    CodeBlob* cb = f.cb();
     if (Devirtualizer::do_metadata(_closure)) {
-      // The nmethod entry barrier takes care of having the right synchronization
-      // when keeping the nmethod alive during concurrent execution.
-      InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed<mixed>(f);
+      if (f.is_interpreted()) {
+        Method* im = f.to_frame().interpreter_frame_method();
+        _closure->do_method(im);
+      } else if (f.is_compiled()) {
+        nmethod* nm = f.cb()->as_nmethod();
+        // The do_nmethod function takes care of having the right synchronization
+        // when keeping the nmethod alive during concurrent execution.
+        _closure->do_nmethod(nm);
+      }
     }
 
     if (_do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
@@ -481,16 +486,30 @@ template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackCh
 template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<true> (stackChunkOop chunk, OopIterateClosure* closure);
 
 class MarkMethodsStackClosure {
+  OopIterateClosure* _closure;
+
 public:
+  MarkMethodsStackClosure(OopIterateClosure* cl)
+    : _closure(cl)
+  { }
+
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-    InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed<mixed>(f);
+    if (f.is_interpreted()) {
+      Method* im = f.to_frame().interpreter_frame_method();
+      _closure->do_method(im);
+    } else if (f.is_compiled()) {
+      nmethod* nm = f.cb()->as_nmethod();
+      // The do_nmethod function takes care of having the right synchronization
+      // when keeping the nmethod alive during concurrent execution.
+      _closure->do_nmethod(nm);
+    }
     return true;
   }
 };
 
-void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk) {
-  MarkMethodsStackClosure closure;
+void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosure* cl) {
+  MarkMethodsStackClosure closure(cl);
   chunk->iterate_stack(&closure);
 }
 
@@ -526,7 +545,15 @@ void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkF
 
   if (mixed) f.handle_deopted(); // we could freeze deopted frames in slow mode.
 
-  run_nmethod_entry_barrier_if_needed<mixed>(f);
+  if (f.is_interpreted()) {
+    Method* m = f.to_frame().interpreter_frame_method();
+    m->record_marking_cycle();
+  } else if (f.is_compiled()) {
+    nmethod* nm = f.cb()->as_nmethod();
+    // The entry barrier takes care of having the right synchronization
+    // when keeping the nmethod alive during concurrent execution.
+    nm->run_nmethod_entry_barrier();
+  }
 
   assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
   bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();

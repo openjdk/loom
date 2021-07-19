@@ -53,6 +53,15 @@ inline void ClaimMetadataVisitingOopIterateClosure::do_klass(Klass* k) {
   ClaimMetadataVisitingOopIterateClosure::do_cld(cld);
 }
 
+inline void ClaimMetadataVisitingOopIterateClosure::do_nmethod(nmethod* nm) {
+  nm->follow_nmethod(this);
+}
+
+inline void ClaimMetadataVisitingOopIterateClosure::do_method(Method* m) {
+  // Mark interpreted frames for marking_cycle
+  m->record_marking_cycle();
+}
+
 // Implementation of the non-virtual do_oop dispatch.
 //
 // The same implementation is used for do_metadata, do_klass, and do_cld.

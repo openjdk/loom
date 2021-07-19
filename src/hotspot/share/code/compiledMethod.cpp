@@ -605,7 +605,7 @@ void CompiledMethod::run_nmethod_entry_barrier() {
     // By calling this nmethod entry barrier, it plays along and acts
     // like any other nmethod found on the stack of a thread (fewer surprises).
     nmethod* nm = as_nmethod_or_null();
-    if (nm != NULL) {
+    if (nm != NULL && bs_nm->is_armed(nm)) {
       bool alive = bs_nm->nmethod_entry_barrier(nm);
       assert(alive, "should be alive");
     }

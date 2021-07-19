@@ -203,6 +203,9 @@ public:
   virtual ReferenceIterationMode reference_iteration_mode() {
     return _verify_weaks ? DO_FIELDS : DO_FIELDS_EXCEPT_REFERENT;
   }
+
+  virtual void do_method(Method* m) {}
+  virtual void do_nmethod(nmethod* nm) {}
 };
 
 typedef ClaimingCLDToOopClosure<ClassLoaderData::_claim_none> ZVerifyCLDClosure;

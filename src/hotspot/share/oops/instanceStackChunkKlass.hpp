@@ -165,16 +165,13 @@ private:
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
+  void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
+
   template <bool mixed, class StackChunkFrameClosureType>
   static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
 
-  void mark_methods(stackChunkOop chunk);
-
   template <bool concurrent_gc>
   void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure);
-
-  template <bool mixed>
-  static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
 
   template <bool concurrent_gc, bool mixed, typename RegisterMapT>
   static void relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);

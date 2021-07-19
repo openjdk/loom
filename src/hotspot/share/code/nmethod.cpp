@@ -1969,6 +1969,13 @@ void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
   }
 }
 
+void nmethod::follow_nmethod(OopIterateClosure* cl) {
+  oops_do(cl);
+  mark_as_maybe_on_continuation();
+  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+  bs_nm->disarm(this);
+}
+
 nmethod* volatile nmethod::_oops_do_mark_nmethods;
 
 void nmethod::oops_do_log_change(const char* state) {

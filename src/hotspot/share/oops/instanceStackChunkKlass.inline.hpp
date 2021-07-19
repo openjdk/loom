@@ -475,23 +475,6 @@ inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(int stack_size_in_words
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
 
-template <bool mixed>
-void InstanceStackChunkKlass::run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f) {
-  if (f.is_interpreted()) {
-    // Mark interpreted frames for marking_cycle
-    Method* im = f.to_frame().interpreter_frame_method();
-    im->record_marking_cycle();
-  } else {
-    CodeBlob* cb = f.cb();
-    if (cb->is_nmethod()) {
-      nmethod* nm = cb->as_nmethod();
-      if (BarrierSet::barrier_set()->barrier_set_nmethod()->is_armed(nm)) {
-        nm->run_nmethod_entry_barrier();
-      }
-    }
-  }
-}
-
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
   assert (obj->is_stackChunk(), "");
@@ -574,7 +557,7 @@ public:
 template <class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end) {
   if (Devirtualizer::do_metadata(closure)) {
-    mark_methods(chunk);
+    mark_methods(chunk, closure);
   }
 
   if (UseCompressedOops) {
