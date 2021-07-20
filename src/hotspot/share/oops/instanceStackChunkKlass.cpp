@@ -487,7 +487,7 @@ public:
     _num_frames++;
     assert (_closure != nullptr, "");
 
-    if (f.is_compiled()) f.handle_deopted(); // because of deopt in thaw; TODO: remove when changing deoptimization
+    assert (!f.is_deoptimized(), ""); // if (f.is_compiled()) f.handle_deopted();
 
     // For unload method debugging
     // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);

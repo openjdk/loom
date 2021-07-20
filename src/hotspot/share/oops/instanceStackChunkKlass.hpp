@@ -246,6 +246,7 @@ class StackChunkFrameStream : public StackObj {
 
 #ifdef ASSERT
   bool is_in_frame(void* p) const;
+  bool is_deoptimized() const;
   template <typename RegisterMapT> bool is_in_oops(void* p, const RegisterMapT* map) const;
 #endif
 

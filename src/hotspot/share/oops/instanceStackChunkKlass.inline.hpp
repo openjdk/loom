@@ -669,6 +669,14 @@ inline address  StackChunkFrameStream<mixed>::orig_pc() const {
   return pc1;
 }
 
+#ifdef ASSERT
+template <bool mixed>
+bool StackChunkFrameStream<mixed>::is_deoptimized() const {
+  address pc1 = pc();
+  return is_compiled() && CodeCache::find_oopmap_slot_fast(pc1) < 0 && cb()->as_compiled_method()->is_deopt_pc(pc1);
+}
+#endif
+
 template <bool mixed>
 void StackChunkFrameStream<mixed>::handle_deopted() const {
   assert (!is_done(), "");
