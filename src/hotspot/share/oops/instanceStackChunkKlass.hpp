@@ -165,6 +165,9 @@ private:
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
+  template <bool mixed, class StackChunkFrameClosureType>
+  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
+
   void mark_methods(stackChunkOop chunk);
 
   template <bool concurrent_gc>
