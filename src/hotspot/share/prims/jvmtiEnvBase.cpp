@@ -1529,7 +1529,6 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
   if (java_thread == current) {
-    assert(single_suspend, "sanity check");
     // java_thread will be suspended in the ~JvmtiVTMTDisabler.
     return JVMTI_ERROR_NONE;
   }
