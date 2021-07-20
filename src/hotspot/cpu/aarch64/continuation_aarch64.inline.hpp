@@ -67,7 +67,7 @@ static inline intptr_t** link_address(const frame& f) {
 static void patch_callee_link(const frame& f, intptr_t* fp) {
   DEBUG_ONLY(intptr_t* orig = *Frame::callee_link_address(f));
   *Frame::callee_link_address(f) = fp;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT " orig: " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp), p2i(orig));
+  log_develop_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT " orig: " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp), p2i(orig));
 }
 
 static void patch_callee_link_relative(const frame& f, intptr_t* fp) {

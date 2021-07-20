@@ -6281,7 +6281,7 @@ RuntimeStub* generate_cont_doYield() {
       // see InterpreterMacroAssembler::restore_bcp/restore_locals
 
       assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
-      __ leave(); // we're now on last thawed frame
+      __ leave(); // we're now on the last thawed frame
 
       __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize));
       __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize));
