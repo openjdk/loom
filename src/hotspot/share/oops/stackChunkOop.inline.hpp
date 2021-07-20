@@ -308,4 +308,8 @@ inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure
                      : InstanceStackChunkKlass::iterate_stack<false>(this, closure);
 }
 
+inline MemRegion stackChunkOopDesc::range() {
+  return MemRegion((HeapWord*)this, size());
+}
+
 #endif // SHARE_OOPS_STACKCHUNKOOP_INLINE_HPP

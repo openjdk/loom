@@ -510,16 +510,33 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
   }
   // InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
   oop_oop_iterate_stack_bounded<false>(chunk, closure, mr);
-  oop_oop_iterate_header<T>(chunk, closure);
+  oop_oop_iterate_header_bounded<T>(chunk, closure, mr);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure) {
+  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset());
+  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset());
   OrderAccess::storestore();
-  Devirtualizer::do_oop(closure, (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset()));
+  Devirtualizer::do_oop(closure, parent_addr);
   OrderAccess::storestore();
-  Devirtualizer::do_oop(closure, (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset())); // must be last oop iterated
+  Devirtualizer::do_oop(closure, cont_addr); // must be last oop iterated
 }
+
+template <typename T, class OopClosureType>
+void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
+  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset());
+  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset());
+  if (mr.contains(parent_addr)) {
+    OrderAccess::storestore();
+    Devirtualizer::do_oop(closure, parent_addr);
+  }
+  if (mr.contains(cont_addr)) {
+    OrderAccess::storestore();
+    Devirtualizer::do_oop(closure, cont_addr); // must be last oop iterated
+  }
+}
+
 template <bool concurrent_gc, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
   if (LIKELY(chunk->has_bitmap())) {
@@ -529,7 +546,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
     if ((intptr_t*)mr.end()   < end)   end   = (intptr_t*)mr.end();
     oop_oop_iterate_stack_helper(chunk, closure, start, end);
   } else {
-    oop_oop_iterate_stack_slow<concurrent_gc>(chunk, closure);
+    oop_oop_iterate_stack_slow<concurrent_gc>(chunk, closure, mr);
   }
 }
 
@@ -538,7 +555,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClos
   if (LIKELY(chunk->has_bitmap())) {
     oop_oop_iterate_stack_helper(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
   } else {
-    oop_oop_iterate_stack_slow<concurrent_gc>(chunk, closure);
+    oop_oop_iterate_stack_slow<concurrent_gc>(chunk, closure, chunk->range());
   }
 }
 

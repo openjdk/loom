@@ -32,6 +32,7 @@
 #include "utilities/macros.hpp"
 
 class frame;
+class MemRegion;
 class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
@@ -119,6 +120,8 @@ public:
   // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*);
   template <class StackChunkFrameClosureType> 
   inline void iterate_stack(StackChunkFrameClosureType* closure);
+
+  MemRegion range();
 
   // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held during safepoints.
   // This is orthogonal to the relativizing of the actual content of interpreted frames.

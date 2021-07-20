@@ -155,6 +155,9 @@ private:
   
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
+  
+  template <typename T, class OopClosureType>
+  inline void oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure);
@@ -171,7 +174,7 @@ private:
   static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
 
   template <bool concurrent_gc>
-  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure);
+  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
   template <bool concurrent_gc, bool mixed, typename RegisterMapT>
   static void relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);

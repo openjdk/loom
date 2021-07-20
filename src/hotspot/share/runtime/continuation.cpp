@@ -22,13 +22,13 @@
  *
  */
 
+#include "precompiled.hpp"
 #include "classfile/javaClasses.hpp"
 #include "gc/g1/g1CollectedHeap.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/stackChunkOop.hpp"
-#include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.inline.hpp"

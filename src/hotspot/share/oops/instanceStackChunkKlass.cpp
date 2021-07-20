@@ -22,13 +22,13 @@
  *
  */
 
+#include "precompiled.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/stackChunkOop.hpp"
-#include "precompiled.hpp"
 #include "code/scopeDesc.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/systemDictionary.hpp"
@@ -351,12 +351,20 @@ public:
 
 
 template<typename OopClosureType>
-class CheckMutationWrapper: public OopClosure {
+class StackChunkOopIterateFilterClosure: public OopClosure {
 private:
   OopClosureType* const _closure;
   stackChunkOop _chunk;
+  MemRegion _bound;
+
 public:
-  CheckMutationWrapper(OopClosureType* closure, stackChunkOop chunk) : _closure(closure), _chunk(chunk), _mutated(false), _num_oops(0) {}
+  StackChunkOopIterateFilterClosure(OopClosureType* closure, stackChunkOop chunk, MemRegion bound)
+    : _closure(closure),
+      _chunk(chunk),
+      _bound(bound),
+      _mutated(false),
+      _num_oops(0) {}
+
   virtual void do_oop(oop* p)       override { do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }
 
@@ -365,10 +373,12 @@ public:
 
   template <typename T>
   void do_oop_work(T* p) {
-    T before = *p;
-    Devirtualizer::do_oop(_closure, p);
-    _mutated |= before != *p;
-    _num_oops++;
+    if (_bound.contains(p)) {
+      T before = *p;
+      Devirtualizer::do_oop(_closure, p);
+      _mutated |= before != *p;
+      _num_oops++;
+    }
   }
 };
 
@@ -377,12 +387,17 @@ class OopOopIterateStackClosure {
   stackChunkOop _chunk;
   const bool _do_destructive_processing;
   OopClosureType * const _closure;
+  MemRegion _bound;
 
 public:
   int _num_frames, _num_oops;
-  OopOopIterateStackClosure(stackChunkOop chunk, bool do_destructive_processing, OopClosureType* closure)
-    : _chunk(chunk), _do_destructive_processing(do_destructive_processing), _closure(closure),
-    _num_frames(0), _num_oops(0) {}
+  OopOopIterateStackClosure(stackChunkOop chunk, bool do_destructive_processing, OopClosureType* closure, MemRegion mr)
+    : _chunk(chunk),
+      _do_destructive_processing(do_destructive_processing),
+      _closure(closure),
+      _bound(mr),
+      _num_frames(0),
+      _num_oops(0) {}
 
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
@@ -427,7 +442,7 @@ public:
       }
     }
 
-    CheckMutationWrapper<OopClosureType> cl(_closure, _chunk);
+    StackChunkOopIterateFilterClosure<OopClosureType> cl(_closure, _chunk, _bound);
     f.iterate_oops(&cl, map);
     bool mutated_oops = cl._mutated;
     _num_oops += cl._num_oops;// f.oopmap()->num_oops();
@@ -440,7 +455,7 @@ public:
 };
 
 template <bool concurrent_gc>
-void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure) {
+void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   // oop_oop_iterate_stack_bounded<concurrent_gc, OopClosureType>(chunk, closure, MemRegion(nullptr, SIZE_MAX));
   assert (Continuation::debug_is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !chunk->requires_barriers());
@@ -459,7 +474,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   }
 
   // tty->print_cr(">>>> OopOopIterateStackClosure::oop_oop_iterate_stack");
-  OopOopIterateStackClosure<concurrent_gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure);
+  OopOopIterateStackClosure<concurrent_gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
   // if (FIX_DERIVED_POINTERS && concurrent_gc) {
@@ -482,8 +497,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
 }
 
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackChunkOop chunk, OopIterateClosure* closure);
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<true> (stackChunkOop chunk, OopIterateClosure* closure);
+template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
+template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<true> (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
 class MarkMethodsStackClosure {
   OopIterateClosure* _closure;
