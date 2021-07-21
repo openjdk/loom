@@ -4376,13 +4376,14 @@ void TemplateTable::monitorenter() {
   __ movptr(Address(rmon, BasicObjectLock::obj_offset_in_bytes()), rax);
   __ lock_object(rmon);
 
-  // check to make sure this monitor doesn't cause stack overflow after locking
-  __ save_bcp();  // in case of exception
-  __ generate_stack_overflow_check(0);
-
+  // The object is stored so counter should be increased even if stackoverflow is generated
   Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
   NOT_LP64(get_thread(rthread);)
   __ inc_held_monitor_count(rthread);
+
+  // check to make sure this monitor doesn't cause stack overflow after locking
+  __ save_bcp();  // in case of exception
+  __ generate_stack_overflow_check(0);
 
   // The bcp has already been incremented. Just need to dispatch to
   // next instruction.
