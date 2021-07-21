@@ -400,6 +400,9 @@ class java_lang_Class : AllStatic {
 
 // Interface to java.lang.Thread objects
 
+#define THREAD_INJECTED_FIELDS(macro)                            \
+  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false)
+
 class java_lang_Thread : AllStatic {
   friend class java_lang_VirtualThread;
  private:
@@ -2005,6 +2008,7 @@ class InjectedField {
   CALLSITECONTEXT_INJECTED_FIELDS(macro)    \
   STACKFRAMEINFO_INJECTED_FIELDS(macro)     \
   MODULE_INJECTED_FIELDS(macro)             \
+  THREAD_INJECTED_FIELDS(macro)             \
   INTERNALERROR_INJECTED_FIELDS(macro)
 
 
