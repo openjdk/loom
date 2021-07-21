@@ -2053,6 +2053,7 @@ const intx ObjectAlignmentInBytes = 8;
   product(intx, ScopeLocalCacheSize, 16,                                    \
           "Size of the cache for scoped values")                            \
            range(0, max_intx)                                               \
+           constraint(ScopeLocalCacheSizeConstraintFunc, AtParse)           \
                                                                             \
   develop(int, VerifyMetaspaceInterval, DEBUG_ONLY(500) NOT_DEBUG(0),       \
                "Run periodic metaspace verifications (0 - none, "           \
