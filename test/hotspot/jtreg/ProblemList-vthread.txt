@@ -124,7 +124,6 @@ serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
 serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java
 serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java
 serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
-serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
 serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
