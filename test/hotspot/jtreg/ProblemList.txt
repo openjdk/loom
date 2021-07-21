@@ -218,6 +218,3 @@ vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t003/hs203t003.java         00
 vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t002/hs203t002.java         0000000 generic-all
 vmTestbase/nsk/jvmti/scenarios/hotswap/HS203/hs203t001/hs203t001.java         0000000 generic-all
 vmTestbase/nsk/jvmti/scenarios/hotswap/HS202/hs202t002/hs202t002.java         0000000 generic-all
-
-#value of ScopeLocalCacheSize should be verfied to don't crash
-runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id7          0000000 generic-all
