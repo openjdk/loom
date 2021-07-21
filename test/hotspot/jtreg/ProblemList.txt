@@ -183,6 +183,10 @@ runtime/vthread/TestObjectAllocationSampleEvent.java                          82
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java 8271008 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java                8271008 generic-all
+
+
 serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
 serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
