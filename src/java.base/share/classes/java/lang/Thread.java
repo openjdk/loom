@@ -683,6 +683,10 @@ public class Thread implements Runnable {
             // scoped variables
             if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
                 this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+                ThreadContainer container = this.container;
+                if (container != null && container.owner() != null) {
+                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+                }
             }
         }
 
@@ -739,6 +743,9 @@ public class Thread implements Runnable {
         // scoped variables
         if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
             this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
+            if (container != null && container.owner() != null) {
+                this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+            }
         }
 
         // no additional fields

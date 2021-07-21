@@ -242,36 +242,24 @@ public class SubmitTasksTest {
                         .peek(f -> assertTrue(f.isDone()))
                         .collect(Collectors.toList());
 
+                assertTrue(futures.size() == 2);
+
+                Future<String> future1 = futures.get(0);
+                Future<String> future2 = futures.get(1);
+                if (future2.isCompletedNormally()) {
+                    Future<String> tmp = future1;
+                    future1 = future2;
+                    future2 = tmp;
+                }
+
+                if (future1.isCompletedNormally()) {
+                    assertEquals(future1.get(), "foo");
+                } else {
+                    assertTrue(future1.isCancelled());
+                }
+                assertTrue(future2.isCancelled());
+
                 if (tasksStarted.get() == 2) {
-                    assertTrue(futures.size() == 2);
-
-                    int completed = 0, cancelled = 0;
-                    for (Future<String> future : futures) {
-                        if (future.isCompletedNormally()) {
-                            completed++;
-                        } else if (future.isCancelled()) {
-                            cancelled++;
-                        }
-                    }
-                    assertTrue((completed == 1 && cancelled == 1)
-                            ^ (completed == 0 && cancelled == 2));
-
-                    Future<String> future1 = futures.get(0);
-                    Future<String> future2 = futures.get(1);
-                    if (future2.isCompletedNormally()) {
-                        Future<String> tmp = future1;
-                        future1 = future2;
-                        future2 = tmp;
-                    }
-
-                    if (future1.isCompletedNormally()) {
-                        assertEquals(future1.join(), "foo");
-                        assertTrue(future2.isCancelled());
-                    } else {
-                        assertTrue(future1.isCancelled());
-                        assertTrue(future2.isCancelled());
-                    }
-
                     // task2 sleep should be interrupted
                     Throwable exc;
                     while ((exc = task2Exception.get()) == null) {

@@ -42,10 +42,8 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import sun.security.util.SecurityConstants;
 
@@ -272,88 +270,6 @@ public class Executors {
     public static ExecutorService newVirtualThreadExecutor() {
         ThreadFactory factory = Thread.ofVirtual().factory();
         return newThreadPerTaskExecutor(factory);
-    }
-
-    /**
-     * Creates an Executor that starts a new Thread for each task.
-     * The number of threads created by the Executor is unbounded.
-     *
-     * <p> An Executor created by this method is intended to be used in a
-     * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
-     * it and must be {@linkplain ExecutorService#close() closed} by the same
-     * thread when it is finished with the executor. Failure to invoke the {@code
-     * close} method may result in a memory leak. The {@code close}, {@link
-     * ExecutorService#shutdown() shutdown}, {@link ExecutorService#shutdownNow()
-     * shutdownNow} methods, and all methods that submit tasks throw {@code
-     * IllegalCallerException} if invoked by other threads.
-     *
-     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
-     * Future Future} representing the pending result of a task submitted to
-     * the Executor will {@link Thread#interrupt() interrupt} the thread
-     * executing the task.
-     *
-     * @apiNote
-     * TBD naming, shape, location, ... Executors is not the right place for this.
-     *
-     * @param threadFactory the factory to use when creating new threads
-     * @return a newly created executor
-     * @throws NullPointerException if threadFactory is null
-     * @since 99
-     */
-    public static ExecutorService newStructuredThreadExecutor(ThreadFactory threadFactory) {
-        return new StructuredThreadPerTaskExecutor(threadFactory, null);
-    }
-
-    /**
-     * Creates an Executor that starts a new Thread for each task and with a
-     * deadline. The number of threads created by the Executor is unbounded.
-     *
-     * <p> An Executor created by this method is intended to be used in a
-     * <em>structured manner</em>. It is <em>owned</em> by the Thread that creates
-     * it and must be {@linkplain ExecutorService#close() closed} by the same
-     * thread when it is finished with the executor. Failure to invoke the {@code
-     * close} method may result in a memory leak. The {@code close}, {@link
-     * ExecutorService#shutdown() shutdown}, {@link ExecutorService#shutdownNow()
-     * shutdownNow} methods, and all methods that submit tasks throw {@code
-     * IllegalCallerException} if invoked by other threads.
-     *
-     * <p> If the deadline specified to this method expires before the Executor
-     * has terminated then it is {@link ExecutorService#shutdown() shutdown} and
-     * its threads are {@linkplain Thread#interrupt() interrupted} to cancel the
-     * remaining tasks. The owner thread is also interrupted when the deadline
-     * expires before it invokes the {@code close} method. The {@code close}
-     * method throws {@link DeadlineExpiredException} after all tasks have
-     * completed and the executor has terminated. When using the {@code
-     * try-with-resources} construct, and an exception is thrown by the owner
-     * thread in response to being interrupted before it closes the executor,
-     * then the {@code DeadlineExpiredException} will be added as a {@linkplain
-     * Throwable#getSuppressed() suppressed exception}.
-     *
-     * <p> Invoking {@link Future#cancel(boolean) cancel(true)} on a {@link
-     * Future Future} representing the pending result of a task submitted to
-     * the Executor will {@link Thread#interrupt() interrupt} the thread
-     * executing the task.
-     *
-     * @apiNote
-     * TBD naming, shape, location, ... Executors is not the right place for this.
-     *
-     * <p> The {@link ExecutorService#invokeAll(Collection) invokeAll} method
-     * throws {@code InterruptedException} if interrupted while waiting for all
-     * tasks to complete. This may be inconvenient when using a deadline where the
-     * results of tasks that completed before the deadline expired are needed.
-     * The {@link ExecutorService#submit(Collection) submit} method may be
-     * useful to the process the results of tasks as they complete.
-     *
-     * @param threadFactory the factory to use when creating new threads
-     * @param deadline the deadline
-     * @return a newly created executor
-     * @throws NullPointerException if threadFactory or deadline is null
-     * @since 99
-     */
-    public static ExecutorService newStructuredThreadExecutor(ThreadFactory threadFactory,
-                                                              Instant deadline) {
-        Objects.requireNonNull(deadline);
-        return new StructuredThreadPerTaskExecutor(threadFactory, deadline);
     }
 
     /**
