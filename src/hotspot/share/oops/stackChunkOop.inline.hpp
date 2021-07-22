@@ -242,8 +242,6 @@ inline intptr_t* stackChunkOopDesc::interpreter_frame_local_at(const frame& fr, 
 
 template <bool dword_aligned>
 inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size) {
-  assert (!requires_barriers(), "");
-
   log_develop_trace(jvmcont)("Chunk bounds: " INTPTR_FORMAT "(%d) - " INTPTR_FORMAT "(%d) (%d words, %d bytes)",
     p2i(start_address()), to_offset(start_address()), p2i(end_address()), to_offset(end_address() - 1) + 1, stack_size(), stack_size() << LogBytesPerWord);
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(from), p2i(from + size), size, size << LogBytesPerWord);

@@ -504,9 +504,7 @@ class MarkMethodsStackClosure {
   OopIterateClosure* _closure;
 
 public:
-  MarkMethodsStackClosure(OopIterateClosure* cl)
-    : _closure(cl)
-  { }
+  MarkMethodsStackClosure(OopIterateClosure* cl) : _closure(cl) {}
 
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
@@ -603,6 +601,28 @@ template void InstanceStackChunkKlass::do_barriers<true> (stackChunkOop chunk, c
 
 template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMap* map);
 template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const SmallRegisterMap* map);
+
+template <bool store>
+class DoBarriersStackClosure {
+  const stackChunkOop _chunk;
+public:
+  DoBarriersStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
+
+  template <bool mixed, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+    InstanceStackChunkKlass::do_barriers<store>(_chunk, f, map);
+    return true;
+  }
+};
+
+template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk);
+template void InstanceStackChunkKlass::do_barriers<true>(stackChunkOop chunk);
+
+template <bool store>
+void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
+  DoBarriersStackClosure<store> closure(chunk);
+  chunk->iterate_stack(&closure);
+}
 
 #ifdef ASSERT
 template<class P>
