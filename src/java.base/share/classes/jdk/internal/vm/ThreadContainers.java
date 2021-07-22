@@ -103,20 +103,15 @@ public class ThreadContainers {
     }
 
     /**
-     * Return the root thread container.
-     */
-    public static ThreadContainer root() {
-        return RootContainer.INSTANCE;
-    }
-
-    /**
      * Returns a stream of the shared thread containers tracked by this class.
-     * The stream does not include the root container.
+     * The stream include the root container.
      */
     public static Stream<ThreadContainer> sharedContainers() {
-        return SHARED_CONTAINERS.stream()
+        Stream<ThreadContainer> s1 = Stream.of(RootContainer.INSTANCE);
+        Stream<ThreadContainer> s2 = SHARED_CONTAINERS.stream()
                 .map(WeakReference::get)
                 .filter(c -> c != null);
+        return Stream.concat(s1, s2);
     }
 
     /**
@@ -168,24 +163,9 @@ public class ThreadContainers {
     }
 
     /**
-     * Returns a stream of all containers. The stream includes the root container,
-     * all shared containers, and all that owned containers that can be found.
-     * @return
-     */
-    public static Stream<ThreadContainer> allContainers() {
-        Stream<ThreadContainer> s1 = Stream.of(root());
-        Stream<ThreadContainer> s2 = ThreadContainers.sharedContainers();
-        Stream<ThreadContainer> s3 = ThreadContainers.ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream);
-        return Stream.concat(s1, Stream.concat(s2, s3));
-    }
-
-    /**
      * Returns the thread container that the given Thread is in.
      */
-    public static ThreadContainer currentContainer(Thread thread) {
+    public static ThreadContainer container(Thread thread) {
         return JLA.threadContainer(thread);
     }
 
