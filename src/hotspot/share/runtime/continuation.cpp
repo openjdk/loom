@@ -1237,6 +1237,16 @@ public:
     return res;
   }
 
+  inline bool stack_overflow() { // detect stack overflow in recursive native code
+    JavaThread* t = !_preempt ? _thread : JavaThread::current();
+    assert (t == JavaThread::current(), "");
+    if (t->stack_overflow_state()->stack_available((address) &t) <= 8192) {
+      Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
+      return true;
+    }
+    return false;
+  }
+  
   frame freeze_start_frame() {
     frame f = _thread->last_frame();
     if (LIKELY(!_preempt)) {
@@ -1282,6 +1292,8 @@ public:
   NOINLINE freeze_result freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top) {
     assert (f.unextended_sp() < _bottom_address, ""); // see recurse_freeze_java_frame
     assert (f.is_interpreted_frame() || ((top && _preempt) == Frame::is_stub(f.cb())), "");
+
+    if (stack_overflow()) return freeze_exception;
 
     // Dynamically branch on frame type
     if (f.is_compiled_frame()) {
