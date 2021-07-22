@@ -1251,7 +1251,7 @@ public:
   inline bool stack_overflow() { // detect stack overflow in recursive native code
     JavaThread* t = !_preempt ? _thread : JavaThread::current();
     assert (t == JavaThread::current(), "");
-    if (t->stack_overflow_state()->stack_available((address) &t) <= 8192) {
+    if ((address)&t < t->stack_overflow_state()->stack_overflow_limit()) {
       Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
       return true;
     }
