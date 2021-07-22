@@ -512,6 +512,7 @@
   template(java_lang_Byte_array_signature,            "[Ljava/lang/Byte;")                        \
   template(java_lang_Boolean_signature,               "Ljava/lang/Boolean;")                      \
   template(url_code_signer_array_void_signature,      "(Ljava/net/URL;[Ljava/security/CodeSigner;)V") \
+  template(jvmti_thread_state_name,                   "jvmti_thread_state")                       \
   template(module_entry_name,                         "module_entry")                             \
   template(resolved_references_name,                  "<resolved_references>")                    \
   template(init_lock_name,                            "<init_lock>")                              \
