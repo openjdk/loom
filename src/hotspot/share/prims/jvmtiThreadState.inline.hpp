@@ -57,11 +57,6 @@ JvmtiEnvThreadState* JvmtiThreadState::env_thread_state(JvmtiEnvBase *env) {
   JvmtiEnvThreadStateIterator it(this);
   for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
     if ((JvmtiEnvBase*)(ets->get_env()) == env) {
-#ifdef DBG // TMP
-      const char* virt = this->is_virtual() ? "virtual" : "carrier";
-      printf("DBG: env_thread_state: %s state: %p, env: %p, ets: %p\n",
-             virt, (void*)this, (void*)env, (void*)ets); fflush(0);
-#endif
       return ets;
     }
   }
@@ -89,10 +84,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   const char* action = "FOUND";
 
   if (state == NULL && thread != NULL && thread->is_exiting()) {
-#ifdef DBG // TMP
-    printf("DBG: state_for_while_locked: JvmtiThreadState: %p, state==NULL or thread is_exiting: %d\n",
-           (void*)state, (thread != NULL && thread->is_exiting())); fflush(0);
-#endif
     // don't add a JvmtiThreadState to a thread that is exiting
     return NULL;
   }
@@ -112,16 +103,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
       }
       action = "CREATED";
     }
-#ifdef DBG // TMP
-    if (!state->is_virtual()) {
-      ResourceMark rm(JavaThread::current());
-      oop name_oop = java_lang_Thread::name(thread_oop);
-      const char* name_str = java_lang_String::as_utf8_string(name_oop);
-      name_str = name_str == NULL ? "<NULL>" : name_str;
-      printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
-             action, (void*)state, name_str); fflush(0);
-    }
-#endif
   }
   return state;
 }

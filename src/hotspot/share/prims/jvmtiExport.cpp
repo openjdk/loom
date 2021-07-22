@@ -1301,11 +1301,11 @@ void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-#if 0
+#ifdef DBG // TMP
     JvmtiThreadState* state = thread->jvmti_thread_state();
 
     if (state != NULL) {
-      printf("JvmtiExport::check_suspend_at_safepoint: state: %p virt: %d jt: %p vt-susp: %d ct-susp: %d\n",
+      printf("DBG: JvmtiExport::check_suspend_at_safepoint: state: %p virt: %d jt: %p vt-susp: %d ct-susp: %d\n",
              (void*)state, state->is_virtual(), (void*)thread,
              JvmtiVTSuspender::is_vthread_suspended(vt),
              thread->is_thread_suspended()
@@ -1963,15 +1963,6 @@ void JvmtiExport::post_single_step(JavaThread *thread, Method* method, address l
       JvmtiJavaThreadEventTransition jet(thread);
       jvmtiEventSingleStep callback = env->callbacks()->SingleStep;
       if (callback != NULL) {
-#if 0
-       ResourceMark rm(thread);
-       oop name_oop = java_lang_Thread::name(thread->mounted_vthread());
-       const char* name_str = java_lang_String::as_utf8_string(name_oop);
-       name_str = name_str == NULL ? "<NULL>" : name_str;
-
-        printf("SERG: post_single_step: st: %p virt: %d jt: %p %s\n",
-               (void*)state, state->is_virtual(), (void*)thread, name_str); fflush(0);
-#endif
         (*callback)(env->jvmti_external(), jem.jni_env(), jem.jni_thread(),
                     jem.jni_methodID(), jem.location());
       }

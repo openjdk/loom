@@ -428,11 +428,6 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
 
   JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(this, env);
-#ifdef DBG // TMP
-    const char* virt = _is_virtual ? "virtual" : "carrier";
-    printf("DBG: JvmtiThreadState::add_env: %s state: %p, env: %p, ets: %p\n",
-           virt, (void*)this, (void*)env, (void*)new_ets); fflush(0);
-#endif
   // add this environment thread state to the end of the list (order is important)
   {
     // list deallocation (which occurs at a safepoint) cannot occur simultaneously
