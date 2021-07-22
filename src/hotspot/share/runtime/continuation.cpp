@@ -890,8 +890,9 @@ template <typename ConfigT>
 class Freeze {
 
 private:
-  JavaThread* const _thread; // nullptr when squashing chunks
+  JavaThread* const _thread;
   ContMirror& _cont;
+  bool _barriers;
   const bool _preempt;
 
   intptr_t *_bottom_address;
@@ -915,7 +916,7 @@ private:
 public:
 
   Freeze(JavaThread* thread, ContMirror& mirror, bool preempt) :
-    _thread(thread), _cont(mirror), _preempt(preempt) {
+    _thread(thread), _cont(mirror), _barriers(false), _preempt(preempt) {
 
     // _cont.read_entry(); // even when retrying, because deopt can change entryPC; see Continuation::get_continuation_entry_pc_for_sender
     _cont.read(); // read_minimal
@@ -988,7 +989,7 @@ public:
       e.commit();
     }
     // TODO R REMOVE when deopt change is fixed
-    assert (!_thread->cont_fastpath(), "");
+    assert (!_thread->cont_fastpath() || _barriers, "");
     log_develop_trace(jvmcont)("-- RETRYING SLOW --");
     return freeze_slow();
   }
@@ -1110,15 +1111,12 @@ public:
       assert (_thread->cont_fastpath(), "");
 
       chunk = allocate_chunk(size + ContinuationHelper::frame_metadata);
-      if (chunk == nullptr || !_thread->cont_fastpath()) {
+      if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath())) {
         return false;
       }
 
       DEBUG_ONLY(empty = true;)
       DEBUG_ONLY(allocated = true;)
-      log_develop_trace(jvmcont)("add max_size: %d -- %d", size + ContinuationHelper::frame_metadata, size + ContinuationHelper::frame_metadata);
-      chunk->set_max_size(size);
-      chunk->set_argsize(argsize);
 
       sp = size + ContinuationHelper::frame_metadata;
       DEBUG_ONLY(orig_chunk_sp = chunk->start_address() + sp;)
@@ -1129,7 +1127,20 @@ public:
 
       _cont.set_tail(chunk);
       // java_lang_Continuation::set_tail(_cont.mirror(), chunk);
+
+      if (UNLIKELY(chunk->requires_barriers())) { // probably humongous
+        log_develop_trace(jvmcont)("allocation requires barriers; retrying slow");
+        chunk->set_argsize(0);
+        chunk->set_sp(sp);
+        _barriers = true;
+        return false;
+      }
+
+      log_develop_trace(jvmcont)("add max_size: %d -- %d", size + ContinuationHelper::frame_metadata, size + ContinuationHelper::frame_metadata);
+      chunk->set_max_size(size);
+      chunk->set_argsize(argsize);
     }
+
     assert (chunk != nullptr, "");
     assert (!chunk->has_mixed_frames(), "");
     assert (!chunk->is_gc_mode(), "");
@@ -1378,15 +1389,18 @@ public:
 
     int overlap = 0; // the args overlap the caller -- if there is one in this chunk and is of the same kind
     int unextended_sp = -1;
-    if (chunk != nullptr && !chunk->is_empty()) {
-      bool top_interpreted = Interpreter::contains(chunk->pc());
+    if (chunk != nullptr) {
       unextended_sp = chunk->sp();
-      if (top_interpreted) {
-        StackChunkFrameStream<true> last(chunk);
-        unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
-      }
-      if (FKind::interpreted == top_interpreted) {
-        overlap = argsize;
+      if (!chunk->is_empty()) {
+        bool top_interpreted = Interpreter::contains(chunk->pc());
+        unextended_sp = chunk->sp();
+        if (top_interpreted) {
+          StackChunkFrameStream<true> last(chunk);
+          unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
+        }
+        if (FKind::interpreted == top_interpreted) {
+          overlap = argsize;
+        }
       }
     }
     // else if (FKind::interpreted) {
@@ -1401,8 +1415,11 @@ public:
     assert (chunk == nullptr || chunk->is_empty() || unextended_sp == chunk->to_offset(StackChunkFrameStream<true>(chunk).unextended_sp()), "");
     assert (chunk != nullptr || unextended_sp < _size, "");
 
+     // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
+    assert (!_barriers || (unextended_sp >= _size && chunk->is_empty()), "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _size, chunk->is_empty());
+
     DEBUG_ONLY(bool empty_chunk = true);
-    if (unextended_sp < _size || chunk->is_gc_mode() || chunk->requires_barriers()) {
+    if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && chunk->requires_barriers())) {
       // ALLOCATION
 
       if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -1426,6 +1443,9 @@ public:
       chunk->set_gc_sp(sp);
       chunk->set_argsize(argsize);
       assert (chunk->is_empty(), "");
+      _barriers = chunk->requires_barriers();
+
+      if (_barriers) { log_develop_trace(jvmcont)("allocation requires barriers"); }
 
       _cont.set_tail(chunk);
       // java_lang_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
@@ -1442,7 +1462,9 @@ public:
     }
     chunk->set_has_mixed_frames(true);
 
-    assert (!chunk->requires_barriers(), "");
+    assert (chunk->requires_barriers() == _barriers, "");
+    assert (!_barriers || chunk->is_empty(), "");
+
     assert (!chunk->has_bitmap(), "");
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).is_done(), "");
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).to_frame().is_empty(), "");
@@ -1533,7 +1555,7 @@ public:
   {
     ResourceMark rm;
     InterpreterOopMap mask;
-    f.interpreted_frame_oop_map(&mask);
+    f.interpreted_frame_oop_map(&mask); // we can stack-overflow and crash here
     assert (vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT, p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
     assert (fsize + 1 >= Interpreted::size(f, &mask), "fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask)); // add 1 for possible alignment padding
     if (fsize > Interpreted::size(f, &mask) + 1) {
@@ -1670,6 +1692,11 @@ public:
     log_develop_trace(jvmcont)("add max_size _align_size: %d -- %d", _align_size, chunk->max_size() + _align_size);
     chunk->set_max_size(chunk->max_size() + _align_size);
 
+    if (UNLIKELY(_barriers)) {
+      log_develop_trace(jvmcont)("do barriers on humongous chunk");
+      InstanceStackChunkKlass::do_barriers<true>(_cont.tail());
+    }
+
     log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
 
     if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -1726,10 +1753,8 @@ public:
     chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
     chunk->set_cont_raw<typename ConfigT::OopT>(_cont.mirror());
 
-    // TODO Erik says: promote young chunks quickly
+    // Promote young chunks quickly
     chunk->set_mark(chunk->mark().set_age(15));
-
-    assert(!chunk->requires_barriers(), "ALLOCATED OLD! size: %d", size);
 
     return chunk;
   }
@@ -1816,9 +1841,10 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   RegisterMap map(thread, false, false, false);
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(cont, f); f = f.sender(&map)) {
-    if (f.is_interpreted_frame()) return true;
-    if (f.is_native_frame()) return true;
-    if (f.is_deoptimized_frame()) return true;
+    if (f.is_interpreted_frame() || f.is_native_frame() || f.is_deoptimized_frame()) {
+      // tty->print_cr("interpreted_native_or_deoptimized_on_stack"); f.print_on(tty);
+      return true;
+    }
   }
   return false;
 }
@@ -3228,7 +3254,6 @@ stackChunkOop ContMirror::allocate_stack_chunk(int stack_size, bool is_preempt) 
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   int size_in_words = klass->instance_size(stack_size);
 
-  assert (!UseG1GC || !G1CollectedHeap::is_humongous(size_in_words), "size_in_words: %d", size_in_words);
   assert(is_preempt || _thread == JavaThread::current(), "should be current");
   JavaThread* current = is_preempt ? JavaThread::current() : _thread;
 

@@ -140,6 +140,9 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
+  template <bool store>
+  static void do_barriers(stackChunkOop chunk);
+
   template <bool store, bool mixed, typename RegisterMapT>
   static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
