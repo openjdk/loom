@@ -654,7 +654,7 @@ void vframeStreamCommon::skip_prefixed_method_and_wrappers() {
 javaVFrame* vframeStreamCommon::asJavaVFrame() {
   javaVFrame* result = NULL;
   if (_mode == compiled_mode && _frame.is_compiled_frame()) {
-    guarantee(_frame.is_compiled_frame(), "expected compiled Java frame");
+    assert(_frame.is_compiled_frame() || _frame.is_native_frame(), "expected compiled Java frame");
     guarantee(_reg_map.update_map(), "");
 
     compiledVFrame* cvf = compiledVFrame::cast(vframe::new_vframe(&_frame, &_reg_map, _thread));
@@ -671,7 +671,7 @@ javaVFrame* vframeStreamCommon::asJavaVFrame() {
   } else {
     result = javaVFrame::cast(vframe::new_vframe(&_frame, &_reg_map, _thread));
   }
-  guarantee(result->method() == method(), "wrong method");
+  assert(result->method() == method(), "wrong method");
   return result;
 }
 
