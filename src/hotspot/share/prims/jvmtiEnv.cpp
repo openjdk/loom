@@ -150,9 +150,10 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
   JvmtiThreadState* state = NULL;
   JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = NULL;
+  JavaThread* current = JavaThread::current();
 
   if (thread == NULL) {
-    java_thread = JavaThread::current();
+    java_thread = current;
     state = java_thread->jvmti_thread_state();
   } else {
     ThreadsListHandle tlh;
@@ -168,7 +169,9 @@ JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
       return JVMTI_ERROR_NONE;
     }
     // otherwise, create the state
-    state = JvmtiThreadState::state_for(java_thread, thread_obj);
+    HandleMark hm(current);
+    Handle thread_handle(current, thread_obj);
+    state = JvmtiThreadState::state_for(java_thread, thread_handle);
     if (state == NULL) {
       return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
@@ -207,7 +210,9 @@ JvmtiEnv::GetThreadLocalStorage(jthread thread, void** data_ptr) {
       return err;
     }
 
-    JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_obj);
+    HandleMark hm(current_thread);
+    Handle thread_handle(current_thread, thread_obj);
+    JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread, thread_handle);
     *data_ptr = (state == NULL) ? NULL :
       state->env_thread_state(this)->get_agent_thread_local_storage_data();
   }
@@ -1901,17 +1906,21 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
   oop thread_obj = NULL;
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh;
+  JavaThread* current = JavaThread::current();
 
   err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
 
+  HandleMark hm(current);
+  Handle thread_handle(current, thread_obj);
+
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) {
       // java_thread is NULL if virtual thread is unmounted
-      JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
+      JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_handle);
       if (state == NULL) {
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
       }
@@ -1922,14 +1931,14 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
     }
   }
 
-  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_obj);
+  JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_handle);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
 
   SetFramePopClosure op(this, state, depth);
   MutexLocker mu(JvmtiThreadState_lock);
-  if (java_thread == JavaThread::current()) {
+  if (java_thread == current) {
     op.doit(java_thread, true /* self */);
   } else {
     Handshake::execute(&op, java_thread);

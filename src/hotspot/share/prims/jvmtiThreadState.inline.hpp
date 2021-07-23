@@ -30,6 +30,7 @@
 
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/safepointVerifiers.hpp"
 #include "runtime/thread.inline.hpp"
 
 // JvmtiEnvThreadStateIterator implementation
@@ -75,6 +76,8 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   assert(thread != NULL || thread_oop != NULL, "sanity check");
 
+  NoSafepointVerifier nsv;  // oop is safe to use.
+
   if (thread_oop == NULL) { // then thread should not be NULL (see assert above)
     thread_oop = thread->mounted_vthread() != NULL ? thread->mounted_vthread() : thread->threadObj();
   }
@@ -93,13 +96,9 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
       state = java_lang_Thread::jvmti_thread_state(thread_oop);
     }
     if (state == NULL) { // need to create state
-      Thread* current_thread = Thread::current();
-      HandleMark hm(current_thread);
-      Handle thread_oop_h = Handle(current_thread, thread_oop);
-
       state = new JvmtiThreadState(thread, thread_oop);
-      if (thread_oop_h() != NULL) { // thread_oop can be NULL at early VMStart
-        java_lang_Thread::set_jvmti_thread_state(thread_oop_h(), state);
+      if (thread_oop != NULL) { // thread_oop can be NULL at early VMStart
+        java_lang_Thread::set_jvmti_thread_state(thread_oop, state);
       }
       action = "CREATED";
     }
@@ -107,17 +106,14 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   return state;
 }
 
-inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, oop thread_oop) {
+inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, Handle thread_handle) {
   // in a case of unmounted virtual thread the thread can be NULL
-  JvmtiThreadState* state = thread_oop == NULL ? thread->jvmti_thread_state() :
-                                                java_lang_Thread::jvmti_thread_state(thread_oop);
+  JvmtiThreadState* state = thread_handle == NULL ? thread->jvmti_thread_state() :
+                                                java_lang_Thread::jvmti_thread_state(thread_handle());
   if (state == NULL) {
-    Thread* current_thread = Thread::current();
-    HandleMark hm(current_thread);
-    Handle h_thread_oop = Handle(current_thread, thread_oop);
     MutexLocker mu(JvmtiThreadState_lock);
     // check again with the lock held
-    state = state_for_while_locked(thread, h_thread_oop());
+    state = state_for_while_locked(thread, thread_handle());
   } else {
     // Check possible safepoint even if state is non-null.
     // (Note: the thread argument isn't the current thread)

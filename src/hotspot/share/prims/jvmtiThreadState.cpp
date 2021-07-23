@@ -84,7 +84,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   _hide_over_cont_yield = false;
   _is_virtual = false;
 
-  _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
+  _thread_oop_h = OopHandle(JvmtiExport::jvmti_oop_storage(), thread_oop);
 
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
@@ -170,7 +170,7 @@ JvmtiThreadState::~JvmtiThreadState()   {
   if (get_thread_oop() != NULL) {
     java_lang_Thread::set_jvmti_thread_state(get_thread_oop(), NULL);
   }
-  _thread_oop_h.release(Universe::vm_global());
+  _thread_oop_h.release(JvmtiExport::jvmti_oop_storage());
 }
 
 
@@ -319,23 +319,24 @@ void
 VThreadList::append(oop vt) {
   assert(!contains(vt), "VThreadList::append sanity check");
 
-  // This is to work around assert in OopHandle copy constructor.
-  GrowableArrayCHeap<OopHandle, mtServiceability>::append(NULLHandle);
-  pop();
-
-  GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
+  OopHandle vthandle(JvmtiExport::jvmti_oop_storage(), vt);
+  GrowableArrayCHeap<OopHandle, mtServiceability>::append(vthandle);
 }
 
 void
 VThreadList::remove(oop vt) {
   int idx = find(vt);
   assert(idx != -1, "VThreadList::remove sanity check");
-  at(idx).release(Universe::vm_global());
+  at(idx).release(JvmtiExport::jvmti_oop_storage());
+  at_put(idx, NULLHandle); // clear released OopHandle entry
 
-  // To work around assert in OopHandle copy constructor do not use remove_at().
-  for (int i = idx + 1; i < length(); i++) {
-    at_put(i - 1, NULLHandle); // work around assert in OopHandle copy constructor
-    at_put(i - 1, at(i));
+  // To work around assert in OopHandle assignment operator do not use remove_at().
+  // OopHandle doesn't allow overwrites if the oop pointer is non-null.
+  // Order doesn't matter, put the last element in idx
+  int last = length() - 1;
+  if (last > idx) {
+    at_put(idx, at(last));
+    at_put(last, NULLHandle); // clear moved OopHandle entry.
   }
   pop();
 }
@@ -343,7 +344,8 @@ VThreadList::remove(oop vt) {
 void
 VThreadList::invalidate() {
   for (int idx = length() - 1; idx >= 0; idx--) {
-    at(idx).release(Universe::vm_global());
+    at(idx).release(JvmtiExport::jvmti_oop_storage());
+    at_put(idx, NULLHandle); // clear released OopHandle entries
   }
   clear();
 }
@@ -373,7 +375,7 @@ JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_none;
-  _vthread_suspend_list->invalidate(); 
+  _vthread_suspend_list->invalidate();
   _vthread_resume_list->invalidate();
 }
 

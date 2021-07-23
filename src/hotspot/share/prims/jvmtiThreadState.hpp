@@ -122,7 +122,7 @@ class VThreadList : public GrowableArrayCHeap<OopHandle, mtServiceability> {
 //
 // Virtual Threads Suspend/Resume management
 //
-class JvmtiVTSuspender {
+class JvmtiVTSuspender : AllStatic {
  private:
   // Suspend modes for virtual threads
   typedef enum VThreadSuspendMode {
@@ -262,7 +262,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   int count_frames();
 
   inline JavaThread *get_thread()      { return _thread;              }
-  inline JavaThread *get_thread_or_saved(); // return _thread_saved if _thread is NULL 
+  inline JavaThread *get_thread_or_saved(); // return _thread_saved if _thread is NULL
 
   // Needed for virtual threads as they can migrate to different JavaThread's.
   // Also used for carrier threads to clear/restore _thread.
@@ -448,7 +448,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   static JvmtiThreadState *state_for_while_locked(JavaThread *thread, oop thread_oop = NULL);
   // retrieve or create JvmtiThreadState
   // Can return NULL if JavaThread is exiting.
-  static JvmtiThreadState *state_for(JavaThread *thread, oop thread_oop = NULL);
+  static JvmtiThreadState *state_for(JavaThread *thread, Handle thread_handle = Handle());
 
   // JVMTI ForceEarlyReturn support
 
