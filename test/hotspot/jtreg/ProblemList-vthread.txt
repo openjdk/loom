@@ -256,6 +256,7 @@ runtime/cds/appcds/dynamicArchive/ArrayKlasses.java
 runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java
 runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java
 runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java
+runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java
 runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java
 runtime/cds/appcds/dynamicArchive/DynamicFlag.java
 runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java
@@ -357,7 +358,8 @@ runtime/ClassFile/PreviewVersion.java
 runtime/getSysPackage/GetSysPkgTest.java
 runtime/logging/VtablesTest.java
 serviceability/sa/TestCpoolForInvokeDynamic.java
-
+compiler/ciReplay/TestServerVM.java
+compiler/ciReplay/TestVMNoCompLevel.java
 
 ####
 # Custom cp adding (overriding -cp)
