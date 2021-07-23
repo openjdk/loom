@@ -36,6 +36,12 @@ import java.lang.ref.WeakReference;
 
 public class Test6397609 {
     public static void main(String[] args) throws Exception {
+        Thread.ofPlatform().start(Test6397609::test).join();
+        // The PropertyEditorManager depends on ThreadGroup
+        // and hang doesn't free editorClass in virtual thread
+        Thread.ofVirtual().start(Test6397609::test).join();
+    }
+    public static void test() {
         Class<?> targetClass = Object.class;
         Class<?> editorClass = new MemoryClassLoader().compile("Editor",
                 "public class Editor extends java.beans.PropertyEditorSupport {}");
@@ -47,7 +53,7 @@ public class Test6397609 {
         object = null;
         while (r.get() != null) {
             System.gc();
-            Thread.sleep(100);
+            sleep(100);
         }
 
         if (PropertyEditorManager.findEditor(targetClass) == null) {
@@ -59,11 +65,19 @@ public class Test6397609 {
         editorClass = null;
         while (ref.get() != null) {
             System.gc();
-            Thread.sleep(100);
+            sleep(100);
         }
 
         if (PropertyEditorManager.findEditor(targetClass) != null) {
             throw new Error("unexpected editor is found");
+        }
+    }
+
+    public static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 }
