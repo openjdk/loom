@@ -176,7 +176,7 @@ public class ThreadContainers {
     private static Stream<Thread> roots() {
         Stream<Thread> platformThreads = Stream.of(JLA.getAllThreads());
 
-        // virtual threads in shared containers and unmanaged virtual threads
+        // virtual threads in shared containers or parked waiting for I/O
         Stream<Thread> s1 = sharedContainers()
                 .flatMap(ThreadContainer::threads)
                 .filter(Thread::isVirtual);
