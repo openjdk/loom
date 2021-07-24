@@ -2247,11 +2247,6 @@ bool G1CollectedHeap::try_collect(GCCause::Cause cause) {
   }
 }
 
-bool G1CollectedHeap::requires_barriers(oop obj) const {
-  assert (obj != NULL, "");
-  return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
-}
-
 bool G1CollectedHeap::is_in(const void* p) const {
   return is_in_reserved(p) && _hrm.is_available(addr_to_region((HeapWord*)p));
 }

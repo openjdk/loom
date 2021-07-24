@@ -1010,7 +1010,7 @@ public:
 #endif
   ) {
     stackChunkOop chunk = _cont.tail();
-    if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
+    if (chunk == nullptr || chunk->is_gc_mode() || ConfigT::requires_barriers(chunk) || chunk->has_mixed_frames()) {
       log_develop_trace(jvmcont)("is_chunk_available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
       return false;
     }
@@ -1128,7 +1128,7 @@ public:
       _cont.set_tail(chunk);
       // java_lang_Continuation::set_tail(_cont.mirror(), chunk);
 
-      if (UNLIKELY(chunk->requires_barriers())) { // probably humongous
+      if (UNLIKELY(ConfigT::requires_barriers(chunk))) { // probably humongous
         log_develop_trace(jvmcont)("allocation requires barriers; retrying slow");
         chunk->set_argsize(0);
         chunk->set_sp(sp);
@@ -1419,7 +1419,7 @@ public:
     assert (!_barriers || (unextended_sp >= _size && chunk->is_empty()), "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _size, chunk->is_empty());
 
     DEBUG_ONLY(bool empty_chunk = true);
-    if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && chunk->requires_barriers())) {
+    if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && ConfigT::requires_barriers(chunk))) {
       // ALLOCATION
 
       if (log_develop_is_enabled(Trace, jvmcont)) {
@@ -1443,7 +1443,7 @@ public:
       chunk->set_gc_sp(sp);
       chunk->set_argsize(argsize);
       assert (chunk->is_empty(), "");
-      _barriers = chunk->requires_barriers();
+      _barriers = ConfigT::requires_barriers(chunk);
 
       if (_barriers) { log_develop_trace(jvmcont)("allocation requires barriers"); }
 
@@ -2256,7 +2256,7 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-    _barriers = (chunk->should_fix<typename ConfigT::OopT, ConfigT::_concurrent_gc>() || chunk->requires_barriers());
+    _barriers = (chunk->should_fix<typename ConfigT::OopT, ConfigT::_concurrent_gc>() || ConfigT::requires_barriers(chunk));
     if (LIKELY(can_thaw_fast(chunk))) {
       // if (kind != thaw_return_barrier) tty->print_cr("THAW FAST");
       return thaw_fast(chunk);
@@ -3334,14 +3334,14 @@ void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
 
 #include CPU_HEADER_INLINE(continuation)
 
-template <bool compressed_oops, bool concurrent_gc>
+template <bool compressed_oops, typename BarrierSetT>
 class Config {
 public:
-  typedef Config<compressed_oops, concurrent_gc> SelfT;
+  typedef Config<compressed_oops, BarrierSetT> SelfT;
   typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
 
   static const bool _compressed_oops = compressed_oops;
-  static const bool _concurrent_gc = concurrent_gc;
+  static const bool _concurrent_gc = BarrierSetT::is_concurrent_gc();
   // static const bool _post_barrier = post_barrier;
   // static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
   // static const bool has_young = use_chunks;
@@ -3355,8 +3355,12 @@ public:
     return thaw0<SelfT>(thread, kind);
   }
 
+  static bool requires_barriers(oop obj) {
+    return BarrierSetT::requires_barriers(obj);
+  }
+
   static void print() {
-    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, concurrent_gc);
+    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, _concurrent_gc);
     // tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
     // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
@@ -3367,22 +3371,31 @@ public:
   static void resolve() { resolve_compressed(); }
 
   static void resolve_compressed() {
-    UseCompressedOops ? resolve_concurrent_gc<true>()
-                      : resolve_concurrent_gc<false>();
+    UseCompressedOops ? resolve_gc<true>()
+                      : resolve_gc<false>();
   }
 
   template <bool use_compressed>
-  static void resolve_concurrent_gc() {
-    (UseZGC || UseShenandoahGC) ? resolve<use_compressed, true>()
-                                : resolve<use_compressed, false>();
+  static void resolve_gc() {
+    BarrierSet* bs = BarrierSet::barrier_set();
+    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
+    switch (bs->kind()) {
+#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
+      case BarrierSet::bs_name: {                                       \
+        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
+      }                                                                 \
+        break;
+      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
+#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
 
+    default:
+      fatal("BarrierSet resolving not implemented");
+    };
   }
 
-  // template <bool use_compressed> static void resolve_modref() { BarrierSet::barrier_set()->is_a(BarrierSet::ModRef) ? resolve<use_compressed, true>() : resolve<use_compressed, false>(); }
-
-  template <bool use_compressed, bool concurrent_gc>
+  template <bool use_compressed, typename BarrierSetT>
   static void resolve() {
-    typedef Config<use_compressed, concurrent_gc> SelectedConfigT;
+    typedef Config<use_compressed, BarrierSetT> SelectedConfigT;
     // SelectedConfigT::print();
 
     cont_freeze = SelectedConfigT::freeze;

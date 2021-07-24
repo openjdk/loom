@@ -35,6 +35,9 @@ class EpsilonBarrierSet: public BarrierSet {
 public:
   EpsilonBarrierSet();
 
+  // Loom support
+  static constexpr bool is_concurrent_gc() { return false; }
+
   virtual void print_on(outputStream *st) const {}
 
   virtual void on_thread_create(Thread* thread);

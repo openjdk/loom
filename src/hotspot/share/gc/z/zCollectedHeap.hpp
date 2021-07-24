@@ -72,7 +72,7 @@ public:
 
   virtual bool is_maximal_no_gc() const;
   virtual bool is_in(const void* p) const;
-  virtual bool requires_barriers(oop obj) const;
+  virtual inline bool requires_barriers(oop obj) const;
 
   // Continuation support
   virtual void collect_for_codecache();

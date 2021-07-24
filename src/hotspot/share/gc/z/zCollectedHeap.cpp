@@ -122,10 +122,6 @@ bool ZCollectedHeap::is_in(const void* p) const {
   return _heap.is_in((uintptr_t)p);
 }
 
-bool ZCollectedHeap::requires_barriers(oop obj) const {
-  return !_heap.is_allocating(cast_from_oop<uintptr_t>(obj));
-}
-
 uint32_t ZCollectedHeap::hash_oop(oop obj) const {
   return _heap.hash_oop(ZOop::to_address(obj));
 }

@@ -50,6 +50,9 @@ public:
     return barrier_set()->_satb_mark_queue_set;
   }
 
+  // Loom support
+  static constexpr bool is_concurrent_gc() { return true; }
+
   static bool need_load_reference_barrier(DecoratorSet decorators, BasicType type);
   static bool need_keep_alive_barrier(DecoratorSet decorators, BasicType type);
 

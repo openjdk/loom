@@ -28,6 +28,7 @@
 #include "gc/g1/g1CollectedHeap.hpp"
 
 #include "gc/g1/g1BarrierSet.hpp"
+#include "gc/g1/g1CardSetContainers.hpp"
 #include "gc/g1/g1CollectorState.hpp"
 #include "gc/g1/g1Policy.hpp"
 #include "gc/g1/g1RemSet.hpp"
@@ -338,6 +339,11 @@ inline void G1CollectedHeap::set_humongous_is_live(oop obj) {
     set_humongous_reclaim_candidate(region, false);
     _region_attr.clear_humongous(region);
   }
+}
+
+inline bool G1CollectedHeap::requires_barriers(oop obj) const {
+  assert (obj != NULL, "");
+  return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
 }
 
 #endif // SHARE_GC_G1_G1COLLECTEDHEAP_INLINE_HPP

@@ -28,6 +28,7 @@
 
 #include "gc/shared/accessBarrierSupport.inline.hpp"
 #include "gc/z/zBarrier.inline.hpp"
+#include "gc/z/zCollectedHeap.inline.hpp"
 #include "utilities/debug.hpp"
 
 template <DecoratorSet decorators, typename BarrierSetT>
@@ -237,6 +238,10 @@ inline oop ZBarrierSet::AccessBarrier<decorators, BarrierSetT>::oop_atomic_xchg_
   verify_decorators_absent<AS_NO_KEEPALIVE>();
 
   return Raw::oop_atomic_xchg_not_in_heap(addr, new_value);
+}
+
+inline bool ZBarrierSet::requires_barriers(oop obj) {
+  return ZCollectedHeap::heap()->ZCollectedHeap::requires_barriers(obj);
 }
 
 #endif // SHARE_GC_Z_ZBARRIERSET_INLINE_HPP
