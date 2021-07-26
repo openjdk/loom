@@ -1906,13 +1906,13 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
   oop thread_obj = NULL;
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh;
-  JavaThread* current = JavaThread::current();
 
   err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
 
+  JavaThread* current = JavaThread::current();
   HandleMark hm(current);
   Handle thread_handle(current, thread_obj);
 
@@ -1937,7 +1937,7 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
   }
 
   SetFramePopClosure op(this, state, depth);
-  MutexLocker mu(JvmtiThreadState_lock);
+  MutexLocker mu(current, JvmtiThreadState_lock);
   if (java_thread == current) {
     op.doit(java_thread, true /* self */);
   } else {
