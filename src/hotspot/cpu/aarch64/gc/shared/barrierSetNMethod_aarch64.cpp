@@ -159,7 +159,8 @@ void BarrierSetNMethod::arm(nmethod* nm, int arm_value) {
     return;
   }
 
-  // TODO LOOM AARCH64
+  NativeNMethodBarrier* barrier = native_nmethod_barrier(nm);
+  barrier->set_value(arm_value);
 }
 
 bool BarrierSetNMethod::is_armed(nmethod* nm) {
