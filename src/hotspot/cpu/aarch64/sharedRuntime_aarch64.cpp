@@ -1252,9 +1252,11 @@ static void gen_continuation_enter(MacroAssembler* masm,
   __ br(Assembler::NE, call_thaw);
   
   address mark = __ pc();
-  __ relocate(resolve.rspec());
+//  __ relocate(resolve.rspec());
   //if (!far_branches()) {
-  __ bl(resolve.target());
+//  __ bl(resolve.target()); 
+  __ trampoline_call1(resolve, NULL, false);
+
   oop_maps->add_gc_map(__ pc() - start, map);
   __ post_call_nop();
 
