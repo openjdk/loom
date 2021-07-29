@@ -60,7 +60,7 @@
 #endif
 
 #ifdef ASSERT
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 extern "C" JNIEXPORT void pns2();
 #endif
 
@@ -232,8 +232,6 @@ template <bool mixed>
 inline intptr_t* StackChunkFrameStream<mixed>::next_sp() const {
   return is_interpreted() ? next_sp_for_interpreter_frame() : unextended_sp() + cb()->frame_size();
 }
-
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
 
 template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_cb() {

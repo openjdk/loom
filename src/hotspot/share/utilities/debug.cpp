@@ -692,8 +692,8 @@ extern "C" JNIEXPORT void pns2() { // print native stack
 
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue) {
-  return p != NULL && SafeFetchN((intptr_t*)p, errvalue) != errvalue;
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue) {
+  return p != NULL && SafeFetchN((intptr_t*)const_cast<void*>(p), errvalue) != errvalue;
 }
 
 //////////////////////////////////////////////////////////////////////////////

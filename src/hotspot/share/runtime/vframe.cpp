@@ -138,6 +138,7 @@ javaVFrame* vframe::java_sender() const {
 }
 
 void vframe::restore_register_map() const {
+  assert (_reg_map.stack_chunk() != nullptr, "");
   if (_reg_map.stack_chunk()() != stack_chunk()) {
     const_cast<vframe*>(this)->_reg_map.set_stack_chunk(stack_chunk());
   }

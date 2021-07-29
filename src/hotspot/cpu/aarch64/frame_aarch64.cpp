@@ -268,16 +268,19 @@ bool frame::safe_for_sender(JavaThread *thread) {
 void frame::patch_pc(Thread* thread, address pc) {
   assert(_cb == CodeCache::find_blob(pc), "unexpected pc");
   address* pc_addr = &(((address*) sp())[-1]);
+
   if (TracePcPatching) {
     tty->print_cr("patch_pc at address " INTPTR_FORMAT " [" INTPTR_FORMAT " -> " INTPTR_FORMAT "]",
                   p2i(pc_addr), p2i(*pc_addr), p2i(pc));
   }
 
+  assert(!Continuation::is_return_barrier_entry(*pc_addr), "return barrier");
+  
   // Only generated code frames should be patched, therefore the return address will not be signed.
   assert(pauth_ptr_is_raw(*pc_addr), "cannot be signed");
   // Either the return address is the original one or we are going to
   // patch in the same address that's already there.
-  assert(_pc == *pc_addr || pc == *pc_addr, "must be");
+  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "must be (pc: " INTPTR_FORMAT " _pc: " INTPTR_FORMAT " pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT  " sp: " INTPTR_FORMAT ")", p2i(pc), p2i(_pc), p2i(pc_addr), p2i(*pc_addr), p2i(sp()));
   DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
   _pc = pc; // must be set before call to get_deopt_original_pc
@@ -285,10 +288,9 @@ void frame::patch_pc(Thread* thread, address pc) {
   if (original_pc != NULL) {
     assert(original_pc == old_pc, "expected original PC to be stored before patching");
     _deopt_state = is_deoptimized;
-    // leave _pc as is
+    _pc = original_pc;
   } else {
     _deopt_state = not_deoptimized;
-    _pc = pc;
   }
 }
 

@@ -1290,7 +1290,7 @@ void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
 #ifndef PRODUCT
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:

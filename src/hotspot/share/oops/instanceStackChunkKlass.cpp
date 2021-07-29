@@ -633,7 +633,7 @@ static inline oop safe_load(P *addr) {
 }
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
 #endif
 
