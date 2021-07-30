@@ -550,7 +550,6 @@ void NativePostCallNop::make_deopt() {
 }
 
 void NativePostCallNop::patch(jint diff) {
-  // TODO LOOM AARCH64
   // unsupported for now
 }
 
@@ -559,7 +558,6 @@ void NativeDeoptInstruction::verify() {
 
 // Inserts an undefined instruction at a given pc
 void NativeDeoptInstruction::insert(address code_pos) {
-  // TODO LOOM AARCH64
   // 1 1 0 1 | 0 1 0 0 | 1 0 1 imm16 0 0 0 0 1
   // d       | 4       | a      | de | 0 | 0 |
   // 0xd4, 0x20, 0x00, 0x00
