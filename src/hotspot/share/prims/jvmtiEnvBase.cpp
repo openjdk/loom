@@ -609,6 +609,8 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
   return found;
 }
 
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
+
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame* jvf) {
   // The second condition is needed to hide notification methods. 
@@ -629,6 +631,10 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame
   }
   if (jvf == NULL) { // TMP workaround for stability until the root cause is fixed
     jvf = jvf_saved;
+    assert (jvf != NULL, "");
+    assert (dbg_is_safe(jvf, -1), "");
+    assert (jvf->register_map() != NULL, "");
+    assert (dbg_is_safe(jvf->register_map(), -1), "");
     jvf->restore_register_map(); // we're returning to a frame we've walked past and might walk from again
   }
   return jvf;
