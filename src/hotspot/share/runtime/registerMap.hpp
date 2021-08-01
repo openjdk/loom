@@ -62,8 +62,6 @@ class JavaThread;
 //      Updating of the RegisterMap can be turned off by instantiating the
 //      register map as: RegisterMap map(thread, false);
 
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-
 class RegisterMap : public StackObj {
  public:
     typedef julong LocationValidType;
@@ -150,7 +148,7 @@ class RegisterMap : public StackObj {
 
   bool in_cont()        const { return _chunk() != NULL; } // Whether we are currently on the hstack; if true, frames are relativized
   oop cont() const;
-  stackChunkHandle stack_chunk() const { assert (this != nullptr, ""); assert (dbg_is_safe(this, -1), ""); return _chunk; }
+  stackChunkHandle stack_chunk() const { return _chunk; }
   void set_stack_chunk(stackChunkOop chunk);
 
   const RegisterMap* as_RegisterMap() const { return this; }
