@@ -124,7 +124,6 @@ serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
 serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java
 serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java
 serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
-serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
 serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
@@ -159,7 +158,7 @@ runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
 serviceability/tmtools/jstack/DaemonThreadTest.java
-
+serviceability/dcmd/thread/JavaThreadDumpTest.java
 
 ####
 # TODO check what are the cds issues with vthread
@@ -257,6 +256,7 @@ runtime/cds/appcds/dynamicArchive/ArrayKlasses.java
 runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java
 runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java
 runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java
+runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java
 runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java
 runtime/cds/appcds/dynamicArchive/DynamicFlag.java
 runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java
@@ -336,6 +336,21 @@ runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java
 runtime/cds/appcds/sharedStrings/SharedStringsStress.java
 runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java
 
+runtime/cds/appcds/NonJarInClasspath.java
+runtime/cds/appcds/OldInfExtendsInfDefMeth.java
+runtime/cds/appcds/OldSuperClass.java
+runtime/cds/appcds/OldSuperInf.java
+runtime/cds/appcds/OldSuperInfIndirect.java
+runtime/cds/appcds/customLoader/OldClassAndInf.java
+runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java
+runtime/cds/appcds/dynamicArchive/OldClassAndInf.java
+runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java
+runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl
+runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl
+runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#default-cl
+
 ####
 ## Fails when run even in new kernel thread
 runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java
@@ -343,7 +358,8 @@ runtime/ClassFile/PreviewVersion.java
 runtime/getSysPackage/GetSysPkgTest.java
 runtime/logging/VtablesTest.java
 serviceability/sa/TestCpoolForInvokeDynamic.java
-
+compiler/ciReplay/TestServerVM.java
+compiler/ciReplay/TestVMNoCompLevel.java
 
 ####
 # Custom cp adding (overriding -cp)

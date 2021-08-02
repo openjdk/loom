@@ -76,11 +76,6 @@ public class ThreadImpl implements ThreadMXBean {
     }
 
     @Override
-    public long getVirtualThreadCount() {
-        return jdk.internal.vm.ThreadContainers.virtualThreadCount();
-    }
-
-    @Override
     public boolean isThreadContentionMonitoringSupported() {
         return jvm.isThreadContentionMonitoringSupported();
     }

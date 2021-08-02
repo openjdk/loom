@@ -57,6 +57,7 @@ public class Blocker {
         try {
             PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
                 MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+            @SuppressWarnings("removal")
             MethodHandles.Lookup l = AccessController.doPrivileged(pa);
             MethodType methodType = MethodType.methodType(void.class, ManagedBlocker.class);
             compensatedBlock = l.findVirtual(ForkJoinPool.class, "compensatedBlock", methodType);

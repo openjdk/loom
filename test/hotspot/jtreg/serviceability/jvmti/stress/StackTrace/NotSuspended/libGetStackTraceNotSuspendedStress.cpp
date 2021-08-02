@@ -38,25 +38,24 @@ static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jvmtiError err;
 
   err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, &count);
-  check_jvmti_status(jni, err, "GetStackTrace returns error.");
+  check_jvmti_status(jni, err, "GetStackTrace returns error");
   if (count <= 0) {
-    LOG("Stacktrace in virtual thread is incorrect. count: %d\n", count);
+    LOG("Agent: Stacktrace in virtual thread is incorrect: count: %d\n", count);
     print_thread_info(jvmti, jni, vthread);
     print_stack_trace_frames(jvmti, jni, count, frames);
-    fatal(jni, "Incorrect frame count.");
+    fatal(jni, "Incorrect frame count");
   }
 
-  method = frames[count -1].method;
+  method = frames[count - 1].method;
 
   const char* class_name = get_method_class_name(jvmti, jni, method);
   const char* method_name = get_method_name(jvmti, jni, method);
 
-  if (strcmp(CONTINUATION_CLASS_NAME, class_name) !=0 || strcmp(CONTINUATION_METHOD_NAME, method_name) != 0) {
-    LOG("Stacktrace in virtual thread is incorrect (doesn't start from enter(...):\n");
+  if (strcmp(CONTINUATION_CLASS_NAME, class_name) != 0 || strcmp(CONTINUATION_METHOD_NAME, method_name) != 0) {
+    LOG("Agent: Stacktrace of virtual thread is incorrect: doesn't start from enter(...):\n");
     print_stack_trace_frames(jvmti, jni, count, frames);
-    fatal(jni, "incorrect stacktrace.");
+    fatal(jni, "incorrect stacktrace");
   }
-
 }
 
 
@@ -65,12 +64,14 @@ static void JNICALL
 agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
   static jlong timeout = 0;
-  LOG("Wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  LOG("Agent: wait for thread to start\n");
+  if (!nsk_jvmti_waitForSync(timeout)) {
     return;
-  if (!nsk_jvmti_resumeSync())
+  }
+  if (!nsk_jvmti_resumeSync()) {
     return;
-  LOG("Started.....\n");
+  }
+  LOG("Agent: started\n");
 
   while(true) {
     jthread *threads = NULL;
@@ -81,7 +82,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     if (err == JVMTI_ERROR_WRONG_PHASE) {
       return;
     }
-    check_jvmti_status(jni, err,  "Error in GetAllThreads");
+    check_jvmti_status(jni, err,  "Error in JVMTI GetAllThreads");
     for (int i = 0; i < count; i++) {
       jthread tested_thread = NULL;
 
@@ -92,15 +93,14 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       if (err == JVMTI_ERROR_WRONG_PHASE) {
         return;
       }
-      check_jvmti_status(jni, err,  "Error in GetVirtualThread");
+      check_jvmti_status(jni, err,  "Error in JVMTI extension GetVirtualThread");
       if (tested_thread != NULL) {
         test_stack_trace(jvmti, jni, tested_thread);
-        //test_stack_trace(jvmti, jni, threads[i]);
       }
-
     }
-    check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error Deallocating memory.");
+    check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error in JVMTI Deallocate");
   }
+  LOG("Agent: finished\n");
 }
 
 
@@ -113,7 +113,6 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *res
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
     return JNI_ERR;
   }
-
   memset(&caps, 0, sizeof(caps));
   caps.can_support_virtual_threads = 1;
 

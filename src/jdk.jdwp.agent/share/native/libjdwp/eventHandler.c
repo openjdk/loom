@@ -720,7 +720,10 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
     }
 
     if (ei == EI_THREAD_END && evinfo->is_vthread && !gdata->notifyVThreads) {
-        // Skip this event since we are not notifying the debugger of vthread START/END events
+        /*
+         * Skip this event since we are not notifying the debugger of vthread START/END
+         * events. Note special handling of EI_THREAD_START is in cbVthreadStart().
+         */
     } else {
         filterAndHandleEvent(env, evinfo, ei, eventBag, eventSessionID);
     }
@@ -1275,6 +1278,10 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
     EventInfo info;
     LOG_CB(("cbVMDeath"));
 
+    /* Setting this flag is needed by findThread(). It's ok to set it before
+       the callbacks are cleared.*/
+    gdata->jvmtiCallBacksCleared = JNI_TRUE;
+
     /* Clear out ALL callbacks at this time, we don't want any more. */
     /*    This should prevent any new BEGIN_CALLBACK() calls. */
     (void)memset(&(gdata->callbacks),0,sizeof(gdata->callbacks));
@@ -1376,8 +1383,8 @@ cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
         }
     }
 
-    /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads
-     * or are tracking all vthreads. */
+    /* Ignore VIRTUAL_THREAD_START events unless we are notifying the debugger of all vthreads or
+     * are tracking all vthreads. Note similar code for VIRTUAL_THREAD_END is in event_callback(). */
     if (!gdata->notifyVThreads && !gdata->trackAllVThreads) {
         return;
     }

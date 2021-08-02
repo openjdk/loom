@@ -144,7 +144,7 @@ bool OptoRuntime::generate(ciEnv* env) {
   gen(env, _multianewarray4_Java           , multianewarray4_Type         , multianewarray4_C               ,    0 , true, false);
   gen(env, _multianewarray5_Java           , multianewarray5_Type         , multianewarray5_C               ,    0 , true, false);
   gen(env, _multianewarrayN_Java           , multianewarrayN_Type         , multianewarrayN_C               ,    0 , true, false);
-  gen(env, _complete_monitor_locking_Java  , complete_monitor_enter_Type  , SharedRuntime::complete_monitor_locking_C, 0, false, false);
+  gen(env, _complete_monitor_locking_Java  , complete_monitor_enter_Type  , SharedRuntime::complete_monitor_locking_C_inc_held_monitor_count, 0, false, false);
   gen(env, _monitor_notify_Java            , monitor_notify_Type          , monitor_notify_C                ,    0 , false, false);
   gen(env, _monitor_notifyAll_Java         , monitor_notify_Type          , monitor_notifyAll_C             ,    0 , false, false);
   gen(env, _rethrow_Java                   , rethrow_Type                 , rethrow_C                       ,    2 , true , true );
@@ -302,7 +302,7 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_nozero_C(Klass* array_type, int len
   if ((len > 0) && (result != NULL) &&
       is_deoptimized_caller_frame(current)) {
     // Zero array here if the caller is deoptimized.
-    int size = ((typeArrayOop)result)->object_size();
+    int size = TypeArrayKlass::cast(array_type)->oop_size(result);
     BasicType elem_type = TypeArrayKlass::cast(array_type)->element_type();
     const size_t hs = arrayOopDesc::header_size(elem_type);
     // Align to next 8 bytes to avoid trashing arrays's length.
@@ -659,6 +659,25 @@ const TypeFunc *OptoRuntime::Math_D_D_Type() {
   fields[TypeFunc::Parms+0] = Type::DOUBLE;
   fields[TypeFunc::Parms+1] = Type::HALF;
   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+2, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+const TypeFunc *OptoRuntime::Math_Vector_Vector_Type(uint num_arg, const TypeVect* in_type, const TypeVect* out_type) {
+  // create input type (domain)
+  const Type **fields = TypeTuple::fields(num_arg);
+  // Symbol* name of class to be loaded
+  assert(num_arg > 0, "must have at least 1 input");
+  for (uint i = 0; i < num_arg; i++) {
+    fields[TypeFunc::Parms+i] = in_type;
+  }
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+num_arg, fields);
+
+  // create result type (range)
+  const uint num_ret = 1;
+  fields = TypeTuple::fields(num_ret);
+  fields[TypeFunc::Parms+0] = out_type;
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+num_ret, fields);
 
   return TypeFunc::make(domain, range);
 }
@@ -1230,7 +1249,7 @@ const TypeFunc* OptoRuntime::base64_encodeBlock_Type() {
 }
 // Base64 decode function
 const TypeFunc* OptoRuntime::base64_decodeBlock_Type() {
-  int argcnt = 6;
+  int argcnt = 7;
 
   const Type** fields = TypeTuple::fields(argcnt);
   int argp = TypeFunc::Parms;
@@ -1240,6 +1259,7 @@ const TypeFunc* OptoRuntime::base64_decodeBlock_Type() {
   fields[argp++] = TypePtr::NOTNULL;    // dest array
   fields[argp++] = TypeInt::INT;        // dest offset
   fields[argp++] = TypeInt::BOOL;       // isURL
+  fields[argp++] = TypeInt::BOOL;       // isMIME
   assert(argp == TypeFunc::Parms + argcnt, "correct decoding");
   const TypeTuple* domain = TypeTuple::make(TypeFunc::Parms+argcnt, fields);
 
@@ -1635,12 +1655,6 @@ void OptoRuntime::print_named_counters() {
           eliminated_lock_count += count;
         }
       }
-    } else if (c->tag() == NamedCounter::BiasedLockingCounter) {
-      BiasedLockingCounters* blc = ((BiasedLockingNamedCounter*)c)->counters();
-      if (blc->nonzero()) {
-        tty->print_cr("%s", c->name());
-        blc->print_on(tty);
-      }
 #if INCLUDE_RTM_OPT
     } else if (c->tag() == NamedCounter::RTMLockingCounter) {
       RTMLockingCounters* rlc = ((RTMLockingNamedCounter*)c)->counters();
@@ -1691,9 +1705,7 @@ NamedCounter* OptoRuntime::new_named_counter(JVMState* youngest_jvms, NamedCount
     // To print linenumbers instead of bci use: m->line_number_from_bci(bci)
   }
   NamedCounter* c;
-  if (tag == NamedCounter::BiasedLockingCounter) {
-    c = new BiasedLockingNamedCounter(st.as_string());
-  } else if (tag == NamedCounter::RTMLockingCounter) {
+  if (tag == NamedCounter::RTMLockingCounter) {
     c = new RTMLockingNamedCounter(st.as_string());
   } else {
     c = new NamedCounter(st.as_string(), tag);

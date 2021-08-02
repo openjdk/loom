@@ -92,7 +92,7 @@ traceid JfrThreadId::id(const Thread* t, oop vthread) {
   if (vthread != NULL) {
     return java_lang_Thread::thread_id(vthread);
   }
-  const oop thread_obj = t->as_Java_thread()->threadObj();
+  const oop thread_obj = JavaThread::cast(t)->threadObj();
   return thread_obj != NULL ? java_lang_Thread::thread_id(thread_obj) : 0;
 }
 
@@ -128,5 +128,5 @@ const char* get_java_thread_name(const JavaThread* jt, oop vthread) {
 
 const char* JfrThreadName::name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
-  return t->is_Java_thread() ? get_java_thread_name(t->as_Java_thread(), vthread) : t->name();
+  return t->is_Java_thread() ? get_java_thread_name(JavaThread::cast(t), vthread) : t->name();
 }

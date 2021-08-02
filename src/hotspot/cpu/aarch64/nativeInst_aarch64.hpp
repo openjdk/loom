@@ -690,7 +690,7 @@ inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
 
 class NativeDeoptInstruction: public NativeInstruction {
  public:
-  enum Intel_specific_constants { // TODO LOOM AARCH64
+  enum {
     instruction_size            =    4,
     instruction_offset          =    0,
   };
@@ -701,10 +701,9 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    return ((*instr) & 0xFF) == 0xd4 && 
-      ((*(instr+1)) & 0xFF) == 0x20 &&
-      ((*(instr+2)) & 0xFF) == 0x00 &&
-      ((*(instr+3)) & 0xFF) == 0x00;
+    assert (instr != NULL, "");
+    uint32_t value = *(uint32_t *) instr;
+    return value == 0xd4ade001;
   }
 
   // MT-safe patching

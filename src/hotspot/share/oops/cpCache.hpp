@@ -34,8 +34,6 @@
 #include "utilities/constantTag.hpp"
 #include "utilities/growableArray.hpp"
 
-class PSPromotionManager;
-
 // The ConstantPoolCache is not a cache! It is the resolution table that the
 // interpreter uses to avoid going into the runtime and a way to access resolved
 // values.

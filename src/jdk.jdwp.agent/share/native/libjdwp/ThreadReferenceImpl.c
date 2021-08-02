@@ -600,7 +600,8 @@ forceEarlyReturn(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* vthread fixme: add vthread support */
+    /* vthread fixme: add vthread support. This should work for vthreads that are
+       mounted and suspended. */
     if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;

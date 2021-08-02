@@ -28,6 +28,7 @@
 #include "asm/codeBuffer.hpp"
 #include "compiler/compilerDefinitions.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "runtime/javaFrameAnchor.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/handles.hpp"
 #include "utilities/align.hpp"
@@ -35,6 +36,7 @@
 
 class ImmutableOopMap;
 class ImmutableOopMapSet;
+class JNIHandleBlock;
 class OopMapSet;
 
 // CodeBlob Types
@@ -59,6 +61,7 @@ struct CodeBlobType {
 //    AdapterBlob        : Used to hold C2I/I2C adapters
 //    VtableBlob         : Used for holding vtable chunks
 //    MethodHandlesAdapterBlob : Used to hold MethodHandles adapters
+//    OptimizedEntryBlob : Used for upcalls from native code
 //   RuntimeStub         : Call to VM runtime methods
 //   SingletonBlob       : Super-class for all blobs that exist in only one instance
 //    DeoptimizationBlob : Used for deoptimization
@@ -76,6 +79,8 @@ struct CodeBlobType {
 
 
 class CodeBlobLayout;
+class OptimizedEntryBlob; // for as_optimized_entry_blob()
+class JavaFrameAnchor; // for OptimizedEntryBlob::jfa_for_frame
 
 class CodeBlob {
   friend class VMStructs;
@@ -139,6 +144,7 @@ public:
   virtual bool is_method_handles_adapter_blob() const { return false; }
   bool is_compiled() const                            { return _is_compiled; }
   const bool* is_compiled_addr() const                { return &_is_compiled; }
+  virtual bool is_optimized_entry_blob() const                  { return false; }
 
   inline bool is_compiled_by_c1() const    { return _type == compiler_c1; };
   inline bool is_compiled_by_c2() const    { return _type == compiler_c2; };
@@ -152,6 +158,7 @@ public:
   CompiledMethod* as_compiled_method_or_null() { return is_compiled() ? (CompiledMethod*) this : NULL; }
   CompiledMethod* as_compiled_method()         { assert(is_compiled(), "must be compiled"); return (CompiledMethod*) this; }
   CodeBlob* as_codeblob_or_null() const        { return (CodeBlob*) this; }
+  OptimizedEntryBlob* as_optimized_entry_blob() const             { assert(is_optimized_entry_blob(), "must be entry blob"); return (OptimizedEntryBlob*) this; }
 
   // Boundaries
   address header_begin() const        { return (address) this; }
@@ -389,6 +396,7 @@ class BufferBlob: public RuntimeBlob {
   friend class AdapterBlob;
   friend class VtableBlob;
   friend class MethodHandlesAdapterBlob;
+  friend class OptimizedEntryBlob;
   friend class WhiteBox;
 
  private:
@@ -726,6 +734,47 @@ class SafepointBlob: public SingletonBlob {
 
   // Typing
   bool is_safepoint_stub() const                 { return true; }
+};
+
+//----------------------------------------------------------------------------------------------------
+
+class ProgrammableUpcallHandler;
+
+class OptimizedEntryBlob: public BufferBlob {
+  friend class ProgrammableUpcallHandler;
+ private:
+  intptr_t _exception_handler_offset;
+  jobject _receiver;
+  ByteSize _frame_data_offset;
+
+  OptimizedEntryBlob(const char* name, int size, CodeBuffer* cb, intptr_t exception_handler_offset,
+                     jobject receiver, ByteSize frame_data_offset);
+
+  struct FrameData {
+    JavaFrameAnchor jfa;
+    JavaThread* thread;
+    JNIHandleBlock* old_handles;
+    JNIHandleBlock* new_handles;
+    bool should_detach;
+  };
+
+  // defined in frame_ARCH.cpp
+  FrameData* frame_data_for_frame(const frame& frame) const;
+ public:
+  // Creation
+  static OptimizedEntryBlob* create(const char* name, CodeBuffer* cb,
+                                    intptr_t exception_handler_offset, jobject receiver,
+                                    ByteSize frame_data_offset);
+
+  address exception_handler() { return code_begin() + _exception_handler_offset; }
+  jobject receiver() { return _receiver; }
+
+  JavaFrameAnchor* jfa_for_frame(const frame& frame) const;
+
+  void oops_do(OopClosure* f, const frame& frame);
+
+  // Typing
+  virtual bool is_optimized_entry_blob() const override { return true; }
 };
 
 #endif // SHARE_CODE_CODEBLOB_HPP

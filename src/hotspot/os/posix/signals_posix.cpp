@@ -629,16 +629,20 @@ int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
   // If it is, patch return address to be deopt handler.
   if (!signal_was_handled) {
     address pc = os::Posix::ucontext_get_pc(uc);
+    assert (pc != NULL, "");
     if (NativeDeoptInstruction::is_deopt_at(pc)) {
       CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
       if (cb != NULL && cb->is_compiled()) {
         CompiledMethod* cm = cb->as_compiled_method();
-        frame fr = os::fetch_frame_from_context(uc);
+        assert(cm->insts_contains_inclusive(pc), "");
         address deopt = cm->is_method_handle_return(pc) ?
           cm->deopt_mh_handler_begin() :
           cm->deopt_handler_begin();
-        assert(cm->insts_contains_inclusive(pc), "");
+        assert (deopt != NULL, "");
+
+        frame fr = os::fetch_frame_from_context(uc);
         cm->set_original_pc(&fr, pc);
+
         os::Posix::ucontext_set_pc(uc, deopt);
         signal_was_handled = true;
       }

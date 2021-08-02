@@ -213,7 +213,7 @@ void frame::set_pc(address   newpc ) {
   }
 #endif // ASSERT
 
-  // Unsafe to use the is_deoptimzed tester after changing pc
+  // Unsafe to use the is_deoptimized tester after changing pc
   _deopt_state = unknown;
   _pc = newpc;
   _cb = CodeCache::find_blob_unsafe(_pc);
@@ -925,6 +925,11 @@ void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool quer
   oops_interpreted_do0<relative>(f, map, m, bci, mask);
 }
 
+// Initialize explicitly so that these can be used only with definitions.
+// TODO: Rectify as Loom stabilizes...
+template void frame::oops_interpreted_do<true> (OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
+template void frame::oops_interpreted_do<false>(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
+
 template <bool relative>
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const {
   Thread *thread = Thread::current();
@@ -1195,6 +1200,8 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
                           : oops_interpreted_do<true >(f, map, use_interpreter_oop_map_cache);
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
+  } else if (is_optimized_entry_frame()) {
+    _cb->as_optimized_entry_blob()->oops_do(f, *this);
   } else if (CodeCache::contains(pc())) {
     oops_code_blob_do(f, cf, df, derived_mode, map);
   } else {
@@ -1241,7 +1248,9 @@ void frame::verify(const RegisterMap* map) const {
   assert(DerivedPointerTable::is_empty(), "must be empty before verify");
 #endif
 
-  oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, DerivedPointerIterationMode::_ignore, map, false);
+  if (map->update_map()) { // The map has to be up-to-date for the current frame
+    oops_do_internal(&VerifyOopClosure::verify_oop, NULL, NULL, DerivedPointerIterationMode::_ignore, map, false);
+  }
 }
 
 
@@ -1281,7 +1290,7 @@ void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
 #ifndef PRODUCT
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(void* p, intptr_t errvalue);
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,6 +36,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,15 +45,11 @@ import java.util.function.Supplier;
 import java.lang.System.LoggerFinder;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
-import jdk.internal.logger.SimpleConsoleLogger;
 
 /**
  * @test
@@ -202,6 +199,10 @@ public class LoggerFinderLoaderTest {
         }
     }
 
+    private static String withoutWarning(String in) {
+        return in.lines().filter(s -> !s.startsWith("WARNING:")).collect(Collectors.joining());
+    }
+
     static LoggerFinder getLoggerFinder(Class<?> expectedClass,
             String errorPolicy, boolean singleton) {
         LoggerFinder provider = null;
@@ -234,7 +235,9 @@ public class LoggerFinderLoaderTest {
                         }
                     }
                 } else if ("QUIET".equals(errorPolicy.toUpperCase(Locale.ROOT))) {
-                    if (!ErrorStream.errorStream.peek().isEmpty()) {
+                    String warning = ErrorStream.errorStream.peek();
+                    warning = withoutWarning(warning);
+                    if (!warning.isEmpty()) {
                         throw new RuntimeException("Unexpected error message found: "
                                 + ErrorStream.errorStream.peek());
                     }

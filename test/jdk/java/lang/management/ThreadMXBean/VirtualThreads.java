@@ -45,19 +45,6 @@ import static org.testng.Assert.*;
 public class VirtualThreads {
 
     /**
-     * Test ThreadMXBean::getVirtualThreadCount.
-     */
-    public void testGetVirtualThreadCount() {
-        Thread thread = Thread.ofVirtual().start(LockSupport::park);
-        try {
-            ThreadMXBean mbean = ManagementFactory.getThreadMXBean();
-            assertTrue(mbean.getVirtualThreadCount() > 0);
-        } finally {
-            LockSupport.unpark(thread);
-        }
-    }
-
-    /**
      * Test that ThreadMXBean::getAllThreadsIds does not include thread ids for
      * virtual threads.
      */

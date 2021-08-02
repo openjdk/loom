@@ -66,7 +66,6 @@ class ExecutorServiceHelper {
                                          Collection<? extends Callable<T>> tasks,
                                          boolean waitAll)
             throws InterruptedException {
-
         if (waitAll) {
             List<Future<T>> futures = new ArrayList<>();
             int j = 0;
@@ -75,13 +74,15 @@ class ExecutorServiceHelper {
                     Future<T> f = executor.submit(t);
                     futures.add(f);
                 }
-                for (int size = futures.size(); j < size; j++) {
+                int size = futures.size();
+                while (j < size) {
                     Future<T> f = futures.get(j);
                     if (!f.isDone()) {
                         try {
                             f.get();
                         } catch (ExecutionException | CancellationException ignore) { }
                     }
+                    j++;
                 }
             } finally {
                 cancelAll(futures, j);
@@ -90,18 +91,19 @@ class ExecutorServiceHelper {
         } else {
             var queue = new LinkedTransferQueue<Future<T>>();
             List<Future<T>> futures = submit(executor, tasks, queue);
-            var spliterator = new BlockingQueueSpliterator<>(queue, futures.size());
+
+            // wait for a task to complete with exception or all tasks to complete
             try {
-                // wait for a task to complete with exception or all tasks to complete
+                Runnable cancelAll = () -> cancelAll(futures);
+                var spliterator = new BlockingQueueSpliterator<>(queue, futures.size(), cancelAll);
                 StreamSupport.stream(spliterator, false)
                         .filter(f -> isCompletedExceptionally(f))
                         .findAny();
-            } catch (CancellationException e) {
-                if (Thread.interrupted())
-                    throw new InterruptedException();
-                throw e;
             } finally {
                 cancelAll(futures);
+            }
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
             }
             return futures;
         }
@@ -182,28 +184,30 @@ class ExecutorServiceHelper {
             this.interruptHandler = interruptHandler;
         }
 
-        BlockingQueueSpliterator(BlockingQueue<Future<T>> queue, int size) {
-            this(queue, size, null);
-        }
-
         @Override
         public boolean tryAdvance(Consumer<? super Future<T>> action) {
             Objects.requireNonNull(action);
             if (taken >= size) {
                 return false;
             } else {
-                Future<T> f;
+                boolean interrupted = false;
                 try {
-                    f = queue.take();
-                } catch (InterruptedException e) {
-                    if (interruptHandler != null)
-                        interruptHandler.run();
-                    Thread.currentThread().interrupt();
-                    throw new CancellationException("Thread interrupted");
+                    Future<T> f = null;
+                    do {
+                        try {
+                            f = queue.take();
+                        } catch (InterruptedException e) {
+                            interruptHandler.run();
+                            interrupted = true;
+                        }
+                    } while (f == null);
+                    taken++;
+                    action.accept(f);
+                    return true;
+                } finally {
+                    if (interrupted)
+                        Thread.currentThread().interrupt();
                 }
-                taken++;
-                action.accept(f);
-                return true;
             }
         }
 

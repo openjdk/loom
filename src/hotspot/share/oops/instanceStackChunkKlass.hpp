@@ -140,14 +140,14 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
+  template <bool store>
+  static void do_barriers(stackChunkOop chunk);
+
   template <bool store, bool mixed, typename RegisterMapT>
   static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
-
-  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
-  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 private:
   static int bitmap_size_in_bits(int stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
@@ -158,6 +158,9 @@ private:
   
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
+  
+  template <typename T, class OopClosureType>
+  inline void oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure);
@@ -168,22 +171,19 @@ private:
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
-  void mark_methods(stackChunkOop chunk);
+  void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
+
+  template <bool mixed, class StackChunkFrameClosureType>
+  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
 
   template <bool concurrent_gc>
-  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure);
-
-  template <bool mixed>
-  static void run_nmethod_entry_barrier_if_needed(const StackChunkFrameStream<mixed>& f);
+  void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
   template <bool concurrent_gc, bool mixed, typename RegisterMapT>
   static void relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   template <bool mixed, typename RegisterMapT>
   static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
-
-  static inline void relativize(intptr_t* const fp, intptr_t* const hfp, int offset);
-  static inline void derelativize(intptr_t* const fp, int offset);
   
   typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
   static void resolve_memcpy_functions();
@@ -252,6 +252,7 @@ class StackChunkFrameStream : public StackObj {
 
 #ifdef ASSERT
   bool is_in_frame(void* p) const;
+  bool is_deoptimized() const;
   template <typename RegisterMapT> bool is_in_oops(void* p, const RegisterMapT* map) const;
 #endif
 

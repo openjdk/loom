@@ -55,8 +55,8 @@ public class CloseTest {
 
             // implementations that may override close
             { new ForkJoinPool(), },
-            { Executors.newThreadExecutor(defaultThreadFactory), },
-            { Executors.newThreadExecutor(virtualThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(defaultThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
         };
     }
 

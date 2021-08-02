@@ -27,8 +27,10 @@
 
 #include "classfile/javaClasses.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
+
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/safepointVerifiers.hpp"
 #include "runtime/thread.inline.hpp"
 
 // JvmtiEnvThreadStateIterator implementation
@@ -56,11 +58,6 @@ JvmtiEnvThreadState* JvmtiThreadState::env_thread_state(JvmtiEnvBase *env) {
   JvmtiEnvThreadStateIterator it(this);
   for (JvmtiEnvThreadState* ets = it.first(); ets != NULL; ets = it.next(ets)) {
     if ((JvmtiEnvBase*)(ets->get_env()) == env) {
-#ifdef DBG // TMP
-      const char* virt = this->is_virtual() ? "virtual" : "carrier";
-      printf("DBG: env_thread_state: %s state: %p, env: %p, ets: %p\n",
-             virt, (void*)this, (void*)env, (void*)ets); fflush(0);
-#endif
       return ets;
     }
   }
@@ -79,6 +76,8 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   assert(thread != NULL || thread_oop != NULL, "sanity check");
 
+  NoSafepointVerifier nsv;  // oop is safe to use.
+
   if (thread_oop == NULL) { // then thread should not be NULL (see assert above)
     thread_oop = thread->mounted_vthread() != NULL ? thread->mounted_vthread() : thread->threadObj();
   }
@@ -88,10 +87,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   const char* action = "FOUND";
 
   if (state == NULL && thread != NULL && thread->is_exiting()) {
-#ifdef DBG // TMP
-    printf("DBG: state_for_while_locked: JvmtiThreadState: %p, state==NULL or thread is_exiting: %d\n",
-           (void*)state, (thread != NULL && thread->is_exiting())); fflush(0);
-#endif
     // don't add a JvmtiThreadState to a thread that is exiting
     return NULL;
   }
@@ -101,41 +96,24 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
       state = java_lang_Thread::jvmti_thread_state(thread_oop);
     }
     if (state == NULL) { // need to create state
-      Thread* current_thread = Thread::current();
-      HandleMark hm(current_thread);
-      Handle thread_oop_h = Handle(current_thread, thread_oop);
-
       state = new JvmtiThreadState(thread, thread_oop);
-      if (thread_oop_h() != NULL) { // thread_oop can be NULL at early VMStart
-        java_lang_Thread::set_jvmti_thread_state(thread_oop_h(), state);
+      if (thread_oop != NULL) { // thread_oop can be NULL at early VMStart
+        java_lang_Thread::set_jvmti_thread_state(thread_oop, state);
       }
       action = "CREATED";
     }
-#ifdef DBG // TMP
-    if (!state->is_virtual()) {
-      ResourceMark rm(JavaThread::current());
-      oop name_oop = java_lang_Thread::name(thread_oop);
-      const char* name_str = java_lang_String::as_utf8_string(name_oop);
-      name_str = name_str == NULL ? "<NULL>" : name_str;
-      printf("DBG: state_for_while_locked: %s cthread JvmtiThreadState: %p, %s\n",
-             action, (void*)state, name_str); fflush(0);
-    }
-#endif
   }
   return state;
 }
 
-inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, oop thread_oop) {
+inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, Handle thread_handle) {
   // in a case of unmounted virtual thread the thread can be NULL
-  JvmtiThreadState* state = thread_oop == NULL ? thread->jvmti_thread_state() :
-                                                java_lang_Thread::jvmti_thread_state(thread_oop);
+  JvmtiThreadState* state = thread_handle == NULL ? thread->jvmti_thread_state() :
+                                                java_lang_Thread::jvmti_thread_state(thread_handle());
   if (state == NULL) {
-    Thread* current_thread = Thread::current();
-    HandleMark hm(current_thread);
-    Handle h_thread_oop = Handle(current_thread, thread_oop);
     MutexLocker mu(JvmtiThreadState_lock);
     // check again with the lock held
-    state = state_for_while_locked(thread, h_thread_oop());
+    state = state_for_while_locked(thread, thread_handle());
   } else {
     // Check possible safepoint even if state is non-null.
     // (Note: the thread argument isn't the current thread)

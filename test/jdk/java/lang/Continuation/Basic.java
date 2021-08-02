@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -38,26 +38,6 @@
 *
 */
 
-/**
- * @test
- * @summary Test which verifies that continuation repspects Xint mode
- *
- * @run testng/othervm -Xint -XX:+SegmentedCodeCache Basic
- */
-
-// Anything excluded or not compileonly is not compiled; see CompilerOracle::should_exclude
-
-// * @library /test/lib /
-// *
-// * @build sun.hotspot.WhiteBox
-// * @run driver ClassFileInstaller sun.hotspot.WhiteBox sun.hotspot.WhiteBox$WhiteBoxPermission
-// *
-// -XX:+WhiteBoxAPI
-
-// @run driver jdk.test.lib.FileInstaller compilerDirectives.json compilerDirectives.json
-// -XX:CompilerDirectivesFile=compilerDirectives.json
-
-// import sun.hotspot.WhiteBox;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,18 +54,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Test
 public class Basic {
-    // private static final WhiteBox WB = WhiteBox.getWhiteBox();
-
     static final ContinuationScope FOO = new ContinuationScope() {};
-
-    // @Test
-    // public void test0() {
-    //     fooooooo();
-    // }
-
-    // private static void fooooooo() {
-    //     new Basic().test1();
-    // }
 
     public void test1() {
         System.out.println("test1");

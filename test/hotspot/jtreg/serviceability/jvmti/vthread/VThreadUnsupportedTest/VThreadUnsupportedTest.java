@@ -35,31 +35,23 @@ public class VThreadUnsupportedTest {
     final AtomicBoolean isJNITestingCompleted = new AtomicBoolean(false);
     
     native boolean isCompletedTestInEvent(); 
-    native boolean testJvmtiFunctionsInJNICall();
-
-    private boolean iterrupted = false;
+    native boolean testJvmtiFunctionsInJNICall(Thread vthread);
 
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
             do {
                 try { 
                     lock.wait(10);
-                } catch (InterruptedException ie) {
-                    System.err.println("Virtual thread was interrupted as expected");
-                    iterrupted = true;
-                }
+                } catch (InterruptedException ie) {}
             } while (!isCompletedTestInEvent() || !isJNITestingCompleted.get());
         }
     };
 
     void runTest() throws Exception { 
         Thread vthread = Thread.ofVirtual().name("VThread").start(pinnedTask);
-        testJvmtiFunctionsInJNICall();
+        testJvmtiFunctionsInJNICall(vthread);
         isJNITestingCompleted.set(true);
         vthread.join();
-        if (!iterrupted) {
-            throw new RuntimeException("Failed: Virtual thread was not interrupted!");
-        }
     }
 
     public static void main(String[] args) throws Exception {

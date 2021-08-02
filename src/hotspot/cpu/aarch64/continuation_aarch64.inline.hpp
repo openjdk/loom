@@ -65,8 +65,9 @@ static inline intptr_t** link_address(const frame& f) {
 }
 
 static void patch_callee_link(const frame& f, intptr_t* fp) {
+  DEBUG_ONLY(intptr_t* orig = *Frame::callee_link_address(f));
   *Frame::callee_link_address(f) = fp;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp));
+  log_develop_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT " orig: " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp), p2i(orig));
 }
 
 static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
@@ -129,17 +130,6 @@ inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this 
 inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
   // tty->print_cr(">>> f.unextended_sp(): %p callee_argsize: %d callee_interpreted: %d", f.unextended_sp(), callee_argsize, callee_interpreted);
   return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
-}
-
-template <bool relative>
-inline int Interpreted::stack_argsize(const frame& f) { // exclusive; this will not be copied with the frame
-  int diff = (int)(f.at(frame::interpreter_frame_locals_offset) - f.at(frame::interpreter_frame_sender_sp_offset) + sizeof(intptr_t));
-  // tty->print_cr(">>>> Interpreted::stack_argsize: %ld -- %ld relative: %d", f.at(frame::interpreter_frame_locals_offset), f.at(frame::interpreter_frame_sender_sp_offset), relative);
-  if (!relative) diff >>= LogBytesPerWord;
-  assert (!Interpreter::contains(Interpreted::return_pc(f)) || diff >= 0, "diff: %d", diff);
-  assert (!CodeCache::find_blob(Interpreted::return_pc(f))->is_compiled() || diff <= 0, "diff: %d", diff);
-  if (diff < 0) diff = 0; // happens when caller is compiled
-  return diff;
 }
 
 template<typename FKind, typename RegisterMapT>
@@ -237,18 +227,25 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
 }
 
 template <typename ConfigT>
-template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller, int num_oops) {
+template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
   assert (!caller.is_interpreted_frame() || caller.unextended_sp() == (intptr_t*)caller.at<true>(frame::interpreter_frame_last_sp_offset), "");
 
   intptr_t *sp, *fp; // sp is really our unextended_sp
   if (FKind::interpreted) {
     assert ((intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset) == nullptr || f.unextended_sp() == (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset), "");
+    int locals = f.interpreter_frame_method()->max_locals();
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
-    fp = caller.unextended_sp() - ((intptr_t*)f.at(frame::interpreter_frame_locals_offset) - f.fp()) + (overlap_caller ? Interpreted::stack_argsize(f) : 0) - 1;
+    fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
     sp = fp - (f.fp() - f.unextended_sp());
     assert (sp <= fp && fp <= caller.unextended_sp(), "");
     caller.set_sp(fp + frame::sender_sp_offset);
+
+    assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
+    
+    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
+    return hf;
   } else {
     fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have had a safepoint in finalize_freeze, after constructing f.
     int fsize = FKind::size(f);
@@ -258,10 +255,32 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
       sp -= argsize;
     }
     caller.set_sp(sp + fsize);
-  }
 
-  assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
-  return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
+    
+    return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+  }
+}
+
+template <typename ConfigT>
+inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+  intptr_t* vfp = f.fp();
+  intptr_t* hfp = hf.fp();
+  assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
+  assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+  assert (f.fp() > (intptr_t*)f.at<false>(frame::interpreter_frame_initial_sp_offset), "");
+
+  // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
+  *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
+  *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
+  
+  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
+
+  assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
+  assert (hf.unextended_sp() == (intptr_t*)hf.at<true>(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at<true>(frame::interpreter_frame_locals_offset), "");
 }
 
 template <typename ConfigT>
@@ -288,22 +307,61 @@ inline frame Thaw<ConfigT>::new_entry_frame() {
 }
 
 template <typename ConfigT>
-template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, intptr_t* vsp, frame& caller) {
+template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& caller, bool bottom) {
   assert (FKind::is_instance(hf), "");
 
   if (FKind::interpreted) {
-    // intptr_t* sp = vsp - (hsp - hf.sp());
     intptr_t* hsp = hf.unextended_sp();
+    const int fsize = Interpreted::frame_bottom<true>(hf) - hf.unextended_sp();
+    const int locals = hf.interpreter_frame_method()->max_locals();
+    intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);
+    if ((intptr_t)fp % 16 != 0) {
+      fp--;
+      vsp--;
+    }
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
     assert (vsp == unextended_sp, "vsp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(vsp), p2i(unextended_sp));
     caller.set_sp(fp + frame::sender_sp_offset);
-    return frame(vsp, vsp, fp, hf.pc());
+    frame f(vsp, vsp, fp, hf.pc());
+    // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
+    intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
+    assert ((int)offset == locals + frame::sender_sp_offset - 1, "");
+    *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + offset;
+    assert ((intptr_t)f.fp() % 16 == 0, "");
+    return f;
   } else {
+    int fsize = FKind::size(hf);
+    intptr_t* vsp = caller.unextended_sp() - fsize;
+    if (bottom || caller.is_interpreted_frame()) {
+      int argsize = hf.compiled_frame_stack_argsize();
+      log_develop_trace(jvmcont)("thaw_compiled_frame add argsize: fsize: %d argsize: %d fsize: %d", fsize, argsize, fsize + argsize);
+      
+      fsize += argsize;
+      vsp   -= argsize;
+      caller.set_sp(caller.sp() - argsize);
+      assert (caller.sp() == vsp + (fsize-argsize), "");
+
+      vsp = align(hf, vsp, caller, bottom);
+    }
+
     assert (hf.cb() != nullptr && hf.oop_map() != nullptr, "");
     intptr_t* fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
   }
+}
+
+template <typename ConfigT>
+inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+  *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = bottom - 1;
+}
+
+template <typename ConfigT>
+inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+  intptr_t* vfp = f.fp();
+
+  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
+  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
 }
 
 template <typename ConfigT>
@@ -351,9 +409,12 @@ inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
 template <typename ConfigT>
 intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   address pc = StubRoutines::cont_interpreter_forced_preempt_return();
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  intptr_t* fp = sp - frame::sender_sp_offset;
 
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
+
+  sp = align_down(sp, 16);
+  assert((intptr_t)sp % 16 == 0, "");
 
   sp -= ContinuationHelper::frame_metadata;
   *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
@@ -371,8 +432,8 @@ void Thaw<ConfigT>::patch_chunk_pd(intptr_t* sp) {
 template <typename ConfigT>
 inline void Thaw<ConfigT>::prefetch_chunk_pd(void* start, int size) {
   size <<= LogBytesPerWord;
-  Prefetch::read_streaming(start, size);
-  Prefetch::read_streaming(start, size - 64);
+  Prefetch::read(start, size);
+  Prefetch::read(start, size - 64);
 }
 
 template <typename ConfigT>

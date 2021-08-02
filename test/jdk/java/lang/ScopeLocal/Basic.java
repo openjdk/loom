@@ -412,7 +412,7 @@ public class Basic {
 
     private <R> R callWithSnapshot(ScopeLocal.Snapshot snapshot, Callable<R> c) {
         try {
-            return ScopeLocal.callWithSnapshot(c, snapshot);
+            return snapshot.call(c);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -441,14 +441,15 @@ public class Basic {
         Object valueInParent = v.get();
 
         // check inherited by platform thread
-        ThreadFactory factory = Thread.ofPlatform().factory();
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        var platformThreadFactory = Thread.ofPlatform().factory();
+        try (var executor = Executors.newThreadPerTaskExecutor(platformThreadFactory)) {
             Object valueInChild = executor.submit(v::get).join();
             assertEquals(valueInChild, valueInParent);
         }
 
         // check inherited by virtual thread
-        try (var executor = Executors.newVirtualThreadExecutor()) {
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        try (var executor = Executors.newThreadPerTaskExecutor(virtualThreadFactory)) {
             Object valueInChild = executor.submit(v::get).join();
             assertEquals(valueInChild, valueInParent);
         }
@@ -461,14 +462,15 @@ public class Basic {
         assertTrue(v.isBound());
 
         // check not inherited by platform thread
-        ThreadFactory factory = Thread.ofPlatform().factory();
-        try (var executor = Executors.newThreadExecutor(factory)) {
+        var platformThreadFactory = Thread.ofPlatform().factory();
+        try (var executor = Executors.newThreadPerTaskExecutor(platformThreadFactory)) {
             boolean boundInChild = executor.submit(v::isBound).join();
             assertFalse(boundInChild);
         }
 
         // check no inherited by virtual thread
-        try (var executor = Executors.newVirtualThreadExecutor()) {
+        var virtualThreadFactory = Thread.ofVirtual().factory();
+        try (var executor = Executors.newThreadPerTaskExecutor(virtualThreadFactory)) {
             boolean boundInChild = executor.submit(v::isBound).join();
             assertFalse(boundInChild);
         }

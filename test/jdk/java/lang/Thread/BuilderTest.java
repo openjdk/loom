@@ -641,7 +641,7 @@ public class BuilderTest {
         Thread.Builder builder = Thread.ofPlatform();
         testInheritedThreadLocals(builder); // default
 
-        // do no inheit
+        // do no inherit
         builder.inheritInheritableThreadLocals(false);
         testNoInheritedThreadLocals(builder);
 
@@ -655,7 +655,7 @@ public class BuilderTest {
         Thread.Builder builder = Thread.ofVirtual();
         testInheritedThreadLocals(builder); // default
 
-        // do no inheit
+        // do no inherit
         builder.inheritInheritableThreadLocals(false);
         testNoInheritedThreadLocals(builder);
 
@@ -702,6 +702,153 @@ public class BuilderTest {
         testNoInheritedThreadLocals(builder);
         builder.inheritInheritableThreadLocals(true);
         testInheritedThreadLocals(builder);
+    }
+
+    /**
+     * Tests a builder creates threads that inherit the context class loader.
+     */
+    private void testInheritContextClassLoader(Thread.Builder builder) throws Exception {
+        ClassLoader savedCCL = Thread.currentThread().getContextClassLoader();
+        try {
+            ClassLoader loader = new ClassLoader() { };
+            Thread.currentThread().setContextClassLoader(loader);
+
+            var ref = new AtomicReference<ClassLoader>();
+            Runnable task = () -> {
+                ref.set(Thread.currentThread().getContextClassLoader());
+            };
+
+            // unstarted
+            Thread thread1 = builder.unstarted(task);
+            assertTrue(thread1.getContextClassLoader() == loader);
+
+            // started
+            ref.set(null);
+            thread1.start();
+            thread1.join();
+            assertTrue(ref.get() == loader);
+
+            // factory
+            Thread thread2 = builder.factory().newThread(task);
+            assertTrue(thread2.getContextClassLoader() == loader);
+
+            // started
+            ref.set(null);
+            thread2.start();
+            thread2.join();
+            assertTrue(ref.get() == loader);
+
+        } finally {
+            Thread.currentThread().setContextClassLoader(savedCCL);
+        }
+    }
+
+    /**
+     * Tests a builder creates threads does not inherit the context class loader.
+     */
+    private void testNoInheritContextClassLoader(Thread.Builder builder) throws Exception {
+        ClassLoader savedCCL = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader( new ClassLoader() { });
+
+            ClassLoader scl = ClassLoader.getSystemClassLoader();
+
+            var ref = new AtomicReference<ClassLoader>();
+            Runnable task = () -> {
+                ref.set(Thread.currentThread().getContextClassLoader());
+            };
+
+            // unstarted
+            Thread thread1 = builder.unstarted(task);
+            assertTrue(thread1.getContextClassLoader() == scl);
+
+            // started
+            ref.set(null);
+            thread1.start();
+            thread1.join();
+            assertTrue(ref.get() == scl);
+
+            // factory
+            Thread thread2 = builder.factory().newThread(task);
+            assertTrue(thread2.getContextClassLoader() == scl);
+
+            // started
+            ref.set(null);
+            thread2.start();
+            thread2.join();
+            assertTrue(ref.get() == scl);
+
+        } finally {
+            Thread.currentThread().setContextClassLoader(savedCCL);
+        }
+    }
+
+    @Test
+    public void testContextClassLoader1() throws Exception {
+        Thread.Builder builder = Thread.ofPlatform();
+        testInheritContextClassLoader(builder); // default
+
+        // do no inherit
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+
+        // inherit
+        builder.inheritInheritableThreadLocals(true);
+        testInheritContextClassLoader(builder);
+    }
+
+    @Test
+    public void testContextClassLoader2() throws Exception {
+        Thread.Builder builder = Thread.ofVirtual();
+        testInheritContextClassLoader(builder); // default
+
+        // do no inherit
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+
+        // inherit
+        builder.inheritInheritableThreadLocals(true);
+        testInheritContextClassLoader(builder);
+    }
+
+    @Test
+    public void testContextClassLoader3() throws Exception {
+        Thread.Builder builder = Thread.ofPlatform();
+
+        // thread locals not allowed
+        builder.allowSetThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(true);
+        testNoInheritContextClassLoader(builder);
+
+        // thread locals allowed
+        builder.allowSetThreadLocals(true);
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(true);
+        testInheritContextClassLoader(builder);
+    }
+
+    @Test
+    public void testContextClassLoader4() throws Exception {
+        Thread.Builder builder = Thread.ofVirtual();
+
+        // thread locals not allowed
+        builder.allowSetThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(true);
+        testNoInheritContextClassLoader(builder);
+
+        // thread locals allowed
+        builder.allowSetThreadLocals(true);
+        builder.inheritInheritableThreadLocals(false);
+        testNoInheritContextClassLoader(builder);
+        builder.inheritInheritableThreadLocals(true);
+        testInheritContextClassLoader(builder);
     }
 
     // test null parameters

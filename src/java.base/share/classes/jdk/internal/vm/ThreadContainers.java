@@ -103,23 +103,20 @@ public class ThreadContainers {
     }
 
     /**
-     * Returns a stream of the shared thread containers tracked by this class.
-     * The stream includes an element for the root container.
+     * Return the root thread container.
      */
-    public static Stream<ThreadContainer> sharedContainers() {
-        return Stream.concat(
-                Stream.of(RootContainer.INSTANCE),
-                SHARED_CONTAINERS.stream()
-                        .map(WeakReference::get)
-                        .filter(c -> c != null)
-        );
+    public static ThreadContainer root() {
+        return RootContainer.INSTANCE;
     }
 
     /**
-     * Returns the thread container that the given Thread is in.
+     * Returns a stream of the shared thread containers tracked by this class.
+     * The stream does not include the root container.
      */
-    public static ThreadContainer currentContainer(Thread thread) {
-        return JLA.threadContainer(thread);
+    public static Stream<ThreadContainer> sharedContainers() {
+        return SHARED_CONTAINERS.stream()
+                .map(WeakReference::get)
+                .filter(c -> c != null);
     }
 
     /**
@@ -145,7 +142,7 @@ public class ThreadContainers {
      * Returns a map of containers found by walking the graph from the set
      * of root threads. The map is keyed on the owner thread that. The map
      * value is the list of container owned by the thread, in creation order,
-     * so that containers executors are before nested containers.
+     * so that an enclosing container is before nested containers.
      */
     public static Map<Thread, List<ThreadContainer>> ownedContainers() {
         Map<Thread, List<ThreadContainer>> map = new HashMap<>();
@@ -171,6 +168,28 @@ public class ThreadContainers {
     }
 
     /**
+     * Returns a stream of all containers. The stream includes the root container,
+     * all shared containers, and all that owned containers that can be found.
+     * @return
+     */
+    public static Stream<ThreadContainer> allContainers() {
+        Stream<ThreadContainer> s1 = Stream.of(root());
+        Stream<ThreadContainer> s2 = ThreadContainers.sharedContainers();
+        Stream<ThreadContainer> s3 = ThreadContainers.ownedContainers()
+                .values()
+                .stream()
+                .flatMap(List::stream);
+        return Stream.concat(s1, Stream.concat(s2, s3));
+    }
+
+    /**
+     * Returns the thread container that the given Thread is in.
+     */
+    public static ThreadContainer currentContainer(Thread thread) {
+        return JLA.threadContainer(thread);
+    }
+
+    /**
      * Returns the set of root Threads to use to find thread containers that
      * are owned by threads.
      */
@@ -187,20 +206,6 @@ public class ThreadContainers {
         Stream<Thread> virtualThreads = Stream.concat(s1, s2);
 
         return Stream.concat(platformThreads, virtualThreads);
-    }
-
-    /**
-     * Returns an estimate of the number of virtual threads.
-     */
-    public static long virtualThreadCount() {
-        Stream<Thread> s1 = sharedContainers().flatMap(ThreadContainer::threads);
-        Stream<Thread> s2 = ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream)
-                .flatMap(ThreadContainer::threads);
-        return Stream.concat(s1, s2).map(Thread::isVirtual).count()
-                + UNMANAGED_VTHREAD_COUNT.sum();
     }
 
     /**

@@ -63,18 +63,18 @@ public class VThreadMonitorTest {
 
     static void m0() {
         synchronized (lock0) {
-            log(thrName() +" entered sync section with lock0\n");
+            // log(thrName() +" entered sync section with lock0\n");
         }
     }
     static void m1() {
         synchronized (lock1) {
-            log(thrName() +" entered sync section with lock1");
+            // log(thrName() +" entered sync section with lock1");
             m0();
         }
     }
     static void m2() {
         synchronized (lock2) {
-            log(thrName() +" entered sync section with lock2");
+            // log(thrName() +" entered sync section with lock2");
             m1();
         }
     }

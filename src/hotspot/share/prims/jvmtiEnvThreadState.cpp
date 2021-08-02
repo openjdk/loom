@@ -159,21 +159,11 @@ JavaThread* JvmtiEnvThreadState::get_thread() {
 }
 
 void* JvmtiEnvThreadState::get_agent_thread_local_storage_data() {
-#ifdef DBG // TMP
-  const char* virt = is_virtual() ? "virtual" : "carrier";
-  printf("DBG: get_LTS:          %s                        env: %p, ets: %p, data: %ld\n\n",
-         virt, (void*)_env, (void*)this, (long)_agent_thread_local_storage_data); fflush(0);
-#endif
   return _agent_thread_local_storage_data;
 }
 
 void JvmtiEnvThreadState::set_agent_thread_local_storage_data (void *data) {
   _agent_thread_local_storage_data = data;
-#ifdef DBG // TMP
-  const char* virt = is_virtual() ? "virtual" : "carrier";
-  printf("DBG: set_LTS:          %s                        env: %p, ets: %p, data: %ld\n\n",
-         virt, (void*)_env, (void*)this, (long)data); fflush(0);
-#endif
 }
 
 
@@ -323,7 +313,7 @@ class GetCurrentLocationClosure : public HandshakeClosure {
       _bci(0),
       _completed(false) {}
   void do_thread(Thread *target) {
-    JavaThread *jt = target->as_Java_thread();
+    JavaThread *jt = JavaThread::cast(target);
     ResourceMark rmark; // jt != Thread::current()
     RegisterMap rm(jt, false);
     // There can be a race condition between a handshake
@@ -385,16 +375,6 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
     if (thread == NULL && event_type == JVMTI_EVENT_SINGLE_STEP && is_virtual()) {
       jmethodID method_id;
       int bci;
-#if 0
-      ResourceMark rm(JavaThread::current());
-      oop thread_oop = jvmti_thread_state()->get_thread_oop();
-      oop name_oop = java_lang_Thread::name(thread_oop);
-      const char* name_str = java_lang_String::as_utf8_string(name_oop);
-      name_str = name_str == NULL ? "<NULL>" : name_str;
-
-      printf("DBG: reset_current_location (SINGLE_STEP) for vthread: JvmtiThreadState: %p jt: %p %s\n",
-             (void*)jvmti_thread_state(), (void*)thread, name_str); fflush(0);
-#endif
       JavaThread* cur_thread = JavaThread::current();
       HandleMark hm(cur_thread);
       VM_VThreadGetCurrentLocation op(Handle(cur_thread, thread_oop));

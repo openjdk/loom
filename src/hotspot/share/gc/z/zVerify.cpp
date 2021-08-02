@@ -203,6 +203,9 @@ public:
   virtual ReferenceIterationMode reference_iteration_mode() {
     return _verify_weaks ? DO_FIELDS : DO_FIELDS_EXCEPT_REFERENT;
   }
+
+  virtual void do_method(Method* m) {}
+  virtual void do_nmethod(nmethod* nm) {}
 };
 
 typedef ClaimingCLDToOopClosure<ClassLoaderData::_claim_none> ZVerifyCLDClosure;
@@ -218,7 +221,7 @@ public:
   virtual void do_thread(Thread* thread) {
     thread->oops_do_no_frames(_cl, NULL);
 
-    JavaThread* const jt = thread->as_Java_thread();
+    JavaThread* const jt = JavaThread::cast(thread);
     if (!jt->has_last_Java_frame()) {
       return;
     }

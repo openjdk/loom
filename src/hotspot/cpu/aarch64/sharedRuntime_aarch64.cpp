@@ -683,6 +683,10 @@ void SharedRuntime::gen_i2c_adapter(MacroAssembler *masm,
     }
   }
 
+  __ mov(rscratch2, rscratch1);
+  __ push_cont_fastpath(rthread); // Set JavaThread::_cont_fastpath to the sp of the oldest interpreted frame we know about; kills rscratch1
+  __ mov(rscratch1, rscratch2);
+
   // 6243940 We might end up in handle_wrong_method if
   // the callee is deoptimized as we race thru here. If that
   // happens we don't want to take a safepoint because the
@@ -863,6 +867,13 @@ static int c_calling_convention_priv(const BasicType *sig_bt,
     }
 
   return stk_args;
+}
+
+int SharedRuntime::vector_calling_convention(VMRegPair *regs,
+                                             uint num_bits,
+                                             uint total_args_passed) {
+  Unimplemented();
+  return 0;
 }
 
 int SharedRuntime::c_calling_convention(const BasicType *sig_bt,
@@ -1230,31 +1241,59 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
-  OopMap* map = continuation_enter_setup(masm, stack_slots);  // kills rax
+  OopMap* map = continuation_enter_setup(masm, stack_slots);
 
   // Frame is now completed as far as size and linkage.
   frame_complete =__ pc() - start;
 
-  fill_continuation_entry(masm); // kills rax
+  fill_continuation_entry(masm);
 
+  __ cmp(c_rarg2, (u1)0);
+  __ br(Assembler::NE, call_thaw);
+  
   address mark = __ pc();
-  
-  __ stop("LOOM AARCH64 gen_continuation_enter");
+//  __ relocate(resolve.rspec());
+  //if (!far_branches()) {
+//  __ bl(resolve.target()); 
+  __ trampoline_call1(resolve, NULL, false);
 
-  //__ call(resolve);
-  // __ mov(r13, sp);
-  // __ blr(c_rarg4);
-  
   oop_maps->add_gc_map(__ pc() - start, map);
   __ post_call_nop();
 
+  __ b(exit);
+
+  __ bind(call_thaw);
+
+  rt_call(masm, CAST_FROM_FN_PTR(address, StubRoutines::cont_thaw()));
   oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
   ContinuationEntry::return_pc_offset = __ pc() - start;
   __ post_call_nop();
 
   __ bind(exit);
   continuation_enter_cleanup(masm);
- 
+  __ leave();
+  __ ret(lr);
+
+  /// exception handling
+
+  exception_offset = __ pc() - start;
+  {
+      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
+      __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
+
+      // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
+
+      __ mov(r1, r0); // the exception handler
+      __ mov(r0, r19); // restore return value contaning the exception oop
+      __ verify_oop(r0);
+
+      continuation_enter_cleanup(masm);
+      __ mov(sp, rfp);
+      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ br(r1); // the exception handler
+  }
+
   CodeBuffer* cbuf = masm->code_section()->outer();
   address stub = CompiledStaticCall::emit_to_interp_stub(*cbuf, mark);
 }
@@ -1856,10 +1895,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     // Load the oop from the handle
     __ ldr(obj_reg, Address(oop_handle_reg, 0));
 
-    if (UseBiasedLocking) {
-      __ biased_locking_enter(lock_reg, obj_reg, swap_reg, tmp, false, lock_done, &slow_path_lock);
-    }
-
     // Load (object->mark() | 1) into swap_reg %r0
     __ ldr(rscratch1, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
     __ orr(swap_reg, rscratch1, 1);
@@ -2007,11 +2042,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ ldr(obj_reg, Address(oop_handle_reg, 0));
 
     Label done;
-
-    if (UseBiasedLocking) {
-      __ biased_locking_exit(obj_reg, old_hdr, done);
-    }
-
     // Simple recursive lock?
 
     __ ldr(rscratch1, Address(sp, lock_slot_offset * VMRegImpl::stack_slot_size));

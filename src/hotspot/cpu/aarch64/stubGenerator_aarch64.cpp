@@ -48,6 +48,7 @@
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.inline.hpp"
 #include "utilities/align.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/powerOfTwo.hpp"
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
@@ -71,6 +72,10 @@
 #endif
 
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
+
+OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
+void fill_continuation_entry(MacroAssembler* masm);
+void continuation_enter_cleanup(MacroAssembler* masm);
 
 // Stub Code definitions
 
@@ -347,6 +352,8 @@ class StubGenerator: public StubCodeGenerator {
       __ BIND(L);
     }
 #endif
+
+    __ pop_cont_fastpath(rthread);
 
     // restore callee-save registers
     __ ldpd(v15, v14,  d15_save);
@@ -2658,7 +2665,7 @@ class StubGenerator: public StubCodeGenerator {
   //   c_rarg2   - K (key) in little endian int array
   //
   address generate_aescrypt_decryptBlock() {
-    assert(UseAES, "need AES instructions and misaligned SSE support");
+    assert(UseAES, "need AES cryptographic extension support");
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", "aescrypt_decryptBlock");
     Label L_doLast;
@@ -2765,7 +2772,7 @@ class StubGenerator: public StubCodeGenerator {
   //   x0        - input length
   //
   address generate_cipherBlockChaining_encryptAESCrypt() {
-    assert(UseAES, "need AES instructions and misaligned SSE support");
+    assert(UseAES, "need AES cryptographic extension support");
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", "cipherBlockChaining_encryptAESCrypt");
 
@@ -2869,7 +2876,7 @@ class StubGenerator: public StubCodeGenerator {
   //   r0        - input length
   //
   address generate_cipherBlockChaining_decryptAESCrypt() {
-    assert(UseAES, "need AES instructions and misaligned SSE support");
+    assert(UseAES, "need AES cryptographic extension support");
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", "cipherBlockChaining_decryptAESCrypt");
 
@@ -5683,6 +5690,7 @@ class StubGenerator: public StubCodeGenerator {
    *  c_rarg3   - dest_start
    *  c_rarg4   - dest_offset
    *  c_rarg5   - isURL
+   *  c_rarg6   - isMIME
    *
    */
   address generate_base64_decodeBlock() {
@@ -5765,12 +5773,13 @@ class StubGenerator: public StubCodeGenerator {
     StubCodeMark mark(this, "StubRoutines", "decodeBlock");
     address start = __ pc();
 
-    Register src   = c_rarg0;  // source array
-    Register soff  = c_rarg1;  // source start offset
-    Register send  = c_rarg2;  // source end offset
-    Register dst   = c_rarg3;  // dest array
-    Register doff  = c_rarg4;  // position for writing to dest array
-    Register isURL = c_rarg5;  // Base64 or URL character set
+    Register src    = c_rarg0;  // source array
+    Register soff   = c_rarg1;  // source start offset
+    Register send   = c_rarg2;  // source end offset
+    Register dst    = c_rarg3;  // dest array
+    Register doff   = c_rarg4;  // position for writing to dest array
+    Register isURL  = c_rarg5;  // Base64 or URL character set
+    Register isMIME = c_rarg6;  // Decoding MIME block - unused in this implementation
 
     Register length = send;    // reuse send as length of source data to process
 
@@ -5954,6 +5963,10 @@ class StubGenerator: public StubCodeGenerator {
         acquire = false;
         release = false;
         break;
+      case memory_order_release:
+        acquire = false;
+        release = true;
+        break;
       default:
         acquire = true;
         release = true;
@@ -6035,6 +6048,20 @@ class StubGenerator: public StubCodeGenerator {
       (_masm, &aarch64_atomic_cmpxchg_8_relaxed_impl);
     gen_cas_entry(MacroAssembler::xword, memory_order_relaxed);
 
+    AtomicStubMark mark_cmpxchg_4_release
+      (_masm, &aarch64_atomic_cmpxchg_4_release_impl);
+    gen_cas_entry(MacroAssembler::word, memory_order_release);
+    AtomicStubMark mark_cmpxchg_8_release
+      (_masm, &aarch64_atomic_cmpxchg_8_release_impl);
+    gen_cas_entry(MacroAssembler::xword, memory_order_release);
+
+    AtomicStubMark mark_cmpxchg_4_seq_cst
+      (_masm, &aarch64_atomic_cmpxchg_4_seq_cst_impl);
+    gen_cas_entry(MacroAssembler::word, memory_order_seq_cst);
+    AtomicStubMark mark_cmpxchg_8_seq_cst
+      (_masm, &aarch64_atomic_cmpxchg_8_seq_cst_impl);
+    gen_cas_entry(MacroAssembler::xword, memory_order_seq_cst);
+
     ICache::invalidate_range(first_entry, __ pc() - first_entry);
   }
 #endif // LINUX
@@ -6043,13 +6070,14 @@ RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
     enum layout {
-      rfp_off,
-      rfpH_off,
-      return_off,
-      return_off2,
+      rfp_off1,
+      rfp_off2,
+      lr_off,
+      lr_off2,
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
+    
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -6057,19 +6085,36 @@ RuntimeStub* generate_cont_doYield() {
     MacroAssembler* masm = new MacroAssembler(&code);
     MacroAssembler* _masm = masm;
 
-    // MacroAssembler* masm = _masm;
-    // StubCodeMark mark(this, "StubRoutines", name);
-
     address start = __ pc();
 
-    // __ enter();
+    __ enter();
+
+    __ mov(c_rarg1, sp);
 
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
 
-    // TODO LOOM AARCH64
+    __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
-    // return start;
+    __ mov(c_rarg0, rthread);
+    __ set_last_Java_frame(sp, rfp, the_pc, rscratch1);
+
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+      
+    __ reset_last_Java_frame(true);
+
+    Label pinned;
+
+    __ cbnz(r0, pinned);
+
+    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch1);
+    continuation_enter_cleanup(masm);
+
+    __ bind(pinned); // pinned -- return to caller
+    
+    __ leave();
+    __ ret(lr);
 
     OopMap* map = new OopMap(framesize, 1);
     // map->set_callee_saved(VMRegImpl::stack2reg(rfp_off), rfp->as_VMReg());
@@ -6089,7 +6134,25 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-    // TODO LOOM AARCH64
+#ifdef ASSERT
+    { // verify that threads correspond
+      Label L;
+      __ get_thread(rscratch1);
+      __ cmp(rthread, rscratch1);
+      __ br(Assembler::EQ, L);
+      __ stop("StubRoutines::cont_jump_from_safepoint: threads must correspond");
+      __ BIND(L);
+    }
+#endif
+
+    __ reset_last_Java_frame(true); // false would be fine, too, I guess
+    __ reinit_heapbase();
+    
+    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch1);
+    continuation_enter_cleanup(_masm);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6099,7 +6162,87 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-    // TODO LOOM AARCH64
+    if (return_barrier) {
+      __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+      __ mov(sp, rscratch1);
+    }
+    assert_asm(_masm, (__ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset())), __ cmp(sp, rscratch1)), Assembler::EQ, "incorrect sp");
+
+    if (return_barrier) {
+      // preserve possible return value from a method returning to the return barrier
+      __ fmovd(rscratch1, v0);
+      __ stp(rscratch1, r0, Address(__ pre(sp, -2 * wordSize)));
+    }
+
+    __ movw(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), rthread, c_rarg1);
+    __ mov(rscratch2, r0); // r0 contains the size of the frames to thaw, 0 if overflow or no more frames
+
+    if (return_barrier) {
+      // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
+      __ ldp(rscratch1, r0, Address(__ post(sp, 2 * wordSize)));
+      __ fmovd(v0, rscratch1);
+    }
+    assert_asm(_masm, (__ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset())), __ cmp(sp, rscratch1)), Assembler::EQ, "incorrect sp");
+
+
+    Label thaw_success;
+    // rscratch2 contains the size of the frames to thaw, 0 if overflow or no more frames
+    __ cbnz(rscratch2, thaw_success);
+    __ lea(rscratch1, ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
+    __ br(rscratch1);
+    __ bind(thaw_success);
+    
+    // make room for the thawed frames
+    __ sub(rscratch1, sp, rscratch2);
+    __ andr(rscratch1, rscratch1, -16); // align
+    __ mov(sp, rscratch1);
+    
+    if (return_barrier) {
+      // save original return value -- again
+      __ fmovd(rscratch1, v0);
+      __ stp(rscratch1, r0, Address(__ pre(sp, -2 * wordSize)));
+    }
+
+    __ movw(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), rthread, c_rarg1);
+    __ mov(rscratch2, r0); // r0 is the sp of the yielding frame
+
+    if (return_barrier) {
+      // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
+      __ ldp(rscratch1, r0, Address(__ post(sp, 2 * wordSize)));
+      __ fmovd(v0, rscratch1);
+    } else {
+      __ mov(r0, zr); // return 0 (success) from doYield
+    }
+
+    // we're now on the yield frame (which is in an address above us b/c rsp has been pushed down)
+    __ sub(sp, rscratch2, 2*wordSize); // now pointing to rfp spill
+    __ mov(rfp, sp);
+
+    if (exception) {
+      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
+      __ verify_oop(r0);
+      __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
+
+      __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
+
+      // Reinitialize the ptrue predicate register, in case the external runtime call clobbers ptrue reg, as we may return to SVE compiled code.
+      // __ reinitialize_ptrue();
+
+      // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
+
+      __ mov(r1, r0); // the exception handler
+      __ mov(r0, r19); // restore return value contaning the exception oop
+      __ verify_oop(r0);
+
+      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ br(r1); // the exception handler
+    }
+
+    // We're "returning" into the topmost thawed frame; see Thaw::push_return_frame
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6134,7 +6277,20 @@ RuntimeStub* generate_cont_doYield() {
       StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
       address start = __ pc();
 
-      // TODO LOOM AARCH64
+      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+      // see InterpreterMacroAssembler::restore_bcp/restore_locals
+
+      assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
+      __ leave(); // we're now on the last thawed frame
+
+      __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize));
+      __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize));
+
+      // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
+      __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+      __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+
+      __ ret(lr);
 
       return start;
     }
@@ -6142,17 +6298,30 @@ RuntimeStub* generate_cont_doYield() {
 #if INCLUDE_JFR
 
   static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
-    // TODO LOOM AARCH64
+    Register last_java_pc = c_rarg0;
+    Register last_java_sp = c_rarg2;
+    __ ldr(last_java_pc, Address(sp, 0));
+    __ lea(last_java_sp, Address(sp, wordSize));
+    // __ vzeroupper();
+    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
+    __ str(last_java_pc, anchor_java_pc);
+    __ str(last_java_sp, Address(thread, JavaThread::last_Java_sp_offset()));
   }
 
   static void jfr_prologue(MacroAssembler* _masm, Register thread) {
     jfr_set_last_java_frame(_masm, thread);
-    // TODO LOOM AARCH64
+    __ mov(c_rarg0, rthread);
   }
 
   // Handle is dereference here using correct load constructs.
   static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
-    // TODO LOOM AARCH64
+    __ reset_last_Java_frame(false);
+    Label null_jobject;
+    __ cbz(r0, null_jobject);
+    DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
+    BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
+    bs->load_at(_masm, decorators, T_OBJECT, r0, Address(r0, 0), rscratch1, rthread);
+    __ bind(null_jobject);
   }
 
   // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
@@ -6161,8 +6330,13 @@ RuntimeStub* generate_cont_doYield() {
   address generate_jfr_write_checkpoint() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
     address start = __ pc();
-    
-    // TODO LOOM AARCH64
+
+    __ enter();
+    jfr_prologue(_masm, rthread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
+    jfr_epilogue(_masm, rthread);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -6173,7 +6347,12 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
 
-    // TODO LOOM AARCH64
+    __ enter();
+    jfr_prologue(_masm, rthread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
+    jfr_epilogue(_masm, rthread);
+    __ leave();
+    __ ret(lr);
 
     return start;
   }
@@ -7358,6 +7537,10 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, )
 DEFAULT_ATOMIC_OP(cmpxchg, 1, _relaxed)
 DEFAULT_ATOMIC_OP(cmpxchg, 4, _relaxed)
 DEFAULT_ATOMIC_OP(cmpxchg, 8, _relaxed)
+DEFAULT_ATOMIC_OP(cmpxchg, 4, _release)
+DEFAULT_ATOMIC_OP(cmpxchg, 8, _release)
+DEFAULT_ATOMIC_OP(cmpxchg, 4, _seq_cst)
+DEFAULT_ATOMIC_OP(cmpxchg, 8, _seq_cst)
 
 #undef DEFAULT_ATOMIC_OP
 
@@ -7367,34 +7550,67 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _relaxed)
 #undef __
 #define __ masm->
 
-// on exit, rsp points to the ContinuationEntry
-// kills rax
+// on exit, sp points to the ContinuationEntry
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
   assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
-  // TODO LOOM AARCH64
+  stack_slots += (int)ContinuationEntry::size()/wordSize;
+  __ sub(sp, sp, (intptr_t)ContinuationEntry::size()); // place Continuation metadata
+
   OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
   ContinuationEntry::setup_oopmap(map);
+
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_offset()));
+  __ mov(rscratch1, sp); // we can't use sp as the source in str
+  __ str(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
 
   return map;
 }
 
 // on entry c_rarg1 points to the continuation 
-//          rsp points to ContinuationEntry
-// kills rax
+//          sp points to ContinuationEntry
 void fill_continuation_entry(MacroAssembler* masm) {
-  __ stop("LOOM AARCH64 fill_continuation_entry");
-  // TODO LOOM AARCH64
+#ifdef ASSERT
+  __ movw(rscratch1, 0x1234);
+  __ strw(rscratch1, Address(sp, ContinuationEntry::cookie_offset()));
+#endif
+
+  __ str(c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
+  __ str(zr, Address(sp, ContinuationEntry::chunk_offset()));
+  __ strw(zr, Address(sp, ContinuationEntry::argsize_offset()));
+
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
+  __ ldr(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+  __ str(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  
+  __ str(zr, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ reset_held_monitor_count(rthread);
 }
 
-// on entry, rsp points to the ContinuationEntry
-// on exit, rsp points to the spilled rbp in the entry frame
-// kills rbx, rcx
+// on entry, sp points to the ContinuationEntry
+// on exit, rfp points to the spilled rfp in the entry frame
 void continuation_enter_cleanup(MacroAssembler* masm) {
-  __ stop("LOOM AARCH64 continuation_enter_cleanup");
-  // TODO LOOM AARCH64
+#ifndef PRODUCT
+  Label OK;
+  __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+  __ cmp(sp, rscratch1);
+  __ br(Assembler::EQ, OK);
+  __ stop("incorrect sp1");
+  __ bind(OK);
+#endif
+  
+  __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
+  __ str(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
+  __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  __ str(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+
+  __ ldr(rscratch2, Address(sp, ContinuationEntry::parent_offset()));
+  __ str(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
+  __ add(rfp, sp, (intptr_t)ContinuationEntry::size());
 }
 
 #undef __

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -148,7 +148,7 @@ public class LogGeneratedClassesTest extends LUtils {
                                "com.example.TestLambda");
         assertEquals(tr.testOutput.stream()
                                   .filter(s -> s.startsWith("WARNING"))
-                                  .peek(s -> assertTrue(s.contains("does not exist")))
+                                  .filter(s -> s.contains("does not exist"))
                                   .count(),
                      1, "only show error once");
         tr.assertZero("Should still return 0");
@@ -164,7 +164,7 @@ public class LogGeneratedClassesTest extends LUtils {
                                "com.example.TestLambda");
         assertEquals(tr.testOutput.stream()
                                   .filter(s -> s.startsWith("WARNING"))
-                                  .peek(s -> assertTrue(s.contains("not a directory")))
+                                  .filter(s -> s.contains("not a directory"))
                                   .count(),
                      1, "only show error once");
         tr.assertZero("Should still return 0");
@@ -223,7 +223,7 @@ public class LogGeneratedClassesTest extends LUtils {
                                    "com.example.TestLambda");
             assertEquals(tr.testOutput.stream()
                                       .filter(s -> s.startsWith("WARNING"))
-                                      .peek(s -> assertTrue(s.contains("not writable")))
+                                      .filter(s -> s.contains("not writable"))
                                       .count(),
                          1, "only show error once");
             tr.assertZero("Should still return 0");

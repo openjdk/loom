@@ -26,7 +26,9 @@
 #define SHARE_GC_G1_G1BARRIERSET_INLINE_HPP
 
 #include "gc/g1/g1BarrierSet.hpp"
+
 #include "gc/g1/g1CardTable.hpp"
+#include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/shared/accessBarrierSupport.inline.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
@@ -103,6 +105,10 @@ oop_store_not_in_heap(T* addr, oop new_value) {
   G1BarrierSet *bs = barrier_set_cast<G1BarrierSet>(BarrierSet::barrier_set());
   bs->write_ref_field_pre<decorators>(addr);
   Raw::oop_store(addr, new_value);
+}
+
+inline bool G1BarrierSet::requires_barriers(oop obj) {
+  return G1CollectedHeap::heap()->G1CollectedHeap::requires_barriers(obj);
 }
 
 #endif // SHARE_GC_G1_G1BARRIERSET_INLINE_HPP

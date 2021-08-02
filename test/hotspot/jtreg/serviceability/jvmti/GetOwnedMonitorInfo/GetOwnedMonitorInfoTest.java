@@ -50,9 +50,15 @@ public class GetOwnedMonitorInfoTest {
     private static native boolean hasEventPosted();
 
     public static void main(String[] args) throws Exception {
+        runTest(true);
+        runTest(false);
+    }
+
+    public static void runTest(boolean isVirtual) throws Exception {
+        var threadFactory = isVirtual ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
         final GetOwnedMonitorInfoTest lock = new GetOwnedMonitorInfoTest();
 
-        Thread t1 = new Thread(() -> {
+        Thread t1 = threadFactory.newThread(() -> {
             synchronized (lock) {
                 System.out.println("Thread in sync section: "
                                    + Thread.currentThread().getName());

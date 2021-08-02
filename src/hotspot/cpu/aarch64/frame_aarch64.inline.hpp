@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -31,6 +31,7 @@
 #include "interpreter/interpreter.hpp"
 #include "interpreter/oopMapCache.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "pauth_aarch64.hpp"
 
 // Inline functions for AArch64 frames:
 
@@ -48,6 +49,7 @@ inline frame::frame() {
 static int spin;
 
 inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
+  assert(pauth_ptr_is_raw(pc), "cannot be signed");
   intptr_t a = intptr_t(sp);
   intptr_t b = intptr_t(fp);
   _sp = sp;
@@ -85,6 +87,9 @@ inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb) {
+  assert(pauth_ptr_is_raw(pc), "cannot be signed");
+  intptr_t a = intptr_t(sp);
+  intptr_t b = intptr_t(fp);
   _sp = sp;
   _unextended_sp = unextended_sp;
   _fp = fp;
@@ -281,8 +286,9 @@ intptr_t** frame::saved_link_address(const RegisterMapT* map) {
 
 // Return address:
 
-inline address* frame::sender_pc_addr()      const { return (address*) addr_at( return_addr_offset); }
-inline address  frame::sender_pc()           const { return *sender_pc_addr(); }
+inline address* frame::sender_pc_addr()         const { return (address*) addr_at( return_addr_offset); }
+inline address  frame::sender_pc_maybe_signed() const { return *sender_pc_addr(); }
+inline address  frame::sender_pc()              const { return pauth_strip_pointer(sender_pc_maybe_signed()); }
 
 inline intptr_t*    frame::sender_sp()        const { return            addr_at(   sender_sp_offset); }
 
@@ -410,8 +416,9 @@ inline frame frame::sender_raw(RegisterMap* map) const {
     return map->stack_chunk()->sender(*this, map);
   }
 
-  if (is_entry_frame())       return sender_for_entry_frame(map);
-  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+  if (is_entry_frame())           return sender_for_entry_frame(map);
+  if (is_optimized_entry_frame()) return sender_for_optimized_entry_frame(map);
+  if (is_interpreted_frame())     return sender_for_interpreter_frame(map);
 
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
 

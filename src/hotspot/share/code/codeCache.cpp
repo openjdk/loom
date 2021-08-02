@@ -1102,12 +1102,6 @@ void CodeCache::old_nmethods_do(MetadataClosure* f) {
   log_debug(redefine, class, nmethod)("Walked %d nmethods for mark_on_stack", length);
 }
 
-// Just marks the methods in this class as needing deoptimization
-void CodeCache::mark_for_evol_deoptimization(InstanceKlass* dependee) {
-  assert(SafepointSynchronize::is_at_safepoint(), "Can only do this at a safepoint!");
-}
-
-
 // Walk compiled methods and mark dependent methods for deoptimization.
 int CodeCache::mark_dependents_for_evol_deoptimization() {
   assert(SafepointSynchronize::is_at_safepoint(), "Can only do this at a safepoint!");
@@ -1200,7 +1194,11 @@ void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>*
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
     if (nm->is_marked_for_deoptimization()) {
-      nm->make_not_entrant();
+      if (!nm->make_not_entrant()) {
+        // if the method is not entrant already then it is needed run barrier
+        // to don't allow method become zombie before deoptimization even without safepoint
+        nm->run_nmethod_entry_barrier();
+      }
       marked->append(nm);
     }
   }

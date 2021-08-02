@@ -425,7 +425,7 @@ JVM_ENTRY_NO_ENV(void, JVM_BeforeHalt())
 #if INCLUDE_CDS
   // Link all classes for dynamic CDS dumping before vm exit.
   if (DynamicDumpSharedSpaces) {
-    DynamicArchive::prepare_for_dynamic_dumping_at_exit();
+    DynamicArchive::prepare_for_dynamic_dumping();
   }
 #endif
   EventShutdown event;
@@ -444,7 +444,10 @@ JVM_END
 
 JVM_ENTRY_NO_ENV(void, JVM_GC(void))
   if (!DisableExplicitGC) {
+    EventSystemGC event;
+    event.set_invokedConcurrent(ExplicitGCInvokesConcurrent);
     Universe::heap()->collect(GCCause::_java_lang_system_gc);
+    event.commit();
   }
 JVM_END
 
@@ -2923,6 +2926,9 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
   assert(native_thread != NULL, "Starting null thread?");
 
   if (native_thread->osthread() == NULL) {
+    ResourceMark rm(thread);
+    log_warning(os, thread)("Failed to start the native thread for java.lang.Thread \"%s\"",
+                            JavaThread::name_for(JNIHandles::resolve_non_null(jthread)));
     // No one should hold a reference to the 'native_thread'.
     native_thread->smr_delete();
     if (JvmtiExport::should_post_resource_exhausted()) {
@@ -3555,11 +3561,11 @@ JVM_END
 
 JVM_ENTRY(void, JVM_RegisterLambdaProxyClassForArchiving(JNIEnv* env,
                                               jclass caller,
-                                              jstring invokedName,
-                                              jobject invokedType,
-                                              jobject methodType,
-                                              jobject implMethodMember,
-                                              jobject instantiatedMethodType,
+                                              jstring interfaceMethodName,
+                                              jobject factoryType,
+                                              jobject interfaceMethodType,
+                                              jobject implementationMember,
+                                              jobject dynamicMethodType,
                                               jclass lambdaProxyClass))
 #if INCLUDE_CDS
   if (!Arguments::is_dumping_archive()) {
@@ -3579,39 +3585,39 @@ JVM_ENTRY(void, JVM_RegisterLambdaProxyClassForArchiving(JNIEnv* env,
   assert(lambda_ik->is_hidden(), "must be a hidden class");
   assert(!lambda_ik->is_non_strong_hidden(), "expected a strong hidden class");
 
-  Symbol* invoked_name = NULL;
-  if (invokedName != NULL) {
-    invoked_name = java_lang_String::as_symbol(JNIHandles::resolve_non_null(invokedName));
+  Symbol* interface_method_name = NULL;
+  if (interfaceMethodName != NULL) {
+    interface_method_name = java_lang_String::as_symbol(JNIHandles::resolve_non_null(interfaceMethodName));
   }
-  Handle invoked_type_oop(THREAD, JNIHandles::resolve_non_null(invokedType));
-  Symbol* invoked_type = java_lang_invoke_MethodType::as_signature(invoked_type_oop(), true);
+  Handle factory_type_oop(THREAD, JNIHandles::resolve_non_null(factoryType));
+  Symbol* factory_type = java_lang_invoke_MethodType::as_signature(factory_type_oop(), true);
 
-  Handle method_type_oop(THREAD, JNIHandles::resolve_non_null(methodType));
-  Symbol* method_type = java_lang_invoke_MethodType::as_signature(method_type_oop(), true);
+  Handle interface_method_type_oop(THREAD, JNIHandles::resolve_non_null(interfaceMethodType));
+  Symbol* interface_method_type = java_lang_invoke_MethodType::as_signature(interface_method_type_oop(), true);
 
-  Handle impl_method_member_oop(THREAD, JNIHandles::resolve_non_null(implMethodMember));
-  assert(java_lang_invoke_MemberName::is_method(impl_method_member_oop()), "must be");
-  Method* m = java_lang_invoke_MemberName::vmtarget(impl_method_member_oop());
+  Handle implementation_member_oop(THREAD, JNIHandles::resolve_non_null(implementationMember));
+  assert(java_lang_invoke_MemberName::is_method(implementation_member_oop()), "must be");
+  Method* m = java_lang_invoke_MemberName::vmtarget(implementation_member_oop());
 
-  Handle instantiated_method_type_oop(THREAD, JNIHandles::resolve_non_null(instantiatedMethodType));
-  Symbol* instantiated_method_type = java_lang_invoke_MethodType::as_signature(instantiated_method_type_oop(), true);
+  Handle dynamic_method_type_oop(THREAD, JNIHandles::resolve_non_null(dynamicMethodType));
+  Symbol* dynamic_method_type = java_lang_invoke_MethodType::as_signature(dynamic_method_type_oop(), true);
 
-  SystemDictionaryShared::add_lambda_proxy_class(caller_ik, lambda_ik, invoked_name, invoked_type,
-                                                 method_type, m, instantiated_method_type, THREAD);
+  SystemDictionaryShared::add_lambda_proxy_class(caller_ik, lambda_ik, interface_method_name, factory_type,
+                                                 interface_method_type, m, dynamic_method_type, THREAD);
 #endif // INCLUDE_CDS
 JVM_END
 
 JVM_ENTRY(jclass, JVM_LookupLambdaProxyClassFromArchive(JNIEnv* env,
                                                         jclass caller,
-                                                        jstring invokedName,
-                                                        jobject invokedType,
-                                                        jobject methodType,
-                                                        jobject implMethodMember,
-                                                        jobject instantiatedMethodType))
+                                                        jstring interfaceMethodName,
+                                                        jobject factoryType,
+                                                        jobject interfaceMethodType,
+                                                        jobject implementationMember,
+                                                        jobject dynamicMethodType))
 #if INCLUDE_CDS
 
-  if (invokedName == NULL || invokedType == NULL || methodType == NULL ||
-      implMethodMember == NULL || instantiatedMethodType == NULL) {
+  if (interfaceMethodName == NULL || factoryType == NULL || interfaceMethodType == NULL ||
+      implementationMember == NULL || dynamicMethodType == NULL) {
     THROW_(vmSymbols::java_lang_NullPointerException(), NULL);
   }
 
@@ -3622,22 +3628,22 @@ JVM_ENTRY(jclass, JVM_LookupLambdaProxyClassFromArchive(JNIEnv* env,
     return NULL;
   }
 
-  Symbol* invoked_name = java_lang_String::as_symbol(JNIHandles::resolve_non_null(invokedName));
-  Handle invoked_type_oop(THREAD, JNIHandles::resolve_non_null(invokedType));
-  Symbol* invoked_type = java_lang_invoke_MethodType::as_signature(invoked_type_oop(), true);
+  Symbol* interface_method_name = java_lang_String::as_symbol(JNIHandles::resolve_non_null(interfaceMethodName));
+  Handle factory_type_oop(THREAD, JNIHandles::resolve_non_null(factoryType));
+  Symbol* factory_type = java_lang_invoke_MethodType::as_signature(factory_type_oop(), true);
 
-  Handle method_type_oop(THREAD, JNIHandles::resolve_non_null(methodType));
-  Symbol* method_type = java_lang_invoke_MethodType::as_signature(method_type_oop(), true);
+  Handle interface_method_type_oop(THREAD, JNIHandles::resolve_non_null(interfaceMethodType));
+  Symbol* interface_method_type = java_lang_invoke_MethodType::as_signature(interface_method_type_oop(), true);
 
-  Handle impl_method_member_oop(THREAD, JNIHandles::resolve_non_null(implMethodMember));
-  assert(java_lang_invoke_MemberName::is_method(impl_method_member_oop()), "must be");
-  Method* m = java_lang_invoke_MemberName::vmtarget(impl_method_member_oop());
+  Handle implementation_member_oop(THREAD, JNIHandles::resolve_non_null(implementationMember));
+  assert(java_lang_invoke_MemberName::is_method(implementation_member_oop()), "must be");
+  Method* m = java_lang_invoke_MemberName::vmtarget(implementation_member_oop());
 
-  Handle instantiated_method_type_oop(THREAD, JNIHandles::resolve_non_null(instantiatedMethodType));
-  Symbol* instantiated_method_type = java_lang_invoke_MethodType::as_signature(instantiated_method_type_oop(), true);
+  Handle dynamic_method_type_oop(THREAD, JNIHandles::resolve_non_null(dynamicMethodType));
+  Symbol* dynamic_method_type = java_lang_invoke_MethodType::as_signature(dynamic_method_type_oop(), true);
 
-  InstanceKlass* lambda_ik = SystemDictionaryShared::get_shared_lambda_proxy_class(caller_ik, invoked_name, invoked_type,
-                                                                                   method_type, m, instantiated_method_type);
+  InstanceKlass* lambda_ik = SystemDictionaryShared::get_shared_lambda_proxy_class(caller_ik, interface_method_name, factory_type,
+                                                                                   interface_method_type, m, dynamic_method_type);
   jclass jcls = NULL;
   if (lambda_ik != NULL) {
     InstanceKlass* loaded_lambda = SystemDictionaryShared::prepare_shared_lambda_proxy_class(lambda_ik, caller_ik, THREAD);
@@ -3883,14 +3889,15 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
+  thread->set_hide_over_cont_yield(false);
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
-  oop vt_oop = JNIHandles::resolve(vthread);
+  oop vt = JNIHandles::resolve(vthread);
 
-  thread->rebind_to_jvmti_thread_state_of(vt_oop);
+  thread->rebind_to_jvmti_thread_state_of(vt);
 
   if (first_mount) {
     // thread start
@@ -3910,7 +3917,8 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
-  oop ct_oop = thread->threadObj();
+  HandleMark hm(thread);
+  Handle ct(thread, thread->threadObj());
 
   if (JvmtiExport::should_post_vthread_unmount()) {
     JvmtiExport::post_vthread_unmount(vthread);
@@ -3927,7 +3935,7 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
     }
     thread->set_mounted_vthread(NULL);
   }
-  thread->rebind_to_jvmti_thread_state_of(ct_oop);
+  thread->rebind_to_jvmti_thread_state_of(ct());
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
@@ -3939,9 +3947,10 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboole
   if (!last_unmount) {
     oop vt_oop = JNIHandles::resolve(vthread);
     JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt_oop);
+
     if (vstate != NULL) {
-      vstate->set_is_in_VTMT(true);
+      vstate->set_hide_over_cont_yield(true);
     }
-    thread->set_is_in_VTMT(true);
+    thread->set_hide_over_cont_yield(true);
   }
 JVM_END

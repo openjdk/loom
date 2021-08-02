@@ -362,6 +362,10 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 
 // Compiled frames
 
+// Register is a class, but it would be assigned numerical value.
+// "0" is assigned for rax. Thus we need to ignore -Wnonnull.
+PRAGMA_DIAG_PUSH
+PRAGMA_NONNULL_IGNORED
 inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop *)map->location(rax->as_VMReg(), sp());
   guarantee(result_adr != NULL, "bad register save location");
@@ -379,6 +383,7 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
 
   *result_adr = obj;
 }
+PRAGMA_DIAG_POP
 
 inline bool frame::is_interpreted_frame() const {
   return Interpreter::contains(pc());
@@ -407,8 +412,9 @@ inline frame frame::sender_raw(RegisterMap* map) const {
     return map->stack_chunk()->sender(*this, map);
   }
 
-  if (is_entry_frame())       return sender_for_entry_frame(map);
-  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+  if (is_entry_frame())           return sender_for_entry_frame(map);
+  if (is_optimized_entry_frame()) return sender_for_optimized_entry_frame(map);
+  if (is_interpreted_frame())     return sender_for_interpreter_frame(map);
 
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
 

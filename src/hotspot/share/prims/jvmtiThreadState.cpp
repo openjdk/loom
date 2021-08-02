@@ -81,9 +81,10 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   _jvmti_event_queue = NULL;
   _is_in_VTMT = false;
+  _hide_over_cont_yield = false;
   _is_virtual = false;
 
-  _thread_oop_h = OopHandle(Universe::vm_global(), thread_oop);
+  _thread_oop_h = OopHandle(JvmtiExport::jvmti_oop_storage(), thread_oop);
 
   // add all the JvmtiEnvThreadState to the new JvmtiThreadState
   {
@@ -169,7 +170,7 @@ JvmtiThreadState::~JvmtiThreadState()   {
   if (get_thread_oop() != NULL) {
     java_lang_Thread::set_jvmti_thread_state(get_thread_oop(), NULL);
   }
-  _thread_oop_h.release(Universe::vm_global());
+  _thread_oop_h.release(JvmtiExport::jvmti_oop_storage());
 }
 
 
@@ -235,6 +236,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
   while (_VTMT_count > 0) {
     ml.wait();
   }
+  assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
   thread->set_is_VTMT_disabler(true);
 }
 
@@ -256,16 +258,26 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
 
-  ThreadBlockInVM tbivm(thread);
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  // Do not allow suspends inside VTMT transitions.
+  // Block while transitions are disabled or there are suspend requests.
+  while (true) {
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  // block while transitions are disabled
-  while (_VTMT_disable_count > 0 ||
-         JvmtiVTSuspender::vthread_is_ext_suspended(vth())) {
-    ml.wait();
+    // block while transitions are disabled or there are suspend requests
+    if (_VTMT_disable_count > 0 ||
+        thread->is_suspended() ||
+        thread->is_thread_suspended() ||
+        JvmtiVTSuspender::is_vthread_suspended(vth())
+    ) {
+      ml.wait(10);
+      continue; // ~ThreadBlockInVM has handshake-based suspend point
+    }
+    assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    thread->set_is_in_VTMT(true);
+    _VTMT_count++;
+    break;
   }
-  _VTMT_count++;
-  thread->set_is_in_VTMT(true);
 }
 
 void
@@ -280,14 +292,8 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
     if (_VTMT_disable_count > 0) {
       ml.notify_all();
     }
+    assert(thread->is_in_VTMT(), "sanity check");
     thread->set_is_in_VTMT(false);
-  }
-  if (callsite_tag == 1) { // finish_VTMT for a vthread unmount
-    if (thread->is_cthread_pending_suspend()) {
-      thread->clear_cthread_pending_suspend();
-      // TBD: Need sync here.
-      JvmtiSuspendControl::suspend(thread);
-    }
   }
 }
 
@@ -313,23 +319,24 @@ void
 VThreadList::append(oop vt) {
   assert(!contains(vt), "VThreadList::append sanity check");
 
-  // This is to work around assert in OopHandle copy constructor.
-  GrowableArrayCHeap<OopHandle, mtServiceability>::append(NULLHandle);
-  pop();
-
-  GrowableArrayCHeap<OopHandle, mtServiceability>::append(OopHandle(Universe::vm_global(), vt));
+  OopHandle vthandle(JvmtiExport::jvmti_oop_storage(), vt);
+  GrowableArrayCHeap<OopHandle, mtServiceability>::append(vthandle);
 }
 
 void
 VThreadList::remove(oop vt) {
   int idx = find(vt);
   assert(idx != -1, "VThreadList::remove sanity check");
-  at(idx).release(Universe::vm_global());
+  at(idx).release(JvmtiExport::jvmti_oop_storage());
+  at_put(idx, NULLHandle); // clear released OopHandle entry
 
-  // To work around assert in OopHandle copy constructor do not use remove_at().
-  for (int i = idx + 1; i < length(); i++) {
-    at_put(i - 1, NULLHandle); // work around assert in OopHandle copy constructor
-    at_put(i - 1, at(i));
+  // To work around assert in OopHandle assignment operator do not use remove_at().
+  // OopHandle doesn't allow overwrites if the oop pointer is non-null.
+  // Order doesn't matter, put the last element in idx
+  int last = length() - 1;
+  if (last > idx) {
+    at_put(idx, at(last));
+    at_put(last, NULLHandle); // clear moved OopHandle entry.
   }
   pop();
 }
@@ -337,7 +344,8 @@ VThreadList::remove(oop vt) {
 void
 VThreadList::invalidate() {
   for (int idx = length() - 1; idx >= 0; idx--) {
-    at(idx).release(Universe::vm_global());
+    at(idx).release(JvmtiExport::jvmti_oop_storage());
+    at_put(idx, NULLHandle); // clear released OopHandle entries
   }
   clear();
 }
@@ -367,7 +375,7 @@ JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
   _vthread_suspend_mode = vthread_suspend_none;
-  _vthread_suspend_list->invalidate(); 
+  _vthread_suspend_list->invalidate();
   _vthread_resume_list->invalidate();
 }
 
@@ -410,7 +418,7 @@ JvmtiVTSuspender::register_vthread_resume(oop vt) {
 }
 
 bool
-JvmtiVTSuspender::vthread_is_ext_suspended(oop vt) {
+JvmtiVTSuspender::is_vthread_suspended(oop vt) {
   bool suspend_is_needed =
    (_vthread_suspend_mode == vthread_suspend_all && !_vthread_resume_list->contains(vt)) ||
    (_vthread_suspend_mode == vthread_suspend_ind && _vthread_suspend_list->contains(vt));
@@ -422,11 +430,6 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
 
   JvmtiEnvThreadState *new_ets = new JvmtiEnvThreadState(this, env);
-#ifdef DBG // TMP
-    const char* virt = _is_virtual ? "virtual" : "carrier";
-    printf("DBG: JvmtiThreadState::add_env: %s state: %p, env: %p, ets: %p\n",
-           virt, (void*)this, (void*)env, (void*)new_ets); fflush(0);
-#endif
   // add this environment thread state to the end of the list (order is important)
   {
     // list deallocation (which occurs at a safepoint) cannot occur simultaneously

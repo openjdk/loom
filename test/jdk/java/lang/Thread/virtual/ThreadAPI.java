@@ -1403,7 +1403,7 @@ public class ThreadAPI {
             int characteristics = TestHelper.NO_INHERIT_THREAD_LOCALS;
             TestHelper.runInVirtualThread(characteristics, () -> {
                 Thread t = Thread.currentThread();
-                assertTrue(t.getContextClassLoader() == null);
+                assertTrue(t.getContextClassLoader() == ClassLoader.getSystemClassLoader());
                 t.setContextClassLoader(loader);
                 assertTrue(t.getContextClassLoader() == loader);
             });

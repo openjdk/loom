@@ -268,28 +268,29 @@ public interface ExecutorService extends Executor, AutoCloseable {
     /**
      * Submits the given value-returning tasks for execution and returns a
      * lazily populated stream of completed Future objects with the result of
-     * each task.
+     * each task. A typical usage will filter the stream to the tasks that
+     * {@linkplain Future#isCompletedNormally() complete normally}. The stream
+     * is unordered and the result of tasks that complete normally may need
+     * to include context to identify the task.
      *
      * <p> Invoking the stream's {@linkplain Stream#close() close} method
-     * cancels any remaining tasks as if by invoking {@linkplain
-     * Future#cancel(boolean) cancel(true)} on each remaining task. In other
-     * words, for each remaining task that has already started, the thread
+     * cancels any unfinished tasks as if by invoking {@linkplain
+     * Future#cancel(boolean) cancel(true)} on each unfinished task. In other
+     * words, for each unfinished task that has already started, the thread
      * executing the task (when known to the implementation) is interrupted
      * in an attempt to stop the task. This may have no effect on
      * implementations that do not use thread interruption to control
      * cancellation, in which case {@code close()} will just close the stream.
      * The {@code try-with-resources} construct may be useful to ensure that
-     * remaining tasks are cancelled when using <em>short-circuiting</em>
+     * unfinished tasks are cancelled when using <em>short-circuiting</em>
      * stream operations.
      *
      * <p> If a thread is interrupted while waiting on the stream for a task to
-     * complete then the remaining tasks are cancelled, as if by invoking
-     * {@linkplain Future#cancel(boolean) cancel(true)}, and {@link
-     * CancellationException} is thrown with the interrupt status set. As with
-     * closing the stream, for each remaining task that has already started,
-     * the thread executing the task (when known to the implementation) is
-     * interrupted in an attempt to stop the task. This may have no effect on
-     * implementations that do not use thread interruption to control
+     * complete then unfinished tasks are cancelled, as if by invoking
+     * {@linkplain Future#cancel(boolean) cancel(true)}. As with closing the
+     * stream, the thread executing the task (when known to the implementation)
+     * is interrupted in an attempt to stop the task. This may have no effect
+     * on implementations that do not use thread interruption to control
      * cancellation.
      *
      * @implSpec
@@ -373,10 +374,9 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * <p> The parameter {@code waitAll} determines if this method should wait
      * for unfinished tasks to complete when any task completes with an
      * exception or error. If {@code true}, this method waits until all
-     * tasks have completed or the current thread is interrupted. If
-     * {@code false}, this method stops waiting when a task completes with an
-     * exception or error, in which case it cancels any unfinished tasks as
-     * if by invoking {@code cancel(true)}.
+     * tasks have completed. If {@code false}, this method stops waiting and
+     * cancels unfinished tasks, as if by invoking {@linkplain Future#cancel(boolean)
+     * cancel(true)}, when a task completes with an exception or error.
      *
      * @implSpec
      * The default implementation {@link #submit(Callable) submits} the tasks

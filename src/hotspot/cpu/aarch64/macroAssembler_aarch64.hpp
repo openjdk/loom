@@ -105,20 +105,6 @@ class MacroAssembler: public Assembler {
 
   void safepoint_poll(Label& slow_path, bool at_return, bool acquire, bool in_nmethod);
 
-  // Biased locking support
-  // lock_reg and obj_reg must be loaded up with the appropriate values.
-  // swap_reg is killed.
-  // tmp_reg must be supplied and must not be rscratch1 or rscratch2
-  // Optional slow case is for implementations (interpreter and C1) which branch to
-  // slow case directly. Leaves condition codes set for C2's Fast_Lock node.
-  void biased_locking_enter(Register lock_reg, Register obj_reg,
-                            Register swap_reg, Register tmp_reg,
-                            bool swap_reg_contains_mark,
-                            Label& done, Label* slow_case = NULL,
-                            BiasedLockingCounters* counters = NULL);
-  void biased_locking_exit (Register obj_reg, Register temp_reg, Label& done);
-
-
   // Helper functions for statistics gathering.
   // Unconditional atomic increment.
   void atomic_incw(Register counter_addr, Register tmp, Register tmp2);
@@ -850,8 +836,6 @@ public:
   // stored using routines that take a jobject.
   void store_heap_oop_null(Address dst);
 
-  void load_prototype_header(Register dst, Register src);
-
   void store_klass_gap(Register dst, Register src);
 
   // This dummy is to prevent a call to store_heap_oop from
@@ -1007,6 +991,10 @@ public:
 
   void should_not_reach_here()                   { stop("should not reach here"); }
 
+  void _assert_asm(Condition cc, const char* msg);
+#define assert_asm0(cc, msg) _assert_asm(cc, FILE_AND_LINE ": " msg)
+#define assert_asm(masm, command, cc, msg) DEBUG_ONLY(command; (masm)->_assert_asm(cc, FILE_AND_LINE ": " #command " " #cc ": " msg))
+
   // Stack overflow checking
   void bang_stack_with_offset(int offset) {
     // stack grows down, caller passes positive offset
@@ -1066,6 +1054,7 @@ public:
                enum operand_size size,
                bool acquire, bool release, bool weak,
                Register result);
+
 private:
   void compare_eq(Register rn, Register rm, enum operand_size size);
 
@@ -1086,7 +1075,8 @@ private:
 public:
   // Calls
 
-  address trampoline_call(Address entry, CodeBuffer* cbuf = NULL);
+  address trampoline_call(Address entry, CodeBuffer* cbuf = NULL) { return trampoline_call1(entry, cbuf, true); }
+  address trampoline_call1(Address entry, CodeBuffer* cbuf, bool check_emit_size = true);
 
   static bool far_branches() {
     return ReservedCodeCacheSize > branch_range;

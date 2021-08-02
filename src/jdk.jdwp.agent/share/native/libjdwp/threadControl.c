@@ -257,12 +257,36 @@ findThread(ThreadList *list, jthread thread)
             node = nonTlsSearch(getEnv(), &otherThreads, thread);
         }
         /*
-         * Search runningThreads list. The TLS lookup may have failed because the
-         * thread has terminated, but the ThreadNode may still be present.
+         * Normally we can assume that a thread with no TLS will never be in the runningThreads
+         * list. This is because we always set the TLS when adding to runningThreads.
+         * However, when a thread exits, its TLS is automatically cleared. Normally this
+         * is not a problem because the debug agent will first get a THREAD_END event,
+         * and that will cause the thread to be removed from runningThreads, thus we
+         * avoid this situation of having a thread in runningThreads, but with no TLS.
+         *
+         * However... there is one exception to this. While handling VM_DEATH, the first thing
+         * the debug agent does is clear all the callbacks. This means we will no longer
+         * get THREAD_END events as threads exit. This means we might find threads on
+         * runningThreads with no TLS during VM_DEATH. Essentially the THREAD_END that
+         * would normally have resulted in removing the thread from runningThreads is
+         * missed, so the thread remains on runningThreads.
+         *
+         * The end result of all this is that if the TLS lookup failed, we still need to check
+         * if the thread is on runningThreads, but only if JVMTI callbacks have been cleared.
+         * Otherwise the thread should not be on the runningThreads.
          */
-        if ( node == NULL ) {
-            if ( list == NULL || list == &runningThreads ) {
-                node = nonTlsSearch(getEnv(), &runningThreads, thread);
+        if ( !gdata->jvmtiCallBacksCleared ) {
+            /* The thread better not be on runningThreads if the TLS lookup failed. */
+            JDI_ASSERT(!nonTlsSearch(getEnv(), &runningThreads, thread));
+        } else {
+            /*
+             * Search the runningThreads list. The TLS lookup may have failed because the
+             * thread has terminated, but we never got the THREAD_END event.
+             */
+            if ( node == NULL ) {
+                if ( list == NULL || list == &runningThreads ) {
+                    node = nonTlsSearch(getEnv(), &runningThreads, thread);
+                }
             }
         }
     }
@@ -1555,9 +1579,9 @@ threadControl_suspendCount(jthread thread, jint *count)
         node = findThread(&runningVThreads, thread);
     } else {
         node = findThread(&runningThreads, thread);
-        if (node == NULL) {
-            node = findThread(&otherThreads, thread);
-        }
+    }
+    if (node == NULL) {
+        node = findThread(&otherThreads, thread);
     }
 
     error = JVMTI_ERROR_NONE;
@@ -1568,8 +1592,22 @@ threadControl_suspendCount(jthread thread, jint *count)
          * If the node is in neither list, the debugger never suspended
          * this thread, so the suspend count is 0.
          */
-        // vthread fixme: use suspendAllCount if vthread has started
+      if (is_vthread) {
+          jint vthread_state = 0;
+          jvmtiError error = threadState(thread, &vthread_state);
+          if (error != JVMTI_ERROR_NONE) {
+              EXIT_ERROR(error, "getting thread state");
+          }
+          if (vthread_state == 0) {
+              // If state == 0, then this is a new vthread that has not been started yet.
+              *count = 0;
+          } else {
+              // This is a started vthread that we are not tracking. Use suspendAllCount.
+              *count = suspendAllCount;
+          }
+      } else {
         *count = 0;
+      }
     }
 
     debugMonitorExit(threadLock);
@@ -1724,6 +1762,29 @@ resumeHelper(JNIEnv *env, ThreadNode *node, void *ignored)
     return resumeThreadByNode(node);
 }
 
+static jvmtiError
+excludeCountHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    JDI_ASSERT(node->is_vthread);
+    if (node->suspendCount > 0) {
+        jint *counter = (jint *)arg;
+        (*counter)++;
+    }
+    return JVMTI_ERROR_NONE;
+}
+
+static jvmtiError
+excludeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
+{
+    JDI_ASSERT(node->is_vthread);
+    if (node->suspendCount > 0) {
+        jthread **listPtr = (jthread **)arg;
+        **listPtr = node->thread;
+        (*listPtr)++;
+    }
+    return JVMTI_ERROR_NONE;
+}
+
 jvmtiError
 threadControl_resumeAll(void)
 {
@@ -1742,9 +1803,31 @@ threadControl_resumeAll(void)
 
     if (gdata->vthreadsSupported) {
         if (suspendAllCount == 1) {
-            /* Tell JVMTI to resume all virtual threads. */
+            jint excludeCnt = 0;
+            jthread *excludeList = NULL;
+            /*
+             * Tell JVMTI to resume all virtual threads except for those we
+             * are tracking separately. The commonResumeList() call below will
+             * resume any vthread with a suspendCount == 1, and we want to ignore
+             * vthreads with a suspendCount > 0. Therefor we don't want
+             * ResumeAllVirtualThreads resuming these vthreads. We must first
+             * build a list of them to pass to as the exclude list.
+             */
+            enumerateOverThreadList(env, &runningVThreads, excludeCountHelper,
+                                    &excludeCnt);
+            if (excludeCnt > 0) {
+                excludeList = newArray(excludeCnt, sizeof(jthread));
+                if (excludeList == NULL) {
+                    EXIT_ERROR(AGENT_ERROR_OUT_OF_MEMORY,"exclude list");
+                }
+                {
+                    jthread *excludeListPtr = excludeList;
+                    enumerateOverThreadList(env, &runningVThreads, excludeCopyHelper,
+                                            &excludeListPtr);
+                }
+            }
             error = JVMTI_FUNC_PTR(gdata->jvmti,ResumeAllVirtualThreads)
-                    (gdata->jvmti, 0, NULL);
+                    (gdata->jvmti, excludeCnt, excludeList);
             if (error != JVMTI_ERROR_NONE) {
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }
@@ -2255,6 +2338,10 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
          * to precede thread start for some VM implementations.
          */
         if (evinfo->is_vthread) {
+          /* fiber fixme: don't add the vthread if this is an EI_THREAD_START or
+             EI_THREAD_EXIT event. Otherwise we end up adding every vthread. This
+             is an issue when notifyVThreads is true, which is the default.
+          */
             node = insertThread(env, &runningVThreads, thread);
         } else {
             node = insertThread(env, &runningThreads, thread);

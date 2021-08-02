@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -81,8 +80,8 @@ public class SubmitTasksTest {
 
             // implementations that may override submit(Collection)
             { new ForkJoinPool(), },
-            { Executors.newThreadExecutor(defaultThreadFactory), },
-            { Executors.newThreadExecutor(virtualThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(defaultThreadFactory), },
+            { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
         };
     }
 
@@ -243,36 +242,24 @@ public class SubmitTasksTest {
                         .peek(f -> assertTrue(f.isDone()))
                         .collect(Collectors.toList());
 
+                assertTrue(futures.size() == 2);
+
+                Future<String> future1 = futures.get(0);
+                Future<String> future2 = futures.get(1);
+                if (future2.isCompletedNormally()) {
+                    Future<String> tmp = future1;
+                    future1 = future2;
+                    future2 = tmp;
+                }
+
+                if (future1.isCompletedNormally()) {
+                    assertEquals(future1.get(), "foo");
+                } else {
+                    assertTrue(future1.isCancelled());
+                }
+                assertTrue(future2.isCancelled());
+
                 if (tasksStarted.get() == 2) {
-                    assertTrue(futures.size() == 2);
-
-                    int completed = 0, cancelled = 0;
-                    for (Future<String> future : futures) {
-                        if (future.isCompletedNormally()) {
-                            completed++;
-                        } else if (future.isCancelled()) {
-                            cancelled++;
-                        }
-                    }
-                    assertTrue((completed == 1 && cancelled == 1)
-                            ^ (completed == 0 && cancelled == 2));
-
-                    Future<String> future1 = futures.get(0);
-                    Future<String> future2 = futures.get(1);
-                    if (future2.isCompletedNormally()) {
-                        Future<String> tmp = future1;
-                        future1 = future2;
-                        future2 = tmp;
-                    }
-
-                    if (future1.isCompletedNormally()) {
-                        assertEquals(future1.join(), "foo");
-                        assertTrue(future2.isCancelled());
-                    } else {
-                        assertTrue(future1.isCancelled());
-                        assertTrue(future2.isCancelled());
-                    }
-
                     // task2 sleep should be interrupted
                     Throwable exc;
                     while ((exc = task2Exception.get()) == null) {
@@ -307,10 +294,10 @@ public class SubmitTasksTest {
 
             Thread.currentThread().interrupt();
             try {
-                stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
-                assertTrue(false);
-            } catch (CancellationException e) {
-                // interrupt status should be set
+                long count = stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
+                assertTrue(count == 2);
+
+                // interrupt status should not be cleared
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {
                 Thread.interrupted(); // clear interrupt
@@ -352,9 +339,9 @@ public class SubmitTasksTest {
             // schedule main thread to be interrupted
             scheduleInterrupt(Thread.currentThread(), Duration.ofSeconds(1));
             try {
-                stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
-                assertTrue(false);
-            } catch (CancellationException e) {
+                long count = stream.peek(f -> assertTrue(f.isDone())).mapToLong(x -> 1L).sum();
+                assertTrue(count == 2);
+
                 // interrupt status should be set
                 assertTrue(Thread.currentThread().isInterrupted());
             } finally {

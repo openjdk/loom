@@ -442,7 +442,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         ForkJoinPool.commonPool() : new ThreadPerTaskExecutor();
 
     /** Fallback if ForkJoinPool.commonPool() cannot support parallelism */
-    static final class ThreadPerTaskExecutor implements Executor {
+    private static final class ThreadPerTaskExecutor implements Executor {
         public void execute(Runnable r) {
             Objects.requireNonNull(r);
             new Thread(r).start();
@@ -487,7 +487,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
         public final void run() {
             if (snapshot != ScopeLocal.snapshot()) {
-                ScopeLocal.runWithSnapshot(() -> tryFire(ASYNC), snapshot);
+                snapshot.run(() -> tryFire(ASYNC));
             } else {
                 tryFire(ASYNC);
             }
@@ -1831,7 +1831,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
 
         public void run() {
             if (snapshot != ScopeLocal.snapshot()) {
-                ScopeLocal.runWithSnapshot(this::doRun, snapshot);
+                snapshot.run(this::doRun);
             } else {
                 doRun();
             }

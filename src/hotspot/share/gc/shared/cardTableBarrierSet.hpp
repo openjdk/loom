@@ -92,6 +92,9 @@ protected:
   // remembered set.
   void flush_deferred_card_mark_barrier(JavaThread* thread);
 
+  // Loom support
+  static constexpr bool is_concurrent_gc() { return false; }
+
   // If a compiler is eliding store barriers for TLAB-allocated objects,
   // we will be informed of a slow-path allocation by a call
   // to on_slowpath_allocation_exit() below. Such a call precedes the
