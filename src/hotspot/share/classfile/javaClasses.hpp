@@ -422,8 +422,7 @@ class java_lang_Thread : AllStatic {
   static int _continuation_offset;
   static int _park_blocker_offset;
   static int _noninheritableScopeLocalBindings_offset;
-  static int _inheritableScopeLocalBindings_offset;
-
+  
   static void compute_offsets();
 
  public:

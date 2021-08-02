@@ -250,7 +250,6 @@ public class Thread implements Runnable {
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     ScopeLocal.Snapshot noninheritableScopeLocalBindings;
-    ScopeLocal.Snapshot inheritableScopeLocalBindings;
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -676,15 +675,6 @@ public class Thread implements Runnable {
                 // default CCL to the system class loader when not inheriting
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
-
-            // scoped variables
-            if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-                this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-                ThreadContainer container = this.container;
-                if (container != null && container.owner() != null) {
-                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-                }
-            }
         }
 
         int priority;
@@ -735,14 +725,6 @@ public class Thread implements Runnable {
         } else {
             // default CCL to the system class loader when not inheriting
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
-        }
-
-        // scoped variables
-        if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-            if (container != null && container.owner() != null) {
-                this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-            }
         }
 
         // no additional fields

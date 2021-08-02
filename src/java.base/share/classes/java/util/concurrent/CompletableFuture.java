@@ -486,11 +486,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         abstract boolean isLive();
 
         public final void run() {
-            if (snapshot != ScopeLocal.snapshot()) {
-                snapshot.run(() -> tryFire(ASYNC));
-            } else {
-                tryFire(ASYNC);
-            }
+            tryFire(ASYNC);
         }
         public final boolean exec() {
             run();
@@ -1830,11 +1826,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         }
 
         public void run() {
-            if (snapshot != ScopeLocal.snapshot()) {
-                snapshot.run(this::doRun);
-            } else {
-                doRun();
-            }
+            doRun();
         }
     }
 
