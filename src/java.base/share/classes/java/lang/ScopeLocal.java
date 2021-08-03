@@ -599,12 +599,17 @@ public final class ScopeLocal<T> {
             objs[n * 2] = key;
         }
 
-        // Return either 0 or 1, at pseudo-random. This chooses either the
-        // primary or secondary cache slot.
+        // Return either 0 or 1, at pseudo-random, with a bias towards zero.
+        // This chooses either the primary or secondary cache slot, but the
+        // primary slot is approximately twice as likely to be chosen as the
+        // secondary one.
         private static int chooseVictim(Thread thread) {
             int tmp = thread.victims;
-            thread.victims = (tmp << 31) | (tmp >>> 1);
-            return tmp & 1;
+            tmp ^= tmp << 13;
+            tmp ^= tmp >>> 17;
+            tmp ^= tmp << 5;
+            thread.victims = tmp;
+            return (tmp & 15) < 5 ? 1 : 0;
         }
 
         public static void invalidate() {
