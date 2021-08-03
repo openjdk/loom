@@ -154,9 +154,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, {@linkplain
- * ScopeLocal#inheritableForType(Class) inheritable-scope-local} variables, the initial
- * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
+ * Creating a {@code Thread} will inherit, by default, the initial values of
+ * {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
  * a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
@@ -680,10 +679,6 @@ public class Thread implements Runnable {
             // scoped variables
             if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
                 this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-                ThreadContainer container = this.container;
-                if (container != null && container.owner() != null) {
-                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-                }
             }
         }
 
@@ -740,9 +735,6 @@ public class Thread implements Runnable {
         // scoped variables
         if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
             this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-            if (container != null && container.owner() != null) {
-                this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-            }
         }
 
         // no additional fields
@@ -1533,8 +1525,13 @@ public class Thread implements Runnable {
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
             // bind thread to container
-            if (container != null)
+            if (container != null) {
                 this.container = container;
+                Thread parent = Thread.currentThread();
+                if (parent.headThreadContainer != null) {
+                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+                }
+            }
             start0();
         }
     }
