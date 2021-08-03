@@ -254,7 +254,7 @@ public final class ScopeLocal<T> {
                 return op.call();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.noninheritableScopeLocalBindings = nonInheritables;
+                currentThread.scopeLocalBindings = nonInheritables;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -294,7 +294,7 @@ public final class ScopeLocal<T> {
                 op.run();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.noninheritableScopeLocalBindings = nonInheritables;
+                currentThread.scopeLocalBindings = nonInheritables;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -479,12 +479,12 @@ public final class ScopeLocal<T> {
 
     private static Snapshot getScopeLocalBindings() {
         Thread currentThread = Thread.currentThread();
-        return currentThread.noninheritableScopeLocalBindings;
+        return currentThread.scopeLocalBindings;
     }
 
     private static void setScopeLocalBindings(Snapshot bindings) {
         Thread currentThread = Thread.currentThread();
-        currentThread.noninheritableScopeLocalBindings = bindings;
+        currentThread.scopeLocalBindings = bindings;
     }
 
     private Snapshot scopeLocalBindings() {

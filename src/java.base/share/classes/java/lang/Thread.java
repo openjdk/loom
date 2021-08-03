@@ -249,7 +249,7 @@ public class Thread implements Runnable {
     // cache entries from the scoped variable cache.
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    ScopeLocal.Snapshot noninheritableScopeLocalBindings;
+    ScopeLocal.Snapshot scopeLocalBindings;
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
