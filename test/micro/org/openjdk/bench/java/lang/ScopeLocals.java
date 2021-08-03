@@ -39,7 +39,7 @@ import static org.openjdk.bench.java.lang.ScopeLocalsData.*;
 @Measurement(iterations=10, time=1)
 @Threads(1)
 @Fork(value = 1,
-        jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.java.lang.ScopeLocalsExecutorService", "-Djmh.executor=CUSTOM", "--enable-preview"})
+      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.java.lang.ScopeLocalsExecutorService", "-Djmh.executor=CUSTOM", "-Djmh.blackhole.mode=COMPILER", "--enable-preview"})
 @State(Scope.Thread)
 @SuppressWarnings("preview")
 public class ScopeLocals {
@@ -98,8 +98,17 @@ public class ScopeLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    public int CreateBindThenGetThenRemove_ScopeLocal() throws Exception {
+        return ScopeLocal.where(sl1, 42).call(sl1::get);
+    }
+
+
+    // Create a Carrier ahead of time: might be slightly faster
+    private static final ScopeLocal.Carrier HOLD_42 = ScopeLocal.where(sl1, 42);
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int bindThenGetThenRemove_ScopeLocal() throws Exception {
-        return ScopeLocal.where(sl1, 42, sl1::get);
+        return HOLD_42.call(sl1::get);
     }
 
     @Benchmark
@@ -122,7 +131,7 @@ public class ScopeLocals {
         return tl1.get();
     }
 
-    // Test 4: The cost of binding, but not using the any result
+    // Test 4: The cost of binding, but not using any result
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
