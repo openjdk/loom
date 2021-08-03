@@ -117,12 +117,12 @@ public final class ScopeLocal<T> {
 
     public static class Snapshot {
         final Snapshot prev;
-        final SingleBinding bindings;
+        final Carrier bindings;
         final short primaryBits;
 
         private static final Object NIL = new Object();
 
-        Snapshot(SingleBinding bindings, Snapshot prev, short primaryBits) {
+        Snapshot(Carrier bindings, Snapshot prev, short primaryBits) {
             this.prev = prev;
             this.bindings = bindings;
             this.primaryBits = primaryBits;
@@ -131,7 +131,7 @@ public final class ScopeLocal<T> {
         Object find(ScopeLocal<?> key) {
             for (Snapshot b = this; b != null; b = b.prev) {
                 if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
-                    for (SingleBinding binding = b.bindings;
+                    for (Carrier binding = b.bindings;
                          binding != null;
                          binding = binding.prev) {
                         if (binding.getKey() == key) {
@@ -167,10 +167,14 @@ public final class ScopeLocal<T> {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache
         final short primaryBits, secondaryBits;
-        final SingleBinding nonInheritables;
+        final ScopeLocal<?> key;
+        final Object value;
+        final Carrier prev;
 
-       Carrier(SingleBinding nonInheritables, short primaryBits, short secondaryBits) {
-            this.nonInheritables = nonInheritables;
+        Carrier(ScopeLocal<?> key, Object value, Carrier prev, short primaryBits, short secondaryBits) {
+            this.key = key;
+            this.value = value;
+            this.prev = prev;
             this.primaryBits = primaryBits;
             this.secondaryBits = secondaryBits;
         }
@@ -179,12 +183,11 @@ public final class ScopeLocal<T> {
          * Add a binding to this map, returning a new Carrier instance.
          */
         private static final <T> Carrier where(ScopeLocal<T> key, T value,
-                                               SingleBinding nonInheritables,
+                                               Carrier prev,
                                                short primaryBits, short secondaryBits) {
-            nonInheritables = new SingleBinding(key, value, nonInheritables);
             primaryBits |= (short)(1 << Cache.primaryIndex(key));
             secondaryBits |= (short)(1 << Cache.secondaryIndex(key));
-            return new Carrier(nonInheritables, primaryBits, secondaryBits);
+            return new Carrier(key, value, prev, primaryBits, secondaryBits);
         }
 
         /**
@@ -196,7 +199,7 @@ public final class ScopeLocal<T> {
          * @return TBD
          */
         public final <T> Carrier where(ScopeLocal<T> key, T value) {
-            return where(key, value, nonInheritables, primaryBits, secondaryBits);
+            return where(key, value, this, primaryBits, secondaryBits);
         }
 
         /*
@@ -204,6 +207,14 @@ public final class ScopeLocal<T> {
          */
         static final <T> Carrier of(ScopeLocal<T> key, T value) {
             return where(key, value, null, (short)0, (short)0);
+        }
+
+        final Object get() {
+            return value;
+        }
+
+        final ScopeLocal<?> getKey() {
+            return key;
         }
 
         /**
@@ -214,7 +225,7 @@ public final class ScopeLocal<T> {
          */
         @SuppressWarnings("unchecked")
         public final <T> T get(ScopeLocal<T> key) {
-            for (SingleBinding b = nonInheritables;
+            for (Carrier b = this;
                  b != null; b = b.prev) {
                 if (b.getKey() == key) {
                     Object value = b.get();
@@ -238,7 +249,7 @@ public final class ScopeLocal<T> {
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var nonInheritables = addScopeLocalBindings(this.nonInheritables, primaryBits);
+            var nonInheritables = addScopeLocalBindings(this, primaryBits);
             try {
                 return op.call();
             } finally {
@@ -278,7 +289,7 @@ public final class ScopeLocal<T> {
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var nonInheritables = addScopeLocalBindings(this.nonInheritables, primaryBits);
+            var nonInheritables = addScopeLocalBindings(this, primaryBits);
             try {
                 op.run();
             } finally {
@@ -291,7 +302,7 @@ public final class ScopeLocal<T> {
         /*
          * Add a list of bindings to the current Thread's set of bound values.
          */
-        private final static Snapshot addScopeLocalBindings(SingleBinding bindings, short primaryBits) {
+        private final static Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
             Snapshot prev = getScopeLocalBindings();
             if (bindings != null) {
                 var b = new Snapshot(bindings, prev, primaryBits);
@@ -362,18 +373,6 @@ public final class ScopeLocal<T> {
      * @return a scope variable
      */
     public static <U,T extends U> ScopeLocal<T> forType(Class<U> type) {
-        return new ScopeLocal<T>(type);
-    }
-
-    /**
-     * Creates an inheritable scoped variable to hold a value with the given type.
-     *
-     * @param <T> the type of the scoped variable's value.
-     * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@code Class} instance {@code T.class}
-     * @return a scope variable
-     */
-    public static <U,T extends U> ScopeLocal<T> inheritableForType(Class<U> type) {
         return new ScopeLocal<T>(type);
     }
 
@@ -520,28 +519,6 @@ public final class ScopeLocal<T> {
      */
     public static Snapshot snapshot() {
         return EmptySnapshot.getInstance();
-    }
-
-    // An immutable object that represents the binding of a single value
-    // to a single key.
-    static final class SingleBinding {
-        final ScopeLocal<?> key;
-        final Object value;
-        final SingleBinding prev;
-
-        SingleBinding(ScopeLocal<?> key, Object value, SingleBinding prev) {
-            this.value = key.type.cast(value);
-            this.key = key;
-            this.prev = prev;
-        }
-
-        final Object get() {
-            return value;
-        }
-
-        final ScopeLocal<?> getKey() {
-            return key;
-        }
     }
 
     // A small fixed-size key-value cache. When a scope variable's get() method
