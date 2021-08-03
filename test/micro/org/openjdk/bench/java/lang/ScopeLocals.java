@@ -176,30 +176,4 @@ public class ScopeLocals {
         var ctr = tl_atomicInt.get();
         ctr.setPlain(ctr.getPlain() + 1);
     }
-
-    // Test 6: Measure the cost of Snapshotting
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public ScopeLocal.Snapshot getSnapshot_ScopeLocal() {
-        return ScopeLocal.snapshot();
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void runWithSnapshot_ScopeLocal() {
-        aSnapshot.run(() -> { });
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public Object callWithSnapshot_ScopeLocal() throws Exception{
-        return aSnapshot.call(() -> getClass());
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public Object callandGetWithSnapshot_ScopeLocal() throws Exception{
-        return aSnapshot.call(sl1::get);
-    }
 }
