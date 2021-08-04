@@ -660,6 +660,7 @@ void vframeStreamCommon::skip_prefixed_method_and_wrappers() {
 
 javaVFrame* vframeStreamCommon::asJavaVFrame() {
   javaVFrame* result = NULL;
+  // FIXME, need to re-do JDK-8271140 and check is_native_frame?
   if (_mode == compiled_mode && _frame.is_compiled_frame()) {
     assert(_frame.is_compiled_frame() || _frame.is_native_frame(), "expected compiled Java frame");
     guarantee(_reg_map.update_map(), "");
