@@ -2131,14 +2131,12 @@ const char* _get_thread_state_name(JavaThreadState _thread_state) {
   }
 }
 
-#ifndef PRODUCT
 void JavaThread::print_thread_state_on(outputStream *st) const {
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
 };
 const char* JavaThread::thread_state_name() const {
   return _get_thread_state_name(_thread_state);
 }
-#endif // PRODUCT
 
 // Called by Threads::print() for VM_PrintThreads operation
 void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
