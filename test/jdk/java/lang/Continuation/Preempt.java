@@ -25,10 +25,10 @@
 * @test
 * @summary Tests for java.lang.Continuation preemption
 *
-* @run testng/othervm/timeout=60 -Xint Preempt
+* @run testng/othervm/timeout=60 -Xlog:jvmcont+preempt=trace -Xint Preempt
 * @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
 * @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
-* @run testng/othervm -XX:-UseTLAB -Xint Preempt
+* @run testng/othervm -Xlog:jvmcont+preempt=trace -XX:-UseTLAB -Xint Preempt
 */
 
 // * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
@@ -71,6 +71,7 @@ public class Preempt {
                     int i = 0;
                     do {
                         res = cont.tryPreempt(t0);
+                        Thread.sleep(10);
                         i++;
                     } while (i < 100 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);
@@ -81,6 +82,7 @@ public class Preempt {
                     int i = 0;
                     do {
                         res = cont.tryPreempt(t0);
+                        Thread.sleep(10);
                         i++;
                     } while (i < 100 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                     assertEquals(res, Continuation.PreemptStatus.SUCCESS, "res: " + res + " i: " + i);

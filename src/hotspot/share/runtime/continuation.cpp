@@ -886,6 +886,15 @@ enum freeze_result {
   freeze_exception = 5
 };
 
+const char* freeze_result_names[6] = {
+  "freeze_ok",
+  "freeze_ok_bottom",
+  "freeze_pinned_cs",
+  "freeze_pinned_native",
+  "freeze_pinned_monitor",
+  "freeze_exception"
+};
+
 template <typename ConfigT>
 class Freeze {
 
@@ -1257,7 +1266,7 @@ public:
     }
     return false;
   }
-  
+
   frame freeze_start_frame() {
     frame f = _thread->last_frame();
     if (LIKELY(!_preempt)) {
@@ -2041,23 +2050,36 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   return freeze_ok;
 }
 
-typedef int (*DoYieldStub)(int scopes);
+static void print_stack_trace(JavaThread* thread) {
+  if (log_is_enabled(Trace, jvmcont, preempt)) {
+    LogTarget(Trace, jvmcont, preempt) lt;
+    assert(lt.is_enabled(), "already tested");
+    ResourceMark rm;
+    LogStream ls(lt);
+    char buf[256];
+    ls.print_cr("Java frames: (J=compiled Java code, j=interpreted, Vv=VM code)");
+    for (StackFrameStream sfs(thread, true /* update */, true /* process_frames */); !sfs.is_done(); sfs.next()) {
+      sfs.current()->print_on_error(&ls, buf, 256, false);
+      ls.cr();
+    }
+  }
+}
 
 static bool is_safe_to_preempt(JavaThread* thread) {
-  // if (Thread::current()->is_VM_thread() && thread->thread_state() == _thread_blocked) {
-  //   log_develop_trace(jvmcont)("is_safe_to_preempt: thread blocked");
-  //   return false;
-  // }
 
   if (!thread->has_last_Java_frame()) {
-    log_develop_trace(jvmcont)("is_safe_to_preempt: no last Java frame");
+    log_trace(jvmcont, preempt)("is_safe_to_preempt: no last Java frame");
     return false;
   }
 
-  if (log_develop_is_enabled(Trace, jvmcont)) {
+  if (log_is_enabled(Trace, jvmcont, preempt)) {
+    LogTarget(Trace, jvmcont, preempt) lt;
+    assert(lt.is_enabled(), "already tested");
+    ResourceMark rm;
+    LogStream ls(lt);
     frame f = thread->last_frame();
-    log_develop_trace(jvmcont)("is_safe_to_preempt %sSAFEPOINT", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
-    f.print_on(tty);
+    ls.print("is_safe_to_preempt %sSAFEPOINT ", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
+    f.print_on(&ls);
   }
 
   address pc = thread->last_Java_pc();
@@ -2065,40 +2087,43 @@ static bool is_safe_to_preempt(JavaThread* thread) {
     // Generally, we don't want to preempt when returning from some useful VM function, and certainly not when inside one.
     InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
     if (codelet != nullptr) {
-      if (log_develop_is_enabled(Trace, jvmcont)) codelet->print_on(tty);
       // We allow preemption only when at a safepoint codelet or a return byteocde
       if (codelet->bytecode() >= 0 && Bytecodes::is_return(codelet->bytecode())) {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: safe bytecode: %s", Bytecodes::name(codelet->bytecode()));
+        log_trace(jvmcont, preempt)("is_safe_to_preempt: safe bytecode: %s",
+                                    Bytecodes::name(codelet->bytecode()));
         assert (codelet->kind() == InterpreterCodelet::codelet_bytecode, "");
         return true;
       } else if (codelet->kind() == InterpreterCodelet::codelet_safepoint_entry) {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: safepoint entry: %s", codelet->description());
+        log_trace(jvmcont, preempt)("is_safe_to_preempt: safepoint entry: %s", codelet->description());
         return true;
       } else {
-        log_develop_trace(jvmcont)("is_safe_to_preempt: %s (unsafe)", codelet->description());
+        log_trace(jvmcont, preempt)("is_safe_to_preempt: %s (unsafe)", codelet->description());
+        print_stack_trace(thread);
         return false;
       }
     } else {
-      log_develop_trace(jvmcont)("is_safe_to_preempt: no codelet (safe?)");
+      log_trace(jvmcont, preempt)("is_safe_to_preempt: no codelet (safe?)");
       return true;
     }
   } else {
     CodeBlob* cb = CodeCache::find_blob(pc);
     if (cb->is_safepoint_stub()) {
-      log_develop_trace(jvmcont)("is_safe_to_preempt: safepoint stub");
+      log_trace(jvmcont, preempt)("is_safe_to_preempt: safepoint stub");
       return true;
     } else {
-      log_develop_trace(jvmcont)("is_safe_to_preempt: not safepoint stub");
+      log_trace(jvmcont, preempt)("is_safe_to_preempt: not safepoint stub");
       return false;
     }
   }
 }
 
-// called in a safepoint
-int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
-  log_develop_trace(jvmcont)("try_force_yield: thread state: %s VM thread: %d", thread->thread_state_name(), Thread::current()->is_VM_thread());
+// Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
+// May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
+// the only frames we're looking at are Java frames.
+int Continuation::try_force_yield(JavaThread* target, const oop cont) {
+  log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
 
-  ContinuationEntry* ce = thread->last_continuation();
+  ContinuationEntry* ce = target->last_continuation();
   oop innermost = ce->continuation();
   while (ce != nullptr && ce->continuation() != cont) {
     ce = ce->parent();
@@ -2106,42 +2131,43 @@ int Continuation::try_force_yield(JavaThread* thread, const oop cont) {
   if (ce == nullptr) {
     return -1; // no continuation
   }
-  if (thread->_cont_yield) {
+  if (target->_cont_yield) {
     return -2; // during yield
   }
-  if (!is_safe_to_preempt(thread)) {
+  if (!is_safe_to_preempt(target)) {
     return freeze_pinned_native;
   }
 
-  assert (thread->has_last_Java_frame(), "");
+  assert (target->has_last_Java_frame(), "");
   // if (Interpreter::contains(thread->last_Java_pc())) { thread->push_cont_fastpath(thread->last_Java_sp()); }
-  assert (!Interpreter::contains(thread->last_Java_pc()) || !thread->cont_fastpath(), "fast_path at codelet %s", Interpreter::codelet_containing(thread->last_Java_pc())->description());
+  assert (!Interpreter::contains(target->last_Java_pc()) || !target->cont_fastpath(),
+          "fast_path at codelet %s",
+          Interpreter::codelet_containing(target->last_Java_pc())->description());
 
   const oop scope = java_lang_Continuation::scope(cont);
   if (innermost != cont) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
-    freeze_result res_pinned = is_pinned0(thread, scope, true);
-    if (res_pinned != freeze_ok)
+    freeze_result res_pinned = is_pinned0(target, scope, true);
+    if (res_pinned != freeze_ok) {
+      log_trace(jvmcont, preempt)("try_force_yield: res_pinned");
       return res_pinned;
-
+    }
     java_lang_Continuation::set_yieldInfo(cont, scope);
   }
 
-  // TODO: save return value
-
-  assert (thread->has_last_Java_frame(), "");
-  int res = cont_freeze(thread, thread->last_Java_sp(), true); // CAST_TO_FN_PTR(DoYieldStub, StubRoutines::cont_doYield_C())(-1);
+  assert (target->has_last_Java_frame(), "need to test again?");
+  int res = cont_freeze(target, target->last_Java_sp(), true);
+  log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
   if (res == 0) { // success
-    thread->set_cont_preempt(true);
+    target->set_cont_preempt(true);
 
-    // frame last = thread->last_frame();
-    // Frame::patch_pc(last, StubRoutines::cont_jump_from_sp()); // reinstates rbpc and rlocals for the sake of the interpreter
-    // log_develop_trace(jvmcont)("try_force_yield installed cont_jump_from_sp stub on"); if (log_develop_is_enabled(Trace, jvmcont)) last.print_on(tty);
-
-    // this return barrier is used for compiled frames; for interpreted frames we use the call to StubRoutines::cont_jump_from_sp_C in JavaThread::handle_special_runtime_exit_condition
+    // The target thread calls
+    // StubRoutines::cont_jump_from_sp_C from JavaThread::handle_special_runtime_exit_condition
+    // to yield on return from suspension/blocking handshake.
   }
   return res;
 }
+
 /////////////// THAW ////
 
 enum thaw_kind {
