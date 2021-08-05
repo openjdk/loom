@@ -1051,9 +1051,9 @@ private:
  public:
   oop _mounted_vthread;
   jlong _scopeLocal_hash_table_shift;
-    
+
   void allocate_scopeLocal_hash_table(int count);
-    
+
  public:
   // Constructor
   JavaThread();                            // delegating constructor
@@ -1169,7 +1169,7 @@ private:
   void set_do_not_unlock_if_synchronized(bool val) { _do_not_unlock_if_synchronized = val; }
 
   SafepointMechanism::ThreadData* poll_data() { return &_poll_data; }
-    
+
   void set_requires_cross_modify_fence(bool val) PRODUCT_RETURN NOT_PRODUCT({ _requires_cross_modify_fence = val; })
 
   // Continuation support
@@ -1224,11 +1224,11 @@ private:
 
   inline void set_thread_suspended();
   inline void clear_thread_suspended();
- 
+
   bool is_thread_suspended() const {
     return (_suspend_flags & _thread_suspended) != 0;
   }
- 
+
   bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
   bool hide_over_cont_yield() const              { return _hide_over_cont_yield; }
@@ -1488,8 +1488,8 @@ private:
   void print_on(outputStream* st, bool print_extended_info) const;
   void print_on(outputStream* st) const { print_on(st, false); }
   void print() const;
-  void print_thread_state_on(outputStream*) const      PRODUCT_RETURN;
-  DEBUG_ONLY(const char* thread_state_name() const;)
+  void print_thread_state_on(outputStream*) const;
+  const char* thread_state_name() const;
   void print_on_error(outputStream* st, char* buf, int buflen) const;
   void print_name_on_error(outputStream* st, char* buf, int buflen) const;
   void verify();
@@ -1577,7 +1577,7 @@ private:
   JvmtiThreadState *jvmti_thread_state() const                                   { return _jvmti_thread_state; }
   static ByteSize jvmti_thread_state_offset()                                    { return byte_offset_of(JavaThread, _jvmti_thread_state); }
 
-  // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier. 
+  // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
   JvmtiThreadState *rebind_to_jvmti_thread_state_of(oop thread_oop);
 
   // JVMTI PopFrame support
