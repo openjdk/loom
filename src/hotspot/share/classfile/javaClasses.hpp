@@ -422,7 +422,7 @@ class java_lang_Thread : AllStatic {
   static int _continuation_offset;
   static int _park_blocker_offset;
   static int _scopeLocalBindings_offset;
-  
+
   static void compute_offsets();
 
  public:
