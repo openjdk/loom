@@ -1509,7 +1509,7 @@ public class Thread implements Runnable {
                 this.container = container;
                 Thread parent = Thread.currentThread();
                 if (parent.headThreadContainer != null) {
-                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+                    this.scopeLocalBindings = parent.scopeLocalBindings;
                 }
             }
             start0();
