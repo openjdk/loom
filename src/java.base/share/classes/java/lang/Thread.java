@@ -154,8 +154,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, {@linkplain
- * ScopeLocal#inheritableForType(Class) inheritable-scope-local} variables, the initial
+ * Creating a {@code Thread} will inherit, by default, the initial
  * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
  * a number of properties from the parent thread:
  * <ul>
@@ -928,15 +927,6 @@ public class Thread implements Runnable {
          * @return this builder
          */
         Builder inheritInheritableThreadLocals(boolean inherit);
-
-        /**
-         * Sets whether the thread inherits {@linkplain ScopeLocal#inheritableForType(Class)
-         * inheritable-scope-local} variables. The default is to inherit.
-         *
-         * @param inherit {@code true} to inherit, {@code false} to not inherit
-         * @return this builder
-         */
-        Builder inheritInheritableScopeLocals(boolean inherit);
 
         /**
          * Sets the uncaught exception handler.

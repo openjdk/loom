@@ -37,41 +37,27 @@ import jdk.internal.vm.annotation.Stable;
 import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 
 /**
- * Represents a scoped variable.
+ * Represents a scoped value.
  *
- * <p> A scope-local variable differs from a normal variable in that it is dynamically
+ * <p> A scope-local value differs from a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
- * to a transitive callee without using an explicit parameter. A scope-local variable
+ * to a transitive callee without using an explicit parameter. A scope-local value
  * does not have a default/initial value: it is bound, meaning it gets a value,
  * when executing an operation specified to {@link #where(ScopeLocal, Object)}.
  * Code executed by the operation
  * uses the {@link #get()} method to get the value of the variable. The variable reverts
  * to being unbound (or its previous value) when the operation completes.
  *
- * <p> Access to the value of a scoped variable is controlled by the accessibility
+ * <p> Access to the value of a scope local is controlled by the accessibility
  * of the {@code ScopeLocal} object. A {@code ScopeLocal} object  will typically be declared
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
- * <p> ScopeLocal variables support nested bindings. If a scoped variable has a value
+ * <p> Scope locals  support nested bindings. If a scoped variable has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
  * another operation with a new value. Code executed by this methods "sees" the new
  * value of the variable. The variable reverts to its previous value when the
  * operation completes.
- *
- * <p> An <em>inheritable scoped variable</em> is created with the {@link
- * #inheritableForType(Class)} method and provides inheritance of values from
- * parent thread to child thread that is arranged when the child thread is
- * created. Unlike {@link InheritableThreadLocal}, inheritable scoped variable
- * are not copied into the child thread, instead the child thread will access
- * the same variable as the parent thread. The value of inheritable scoped
- * variables should be immutable to avoid needing synchronization to coordinate
- * access.
- *
- * <p> As an advanced feature, the {@link #snapshot()} method is defined to obtain
- * a {@link Snapshot} of the inheritable scoped variables that are currently bound.
- * This can be used to support cases where inheritance needs to be done at times
- * other than thread creation.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -112,10 +98,9 @@ public final class ScopeLocal<T> {
      * or method in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @since 99
-     * @see ScopeLocal#snapshot()
      */
 
-    public static class Snapshot {
+    static class Snapshot {
         final Snapshot prev;
         final Carrier bindings;
         final short primaryBits;
@@ -222,6 +207,8 @@ public final class ScopeLocal<T> {
          * @param key the ScopeLocal to find
          * @param <T> the type of the ScopeLocal
          * @return the value
+         * @throws NoSuchElementException if key is not bound to any value
+         *
          */
         @SuppressWarnings("unchecked")
         public final <T> T get(ScopeLocal<T> key) {
@@ -249,12 +236,12 @@ public final class ScopeLocal<T> {
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var nonInheritables = addScopeLocalBindings(this, primaryBits);
+            var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
                 return op.call();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.scopeLocalBindings = nonInheritables;
+                currentThread.scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -289,12 +276,12 @@ public final class ScopeLocal<T> {
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
-            var nonInheritables = addScopeLocalBindings(this, primaryBits);
+            var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
                 op.run();
             } finally {
                 Thread currentThread = Thread.currentThread();
-                currentThread.scopeLocalBindings = nonInheritables;
+                currentThread.scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
         }
@@ -324,7 +311,6 @@ public final class ScopeLocal<T> {
      * @return A Carrier instance that contains one binding, that of key and value
      */
     public static <T> Carrier where(ScopeLocal<T> key, T value) {
-        // This could be made more efficient by not creating the Carrier instance.
         return Carrier.of(key, value);
     }
 
@@ -340,8 +326,6 @@ public final class ScopeLocal<T> {
      * @throws Exception if the operation completes with an exception
      */
     public static <T, U> U where(ScopeLocal<T> key, T value, Callable<U> op) throws Exception {
-        // This could be made more efficient by not creating the Carrier instance,
-        // but there isn't much in it.
         return where(key, value).call(op);
     }
 
@@ -354,8 +338,6 @@ public final class ScopeLocal<T> {
      * @param op the operation to run
      */
     public static <T> void where(ScopeLocal<T> key, T value, Runnable op) {
-        // This could be made more efficient by not creating the Carrier instance,
-        // but there isn't much in it.
         where(key, value).run(op);
     }
 
@@ -508,19 +490,6 @@ public final class ScopeLocal<T> {
         return (nextKey = x);
     }
 
-    /**
-     * Returns a "snapshot" of the inheritable scoped variables that are currently
-     * bound.
-     *
-     * <p>This snapshot may be capured at any time. It is inteneded to be used
-     * in circumstances where values may be shared by sub-tasks.
-     *
-     * @return a "snapshot" of the currently-bound inheritable scoped variables.
-     */
-    public static Snapshot snapshot() {
-        return EmptySnapshot.getInstance();
-    }
-
     // A small fixed-size key-value cache. When a scope variable's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
@@ -549,9 +518,9 @@ public final class ScopeLocal<T> {
             Thread thread = Thread.currentThread();
             int k1 = primaryIndex(key);
             int k2 = secondaryIndex(key);
-            int tmp = chooseVictim(thread);
-            int victim = tmp == 0 ? k1 : k2;
-            int other = tmp == 0 ? k2 : k1;
+            var usePrimaryIndex = chooseVictim(thread);
+            int victim = usePrimaryIndex ? k1 : k2;
+            int other = usePrimaryIndex ? k2 : k1;
             setKeyAndObjectAt(victim, key, value);
             if (getKey(theCache, other) == key) {
                 setKey(theCache, other, null);
@@ -599,17 +568,17 @@ public final class ScopeLocal<T> {
             objs[n * 2] = key;
         }
 
-        // Return either 0 or 1, at pseudo-random, with a bias towards zero.
+        // Return either true or false, at pseudo-random, with a bias towards true.
         // This chooses either the primary or secondary cache slot, but the
         // primary slot is approximately twice as likely to be chosen as the
         // secondary one.
-        private static int chooseVictim(Thread thread) {
+        private static boolean chooseVictim(Thread thread) {
             int tmp = thread.victims;
             tmp ^= tmp << 13;
             tmp ^= tmp >>> 17;
             tmp ^= tmp << 5;
             thread.victims = tmp;
-            return (tmp & 15) < 5 ? 1 : 0;
+            return (tmp & 15) >= 5;
         }
 
         public static void invalidate() {
@@ -621,10 +590,9 @@ public final class ScopeLocal<T> {
             assert(toClearBits == (short)toClearBits);
             Object[] objects;
             if ((objects = Thread.scopeLocalCache()) != null) {
-                for (short bits = (short)toClearBits;
-                     bits != 0; ) {
+                for (short bits = (short)toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
-                    setKey(objects, index, null);
+                    setKeyAndObjectAt(index, null, null);
                     bits &= ~1 << index;
                 }
             }
