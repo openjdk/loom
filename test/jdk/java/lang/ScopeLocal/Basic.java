@@ -42,13 +42,13 @@ public class Basic {
 
     @Test(expectedExceptions = { NoSuchElementException.class })
     public void testUnbound1() {
-        ScopeLocal<String> v = ScopeLocal.forType(String.class);
+        ScopeLocal<String> v = ScopeLocal.newInstance();
         assertFalse(v.isBound());
         v.get();
     }
 
     public void testOrElse() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
         assertTrue(name.orElse(null) == null);
         assertEquals(name.orElse("default"), "default");
@@ -59,7 +59,7 @@ public class Basic {
     }
 
     public void testOrElseThrow() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
         assertThrows(IllegalStateException.class, () -> name.orElseThrow(IllegalStateException::new));
         assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
@@ -73,7 +73,7 @@ public class Basic {
      * Test runWithBinding with non-inheritable scope variable.
      */
     public void testRunWithBinding1() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
@@ -81,7 +81,7 @@ public class Basic {
     }
 
     public void testRunWithBinding2() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
@@ -100,7 +100,7 @@ public class Basic {
      * Test runWithBinding with non-inheritable scope variable, null value.
      */
     public void testRunWithBinding3() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
@@ -108,7 +108,7 @@ public class Basic {
     }
 
     public void testRunWithBinding4() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
@@ -132,7 +132,7 @@ public class Basic {
      */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testRunWithBinding9() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Runnable)null);
     }
 
@@ -140,7 +140,7 @@ public class Basic {
      * Test callWithBinding with non-inheritable scope variable.
      */
     public void testCallWithBinding1() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value = name.get();
@@ -151,7 +151,7 @@ public class Basic {
     }
 
     public void testCallWithBinding2() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
@@ -174,7 +174,7 @@ public class Basic {
      * Test callWithBinding with non-inheritable scope variable, null value.
      */
     public void testCallWithBinding3() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
@@ -184,7 +184,7 @@ public class Basic {
     }
 
     public void testCallWithBinding4() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
@@ -207,7 +207,7 @@ public class Basic {
      */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testCallWithBinding9() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Callable)null);
     }
 }

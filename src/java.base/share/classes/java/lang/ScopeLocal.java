@@ -39,13 +39,13 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 /**
  * Represents a scoped value.
  *
- * <p> A scope-local value differs from a normal variable in that it is dynamically
+ * <p> A scope-local value (hereinafter called a scope local) differs from a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
  * to a transitive callee without using an explicit parameter. A scope-local value
  * does not have a default/initial value: it is bound, meaning it gets a value,
  * when executing an operation specified to {@link #where(ScopeLocal, Object)}.
  * Code executed by the operation
- * uses the {@link #get()} method to get the value of the variable. The variable reverts
+ * uses the {@link #get()} method to get the value of the scope local. The scope local reverts
  * to being unbound (or its previous value) when the operation completes.
  *
  * <p> Access to the value of a scope local is controlled by the accessibility
@@ -53,17 +53,17 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
- * <p> Scope locals  support nested bindings. If a scoped variable has a value
+ * <p> Scope locals  support nested bindings. If a scope local has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
  * another operation with a new value. Code executed by this methods "sees" the new
- * value of the variable. The variable reverts to its previous value when the
+ * value of the scope local. The scope local reverts to its previous value when the
  * operation completes.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @apiNote
- * The following example uses a scoped variable to make credentials available to callees.
+ * The following example uses a scope local to make credentials available to callees.
  *
  * <pre>{@code
  *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.forType(Credentials.class);
@@ -81,12 +81,11 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *   }
  * }</pre>
  *
- * @param <T> the variable type
+ * @param <T> the scope local's type
  * @since 99
  */
 @jdk.internal.javac.PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
-    private final @Stable Class<? super T> type;
     private final @Stable int hash;
 
     public final int hashCode() { return hash; }
@@ -225,7 +224,7 @@ public final class ScopeLocal<T> {
         /**
          * Runs a value-returning operation with this some ScopeLocals bound to values.
          * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the variables. The variables revert to their previous values or
+         * get the value of the scope local. The scope locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * @param op    the operation to run
@@ -268,7 +267,7 @@ public final class ScopeLocal<T> {
         /**
          * Runs an operation with some ScopeLocals bound to our values.
          * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the variables. The variables revert to their previous values or
+         * get the value of the scope local. The scope locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * @param op    the operation to run
@@ -341,27 +340,24 @@ public final class ScopeLocal<T> {
         where(key, value).run(op);
     }
 
-    private ScopeLocal(Class<? super T> type) {
-        this.type = Objects.requireNonNull(type);
+    private ScopeLocal() {
         this.hash = generateKey();
     }
 
     /**
-     * Creates a scoped variable to hold a value with the given type.
+     * Creates a scope-local handle to refer to a value of type T.
      *
-     * @param <T> the type of the scoped variable's value.
-     * @param <U> a supertype of {@code T}. It should either be {@code T} itself or, if T is a parameterized type, its generic type.
-     * @param type The {@code Class} instance {@code T.class}
-     * @return a scope variable
+     * @param <T> the type of the scope local's value.
+     * @return a scope-local handle
      */
-    public static <U,T extends U> ScopeLocal<T> forType(Class<U> type) {
-        return new ScopeLocal<T>(type);
+    public static <T> ScopeLocal<T> newInstance() {
+        return new ScopeLocal<T>();
     }
 
     /**
-     * Returns the value of the variable.
-     * @return the value of the variable
-     * @throws NoSuchElementException if the variable is not bound (exception is TBD)
+     * Returns the value of the scope local.
+     * @return the value of the scope local
+     * @throws NoSuchElementException if the scope local is not bound (exception is TBD)
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -397,9 +393,9 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Returns {@code true} if the variable is bound to a value.
+     * Returns {@code true} if the scope local is bound to a value.
      *
-     * @return {@code true} if the variable is bound to a value, otherwise {@code false}
+     * @return {@code true} if the scope local is bound to a value, otherwise {@code false}
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
@@ -411,7 +407,7 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Return the value of the variable or NIL if not bound.
+     * Return the value of the scope local or NIL if not bound.
      */
     private Object findBinding() {
         var bindings = scopeLocalBindings();
@@ -423,9 +419,9 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Return the value of the variable if bound, otherwise returns {@code other}.
+     * Return the value of the scope local if bound, otherwise returns {@code other}.
      * @param other the value to return if not bound, can be {@code null}
-     * @return the value of the variable if bound, otherwise {@code other}
+     * @return the value of the scope local if bound, otherwise {@code other}
      */
     public T orElse(T other) {
         Object obj = findBinding();
@@ -439,13 +435,13 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Return the value of the variable if bound, otherwise throws an exception
+     * Return the value of the scope local if bound, otherwise throws an exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces an
      *        exception to be thrown
-     * @return the value of the variable if bound
-     * @throws X if the variable is unbound
+     * @return the value of the scope local if bound
+     * @throws X if the scope local is unbound
      */
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         Objects.requireNonNull(exceptionSupplier);
@@ -490,7 +486,7 @@ public final class ScopeLocal<T> {
         return (nextKey = x);
     }
 
-    // A small fixed-size key-value cache. When a scope variable's get() method
+    // A small fixed-size key-value cache. When a scope scope local's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
     private static class Cache {
