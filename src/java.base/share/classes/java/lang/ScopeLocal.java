@@ -129,12 +129,12 @@ public final class ScopeLocal<T> {
         }
     }
 
-    private static final class EmptySnapshot extends Snapshot {
+     static final class EmptySnapshot extends Snapshot {
         private EmptySnapshot() {
             super(null, null, (short)0);
         }
 
-        static final Snapshot SINGLETON = new EmptySnapshot();
+        private static final Snapshot SINGLETON = new EmptySnapshot();
 
         static final Snapshot getInstance() {
             return SINGLETON;
@@ -290,10 +290,8 @@ public final class ScopeLocal<T> {
          */
         private final static Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
             Snapshot prev = getScopeLocalBindings();
-            if (bindings != null) {
-                var b = new Snapshot(bindings, prev, primaryBits);
-                ScopeLocal.setScopeLocalBindings(b);
-            }
+            var b = new Snapshot(bindings, prev, primaryBits);
+            ScopeLocal.setScopeLocalBindings(b);
             return prev;
         }
     }
@@ -382,8 +380,6 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     private T slowGet() {
         var bindings = scopeLocalBindings();
-        if (bindings == null)
-            throw new NoSuchElementException();
         var value =  bindings.find(this);
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();
@@ -399,23 +395,14 @@ public final class ScopeLocal<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
-        var bindings = scopeLocalBindings();
-        if (bindings == null) {
-            return false;
-        }
-        return (bindings.find(this) != Snapshot.NIL);
+        return (scopeLocalBindings().find(this) != Snapshot.NIL);
     }
 
     /**
      * Return the value of the scope local or NIL if not bound.
      */
     private Object findBinding() {
-        var bindings = scopeLocalBindings();
-        if (bindings != null) {
-            return bindings.find(this);
-        } else {
-            return Snapshot.NIL;
-        }
+        return scopeLocalBindings().find(this);
     }
 
     /**
