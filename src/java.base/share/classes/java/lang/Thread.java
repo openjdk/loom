@@ -248,8 +248,7 @@ public class Thread implements Runnable {
     // cache entries from the scoped variable cache.
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    ScopeLocal.Snapshot noninheritableScopeLocalBindings;
-    ScopeLocal.Snapshot inheritableScopeLocalBindings;
+    ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -675,11 +674,6 @@ public class Thread implements Runnable {
                 // default CCL to the system class loader when not inheriting
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
-
-            // scoped variables
-            if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-                this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-            }
         }
 
         int priority;
@@ -730,11 +724,6 @@ public class Thread implements Runnable {
         } else {
             // default CCL to the system class loader when not inheriting
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
-        }
-
-        // scoped variables
-        if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
         }
 
         // no additional fields
@@ -938,15 +927,6 @@ public class Thread implements Runnable {
          * @return this builder
          */
         Builder inheritInheritableThreadLocals(boolean inherit);
-
-        /**
-         * Sets whether the thread inherits {@linkplain ScopeLocal#inheritableForType(Class)
-         * inheritable-scope-local} variables. The default is to inherit.
-         *
-         * @param inherit {@code true} to inherit, {@code false} to not inherit
-         * @return this builder
-         */
-        Builder inheritInheritableScopeLocals(boolean inherit);
 
         /**
          * Sets the uncaught exception handler.
@@ -1529,7 +1509,7 @@ public class Thread implements Runnable {
                 this.container = container;
                 Thread parent = Thread.currentThread();
                 if (parent.headThreadContainer != null) {
-                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+                    this.scopeLocalBindings = parent.scopeLocalBindings;
                 }
             }
             start0();
