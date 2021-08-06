@@ -118,11 +118,6 @@ public class ExecutorCompletionService<V> implements CompletionService<V> {
         private final Future<V> task;
         private final BlockingQueue<Future<V>> completionQueue;
         protected void done() { completionQueue.add(task); }
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            boolean cancelled = super.cancel(mayInterruptIfRunning);
-            task.cancel(false);  // propagate cancel
-            return cancelled;
-        }
     }
 
     private RunnableFuture<V> newTaskFor(Callable<V> task) {

@@ -518,6 +518,10 @@ class VirtualThread extends Thread {
         }
         if (container != null) {
             setThreadContainer(container);
+            Thread parent = Thread.currentThread();
+            if (parent.headThreadContainer() != null) {
+                this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+            }
         } else {
             ThreadContainers.incrementUnmanagedVirtualThreadCount();
         }

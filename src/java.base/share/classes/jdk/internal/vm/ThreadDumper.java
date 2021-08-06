@@ -38,6 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.stream.Stream;
 
 /**
  * Thread dump support.
@@ -93,7 +94,12 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        ThreadContainers.allContainers()
+        Stream<ThreadContainer> s1 = ThreadContainers.sharedContainers();
+        Stream<ThreadContainer> s2 = ThreadContainers.ownedContainers()
+                .values()
+                .stream()
+                .flatMap(List::stream);
+        Stream.concat(s1, s2)
                 .flatMap(ThreadContainer::threads)
                 .forEach(t -> dumpThread(t, ps));
         ps.flush();
@@ -122,7 +128,6 @@ public class ThreadDumper {
      */
     private static void dumpThreadsToJson(PrintStream out) {
         List<ThreadContainer> containers = new ArrayList<>();
-        containers.add(ThreadContainers.root());
         ThreadContainers.sharedContainers().forEach(containers::add);
 
         // maps thread container to its enclosing container

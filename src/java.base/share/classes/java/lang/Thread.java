@@ -154,8 +154,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, the initial
- * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
+ * Creating a {@code Thread} will inherit, by default, the initial values of
+ * {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
  * a number of properties from the parent thread:
  * <ul>
  *     <li> Platform threads inherit the daemon status, priority, and thread-group.
@@ -632,14 +632,14 @@ public class Thread implements Runnable {
             }
         }
 
-        /* checkAccess regardless of whether or not threadgroup is
-           explicitly passed in. */
-        g.checkAccess();
-
         /*
          * Do we have the required permissions?
          */
         if (security != null) {
+            /* checkAccess regardless of whether or not threadgroup is
+               explicitly passed in. */
+            security.checkAccess(g);
+
             if (isCCLOverridden(getClass())) {
                 security.checkPermission(
                         SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
@@ -1505,8 +1505,13 @@ public class Thread implements Runnable {
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
             // bind thread to container
-            if (container != null)
+            if (container != null) {
                 this.container = container;
+                Thread parent = Thread.currentThread();
+                if (parent.headThreadContainer != null) {
+                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
+                }
+            }
             start0();
         }
     }

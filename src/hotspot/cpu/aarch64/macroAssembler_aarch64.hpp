@@ -897,7 +897,6 @@ public:
     Register t2,                       // temp register
     Label&   slow_case                 // continuation point if fast allocation fails
   );
-  void zero_memory(Register addr, Register len, Register t1);
   void verify_tlab();
 
   // interface method calling
