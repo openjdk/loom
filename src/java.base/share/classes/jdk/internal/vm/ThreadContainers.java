@@ -26,13 +26,7 @@ package jdk.internal.vm;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
@@ -94,7 +88,7 @@ public class ThreadContainers {
     }
 
     /**
-     * Removes a shared thread container ffrom being tracked by specifying the
+     * Removes a shared thread container from being tracked by specifying the
      * key returned when the thread container was registered.
      */
     public static void deregisterSharedContainer(Object key) {
@@ -103,89 +97,103 @@ public class ThreadContainers {
     }
 
     /**
-     * Returns a stream of the shared thread containers tracked by this class.
-     * The stream include the root container.
+     * Returns the root thread container.
      */
-    public static Stream<ThreadContainer> sharedContainers() {
-        Stream<ThreadContainer> s1 = Stream.of(RootContainer.INSTANCE);
-        Stream<ThreadContainer> s2 = SHARED_CONTAINERS.stream()
-                .map(WeakReference::get)
-                .filter(c -> c != null);
+    public static ThreadContainer root() {
+        return RootContainer.INSTANCE;
+    }
+
+    /**
+     * Returns the "parent" of the given thread container.
+     *
+     * The parent of an owned container is the enclosing container when nested,
+     * otherwise the parent of an owned container is the owner's container.
+     *
+     * The root thread container is the parent of all unowned/shared thread
+     * containers. The parent of the root container is null.
+     */
+    public static ThreadContainer parent(ThreadContainer container) {
+        ThreadContainer parent = container.previous();
+        if (parent != null)
+            return parent;
+        Thread owner = container.owner();
+        if (owner != null && (parent = JLA.threadContainer(owner)) != null)
+            return parent;
+        ThreadContainer root = root();
+        return (container != root) ? root : null;
+    }
+
+    /**
+     * Returns a stream of the given thread container's "children".
+     *
+     * An owned thread container is the parent of the thread container that is
+     * encloses. The "top most" container owned by threads in the container are also
+     * children.
+     *
+     * Unowned/shared thread containers that are reachable from the root container
+     * are children of the root container.
+     */
+    public static Stream<ThreadContainer> children(ThreadContainer container) {
+        Stream<ThreadContainer> s1 = Stream.empty();
+        Thread owner = container.owner();
+        if (owner != null) {
+            // container may enclose another container
+            ThreadContainer next = next(container);
+            s1 = Stream.ofNullable(next);
+        } else if (container == root()) {
+            // the root container is the parent of all shared containers
+            s1 = SHARED_CONTAINERS.stream()
+                    .map(WeakReference::get)
+                    .filter(c -> c != null);
+        }
+
+        // the top-most container owned by the threads in the container
+        Stream<ThreadContainer> s2 = container.threads()
+                .map(t -> Optional.ofNullable(top(t)))
+                .flatMap(Optional::stream);
         return Stream.concat(s1, s2);
     }
 
     /**
-     * Returns the list of thread containers owned by the given thread. The
-     * list is ordered, enclosing containers before nested containers.
-     */
-    public static List<ThreadContainer> ownedContainers(Thread thread) {
-        ThreadContainer container = JLA.headThreadContainer(thread);
-        if (container == null) {
-            return List.of();
-        } else {
-            List<ThreadContainer> list = new ArrayList<>();
-            while (container != null) {
-                list.add(container);
-                container = container.previous();
-            }
-            Collections.reverse(list);
-            return list;
-        }
-    }
-
-    /**
-     * Returns a map of containers found by walking the graph from the set
-     * of root threads. The map is keyed on the owner thread that. The map
-     * value is the list of container owned by the thread, in creation order,
-     * so that an enclosing container is before nested containers.
-     */
-    public static Map<Thread, List<ThreadContainer>> ownedContainers() {
-        Map<Thread, List<ThreadContainer>> map = new HashMap<>();
-        Deque<ThreadContainer> stack = new ArrayDeque<>();
-        roots().forEach(t -> {
-            List<ThreadContainer> containers = ownedContainers(t);
-            if (!containers.isEmpty()) {
-                map.put(t, containers);
-                containers.forEach(stack::push);
-            }
-        });
-        while (!stack.isEmpty()) {
-            ThreadContainer container = stack.pop();
-            container.threads().forEach(t -> {
-                List<ThreadContainer> containers = ownedContainers(t);
-                if (!containers.isEmpty()) {
-                    map.put(t, containers);
-                    containers.forEach(stack::push);
-                }
-            });
-        }
-        return map;
-    }
-
-    /**
-     * Returns the thread container that the given Thread is in.
+     * Returns the thread container that the given Thread is in or the root
+     * container if not started in a container.
      */
     public static ThreadContainer container(Thread thread) {
-        return JLA.threadContainer(thread);
+        ThreadContainer container = JLA.threadContainer(thread);
+        return (container != null) ? container : root();
     }
 
     /**
-     * Returns the set of root Threads to use to find thread containers that
-     * are owned by threads.
+     * Returns the top-most thread container owned by the given thread.
      */
-    private static Stream<Thread> roots() {
-        Stream<Thread> platformThreads = Stream.of(JLA.getAllThreads());
+    private static ThreadContainer top(Thread thread) {
+        ThreadContainer container = JLA.headThreadContainer(thread);
+        while (container != null) {
+            ThreadContainer previous = container.previous();
+            if (previous == null)
+                return container;
+            container = previous;
+        }
+        return null;
+    }
 
-        // virtual threads in shared containers or parked waiting for I/O
-        Stream<Thread> s1 = sharedContainers()
-                .flatMap(ThreadContainer::threads)
-                .filter(Thread::isVirtual);
-        Stream<Thread> s2 = Poller.blockedThreads()
-                .filter(t -> t.isVirtual()
-                        && JLA.threadContainer(t) == null);
-        Stream<Thread> virtualThreads = Stream.concat(s1, s2);
-
-        return Stream.concat(platformThreads, virtualThreads);
+    /**
+     * Returns the thread container that the given thread container encloses.
+     */
+    private static ThreadContainer next(ThreadContainer container) {
+        ThreadContainer head = JLA.headThreadContainer(container.owner());
+        if (head != null) {
+            ThreadContainer next = head;
+            ThreadContainer previous = next.previous();
+            while (previous != null) {
+                if (previous == container) {
+                    return next;
+                }
+                next = previous;
+                previous = next.previous();
+            }
+        }
+        return null;
     }
 
     /**
@@ -210,10 +218,6 @@ public class ThreadContainers {
             Stream<Thread> s1 = Stream.of(JLA.getAllThreads());
             Stream<Thread> s2 = Poller.blockedThreads().filter(Thread::isVirtual);
             return Stream.concat(s1, s2).filter(t -> JLA.threadContainer(t) == null);
-        }
-        @Override
-        public ThreadContainer previous() {
-            throw new UnsupportedOperationException();
         }
         @Override
         public void setPrevious(ThreadContainer container) {

@@ -36,9 +36,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.stream.Stream;
 
 /**
  * Thread dump support.
@@ -94,15 +91,13 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        Stream<ThreadContainer> s1 = ThreadContainers.sharedContainers();
-        Stream<ThreadContainer> s2 = ThreadContainers.ownedContainers()
-                .values()
-                .stream()
-                .flatMap(List::stream);
-        Stream.concat(s1, s2)
-                .flatMap(ThreadContainer::threads)
-                .forEach(t -> dumpThread(t, ps));
+        dumpThreads(ThreadContainers.root(), ps);
         ps.flush();
+    }
+
+    private static void dumpThreads(ThreadContainer container, PrintStream ps) {
+        container.threads().forEach(t -> dumpThread(t, ps));
+        ThreadContainers.children(container).forEach(c -> dumpThreads(c, ps));
     }
 
     private static void dumpThread(Thread thread, PrintStream ps) {
@@ -127,75 +122,65 @@ public class ThreadDumper {
      * Generate a thread dump to the given print stream in JSON format.
      */
     private static void dumpThreadsToJson(PrintStream out) {
-        List<ThreadContainer> containers = new ArrayList<>();
-        ThreadContainers.sharedContainers().forEach(containers::add);
-
-        // maps thread container to its enclosing container
-        Map<ThreadContainer, ThreadContainer> containerToEnclosing = new HashMap<>();
-        for (List<ThreadContainer> list : ThreadContainers.ownedContainers().values()) {
-            list.forEach(containers::add);
-            if (list.size() > 1) {
-                ThreadContainer previous = list.get(0);
-                for (int i = 1; i < list.size(); i++) {
-                    ThreadContainer container = list.get(i);
-                    containerToEnclosing.put(container, previous);
-                    previous = container;
-                }
-            }
-        }
-
         out.println("{");
         out.println("  \"threadDump\": {");
-
         out.println("    \"threadContainers\": [");
 
+        List<ThreadContainer> containers = allContainers();
         Iterator<ThreadContainer> iterator = containers.iterator();
         while (iterator.hasNext()) {
             ThreadContainer container = iterator.next();
-
-            out.println("      {");
-            out.format("        \"container\": \"%s\",%n", escape(container.toString()));
-
-            Thread owner = container.owner();
-            if (owner == null) {
-                out.format("        \"owner\": null,%n");
-            } else {
-                out.format("        \"owner\": %d,%n", owner.getId());
-            }
-
-            ThreadContainer parent = containerToEnclosing.get(container);
-            if (parent == null) {
-                out.format("        \"enclosedBy\": null,%n");
-            } else {
-                out.format("        \"enclosedBy\": \"%s\",%n", escape(parent.toString()));
-            }
-
-            long threadCount = 0;
-            out.println("        \"threads\": [");
-            Iterator<Thread> threads = container.threads().iterator();
-            while (threads.hasNext()) {
-                Thread thread = threads.next();
-                dumpThreadToJson(thread, out, threads.hasNext());
-                threadCount++;
-            }
-            out.println("        ],");   // end of threads
-
-            // thread count
-            threadCount = Long.max(threadCount, container.threadCount());
-            out.format("        \"threadCount\": %d%n", threadCount);
-
             boolean more = iterator.hasNext();
-            if (more) {
-                out.println("      },");
-            } else {
-                out.println("      }");  // last container, no trailing comma
-            }
+            dumpThreadsToJson(container, out, more);
         }
 
         out.println("    ]");   // end of threadContainers
-
         out.println("  }");   // end threadDump
         out.println("}");  // end object
+    }
+
+    /**
+     * Dump the given thread container to the print stream in JSON format.
+     */
+    private static void dumpThreadsToJson(ThreadContainer container,
+                                          PrintStream out,
+                                          boolean more) {
+        out.println("      {");
+        out.format("        \"container\": \"%s\",%n", escape(container.toString()));
+
+        ThreadContainer parent = ThreadContainers.parent(container);
+        if (parent == null) {
+            out.format("        \"parent\": null,%n");
+        } else {
+            out.format("        \"parent\": \"%s\",%n", escape(parent.toString()));
+        }
+
+        Thread owner = container.owner();
+        if (owner == null) {
+            out.format("        \"owner\": null,%n");
+        } else {
+            out.format("        \"owner\": %d,%n", owner.getId());
+        }
+
+        long threadCount = 0;
+        out.println("        \"threads\": [");
+        Iterator<Thread> threads = container.threads().iterator();
+        while (threads.hasNext()) {
+            Thread thread = threads.next();
+            dumpThreadToJson(thread, out, threads.hasNext());
+            threadCount++;
+        }
+        out.println("        ],");   // end of threads
+
+        // thread count
+        threadCount = Long.max(threadCount, container.threadCount());
+        out.format("        \"threadCount\": %d%n", threadCount);
+
+        if (more) {
+            out.println("      },");
+        } else {
+            out.println("      }");  // last container, no trailing comma
+        }
     }
 
     /**
@@ -223,6 +208,21 @@ public class ThreadDumper {
         } else {
             out.println("         }");  // last thread, no trailing comma
         }
+    }
+
+    /**
+     * Returns a list of all thread containers that are "reachable" from
+     * the root container.
+     */
+    private static List<ThreadContainer> allContainers() {
+        List<ThreadContainer> containers = new ArrayList<>();
+        collect(ThreadContainers.root(), containers);
+        return containers;
+    }
+
+    private static void collect(ThreadContainer container, List<ThreadContainer> containers) {
+        containers.add(container);
+        ThreadContainers.children(container).forEach(c -> collect(c, containers));
     }
 
     /**
