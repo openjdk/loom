@@ -391,7 +391,10 @@ compiler/aot/verification/ClassAndLibraryNotMatchTest.java
 
 runtime/symboltable/ShortLivedSymbolCleanup.java
 runtime/logging/LoaderConstraintsTest.java
-
+runtime/NMT/NMTInitializationTest.java#default_long-detail
+runtime/NMT/NMTInitializationTest.java#default_long-off
+runtime/NMT/NMTInitializationTest.java#normal-detail
+runtime/NMT/NMTInitializationTest.java#normal-off
 
 ####
 # Seems module patching doesn't work with wrapper
