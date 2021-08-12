@@ -420,7 +420,6 @@ gc/arguments/TestMinInitialErgonomics.java
 gc/arguments/TestMaxRAMFlags.java
 gc/arguments/TestG1HeapSizeFlags.java
 gc/arguments/TestNewSizeThreadIncrease.java
-gc/g1/TestMixedGCLiveThreshold.java
 gc/g1/TestSkipRebuildRemsetPhase.java
 gc/g1/TestStringDeduplicationYoungGC.java
 gc/g1/TestStringDeduplicationTableRehash.java
@@ -430,6 +429,8 @@ gc/g1/TestStringDeduplicationFullGC.java
 gc/g1/TestStringDeduplicationAgeThreshold.java
 gc/g1/TestRemsetLoggingPerRegion.java
 gc/g1/TestRemsetLogging.java
+
+gc/g1/TestMixedGCLiveThreshold.java#25percent
 
 ####
 ## Expected exception is ignored
