@@ -283,18 +283,16 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
-  {
-    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-    _VTMT_count--;
+  _VTMT_count--;
 
-    // unblock waiting VTMT disablers
-    if (_VTMT_disable_count > 0) {
-      ml.notify_all();
-    }
-    assert(thread->is_in_VTMT(), "sanity check");
-    thread->set_is_in_VTMT(false);
+  // unblock waiting VTMT disablers
+  if (_VTMT_disable_count > 0) {
+    ml.notify_all();
   }
+  assert(thread->is_in_VTMT(), "sanity check");
+  thread->set_is_in_VTMT(false);
 }
 
 /* VThreadList implementation */
