@@ -267,7 +267,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     // block while transitions are disabled or there are suspend requests
     if (_VTMT_disable_count > 0 ||
         thread->is_suspended() ||
-        thread->is_thread_suspended() ||
         JvmtiVTSuspender::is_vthread_suspended(vth())
     ) {
       ml.wait(10);
