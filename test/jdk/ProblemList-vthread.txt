@@ -267,6 +267,11 @@ tools/launcher/modules/validate/ValidateModulesTest.java
 java/rmi/module/ModuleTest.java
 javax/crypto/SecretKeyFactory/TestFailOver.java
 javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
+tools/jimage/JImageToolTest.java
+tools/jpackage/junit/junit.java
+jdk/security/JavaDotSecurity/MakeJavaSecurityTest.java
+javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
+
 
 ####
 # No expected StackOverflow

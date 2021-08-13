@@ -240,6 +240,7 @@ runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
 runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
 runtime/cds/appcds/cacheObject/RedefineClassTest.java
 runtime/cds/appcds/condy/CondyHelloTest.java
+runtime/cds/appcds/customLoader/CustomClassListDump.java
 runtime/cds/appcds/customLoader/HelloCustom.java
 runtime/cds/appcds/customLoader/HelloCustom_JFR.java
 runtime/cds/appcds/customLoader/LoaderSegregationTest.java
