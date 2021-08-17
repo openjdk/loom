@@ -101,7 +101,8 @@ java/lang/ThreadGroup/SetMaxPriority.java
 java/lang/ThreadGroup/Suspend.java
 java/lang/Thread/virtual/CustomScheduler.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
-com/sun/net/httpserver/bugs/B6431193.java #HttpServer inherit thread properies (daemon, but sure not virtuality)
+com/sun/net/httpserver/bugs/B6431193.java
+#B6431193.java: HttpServer inherit thread properies (daemon, but sure not virtuality)
 
 ####
 # Other virtual threads tests, failing with wrapper
