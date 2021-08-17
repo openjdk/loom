@@ -6285,13 +6285,7 @@ RuntimeStub* generate_cont_doYield() {
       __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
       __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
       __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
-      // The next ones, rmethod and rdispatch might not be necessary
-      __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod)
-      {                                                                                 // InterpreterMacroAssembler::get_dispatch(rmethod)
-        uint64_t offset;
-        __ adrp(rdispatch, ExternalAddress((address)Interpreter::dispatch_table()), offset);
-        __ lea(rdispatch, Address(rdispatch, offset)); 
-      }
+      __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
       // __ reinit_heapbase();
 
       // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
