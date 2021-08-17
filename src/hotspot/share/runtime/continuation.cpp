@@ -2486,8 +2486,12 @@ public:
   #endif
 
     if (last_interpreted && _cont.is_preempted()) {
-      assert (last_interpreted == Interpreter::contains(*(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET)), "last_interpreted: %d interpreted: %d", last_interpreted, Interpreter::contains(*(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET)));
-      sp = push_interpreter_return_frame(sp);
+      assert (f.pc() == *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET), "");
+      assert (Interpreter::contains(f.pc()), "");
+      InterpreterCodelet* codelet = Interpreter::codelet_containing(f.pc());
+      if (codelet != nullptr) {
+        sp = push_interpreter_return_frame(sp);
+      }
     }
 
     return sp;
