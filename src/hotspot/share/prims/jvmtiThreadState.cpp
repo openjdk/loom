@@ -81,7 +81,6 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   _jvmti_event_queue = NULL;
   _is_in_VTMT = false;
-  _hide_over_cont_yield = false;
   _is_virtual = false;
 
   _thread_oop_h = OopHandle(JvmtiExport::jvmti_oop_storage(), thread_oop);
@@ -274,6 +273,10 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     }
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
     thread->set_is_in_VTMT(true);
+    JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
+    if (vstate != NULL) {
+      vstate->set_is_in_VTMT(true);
+    }
     _VTMT_count++;
     break;
   }
@@ -292,6 +295,11 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   }
   assert(thread->is_in_VTMT(), "sanity check");
   thread->set_is_in_VTMT(false);
+  oop vt = JNIHandles::resolve_external_guard(vthread);
+  JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt);
+  if (vstate != NULL) {
+    vstate->set_is_in_VTMT(false);
+  }
 }
 
 /* VThreadList implementation */

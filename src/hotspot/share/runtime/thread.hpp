@@ -932,8 +932,6 @@ class JavaThread: public Thread {
                                                          // never locked) when throwing an exception. Used by interpreter only.
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
-  bool                  _hide_over_cont_yield;   // thread is in a mode to hide activity around Continuation.yield
-                                                 // from JVMTI (set at unmount and cleared at mount)
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -1231,14 +1229,9 @@ private:
 
   bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
-  bool hide_over_cont_yield() const              { return _hide_over_cont_yield; }
-  bool disable_jvmti_events() const {
-    return is_in_VTMT() || hide_over_cont_yield();
-  }
 
   void set_is_in_VTMT(bool val);
   void set_is_VTMT_disabler(bool val);
-  void set_hide_over_cont_yield(bool val)        { _hide_over_cont_yield = val; }
 
   bool is_cont_force_yield() { return cont_preempt(); }
 

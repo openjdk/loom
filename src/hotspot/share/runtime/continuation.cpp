@@ -1786,28 +1786,12 @@ int early_return(int res, JavaThread* thread) {
   return res;
 }
 
-static void JVMTI_yield_VTMT_cleanup(JavaThread* thread) {
-#if INCLUDE_JVMTI
-  // this is to hide JVMTI events when in VTMT or over continuation yield transitions
-  oop vt_oop = thread->vthread();
-  JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
-  assert(state == NULL || !state->is_in_VTMT(), "VTMT sanity check");
-  assert(state == NULL || !state->hide_over_cont_yield(), "VTMT sanity check");
-  if (state != NULL && state->is_virtual()) {
-    state->set_is_in_VTMT(thread->is_in_VTMT());
-    state->set_hide_over_cont_yield(thread->hide_over_cont_yield());
-  }
-  thread->set_is_in_VTMT(false);
-  thread->set_hide_over_cont_yield(false);
-#endif // INCLUDE_JVMTI
-}
-
 #if INCLUDE_JVMTI
 static void invalidate_JVMTI_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
-    JvmtiThreadState *jvmti_state = thread->jvmti_thread_state();
-    if (jvmti_state != nullptr)
-      jvmti_state->invalidate_cur_stack_depth();
+    JvmtiThreadState *state = thread->jvmti_thread_state();
+    if (state != nullptr)
+      state->invalidate_cur_stack_depth();
   }
 }
 #endif // INCLUDE_JVMTI
@@ -1948,8 +1932,6 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
-
-  JVMTI_yield_VTMT_cleanup(current);
 
   if (java_lang_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
@@ -2840,20 +2822,9 @@ public:
   }
 
   static void JVMTI_continue_cleanup(JavaThread* thread) {
-  #if INCLUDE_JVMTI
-    // this is to hide JVMTI events when in VTMT or over continuation yield transitions
-    oop vt_oop = thread->vthread();
-    JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vt_oop);
-    assert(!thread->is_in_VTMT(), "VTMT sanity check");
-    assert(!thread->hide_over_cont_yield(), "VTMT sanity check");
-    if (state != NULL && state->is_virtual()) {
-      thread->set_is_in_VTMT(state->is_in_VTMT());
-      state->set_is_in_VTMT(false);
-      thread->set_hide_over_cont_yield(state->hide_over_cont_yield());
-      state->set_hide_over_cont_yield(false);
-    }
+#if INCLUDE_JVMTI
     invalidate_JVMTI_stack(thread);
-  #endif // INCLUDE_JVMTI
+#endif // INCLUDE_JVMTI
   }
 };
 

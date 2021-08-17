@@ -612,9 +612,9 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame* jvf) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
   // The second condition is needed to hide notification methods. 
-  if (!disable_jvmti_events && !jvf->method()->jvmti_mount_transition()) {
+  if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf; // no frames to skip
   }
   javaVFrame* jvf_saved = jvf;
@@ -642,7 +642,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  jvf = check_and_skip_hidden_frames(jt->disable_jvmti_events(), jvf);
+  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
   return jvf;
 }
 
@@ -652,7 +652,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   if (state == NULL) {
     return jvf; // nothing to skip
   }
-  jvf = check_and_skip_hidden_frames(state->hide_over_cont_yield(), jvf);
+  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
   return jvf;
 }
 
