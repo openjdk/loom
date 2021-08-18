@@ -213,7 +213,7 @@ jdk/jfr/startupargs/TestDumpOnExit.java
 java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
 java/lang/annotation/ParameterAnnotations.java
-
+sun/security/util/Resources/early/EarlyResources.java
 
 #####
 # Tests failing because of ProcessTools wrapper
@@ -273,6 +273,8 @@ tools/jpackage/junit/junit.java
 jdk/security/JavaDotSecurity/MakeJavaSecurityTest.java
 javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
 
+java/io/Serializable/class/NonSerializableTest.java
+java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 
 ####
 # No expected StackOverflow
