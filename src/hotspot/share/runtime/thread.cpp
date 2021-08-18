@@ -1692,7 +1692,7 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
     set_cont_preempt(false);
     assert(thread_state() == _thread_in_Java, "can only continue from Java state");
     StackWatermarkSet::after_unwind(this);
-    StubRoutines::cont_jump_from_sp_C()();
+    StubRoutines::cont_jump_from_sp_C();
   }
 
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)

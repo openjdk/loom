@@ -6130,6 +6130,7 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_jump_from_safepoint() {
+    __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
     address start = __ pc();
