@@ -229,9 +229,8 @@ class VirtualThread extends Thread {
             throw new IllegalCallerException();
         }
 
-        boolean firstRun;
-
         // set state to RUNNING
+        boolean firstRun;
         int initialState = state();
         if (initialState == STARTED && compareAndSetState(STARTED, RUNNING)) {
             // first run
@@ -244,6 +243,7 @@ class VirtualThread extends Thread {
             throw new IllegalStateException();
         }
 
+        // notify JVMTI before mount
         if (notifyJvmtiEvents) notifyJvmtiMountBegin(firstRun);
 
         try {
@@ -305,6 +305,7 @@ class VirtualThread extends Thread {
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
+
             // last unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin(true);
             unmount();
@@ -406,6 +407,7 @@ class VirtualThread extends Thread {
         if (s == PARKING) {
             setState(PARKED);
 
+            // notify JVMTI that unmount has completed, thread is parked
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
             // may have been unparked while parking
@@ -415,6 +417,7 @@ class VirtualThread extends Thread {
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
 
+            // notify JVMTI that unmount has completed, thread is runnable
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
             // submit to random queue periodically
