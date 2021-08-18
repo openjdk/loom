@@ -3889,7 +3889,6 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
-  thread->set_hide_over_cont_yield(false);
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
@@ -3944,13 +3943,4 @@ JVM_END
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
-  if (!last_unmount) {
-    oop vt_oop = JNIHandles::resolve(vthread);
-    JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt_oop);
-
-    if (vstate != NULL) {
-      vstate->set_hide_over_cont_yield(true);
-    }
-    thread->set_hide_over_cont_yield(true);
-  }
 JVM_END

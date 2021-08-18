@@ -158,7 +158,6 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
   bool              _is_in_VTMT; // saved JavaThread.is_in_VTMT()
-  bool              _hide_over_cont_yield; // saved JavaThread.hide_over_cont_yield()
   bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
   bool              _pending_step_for_popframe;
@@ -269,12 +268,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void set_thread(JavaThread* thread);
   oop get_thread_oop();
 
-  // The JavaThread is_in_VTMT() and hide_over_cont_yield() bits
-  // saved at unmount to restore at mount.
+  // The JavaThread is_in_VTMT() bit saved at unmount to restore at mount.
   inline bool is_in_VTMT() { return _is_in_VTMT; }
-  inline bool hide_over_cont_yield() { return _hide_over_cont_yield; }
   inline void set_is_in_VTMT(bool val) { _is_in_VTMT = val; }
-  inline void set_hide_over_cont_yield(bool val) { _hide_over_cont_yield = val; }
   inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }

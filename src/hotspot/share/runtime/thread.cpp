@@ -1015,7 +1015,6 @@ JavaThread::JavaThread() :
   _do_not_unlock_if_synchronized(false),
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
-  _hide_over_cont_yield(false),
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),

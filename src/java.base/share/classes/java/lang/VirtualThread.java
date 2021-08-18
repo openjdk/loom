@@ -229,16 +229,22 @@ class VirtualThread extends Thread {
             throw new IllegalCallerException();
         }
 
+        boolean firstRun;
+
         // set state to RUNNING
         int initialState = state();
         if (initialState == STARTED && compareAndSetState(STARTED, RUNNING)) {
             // first run
+            firstRun = true;
         } else if (initialState == RUNNABLE && compareAndSetState(RUNNABLE, RUNNING)) {
             // consume parking permit
             setParkPermit(false);
+            firstRun = false;
         } else {
             throw new IllegalStateException();
         }
+
+        if (notifyJvmtiEvents) notifyJvmtiMountBegin(firstRun);
 
         try {
             cont.run();
@@ -291,7 +297,6 @@ class VirtualThread extends Thread {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // first mount
-        if (notifyJvmti) notifyJvmtiMountBegin(true);
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
@@ -364,7 +369,6 @@ class VirtualThread extends Thread {
         // unmount
         if (notifyJvmti) notifyJvmtiUnmountBegin(false);
         unmount();
-        if (notifyJvmti) notifyJvmtiUnmountEnd(false);
 
         boolean yielded = false;
         try {
@@ -372,7 +376,6 @@ class VirtualThread extends Thread {
         } finally {
 
             // mount
-            if (notifyJvmti) notifyJvmtiMountBegin(false);
             mount();
             if (notifyJvmti) notifyJvmtiMountEnd(false);
 
@@ -402,12 +405,18 @@ class VirtualThread extends Thread {
 
         if (s == PARKING) {
             setState(PARKED);
+
+            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
+
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
                 submitRunContinuation();
             }
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
+
+            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
+
             // submit to random queue periodically
             int r = ThreadLocalRandom.current().nextInt(8);
             submitRunContinuation(r != 0);   // 1 in 8

@@ -233,7 +233,7 @@ void RegisterSaver::restore_live_registers(MacroAssembler* masm) {
 #endif
   __ pop_CPU_state(_save_vectors);
 #endif
-  __ leave();
+  __ ldp(rfp, lr, Address(__ post(sp, 2 * wordSize)));
 
 }
 
