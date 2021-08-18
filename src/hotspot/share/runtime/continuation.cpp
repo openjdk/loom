@@ -2488,10 +2488,7 @@ public:
     if (last_interpreted && _cont.is_preempted()) {
       assert (f.pc() == *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET), "");
       assert (Interpreter::contains(f.pc()), "");
-      InterpreterCodelet* codelet = Interpreter::codelet_containing(f.pc());
-      if (codelet != nullptr) {
-        sp = push_interpreter_return_frame(sp);
-      }
+      sp = push_interpreter_return_frame(sp);
     }
 
     return sp;
