@@ -2038,7 +2038,7 @@ public class Thread implements Runnable {
      *     ThreadGroup#enumerate(Thread[])} method.
      */
     @Deprecated(since = "99")
-    public static int enumerate(Thread tarray[]) {
+    public static int enumerate(Thread[] tarray) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
 

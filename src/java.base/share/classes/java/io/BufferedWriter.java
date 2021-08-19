@@ -238,7 +238,7 @@ public class BufferedWriter extends Writer {
      *
      * @throws  IOException  If an I/O error occurs
      */
-    public void write(char cbuf[], int off, int len) throws IOException {
+    public void write(char[] cbuf, int off, int len) throws IOException {
         Object lock = this.lock;
         if (lock instanceof InternalLock locker) {
             locker.lock();
@@ -254,7 +254,7 @@ public class BufferedWriter extends Writer {
         }
     }
 
-    private void lockedWrite(char cbuf[], int off, int len) throws IOException {
+    private void lockedWrite(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         if ((off < 0) || (off > cbuf.length) || (len < 0) ||
             ((off + len) > cbuf.length) || ((off + len) < 0)) {

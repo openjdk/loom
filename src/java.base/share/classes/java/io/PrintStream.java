@@ -619,7 +619,7 @@ public class PrintStream extends FilterOutputStream
      * @param  len   Number of bytes to write
      */
     @Override
-    public void write(byte buf[], int off, int len) {
+    public void write(byte[] buf, int off, int len) {
         try {
             if (lock != null) {
                 lock.lock();
@@ -642,7 +642,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWrite(byte buf[], int off, int len) throws IOException {
+    private void lockedWrite(byte[] buf, int off, int len) throws IOException {
         ensureOpen();
         out.write(buf, off, len);
         if (autoFlush)
@@ -684,7 +684,7 @@ public class PrintStream extends FilterOutputStream
      * @since 14
      */
     @Override
-    public void write(byte buf[]) throws IOException {
+    public void write(byte[] buf) throws IOException {
         this.write(buf, 0, buf.length);
     }
 
@@ -706,7 +706,7 @@ public class PrintStream extends FilterOutputStream
      *
      * @since 14
      */
-    public void writeBytes(byte buf[]) {
+    public void writeBytes(byte[] buf) {
         this.write(buf, 0, buf.length);
     }
 
@@ -982,7 +982,7 @@ public class PrintStream extends FilterOutputStream
      *
      * @throws  NullPointerException  If {@code s} is {@code null}
      */
-    public void print(char s[]) {
+    public void print(char[] s) {
         write(s);
     }
 

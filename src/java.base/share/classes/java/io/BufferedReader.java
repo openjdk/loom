@@ -293,7 +293,7 @@ public class BufferedReader extends Reader {
      * @throws     IndexOutOfBoundsException {@inheritDoc}
      * @throws     IOException  {@inheritDoc}
      */
-    public int read(char cbuf[], int off, int len) throws IOException {
+    public int read(char[] cbuf, int off, int len) throws IOException {
         Object lock = this.lock;
         if (lock instanceof InternalLock locker) {
             locker.lock();
@@ -309,7 +309,7 @@ public class BufferedReader extends Reader {
         }
     }
 
-    private int lockedRead(char cbuf[], int off, int len) throws IOException {
+    private int lockedRead(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         Objects.checkFromIndexSize(off, len, cbuf.length);
         if (len == 0) {

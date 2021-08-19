@@ -246,7 +246,7 @@ public class FileInputStream extends InputStream
      * @param     len the number of bytes that are written
      * @throws    IOException If an I/O error has occurred.
      */
-    private native int readBytes(byte b[], int off, int len) throws IOException;
+    private native int readBytes(byte[] b, int off, int len) throws IOException;
 
     /**
      * Reads up to {@code b.length} bytes of data from this input
@@ -259,7 +259,7 @@ public class FileInputStream extends InputStream
      *             the file has been reached.
      * @throws     IOException  if an I/O error occurs.
      */
-    public int read(byte b[]) throws IOException {
+    public int read(byte[] b) throws IOException {
         if (Thread.currentThread().isVirtual()) {
             return Blocker.managedBlock(() -> readBytes(b, 0, b.length));
         } else {
@@ -285,7 +285,7 @@ public class FileInputStream extends InputStream
      *             {@code b.length - off}
      * @throws     IOException  if an I/O error occurs.
      */
-    public int read(byte b[], int off, int len) throws IOException {
+    public int read(byte[] b, int off, int len) throws IOException {
         if (Thread.currentThread().isVirtual()) {
             return Blocker.managedBlock(() -> readBytes(b, off, len));
         } else {
@@ -369,6 +369,24 @@ public class FileInputStream extends InputStream
             }
         } while (n >= 0 && remaining > 0);
         return (capacity == nread) ? buf : Arrays.copyOf(buf, nread);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long transferTo(OutputStream out) throws IOException {
+        long transferred = 0L;
+        if (out instanceof FileOutputStream fos) {
+            FileChannel fc = getChannel();
+            long pos = fc.position();
+            transferred = fc.transferTo(pos, Long.MAX_VALUE, fos.getChannel());
+            long newPos = pos + transferred;
+            fc.position(newPos);
+            if (newPos >= fc.size()) {
+                return transferred;
+            }
+        }
+        return transferred + super.transferTo(out);
     }
 
     private long length() throws IOException {
