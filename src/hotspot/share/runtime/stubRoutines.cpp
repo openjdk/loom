@@ -494,10 +494,10 @@ JRT_END
 
 typedef void (*cont_jump_from_sp_t)();
 
-[[noreturn]] void StubRoutines::cont_jump_from_sp_C() { 
+void StubRoutines::cont_jump_from_sp_C() {
   MACOS_AARCH64_ONLY(JavaThread::current()->enable_wx(WXExec));
-  CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp)();
-  exit(1); 
+  CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp)(); // does not return
+  ShouldNotReachHere();
 }
 
 address StubRoutines::select_fill_function(BasicType t, bool aligned, const char* &name) {

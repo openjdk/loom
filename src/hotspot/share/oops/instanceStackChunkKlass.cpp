@@ -855,8 +855,8 @@ public:
 
     oop base = (_chunk->has_bitmap() && UseCompressedOops) ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc)) : Atomic::load((oop*)base_loc);
     // (oop)NativeAccess<>::oop_load((oop*)base_loc); //
-    assert (base == nullptr || is_good_oop(base), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(base_loc), p2i((oopDesc*)base));
     if (base != nullptr) {
+      ZGC_ONLY(if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) return;)
       assert (!CompressedOops::is_base(base), "");
       assert (oopDesc::is_oop(base), "");
       ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
