@@ -328,6 +328,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static javaVFrame* check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf);
   static javaVFrame* check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf);
 
+  // check if virtual thread is not terminated (alive)
+  static bool is_vthread_alive(oop vt);
+
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);
 
