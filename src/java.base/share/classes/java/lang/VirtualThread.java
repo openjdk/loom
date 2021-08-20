@@ -294,6 +294,7 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void run(Runnable task) {
+        assert state == RUNNING;
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // first mount
@@ -310,6 +311,9 @@ class VirtualThread extends Thread {
             if (notifyJvmti) notifyJvmtiUnmountBegin(true);
             unmount();
             if (notifyJvmti) notifyJvmtiUnmountEnd(true);
+
+            // final state
+            setState(TERMINATED);
         }
     }
 
@@ -427,15 +431,13 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Invoked when the task completes (or start failed). This method sets
-     * the state to TERMINATED and notifies anyone waiting for the thread
-     * to terminate.
+     * Invoked after the thread terminates (or start failed). This method
+     * notifies anyone waiting for the thread to terminate.
      *
      * @param executed true if the thread executed, false if it failed to start
      */
     private void afterTerminate(boolean executed) {
-        assert (state() == STARTED || state() == RUNNING) && (carrierThread == null);
-        setState(TERMINATED);   // final state
+        assert (state() == TERMINATED) && (carrierThread == null);
 
         // notify anyone waiting for this virtual thread to terminate
         ReentrantLock lock = this.lock;
@@ -454,9 +456,8 @@ class VirtualThread extends Thread {
             event.commit();
         }
 
-        if (threadContainer() == null) {
-            ThreadContainers.decrementUnmanagedVirtualThreadCount();
-        }
+        // notify container
+        threadContainer().onExit(this);
 
         // clear references to thread locals, this method is assumed to be
         // called on its carrier thread on which it terminated.
@@ -528,16 +529,18 @@ class VirtualThread extends Thread {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
-        if (container != null) {
-            setThreadContainer(container);
-            Thread parent = Thread.currentThread();
-            if (parent.headThreadContainer() != null) {
-                this.scopeLocalBindings = parent.scopeLocalBindings;
-            }
-        } else {
-            ThreadContainers.incrementUnmanagedVirtualThreadCount();
+
+        // bind thread to container
+        setThreadContainer(container);
+        container.onStart(this);
+
+        // inherit scope locals from structured container
+        Object bindings = container.scopeLocalBindings();
+        if (bindings != null) {
+            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
         }
-        boolean submitted = false;
+
+        boolean started = false;
         try {
             if (VirtualThreadStartEvent.isTurnedOn()) {
                 var event = new VirtualThreadStartEvent();
@@ -545,9 +548,10 @@ class VirtualThread extends Thread {
                 event.commit();
             }
             submitRunContinuation();
-            submitted = true;
+            started = true;
         } finally {
-            if (!submitted) {
+            if (!started) {
+                setState(TERMINATED);
                 afterTerminate(/*executed*/ false);
             }
         }
@@ -555,7 +559,7 @@ class VirtualThread extends Thread {
 
     @Override
     public void start() {
-        start(null);
+        start(ThreadContainers.root());
     }
 
     /**

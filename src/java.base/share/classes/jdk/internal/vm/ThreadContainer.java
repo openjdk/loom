@@ -49,6 +49,21 @@ public interface ThreadContainer {
     Stream<Thread> threads();
 
     /**
+     * Invoked when thread starts in the container.
+     */
+    default void onStart(Thread thread) { }
+
+    /**
+     * Invoked when thread in container terminates.
+     */
+    default void onExit(Thread thread) { }
+
+    /**
+     * The scope locals captured when the thread container was created.
+     */
+    default Object scopeLocalBindings() { return null; }
+
+    /**
      * Returns the previous thread container in the list.
      */
     default ThreadContainer previous() {

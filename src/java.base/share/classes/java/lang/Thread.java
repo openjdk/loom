@@ -50,6 +50,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.ThreadContainer;
+import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
@@ -1490,29 +1491,42 @@ public class Thread implements Runnable {
      *             is virtual and the scheduler cannot accept a task
      */
     public void start() {
-        start(null);
+        synchronized (this) {
+            // zero status  corresponds to state "NEW".
+            if (holder.threadStatus != 0)
+                throw new IllegalThreadStateException();
+            start0();
+        }
     }
 
     /**
      * Schedules this thread to begin execution in the given thread container.
-     *
-     * This method is not invoked for the main thread or other system threads
-     * created by the VM during startup.
      */
     void start(ThreadContainer container) {
         synchronized (this) {
             // zero status  corresponds to state "NEW".
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
+
             // bind thread to container
-            if (container != null) {
-                this.container = container;
-                Thread parent = Thread.currentThread();
-                if (parent.headThreadContainer != null) {
-                    this.scopeLocalBindings = parent.scopeLocalBindings;
+            this.container = container;
+            container.onStart(this);
+
+            // inherit scope locals from structured container
+            Object bindings = container.scopeLocalBindings();
+            if (bindings != null) {
+                this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+            }
+
+            boolean started = false;
+            try {
+                start0();
+                started = true;
+            } finally {
+                if (!started) {
+                    container.onExit(this);
                 }
             }
-            start0();
         }
     }
 
@@ -1559,6 +1573,11 @@ public class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        ThreadContainer container = threadContainer();
+        if (container != null) {
+            container.onExit(this);
+        }
+
         try {
             if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
                 TerminatingThreadLocal.threadTerminated();

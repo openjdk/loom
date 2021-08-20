@@ -42,28 +42,11 @@ import sun.nio.ch.Poller;
 public class ThreadContainers {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    // the count of virtual threads that are not in a thread container
-    private static final LongAdder UNMANAGED_VTHREAD_COUNT = new LongAdder();
-
     // the set of shared thread containers
     private static final Set<WeakReference<ThreadContainer>> SHARED_CONTAINERS = ConcurrentHashMap.newKeySet();
     private static final ReferenceQueue<Object> QUEUE = new ReferenceQueue<>();
 
     private ThreadContainers() { }
-
-    /**
-     * Increments the count of virtual threads.
-     */
-    public static void incrementUnmanagedVirtualThreadCount() {
-        UNMANAGED_VTHREAD_COUNT.add(1L);
-    }
-
-    /**
-     * Decrements the count of virtual threads.
-     */
-    public static void decrementUnmanagedVirtualThreadCount() {
-        UNMANAGED_VTHREAD_COUNT.add(-1L);
-    }
 
     /**
      * Expunge stale entries from set of shared thread containers.
@@ -201,6 +184,7 @@ public class ThreadContainers {
      */
     private static class RootContainer implements ThreadContainer {
         static final RootContainer INSTANCE = new RootContainer();
+        private static final LongAdder VTHREAD_COUNT = new LongAdder();
         @Override
         public Thread owner() {
             return null;
@@ -211,13 +195,18 @@ public class ThreadContainers {
             long platformThreadCount = Stream.of(JLA.getAllThreads())
                     .filter(t -> JLA.threadContainer(t) == null)
                     .count();
-            return platformThreadCount + UNMANAGED_VTHREAD_COUNT.sum();
+            return platformThreadCount + VTHREAD_COUNT.sum();
         }
         @Override
         public Stream<Thread> threads() {
-            Stream<Thread> s1 = Stream.of(JLA.getAllThreads());
-            Stream<Thread> s2 = Poller.blockedThreads().filter(Thread::isVirtual);
-            return Stream.concat(s1, s2).filter(t -> JLA.threadContainer(t) == null);
+            // platform threads that are not in a container
+            Stream<Thread> s1 = Stream.of(JLA.getAllThreads())
+                    .filter(t -> JLA.threadContainer(t) == null);
+            // virtual threads in the root container that are blocked on I/O
+            Stream<Thread> s2 = Poller.blockedThreads()
+                    .filter(t -> t.isVirtual()
+                            && JLA.threadContainer(t) == this);
+            return Stream.concat(s1, s2);
         }
         @Override
         public void setPrevious(ThreadContainer container) {
@@ -226,6 +215,16 @@ public class ThreadContainers {
         @Override
         public String toString() {
             return "<root>";
+        }
+        @Override
+        public void onStart(Thread thread) {
+            assert thread.isVirtual();
+            VTHREAD_COUNT.add(1L);
+        }
+        @Override
+        public void onExit(Thread thread) {
+            assert thread.isVirtual();
+            VTHREAD_COUNT.add(-11L);
         }
     }
 }
