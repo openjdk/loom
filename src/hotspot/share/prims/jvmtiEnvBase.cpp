@@ -659,11 +659,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
 bool
 JvmtiEnvBase::is_vthread_alive(oop vt) {
   assert(java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW, "sanity check");
-  oop cont = java_lang_VirtualThread::continuation(vt);
-
-  bool alive = !(java_lang_VirtualThread::state(vt) == java_lang_VirtualThread::TERMINATED ||
-                 java_lang_Continuation::done(cont));
-  return alive;
+  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
 }
 
 javaVFrame*
