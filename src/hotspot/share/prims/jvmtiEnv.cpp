@@ -1022,19 +1022,17 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
   }
 
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
-    oop jt_oop = java_thread->threadObj();
-    if (jt_oop == NULL || java_thread->is_exiting() ||
-        !java_lang_Thread::is_alive(jt_oop) ||
-        java_thread->is_jvmti_agent_thread() ||
-        java_thread->is_hidden_from_external_view() ||
-        is_in_thread_list(except_count, except_list, jt_oop)) {
-      continue;
-    }
-    oop thread_oop = java_thread->mounted_vthread();
-    // suspend non-suspended vthreads only
-    if (java_lang_VirtualThread::is_instance(thread_oop) &&
-        !JvmtiVTSuspender::is_vthread_suspended(thread_oop)) {
-      suspend_thread(thread_oop,
+    oop vt_oop = java_thread->mounted_vthread();
+    if (!java_thread->is_exiting() &&
+        !java_thread->is_jvmti_agent_thread() &&
+        !java_thread->is_hidden_from_external_view() &&
+        vt_oop != NULL &&
+        java_lang_VirtualThread::is_instance(vt_oop) &&
+        JvmtiEnvBase::is_vthread_alive(vt_oop) &&
+        !JvmtiVTSuspender::is_vthread_suspended(vt_oop) &&
+        !is_in_thread_list(except_count, except_list, vt_oop)
+    ) {
+      suspend_thread(vt_oop,
                      java_thread,
                      false, // suspend all
                      NULL);
