@@ -66,7 +66,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * The following example uses a scope local to make credentials available to callees.
  *
  * <pre>{@code
- *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.forType(Credentials.class);
+ *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.newInstance();
  *
  *   Credentials creds = ...
  *   ScopeLocal.where(CREDENTIALS, creds).run(creds, () -> {
