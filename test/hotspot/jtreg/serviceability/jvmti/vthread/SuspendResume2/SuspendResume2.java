@@ -66,7 +66,7 @@ public class SuspendResume2 extends DebugeeClass {
         return new SuspendResume2().runIt(argv, out);
     }
 
-    private static final int VTHREADS_CNT = 30;
+    private static final int VTHREADS_CNT = 20;
     int status = DebugeeClass.TEST_PASSED;
 
     // run debuggee
