@@ -216,7 +216,11 @@ test_vthread_resume_all(JNIEnv* jni, const jthread* thread_list, int suspend_mas
   check_jvmti_status(jni, err, "test_vthread_resume_all: error in JVMTI ResumeAllVirtualThreads");
 
   // wait a second to give the breakpoints a chance to be hit.
+#ifdef WINDOWS
+  Sleep(1000);
+#else
   sleep(1);
+#endif
 
   for (int idx = 0; idx < EXCLUDE_CNT; idx++) {
     // Disable Breakpoint events on excluded thread
