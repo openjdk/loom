@@ -198,6 +198,8 @@ vmTestbase/nsk/stress/stack/stack008.java	8252468 generic-all
 vmTestbase/nsk/stress/stack/stack018.java	8252468 generic-all
 vmTestbase/gc/memory/Nio/Nio.java 8249549 generic-all
 
+runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 linux-aarch64
+
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
