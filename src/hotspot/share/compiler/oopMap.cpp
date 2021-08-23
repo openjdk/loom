@@ -460,29 +460,29 @@ void OopMapSet::oops_do(const frame *fr, const RegisterMap* reg_map, OopClosure*
 // }
 
 // NULL, fail, success (address)
-void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
-  /* The address of the ImmutableOopMap is put into the _freeze_stub and _thaw_stub
-   * if we can't generate the stub for some reason */
-  // address default_value = Continuations::default_freeze_oops_stub();
-  // address slow_value = Continuations::freeze_oops_slow();
+// void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
+//   /* The address of the ImmutableOopMap is put into the _freeze_stub and _thaw_stub
+//    * if we can't generate the stub for some reason */
+//   address default_value = Continuations::default_freeze_oops_stub();
+//   address slow_value = Continuations::freeze_oops_slow();
 
-  // assert(default_value != slow_value, "should not reach here!");
+//   assert(default_value != slow_value, "should not reach here!");
 
-  // if (_freeze_stub == default_value) {
-  //   OopMapStubGenerator cgen(cb, *this);
-  //   // lock this by putting the slow path in place
-  //   if (Atomic::cmpxchg(&_freeze_stub, default_value, slow_value) == default_value) {
-  //     if (!cgen.generate()) {
-  //       Atomic::store(&_thaw_stub, (address) Continuations::thaw_oops_slow());
-  //       cgen.free();
-  //       return;
-  //     }
+//   if (_freeze_stub == default_value) {
+//     OopMapStubGenerator cgen(cb, *this);
+//     // lock this by putting the slow path in place
+//     if (Atomic::cmpxchg(&_freeze_stub, default_value, slow_value) == default_value) {
+//       if (!cgen.generate()) {
+//         Atomic::store(&_thaw_stub, (address) Continuations::thaw_oops_slow());
+//         cgen.free();
+//         return;
+//       }
 
-  //     Atomic::store(&_freeze_stub, cgen.freeze_stub());
-  //     Atomic::store(&_thaw_stub, cgen.thaw_stub());
-  //   }
-  // }
-}
+//       Atomic::store(&_freeze_stub, cgen.freeze_stub());
+//       Atomic::store(&_thaw_stub, cgen.thaw_stub());
+//     }
+//   }
+// }
 
 void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
                               OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn) const {
@@ -776,9 +776,7 @@ const ImmutableOopMap* ImmutableOopMapSet::find_map_at_offset(int pc_offset) con
 }
 
 ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) 
-  : _freeze_stub(NULL /*Continuations::default_freeze_oops_stub()*/), 
-    _thaw_stub(NULL /*Continuations::default_thaw_oops_stub()*/), 
-    _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
+  : _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
   _has_derived_oops = oopmap->has_derived_oops();
   address addr = data_addr();

@@ -3417,27 +3417,6 @@ void Continuations::init() {
   Continuation::init();
 }
 
-volatile intptr_t Continuations::_exploded_miss = 0;
-volatile intptr_t Continuations::_exploded_hit = 0;
-volatile intptr_t Continuations::_nmethod_miss = 0;
-volatile intptr_t Continuations::_nmethod_hit = 0;
-
-void Continuations::exploded_miss() {
-  //Atomic::inc(&_exploded_miss);
-}
-
-void Continuations::exploded_hit() {
-  //Atomic::inc(&_exploded_hit);
-}
-
-void Continuations::nmethod_miss() {
-  //Atomic::inc(&_nmethod_miss);
-}
-
-void Continuations::nmethod_hit() {
-  //Atomic::inc(&_nmethod_hit);
-}
-
 void Continuations::print_statistics() {
   //tty->print_cr("Continuations hit/miss %ld / %ld", _exploded_hit, _exploded_miss);
   //tty->print_cr("Continuations nmethod hit/miss %ld / %ld", _nmethod_hit, _nmethod_miss);

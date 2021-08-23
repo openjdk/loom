@@ -38,18 +38,7 @@ class ContinuationEntry;
 
 // TODO: remove
 class Continuations : public AllStatic {
-private:
-  static volatile intptr_t _exploded_miss;
-  static volatile intptr_t _exploded_hit;
-  static volatile intptr_t _nmethod_hit;
-  static volatile intptr_t _nmethod_miss;
-
 public:
-  static void exploded_miss();
-  static void exploded_hit();
-  static void nmethod_miss();
-  static void nmethod_hit();
-
   static void print_statistics();
   static void init();
 };
