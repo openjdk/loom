@@ -54,7 +54,7 @@ public class DoContinueSingleStepTest {
                 if (i == MSG_COUNT - 10) {
                     // Once we have warmed up, enable the first breakpoint which eventually will
                     // lead to enabling single stepping.
-                    enableEvents(Thread.currentThread(), java.lang.Continuation.class,
+                    enableEvents(Thread.currentThread(), jdk.internal.vm.Continuation.class,
                                  DoContinueSingleStepTest.class);
                 }
             }

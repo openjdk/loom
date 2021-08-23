@@ -1,6 +1,6 @@
 # Filed bugs
-java/lang/Continuation/Basic.java                                                               8241633 generic-all
-java/lang/Continuation/LiveFramesDriver.java                                                    8241633 generic-all
+jdk/internal/vm/Continuation/Basic.java                                                               8241633 generic-all
+jdk/internal/vm/Continuation/LiveFramesDriver.java                                                    8241633 generic-all
 
 jdk/jfr/api/consumer/recordingstream/TestBasics.java                                            8253378 generic-all
 jdk/jfr/api/recording/event/TestLoadEventAfterStart.java                                        8253378 generic-all
@@ -26,8 +26,8 @@ java/lang/annotation/LoaderLeakTest.java                                        
 
 java/foreign/TestMismatch.java                                                                  8253918 generic-all
 jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
-java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
-java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
+jdk/internal/vm/Continuation/Basic.java#id0                                                           8253918 generic-all
+jdk/internal/vm/Continuation/Fuzz.java                                                                8253918 generic-all
 java/lang/Thread/virtual/stress/SleepALot.java#id2                                              8253918 generic-all
 java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
 java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
@@ -91,9 +91,9 @@ java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
-java/lang/Continuation/Scoped.java
-java/lang/Continuation/PreemptLiveFramesDriver.java
-java/lang/Continuation/Preempt.java
+jdk/internal/vm/Continuation/Scoped.java
+jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
+jdk/internal/vm/Continuation/Preempt.java
 
 ####
 # Thread-sensitive threads

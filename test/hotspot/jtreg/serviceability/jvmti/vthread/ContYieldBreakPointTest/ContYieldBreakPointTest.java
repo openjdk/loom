@@ -25,8 +25,12 @@
  * @test
  * @summary Verifies setting a breakpoint in Continuation.yield() followed by single stepping
  * @compile ContYieldBreakPointTest.java
+ * @modules java.base/jdk.internal.vm
  * @run main/othervm/native -agentlib:ContYieldBreakPointTest ContYieldBreakPointTest
  */
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 public class ContYieldBreakPointTest {
     private static final String agentLib = "ContYieldBreakPointTest";
@@ -80,7 +84,7 @@ public class ContYieldBreakPointTest {
         log("\n####  yieldTest: done warming up ####\n");
 
         // Enable the breakpoint on Continuation.yield0(). Once hit, single stepping will be enabled.
-        enableEvents(Thread.currentThread(), java.lang.Continuation.class);
+        enableEvents(Thread.currentThread(), jdk.internal.vm.Continuation.class);
 
         cont.run();
         cont.run();

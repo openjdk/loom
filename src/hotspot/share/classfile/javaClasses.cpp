@@ -2290,7 +2290,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     }
 
     oop contScopeName(oop cont) {
-      return cont == NULL ? NULL : java_lang_ContinuationScope::name(Continuation::continuation_scope(cont));
+      return cont == NULL ? NULL : jdk_internal_vm_ContinuationScope::name(Continuation::continuation_scope(cont));
     }
   };
 
@@ -2807,7 +2807,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
-    oop contScopeName = (cont_h() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(cont_h())) : (oop)NULL;
+    oop contScopeName = (cont_h() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(cont_h())) : (oop)NULL;
 
     // Compiled java method case.
     if (decode_offset != 0) {
@@ -2819,10 +2819,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       if (fr.is_first_frame()) break;
 
       if (cont_h() != NULL && Continuation::is_continuation_enterSpecial(fr)) {
-        oop scope = java_lang_Continuation::scope(cont_h());
+        oop scope = jdk_internal_vm_Continuation::scope(cont_h());
         if (!show_carrier && scope == java_lang_VirtualThread::vthread_scope()) break;
 
-        Handle parent_h(THREAD, java_lang_Continuation::parent(cont_h()));
+        Handle parent_h(THREAD, jdk_internal_vm_Continuation::parent(cont_h()));
         cont_h =  parent_h;
       }
 
@@ -3264,7 +3264,7 @@ void java_lang_StackFrameInfo::set_method_and_bci(Handle stackFrame, const metho
   assert((jushort)version == version, "version should be short");
   java_lang_StackFrameInfo::set_version(stackFrame(), (short)version);
 
-  oop contScope = cont_h() != NULL ? java_lang_Continuation::scope(cont_h()) : (oop)NULL;
+  oop contScope = cont_h() != NULL ? jdk_internal_vm_Continuation::scope(cont_h()) : (oop)NULL;
   java_lang_StackFrameInfo::set_contScope(stackFrame(), contScope);
 }
 
@@ -3276,7 +3276,7 @@ void java_lang_StackFrameInfo::to_stack_trace_element(Handle stackFrame, Handle 
   InstanceKlass* holder = InstanceKlass::cast(clazz);
   Method* method = java_lang_StackFrameInfo::get_method(stackFrame, holder, CHECK);
   oop contScope = stackFrame->obj_field(java_lang_StackFrameInfo::_contScope_offset);
-  Handle contScopeName(THREAD, contScope != (oop)NULL ? java_lang_ContinuationScope::name(contScope) : (oop)NULL);
+  Handle contScopeName(THREAD, contScope != (oop)NULL ? jdk_internal_vm_ContinuationScope::name(contScope) : (oop)NULL);
 
   short version = stackFrame->short_field(_version_offset);
   int bci = stackFrame->int_field(_bci_offset);
@@ -5017,35 +5017,35 @@ void java_lang_AssertionStatusDirectives::set_deflt(oop o, bool val) {
   o->bool_field_put(_deflt_offset, val);
 }
 
-// Support for java.lang.ContinuationScope
+// Support for jdk.internal.vm.Continuation
 
-int java_lang_ContinuationScope::_name_offset;
-int java_lang_Continuation::_scope_offset;
-int java_lang_Continuation::_target_offset;
-int java_lang_Continuation::_tail_offset;
-int java_lang_Continuation::_parent_offset;
-int java_lang_Continuation::_yieldInfo_offset;
-int java_lang_Continuation::_cs_offset;
-int java_lang_Continuation::_reset_offset;
-int java_lang_Continuation::_mounted_offset;
-int java_lang_Continuation::_done_offset;
-int java_lang_Continuation::_preempted_offset;
+int jdk_internal_vm_ContinuationScope::_name_offset;
+int jdk_internal_vm_Continuation::_scope_offset;
+int jdk_internal_vm_Continuation::_target_offset;
+int jdk_internal_vm_Continuation::_tail_offset;
+int jdk_internal_vm_Continuation::_parent_offset;
+int jdk_internal_vm_Continuation::_yieldInfo_offset;
+int jdk_internal_vm_Continuation::_cs_offset;
+int jdk_internal_vm_Continuation::_reset_offset;
+int jdk_internal_vm_Continuation::_mounted_offset;
+int jdk_internal_vm_Continuation::_done_offset;
+int jdk_internal_vm_Continuation::_preempted_offset;
 
 #define CONTINUATIONSCOPE_FIELDS_DO(macro) \
   macro(_name_offset, k, vmSymbols::name_name(), string_signature, false);
 
-void java_lang_ContinuationScope::compute_offsets() {
+void jdk_internal_vm_ContinuationScope::compute_offsets() {
   InstanceKlass* k = vmClasses::ContinuationScope_klass();
   CONTINUATIONSCOPE_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
 #if INCLUDE_CDS
-void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
+void jdk_internal_vm_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   CONTINUATIONSCOPE_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
-// Support for java.lang.Continuation
+// Support for jdk.internal.vm.Continuation
 
 #define CONTINUATION_FIELDS_DO(macro) \
   macro(_scope_offset,     k, vmSymbols::scope_name(),     continuationscope_signature, false); \
@@ -5059,31 +5059,31 @@ void java_lang_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
   macro(_preempted_offset, k, "preempted",                 bool_signature,              false);
 
-void java_lang_Continuation::compute_offsets() {
+void jdk_internal_vm_Continuation::compute_offsets() {
   InstanceKlass* k = vmClasses::Continuation_klass();
   CONTINUATION_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
 #if INCLUDE_CDS
-void java_lang_Continuation::serialize_offsets(SerializeClosure* f) {
+void jdk_internal_vm_Continuation::serialize_offsets(SerializeClosure* f) {
   CONTINUATION_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
-// Support for jdk.internal.misc.StackChunk
+// Support for jdk.internal.vm.StackChunk
 
-int jdk_internal_misc_StackChunk::_parent_offset;
-int jdk_internal_misc_StackChunk::_size_offset;
-int jdk_internal_misc_StackChunk::_sp_offset;
-int jdk_internal_misc_StackChunk::_pc_offset;
-int jdk_internal_misc_StackChunk::_argsize_offset;
-int jdk_internal_misc_StackChunk::_flags_offset;
-int jdk_internal_misc_StackChunk::_gcSP_offset;
-int jdk_internal_misc_StackChunk::_markCycle_offset;
-int jdk_internal_misc_StackChunk::_maxSize_offset;
-int jdk_internal_misc_StackChunk::_numFrames_offset;
-int jdk_internal_misc_StackChunk::_numOops_offset;
-int jdk_internal_misc_StackChunk::_cont_offset;
+int jdk_internal_vm_StackChunk::_parent_offset;
+int jdk_internal_vm_StackChunk::_size_offset;
+int jdk_internal_vm_StackChunk::_sp_offset;
+int jdk_internal_vm_StackChunk::_pc_offset;
+int jdk_internal_vm_StackChunk::_argsize_offset;
+int jdk_internal_vm_StackChunk::_flags_offset;
+int jdk_internal_vm_StackChunk::_gcSP_offset;
+int jdk_internal_vm_StackChunk::_markCycle_offset;
+int jdk_internal_vm_StackChunk::_maxSize_offset;
+int jdk_internal_vm_StackChunk::_numFrames_offset;
+int jdk_internal_vm_StackChunk::_numOops_offset;
+int jdk_internal_vm_StackChunk::_cont_offset;
 
 #define STACKCHUNK_FIELDS_DO(macro) \
   macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
@@ -5099,13 +5099,13 @@ int jdk_internal_misc_StackChunk::_cont_offset;
   macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);
 
-void jdk_internal_misc_StackChunk::compute_offsets() {
+void jdk_internal_vm_StackChunk::compute_offsets() {
   InstanceKlass* k = vmClasses::StackChunk_klass();
   STACKCHUNK_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
 #if INCLUDE_CDS
-void jdk_internal_misc_StackChunk::serialize_offsets(SerializeClosure* f) {
+void jdk_internal_vm_StackChunk::serialize_offsets(SerializeClosure* f) {
   STACKCHUNK_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
@@ -5533,13 +5533,13 @@ void JavaClasses::check_offsets() {
   CHECK_OFFSET("java/lang/Integer",   java_lang_boxing_object, value, "I");
   CHECK_LONG_OFFSET("java/lang/Long", java_lang_boxing_object, value, "J");
 
-  // java.lang.Continuation
+  // jdk.internal.vm.Continuation
 
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, target,   "Ljava/lang/Runnable;");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, stack,    "[I");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, parent,   "Ljava/lang/Continuation;");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, lastFP,   "I");
-  // CHECK_OFFSET("java/lang/Continuation", java_lang_Continuation, lastSP,   "I");
+  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, target,   "Ljava/lang/Runnable;");
+  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, stack,    "[I");
+  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, parent,   "Ljdk/internal/vm/Continuation;");
+  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, lastFP,   "I");
+  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, lastSP,   "I");
 
   if (!valid) vm_exit_during_initialization("Field offset verification failed");
 }

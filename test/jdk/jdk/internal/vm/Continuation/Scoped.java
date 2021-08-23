@@ -24,10 +24,15 @@
 /**
  * @test
  * @summary Nested continuations test
+ * @modules java.base/jdk.internal.vm
+ * @build java.base/java.lang.StackWalkerHelper
  * 
  * @run testng/othervm -Xint Scoped
- * @run testng/othervm -Xcomp -XX:CompileOnly=java/lang/Continuation,Scoped Scoped
+ * @run testng/othervm -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Scoped Scoped
  */
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -116,19 +121,19 @@ public class Scoped {
                 
                         assertEquals(frames.subList(0, 15), Arrays.asList("lambda$bar$14", "enter0", "enter", "run", "bar", "lambda$foo$8", "enter0", "enter", "run", "foo", "lambda$test1$0", "enter0", "enter", "run", "test1"));
                 
-                        frames = StackWalker.getInstance(C).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
+                        frames = StackWalkerHelper.getInstance(C).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
                 
                         assertEquals(frames, Arrays.asList("lambda$bar$14", "enter0", "enter"));
 
-                        frames = StackWalker.getInstance(B).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
+                        frames = StackWalkerHelper.getInstance(B).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
                 
                         assertEquals(frames, Arrays.asList("lambda$bar$14", "enter0", "enter", "run", "bar", "lambda$foo$8", "enter0", "enter"));
 
-                        frames = StackWalker.getInstance(A).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
+                        frames = StackWalkerHelper.getInstance(A).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
                 
                         assertEquals(frames, Arrays.asList("lambda$bar$14", "enter0", "enter", "run", "bar", "lambda$foo$8", "enter0", "enter", "run", "foo", "lambda$test1$0", "enter0", "enter"));
 
-                        frames = StackWalker.getInstance(K).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
+                        frames = StackWalkerHelper.getInstance(K).walk(fs -> fs.map(StackWalker.StackFrame::getMethodName).collect(Collectors.toList()));
                 
                         assertEquals(frames.subList(0, 15), Arrays.asList("lambda$bar$14", "enter0", "enter", "run", "bar", "lambda$foo$8", "enter0", "enter", "run", "foo", "lambda$test1$0", "enter0", "enter", "run", "test1"));
 

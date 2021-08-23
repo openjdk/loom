@@ -34,9 +34,15 @@ import java.util.Set;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 public final class StackWalkerHelper {
     private static final Set<Option> OPTS = EnumSet.of(Option.SHOW_REFLECT_FRAMES); // EnumSet.noneOf(Option.class);
+
+    public static StackWalker getInstance(ContinuationScope scope) {
+        return StackWalker.getInstance(scope);
+    }
 
     public static StackFrame[] getStackFrames(ContinuationScope scope)     { return getStackFrames(StackWalker.getInstance(OPTS, scope)); }
     public static StackFrame[] getStackFrames(Continuation cont)           { return getStackFrames(cont.stackWalker(OPTS)); }

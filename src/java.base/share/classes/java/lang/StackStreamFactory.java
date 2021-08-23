@@ -43,6 +43,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import sun.security.action.GetPropertyAction;
 
 import static java.lang.StackStreamFactory.WalkerState.*;

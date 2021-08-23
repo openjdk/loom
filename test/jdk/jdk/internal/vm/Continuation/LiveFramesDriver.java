@@ -25,10 +25,11 @@
  * @test
  * @summary Functional test for continuations walked with StackWalker's LiveStackFrames
  * @build java.base/java.lang.LiveFrames
+ * @modules java.base/jdk.internal.vm
  * 
-* @run main/othervm -XX:+UnlockDiagnosticVMOptions -Xint LiveFramesDriver
-* @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/LiveFrames LiveFramesDriver
-* @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,java/lang/LiveFrames LiveFramesDriver
+ * @run main/othervm -XX:+UnlockDiagnosticVMOptions -Xint LiveFramesDriver
+ * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:-TieredCompilation -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/LiveFrames LiveFramesDriver
+ * @run main/othervm -XX:+UnlockDiagnosticVMOptions -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/LiveFrames LiveFramesDriver
  */
 
 

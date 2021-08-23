@@ -57,7 +57,7 @@
         <!--
             Java source/target to use for compilation.
           -->
-        <javac.target>15</javac.target>
+        <javac.target>18</javac.target>
 
         <!--
             Name of the benchmark Uber-JAR to generate.
@@ -78,6 +78,11 @@
                     <compilerVersion>${javac.target}</compilerVersion>
                     <source>${javac.target}</source>
                     <target>${javac.target}</target>
+                     <compilerArgs>
+                        <arg>--enable-preview</arg>
+                        <arg>--add-exports</arg><arg>java.base/jdk.internal.vm=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg><arg>java.base/sun.security.util=ALL-UNNAMED</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>

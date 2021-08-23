@@ -23,18 +23,22 @@
 
 /**
 * @test
-* @summary Tests for java.lang.Continuation preemption
+* @summary Tests for jdk.internal.vm.Continuation preemption
+* @modules java.base/jdk.internal.vm
 *
 * @run testng/othervm/timeout=60 -Xlog:jvmcont+preempt=trace -Xint Preempt
-* @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
-* @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+* @run testng/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Preempt Preempt
+* @run testng/othervm -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Preempt Preempt
 * @run testng/othervm -Xlog:jvmcont+preempt=trace -XX:-UseTLAB -Xint Preempt
 */
 
-// * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=java/lang/Continuation,Preempt Preempt
+// * @run testng/othervm -XX:+UnlockExperimentalVMOptions -XX:-TieredCompilation -XX:+UseJVMCICompiler -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Preempt Preempt
 
 // TODO:
 // - Add tests for failed preemptions
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 import java.util.ArrayList;
 import java.util.Arrays;

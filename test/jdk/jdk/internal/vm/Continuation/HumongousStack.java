@@ -24,11 +24,15 @@
 /**
 * @test
 * @summary Tests humongous stack-chunk handling
+* @modules java.base/jdk.internal.vm
 *
 * @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xint HumongousStack 5000
-* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=java/lang/Continuation,HumongousStack HumongousStack 10000
-* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:-TieredCompilation -XX:CompileOnly=java/lang/Continuation,HumongousStack HumongousStack 10000
+* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
+* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
 */
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 public class HumongousStack implements Runnable {
     static final ContinuationScope FOO = new ContinuationScope() {};

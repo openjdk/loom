@@ -53,6 +53,8 @@ import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.ChangesCurrentThread;

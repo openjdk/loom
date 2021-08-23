@@ -23,6 +23,9 @@
 
 package org.openjdk.bench.loom.obsolete;
 
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadFactory;

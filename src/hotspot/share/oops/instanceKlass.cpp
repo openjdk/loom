@@ -440,7 +440,7 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
   if (REF_NONE == parser.reference_type()) {
     if (class_name == vmSymbols::java_lang_Class()) {
       ik = new (loader_data, size, THREAD) InstanceMirrorKlass(parser);
-    } else if (class_name == vmSymbols::jdk_internal_misc_StackChunk()) {
+    } else if (class_name == vmSymbols::jdk_internal_vm_StackChunk()) {
       ik = new (loader_data, size, THREAD) InstanceStackChunkKlass(parser);
     } else if (is_class_loader(class_name, parser)) {
       ik = new (loader_data, size, THREAD) InstanceClassLoaderKlass(parser);

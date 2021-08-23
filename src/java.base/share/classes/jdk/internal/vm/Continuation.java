@@ -23,9 +23,8 @@
  * questions.
  */
 
-package java.lang;
+package jdk.internal.vm;
 
-import jdk.internal.misc.StackChunk;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.security.action.GetPropertyAction;
@@ -39,11 +38,14 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * TBD
  */
 public class Continuation {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         StackChunk.init(); // ensure StackChunk class is initialized
     }
@@ -51,8 +53,8 @@ public class Continuation {
     // private static final WhiteBox WB = sun.hotspot.WhiteBox.WhiteBox.getWhiteBox();
     private static final jdk.internal.misc.Unsafe unsafe = jdk.internal.misc.Unsafe.getUnsafe();
 
-    private static final boolean TRACE = isEmptyOrTrue("java.lang.Continuation.trace");
-    private static final boolean DEBUG = TRACE | isEmptyOrTrue("java.lang.Continuation.debug");
+    private static final boolean TRACE = isEmptyOrTrue("jdk.internal.vm.Continuation.trace");
+    private static final boolean DEBUG = TRACE | isEmptyOrTrue("jdk.internal.vm.Continuation.debug");
 
     private static final VarHandle MOUNTED;
 
@@ -104,7 +106,7 @@ public class Continuation {
     }
 
     private static Thread currentCarrierThread() {
-        return Thread.currentCarrierThread();
+        return JLA.currentCarrierThread();
     }
 
     static {
@@ -159,11 +161,11 @@ public class Continuation {
         return super.toString() + " scope: " + scope;
     }
 
-    ContinuationScope getScope() {
+    public ContinuationScope getScope() {
         return scope;
     }
 
-    Continuation getParent() {
+    public Continuation getParent() {
         return parent;
     }
 
@@ -173,7 +175,7 @@ public class Continuation {
      * @return TBD
      */
     public static Continuation getCurrentContinuation(ContinuationScope scope) {
-        Continuation cont = currentCarrierThread().getContinuation();
+        Continuation cont = JLA.getContinuation(currentCarrierThread());
         while (cont != null && cont.scope != scope)
             cont = cont.parent;
         return cont;
@@ -224,7 +226,7 @@ public class Continuation {
         // } else {
         //     scope = this.scope;
         // }
-        return StackWalker.newInstance(options, null, scope, innermost());
+        return JLA.newStackWalkerInstance(options, scope, innermost());
     }
 
     /**
@@ -239,7 +241,7 @@ public class Continuation {
     }
 
     /// Support for StackWalker
-    static <R> R wrapWalk(Continuation inner, ContinuationScope scope, Supplier<R> walk) {
+    public static <R> R wrapWalk(Continuation inner, ContinuationScope scope, Supplier<R> walk) {
         try {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
                 c.mount();
@@ -264,12 +266,12 @@ public class Continuation {
     private void mount() {
         if (!compareAndSetMounted(false, true))
             throw new IllegalStateException("Mounted!!!!");
-        Thread.setScopeLocalCache(scopeLocalCache);
+        JLA.setScopeLocalCache(scopeLocalCache);
     }
 
     private void unmount() {
-        scopeLocalCache = Thread.scopeLocalCache();
-        Thread.setScopeLocalCache(null);
+        scopeLocalCache = JLA.scopeLocalCache();
+        JLA.setScopeLocalCache(null);
         setMounted(false);
     }
     
@@ -287,11 +289,11 @@ public class Continuation {
 
             Thread t = currentCarrierThread();
             if (parent != null) {
-                if (parent != t.getContinuation())
+                if (parent != JLA.getContinuation(t))
                     throw new IllegalStateException();
             } else
-                this.parent = t.getContinuation();
-            t.setContinuation(this);
+                this.parent = JLA.getContinuation(t);
+            JLA.setContinuation(t, this);
 
             try {
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
@@ -311,7 +313,7 @@ public class Continuation {
                 if (TRACE) System.out.println("run (after): preemted: " + preempted);
 
                 assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
-                currentCarrierThread().setContinuation(this.parent);
+                JLA.setContinuation(currentCarrierThread(), this.parent);
                 if (parent != null)
                     parent.child = null;
 
@@ -392,7 +394,7 @@ public class Continuation {
      * @throws IllegalStateException if not currently in the given {@code scope},
      */
     public static boolean yield(ContinuationScope scope) {
-        Continuation cont = currentCarrierThread().getContinuation();
+        Continuation cont = JLA.getContinuation(currentCarrierThread());
         Continuation c;
         for (c = cont; c != null && c.scope != scope; c = c.parent)
             ;
@@ -496,7 +498,7 @@ public class Continuation {
      * This increments an internal semaphore that, when greater than 0, pins the continuation.
      */
     public static void pin() {
-        Continuation cont = currentCarrierThread().getContinuation();
+        Continuation cont = JLA.getContinuation(currentCarrierThread());
         if (cont != null) {
             assert cont.cs >= 0;
             if (cont.cs == Short.MAX_VALUE)
@@ -511,7 +513,7 @@ public class Continuation {
      * if pinne with {@link #pin()}.
      */
     public static void unpin() {
-        Continuation cont = currentCarrierThread().getContinuation();
+        Continuation cont = JLA.getContinuation(currentCarrierThread());
         if (cont != null) {
             assert cont.cs >= 0;
             if (cont.cs == 0)

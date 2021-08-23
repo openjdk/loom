@@ -59,8 +59,8 @@ static frame_info expected_virtual_frames[] = {
     {"Ljava/lang/VirtualThread;", "run", "(Ljava/lang/Runnable;)V"},
     {"Ljava/lang/VirtualThread$VThreadContinuation;", "lambda$new$0", "(Ljava/lang/VirtualThread;Ljava/lang/Runnable;)V"},
     {"Ljava/lang/VirtualThread$VThreadContinuation$$Lambda;", "run", "()V"},
-    {"Ljava/lang/Continuation;", "enter0", "()V"},
-    {"Ljava/lang/Continuation;", "enter", "(Ljava/lang/Continuation;Z)V"},
+    {"Ljdk/internal/vm/Continuation;", "enter0", "()V"},
+    {"Ljdk/internal/vm/Continuation;", "enter", "(Ljdk/internal/vm/Continuation;Z)V"},
 };
 
 int compare_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, int offset = 0) {

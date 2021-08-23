@@ -876,8 +876,6 @@ java/awt/Focus/FrameMinimizeTest/FrameMinimizeTest.java 8016266 linux-x64
 
 # Loom specific
 
-java/lang/Continuation/Basic.java#id1                           8253570 generic-all
-
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 jdk/jfr/event/runtime/TestVirtualThreadStartEvent.java                 0000000 generic-all

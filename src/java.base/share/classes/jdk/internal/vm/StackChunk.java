@@ -23,7 +23,7 @@
  * questions.
  */
 
-package jdk.internal.misc;
+package jdk.internal.vm;
 
 public final class StackChunk {
     public static void init() {}

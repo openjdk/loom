@@ -72,9 +72,9 @@
   template(java_lang_ClassLoader,                     "java/lang/ClassLoader")                    \
   template(java_lang_ThreadDeath,                     "java/lang/ThreadDeath")                    \
   template(java_lang_Runnable,                        "java/lang/Runnable")                       \
-  /*template(java_lang_Continuation,                    "java/lang/Continuation")                 */\
-  template(java_lang_ContinuationScope,               "java/lang/ContinuationScope")              \
-  template(jdk_internal_misc_StackChunk,              "jdk/internal/misc/StackChunk")             \
+  /*template(jdk_internal_vm_Continuation,            "jdk/internal/vm/Continuation")           */\
+  template(jdk_internal_vm_ContinuationScope,         "jdk/internal/vm/ContinuationScope")        \
+  template(jdk_internal_vm_StackChunk,                "jdk/internal/vm/StackChunk")               \
   template(java_lang_Boolean,                         "java/lang/Boolean")                        \
   template(java_lang_Character,                       "java/lang/Character")                      \
   template(java_lang_Character_CharacterCache,        "java/lang/Character$CharacterCache")       \
@@ -570,9 +570,9 @@
   template(int_array_signature,                       "[I")                                       \
   template(long_array_signature,                      "[J")                                       \
   template(runnable_signature,                        "Ljava/lang/Runnable;")                     \
-  template(continuation_signature,                    "Ljava/lang/Continuation;")                 \
-  template(continuationscope_signature,               "Ljava/lang/ContinuationScope;")            \
-  template(stackchunk_signature,                      "Ljdk/internal/misc/StackChunk;")           \
+  template(continuation_signature,                    "Ljdk/internal/vm/Continuation;")           \
+  template(continuationscope_signature,               "Ljdk/internal/vm/ContinuationScope;")      \
+  template(stackchunk_signature,                      "Ljdk/internal/vm/StackChunk;")             \
   template(vthread_signature,                         "Ljava/lang/VirtualThread;")                \
   template(object_void_signature,                     "(Ljava/lang/Object;)V")                    \
   template(object_int_signature,                      "(Ljava/lang/Object;)I")                    \

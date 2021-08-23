@@ -81,6 +81,8 @@ import jdk.internal.logger.LoggerFinderLoader;
 import jdk.internal.logger.LazyLoggers;
 import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
@@ -2503,6 +2505,22 @@ public final class System {
                 local.setCarrierThreadLocal(value);
             }
 
+            public Object[] scopeLocalCache() {
+                return Thread.scopeLocalCache();
+            }
+
+            public void setScopeLocalCache(Object[] cache) {
+                Thread.setScopeLocalCache(cache);
+            }
+
+            public Continuation getContinuation(Thread thread) {
+                return thread.getContinuation();
+            }
+
+            public void setContinuation(Thread thread, Continuation continuation) {
+                thread.setContinuation(continuation);
+            }
+
             public void parkVirtualThread() {
                 ((VirtualThread) Thread.currentThread()).park();
             }
@@ -2513,6 +2531,10 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread, boolean tryPush) {
                 ((VirtualThread) thread).unpark(tryPush);
+            }
+
+            public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation) {
+                return StackWalker.newInstance(options, null, contScope, continuation);
             }
         });
     }

@@ -101,9 +101,9 @@
   do_klass(reflect_Constructor_klass,                   java_lang_reflect_Constructor                         ) \
                                                                                                                 \
   do_klass(Runnable_klass,                              java_lang_Runnable                                    ) \
-  do_klass(ContinuationScope_klass,                     java_lang_ContinuationScope                           ) \
-  do_klass(Continuation_klass,                          java_lang_Continuation                                ) \
-  do_klass(StackChunk_klass,                            jdk_internal_misc_StackChunk                          ) \
+  do_klass(ContinuationScope_klass,                     jdk_internal_vm_ContinuationScope                     ) \
+  do_klass(Continuation_klass,                          jdk_internal_vm_Continuation                          ) \
+  do_klass(StackChunk_klass,                            jdk_internal_vm_StackChunk                            ) \
                                                                                                                 \
   /* NOTE: needed too early in bootstrapping process to have checks based on JDK version */                     \
   /* It's okay if this turns out to be NULL in non-1.4 JDKs. */                                                 \

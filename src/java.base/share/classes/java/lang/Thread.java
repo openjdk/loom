@@ -49,6 +49,8 @@ import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.IntrinsicCandidate;

@@ -496,15 +496,15 @@ class methodHandle;
   do_intrinsic(_updateByteBufferAdler32,  java_util_zip_Adler32,  updateByteBuffer_A_name,  updateByteBuffer_signature,  F_SN) \
    do_name(     updateByteBuffer_A_name,                          "updateByteBuffer")                                   \
                                                                                                                         \
-  /* java/lang/Continuation */                                                                                                \
-  do_class(java_lang_Continuation,                      "java/lang/Continuation")                                             \
-  do_intrinsic(_Continuation_enter,  java_lang_Continuation,       enter_name,    continuationEnter_signature, F_S)           \
-    do_signature(continuationEnter_signature,                        "(Ljava/lang/Continuation;Z)V")                          \
-  do_intrinsic(_Continuation_enterSpecial, java_lang_Continuation, enterSpecial_name,    continuationEnter_signature, F_SN)   \
-  do_signature(continuationGetStacks_signature,                   "(III)V")                                                   \
-  do_alias(continuationOnPinned_signature,                        int_void_signature)                                         \
-  do_intrinsic(_Continuation_doYield,     java_lang_Continuation,  doYield_name,       continuationDoYield_signature, F_S)    \
-    do_alias(continuationDoYield_signature,                          int_int_signature)                                       \
+  /* jdk/internal/vm/Continuation */                                                                                    \
+  do_class(jdk_internal_vm_Continuation, "jdk/internal/vm/Continuation")                                                \
+  do_intrinsic(_Continuation_enter,  jdk_internal_vm_Continuation, enter_name,    continuationEnter_signature, F_S)     \
+    do_signature(continuationEnter_signature,   "(Ljdk/internal/vm/Continuation;Z)V")                                   \
+  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnter_signature, F_SN) \
+  do_signature(continuationGetStacks_signature, "(III)V")                                                               \
+  do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
+  do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \
+    do_alias(continuationDoYield_signature,     int_int_signature)                                                      \
                                                                                                                         \
   /* support for UnsafeConstants */                                                                                     \
   do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \

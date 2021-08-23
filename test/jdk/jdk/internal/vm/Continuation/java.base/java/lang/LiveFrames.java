@@ -23,101 +23,67 @@
 
 package java.lang;
 
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
+
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.CountDownLatch;
 import java.util.Arrays;
 import java.util.Objects;
 
-public class PreemptLiveFrames {
+public class LiveFrames {
     public static void main(String[] args) {
-        try {
-            PreemptLiveFrames obj = new PreemptLiveFrames();
-            obj.test1();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        LiveFrames obj = new LiveFrames();
+        obj.test1();
     }
 
     static final ContinuationScope FOO = new ContinuationScope() {};
-    CountDownLatch startLatch = new CountDownLatch(1);
-    volatile boolean run;
-    volatile int x;
-
-    public void test1() throws Exception {
-        System.out.println("test1");
-
-        final AtomicInteger result = new AtomicInteger(0);
-        final Continuation cont = new Continuation(FOO, ()-> {
-                double r = 0;
-                int k = 1;
+    
+    public void test1() {
+        final AtomicInteger res = new AtomicInteger(0);
+        Continuation cont = new Continuation(FOO, ()-> {
+            double r = 0;
+            for (int k = 1; k < 4; k++) {
                 int x = 3;
                 String s = "abc";
                 r += foo(k);
-                result.set((int)r);
-            });
-
-        final Thread t0 = Thread.currentThread();
-        Thread t = new Thread(() -> {
-            try {
-                startLatch.await();
-
-                Continuation.PreemptStatus res;
-                int i = 0;
-                do {
-                    res = cont.tryPreempt(t0);
-                    i++;
-                } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
-                assertEquals(res, Continuation.PreemptStatus.SUCCESS);
-                // var res = cont.tryPreempt(t0);
-                // assertEquals(res, Continuation.PreemptStatus.SUCCESS);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
             }
+            res.set((int)r);
         });
-        t.start();
+        
+        int i = 0;
+        while (!cont.isDone()) {
+            cont.run();
+            System.gc();
 
-        run = true;
-
-        cont.run();
-        assertEquals(cont.isDone(), false);
-        assertEquals(cont.isPreempted(), true);
-
-        testStackWalk(LiveStackFrame.getStackWalker(cont));
-
-        t.join();
+            System.out.println("^&^ UNMOUNTED");
+            testStackWalk(LiveStackFrame.getStackWalker(cont));
+            System.out.println("^&^ END UNMOUNTED");
+        }
     }
-
-    double foo(int a) {
+    
+    static double foo(int a) {
         long x = 8;
         String s = "yyy";
         String r = bar(a + 1);
         return Integer.parseInt(r)+1;
     }
-
-    String bar(long b) {
+    
+    static String bar(long b) {
         double x = 9.99;
         String s = "zzz";
         String r = baz(b + 1);
         return "" + r;
     }
-
-    String baz(long b) {
+    
+    static String baz(long b) {
         double x = 9.99;
         String s = "zzz";
+        Continuation.yield(FOO);
 
-        loop();
+        testStackWalk(LiveStackFrame.getStackWalker());
 
         long r = b+1;
         return "" + r;
-    }
-
-    void loop() {
-        while (run) {
-            x++;
-            if (startLatch.getCount() > 0) {
-                startLatch.countDown();
-            }
-        }
     }
 
     static void testStackWalk(StackWalker walker) {
@@ -137,6 +103,7 @@ public class PreemptLiveFrames {
         });
         System.out.println("^&^ end");
     }
+    
 
     static void assertEquals(Object actual, Object expected) {
         if (!Objects.equals(actual, expected)) {

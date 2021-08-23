@@ -27,6 +27,8 @@ package java.lang;
 import java.lang.StackWalker.StackFrame;
 import java.util.EnumSet;
 import java.util.Set;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 import static java.lang.StackWalker.ExtendedOption.LOCALS_AND_OPERANDS;
 

@@ -47,6 +47,8 @@ import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.ConstantPool;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -456,6 +458,26 @@ public interface JavaLangAccess {
     <T> void setCarrierThreadLocal(ThreadLocal<T> local, T value);
 
     /**
+     * Returns the current thread's scope locals cache
+     */
+    public Object[] scopeLocalCache();
+
+    /**
+     * Sets the current thread's scope locals cache
+     */
+    public void setScopeLocalCache(Object[] cache);
+
+    /**
+     * Returns the innermost mounted continuation
+     */
+    public Continuation getContinuation(Thread thread);
+
+    /**
+     * Sets the innermost mounted continuation
+     */
+    public void setContinuation(Thread thread, Continuation continuation);
+
+    /**
      * Parks the current virtual thread.
      */
     void parkVirtualThread();
@@ -472,4 +494,10 @@ public interface JavaLangAccess {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unparkVirtualThread(Thread thread, boolean tryPush);
+
+
+    /**
+     * Creates a new StackWalker
+     */
+    StackWalker newStackWalkerInstance(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation);
 }

@@ -94,7 +94,7 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
 
 int InstanceStackChunkKlass::oop_size(oop obj) const {
   // see oopDesc::size_given_klass
-  return instance_size(jdk_internal_misc_StackChunk::size(obj));
+  return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
 
 template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
@@ -192,7 +192,7 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
                  : Copy::aligned_conjoint_words(from_addr, to_addr, header);
       }
 
-      jdk_internal_misc_StackChunk::set_size(to_addr, to_stack_size);
+      jdk_internal_vm_StackChunk::set_size(to_addr, to_stack_size);
       to_chunk->set_sp(metadata_words());
       break;
     case 1: // copy stack

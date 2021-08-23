@@ -573,7 +573,7 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _bci = jvf->bci();
   _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
   _locked_monitors = NULL;
-  _cont_scope_name = OopHandle(Universe::vm_global(), (jvf->continuation() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(jvf->continuation())) : (oop)NULL);
+  _cont_scope_name = OopHandle(Universe::vm_global(), (jvf->continuation() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
     Thread* current_thread = Thread::current();
     ResourceMark rm(current_thread);

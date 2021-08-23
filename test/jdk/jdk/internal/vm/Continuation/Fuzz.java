@@ -23,7 +23,8 @@
 
 /*
  * @test
- * @summary Fuzz tests for java.lang.Continuation
+ * @summary Fuzz tests for jdk.internal.vm.Continuation
+* @modules java.base/jdk.internal.vm
  *
  * @requires vm.flavor == "server" & (vm.opt.TieredStopAtLevel == null | vm.opt.TieredStopAtLevel == 4)
  * @requires vm.opt.TieredCompilation == null | vm.opt.TieredCompilation == true
@@ -45,6 +46,9 @@
 
 // @run driver jdk.test.lib.FileInstaller compilerDirectives.json compilerDirectives.json
 // -XX:CompilerDirectivesFile=compilerDirectives.json
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 import java.lang.invoke.*;
 import java.lang.reflect.*;

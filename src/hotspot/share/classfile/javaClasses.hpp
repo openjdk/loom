@@ -79,9 +79,9 @@ class RecordComponent;
   f(java_lang_StackTraceElement) \
   f(java_lang_StackFrameInfo) \
   f(java_lang_LiveStackFrameInfo) \
-  f(java_lang_ContinuationScope) \
-  f(java_lang_Continuation) \
-  f(jdk_internal_misc_StackChunk) \
+  f(jdk_internal_vm_ContinuationScope) \
+  f(jdk_internal_vm_Continuation) \
+  f(jdk_internal_vm_StackChunk) \
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
   f(jdk_internal_invoke_NativeEntryPoint) \
   f(jdk_internal_misc_UnsafeConstants) \
@@ -1085,8 +1085,8 @@ class java_lang_ref_SoftReference: public java_lang_ref_Reference {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 };
 
-// Interface to java.lang.ContinuationScope objects
-class java_lang_ContinuationScope: AllStatic {
+// Interface to jdk.internal.vm.ContinuationScope objects
+class jdk_internal_vm_ContinuationScope: AllStatic {
   friend class JavaClasses;
  private:
   static int _name_offset;
@@ -1098,8 +1098,8 @@ class java_lang_ContinuationScope: AllStatic {
   static inline oop name(oop ref);
 };
 
-// Interface to java.lang.Continuation objects
-class java_lang_Continuation: AllStatic {
+// Interface to jdk.internal.vm.Continuation objects
+class jdk_internal_vm_Continuation: AllStatic {
   friend class JavaClasses;
  private:
   static int _scope_offset;
@@ -1134,8 +1134,8 @@ class java_lang_Continuation: AllStatic {
   static inline void set_preempted(oop ref, bool value);
 };
 
-// Interface to jdk.internal.misc.StackChunk objects
-class jdk_internal_misc_StackChunk: AllStatic {
+// Interface to jdk.internal.vm.StackChunk objects
+class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
  private:
   static int _parent_offset;

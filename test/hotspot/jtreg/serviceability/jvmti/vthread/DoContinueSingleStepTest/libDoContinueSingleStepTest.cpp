@@ -62,9 +62,9 @@ static jboolean received_vthread_singlestep = JNI_FALSE;
 static jboolean received_method_exit_event = JNI_FALSE;
 
 
-static jmethodID *java_lang_Continuation_methods = NULL;
-jint java_lang_Continuation_method_count = 0;
-jclass java_lang_Continuation_class = NULL;
+static jmethodID *jdk_internal_vm_Continuation_methods = NULL;
+jint jdk_internal_vm_Continuation_method_count = 0;
+jclass jdk_internal_vm_Continuation_class = NULL;
 
 static jmethodID *test_methods = NULL;
 jint test_method_count = 0;
@@ -182,10 +182,10 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
           //passed = JNI_FALSE;
       }
       runBreakpointHit = JNI_TRUE;
-      clearBreakpoint(jni, "run", java_lang_Continuation_class,
-                      java_lang_Continuation_methods, java_lang_Continuation_method_count);
-      setBreakpoint(jni, "isStarted", java_lang_Continuation_class,
-                    java_lang_Continuation_methods, java_lang_Continuation_method_count);
+      clearBreakpoint(jni, "run", jdk_internal_vm_Continuation_class,
+                      jdk_internal_vm_Continuation_methods, jdk_internal_vm_Continuation_method_count);
+      setBreakpoint(jni, "isStarted", jdk_internal_vm_Continuation_class,
+                    jdk_internal_vm_Continuation_methods, jdk_internal_vm_Continuation_method_count);
       // uncomment the following line to reproduce crash in HandshakeState::active_handshaker
       //err = jvmti->NotifyFramePop(thread, 0);
       //check_jvmti_status(jni, err, "Breakpoint: error in JVMTI NotifyFramePop0");
@@ -199,8 +199,8 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
       print_frame_event_info(jvmti, jni, thread, method,
                              "Breakpoint", ++breakpoint_count);
       isStartedBreakpointHit = JNI_TRUE;
-      clearBreakpoint(jni, "isStarted", java_lang_Continuation_class,
-                      java_lang_Continuation_methods, java_lang_Continuation_method_count);
+      clearBreakpoint(jni, "isStarted", jdk_internal_vm_Continuation_class,
+                      jdk_internal_vm_Continuation_methods, jdk_internal_vm_Continuation_method_count);
       LOG("Breakpoint: %s: enabling SingleStep events on virtual thread\n", mname);
       err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, thread);
       check_jvmti_status(jni, err, "Breakpoint: error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
@@ -508,15 +508,15 @@ Java_DoContinueSingleStepTest_enableEvents(JNIEnv *jni, jclass klass, jthread th
 
   LOG("enableEvents: started\n");
 
-  java_lang_Continuation_class = (jclass)jni->NewGlobalRef(contKlass);
-  err = jvmti->GetClassMethods(contKlass, &java_lang_Continuation_method_count, &java_lang_Continuation_methods);
+  jdk_internal_vm_Continuation_class = (jclass)jni->NewGlobalRef(contKlass);
+  err = jvmti->GetClassMethods(contKlass, &jdk_internal_vm_Continuation_method_count, &jdk_internal_vm_Continuation_methods);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI GetClassMethods for contKlass");
 
   test_class = (jclass)jni->NewGlobalRef(testKlass);
   err = jvmti->GetClassMethods(testKlass, &test_method_count, &test_methods);
   check_jvmti_status(jni, err, "enableEvents: error in JVMTI GetClassMethods for testKlass");
 
-  setBreakpoint(jni, "run", java_lang_Continuation_class, java_lang_Continuation_methods, java_lang_Continuation_method_count);
+  setBreakpoint(jni, "run", jdk_internal_vm_Continuation_class, jdk_internal_vm_Continuation_methods, jdk_internal_vm_Continuation_method_count);
 
   // Enable Breakpoint events globally
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);

@@ -460,7 +460,7 @@ inline int InstanceStackChunkKlass::instance_size(int stack_size_in_words) const
 }
 
 inline HeapWord* InstanceStackChunkKlass::start_of_bitmap(oop obj) {
-  return start_of_stack(obj) + jdk_internal_misc_StackChunk::size(obj);
+  return start_of_stack(obj) + jdk_internal_vm_StackChunk::size(obj);
 }
 
 inline int InstanceStackChunkKlass::bitmap_size(int stack_size_in_words) {
@@ -519,8 +519,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure) {
-  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset());
-  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset());
+  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
+  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
   OrderAccess::storestore();
   Devirtualizer::do_oop(closure, parent_addr);
   OrderAccess::storestore();
@@ -529,8 +529,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClo
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
-  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::parent_offset());
-  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_misc_StackChunk::cont_offset());
+  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
+  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
   if (mr.contains(parent_addr)) {
     OrderAccess::storestore();
     Devirtualizer::do_oop(closure, parent_addr);

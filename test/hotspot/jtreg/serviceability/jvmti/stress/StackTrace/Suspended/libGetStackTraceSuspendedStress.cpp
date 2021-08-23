@@ -28,7 +28,7 @@
 
 #define MAX_FRAME_COUNT 80
 
-static const char CONTINUATION_CLASS_NAME[] = "java/lang/Continuation";
+static const char CONTINUATION_CLASS_NAME[] = "jdk/internal/vm/Continuation";
 static const char CONTINUATION_METHOD_NAME[] = "enter";
 
 static jrawMonitorID event_mon = NULL;

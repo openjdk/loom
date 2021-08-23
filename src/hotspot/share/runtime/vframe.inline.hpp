@@ -73,14 +73,14 @@ inline void vframeStreamCommon::next() {
       assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
       
-      oop scope = java_lang_Continuation::scope(_cont->cont_oop());
+      oop scope = jdk_internal_vm_Continuation::scope(_cont->cont_oop());
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;
       }
     } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       assert (_reg_map.cont() != NULL, "");
-      oop scope = java_lang_Continuation::scope(_reg_map.cont());
+      oop scope = jdk_internal_vm_Continuation::scope(_reg_map.cont());
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;

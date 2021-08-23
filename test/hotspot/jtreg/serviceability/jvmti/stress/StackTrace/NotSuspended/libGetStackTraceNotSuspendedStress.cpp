@@ -28,7 +28,7 @@
 
 #define MAX_FRAME_COUNT 80
 
-const char CONTINUATION_CLASS_NAME[] = "java/lang/Continuation";
+const char CONTINUATION_CLASS_NAME[] = "jdk/internal/vm/Continuation";
 const char CONTINUATION_METHOD_NAME[] = "enter";
 
 static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
