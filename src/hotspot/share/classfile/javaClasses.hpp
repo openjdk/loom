@@ -1125,6 +1125,7 @@ class java_lang_Continuation: AllStatic {
   static inline stackChunkOop tail(oop ref);
   static inline void set_tail(oop ref, stackChunkOop value);
   static inline jshort critical_section(oop ref);
+  static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
   static inline bool is_reset(oop ref);
   static inline bool is_mounted(oop ref);

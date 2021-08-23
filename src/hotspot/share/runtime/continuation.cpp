@@ -3246,6 +3246,40 @@ oop Continuation::continuation_scope(oop cont) {
   return cont != nullptr ? java_lang_Continuation::scope(cont) : nullptr;
 }
 
+bool Continuation::pin(JavaThread* current) {
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce == nullptr)
+    return false;
+
+  oop cont = ce->cont_oop();
+  assert (cont != nullptr, "");
+  assert (cont == ContinuationHelper::get_continuation(current), "");
+
+  jshort value = java_lang_Continuation::critical_section(cont);
+  if (value < max_jshort) {
+    java_lang_Continuation::set_critical_section(cont, value + 1);
+    return true;
+  }
+  return false;
+}
+
+bool Continuation::unpin(JavaThread* current) {
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce == nullptr)
+    return false;
+
+  oop cont = ce->cont_oop();
+  assert (cont != nullptr, "");
+  assert (cont == ContinuationHelper::get_continuation(current), "");
+  
+  jshort value = java_lang_Continuation::critical_section(cont);
+  if (value > 0) {
+    java_lang_Continuation::set_critical_section(cont, value - 1);
+    return true;
+  }
+  return false;
+}
+
 ///// Allocation
 
 inline void ContMirror::post_safepoint(Handle conth) {

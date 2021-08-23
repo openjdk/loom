@@ -79,6 +79,10 @@ public:
   static frame last_frame(oop continuation, RegisterMap *map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
 
+  // pins/unpins the innermost mounted continuation; returns true on success or false if there's no continuation or the operation failed
+  static bool pin(JavaThread* current);
+  static bool unpin(JavaThread* current);
+
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
 

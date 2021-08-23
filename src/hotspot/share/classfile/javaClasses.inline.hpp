@@ -227,6 +227,9 @@ inline void java_lang_Continuation::set_tail(oop ref, stackChunkOop value) {
 inline jshort java_lang_Continuation::critical_section(oop ref) {
   return ref->short_field(_cs_offset);
 }
+inline void java_lang_Continuation::set_critical_section(oop ref, jshort value) {
+  ref->short_field_put(_cs_offset, value);
+}
 inline bool java_lang_Continuation::is_reset(oop ref) {
   return ref->bool_field(_reset_offset);
 }
