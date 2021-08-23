@@ -71,6 +71,8 @@ inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
 
 template <bool dword_aligned>
 inline void InstanceStackChunkKlass::copy_from_stack_to_chunk(void* from, void* to, size_t size) {
+  memcpy(to, from, size << LogBytesPerWord);
+#if 0
   if (dword_aligned) {
     assert (size >= 2, ""); // one word for return address, another for rbp spill
     assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
@@ -80,10 +82,13 @@ inline void InstanceStackChunkKlass::copy_from_stack_to_chunk(void* from, void* 
   } else {
     default_memcpy(from, to, size);
   }
+#endif
 }
 
 template <bool dword_aligned>
 inline void InstanceStackChunkKlass::copy_from_chunk_to_stack(void* from, void* to, size_t size) {
+  memcpy(to, from, size << LogBytesPerWord);
+#if 0
   if (dword_aligned) {
     assert (size >= 2, ""); // one word for return address, another for rbp spill
     assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
@@ -93,6 +98,7 @@ inline void InstanceStackChunkKlass::copy_from_chunk_to_stack(void* from, void* 
   } else {
     default_memcpy(from, to, size);
   }
+#endif
 }
 
 template <bool mixed>
