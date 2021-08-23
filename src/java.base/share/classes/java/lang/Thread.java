@@ -1510,20 +1510,19 @@ public class Thread implements Runnable {
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
 
-            // bind thread to container
-            this.container = container;
-            container.onStart(this);
-
             // inherit scope locals from structured container
             Object bindings = container.scopeLocalBindings();
             if (bindings != null) {
                 this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
             }
 
+            // bind thread to container
+            setThreadContainer(container);
+
+            container.onStart(this);
             boolean started = false;
             try {
                 start0();
-                started = true;
             } finally {
                 if (!started) {
                     container.onExit(this);
@@ -3082,9 +3081,10 @@ public class Thread implements Runnable {
     ThreadContainer headThreadContainer() {
         return headThreadContainer;
     }
-    void pushThreadContainer(ThreadContainer container) {
+    ScopeLocal.Snapshot pushThreadContainer(ThreadContainer container) {
         container.setPrevious(headThreadContainer);
         headThreadContainer = container;
+        return scopeLocalBindings;
     }
     void popThreadContainer(ThreadContainer container) {
         ThreadContainer head = headThreadContainer;

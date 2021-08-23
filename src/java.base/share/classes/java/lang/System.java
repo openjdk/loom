@@ -2469,8 +2469,8 @@ public final class System {
                 return thread.headThreadContainer();
             }
 
-            public void pushThreadContainer(ThreadContainer container) {
-                Thread.currentThread().pushThreadContainer(container);
+            public Object pushThreadContainer(ThreadContainer container) {
+                return Thread.currentThread().pushThreadContainer(container);
             }
 
             public void popThreadContainer(ThreadContainer container) {

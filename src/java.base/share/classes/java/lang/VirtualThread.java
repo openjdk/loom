@@ -532,16 +532,16 @@ class VirtualThread extends Thread {
             throw new IllegalThreadStateException("Already started");
         }
 
-        // bind thread to container
-        setThreadContainer(container);
-        container.onStart(this);
-
         // inherit scope locals from structured container
         Object bindings = container.scopeLocalBindings();
         if (bindings != null) {
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
         }
 
+        // bind thread to container
+        setThreadContainer(container);
+
+        container.onStart(this);
         boolean started = false;
         try {
             if (VirtualThreadStartEvent.isTurnedOn()) {

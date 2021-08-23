@@ -428,8 +428,9 @@ public interface JavaLangAccess {
 
     /**
      * Pushes a thread container to the top of the current thread's stack.
+     * @return the current thread's scope local bindings
      */
-    void pushThreadContainer(ThreadContainer container);
+    Object pushThreadContainer(ThreadContainer container);
 
     /**
      * Pops a thread container from the current thread's stack.
