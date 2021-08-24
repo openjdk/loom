@@ -53,7 +53,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
+import java.util.stream.Stream;
 import jdk.internal.misc.VirtualThreads;
+import jdk.internal.vm.SharedThreadContainer;
 
 /**
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
@@ -1420,6 +1422,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     final ForkJoinWorkerThreadFactory factory;
     final UncaughtExceptionHandler ueh;  // per-worker UEH
     final Predicate<? super ForkJoinPool> saturate;
+    final SharedThreadContainer container;
 
     @jdk.internal.vm.annotation.Contended("fjpctl") // segregate
     volatile long ctl;                   // main pool control
@@ -1463,7 +1466,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         ForkJoinWorkerThread wt = null;
         try {
             if (fac != null && (wt = fac.newThread(this)) != null) {
-                wt.start();
+                container.start(wt);
                 return true;
             }
         } catch (Throwable rex) {
@@ -2361,6 +2364,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                 if ((cond = termination) != null)
                     cond.signalAll();
                 lock.unlock();
+                container.close();
             }
             if (changed)
                 rescan = true;
@@ -2370,6 +2374,27 @@ public class ForkJoinPool extends AbstractExecutorService {
                 break;
         }
         return true;
+    }
+
+    /**
+     * Returns a stream of the worker threads.
+     */
+    private Stream<Thread> threads() {
+        WorkQueue[] qs = queues;
+        if (qs != null) {
+            List<Thread> threads = new ArrayList<>();
+            for (WorkQueue q : qs) {
+                if (q != null) {
+                    Thread t = q.owner;
+                    if (t != null) {
+                        threads.add(t);
+                    }
+                }
+            }
+            return threads.stream();
+        } else {
+            return Stream.empty();
+        }
     }
 
     // Exported methods
@@ -2559,6 +2584,9 @@ public class ForkJoinPool extends AbstractExecutorService {
         this.queues = new WorkQueue[size];
         String pid = Integer.toString(getAndAddPoolIds(1) + 1);
         this.workerNamePrefix = "ForkJoinPool-" + pid + "-worker-";
+
+        String name = "ForkJoinPool-" + pid;
+        this.container = SharedThreadContainer.create(name, this::threads);
     }
 
     // helper method for commonPool constructor
@@ -2610,6 +2638,9 @@ public class ForkJoinPool extends AbstractExecutorService {
             new DefaultCommonPoolForkJoinWorkerThreadFactory();
         this.queues = new WorkQueue[size];
         this.registrationLock = new ReentrantLock();
+
+        String name = "ForkJoinPool.commonPool";
+        this.container = SharedThreadContainer.create(name, this::threads);
     }
 
     /**

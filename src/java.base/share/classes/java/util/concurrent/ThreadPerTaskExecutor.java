@@ -37,18 +37,14 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.ThreadContainer;
-import jdk.internal.vm.ThreadContainers;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import jdk.internal.vm.SharedThreadContainer;
 
 /**
  * An ExecutorService that starts a new thread for each task. The number of
  * threads is unbounded.
  */
-class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+class ThreadPerTaskExecutor implements ExecutorService {
     private static final Permission MODIFY_THREAD = new RuntimePermission("modifyThread");
     private static final VarHandle STATE;
     static {
@@ -65,7 +61,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
     private final Condition terminationCondition = terminationLock.newCondition();
 
     private final ThreadFactory factory;
-    private final Object registrationKey;
+    private final SharedThreadContainer container;
 
     // states: RUNNING -> SHUTDOWN -> TERMINATED
     private static final int RUNNING    = 0;
@@ -79,7 +75,8 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
      */
     ThreadPerTaskExecutor(ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory);
-        this.registrationKey = ThreadContainers.registerSharedContainer(this);
+        String name = getClass().getName() + "@" + System.identityHashCode(this);
+        this.container = SharedThreadContainer.create(name, this::threads);
     }
 
     /**
@@ -121,10 +118,8 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
                 terminationLock.unlock();
             }
 
-            // remove from registry if tracked
-            if (registrationKey != null) {
-                ThreadContainers.deregisterSharedContainer(registrationKey);
-            }
+            // remove from registry
+            container.close();
         }
     }
 
@@ -140,13 +135,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
         }
     }
 
-    @Override
-    public long threadCount() {
-        return threads.size();
-    }
-
-    @Override
-    public Stream<Thread> threads() {
+    private Stream<Thread> threads() {
         return threads.stream();
     }
 
@@ -257,7 +246,7 @@ class ThreadPerTaskExecutor implements ExecutorService, ThreadContainer {
         boolean started = false;
         try {
             if (state == RUNNING) {
-                JLA.start(thread, this);
+                container.start(thread);
                 started = true;
             }
         } finally {
