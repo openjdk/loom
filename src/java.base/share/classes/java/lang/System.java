@@ -2533,7 +2533,9 @@ public final class System {
                 ((VirtualThread) thread).unpark(tryPush);
             }
 
-            public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation) {
+            public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
+                                                      ContinuationScope contScope,
+                                                      Continuation continuation) {
                 return StackWalker.newInstance(options, null, contScope, continuation);
             }
         });

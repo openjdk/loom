@@ -239,7 +239,9 @@ interface LiveStackFrame extends StackFrame {
      * {@link StackWalker.Option#RETAIN_CLASS_REFERENCE Option.RETAIN_CLASS_REFERENCE}
      * and it denies access to {@code RuntimePermission("getStackWalkerWithClassReference")}.
      */
-    public static StackWalker getStackWalker(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation) {
+    public static StackWalker getStackWalker(Set<StackWalker.Option> options,
+                                             ContinuationScope contScope,
+                                             Continuation continuation) {
         @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {

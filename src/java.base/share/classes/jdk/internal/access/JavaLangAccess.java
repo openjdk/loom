@@ -461,22 +461,22 @@ public interface JavaLangAccess {
     /**
      * Returns the current thread's scope locals cache
      */
-    public Object[] scopeLocalCache();
+    Object[] scopeLocalCache();
 
     /**
      * Sets the current thread's scope locals cache
      */
-    public void setScopeLocalCache(Object[] cache);
+    void setScopeLocalCache(Object[] cache);
 
     /**
      * Returns the innermost mounted continuation
      */
-    public Continuation getContinuation(Thread thread);
+     Continuation getContinuation(Thread thread);
 
     /**
      * Sets the innermost mounted continuation
      */
-    public void setContinuation(Thread thread, Continuation continuation);
+    void setContinuation(Thread thread, Continuation continuation);
 
     /**
      * Parks the current virtual thread.
@@ -496,9 +496,10 @@ public interface JavaLangAccess {
      */
     void unparkVirtualThread(Thread thread, boolean tryPush);
 
-
     /**
      * Creates a new StackWalker
      */
-    StackWalker newStackWalkerInstance(Set<StackWalker.Option> options, ContinuationScope contScope, Continuation continuation);
+    StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
+                                       ContinuationScope contScope,
+                                       Continuation continuation);
 }
