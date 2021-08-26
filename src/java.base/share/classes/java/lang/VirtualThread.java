@@ -660,7 +660,17 @@ class VirtualThread extends Thread {
         if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                submitRunContinuation(tryPush);
+                if (Thread.currentThread() instanceof VirtualThread vthread) {
+                    Thread carrier = vthread.carrierThread;
+                    carrier.setCurrentThread(carrier);
+                    try {
+                        submitRunContinuation(tryPush);
+                    } finally {
+                        carrier.setCurrentThread(vthread);
+                    }
+                } else {
+                    submitRunContinuation(tryPush);
+                }
             } else if (s == PINNED) {
                 // signal pinned thread so that it continues
                 final ReentrantLock lock = getLock();
