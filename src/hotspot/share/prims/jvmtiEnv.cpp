@@ -1474,6 +1474,9 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
       err = op.result();
     } else {
       *monitor_ptr = NULL;
+      if (!JvmtiEnvBase::is_vthread_alive(thread_oop)) {
+        err = JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
     }
     return err;
   }
