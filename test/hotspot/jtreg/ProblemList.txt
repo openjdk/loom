@@ -189,7 +189,6 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.jav
 runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java                8271008 generic-all
 
 
-serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java    0000000 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java               0000000 generic-all
 serviceability/sa/JhsdbThreadInfoTest.java 8243016 generic-all
 

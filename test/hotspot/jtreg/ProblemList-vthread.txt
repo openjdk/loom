@@ -121,7 +121,6 @@ serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
 serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
 serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
-serviceability/jvmti/vthread/DoContinueSingleStepTest/DoContinueSingleStepTest.java
 serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java
 serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
