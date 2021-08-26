@@ -69,9 +69,8 @@ public class PreemptLiveFrames {
                 do {
                     res = cont.tryPreempt(t0);
                     i++;
-                } while (i < 20 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
+                } while (i < 100 && res == Continuation.PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE);
                 assertEquals(res, Continuation.PreemptStatus.SUCCESS);
-                // var res = cont.tryPreempt(t0);
                 // assertEquals(res, Continuation.PreemptStatus.SUCCESS);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
