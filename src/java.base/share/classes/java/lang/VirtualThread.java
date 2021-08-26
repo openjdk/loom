@@ -523,6 +523,7 @@ class VirtualThread extends Thread {
     /**
      * Schedules this {@code VirtualThread} to execute.
      *
+     * @throws IllegalStateException if the container is shutdown or closed
      * @throws IllegalThreadStateException if the thread has already been started
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
@@ -532,23 +533,24 @@ class VirtualThread extends Thread {
             throw new IllegalThreadStateException("Already started");
         }
 
-        // inherit scope locals from structured container
-        Object bindings = container.scopeLocalBindings();
-        if (bindings != null) {
-            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-        }
-
-        // bind thread to container
-        setThreadContainer(container);
-
-        container.onStart(this);
         boolean started = false;
+        container.onStart(this); // may throw
         try {
+            // inherit scope locals from structured container
+            Object bindings = container.scopeLocalBindings();
+            if (bindings != null) {
+                this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+            }
+
+            // bind thread to container
+            setThreadContainer(container);
             if (VirtualThreadStartEvent.isTurnedOn()) {
                 var event = new VirtualThreadStartEvent();
                 event.javaThreadId = getId();
                 event.commit();
             }
+
+            // submit task to run thread
             submitRunContinuation();
             started = true;
         } finally {

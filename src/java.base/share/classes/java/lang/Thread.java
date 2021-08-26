@@ -1501,6 +1501,8 @@ public class Thread implements Runnable {
 
     /**
      * Schedules this thread to begin execution in the given thread container.
+     * @throws IllegalStateException if the container is shutdown or closed
+     * @throws IllegalThreadStateException if the thread has already been started
      */
     void start(ThreadContainer container) {
         synchronized (this) {
@@ -1508,18 +1510,18 @@ public class Thread implements Runnable {
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
 
-            // inherit scope locals from structured container
-            Object bindings = container.scopeLocalBindings();
-            if (bindings != null) {
-                this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-            }
-
-            // bind thread to container
-            setThreadContainer(container);
-
-            container.onStart(this);
             boolean started = false;
+            container.onStart(this);  // may throw
             try {
+                // inherit scope locals from structured container
+                Object bindings = container.scopeLocalBindings();
+                if (bindings != null) {
+                    this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+                }
+
+                // bind thread to container
+                setThreadContainer(container);
+
                 start0();
             } finally {
                 if (!started) {
