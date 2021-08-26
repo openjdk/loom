@@ -123,6 +123,9 @@ JvmtiRawMonitor::is_valid() {
 void JvmtiRawMonitor::simple_enter(Thread* self) {
   for (;;) {
     if (Atomic::replace_if_null(&_owner, self)) {
+      if (self->is_Java_thread()) {
+        Continuation::pin(JavaThread::cast(self));
+      }
       return;
     }
 
@@ -150,6 +153,9 @@ void JvmtiRawMonitor::simple_exit(Thread* self) {
   guarantee(_owner == self, "invariant");
   Atomic::release_store(&_owner, (Thread*)NULL);
   OrderAccess::fence();
+  if (self->is_Java_thread()) {
+    Continuation::unpin(JavaThread::cast(self));
+  }
   if (_entry_list == NULL) {
     return;
   }

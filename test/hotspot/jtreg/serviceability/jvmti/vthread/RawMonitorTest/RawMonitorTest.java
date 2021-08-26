@@ -40,10 +40,10 @@ public class RawMonitorTest {
             rawMonitorEnter();
             rawMonitorNotifyAll();
             // uncomment lines below to get failures with NOT_MONITOR_OWNER
-            // try {
-            //     Thread.sleep(1);
-            // } catch (InterruptedException ie) {
-            // }
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException ie) {
+            }
             rawMonitorWait();
             rawMonitorExit();
         }
