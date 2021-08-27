@@ -2144,10 +2144,26 @@ int Continuation::try_force_yield(JavaThread* target, const oop cont) {
     target->set_cont_preempt(true);
 
     // The target thread calls
-    // StubRoutines::cont_jump_from_sp_C from JavaThread::handle_special_runtime_exit_condition
+    // Continuation::jump_from_safepoint from JavaThread::handle_special_runtime_exit_condition
     // to yield on return from suspension/blocking handshake.
   }
   return res;
+}
+
+typedef void (*cont_jump_from_sp_t)();
+
+void Continuation::jump_from_safepoint(JavaThread* thread) {
+  assert (thread == JavaThread::current(), "");
+  assert (thread->is_cont_force_yield(), "");
+  log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
+  thread->set_cont_preempt(false);
+  if (thread->thread_state() == _thread_in_vm) {
+    thread->set_thread_state(_thread_in_Java);
+  }
+  StackWatermarkSet::after_unwind(thread);
+  MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
+  CAST_TO_FN_PTR(cont_jump_from_sp_t, StubRoutines::cont_jump_from_sp())(); // does not return
+  ShouldNotReachHere();
 }
 
 /////////////// THAW ////

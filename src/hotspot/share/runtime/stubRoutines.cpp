@@ -493,14 +493,6 @@ JRT_LEAF(void, StubRoutines::arrayof_oop_copy_uninit(HeapWord* src, HeapWord* de
   ArrayAccess<ARRAYCOPY_ARRAYOF | IS_DEST_UNINITIALIZED>::oop_arraycopy_raw(src, dest, count);
 JRT_END
 
-typedef void (*cont_jump_from_sp_t)();
-
-void StubRoutines::cont_jump_from_sp_C() {
-  MACOS_AARCH64_ONLY(JavaThread::current()->enable_wx(WXExec));
-  CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp)(); // does not return
-  ShouldNotReachHere();
-}
-
 address StubRoutines::select_fill_function(BasicType t, bool aligned, const char* &name) {
 #define RETURN_STUB(xxx_fill) { \
   name = #xxx_fill; \
