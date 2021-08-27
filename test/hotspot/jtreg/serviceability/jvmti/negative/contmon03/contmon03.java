@@ -37,27 +37,17 @@
  * COMMENTS
  *     Ported from JVMDI.
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native -agentlib:contmon03 contmon03
  */
-
-import java.io.PrintStream;
 
 public class contmon03 {
 
     static {
-        try {
-            System.loadLibrary("contmon03");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load contmon03 library");
-            System.err.println("java.library.path:"  + System.getProperty("java.library.path"));
-            System.err.println("java.library.path:"  + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("contmon03");
     }
 
-    native static int check(Thread thr);
+    native static int check(Thread thread);
 
     public static void main(String args[]) {
         if(check(Thread.currentThread()) != 0) {

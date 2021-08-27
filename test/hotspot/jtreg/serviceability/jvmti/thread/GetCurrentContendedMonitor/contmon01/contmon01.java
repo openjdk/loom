@@ -59,36 +59,22 @@
  *       - rearranged synchronization of tested thread
  *       - enhanced descripton
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native -agentlib:contmon01 contmon01
  */
 
-import java.io.PrintStream;
-
 public class contmon01 {
 
-    native static void checkMon(int point, Thread thr, Object mon);
-    native static int getRes();
+    native static void checkMonitor(int point, Thread thread, Object monitor);
 
     static {
-        try {
-            System.loadLibrary("contmon01");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load contmon01 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("contmon01");
     }
 
     public static volatile boolean startingBarrier = true;
     public static volatile boolean waitingBarrier = true;
     static Object lockFld = new Object();
-
-    static boolean DEBUG_MODE = false;
-    static PrintStream out = System.out;
-
+    
     public static void doSleep() {
         try {
             Thread.sleep(10);
@@ -97,99 +83,85 @@ public class contmon01 {
         }
     }
 
-    public static int main(String argv[]) {
-        for (int i = 0; i < argv.length; i++) {
-            if (argv[i].equals("-v")) // verbose mode
-                DEBUG_MODE = true;
-        }
+    public static void main(String argv[]) {
+        test(false);
+        test(true);
+    }
 
+    public static void test(boolean isVirtual) {
+        startingBarrier = true;
+        waitingBarrier = true;
         Object lock = new Object();
-        Thread currThr = Thread.currentThread();
+        Thread currThread = Thread.currentThread();
 
-        if (DEBUG_MODE)
-            out.println("\nCheck #1: verifying a contended monitor of current thread \""
-                + currThr.getName() + "\" ...");
+        System.out.println("\nCheck #1: verifying a contended monitor of current thread \""
+                + currThread.getName() + "\" ...");
         synchronized (lock) {
-            checkMon(1, currThr, null);
+            checkMonitor(1, currThread, null);
         }
-        if (DEBUG_MODE)
-            out.println("Check #1 done");
+        System.out.println("Check #1 done");
 
-        contmon01a thr = new contmon01a();
+        contmon01Task task = new contmon01Task();
 
-        thr.start();
-        if (DEBUG_MODE)
-            out.println("\nWaiting for auxiliary thread ...");
+        Thread thread = isVirtual ? Thread.ofVirtual().start(task) : Thread.ofPlatform().start(task);
+
+        System.out.println("\nWaiting for auxiliary thread ...");
         while (startingBarrier) {
             doSleep();
         }
-        if (DEBUG_MODE)
-            out.println("Auxiliary thread is ready");
+        System.out.println("Auxiliary thread is ready");
 
-        if (DEBUG_MODE)
-            out.println("\nCheck #3: verifying a contended monitor of auxiliary thread ...");
-        checkMon(3, thr, null);
-        if (DEBUG_MODE)
-            out.println("Check #3 done");
+        System.out.println("\nCheck #3: verifying a contended monitor of auxiliary thread ...");
+        checkMonitor(3, thread, null);
+        System.out.println("Check #3 done");
 
-        thr.letItGo();
+        task.letItGo();
 
         while (waitingBarrier) {
             doSleep();
         }
         synchronized (lockFld) {
-            if (DEBUG_MODE)
-                out.println("\nMain thread entered lockFld's monitor"
+            System.out.println("\nMain thread entered lockFld's monitor"
                     + "\n\tand calling lockFld.notifyAll() to awake auxiliary thread");
             lockFld.notifyAll();
-            if (DEBUG_MODE)
-                out.println("\nCheck #4: verifying a contended monitor of auxiliary thread ...");
-            checkMon(4, thr, lockFld);
-            if (DEBUG_MODE)
-                out.println("Check #4 done");
+            System.out.println("\nCheck #4: verifying a contended monitor of auxiliary thread ...");
+            checkMonitor(4, thread, lockFld);
+            System.out.println("Check #4 done");
         }
 
-        if (DEBUG_MODE)
-            out.println("\nMain thread released lockFld's monitor"
+        System.out.println("\nMain thread released lockFld's monitor"
                 + "\n\tand waiting for auxiliary thread death ...");
 
         try {
-            thr.join();
+            thread.join();
         } catch (InterruptedException e) {
             throw new Error("Unexpected " + e);
         }
-        if (DEBUG_MODE)
-            out.println("\nCheck #5: verifying a contended monitor of dead auxiliary thread ...");
-        checkMon(5, thr, null);
-        if (DEBUG_MODE)
-            out.println("Check #5 done");
-
-        return getRes();
+        System.out.println("\nCheck #5: verifying a contended monitor of dead auxiliary thread ...");
+        checkMonitor(5, thread, null);
+        System.out.println("Check #5 done");
     }
 }
 
 
-class contmon01a extends Thread {
+class contmon01Task implements Runnable {
     private volatile boolean flag = true;
 
     public void run() {
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("check #2: verifying a contended monitor of current auxiliary thread ...");
-        contmon01.checkMon(2, currentThread(), null);
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("check #2 done");
+        System.out.println("check #2: verifying a contended monitor of current auxiliary thread ...");
+        contmon01.checkMonitor(2, Thread.currentThread(), null);
+        System.out.println("check #2 done");
 
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("notifying main thread");
+        System.out.println("notifying main thread");
         contmon01.startingBarrier = false;
 
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("thread is going to loop while <flag> is true ...");
+        System.out.println("thread is going to loop while <flag> is true ...");
         int i = 0;
         int n = 1000;
         while (flag) {
             if (n <= 0) {
                 n = 1000;
+                contmon01.doSleep();
             }
             if (i > n) {
                 i = 0;
@@ -197,13 +169,11 @@ class contmon01a extends Thread {
             }
             i++;
         }
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("looping is done: <flag> is false");
+        System.out.println("looping is done: <flag> is false");
 
         synchronized (contmon01.lockFld) {
             contmon01.waitingBarrier = false;
-            if (contmon01.DEBUG_MODE)
-                contmon01.out.println("\nthread entered lockFld's monitor"
+            System.out.println("\nthread entered lockFld's monitor"
                     + "\n\tand releasing it through the lockFld.wait() call");
             try {
                 contmon01.lockFld.wait();
@@ -212,8 +182,7 @@ class contmon01a extends Thread {
             }
         }
 
-        if (contmon01.DEBUG_MODE)
-            contmon01.out.println("thread exiting");
+        System.out.println("thread exiting");
     }
 
     public void letItGo() {

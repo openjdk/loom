@@ -33,60 +33,33 @@ extern "C" {
 #define STATUS_FAILED 2
 
 static jvmtiEnv *jvmti = NULL;
-static jvmtiCapabilities caps;
 static jint result = PASSED;
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jint res;
   jvmtiError err;
+  jvmtiCapabilities caps;
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
-    printf("Wrong result of a valid call to GetEnv!\n");
+    LOG("Wrong result of a valid call to GetEnv!\n");
     return JNI_ERR;
   }
 
-  err = jvmti->GetCapabilities(&caps);
+  memset(&caps, 0, sizeof(jvmtiCapabilities));
+  caps.can_get_current_contended_monitor = 1;
+  err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
-    printf("(GetCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
-  if (!caps.can_get_current_contended_monitor) {
-    /*
-     * GetCurrentContendedMonitor is not currently available, but
-     * is it potentially available?
-     */
-    err = jvmti->GetPotentialCapabilities(&caps);
-    if (err != JVMTI_ERROR_NONE) {
-      printf("(GetPotentialCapabilities) unexpected error: %s (%d)\n",
-             TranslateError(err), err);
-      return JNI_ERR;
-    }
-    if (caps.can_get_current_contended_monitor) {
-      /*
-       * Yes, GetCurrentContendedMonitor is potentially available.
-       * Let's turn it on!
-       */
-      memset(&caps, 0, sizeof(jvmtiCapabilities));
-      caps.can_get_current_contended_monitor = 1;
-      err = jvmti->AddCapabilities(&caps);
-      if (err != JVMTI_ERROR_NONE) {
-        printf("(AddCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
-        return JNI_ERR;
-      }
-    } else {
-      printf("Warning: GetCurrentContendedMonitor is not implemented\n");
-    }
-  }
 
   return JNI_OK;
 }
 
 JNIEXPORT jint JNICALL
-Java_contmon03_check(JNIEnv *env, jclass cls, jthread thr) {
+Java_contmon03_check(JNIEnv *env, jclass cls, jthread thread) {
   jvmtiError err;
   jobject monitor;
 
@@ -98,10 +71,7 @@ Java_contmon03_check(JNIEnv *env, jclass cls, jthread thr) {
   LOG(">>> invalid thread check ...\n");
 
   err = jvmti->GetCurrentContendedMonitor(cls, &monitor);
-  if (err == JVMTI_ERROR_MUST_POSSESS_CAPABILITY &&
-      !caps.can_get_current_contended_monitor) {
-    /* It is OK */
-  } else if (err != JVMTI_ERROR_INVALID_THREAD) {
+  if (err != JVMTI_ERROR_INVALID_THREAD) {
     LOG("Error expected: JVMTI_ERROR_INVALID_THREAD,\n");
     LOG("           got: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
@@ -109,11 +79,8 @@ Java_contmon03_check(JNIEnv *env, jclass cls, jthread thr) {
 
   LOG(">>> null pointer check ...\n");
 
-  err = jvmti->GetCurrentContendedMonitor(thr, NULL);
-  if (err == JVMTI_ERROR_MUST_POSSESS_CAPABILITY &&
-      !caps.can_get_current_contended_monitor) {
-    /* It is OK */
-  } else if (err != JVMTI_ERROR_NULL_POINTER) {
+  err = jvmti->GetCurrentContendedMonitor(thread, NULL);
+  if (err != JVMTI_ERROR_NULL_POINTER) {
     LOG("Error expected: JVMTI_ERROR_NULL_POINTER,\n");
     LOG("           got: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;

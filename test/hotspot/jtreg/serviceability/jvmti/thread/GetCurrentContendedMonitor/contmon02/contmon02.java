@@ -40,26 +40,16 @@
  *       - rearranged synchronization of tested thread
  *       - enhanced descripton
  *
- * @library /vmTestbase
- *          /test/lib
+ * @library /test/lib
  * @run main/othervm/native -agentlib:contmon02 contmon02
  */
-import java.io.PrintStream;
 
 public class contmon02 {
 
-    native static void checkMon(int point, Thread thr);
-    native static int getRes();
+    native static void checkMonitor(int point, Thread thr);
 
     static {
-        try {
-            System.loadLibrary("contmon02");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load contmon02 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("contmon02");
     }
 
     public static boolean startingBarrier = true;
@@ -73,28 +63,30 @@ public class contmon02 {
     }
 
     public static void main(String argv[]) {
-        checkMon(1, Thread.currentThread());
+        test(true);
+        test(false);
+    }
 
-        contmon02a thr = new contmon02a();
-        thr.start();
+    public static void test(boolean isVirtual) {
+        checkMonitor(1, Thread.currentThread());
+
+        contmon02Task task = new contmon02Task();
+        Thread thread = isVirtual ? Thread.ofVirtual().start(task) : Thread.ofPlatform().start(task);
+
         while (startingBarrier) {
             doSleep();
         }
-        checkMon(2, thr);
-        thr.letItGo();
+        checkMonitor(2, thread);
+        task.letItGo();
         try {
-            thr.join();
+            thread.join();
         } catch (InterruptedException e) {
             throw new Error("Unexpected " + e);
-        }
-
-        if(getRes() != 0) {
-            throw new RuntimeException("check failed for: " + Thread.currentThread());
         }
     }
 }
 
-class contmon02a extends Thread {
+class contmon02Task implements Runnable {
     private volatile boolean flag = true;
 
     private synchronized void meth() {
