@@ -56,6 +56,7 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
+  static void jump_from_safepoint(JavaThread* thread);
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
