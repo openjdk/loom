@@ -39,35 +39,52 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:framepop02 framepop02
+ * @run main/othervm/native -agentlib:framepop02 framepop02 platform
+ */
+
+/*
+ * @test
+ *
+ * @summary converted from VM Testbase nsk/jvmti/FramePop/framepop002.
+ * VM Testbase keywords: [quick, jpda, jvmti, noras]
+ * VM Testbase readme:
+ * DESCRIPTION
+ *     The test exercises JVMTI event callback function FramePop.
+ *     The test do some nesting/recursive calls watching frame pop
+ *     events to be uniquely identified by thread/class/method/frame_depth.
+ * COMMENTS
+ *     The test was created as a result of investigating the following bugs
+ *     intended to write a regression test:
+ *     4335224 Bug 4245697 not completely fixed jevent.u.frame.frame incorrect
+ *     4504077 java: dbx should not hold on to a frameid after thread suspension
+ *     Ported from JVMDI.
+ *
+ * @library /test/lib
+ * @run main/othervm/native -agentlib:framepop02 framepop02 virtual
  */
 
 
 
 public class framepop02 {
 
-    final static int THREADS_LIMIT = 20;
-    final static int NESTING_DEPTH = 100;
+    final static int NESTING_DEPTH = 20;
     final static String TEST_THREAD_NAME_BASE = "Test Thread #";
 
     static {
-        try {
-            System.loadLibrary("framepop02");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load framepop02 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("framepop02");
     }
 
     native static void getReady();
     native static int check();
 
     public static void main(String args[]) {
+        boolean isVirtual = args.length > 0 && args[0].equals("virtual");
+        final int THREADS_LIMIT = Runtime.getRuntime().availableProcessors() * 2;
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
-        Thread.Builder builder = Thread.ofVirtual().name(TEST_THREAD_NAME_BASE, 0);
+        Thread.Builder builder = (isVirtual ? Thread.ofVirtual() : Thread.ofPlatform())
+                .name(TEST_THREAD_NAME_BASE, 0);
+        System.out.println("Builder: " + builder);
         for (int i = 0; i < THREADS_LIMIT; i++) {
             t[i] = builder.start(new TestTask());
         }
