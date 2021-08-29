@@ -1336,7 +1336,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         this.handler = handler;
 
         String name = getClass().getName() + "@" + System.identityHashCode(this);
-        this.container = SharedThreadContainer.create(name, this::threads);
+        this.container = SharedThreadContainer.create(name);
     }
 
     /**

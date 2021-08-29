@@ -31,6 +31,14 @@ import java.util.stream.Stream;
  * A container of threads. Thread containers can be arranged in linked list.
  */
 public interface ThreadContainer {
+
+    /**
+     * Return the container name, null if not named.
+     */
+    default String name() {
+        return null;
+    }
+
     /**
      * Return the owner, null if not owned.
      */
@@ -39,9 +47,25 @@ public interface ThreadContainer {
     }
 
     /**
+     * Returns the parent of this container or null if this is the root container.
+     */
+    default ThreadContainer parent() {
+        return ThreadContainers.parent(this);
+    }
+
+    /**
+     * Return the stream of children of this container.
+     */
+    default Stream<ThreadContainer> children() {
+        return ThreadContainers.children(this);
+    }
+    
+    /**
      * Return a count of the number of threads in this container.
      */
-    long threadCount();
+    default long threadCount() {
+        return threads().mapToLong(e -> 1L).sum();
+    }
 
     /**
      * Returns a stream of the threads in this container.

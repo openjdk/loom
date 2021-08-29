@@ -186,6 +186,10 @@ public class ThreadContainers {
         static final RootContainer INSTANCE = new RootContainer();
         private static final LongAdder VTHREAD_COUNT = new LongAdder();
         @Override
+        public String name() {
+            return "<root>";
+        }
+        @Override
         public Thread owner() {
             return null;
         }
@@ -214,7 +218,7 @@ public class ThreadContainers {
         }
         @Override
         public String toString() {
-            return "<root>";
+            return name();
         }
         @Override
         public void onStart(Thread thread) {

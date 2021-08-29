@@ -2586,7 +2586,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         this.workerNamePrefix = "ForkJoinPool-" + pid + "-worker-";
 
         String name = "ForkJoinPool-" + pid;
-        this.container = SharedThreadContainer.create(name, this::threads);
+        this.container = SharedThreadContainer.create(name);
     }
 
     // helper method for commonPool constructor
@@ -2640,7 +2640,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         this.registrationLock = new ReentrantLock();
 
         String name = "ForkJoinPool.commonPool";
-        this.container = SharedThreadContainer.create(name, this::threads);
+        this.container = SharedThreadContainer.create(name);
     }
 
     /**

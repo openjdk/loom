@@ -26,7 +26,7 @@ package jdk.internal.vm;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Objects;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
@@ -50,18 +50,31 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
 
     private final String name;
     private final Supplier<Stream<Thread>> threadsSupplier;
+    private final LongAdder threadCount;
     private final Object key;
     private volatile boolean closed;
 
-    private SharedThreadContainer(String name,
-                                  Supplier<Stream<Thread>> threadsSupplier) {
+    private SharedThreadContainer(String name, Supplier<Stream<Thread>> threadsSupplier) {
         this.name = name;
-        this.threadsSupplier = Objects.requireNonNull(threadsSupplier);
+        if (threadsSupplier != null) {
+            this.threadsSupplier = threadsSupplier;
+            this.threadCount = null;
+        } else {
+            this.threadsSupplier = null;
+            this.threadCount = new LongAdder();
+        }
         this.key = ThreadContainers.registerSharedContainer(this);
     }
 
     /**
      * Creates a shared thread container with the given name.
+     */
+    public static SharedThreadContainer create(String name) {
+        return new SharedThreadContainer(name, null);
+    }
+
+    /**
+     * Creates a shared thread container with the given name and threads supplier.
      */
     public static SharedThreadContainer create(String name,
                                                Supplier<Stream<Thread>> threadsSupplier) {
@@ -69,13 +82,41 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
     }
 
     @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public void onStart(Thread thread) {
+        if (threadCount != null) {
+            threadCount.add(1L);
+        }
+    }
+
+    @Override
+    public void onExit(Thread thread) {
+        if (threadCount != null) {
+            threadCount.add(-1L);
+        }
+    }
+
+    @Override
     public long threadCount() {
-        return threads().count();
+        if (threadCount != null) {
+            return threadCount.sum();
+        } else {
+            return threads().mapToLong(e -> 1L).sum();
+        }
     }
 
     @Override
     public Stream<Thread> threads() {
-        return threadsSupplier.get();
+        if (threadsSupplier != null) {
+            return threadsSupplier.get();
+        } else {
+            return Stream.of(JLA.getAllThreads())
+                    .filter(t -> JLA.threadContainer(t) == this);
+        }
     }
 
     /**
@@ -101,6 +142,12 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
 
     @Override
     public String toString() {
-        return (name != null) ? name : super.toString();
+        String id = getClass().getName() + "@" + System.identityHashCode(this);
+        String name = name();
+        if (name != null) {
+            return name + "/" + id;
+        } else {
+            return id;
+        }
     }
 }
