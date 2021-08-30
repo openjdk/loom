@@ -479,15 +479,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         /** Returns true if possibly still triggerable. Used by cleanStack. */
         abstract boolean isLive();
 
-        public final void run() {
-            tryFire(ASYNC);
-        }
-        public final boolean exec() {
-            run();
-            return false;
-        }
-
-    public final Void getRawResult()       { return null; }
+        public final void run()                { tryFire(ASYNC); }
+        public final boolean exec()            { tryFire(ASYNC); return false; }
+        public final Void getRawResult()       { return null; }
         public final void setRawResult(Void v) {}
     }
 
