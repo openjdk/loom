@@ -664,11 +664,13 @@ class VirtualThread extends Thread {
      *     when invoked from a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
+    @ChangesCurrentThread
     void unpark(boolean tryPush) {
-        if (!getAndSetParkPermit(true) && Thread.currentThread() != this) {
+        Thread currentThread = Thread.currentThread();
+        if (!getAndSetParkPermit(true) && currentThread!= this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
-                if (Thread.currentThread() instanceof VirtualThread vthread) {
+                if (currentThread instanceof VirtualThread vthread) {
                     Thread carrier = vthread.carrierThread;
                     carrier.setCurrentThread(carrier);
                     try {
