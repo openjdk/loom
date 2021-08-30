@@ -33,9 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import jdk.internal.vm.SharedThreadContainer;
@@ -57,8 +55,7 @@ class ThreadPerTaskExecutor implements ExecutorService {
     }
 
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
-    private final ReentrantLock terminationLock = new ReentrantLock();
-    private final Condition terminationCondition = terminationLock.newCondition();
+    private final CountDownLatch terminationSignal = new CountDownLatch(1);
 
     private final ThreadFactory factory;
     private final SharedThreadContainer container;
@@ -110,13 +107,8 @@ class ThreadPerTaskExecutor implements ExecutorService {
         if (threads.isEmpty()
             && STATE.compareAndSet(this, SHUTDOWN, TERMINATED)) {
 
-            // signal any waiters
-            terminationLock.lock();
-            try {
-                terminationCondition.signalAll();
-            } finally {
-                terminationLock.unlock();
-            }
+            // signal waiters
+            terminationSignal.countDown();
 
             // remove from registry
             container.close();
@@ -170,15 +162,7 @@ class ThreadPerTaskExecutor implements ExecutorService {
         if (isTerminated()) {
             return true;
         } else {
-            terminationLock.lock();
-            try {
-                if (!isTerminated()) {
-                    terminationCondition.await(timeout, unit);
-                }
-            } finally {
-                terminationLock.unlock();
-            }
-            return isTerminated();
+            return terminationSignal.await(timeout, unit);
         }
     }
 
