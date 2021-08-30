@@ -187,7 +187,7 @@ public class CustomScheduler {
      * Test running task with the carrier interrupt status set.
      */
     @Test
-    public void testInterruptBeforeRun() throws Exception {
+    public void testRunWithInterruptSet() throws Exception {
         Executor scheduler = (task) -> {
             Thread.currentThread().interrupt();
             task.run();
@@ -198,49 +198,6 @@ public class CustomScheduler {
                 interrupted.set(Thread.currentThread().isInterrupted());
             });
             assertFalse(vthread.isInterrupted());
-        } finally {
-            Thread.interrupted();
-        }
-    }
-
-    /**
-     * Test carrier interrupt after running task.
-     */
-    @Test
-    public void testInterruptAfterRun() {
-        Executor scheduler = (task) -> {
-            task.run();
-            Thread.currentThread().interrupt();
-        };
-
-        Thread carrier = Thread.currentThread();
-        AtomicBoolean carrierInterrupted = new AtomicBoolean();
-        Runnable checkCarrierInterruptStatus = () -> {
-            if (carrier.isInterrupted()) {
-                carrierInterrupted.set(true);
-            }
-        };
-
-        Thread vthread1 = Thread.ofVirtual()
-                .scheduler(scheduler)
-                .unstarted(() -> {
-                    checkCarrierInterruptStatus.run();
-                    LockSupport.park();
-                    checkCarrierInterruptStatus.run();
-                });
-
-        Thread vthread2 = Thread.ofVirtual()
-                .scheduler(scheduler)
-                .unstarted(() -> {
-                    checkCarrierInterruptStatus.run();
-                    LockSupport.unpark(vthread1);
-                    checkCarrierInterruptStatus.run();
-                });
-
-        try {
-            vthread1.start();
-            vthread2.start();
-            assertFalse(carrierInterrupted.get());
         } finally {
             Thread.interrupted();
         }

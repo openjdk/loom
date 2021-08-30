@@ -220,6 +220,10 @@ class VirtualThread extends Thread {
         public Object attachment() {
             return attachment;
         }
+        @Override
+        public String toString() {
+            return vthread.toString();
+        }
     }
 
     /**
