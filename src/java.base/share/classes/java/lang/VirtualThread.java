@@ -369,39 +369,22 @@ class VirtualThread extends Thread {
 
     /**
      * Unmounts this virtual thread, invokes Continuation.yield, and re-mounts the
-     * thread when continued.
-     *
-     * When enabled, JVMTI must be notified from this method.
+     * thread when continued. When enabled, JVMTI must be notified from this method.
+     * @return true if the yield was successful
      */
     @ChangesCurrentThread
-    private void yieldContinuation() {
+    private boolean yieldContinuation() {
         boolean notifyJvmti = notifyJvmtiEvents;
 
         // unmount
         if (notifyJvmti) notifyJvmtiUnmountBegin(false);
         unmount();
-
-        boolean yielded = false;
         try {
-            yielded = Continuation.yield(VTHREAD_SCOPE);
+            return Continuation.yield(VTHREAD_SCOPE);
         } finally {
-
-            // mount
+            // re-mount
             mount();
             if (notifyJvmti) notifyJvmtiMountEnd(false);
-
-            if (!yielded) {
-                // pinned or resource error
-                try {
-                    if (state() == PARKING) {
-                        parkOnCarrierThread();
-                    }
-                } finally {
-                    setState(RUNNING);
-                }
-            }
-
-            assert (Thread.currentThread() == this) && (state() == RUNNING);
         }
     }
 
@@ -586,7 +569,9 @@ class VirtualThread extends Thread {
         // park the thread
         setState(PARKING);
         try {
-            yieldContinuation();
+            if (!yieldContinuation()) {
+                parkOnCarrierThread();
+            }
         } finally {
             assert (Thread.currentThread() == this) && (state() == RUNNING);
         }
@@ -613,7 +598,9 @@ class VirtualThread extends Thread {
             Future<?> unparker = scheduleUnpark(nanos);
             setState(PARKING);
             try {
-                yieldContinuation();
+                if (!yieldContinuation()) {
+                    parkOnCarrierThread();
+                }
             } finally {
                 assert (Thread.currentThread() == this) && (state() == RUNNING);
                 cancel(unparker);
@@ -714,8 +701,11 @@ class VirtualThread extends Thread {
         try {
             yieldContinuation();
         } finally {
-            assert Thread.currentThread() == this && state() == RUNNING :
-                "this: " + this + " currentThread: " + Thread.currentThread() + " state: " + state();
+            assert Thread.currentThread() == this;
+            if (state() != RUNNING) {
+                assert state() == YIELDING;
+                setState(RUNNING);
+            }
         }
     }
 
@@ -1092,11 +1082,11 @@ class VirtualThread extends Thread {
      * A thread in the ForkJoinPool created by the default scheduler.
      */
     private static class CarrierThread extends ForkJoinWorkerThread {
+        private static final Unsafe UNSAFE = Unsafe.getUnsafe();
         private static final ThreadGroup CARRIER_THREADGROUP = carrierThreadGroup();
         @SuppressWarnings("removal")
         private static final AccessControlContext INNOCUOUS_ACC = innocuousACC();
 
-        private static final Unsafe UNSAFE;
         private static final long CONTEXTCLASSLOADER;
         private static final long INHERITABLETHREADLOCALS;
         private static final long INHERITEDACCESSCONTROLCONTEXT;
@@ -1144,7 +1134,6 @@ class VirtualThread extends Thread {
         }
 
         static {
-            UNSAFE = Unsafe.getUnsafe();
             CONTEXTCLASSLOADER = UNSAFE.objectFieldOffset(Thread.class,
                     "contextClassLoader");
             INHERITABLETHREADLOCALS = UNSAFE.objectFieldOffset(Thread.class,

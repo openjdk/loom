@@ -1209,7 +1209,7 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread interrupt when sleeping.
+     * Test interrupting Thread.sleep
      */
     @Test
     public void testSleep5() throws Exception {
@@ -1284,6 +1284,63 @@ public class ThreadAPI {
         if (e != null) {
             throw e;
         }
+    }
+
+    /**
+     * Test Thread.sleep when pinned
+     */
+    @Test
+    public void testSleep8() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            long start = millisTime();
+            Object lock = new Object();
+            synchronized (lock) {
+                Thread.sleep(2000);
+            }
+            expectDuration(start, /*min*/1900, /*max*/4000);
+        });
+    }
+
+    /**
+     * Test Thread.sleep when pinned and with interrupt status set
+     */
+    @Test
+    public void testSleep9() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread me = Thread.currentThread();
+            me.interrupt();
+            try {
+                Object lock = new Object();
+                synchronized (lock) {
+                    Thread.sleep(2000);
+                }
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // expected
+                assertFalse(me.isInterrupted());
+            }
+        });
+    }
+
+    /**
+     * Test interrupting Thread.sleep when pinned
+     */
+    @Test
+    public void testSleep10() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            TestHelper.scheduleInterrupt(t, 2000);
+            try {
+                Object lock = new Object();
+                synchronized (lock) {
+                    Thread.sleep(20 * 1000);
+                }
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // interrupt status should be clearer
+                assertFalse(t.isInterrupted());
+            }
+        });
     }
 
     /**
