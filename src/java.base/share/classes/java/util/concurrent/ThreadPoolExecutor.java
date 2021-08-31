@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Stream;
 import jdk.internal.vm.SharedThreadContainer;
 
 /**
@@ -1156,23 +1155,6 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             completedAbruptly = false;
         } finally {
             processWorkerExit(w, completedAbruptly);
-        }
-    }
-
-    /**
-     * Returns a stream of the worker threads.
-     */
-    private Stream<Thread> threads() {
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
-        try {
-            List<Thread> threads = new ArrayList<>();
-            for (Worker w : workers) {
-                threads.add(w.thread);
-            }
-            return threads.stream();
-        } finally {
-            mainLock.unlock();
         }
     }
 

@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
-import java.util.stream.Stream;
 import jdk.internal.misc.VirtualThreads;
 import jdk.internal.vm.SharedThreadContainer;
 
@@ -2374,27 +2373,6 @@ public class ForkJoinPool extends AbstractExecutorService {
                 break;
         }
         return true;
-    }
-
-    /**
-     * Returns a stream of the worker threads.
-     */
-    private Stream<Thread> threads() {
-        WorkQueue[] qs = queues;
-        if (qs != null) {
-            List<Thread> threads = new ArrayList<>();
-            for (WorkQueue q : qs) {
-                if (q != null) {
-                    Thread t = q.owner;
-                    if (t != null) {
-                        threads.add(t);
-                    }
-                }
-            }
-            return threads.stream();
-        } else {
-            return Stream.empty();
-        }
     }
 
     // Exported methods
