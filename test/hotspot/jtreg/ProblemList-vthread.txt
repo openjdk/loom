@@ -460,7 +460,7 @@ vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 ## NSK JDB Tests failing with wrapper
 
 ####
-## Functionality not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
+## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
 
 vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 
@@ -482,7 +482,8 @@ vmTestbase/nsk/jdb/where/where005/where005.java
 ## NSK JDWP Tests failing with wrapper
 
 ####
-## Incorrect stack depth for wrapped thread
+## Incorrect stack depth for wrapped thread. Probably test bug for not accounting for vthreads
+## having a different bottom of stack.
 
 vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsStackDepthInfo001/ownedMonitorsStackDepthInfo001.java
 
@@ -558,6 +559,28 @@ vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects001/referrin
 
 vmTestbase/nsk/jdi/EventRequest/disable/disable001/TestDescription.java
 
+###
+## These tests fail due to calling invokeMethod() with the INVOKE_SINGLE_THREADED flag while
+## all threads are suspended, and doing a Thread.sleep() in the invoked method. The vthread
+## can't properly unpark without support from a VirtualThread-unparker thread,
+## which is suspended. We'll likely decide to consdier this a test bug since invokeMethod()
+## alread warns about potential deadlocks when using INVOKE_SINGLE_THREADED.
+
+vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod010/TestDescription.java
+vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod011/TestDescription.java
+vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod012/TestDescription.java
+vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod011/TestDescription.java
+vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod012/TestDescription.java
+
+
+###
+## JVMTI PropFrame() is returning INVALID_THREAD because vthreads are not supported.
+vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
+
+###
+## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
+vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
+vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
 
 ####
 ## Invalid opertations with virtual threads
@@ -578,10 +601,9 @@ vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses004/TestDescrip
 
 
 ####
-## Wrong number of thread references
+## Wrong number of thread references (No longer failing)
 
-vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects003/referringObjects003.java
-vmTestbase/nsk/jdi/ThreadGroupReference/threads/threads001/TestDescription.java
+# vmTestbase/nsk/jdi/ThreadGroupReference/threads/threads001/TestDescription.java
 
 
 ####
@@ -602,22 +624,29 @@ vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn001/forceEar
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn007/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
+
+###
+## Failure due to extra Thread object reference. Likely test bug. vthreads may have extra referneces.
+
 vmTestbase/nsk/jdi/stress/serial/heapwalking001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/heapwalking002/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/mixed001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/mixed002/TestDescription.java
+vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects003/referringObjects003.java
+
 
 
 ####
 ## Not able to find reason, java.lang.IllegalThreadStateException while resuming main thread.
+## (No longer failing)
 
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes005/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes006/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes007/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes005/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes006/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes007/TestDescription.java
 
 
 ####
