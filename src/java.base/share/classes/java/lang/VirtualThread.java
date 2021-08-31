@@ -77,6 +77,7 @@ class VirtualThread extends Thread {
     private static final VarHandle PARK_PERMIT;
     private static final VarHandle CARRIER_THREAD;
     private static final VarHandle LOCK;
+    private static final VarHandle NEXT_UNPARKER_ID;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
@@ -84,6 +85,7 @@ class VirtualThread extends Thread {
             PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
             CARRIER_THREAD = l.findVarHandle(VirtualThread.class, "carrierThread", Thread.class);
             LOCK = l.findVarHandle(VirtualThread.class, "lock", ReentrantLock.class);
+            NEXT_UNPARKER_ID = l.findStaticVarHandle(VirtualThread.class, "nextUnparkerId", int.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -1150,12 +1152,18 @@ class VirtualThread extends Thread {
         int poolSize = Math.max(Runtime.getRuntime().availableProcessors()/4, 1);
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(poolSize, task -> {
-                var thread = InnocuousThread.newThread("VirtualThread-unparker", task);
+                int id = nextUnparkerId();
+                var thread = InnocuousThread.newThread("VirtualThread-unparker-" + id, task);
                 thread.setDaemon(true);
                 return thread;
             });
         stpe.setRemoveOnCancelPolicy(true);
         return stpe;
+    }
+
+    private static volatile int nextUnparkerId;
+    private static int nextUnparkerId() {
+        return (int) NEXT_UNPARKER_ID.getAndAdd(1) + 1;
     }
 
     /**
