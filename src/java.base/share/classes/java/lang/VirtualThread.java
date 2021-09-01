@@ -35,6 +35,7 @@ import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -45,8 +46,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
@@ -68,6 +67,7 @@ import static java.util.concurrent.TimeUnit.*;
  * system.
  */
 class VirtualThread extends Thread {
+    private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
     private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
@@ -76,7 +76,7 @@ class VirtualThread extends Thread {
     private static final VarHandle STATE;
     private static final VarHandle PARK_PERMIT;
     private static final VarHandle CARRIER_THREAD;
-    private static final VarHandle LOCK;
+    private static final VarHandle TERMINATION;
     private static final VarHandle NEXT_UNPARKER_ID;
     static {
         try {
@@ -84,7 +84,7 @@ class VirtualThread extends Thread {
             STATE = l.findVarHandle(VirtualThread.class, "state", int.class);
             PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
             CARRIER_THREAD = l.findVarHandle(VirtualThread.class, "carrierThread", Thread.class);
-            LOCK = l.findVarHandle(VirtualThread.class, "lock", ReentrantLock.class);
+            TERMINATION = l.findVarHandle(VirtualThread.class, "termination", CountDownLatch.class);
             NEXT_UNPARKER_ID = l.findStaticVarHandle(VirtualThread.class, "nextUnparkerId", int.class);
         } catch (Exception e) {
             throw new InternalError(e);
@@ -119,9 +119,8 @@ class VirtualThread extends Thread {
     // carrier thread when mounted
     private volatile Thread carrierThread;
 
-    // lock/condition used when waiting (join or pinned)
-    private volatile ReentrantLock lock;   // created lazily
-    private Condition condition;           // created lazily while holding lock
+    // termination object when joining, created lazily if needed
+    private volatile CountDownLatch termination;
 
     /**
      * Returns the default scheduler.
@@ -431,14 +430,10 @@ class VirtualThread extends Thread {
         assert (state() == TERMINATED) && (carrierThread == null);
 
         // notify anyone waiting for this virtual thread to terminate
-        ReentrantLock lock = this.lock;
-        if (lock != null) {
-            lock.lock();
-            try {
-                getCondition().signalAll();
-            } finally {
-                lock.unlock();
-            }
+        CountDownLatch termination = this.termination;
+        if (termination != null) {
+            assert termination.getCount() == 1;
+            termination.countDown();
         }
 
         if (VirtualThreadEndEvent.isTurnedOn()) {
@@ -458,50 +453,28 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks on the carrier thread until signalled or interrupted. If the
-     * virtual thread interrupted then interrupt status will be propagated
-     * to the carrier thread so it will wakeup.
+     * Parks on the carrier thread up to the given waiting time or until unparked
+     * or interrupted. If the virtual thread is interrupted then the interrupt
+     * status will be propagated to the carrier thread so it will wakeup.
+     * @param nanos the waiting time in nanoseconds or 0 to wait indefinitely
      */
-    @ChangesCurrentThread
-    private void parkOnCarrierThread() {
+    private void parkOnCarrierThread(long nanos) {
         assert state() == PARKING;
 
         var pinnedEvent = new VirtualThreadPinnedEvent();
         pinnedEvent.begin();
 
-        // switch to carrier thread
-        Thread carrier = this.carrierThread;
-        carrier.setCurrentThread(carrier);
-
-        boolean awaitInterrupted = false;
+        setState(PINNED);
         try {
-            final ReentrantLock lock = getLock();
-            lock.lock();
-            try {
-                setState(PINNED);
-                if (!parkPermit) {
-                    // wait to be signalled or interrupted
-                    getCondition().await();
-                }
-            } catch (InterruptedException e) {
-                awaitInterrupted = true;
-            } finally {
-                lock.unlock();
-
-                // continue running on the carrier thread
-                setState(RUNNING);
-
-                // consume parking permit
-                setParkPermit(false);
+            if (!parkPermit) {
+                U.park(false, nanos);
             }
         } finally {
-            // switch back to virtual thread
-            carrier.setCurrentThread(this);
-
-            // restore interrupt status
-            if (awaitInterrupted)
-                Thread.currentThread().interrupt();
+            setState(RUNNING);
         }
+
+        // consume parking permit
+        setParkPermit(false);
 
         // commit event if enabled
         if (pinnedEvent.isEnabled()) {
@@ -572,7 +545,7 @@ class VirtualThread extends Thread {
         setState(PARKING);
         try {
             if (!yieldContinuation()) {
-                parkOnCarrierThread();
+                parkOnCarrierThread(0);
             }
         } finally {
             assert (Thread.currentThread() == this) && (state() == RUNNING);
@@ -597,15 +570,20 @@ class VirtualThread extends Thread {
 
         // park the thread for the waiting time
         if (nanos > 0) {
+            boolean yielded;
             Future<?> unparker = scheduleUnpark(nanos);
             setState(PARKING);
             try {
-                if (!yieldContinuation()) {
-                    parkOnCarrierThread();
-                }
+               yielded = yieldContinuation();
             } finally {
-                assert (Thread.currentThread() == this) && (state() == RUNNING);
+                assert (Thread.currentThread() == this)
+                        && (state() == RUNNING || state() == PARKING);
                 cancel(unparker);
+            }
+
+            // park on the carrier thread when pinned
+            if (!yielded) {
+                parkOnCarrierThread(nanos);
             }
         }
     }
@@ -671,15 +649,12 @@ class VirtualThread extends Thread {
                     submitRunContinuation(tryPush);
                 }
             } else if (s == PINNED) {
-                // signal pinned thread so that it continues
-                final ReentrantLock lock = getLock();
-                lock.lock();
-                try {
-                    if (state() == PINNED) {
-                        getCondition().signalAll();
+                // unpark carrier thread when pinned.
+                synchronized (interruptLock) {
+                    Thread carrier = carrierThread;
+                    if (carrier != null && state() == PINNED) {
+                        U.unpark(carrier);
                     }
-                } finally {
-                    lock.unlock();
                 }
             }
         }
@@ -719,25 +694,26 @@ class VirtualThread extends Thread {
      * @return true if the thread has terminated
      */
     boolean joinNanos(long nanos) throws InterruptedException {
-        final ReentrantLock lock = getLock();
-        lock.lock();
-        try {
-            final Condition condition = getCondition();
-            if (nanos == 0) {
-                while (state() != TERMINATED) {
-                    condition.await();
-                }
-                return true;
-            } else {
-                long remainingNanos = nanos;
-                while (remainingNanos > 0 && state() != TERMINATED) {
-                    remainingNanos = condition.awaitNanos(remainingNanos);
-                }
-                return (state() == TERMINATED);
+        if (state() == TERMINATED)
+            return true;
+
+        // ensure termination object exists, then re-check state
+        CountDownLatch termination = getTermination();
+        if (state() == TERMINATED)
+            return true;
+
+        // wait for virtual thread to terminate
+        if (nanos == 0) {
+            termination.await();
+        } else {
+            boolean terminated = termination.await(nanos, NANOSECONDS);
+            if (!terminated) {
+                // waiting time elapsed
+                return false;
             }
-        } finally {
-            lock.unlock();
         }
+        assert state() == TERMINATED;
+        return true;
     }
 
     @Override
@@ -938,29 +914,17 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the lock object, creating it if needed.
+     * Returns the termination object, creating it if needed.
      */
-    private ReentrantLock getLock() {
-        ReentrantLock lock = this.lock;
-        if (lock == null) {
-            lock = new ReentrantLock();
-            if (!LOCK.compareAndSet(this, null, lock)) {
-                lock = this.lock;
+    private CountDownLatch getTermination() {
+        CountDownLatch termination = this.termination;
+        if (termination == null) {
+            termination = new CountDownLatch(1);
+            if (!TERMINATION.compareAndSet(this, null, termination)) {
+                termination = this.termination;
             }
         }
-        return lock;
-    }
-
-    /**
-     * Returns the condition object for signalling, creating it if needed.
-     */
-    private Condition getCondition() {
-        assert getLock().isHeldByCurrentThread();
-        Condition condition = this.condition;
-        if (condition == null) {
-            this.condition = condition = lock.newCondition();
-        }
-        return condition;
+        return termination;
     }
 
     // -- wrappers for VarHandle methods --
@@ -1084,7 +1048,6 @@ class VirtualThread extends Thread {
      * A thread in the ForkJoinPool created by the default scheduler.
      */
     private static class CarrierThread extends ForkJoinWorkerThread {
-        private static final Unsafe UNSAFE = Unsafe.getUnsafe();
         private static final ThreadGroup CARRIER_THREADGROUP = carrierThreadGroup();
         @SuppressWarnings("removal")
         private static final AccessControlContext INNOCUOUS_ACC = innocuousACC();
@@ -1095,9 +1058,9 @@ class VirtualThread extends Thread {
 
         CarrierThread(ForkJoinPool pool) {
             super(CARRIER_THREADGROUP, pool);
-            UNSAFE.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
-            UNSAFE.putReference(this, INHERITABLETHREADLOCALS, null);
-            UNSAFE.putReferenceRelease(this, INHERITEDACCESSCONTROLCONTEXT, INNOCUOUS_ACC);
+            U.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
+            U.putReference(this, INHERITABLETHREADLOCALS, null);
+            U.putReferenceRelease(this, INHERITEDACCESSCONTROLCONTEXT, INNOCUOUS_ACC);
         }
 
         @Override
@@ -1136,11 +1099,11 @@ class VirtualThread extends Thread {
         }
 
         static {
-            CONTEXTCLASSLOADER = UNSAFE.objectFieldOffset(Thread.class,
+            CONTEXTCLASSLOADER = U.objectFieldOffset(Thread.class,
                     "contextClassLoader");
-            INHERITABLETHREADLOCALS = UNSAFE.objectFieldOffset(Thread.class,
+            INHERITABLETHREADLOCALS = U.objectFieldOffset(Thread.class,
                     "inheritableThreadLocals");
-            INHERITEDACCESSCONTROLCONTEXT = UNSAFE.objectFieldOffset(Thread.class,
+            INHERITEDACCESSCONTROLCONTEXT = U.objectFieldOffset(Thread.class,
                     "inheritedAccessControlContext");
         }
     }
