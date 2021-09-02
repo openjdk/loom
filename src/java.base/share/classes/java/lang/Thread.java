@@ -1492,7 +1492,7 @@ public class Thread implements Runnable {
      */
     public void start() {
         synchronized (this) {
-            // zero status  corresponds to state "NEW".
+            // zero status corresponds to state "NEW".
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
             start0();
@@ -1506,7 +1506,7 @@ public class Thread implements Runnable {
      */
     void start(ThreadContainer container) {
         synchronized (this) {
-            // zero status  corresponds to state "NEW".
+            // zero status corresponds to state "NEW".
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
 
@@ -1523,6 +1523,7 @@ public class Thread implements Runnable {
                 setThreadContainer(container);
 
                 start0();
+                started = true;
             } finally {
                 if (!started) {
                     container.onExit(this);
