@@ -120,9 +120,7 @@ public class JDIBase {
                 try {
                     breakpRequest = eventRManager.createBreakpointRequest(lineLocation);
                     breakpRequest.putProperty("number", property);
-                    if (thread != null && !"Virtual".equals(System.getProperty("main.wrapper"))) {
-                        breakpRequest.addThreadFilter(thread);
-                    }
+                    breakpRequest.addThreadFilter(thread);
                     breakpRequest.setSuspendPolicy(EventRequest.SUSPEND_EVENT_THREAD);
                 } catch (Exception e1) {
                     log3("ERROR: inner Exception within settingBreakpoint() : " + e1);
