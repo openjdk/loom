@@ -101,7 +101,7 @@ public class JfrEvents {
                         LockSupport.parkNanos(1);
 
                         // pinned, duration > 500ms
-                        long nanos = Duration.ofSeconds(1).toNanos();
+                        long nanos = Duration.ofSeconds(5).toNanos();
                         LockSupport.parkNanos(nanos);
                         LockSupport.parkNanos(nanos);
                     }
@@ -147,15 +147,13 @@ public class JfrEvents {
                 try {
                     LockSupport.unpark(thread);
                     assertTrue(false);
-                } catch (RejectedExecutionException expected) {
-                }
+                } catch (RejectedExecutionException expected) { }
 
                 // start another thread, it should fail and an event should be recorded
                 try {
                     factory.newThread(LockSupport::park).start();
                     throw new RuntimeException("RejectedExecutionException expected");
-                } catch (RejectedExecutionException expected) {
-                }
+                } catch (RejectedExecutionException expected) { }
             } finally {
                 recording.stop();
             }
