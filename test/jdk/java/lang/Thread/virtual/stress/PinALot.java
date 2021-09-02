@@ -35,6 +35,7 @@
  */
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
@@ -61,8 +62,8 @@ public class PinALot {
 
         boolean terminated;
         do {
-            terminated = thread.join(Duration.ofMillis(500));
-            System.out.println(count.get());
+            terminated = thread.join(Duration.ofSeconds(1));
+            System.out.println(Instant.now() + " => " + count.get());
         } while (!terminated);
 
         int countValue = count.get();

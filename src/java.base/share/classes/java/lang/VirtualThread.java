@@ -456,9 +456,10 @@ class VirtualThread extends Thread {
      * Parks on the carrier thread up to the given waiting time or until unparked
      * or interrupted. If the virtual thread is interrupted then the interrupt
      * status will be propagated to the carrier thread so it will wakeup.
-     * @param nanos the waiting time in nanoseconds or 0 to wait indefinitely
+     * @param timed true for a timed park, false for untimed
+     * @param nanos the waiting time in nanoseconds
      */
-    private void parkOnCarrierThread(long nanos) {
+    private void parkOnCarrierThread(boolean timed, long nanos) {
         assert state() == PARKING;
 
         var pinnedEvent = new VirtualThreadPinnedEvent();
@@ -467,7 +468,11 @@ class VirtualThread extends Thread {
         setState(PINNED);
         try {
             if (!parkPermit) {
-                U.park(false, nanos);
+                if (!timed) {
+                    U.park(false, 0);
+                } else if (nanos > 0) {
+                    U.park(false, nanos);
+                }
             }
         } finally {
             setState(RUNNING);
@@ -545,7 +550,8 @@ class VirtualThread extends Thread {
         setState(PARKING);
         try {
             if (!yieldContinuation()) {
-                parkOnCarrierThread(0);
+                // park on the carrier thread when pinned
+                parkOnCarrierThread(false, 0);
             }
         } finally {
             assert (Thread.currentThread() == this) && (state() == RUNNING);
@@ -570,6 +576,8 @@ class VirtualThread extends Thread {
 
         // park the thread for the waiting time
         if (nanos > 0) {
+           long startTime = System.nanoTime();
+
             boolean yielded;
             Future<?> unparker = scheduleUnpark(nanos);
             setState(PARKING);
@@ -581,9 +589,12 @@ class VirtualThread extends Thread {
                 cancel(unparker);
             }
 
-            // park on the carrier thread when pinned
+            // park on the carrier thread for remaining time when pinned
             if (!yielded) {
-                parkOnCarrierThread(nanos);
+                long deadline = startTime + nanos;
+                if (deadline < 0L)
+                    deadline = Long.MAX_VALUE;
+                parkOnCarrierThread(true, deadline - System.nanoTime());
             }
         }
     }
