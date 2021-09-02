@@ -463,20 +463,22 @@ vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 ## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
 
 vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
+vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
+
+###
+## Unknown (no longer failing)
+# vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses004/TestDescription.java
 
 
 ####
-## Exception wasn't caught by jdb
+## There is a java.lang.reflect.InvocationTargetException being thrown during
+## the wrapper invocation of the test, which is not suppose to happen. However,
+## the debuggee does seem to launch and throw the expected exception, but it also
+## appears that by the time the test is notified of the exception, the debuggee
+## is now in the MainWrapper.main() code, so the "locals" command fails due to lack of -g info.
 
-vmTestbase/nsk/jdb/set/set002/set002.java
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
-
-
-####
-## Exception wasn't caught by jdb
-
 vmTestbase/nsk/jdb/where/where005/where005.java
-
 
 ####
 ## NSK JDWP Tests failing with wrapper
@@ -489,15 +491,15 @@ vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsSta
 
 
 ####
-## Can't find virtual thread by it's name
+## Can't find virtual thread by it's name (no longer failing)
 
-vmTestbase/nsk/jdwp/ReferenceType/Instances/instances001/instances001.java
+#vmTestbase/nsk/jdwp/ReferenceType/Instances/instances001/instances001.java
 
 
 ####
-## VirtualThread is not a JDWP.Tag.THREAD but JDWP.Tag.OBJECT
+## VirtualThread is not a JDWP.Tag.THREAD but JDWP.Tag.OBJECT (no longer failing)
 
-vmTestbase/nsk/jdwp/ArrayReference/GetValues/getvalues002/TestDescription.java
+#vmTestbase/nsk/jdwp/ArrayReference/GetValues/getvalues002/TestDescription.java
 
 
 ####
@@ -537,27 +539,42 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
 
 ####
-## Failing with kernel thread wrapper, exception has incorrect location, and event sent for 2 main threads
+## The test expects an exception to be uncaught, but it seems to be caught by
+## the lambda expression in MainWrapper.main(), and by LambdaForm code generated
+## during the Method.invoke() call.
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
+
+####
+## This is a test bug. After the ThreadStart event is sent for "main", the vthread wrapper
+## support renames "main" to "old-m-a-i-n", and a new "main" thread is started (as a vthread).
+## This causes the test to see two ThreadStart events for a thread called "main", which
+## it complains about and fails, even though they are for two different threads.
+
 vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
 
 ####
-## Requires communicationBreakpoint to be sent to "main"
+## Occasionally fails with:
+##  Got ThreadStartEvent for wrong thread: ThreadStartEvent in thread ForkJoinPool-1-worker-15
+## This is likely the result of a spurious cthread startup that the test needs to account for.
 
 vmTestbase/nsk/jdi/Event/request/request001/TestDescription.java
-vmTestbase/nsk/jdi/EventIterator/nextEvent/nextevent001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/enable/enable001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/hashCode/hashcode001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/isEnabled/isenabled001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/setSuspendPolicy/setsuspendpolicy001/TestDescription.java
-vmTestbase/nsk/jdi/LocatableEvent/thread/thread001/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects001/referringObjects001.java
 
 ####
-## Need to fix settingBreakpoint and add JDIBase
+## Requires communicationBreakpoint to be sent to "main" (no longer failing)
 
-vmTestbase/nsk/jdi/EventRequest/disable/disable001/TestDescription.java
+#vmTestbase/nsk/jdi/EventIterator/nextEvent/nextevent001/TestDescription.java
+#vmTestbase/nsk/jdi/EventRequest/enable/enable001/TestDescription.java
+#vmTestbase/nsk/jdi/EventRequest/hashCode/hashcode001/TestDescription.java
+#vmTestbase/nsk/jdi/EventRequest/isEnabled/isenabled001/TestDescription.java
+#vmTestbase/nsk/jdi/EventRequest/setSuspendPolicy/setsuspendpolicy001/TestDescription.java
+#vmTestbase/nsk/jdi/LocatableEvent/thread/thread001/TestDescription.java
+#vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects001/referringObjects001.java
+
+####
+## Need to fix settingBreakpoint and add JDIBase (no longer failing)
+
+#vmTestbase/nsk/jdi/EventRequest/disable/disable001/TestDescription.java
 
 ###
 ## These tests fail due to calling invokeMethod() with the INVOKE_SINGLE_THREADED flag while
@@ -572,19 +589,16 @@ vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod012/TestDescription.
 vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod011/TestDescription.java
 vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod012/TestDescription.java
 
-
-###
-## JVMTI PropFrame() is returning INVALID_THREAD because vthreads are not supported.
-vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
-
 ###
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
 vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
 vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
+vmTestbase/nsk/jdb/set/set002/set002.java
 
-####
-## Invalid opertations with virtual threads
+###
+## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
 
+vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc01x002/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc02x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc02x002/TestDescription.java
@@ -593,11 +607,22 @@ vmTestbase/nsk/jdi/BScenarios/hotswap/tc04x002/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc06x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc08x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc10x002/TestDescription.java
+
+####
+## forceEarlyReturn in the debug agent is purposefully failing with INVALID_THREAD.
+## It should work with vthreads that are mounted and suspended, so we need to
+## enable this in the agent and see how it does.
+
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn002/forceEarlyReturn002.java
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEarlyReturn014.java
+vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
+vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
+
+###
+## asserts !evinfo->is_vthread in handleAppResumeCompletion(). If this assert is removed
+## then it asserts "node->resumeFrameDepth == 0" in trackAppResume(), so it looks like
+## there is some issue with the JDWP "app resume" support.
 vmTestbase/nsk/jdi/ThreadReference/interrupt/interrupt001/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses004/TestDescription.java
 
 
 ####
@@ -612,18 +637,19 @@ vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses004/TestDescrip
 vmTestbase/nsk/jdi/EventRequest/addCountFilter/addcountfilter001/TestDescription.java
 vmTestbase/nsk/jdi/EventRequest/setEnabled/setenabled001/TestDescription.java
 
-
 ####
-## Intermittent crashes
+## Extra references returned by ClassLoaderReference.referringObjects(). Probably test bug.
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
-vmTestbase/nsk/jdi/ReferenceType/instances/instances001/instances001.java
-vmTestbase/nsk/jdi/ReferenceType/instances/instances003/instances003.java
-vmTestbase/nsk/jdi/ReferenceType/instances/instances004/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn001/forceEarlyReturn001.java
-vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn007/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
+
+####
+## Intermittent crashes (no longer failing)
+
+#vmTestbase/nsk/jdi/ReferenceType/instances/instances001/instances001.java
+#vmTestbase/nsk/jdi/ReferenceType/instances/instances003/instances003.java
+#vmTestbase/nsk/jdi/ReferenceType/instances/instances004/TestDescription.java
+#vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn001/forceEarlyReturn001.java
+#vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn007/TestDescription.java
 
 ###
 ## Failure due to extra Thread object reference. Likely test bug. vthreads may have extra referneces.
