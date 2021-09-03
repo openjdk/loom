@@ -465,11 +465,6 @@ vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
 
-###
-## Unknown (no longer failing)
-# vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses004/TestDescription.java
-
-
 ####
 ## There is a java.lang.reflect.InvocationTargetException being thrown during
 ## the wrapper invocation of the test, which is not suppose to happen. However,
@@ -480,6 +475,7 @@ vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescrip
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
 vmTestbase/nsk/jdb/where/where005/where005.java
 
+
 ####
 ## NSK JDWP Tests failing with wrapper
 
@@ -488,18 +484,6 @@ vmTestbase/nsk/jdb/where/where005/where005.java
 ## having a different bottom of stack.
 
 vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsStackDepthInfo001/ownedMonitorsStackDepthInfo001.java
-
-
-####
-## Can't find virtual thread by it's name (no longer failing)
-
-#vmTestbase/nsk/jdwp/ReferenceType/Instances/instances001/instances001.java
-
-
-####
-## VirtualThread is not a JDWP.Tag.THREAD but JDWP.Tag.OBJECT (no longer failing)
-
-#vmTestbase/nsk/jdwp/ArrayReference/GetValues/getvalues002/TestDescription.java
 
 
 ####
@@ -524,8 +508,8 @@ vmTestbase/nsk/jvmti/SetLocalVariable/setlocal002/TestDescription.java
 vmTestbase/nsk/jvmti/SetLocalVariable/setlocal001/TestDescription.java
 vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
 
-
-# Test fails because expect to find vthread in GetAllThreads
+####
+## Test fails because expect to find vthread in GetAllThreads
 vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
 
 ####
@@ -536,7 +520,6 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
 ####
 ## NSK JDI tests failing with wrapper
-
 
 ####
 ## The test expects an exception to be uncaught, but it seems to be caught by
@@ -560,23 +543,9 @@ vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
 
 vmTestbase/nsk/jdi/Event/request/request001/TestDescription.java
 
-####
-## Requires communicationBreakpoint to be sent to "main" (no longer failing)
 
-#vmTestbase/nsk/jdi/EventIterator/nextEvent/nextevent001/TestDescription.java
-#vmTestbase/nsk/jdi/EventRequest/enable/enable001/TestDescription.java
-#vmTestbase/nsk/jdi/EventRequest/hashCode/hashcode001/TestDescription.java
-#vmTestbase/nsk/jdi/EventRequest/isEnabled/isenabled001/TestDescription.java
-#vmTestbase/nsk/jdi/EventRequest/setSuspendPolicy/setsuspendpolicy001/TestDescription.java
-#vmTestbase/nsk/jdi/LocatableEvent/thread/thread001/TestDescription.java
-#vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects001/referringObjects001.java
 
 ####
-## Need to fix settingBreakpoint and add JDIBase (no longer failing)
-
-#vmTestbase/nsk/jdi/EventRequest/disable/disable001/TestDescription.java
-
-###
 ## These tests fail due to calling invokeMethod() with the INVOKE_SINGLE_THREADED flag while
 ## all threads are suspended, and doing a Thread.sleep() in the invoked method. The vthread
 ## can't properly unpark without support from a VirtualThread-unparker thread,
@@ -589,13 +558,14 @@ vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod012/TestDescription.
 vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod011/TestDescription.java
 vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod012/TestDescription.java
 
-###
+####
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
+
 vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
 vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
 vmTestbase/nsk/jdb/set/set002/set002.java
 
-###
+####
 ## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
 
 vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
@@ -618,12 +588,12 @@ vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEar
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
-###
+####
 ## asserts !evinfo->is_vthread in handleAppResumeCompletion(). If this assert is removed
 ## then it asserts "node->resumeFrameDepth == 0" in trackAppResume(), so it looks like
 ## there is some issue with the JDWP "app resume" support.
-vmTestbase/nsk/jdi/ThreadReference/interrupt/interrupt001/TestDescription.java
 
+vmTestbase/nsk/jdi/ThreadReference/interrupt/interrupt001/TestDescription.java
 
 ####
 ## Wrong number of thread references (No longer failing)
@@ -643,15 +613,6 @@ vmTestbase/nsk/jdi/EventRequest/setEnabled/setenabled001/TestDescription.java
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 
 ####
-## Intermittent crashes (no longer failing)
-
-#vmTestbase/nsk/jdi/ReferenceType/instances/instances001/instances001.java
-#vmTestbase/nsk/jdi/ReferenceType/instances/instances003/instances003.java
-#vmTestbase/nsk/jdi/ReferenceType/instances/instances004/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn001/forceEarlyReturn001.java
-#vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn007/TestDescription.java
-
-###
 ## Failure due to extra Thread object reference. Likely test bug. vthreads may have extra referneces.
 
 vmTestbase/nsk/jdi/stress/serial/heapwalking001/TestDescription.java
@@ -661,23 +622,8 @@ vmTestbase/nsk/jdi/stress/serial/mixed002/TestDescription.java
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects003/referringObjects003.java
 
 
-
-####
-## Not able to find reason, java.lang.IllegalThreadStateException while resuming main thread.
-## (No longer failing)
-
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes005/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes006/TestDescription.java
-#vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes007/TestDescription.java
-
-
 ####
 ## NSK JMX Tests
-
 
 ####
 ## Unsupported functionality
