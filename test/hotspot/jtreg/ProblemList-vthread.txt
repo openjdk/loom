@@ -544,20 +544,6 @@ vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
 vmTestbase/nsk/jdi/Event/request/request001/TestDescription.java
 
 
-
-####
-## These tests fail due to calling invokeMethod() with the INVOKE_SINGLE_THREADED flag while
-## all threads are suspended, and doing a Thread.sleep() in the invoked method. The vthread
-## can't properly unpark without support from a VirtualThread-unparker thread,
-## which is suspended. We'll likely decide to consdier this a test bug since invokeMethod()
-## alread warns about potential deadlocks when using INVOKE_SINGLE_THREADED.
-
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod010/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod011/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/invokeMethod/invokemethod012/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod011/TestDescription.java
-vmTestbase/nsk/jdi/ClassType/invokeMethod/invokemethod012/TestDescription.java
-
 ####
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
 
