@@ -565,9 +565,7 @@ vmTestbase/nsk/jdi/BScenarios/hotswap/tc08x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc10x002/TestDescription.java
 
 ####
-## forceEarlyReturn in the debug agent is purposefully failing with INVALID_THREAD.
-## It should work with vthreads that are mounted and suspended, so we need to
-## enable this in the agent and see how it does.
+## JVMTI ForceEarlyReturn not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
 
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn002/forceEarlyReturn002.java
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEarlyReturn014.java
