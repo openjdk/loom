@@ -573,13 +573,6 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 ####
-## asserts !evinfo->is_vthread in handleAppResumeCompletion(). If this assert is removed
-## then it asserts "node->resumeFrameDepth == 0" in trackAppResume(), so it looks like
-## there is some issue with the JDWP "app resume" support.
-
-vmTestbase/nsk/jdi/ThreadReference/interrupt/interrupt001/TestDescription.java
-
-####
 ## Wrong number of thread references (No longer failing)
 
 # vmTestbase/nsk/jdi/ThreadGroupReference/threads/threads001/TestDescription.java

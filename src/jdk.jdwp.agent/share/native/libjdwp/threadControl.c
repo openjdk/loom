@@ -731,6 +731,11 @@ pendingAppResume(jboolean includeSuspended)
             }
         }
         node = node->next;
+        if (node == NULL && list == &runningThreads) {
+            // We need to look at runningVThreads after we are done with runningThreads.
+            list = &runningVThreads;
+            node = list->first;
+        }
     }
     return JNI_FALSE;
 }
@@ -763,14 +768,11 @@ handleAppResumeCompletion(JNIEnv *env, EventInfo *evinfo,
     ThreadNode *node;
     jthread     thread;
 
-    /* vthread fixme: it's unclear how this is used and if anything special needs to be done for vthreads. */
-    JDI_ASSERT(!evinfo->is_vthread);
-
     thread = evinfo->thread;
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         if (node->resumeFrameDepth > 0) {
             jint compareDepth = getStackDepth(thread);
