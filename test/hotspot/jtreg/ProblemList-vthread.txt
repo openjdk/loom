@@ -130,6 +130,7 @@ serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java
 serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java
+serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
 
 ####
 # JVMTI tests failing to find thread
@@ -573,30 +574,9 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 ####
-## Wrong number of thread references (No longer failing)
-
-# vmTestbase/nsk/jdi/ThreadGroupReference/threads/threads001/TestDescription.java
-
-
-####
-## Existing issues, need to re-check
-
-vmTestbase/nsk/jdi/EventRequest/addCountFilter/addcountfilter001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/setEnabled/setenabled001/TestDescription.java
-
-####
 ## Extra references returned by ClassLoaderReference.referringObjects(). Probably test bug.
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
-
-####
-## Failure due to extra Thread object reference. Likely test bug. vthreads may have extra referneces.
-
-vmTestbase/nsk/jdi/stress/serial/heapwalking001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/heapwalking002/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/mixed001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/mixed002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects003/referringObjects003.java
 
 
 ####
