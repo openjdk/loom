@@ -28,6 +28,11 @@ package sun.management;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import javax.management.ObjectName;
 import java.util.Objects;
 
@@ -226,7 +231,7 @@ public class ThreadImpl implements ThreadMXBean {
 
     private boolean verifyCurrentThreadCpuTime() {
         // check if Thread CPU time measurement is supported.
-        if (Thread.currentThread().isVirtual()) {
+        if (isVirtual(Thread.currentThread())) {
             throw new UnsupportedOperationException("Not supported by virtual threads");
         }
         if (!isCurrentThreadCpuTimeSupported()) {
@@ -288,7 +293,7 @@ public class ThreadImpl implements ThreadMXBean {
                 long id = ids[0];
                 Thread thread = Thread.currentThread();
                 if (id == thread.getId()) {
-                    if (thread.isVirtual()) {
+                    if (isVirtual(thread)) {
                         times[0] = -1;
                     } else {
                         times[0] = getThreadTotalCpuTime0(0);
@@ -331,7 +336,7 @@ public class ThreadImpl implements ThreadMXBean {
                 long id = ids[0];
                 Thread thread = Thread.currentThread();
                 if (id == thread.getId()) {
-                    if (thread.isVirtual()) {
+                    if (isVirtual(thread)) {
                         times[0] = -1;
                     } else {
                         times[0] = getThreadUserCpuTime0(0);
@@ -365,7 +370,7 @@ public class ThreadImpl implements ThreadMXBean {
     }
 
     protected long getCurrentThreadAllocatedBytes() {
-        if (isThreadAllocatedMemoryEnabled() && !Thread.currentThread().isVirtual()) {
+        if (isThreadAllocatedMemoryEnabled() && !isVirtual(Thread.currentThread())) {
             return getThreadAllocatedMemory0(0);
         }
         return -1;
@@ -381,7 +386,7 @@ public class ThreadImpl implements ThreadMXBean {
         if (verified) {
             Thread thread = Thread.currentThread();
             if (id == thread.getId()) {
-                if (thread.isVirtual()) {
+                if (isVirtual(thread)) {
                     return -1L;
                 } else {
                     return getThreadAllocatedMemory0(0);
@@ -573,4 +578,27 @@ public class ThreadImpl implements ThreadMXBean {
         return Util.newObjectName(ManagementFactory.THREAD_MXBEAN_NAME);
     }
 
+    /**
+     * Returns true if the given Thread is a virutal thread.
+     */
+    private static boolean isVirtual(Thread thread) {
+        try {
+            return (boolean) IS_VIRTUAL.invoke(thread);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new InternalError(e);
+        }
+    }
+
+    static final Method IS_VIRTUAL;
+    static {
+        try {
+            PrivilegedExceptionAction<Method> pa = () -> Thread.class.getMethod("isVirtual");
+            @SuppressWarnings("removal")
+            Method m = AccessController.doPrivileged(pa);
+            IS_VIRTUAL = m;
+        } catch (PrivilegedActionException e) {
+            throw new InternalError(e);
+        }
+
+    }
 }
