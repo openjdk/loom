@@ -98,13 +98,13 @@ public class JfrEvents {
                     Object lock = new Object();
                     synchronized (lock) {
                         // pinned, duration < 500ms
-                        LockSupport.parkNanos(1);
+                        Thread.sleep(1);
 
                         // pinned, duration > 500ms
-                        long nanos = Duration.ofSeconds(5).toNanos();
-                        LockSupport.parkNanos(nanos);
-                        LockSupport.parkNanos(nanos);
+                        Thread.sleep(Duration.ofSeconds(3));
+                        Thread.sleep(Duration.ofSeconds(3));
                     }
+                    return null;
                 });
             } finally {
                 recording.stop();
