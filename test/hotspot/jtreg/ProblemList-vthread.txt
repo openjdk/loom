@@ -577,15 +577,6 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 
-####
-## Failure due to extra Thread object reference. Likely test bug. vthreads may have extra referneces.
-
-vmTestbase/nsk/jdi/stress/serial/heapwalking001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/heapwalking002/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/mixed001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/mixed002/TestDescription.java
-vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects003/referringObjects003.java
-
 
 ####
 ## NSK JMX Tests
