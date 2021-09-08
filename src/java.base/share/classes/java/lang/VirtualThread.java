@@ -442,12 +442,11 @@ class VirtualThread extends Thread {
             event.commit();
         }
 
-        // notify container
-        threadContainer().onExit(this);
-
-        // clear references to thread locals, this method is assumed to be
-        // called on its carrier thread on which it terminated.
         if (executed) {
+            // notify container if thread executed
+            threadContainer().onExit(this);
+
+            // clear references to thread locals
             clearReferences();
         }
     }
@@ -506,6 +505,9 @@ class VirtualThread extends Thread {
             // inherit scope locals from structured container
             Object bindings = container.scopeLocalBindings();
             if (bindings != null) {
+                if (Thread.currentThread().scopeLocalBindings != bindings) {
+                    throw new IllegalStateException("Scope local bindings have changed");
+                }
                 this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
             }
 
@@ -523,6 +525,7 @@ class VirtualThread extends Thread {
         } finally {
             if (!started) {
                 setState(TERMINATED);
+                container.onExit(this);
                 afterTerminate(/*executed*/ false);
             }
         }

@@ -324,12 +324,6 @@ public class Thread implements Runnable {
      */
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
-    /**
-     * Characteristic value signifying that {@link ScopeLocal#inheritableForType(Class)
-     * inheritable-scope-locals} are not inherited from the constructing thread.
-     */
-    static final int NO_INHERIT_SCOPE_LOCALS = 1 << 3;
-
     // current inner-most continuation
     private Continuation cont;
 
@@ -1516,6 +1510,9 @@ public class Thread implements Runnable {
                 // inherit scope locals from structured container
                 Object bindings = container.scopeLocalBindings();
                 if (bindings != null) {
+                    if (Thread.currentThread().scopeLocalBindings != bindings) {
+                        throw new IllegalStateException("Scope local bindings have changed");
+                    }
                     this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
                 }
 
