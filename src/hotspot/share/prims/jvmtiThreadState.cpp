@@ -33,7 +33,9 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/safepointVerifiers.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/vframe.hpp"
+#include "prims/jvmtiEnvBase.hpp"
 
 // marker for when the stack depth has been reset and is now unknown.
 // any negative number would work but small ones might obscure an
@@ -232,8 +234,22 @@ JvmtiVTMTDisabler::disable_VTMT() {
   _VTMT_disable_count++;
 
   // Block while some mount/unmount transitions are in progress.
+  int attempts = 10;
   while (_VTMT_count > 0) {
-    ml.wait();
+    ml.wait(1000);
+    attempts--;
+    if (attempts <= 0) {
+      tty->print_cr("VTMT disabled with count = %d. ThreadList: \n", _VTMT_count);
+      for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
+        tty->print_cr("Thread %s VTMT state %s. Info:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
+        // Handshake with target
+        ResourceMark rm(thread);
+        HandleMark   hm(thread);
+        PrintStackTraceClosure pstc;
+        Handshake::execute(&pstc, java_thread);
+      }
+      guarantee(--attempts > 0, "stuck in VTMT disabler.");
+    }
   }
   assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
   thread->set_is_VTMT_disabler(true);
