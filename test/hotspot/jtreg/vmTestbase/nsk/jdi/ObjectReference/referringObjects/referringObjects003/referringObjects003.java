@@ -170,7 +170,7 @@ public class referringObjects003 extends HeapwalkingDebugger {
         expectedCount = 1 + HeapwalkingDebuggee.includedIntoReferrersCountTypes.size();
 
         // 1 referrer is debugee object + 'includedIntoReferrersCountTypes.size()' referrers
-        // was additionally created (there is no longer a ThreadGroup reference)
+        // was additionally created (there is no longer a reference from ThreadGroup)
         checkThreadReferrersCount(threads, expectedCount);
 
         pipe.println(referringObjects003a.COMMAND_STOP_THREADS);
