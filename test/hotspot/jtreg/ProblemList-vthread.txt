@@ -573,18 +573,6 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 ####
-## Wrong number of thread references (No longer failing)
-
-# vmTestbase/nsk/jdi/ThreadGroupReference/threads/threads001/TestDescription.java
-
-
-####
-## Existing issues, need to re-check
-
-vmTestbase/nsk/jdi/EventRequest/addCountFilter/addcountfilter001/TestDescription.java
-vmTestbase/nsk/jdi/EventRequest/setEnabled/setenabled001/TestDescription.java
-
-####
 ## Extra references returned by ClassLoaderReference.referringObjects(). Probably test bug.
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
