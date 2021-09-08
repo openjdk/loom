@@ -130,6 +130,7 @@ serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java
 serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java
+serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
 
 ####
 # JVMTI tests failing to find thread
