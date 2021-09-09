@@ -560,7 +560,9 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 ####
-## Extra references returned by ClassLoaderReference.referringObjects(). Probably test bug.
+## Extra references returned by ClassObjectReference.referringObjects(). The extra references
+## are all from java.lang.invoke.MethodType instances, and are due to some rework of Class::newInstance
+## for loom. This issue should go away once JEP 416 is pushed.
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 
