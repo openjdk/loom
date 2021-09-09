@@ -467,11 +467,12 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
 
 ####
-## There is a java.lang.reflect.InvocationTargetException being thrown during
-## the wrapper invocation of the test, which is not suppose to happen. However,
-## the debuggee does seem to launch and throw the expected exception, but it also
-## appears that by the time the test is notified of the exception, the debuggee
-## is now in the MainWrapper.main() code, so the "locals" command fails due to lack of -g info.
+## The test expects an NPE to be uncaught. For vthreads the code in
+## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
+## that has an exception handler. So when the test purposefully throws an NPE,
+## jdb detects that it will be caught, so does not generate the
+## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
+## expects. This might be fixed by JEP 416 when pushed.
 
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
 vmTestbase/nsk/jdb/where/where005/where005.java
@@ -519,7 +520,7 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 ####
 ## The test expects an exception to be uncaught, but it seems to be caught by
 ## the lambda expression in MainWrapper.main(), and by LambdaForm code generated
-## during the Method.invoke() call.
+## during the Method.invoke() call. This might be fixed by JEP 416 when pushed.
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 
