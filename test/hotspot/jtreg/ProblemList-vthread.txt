@@ -480,12 +480,6 @@ vmTestbase/nsk/jdb/where/where005/where005.java
 ####
 ## NSK JDWP Tests failing with wrapper
 
-####
-## Incorrect stack depth for wrapped thread. Probably test bug for not accounting for vthreads
-## having a different bottom of stack.
-
-vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsStackDepthInfo001/ownedMonitorsStackDepthInfo001.java
-
 
 ####
 ## NSK JVMTI tests failing with wrapper
