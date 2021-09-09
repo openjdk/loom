@@ -457,31 +457,6 @@ runtime/ClassUnload/ConstantPoolDependsTest.java
 vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
-##########
-## NSK JDB Tests failing with wrapper
-
-####
-## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
-
-vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
-
-####
-## The test expects an NPE to be uncaught. For vthreads the code in
-## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
-## that has an exception handler. So when the test purposefully throws an NPE,
-## jdb detects that it will be caught, so does not generate the
-## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
-## expects. This might be fixed by JEP 416 when pushed.
-
-vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
-vmTestbase/nsk/jdb/where/where005/where005.java
-
-
-####
-## NSK JDWP Tests failing with wrapper
-
-
 ####
 ## NSK JVMTI tests failing with wrapper
 
@@ -512,6 +487,31 @@ vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
 ## Breakpoint expects name of virtual thread which is set by test.
 
 vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
+
+
+####
+## NSK JDWP Tests failing with wrapper
+
+
+##########
+## NSK JDB Tests failing with wrapper
+
+####
+## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
+
+vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
+vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
+
+####
+## The test expects an NPE to be uncaught. For vthreads the code in
+## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
+## that has an exception handler. So when the test purposefully throws an NPE,
+## jdb detects that it will be caught, so does not generate the
+## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
+## expects. This might be fixed by JEP 416 when pushed.
+
+vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
+vmTestbase/nsk/jdb/where/where005/where005.java
 
 
 ####
