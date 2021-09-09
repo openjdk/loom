@@ -524,14 +524,6 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 
 ####
-## This is a test bug. After the ThreadStart event is sent for "main", the vthread wrapper
-## support renames "main" to "old-m-a-i-n", and a new "main" thread is started (as a vthread).
-## This causes the test to see two ThreadStart events for a thread called "main", which
-## it complains about and fails, even though they are for two different threads.
-
-vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
-
-####
 ## Occasionally fails with:
 ##  Got ThreadStartEvent for wrong thread: ThreadStartEvent in thread ForkJoinPool-1-worker-15
 ## This is likely the result of a spurious cthread startup that the test needs to account for.
