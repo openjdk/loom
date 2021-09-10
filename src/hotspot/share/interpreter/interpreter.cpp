@@ -47,19 +47,22 @@
 # define __ _masm->
 
 
-//------------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Implementation of InterpreterCodelet
 
 void InterpreterCodelet::initialize(const char* description, Kind kind, Bytecodes::Code bytecode) {
-  _description       = description;
-  _kind              = kind;
-  _bytecode          = bytecode;
+  _description = description;
+  _kind        = kind;
+  _bytecode    = bytecode;
+#ifndef PRODUCT
+  AsmRemarks* arp = new(&_asm_remarks) AsmRemarks();
+  DbgStrings* dsp = new(&_dbg_strings) DbgStrings();
+  postcond(arp == &_asm_remarks);
+  postcond(dsp == &_dbg_strings);
+#endif
 }
 
-
-void InterpreterCodelet::verify() {
-}
-
+void InterpreterCodelet::verify() {}
 
 void InterpreterCodelet::print_on(outputStream* st) const {
   ttyLocker ttyl;
@@ -76,7 +79,7 @@ void InterpreterCodelet::print_on(outputStream* st) const {
 
   if (PrintInterpreter) {
     st->cr();
-    Disassembler::decode(code_begin(), code_end(), st DEBUG_ONLY(COMMA &_strings));
+    Disassembler::decode(code_begin(), code_end(), st NOT_PRODUCT(COMMA &_asm_remarks));
   }
 }
 
@@ -106,9 +109,13 @@ CodeletMark::~CodeletMark() {
 
   // Commit Codelet.
   int committed_code_size = (*_masm)->code()->pure_insts_size();
-  if (committed_code_size) {
-    CodeStrings cs NOT_PRODUCT(= (*_masm)->code()->strings());
-    AbstractInterpreter::code()->commit(committed_code_size, cs);
+  if (committed_code_size > 0) {
+    // This is  the ONE place where  we pickup any assembly  remarks and debug
+    // strings, and propagate these to the codelet.
+    NOT_PRODUCT(_clet->use_remarks((*_masm)->code()->asm_remarks()));
+    NOT_PRODUCT(_clet->use_strings((*_masm)->code()->dbg_strings()));
+
+    AbstractInterpreter::code()->commit(committed_code_size);
   }
   // Make sure nobody can use _masm outside a CodeletMark lifespan.
   *_masm = NULL;

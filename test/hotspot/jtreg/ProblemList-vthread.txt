@@ -55,7 +55,8 @@ serviceability/jvmti/events/FieldAccess/fieldacc04/fieldacc04.java
 serviceability/jvmti/events/FieldModification/fieldmod01/fieldmod01.java
 serviceability/jvmti/events/FieldModification/fieldmod02/fieldmod02.java
 serviceability/jvmti/events/FramePop/framepop01/framepop01.java
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id0
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
 serviceability/jvmti/events/MethodEntry/mentry01/mentry01.java
 serviceability/jvmti/events/MethodEntry/mentry02/mentry02.java
 serviceability/jvmti/events/MethodExit/mexit01/mexit01.java
@@ -457,36 +458,6 @@ runtime/ClassUnload/ConstantPoolDependsTest.java
 vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
-##########
-## NSK JDB Tests failing with wrapper
-
-####
-## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
-
-vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
-
-####
-## There is a java.lang.reflect.InvocationTargetException being thrown during
-## the wrapper invocation of the test, which is not suppose to happen. However,
-## the debuggee does seem to launch and throw the expected exception, but it also
-## appears that by the time the test is notified of the exception, the debuggee
-## is now in the MainWrapper.main() code, so the "locals" command fails due to lack of -g info.
-
-vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
-vmTestbase/nsk/jdb/where/where005/where005.java
-
-
-####
-## NSK JDWP Tests failing with wrapper
-
-####
-## Incorrect stack depth for wrapped thread. Probably test bug for not accounting for vthreads
-## having a different bottom of stack.
-
-vmTestbase/nsk/jdwp/ThreadReference/OwnedMonitorsStackDepthInfo/ownedMonitorsStackDepthInfo001/ownedMonitorsStackDepthInfo001.java
-
-
 ####
 ## NSK JVMTI tests failing with wrapper
 
@@ -520,22 +491,39 @@ vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
 
 ####
+## NSK JDWP Tests failing with wrapper
+
+
+##########
+## NSK JDB Tests failing with wrapper
+
+####
+## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
+
+vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
+vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
+
+####
+## The test expects an NPE to be uncaught. For vthreads the code in
+## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
+## that has an exception handler. So when the test purposefully throws an NPE,
+## jdb detects that it will be caught, so does not generate the
+## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
+## expects. This might be fixed by JEP 416 when pushed.
+
+vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
+vmTestbase/nsk/jdb/where/where005/where005.java
+
+
+####
 ## NSK JDI tests failing with wrapper
 
 ####
 ## The test expects an exception to be uncaught, but it seems to be caught by
 ## the lambda expression in MainWrapper.main(), and by LambdaForm code generated
-## during the Method.invoke() call.
+## during the Method.invoke() call. This might be fixed by JEP 416 when pushed.
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
-
-####
-## This is a test bug. After the ThreadStart event is sent for "main", the vthread wrapper
-## support renames "main" to "old-m-a-i-n", and a new "main" thread is started (as a vthread).
-## This causes the test to see two ThreadStart events for a thread called "main", which
-## it complains about and fails, even though they are for two different threads.
-
-vmTestbase/nsk/jdi/ThreadStartEvent/thread/thread001/TestDescription.java
 
 ####
 ## Occasionally fails with:
@@ -574,7 +562,9 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 
 ####
-## Extra references returned by ClassLoaderReference.referringObjects(). Probably test bug.
+## Extra references returned by ClassObjectReference.referringObjects(). The extra references
+## are all from java.lang.invoke.MethodType instances, and are due to some rework of Class::newInstance
+## for loom. This issue should go away once JEP 416 is pushed.
 
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 

@@ -41,32 +41,15 @@
  * @library /test/lib
  * @run main/othervm/native -agentlib:framepop02 framepop02 platform
  */
-
 /*
  * @test
- *
- * @summary converted from VM Testbase nsk/jvmti/FramePop/framepop002.
- * VM Testbase keywords: [quick, jpda, jvmti, noras]
- * VM Testbase readme:
- * DESCRIPTION
- *     The test exercises JVMTI event callback function FramePop.
- *     The test do some nesting/recursive calls watching frame pop
- *     events to be uniquely identified by thread/class/method/frame_depth.
- * COMMENTS
- *     The test was created as a result of investigating the following bugs
- *     intended to write a regression test:
- *     4335224 Bug 4245697 not completely fixed jevent.u.frame.frame incorrect
- *     4504077 java: dbx should not hold on to a frameid after thread suspension
- *     Ported from JVMDI.
- *
  * @library /test/lib
  * @run main/othervm/native -agentlib:framepop02 framepop02 virtual
  */
 
-
-
 public class framepop02 {
 
+    final static int MAX_THREADS_LIMIT = 32;
     final static int NESTING_DEPTH = 20;
     final static String TEST_THREAD_NAME_BASE = "Test Thread #";
 
@@ -75,11 +58,11 @@ public class framepop02 {
     }
 
     native static void getReady();
-    native static int check();
+    native static void check();
 
     public static void main(String args[]) {
         boolean isVirtual = args.length > 0 && args[0].equals("virtual");
-        final int THREADS_LIMIT = Runtime.getRuntime().availableProcessors() * 2;
+        final int THREADS_LIMIT = Math.min(Runtime.getRuntime().availableProcessors() + 1, MAX_THREADS_LIMIT);
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
         Thread.Builder builder = (isVirtual ? Thread.ofVirtual() : Thread.ofPlatform())
@@ -95,10 +78,7 @@ public class framepop02 {
                 throw new Error("Unexpected: " + e);
             }
         }
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
-        }
+        check();
     }
 
     static class TestTask implements Runnable {
