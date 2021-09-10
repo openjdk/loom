@@ -55,7 +55,8 @@ serviceability/jvmti/events/FieldAccess/fieldacc04/fieldacc04.java
 serviceability/jvmti/events/FieldModification/fieldmod01/fieldmod01.java
 serviceability/jvmti/events/FieldModification/fieldmod02/fieldmod02.java
 serviceability/jvmti/events/FramePop/framepop01/framepop01.java
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id0
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
 serviceability/jvmti/events/MethodEntry/mentry01/mentry01.java
 serviceability/jvmti/events/MethodEntry/mentry02/mentry02.java
 serviceability/jvmti/events/MethodExit/mexit01/mexit01.java

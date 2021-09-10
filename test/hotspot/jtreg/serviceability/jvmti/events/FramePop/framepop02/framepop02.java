@@ -49,7 +49,7 @@
 
 public class framepop02 {
 
-    final static int NAX_THREADS_LIMIT = 32;
+    final static int MAX_THREADS_LIMIT = 32;
     final static int NESTING_DEPTH = 20;
     final static String TEST_THREAD_NAME_BASE = "Test Thread #";
 
@@ -62,7 +62,7 @@ public class framepop02 {
 
     public static void main(String args[]) {
         boolean isVirtual = args.length > 0 && args[0].equals("virtual");
-        final int THREADS_LIMIT = Math.min(Runtime.getRuntime().availableProcessors() + 1, NAX_THREADS_LIMIT);
+        final int THREADS_LIMIT = Math.min(Runtime.getRuntime().availableProcessors() + 1, MAX_THREADS_LIMIT);
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
         Thread.Builder builder = (isVirtual ? Thread.ofVirtual() : Thread.ofPlatform())
