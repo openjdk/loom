@@ -541,13 +541,15 @@ public:
   void do_thread(Thread *target);
 };
 
-// HandshakeClosure to print stack trace.
+#ifdef ASSERT
+// HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
 class PrintStackTraceClosure : public HandshakeClosure {
  public:
   PrintStackTraceClosure()
       : HandshakeClosure("PrintStackTraceClosure") {}
   void do_thread(Thread *target);
 };
+#endif
 
 // forward declaration
 struct StackInfoNode;

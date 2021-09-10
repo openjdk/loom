@@ -2202,7 +2202,7 @@ GetStackTraceClosure::do_thread(Thread *target) {
   }
 }
 
-
+#ifdef ASSERT
 void
 PrintStackTraceClosure::do_thread(Thread *target) {
   JavaThread *java_thread = JavaThread::cast(target);
@@ -2210,19 +2210,20 @@ PrintStackTraceClosure::do_thread(Thread *target) {
   assert(SafepointSynchronize::is_at_safepoint() ||
       java_thread->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
-  int count = 0;
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, true, true);
     ResourceMark rm(current_thread);
     HandleMark hm(current_thread);
-
     javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
     while (jvf != NULL) {
-      tty->print_cr("%s", jvf->method()->external_name());
+      tty->print_cr("  %s:%d",
+                    jvf->method()->external_name(),
+                    jvf->method()->line_number_from_bci(jvf->bci()));
       jvf = jvf->java_sender();
     }
   }
 }
+#endif
 
 void
 VM_VThreadGetFrameCount::doit() {
