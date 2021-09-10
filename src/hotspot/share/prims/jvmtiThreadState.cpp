@@ -259,7 +259,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
   }
 #else
   while (_VTMT_count > 0) {
-    ml.wait(;
+    ml.wait();
   }
 #endif
   assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
