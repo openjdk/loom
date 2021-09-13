@@ -83,12 +83,9 @@ class JvmtiVTMTDisabler {
 
   static void disable_VTMT();
   static void enable_VTMT();
-
-#ifdef ASSERT
-  static void print_info(JavaThread* thread);
-#endif
   bool _self_suspend;
 
+  DEBUG_ONLY(static void print_info(JavaThread* thread);)
  public:
   JvmtiVTMTDisabler() {
     _self_suspend = false;
