@@ -3266,7 +3266,7 @@ oop Continuation::continuation_scope(oop cont) {
 bool Continuation::pin(JavaThread* current) {
   ContinuationEntry* ce = current->last_continuation();
   if (ce == nullptr)
-    return false;
+    return true;
 
   oop cont = ce->cont_oop();
   assert (cont != nullptr, "");
@@ -3283,7 +3283,7 @@ bool Continuation::pin(JavaThread* current) {
 bool Continuation::unpin(JavaThread* current) {
   ContinuationEntry* ce = current->last_continuation();
   if (ce == nullptr)
-    return false;
+    return true;
 
   oop cont = ce->cont_oop();
   assert (cont != nullptr, "");

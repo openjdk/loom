@@ -2718,6 +2718,10 @@ JNI_ENTRY(jint, jni_MonitorEnter(JNIEnv *env, jobject jobj))
 
   Handle obj(thread, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_enter(obj, thread);
+  if (!Continuation::pin(thread)) {
+    ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
+    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+  }
   ret = JNI_OK;
   return ret;
 JNI_END
@@ -2737,7 +2741,9 @@ JNI_ENTRY(jint, jni_MonitorExit(JNIEnv *env, jobject jobj))
 
   Handle obj(THREAD, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
-
+  if (!Continuation::unpin(thread)) {
+    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+  }
   ret = JNI_OK;
   return ret;
 JNI_END
