@@ -541,6 +541,16 @@ public:
   void do_thread(Thread *target);
 };
 
+#ifdef ASSERT
+// HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
+class PrintStackTraceClosure : public HandshakeClosure {
+ public:
+  PrintStackTraceClosure()
+      : HandshakeClosure("PrintStackTraceClosure") {}
+  void do_thread(Thread *target);
+};
+#endif
+
 // forward declaration
 struct StackInfoNode;
 
@@ -647,7 +657,7 @@ public:
 };
 
 class VM_VThreadGetFrameCount : public VM_Operation {
-private: 
+private:
   JvmtiEnv *_env;
   Handle _vthread_h;
   jint* _count_ptr;
@@ -659,7 +669,7 @@ public:
       _count_ptr(count_ptr),
       _result(JVMTI_ERROR_NONE)
   {}
-  
+
   VMOp_Type type() const { return VMOp_VThreadGetFrameCount; }
   void doit();
   jvmtiError result() { return _result; }
@@ -791,7 +801,7 @@ private:
 public:
   VThreadGetStackTraceClosure(JvmtiEnv *env, Handle vthread_h,
                               jint start_depth, jint max_count,
-                              jvmtiFrameInfo* frame_buffer, jint* count_ptr) 
+                              jvmtiFrameInfo* frame_buffer, jint* count_ptr)
     : HandshakeClosure("VThreadGetStackTrace"),
       _env(env),
       _vthread_h(vthread_h),

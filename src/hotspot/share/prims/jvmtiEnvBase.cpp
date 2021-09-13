@@ -613,7 +613,7 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
-  // The second condition is needed to hide notification methods. 
+  // The second condition is needed to hide notification methods.
   if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf; // no frames to skip
   }
@@ -1496,7 +1496,7 @@ JvmtiEnvBase::is_in_thread_list(jint count, const jthread* list, oop jt_oop) {
     if (thread_oop == jt_oop) {
       return true;
     }
-  } 
+  }
   return false;
 }
 
@@ -1684,7 +1684,7 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
   jint state = 0;
   struct StackInfoNode *node = NEW_RESOURCE_OBJ(struct StackInfoNode);
   jvmtiStackInfo *infop = &(node->info);
-  
+
   node->next = head();
   set_head(node);
   infop->frame_count = 0;
@@ -1781,7 +1781,7 @@ void
 GetSingleStackTraceClosure::do_thread(Thread *target) {
     JavaThread *jt = JavaThread::cast(target);
     oop thread_oop = jt->threadObj();
-    
+
     if (!jt->is_exiting() && thread_oop != NULL) {
         ResourceMark rm;
         _collector.fill_frames(_jthread, jt, thread_oop);
@@ -2201,6 +2201,29 @@ GetStackTraceClosure::do_thread(Thread *target) {
                                                       _frame_buffer, _count_ptr);
   }
 }
+
+#ifdef ASSERT
+void
+PrintStackTraceClosure::do_thread(Thread *target) {
+  JavaThread *java_thread = JavaThread::cast(target);
+  Thread *current_thread = Thread::current();
+  assert(SafepointSynchronize::is_at_safepoint() ||
+      java_thread->is_handshake_safe_for(current_thread),
+         "call by myself / at safepoint / at handshake");
+  if (java_thread->has_last_Java_frame()) {
+    RegisterMap reg_map(java_thread, true, true);
+    ResourceMark rm(current_thread);
+    HandleMark hm(current_thread);
+    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    while (jvf != NULL) {
+      tty->print_cr("  %s:%d",
+                    jvf->method()->external_name(),
+                    jvf->method()->line_number_from_bci(jvf->bci()));
+      jvf = jvf->java_sender();
+    }
+  }
+}
+#endif
 
 void
 VM_VThreadGetFrameCount::doit() {
