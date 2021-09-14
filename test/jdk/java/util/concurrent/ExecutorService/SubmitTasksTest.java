@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import static java.util.concurrent.Future.State.*;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -115,7 +116,7 @@ public class SubmitTasksTest {
         try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
-                    .map(Future::join)
+                    .map(Future::resultNow)
                     .collect(Collectors.toSet());
             assertEquals(results, Set.of("foo", "bar"));
         }
@@ -137,7 +138,7 @@ public class SubmitTasksTest {
         try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
-                    .map(Future::join)
+                    .map(Future::resultNow)
                     .collect(Collectors.toSet());
             assertEquals(results, Set.of("foo", "bar"));
         }
@@ -165,7 +166,7 @@ public class SubmitTasksTest {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 Set<String> results = stream
                         .peek(f -> assertTrue(f.isDone()))
-                        .map(Future::join)
+                        .map(Future::resultNow)
                         .collect(Collectors.toSet());
                 assertEquals(results, Set.of("foo", "bar"));
             }
@@ -195,7 +196,7 @@ public class SubmitTasksTest {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 String first = stream
                         .peek(f -> assertTrue(f.isDone()))
-                        .map(Future::join)
+                        .map(Future::resultNow)
                         .findFirst()
                         .orElseThrow();
                 assertEquals(first, "foo");
@@ -246,13 +247,13 @@ public class SubmitTasksTest {
 
                 Future<String> future1 = futures.get(0);
                 Future<String> future2 = futures.get(1);
-                if (future2.isCompletedNormally()) {
+                if (future2.state() == SUCCESS) {
                     Future<String> tmp = future1;
                     future1 = future2;
                     future2 = tmp;
                 }
 
-                if (future1.isCompletedNormally()) {
+                if (future1.state() == SUCCESS) {
                     assertEquals(future1.get(), "foo");
                 } else {
                     assertTrue(future1.isCancelled());

@@ -42,6 +42,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import static java.util.concurrent.Future.State.*;
 
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -120,7 +121,7 @@ public class InvokeAllTest {
 
             // check results
             List<String> results = list.stream()
-                    .map(Future::join)
+                    .map(Future::resultNow)
                     .toList();
             assertEquals(results, List.of("foo", "bar"));
         }
@@ -185,7 +186,7 @@ public class InvokeAllTest {
 
             // task1 should have a result or be cancelled
             Future<String> future = list.get(0);
-            if (future.isCompletedNormally()) {
+            if (future.state() == SUCCESS) {
                 assertEquals(future.get(), "foo");
             } else {
                 expectThrows(CancellationException.class, future::get);
@@ -233,7 +234,7 @@ public class InvokeAllTest {
 
             // task3 should have a result or be cancelled
             Future<String> future = list.get(2);
-            if (future.isCompletedNormally()) {
+            if (future.state() == SUCCESS) {
                 assertEquals(future.get(), "baz");
             } else {
                 expectThrows(CancellationException.class, future::get);
