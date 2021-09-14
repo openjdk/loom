@@ -54,8 +54,8 @@ public class filter_s001a {
 
     //====================================================== test program
 
-    static Thread1filter_s001a thread1 = null;
-    static Thread2filter_s001a thread2 = null;
+    static Thread thread1 = null;
+    static Thread thread2 = null;
 
     //------------------------------------------------------ common section
 
@@ -102,14 +102,14 @@ public class filter_s001a {
  //------------------------------------------------------  section tested
 
                 case 0:
-                thread1 = new Thread1filter_s001a("thread1");
+                thread1 = JDIThreadFactory.newThread(new Thread1filter_s001a("thread1"));
                 log1("new filter_s001a().run1(thread1);");
                 new filter_s001a().run1(thread1);
 
                 break;
 
                 case 1:
-                thread2 = new Thread2filter_s001a("thread2");
+                thread2 = JDIThreadFactory.newThread(new Thread2filter_s001a("thread2"));
                 log1("new filter_s001a().run1(thread2);");
                 new filter_s001a().run1(thread2);
 
