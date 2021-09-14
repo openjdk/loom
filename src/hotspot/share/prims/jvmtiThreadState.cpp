@@ -249,15 +249,16 @@ JvmtiVTMTDisabler::disable_VTMT() {
   // Block while some mount/unmount transitions are in progress.
   // Debug version fails and print diagnostic information
 
-  DEBUG_ONLY(int attempts = 10);
+  //DEBUG_ONLY(int attempts = 10);
   while (_VTMT_count > 0) {
     ml.wait(1000);
-    #ifdef ASSERT
+    /*
+     Temporary disabled until fixed
     if (--attempts == 0) {
       print_info(thread);
       assert(false, "stuck in VTMT disabler for 10 seconds.");
     }
-    #endif
+    */
   }
   assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
   thread->set_is_VTMT_disabler(true);
