@@ -223,6 +223,7 @@ runtime/cds/appcds/SpecifySysLoaderProp.java
 runtime/cds/appcds/StaticArchiveWithLambda.java
 runtime/cds/appcds/TestCombinedCompressedFlags.java
 runtime/cds/appcds/TestWithProfiler.java
+runtime/cds/appcds/TestEpsilonGCWithCDS.java
 runtime/cds/appcds/TestZGCWithCDS.java
 runtime/cds/appcds/UnusedCPDuringDump.java
 runtime/cds/appcds/VerifierTest_1A.java
