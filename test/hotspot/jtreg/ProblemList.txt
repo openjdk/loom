@@ -201,6 +201,8 @@ runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          82
 
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
+vmTestbase/gc/gctests/FinalizeLock/FinalizeLock.java fails                    8273778 generic-all
+
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace003.java                                   8254188 generic-all

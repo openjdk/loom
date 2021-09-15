@@ -37,6 +37,8 @@ compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                       
 gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
 runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
 
+java/lang/ClassLoader/loadLibraryUnload/LoadLibraryUnload.java                                  8273780 generic-all
+
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
 
