@@ -352,8 +352,6 @@ eventInstance(EventInfo *evinfo)
                         (gdata->jvmti, thread, fnum, &object);
         } else {
             /* get slot zero object "this" */
-            // vthread fixme: I think this assert is bogus, but let's see if we hit it
-            JDI_ASSERT(!isVThread(thread));
             error = JVMTI_FUNC_PTR(gdata->jvmti,GetLocalObject)
                         (gdata->jvmti, thread, fnum, 0, &object);
         }
