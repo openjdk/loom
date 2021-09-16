@@ -133,41 +133,6 @@ public interface Future<V> {
     boolean isDone();
 
     /**
-     * Returns {@code true} if this task completed normally. Returns
-     * {@code false} if the task has not completed, completed with an
-     * exception or error, or was cancelled before it completed.
-     *
-     * @implSpec
-     * The default implementation invokes {@code isDone} to test if the task
-     * has completed. If completed, it invokes {@code get()} and returns
-     * {@code true} if the task completed normally. It returns {@code false}
-     * if the task is not completed or did not complete normally.
-     *
-     * @return {@code true} if this task completed normally
-     * @since 99
-     */
-    default boolean isCompletedNormally() {
-        if (!isDone())
-            return false;
-        boolean interrupted = false;
-        try {
-            while (true) {
-                try {
-                    get();  // may throw InterruptedException when done
-                    return true;
-                } catch (InterruptedException e) {
-                    interrupted = true;
-                } catch (ExecutionException | CancellationException e) {
-                    return false;
-                }
-            }
-        } finally {
-            if (interrupted)
-                Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
      * Waits if necessary for the computation to complete, and then
      * retrieves its result.
      *
@@ -179,41 +144,6 @@ public interface Future<V> {
      * while waiting
      */
     V get() throws InterruptedException, ExecutionException;
-
-    /**
-     * Waits if necessary for the computation to complete, and then
-     * retrieves its result. This method differs to {@linkplain #get()} in
-     * that it throws an unchecked exception if the computation completed
-     * with an exception or error. Waiting is not interrupted if the
-     * current thread is interrupted.
-     *
-     * @implSpec
-     * The default implementation invokes {@code get()} to wait for the
-     * computation to complete.
-     *
-     * @return the computed result
-     * @throws CancellationException if the computation was cancelled
-     * @throws CompletionException if the computation completed with an
-     * exception or error
-     * @since 99
-     */
-    default V join() {
-        boolean interrupted = false;
-        try {
-            while (true) {
-                try {
-                    return get();
-                } catch (InterruptedException e) {
-                    interrupted = true;
-                } catch (ExecutionException e) {
-                    throw new CompletionException(e.getCause());
-                }
-            }
-        } finally {
-            if (interrupted)
-                Thread.currentThread().interrupt();
-        }
-    }
 
     /**
      * Waits if necessary for at most the given time for the computation
@@ -231,4 +161,125 @@ public interface Future<V> {
      */
     V get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException;
+
+    /**
+     * Returns the computed result, without waiting.
+     *
+     * @implSpec
+     * The default implementation invokes {@code isDone()} to test if the task
+     * has completed. If done, it invokes {@code get()} to obtain the result.
+     *
+     * @return the computed result
+     * @throws IllegalStateException if the task has not completed or the task
+     * did not complete with a result
+     * @since 99
+     */
+    default V resultNow() {
+        if (!isDone())
+            throw new IllegalStateException();
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    return get();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException | CancellationException e) {
+                    throw new IllegalStateException();
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Returns the exception thrown by the task, without waiting.
+     *
+     * @implSpec
+     * The default implementation invokes {@code isDone()} to test if the task
+     * has completed. If done and not cancelled, it invokes {@code get()} and
+     * catches the {@code ExecutionException} to obtain the exception.
+     *
+     * @return the exception thrown by the task
+     * @throws IllegalStateException if the task has not completed or the task
+     * completed normally or cancelled
+     * @since 99
+     */
+    default Throwable exceptionNow() {
+        if (!isDone() || isCancelled())
+            throw new IllegalStateException();
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    get();
+                    throw new IllegalStateException();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException e) {
+                    return e.getCause();
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Represents the computation state.
+     * @since 99
+     */
+    enum State {
+        /**
+         * The task has not completed.
+         */
+        RUNNING,
+        /**
+         * The task completed with a result.
+         * @see Future#resultNow()
+         */
+        SUCCESS,
+        /**
+         * The task completed with an exception.
+         * @see Future#exceptionNow()
+         */
+        FAILED,
+        /**
+         * The task is cancelled.
+         * @see #cancel(boolean)
+         */
+        CANCELLED
+    }
+
+    /**
+     * {@return the computation state}
+     *
+     * @implSpec
+     * The default implementation uses {@code isDone()}, {@code isCancelled()},
+     * and {@code get()} to determine the state.
+     *
+     * @since 99
+     */
+    default State state() {
+        if (!isDone())
+            return State.RUNNING;
+        if (isCancelled())
+            return State.CANCELLED;
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    get();  // may throw InterruptedException when done
+                    return State.SUCCESS;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                } catch (ExecutionException e) {
+                    return State.FAILED;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
 }

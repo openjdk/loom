@@ -898,6 +898,39 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         return (status & (DONE | ABNORMAL)) == DONE;
     }
 
+    @Override
+    public State state() {
+        int s = status;
+        if (s < 0) {
+            if ((s & (DONE | ABNORMAL)) == DONE)
+                return State.SUCCESS;
+            if ((s & (ABNORMAL | THROWN)) == (ABNORMAL | THROWN))
+                return State.FAILED;
+            else
+                return State.CANCELLED;
+        } else {
+            return State.RUNNING;
+        }
+    }
+
+    @Override
+    public V resultNow() {
+        if ((status & (DONE | ABNORMAL)) == DONE) {
+            return getRawResult();
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public Throwable exceptionNow() {
+        if ((status & (ABNORMAL | THROWN)) == (ABNORMAL | THROWN)) {
+            return getThrowableException();
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
     /**
      * Returns the exception thrown by the base computation, or a
      * {@code CancellationException} if cancelled, or {@code null} if

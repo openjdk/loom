@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import static java.util.concurrent.Future.State.*;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -669,7 +670,7 @@ public class ThreadPerTaskExecutorTest {
             assertFalse(notDone);
 
             // check results
-            List<String> results = list.stream().map(Future::join).collect(Collectors.toList());
+            List<String> results = list.stream().map(Future::resultNow).collect(Collectors.toList());
             assertEquals(results, List.of("foo", "bar"));
         }
     }
@@ -723,7 +724,7 @@ public class ThreadPerTaskExecutorTest {
             assertFalse(notDone);
 
             // check results
-            List<String> results = list.stream().map(Future::join).collect(Collectors.toList());
+            List<String> results = list.stream().map(Future::resultNow).collect(Collectors.toList());
             assertEquals(results, List.of("foo", "bar"));
         }
     }
@@ -792,7 +793,7 @@ public class ThreadPerTaskExecutorTest {
 
             // task1 should have a result or be cancelled
             Future<String> future = list.get(0);
-            if (future.isCompletedNormally()) {
+            if (future.state() == SUCCESS) {
                 assertEquals(future.get(), "foo");
             } else {
                 expectThrows(CancellationException.class, future::get);
@@ -840,7 +841,7 @@ public class ThreadPerTaskExecutorTest {
 
             // task3 should have a result or be cancelled
             Future<String> future = list.get(2);
-            if (future.isCompletedNormally()) {
+            if (future.state() == SUCCESS) {
                 assertEquals(future.get(), "baz");
             } else {
                 expectThrows(CancellationException.class, future::get);

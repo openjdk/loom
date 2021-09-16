@@ -269,7 +269,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      * Submits the given value-returning tasks for execution and returns a
      * lazily populated stream of completed Future objects with the result of
      * each task. A typical usage will filter the stream to the tasks that
-     * {@linkplain Future#isCompletedNormally() complete normally}. The stream
+     * {@linkplain Future.State#SUCCESS complete normally}. The stream
      * is unordered and the result of tasks that complete normally may need
      * to include context to identify the task.
      *
@@ -312,13 +312,13 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *     Collection<Callable<String>> tasks = ...
      *
      *     List<String> results = executor.submit(tasks)
-     *             .filter(Future::isCompletedNormally)
-     *             .map(Future::join)
+     *             .filter(f -> f.state() == Future.State.SUCCESS)
+     *             .map(Future::resultNow)
      *             .toList();
      *
      *     try (Stream<Future<String>> stream = executor.submit(tasks)) {
-     *         String first = stream.filter(Future::isCompletedNormally)
-     *                 .map(Future::join)
+     *         String first = stream.filter(f -> f.state() == Future.State.SUCCESS)
+     *                 .map(Future::resultNow)
      *                 .findFirst()
      *                 .orElseThrow();
      *    }

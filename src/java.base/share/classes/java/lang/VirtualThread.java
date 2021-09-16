@@ -1004,9 +1004,10 @@ class VirtualThread extends Thread {
             return AccessController.doPrivileged(pa);
         };
         PrivilegedAction<ForkJoinPool> pa = () -> {
-            int parallelism, maxPoolSize;
+            int parallelism, maxPoolSize, minRunnable;
             String parallelismValue = System.getProperty("jdk.defaultScheduler.parallelism");
             String maxPoolSizeValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
+            String minRunnableValue = System.getProperty("jdk.defaultScheduler.minRunnable");
             if (parallelismValue != null) {
                 parallelism = Integer.parseInt(parallelismValue);
             } else {
@@ -1018,10 +1019,15 @@ class VirtualThread extends Thread {
             } else {
                 maxPoolSize = Integer.max(parallelism, 256);
             }
+            if (minRunnableValue != null) {
+                minRunnable = Integer.parseInt(minRunnableValue);
+            } else {
+                minRunnable = Integer.max(parallelism / 2, 1);
+            }
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
             return new ForkJoinPool(parallelism, factory, handler, asyncMode,
-                         0, maxPoolSize, 1, pool -> true, 30, SECONDS);
+                         0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
     }

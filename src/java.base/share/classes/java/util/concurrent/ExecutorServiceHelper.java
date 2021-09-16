@@ -97,7 +97,7 @@ class ExecutorServiceHelper {
                 Runnable cancelAll = () -> cancelAll(futures);
                 var spliterator = new BlockingQueueSpliterator<>(queue, futures.size(), cancelAll);
                 StreamSupport.stream(spliterator, false)
-                        .filter(f -> isCompletedExceptionally(f))
+                        .filter(f -> f.state() != Future.State.SUCCESS)
                         .findAny();
             } finally {
                 cancelAll(futures);
@@ -150,18 +150,6 @@ class ExecutorServiceHelper {
             if (!f.isDone()) {
                 f.cancel(true);
             }
-        }
-    }
-
-    /**
-     * Returns true if the Future completed exceptionally.
-     */
-    private static boolean isCompletedExceptionally(Future<?> future) {
-        try {
-            future.join();
-            return false;
-        } catch (CompletionException | CancellationException e) {
-            return true;
         }
     }
 

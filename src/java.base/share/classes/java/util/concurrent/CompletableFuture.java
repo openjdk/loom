@@ -2138,6 +2138,32 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         return ((r = result) == null) ? valueIfAbsent : (T) reportJoin(r);
     }
 
+    @Override
+    public T resultNow() {
+        Object r = result;
+        if (r != null) {
+            if (r instanceof AltResult alt) {
+                if (alt.ex == null) return null;
+            } else {
+                @SuppressWarnings("unchecked")
+                T t = (T) r;
+                return t;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public Throwable exceptionNow() {
+        Object r = result;
+        if (r instanceof AltResult alt
+                && alt.ex != null
+                && !(alt.ex instanceof CancellationException)) {
+            return alt.ex;
+        }
+        throw new IllegalStateException();
+    }
+
     /**
      * If not already completed, sets the value returned by {@link
      * #get()} and related methods to the given value.
@@ -2499,17 +2525,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     /**
-     * Returns {@code true} if this CompletableFuture completed normally.
-     *
-     * @return {@code true} if this CompletableFuture completed normally
-     */
-    public boolean isCompletedNormally() {
-        Object r;
-        return ((r = result) != null
-                && (r == NIL || !(r instanceof AltResult)));
-    }
-
-    /**
      * Returns {@code true} if this CompletableFuture completed
      * exceptionally, in any way. Possible causes include
      * cancellation, explicit invocation of {@code
@@ -2522,6 +2537,20 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     public boolean isCompletedExceptionally() {
         Object r;
         return ((r = result) instanceof AltResult) && r != NIL;
+    }
+
+    @Override
+    public State state() {
+        Object r = result;
+        if (r == null)
+            return State.RUNNING;
+        if (r != NIL && r instanceof AltResult alt) {
+            if (alt.ex instanceof CancellationException)
+                return State.CANCELLED;
+            else
+                return State.FAILED;
+        }
+        return State.SUCCESS;
     }
 
     /**
@@ -2927,6 +2956,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public T join() {
             throw new UnsupportedOperationException(); }
+        @Override public T resultNow() {
+            throw new UnsupportedOperationException(); }
+        @Override public Throwable exceptionNow() {
+            throw new UnsupportedOperationException(); }
         @Override public boolean complete(T value) {
             throw new UnsupportedOperationException(); }
         @Override public boolean completeExceptionally(Throwable ex) {
@@ -2941,9 +2974,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCancelled() {
             throw new UnsupportedOperationException(); }
-        @Override public boolean isCompletedNormally() {
-            throw new UnsupportedOperationException(); }
         @Override public boolean isCompletedExceptionally() {
+            throw new UnsupportedOperationException(); }
+        @Override public State state() {
             throw new UnsupportedOperationException(); }
         @Override public int getNumberOfDependents() {
             throw new UnsupportedOperationException(); }
