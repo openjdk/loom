@@ -819,7 +819,6 @@ stepControl_beginStep(JNIEnv *env, jthread thread, jint size, jint depth,
              */
             step->granularity = size;
             step->depth = depth;
-            step->is_vthread = isVThread(thread);
             step->catchHandlerNode = NULL;
             step->framePopHandlerNode = NULL;
             step->methodEnterHandlerNode = NULL;
