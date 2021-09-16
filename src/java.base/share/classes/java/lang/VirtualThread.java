@@ -1022,7 +1022,7 @@ class VirtualThread extends Thread {
             if (minRunnableValue != null) {
                 minRunnable = Integer.parseInt(minRunnableValue);
             } else {
-                minRunnable = Integer.min(parallelism / 2, 1);
+                minRunnable = Integer.max(parallelism / 2, 1);
             }
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
