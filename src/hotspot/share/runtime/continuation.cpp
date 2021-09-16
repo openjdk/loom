@@ -3167,9 +3167,6 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
   if (cont_scope == nullptr || !is_continuation_entry_frame(f, map))
     return false;
 
-  assert (!map->in_cont(), "");
-  // if (map->in_cont()) return false;
-
   oop cont = get_continuation_for_sp(map->thread(), f.sp());
   if (cont == nullptr)
     return false;
