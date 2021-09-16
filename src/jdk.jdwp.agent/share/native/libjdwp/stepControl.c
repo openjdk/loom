@@ -430,39 +430,6 @@ handleExceptionCatchEvent(JNIEnv *env, EventInfo *evinfo,
     stepControl_unlock();
 }
 
-/*
- * Help deal with a METHOD_ENTRY event (or a simulated one). Returns JNI_TRUE if
- * single stepping gets enabled.
- */
-static jboolean
-methodEnterHelper(JNIEnv *env, jthread thread, StepRequest *step, jclass clazz, jmethodID method)
-{
-    jboolean steppingEnabled = JNI_FALSE;
-    if (step->pending) {
-        char *classname = getClassname(clazz);
-
-        /* This handler is relevant only to step into. */
-        JDI_ASSERT(step->depth == JDWP_STEP_DEPTH(INTO));
-
-        if ((!eventFilter_predictFiltering(step->stepHandlerNode, clazz, classname))
-            && (step->granularity != JDWP_STEP_SIZE(LINE) || hasLineNumbers(method))) {
-            /*
-             * We've found a suitable method in which to resume stepping.
-             * We can also get rid of the method entry handler now.
-             */
-            enableStepping(thread);
-            steppingEnabled = JNI_TRUE;
-            if ( step->methodEnterHandlerNode != NULL ) {
-                (void)eventHandler_free(step->methodEnterHandlerNode);
-                step->methodEnterHandlerNode = NULL;
-            }
-        }
-        jvmtiDeallocate(classname);
-        classname = NULL;
-    }
-    return steppingEnabled;
-}
-
 static void
 handleMethodEnterEvent(JNIEnv *env, EventInfo *evinfo,
                        HandlerNode *node,
@@ -474,12 +441,45 @@ handleMethodEnterEvent(JNIEnv *env, EventInfo *evinfo,
     thread = evinfo->thread;
 
     stepControl_lock();
-    LOG_STEP(("handleMethodEnterEvent: thread=%p", thread));
+
     step = threadControl_getStepRequest(thread);
     if (step == NULL) {
         EXIT_ERROR(AGENT_ERROR_INVALID_THREAD, "getting step request");
     }
-    methodEnterHelper(env, thread, step, evinfo->clazz, evinfo->method);
+
+    if (step->pending) {
+        jclass    clazz;
+        jmethodID method;
+        char     *classname;
+
+        LOG_STEP(("handleMethodEnterEvent: thread=%p", thread));
+
+        clazz     = evinfo->clazz;
+        method    = evinfo->method;
+        classname = getClassname(clazz);
+
+        /*
+         * This handler is relevant only to step into
+         */
+        JDI_ASSERT(step->depth == JDWP_STEP_DEPTH(INTO));
+
+        if (    (!eventFilter_predictFiltering(step->stepHandlerNode, clazz, classname))
+             && (   step->granularity != JDWP_STEP_SIZE(LINE)
+                 || hasLineNumbers(method) ) ) {
+            /*
+             * We've found a suitable method in which to resume stepping.
+             * We can also get rid of the method entry handler now.
+             */
+            enableStepping(thread);
+            if ( step->methodEnterHandlerNode != NULL ) {
+                (void)eventHandler_free(step->methodEnterHandlerNode);
+                step->methodEnterHandlerNode = NULL;
+            }
+        }
+        jvmtiDeallocate(classname);
+        classname = NULL;
+    }
+
     stepControl_unlock();
 }
 
