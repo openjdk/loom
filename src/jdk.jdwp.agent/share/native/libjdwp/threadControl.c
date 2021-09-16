@@ -1705,20 +1705,9 @@ threadControl_suspendAll(void)
             error = AGENT_ERROR_OUT_OF_MEMORY;
             goto err;
         }
-        if (canSuspendResumeThreadLists()) {
-            error = commonSuspendList(env, count, threads);
-            if (error != JVMTI_ERROR_NONE) {
-                goto err;
-            }
-        } else {
-            int i;
-            for (i = 0; i < count; i++) {
-                error = commonSuspend(env, threads[i], JNI_FALSE);
-
-                if (error != JVMTI_ERROR_NONE) {
-                    goto err;
-                }
-            }
+        error = commonSuspendList(env, count, threads);
+        if (error != JVMTI_ERROR_NONE) {
+            goto err;
         }
 
         /*
