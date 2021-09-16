@@ -376,17 +376,13 @@ eventInstance(EventInfo *evinfo)
  *
  * If shouldDelete is returned true, a count filter has expired
  * and the corresponding node should be deleted.
- *
- * If filterOnly is true, then we don't perform any actions that may
- * change the state of the filter or the debugging state of the thread.
  */
 jboolean
 eventFilterRestricted_passesFilter(JNIEnv *env,
                                    char *classname,
                                    EventInfo *evinfo,
                                    HandlerNode *node,
-                                   jboolean *shouldDelete,
-                                   jboolean filterOnly)
+                                   jboolean *shouldDelete)
 {
     jthread thread;
     jclass clazz;
@@ -487,14 +483,6 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
             }
             case JDWP_REQUEST_MODIFIER(Count): {
                 JDI_ASSERT(filter->u.Count.count > 0);
-                if (filterOnly) {
-                    /* Don't decrement the counter. */
-                    if (filter->u.Count.count > 1) {
-                        return JNI_FALSE;
-                    } else {
-                        break;
-                    }
-                }
                 if (--filter->u.Count.count > 0) {
                     return JNI_FALSE;
                 }
@@ -530,18 +518,10 @@ eventFilterRestricted_passesFilter(JNIEnv *env,
                 if (!isSameObject(env, thread, filter->u.Step.thread)) {
                     return JNI_FALSE;
                 }
-            /*
-             * Don't call handleStep() if filterOnly is true. It's too complicated to see if the step
-             * would be completed without actually changing the state, so we just assume it will be.
-             * No harm can come from this since the vthread is already a known one, and that's the
-             * only reason this "filterOnly" request is being made.
-             */
-            if (!filterOnly) {
                 if (!stepControl_handleStep(env, thread, clazz, method)) {
                     return JNI_FALSE;
                 }
-            }
-            break;
+                break;
 
           case JDWP_REQUEST_MODIFIER(SourceNameMatch): {
               char* desiredNamePattern = filter->u.SourceNameOnly.sourceNamePattern;
