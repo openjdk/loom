@@ -410,7 +410,8 @@ public:
     _num_frames++;
     assert (_closure != nullptr, "");
 
-    assert (!f.is_deoptimized(), ""); // if (f.is_compiled()) f.handle_deopted();
+    assert (mixed || !f.is_deoptimized(), "");
+    if (mixed && f.is_compiled()) f.handle_deopted();
 
     // For unload method debugging
     // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);
