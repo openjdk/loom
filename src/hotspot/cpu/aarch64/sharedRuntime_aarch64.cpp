@@ -1278,8 +1278,12 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   exception_offset = __ pc() - start;
   {
-      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
       __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
+  
+      continuation_enter_cleanup(masm);
+      // __ mov(sp, rfp);
+  
+      __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
 
       // see OptoRuntime::generate_exception_blob: r0 -- exception oop, r3 -- exception pc
@@ -1288,9 +1292,8 @@ static void gen_continuation_enter(MacroAssembler* masm,
       __ mov(r0, r19); // restore return value contaning the exception oop
       __ verify_oop(r0);
 
-      continuation_enter_cleanup(masm);
-      __ mov(sp, rfp);
-      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ leave();
+      __ mov(r3, lr);
       __ br(r1); // the exception handler
   }
 
