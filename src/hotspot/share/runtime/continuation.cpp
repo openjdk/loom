@@ -1858,7 +1858,7 @@ static inline bool can_freeze_fast(JavaThread* thread) {
   #endif
   assert (!thread->cont_fastpath() || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "thread->raw_cont_fastpath(): " INTPTR_FORMAT " thread->cont_fastpath_thread_state(): %d", p2i(thread->raw_cont_fastpath()), thread->cont_fastpath_thread_state());
 
-  // We also clear thread->cont_fastpath in Deoptimize::deoptimize_single_frame and when we thaw interpreted frames
+  // We also clear thread->cont_fastpath on deoptimization (notify_deopt) and when we thaw interpreted frames
   bool fast = UseContinuationFastPath && thread->cont_fastpath();
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
   fast = fast && thread->held_monitor_count() == 0;
