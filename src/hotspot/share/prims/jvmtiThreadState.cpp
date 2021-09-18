@@ -226,9 +226,10 @@ JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
 
 #ifdef ASSERT
 void
-JvmtiVTMTDisabler::print_info(JavaThread* thread) {
+JvmtiVTMTDisabler::print_info() {
   tty->print_cr("VTMT disabled with count = %d.\n", _VTMT_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
+    ResourceMark rm;
     tty->print_cr("Thread %s VTMT state %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
     // Handshake with target
     PrintStackTraceClosure pstc;
@@ -240,28 +241,31 @@ JvmtiVTMTDisabler::print_info(JavaThread* thread) {
 void
 JvmtiVTMTDisabler::disable_VTMT() {
   JavaThread* thread = JavaThread::current();
-  ThreadBlockInVM tbivm(thread);
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  int attempts = 10;
+  {
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  assert(!thread->is_in_VTMT(), "VTMT sanity check");
-  _VTMT_disable_count++;
+    assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    _VTMT_disable_count++;
 
-  // Block while some mount/unmount transitions are in progress.
-  // Debug version fails and print diagnostic information
-
-  //DEBUG_ONLY(int attempts = 10);
-  while (_VTMT_count > 0) {
-    ml.wait(1000);
-    /*
-     Temporary disabled until fixed
-    if (--attempts == 0) {
-      print_info(thread);
-      assert(false, "stuck in VTMT disabler for 10 seconds.");
+    // Block while some mount/unmount transitions are in progress.
+    // Debug version fails and print diagnostic information
+    while (_VTMT_count > 0) {
+      ml.wait(1000);
+      DEBUG_ONLY(if (--attempts == 0) break;)
     }
-    */
+    assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
+    if (attempts != 0) {
+      thread->set_is_VTMT_disabler(true);
+    }
   }
-  assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
-  thread->set_is_VTMT_disabler(true);
+#ifdef ASSERT
+  if (attempts == 0) {
+    print_info();
+    assert(false, "stuck in VTMT disabler for 10 seconds.");
+  }
+#endif
 }
 
 void
