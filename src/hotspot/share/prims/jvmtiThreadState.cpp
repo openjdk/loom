@@ -230,9 +230,10 @@ JvmtiVTMTDisabler::print_info() {
   tty->print_cr("VTMT disabled with count = %d.\n", _VTMT_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
-    tty->print_cr("Thread %s VTMT state %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
+    tty->print_cr("Thread %s, is_in_VTMT = %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
     // Handshake with target
     PrintStackTraceClosure pstc;
+    tty->print_cr("");
     Handshake::execute(&pstc, java_thread);
   }
 }
@@ -252,8 +253,10 @@ JvmtiVTMTDisabler::disable_VTMT() {
     // Block while some mount/unmount transitions are in progress.
     // Debug version fails and print diagnostic information
     while (_VTMT_count > 0) {
-      ml.wait(1000);
-      DEBUG_ONLY(if (--attempts == 0) break;)
+      if (ml.wait(1000)) {
+        attempts--;
+      }
+      DEBUG_ONLY(if (attempts == 0) break;)
     }
     assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
     if (attempts != 0) {
