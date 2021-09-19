@@ -3332,6 +3332,7 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
     e.set_id(cast_from_oop<u8>(chunk));
     e.set_safepoint(SafepointSynchronize::is_at_safepoint());
     e.set_numFrames((u2)num_frames);
+    e.set_numOops((u2)num_oops);
     e.commit();
   }
 }
