@@ -34,8 +34,6 @@ jdk/internal/vm/Continuation/Preempt.java
 # Thread-sensitive threads
 
 java/lang/Thread/BuilderTest.java
-java/lang/ThreadGroup/SetMaxPriority.java
-java/lang/ThreadGroup/Suspend.java
 java/lang/Thread/virtual/CustomScheduler.java
 java/lang/Thread/UncaughtExceptionsTest.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
