@@ -914,7 +914,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     }
 
     @Override
-    public V resultNow() {
+    public V completedResult() {
         if ((status & (DONE | ABNORMAL)) == DONE) {
             return getRawResult();
         } else {
@@ -923,9 +923,10 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     }
 
     @Override
-    public Throwable exceptionNow() {
-        if ((status & (ABNORMAL | THROWN)) == (ABNORMAL | THROWN)) {
-            return getThrowableException();
+    public Throwable completedException() {
+        Throwable ex = getException(status);
+        if (ex != null) {
+            return ex;
         } else {
             throw new IllegalStateException();
         }

@@ -2139,7 +2139,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     @Override
-    public T resultNow() {
+    public T completedResult() {
         Object r = result;
         if (r != null) {
             if (r instanceof AltResult alt) {
@@ -2154,11 +2154,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     @Override
-    public Throwable exceptionNow() {
+    public Throwable completedException() {
         Object r = result;
-        if (r instanceof AltResult alt
-                && alt.ex != null
-                && !(alt.ex instanceof CancellationException)) {
+        if (r instanceof AltResult alt && alt.ex != null) {
             return alt.ex;
         }
         throw new IllegalStateException();
@@ -2956,9 +2954,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public T join() {
             throw new UnsupportedOperationException(); }
-        @Override public T resultNow() {
+        @Override public T completedResult() {
             throw new UnsupportedOperationException(); }
-        @Override public Throwable exceptionNow() {
+        @Override public Throwable completedException() {
             throw new UnsupportedOperationException(); }
         @Override public boolean complete(T value) {
             throw new UnsupportedOperationException(); }

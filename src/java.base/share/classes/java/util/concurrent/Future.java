@@ -174,7 +174,7 @@ public interface Future<V> {
      * did not complete with a result
      * @since 99
      */
-    default V resultNow() {
+    default V completedResult() {
         if (!isDone())
             throw new IllegalStateException();
         boolean interrupted = false;
@@ -194,7 +194,8 @@ public interface Future<V> {
     }
 
     /**
-     * Returns the exception thrown by the task, without waiting.
+     * Returns the exception thrown by the task or a CancellationException
+     * if cancelled, without waiting.
      *
      * @implSpec
      * The default implementation invokes {@code isDone()} to test if the task
@@ -203,12 +204,14 @@ public interface Future<V> {
      *
      * @return the exception thrown by the task
      * @throws IllegalStateException if the task has not completed or the task
-     * completed normally or cancelled
+     * completed normally
      * @since 99
      */
-    default Throwable exceptionNow() {
-        if (!isDone() || isCancelled())
+    default Throwable completedException() {
+        if (!isDone())
             throw new IllegalStateException();
+        if (isCancelled())
+            return new CancellationException();
         boolean interrupted = false;
         try {
             while (true) {
@@ -237,12 +240,12 @@ public interface Future<V> {
         RUNNING,
         /**
          * The task completed with a result.
-         * @see Future#resultNow()
+         * @see Future#completedResult() ()
          */
         SUCCESS,
         /**
          * The task completed with an exception.
-         * @see Future#exceptionNow()
+         * @see Future#completedResult() ()
          */
         FAILED,
         /**

@@ -28,12 +28,7 @@
  * @run testng DefaultMethods
  */
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import static java.util.concurrent.Future.State.*;
 
 import org.testng.annotations.DataProvider;
@@ -64,8 +59,8 @@ public class DefaultMethods {
             Future<?> future = executor.submit(() -> { latch.await(); return null; });
             try {
                 assertTrue(future.state() == RUNNING);
-                expectThrows(IllegalStateException.class, future::resultNow);
-                expectThrows(IllegalStateException.class, future::exceptionNow);
+                expectThrows(IllegalStateException.class, future::completedResult);
+                expectThrows(IllegalStateException.class, future::completedException);
             } finally {
                 latch.countDown();
             }
@@ -81,8 +76,8 @@ public class DefaultMethods {
             Future<String> future = executor.submit(() -> "foo");
             awaitDone(future);
             assertTrue(future.state() == SUCCESS);
-            assertEquals(future.resultNow(), "foo");
-            expectThrows(IllegalStateException.class, future::exceptionNow);
+            assertEquals(future.completedResult(), "foo");
+            expectThrows(IllegalStateException.class, future::completedException);
         }
     }
 
@@ -95,8 +90,8 @@ public class DefaultMethods {
             Future<String> future = executor.submit(() -> null);
             awaitDone(future);
             assertTrue(future.state() == SUCCESS);
-            assertEquals(future.resultNow(), null);
-            expectThrows(IllegalStateException.class, future::exceptionNow);
+            assertEquals(future.completedResult(), null);
+            expectThrows(IllegalStateException.class, future::completedException);
         }
     }
 
@@ -109,8 +104,8 @@ public class DefaultMethods {
             Future<?> future = executor.submit(() -> { throw new ArithmeticException(); });
             awaitDone(future);
             assertTrue(future.state() == FAILED);
-            expectThrows(IllegalStateException.class, future::resultNow);
-            Throwable ex = future.exceptionNow();
+            expectThrows(IllegalStateException.class, future::completedResult);
+            Throwable ex = future.completedException();
             assertTrue(ex instanceof ArithmeticException);
         }
     }
@@ -126,8 +121,9 @@ public class DefaultMethods {
             future.cancel(false);
             try {
                 assertTrue(future.state() == CANCELLED);
-                expectThrows(IllegalStateException.class, future::resultNow);
-                expectThrows(IllegalStateException.class, future::exceptionNow);
+                expectThrows(IllegalStateException.class, future::completedResult);
+                Throwable ex = future.completedException();
+                assertTrue(ex instanceof CancellationException);
             } finally {
                 latch.countDown();
             }
@@ -145,8 +141,9 @@ public class DefaultMethods {
             future.cancel(true);
             try {
                 assertTrue(future.state() == CANCELLED);
-                expectThrows(IllegalStateException.class, future::resultNow);
-                expectThrows(IllegalStateException.class, future::exceptionNow);
+                expectThrows(IllegalStateException.class, future::completedResult);
+                Throwable ex = future.completedException();
+                assertTrue(ex instanceof CancellationException);
             } finally {
                 latch.countDown();
             }
@@ -160,8 +157,8 @@ public class DefaultMethods {
     public void testCompletableFuture1() {
         var future = new CompletableFuture<String>();
         assertTrue(future.state() == RUNNING);
-        expectThrows(IllegalStateException.class, future::resultNow);
-        expectThrows(IllegalStateException.class, future::exceptionNow);
+        expectThrows(IllegalStateException.class, future::completedResult);
+        expectThrows(IllegalStateException.class, future::completedException);
     }
 
     /**
@@ -172,8 +169,8 @@ public class DefaultMethods {
         var future = new CompletableFuture<String>();
         future.complete("foo");
         assertTrue(future.state() == SUCCESS);
-        assertEquals(future.resultNow(), "foo");
-        expectThrows(IllegalStateException.class, future::exceptionNow);
+        assertEquals(future.completedResult(), "foo");
+        expectThrows(IllegalStateException.class, future::completedException);
     }
 
     /**
@@ -184,8 +181,8 @@ public class DefaultMethods {
         var future = new CompletableFuture<String>();
         future.complete(null);
         assertTrue(future.state() == SUCCESS);
-        assertEquals(future.resultNow(), null);
-        expectThrows(IllegalStateException.class, future::exceptionNow);
+        assertEquals(future.completedResult(), null);
+        expectThrows(IllegalStateException.class, future::completedException);
     }
 
     /**
@@ -196,8 +193,8 @@ public class DefaultMethods {
         var future = new CompletableFuture<String>();
         future.completeExceptionally(new ArithmeticException());
         assertTrue(future.state() == FAILED);
-        expectThrows(IllegalStateException.class, future::resultNow);
-        Throwable ex = future.exceptionNow();
+        expectThrows(IllegalStateException.class, future::completedResult);
+        Throwable ex = future.completedException();
         assertTrue(ex instanceof ArithmeticException);
     }
 
@@ -209,8 +206,9 @@ public class DefaultMethods {
         var future = new CompletableFuture<String>();
         future.cancel(false);
         assertTrue(future.state() == CANCELLED);
-        expectThrows(IllegalStateException.class, future::resultNow);
-        expectThrows(IllegalStateException.class, future::exceptionNow);
+        expectThrows(IllegalStateException.class, future::completedResult);
+        Throwable ex = future.completedException();
+        assertTrue(ex instanceof CancellationException);
     }
 
     /**

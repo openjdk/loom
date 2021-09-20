@@ -206,7 +206,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     @Override
-    public V resultNow() {
+    public V completedResult() {
         if (state == NORMAL) {
             @SuppressWarnings("unchecked")
             V result = (V) outcome;
@@ -217,12 +217,17 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     @Override
-    public Throwable exceptionNow() {
-        if (state == EXCEPTIONAL) {
-            Object x = outcome;
-            return (Throwable) x;
-        } else {
-            throw new IllegalStateException();
+    public Throwable completedException() {
+        switch (state) {
+            case EXCEPTIONAL:
+                Object x = outcome;
+                return (Throwable) x;
+            case CANCELLED:
+            case INTERRUPTING:
+            case INTERRUPTED:
+                return new CancellationException();
+            default:
+                throw new IllegalStateException();
         }
     }
 

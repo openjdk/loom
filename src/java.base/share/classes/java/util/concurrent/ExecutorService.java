@@ -313,12 +313,12 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *
      *     List<String> results = executor.submit(tasks)
      *             .filter(f -> f.state() == Future.State.SUCCESS)
-     *             .map(Future::resultNow)
+     *             .map(Future::completedResult)
      *             .toList();
      *
      *     try (Stream<Future<String>> stream = executor.submit(tasks)) {
      *         String first = stream.filter(f -> f.state() == Future.State.SUCCESS)
-     *                 .map(Future::resultNow)
+     *                 .map(Future::completedResult)
      *                 .findFirst()
      *                 .orElseThrow();
      *    }
