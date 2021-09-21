@@ -6237,7 +6237,8 @@ RuntimeStub* generate_cont_doYield() {
       __ mov(r0, r19); // restore return value contaning the exception oop
       __ verify_oop(r0);
 
-      __ ldp(rfp, r3, Address(__ post(sp, 2 * wordSize))); 
+      __ leave();
+      __ mov(r3, lr);
       __ br(r1); // the exception handler
     }
 
