@@ -27,35 +27,36 @@
  * @run main/othervm/native -agentlib:RawMonitorTest RawMonitorTest
  */
 
+import java.util.List;
+import java.util.ArrayList;
+
 public class RawMonitorTest {
     private static final String AGENT_LIB = "RawMonitorTest";
-    
-    native void rawMonitorEnter(); 
-    native void rawMonitorExit(); 
-    native void rawMonitorWait(); 
-    native void rawMonitorNotifyAll(); 
+
+    native void rawMonitorEnter();
+    native void rawMonitorExit();
+    native void rawMonitorWait();
+    native void rawMonitorNotifyAll();
 
     final Runnable parkingTask = () -> {
        for (int i = 0; i < 40; i++) {
             rawMonitorEnter();
             rawMonitorNotifyAll();
             // uncomment lines below to get failures with NOT_MONITOR_OWNER
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException ie) {
-            }
+            Thread.yield();
             rawMonitorWait();
             rawMonitorExit();
         }
     };
 
-    void runTest() throws Exception { 
-        Thread vt1 = Thread.ofVirtual().name("VT1").start(parkingTask);
-        Thread vt2 = Thread.ofVirtual().name("VT2").start(parkingTask);
-        Thread vt3 = Thread.ofVirtual().name("VT3").start(parkingTask);
-        vt1.join();
-        vt2.join();
-        vt3.join();
+    void runTest() throws Exception {
+        List<Thread> vthreads = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            vthreads.add(Thread.ofVirtual().name("VT" + i).start(parkingTask));
+        }
+        for (Thread vthread: vthreads) {
+            vthread.join();
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -65,7 +66,7 @@ public class RawMonitorTest {
             System.err.println("Failed to load " + AGENT_LIB + " lib");
             System.err.println("java.library.path: " + System.getProperty("java.library.path"));
             throw ex;
-        } 
+        }
         RawMonitorTest t = new RawMonitorTest();
         t.runTest();
     }
