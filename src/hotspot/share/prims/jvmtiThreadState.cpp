@@ -233,8 +233,8 @@ JvmtiVTMTDisabler::print_info() {
     tty->print_cr("Thread %s, is_in_VTMT = %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
     // Handshake with target
     PrintStackTraceClosure pstc;
-    tty->print_cr("");
     Handshake::execute(&pstc, java_thread);
+    tty->print_cr("");
   }
 }
 #endif
@@ -291,6 +291,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
   // Do not allow suspends inside VTMT transitions.
   // Block while transitions are disabled or there are suspend requests.
+  int attempts = 10 * 100;
   while (true) {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
@@ -300,7 +301,10 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
         thread->is_suspended() ||
         JvmtiVTSuspender::is_vthread_suspended(vth())
     ) {
-      ml.wait(10);
+      if (ml.wait(10)) {
+        attempts--;
+      }
+      DEBUG_ONLY(if (attempts == 0) break;)
       continue; // ~ThreadBlockInVM has handshake-based suspend point
     }
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
@@ -312,6 +316,12 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     _VTMT_count++;
     break;
   }
+#ifdef ASSERT
+  if (attempts == 0) {
+    print_info();
+    assert(false, "stuck in VTMT disabler for 10 seconds.");
+  }
+#endif
 }
 
 void
