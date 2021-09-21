@@ -140,6 +140,9 @@ void JvmtiRawMonitor::simple_enter(Thread* self) {
     if (_owner == NULL && Atomic::replace_if_null(&_owner, self)) {
       _entry_list = node._next;
       RawMonitor_lock->unlock();
+      if (self->is_Java_thread()) {
+        Continuation::pin(JavaThread::cast(self));
+      }
       return;
     }
     RawMonitor_lock->unlock();

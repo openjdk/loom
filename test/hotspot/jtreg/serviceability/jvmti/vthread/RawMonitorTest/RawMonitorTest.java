@@ -39,7 +39,7 @@ public class RawMonitorTest {
     native void rawMonitorNotifyAll();
 
     final Runnable parkingTask = () -> {
-       for (int i = 0; i < 40; i++) {
+       for (int i = 0; i < 100; i++) {
             rawMonitorEnter();
             rawMonitorNotifyAll();
             // uncomment lines below to get failures with NOT_MONITOR_OWNER
