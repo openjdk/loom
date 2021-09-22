@@ -77,9 +77,8 @@ class JvmtiEnvThreadStateIterator : public StackObj {
 //
 class JvmtiVTMTDisabler {
  private:
-  // VTMT is disabled while this counter is non-zero
   static unsigned short _VTMT_count;
-  static unsigned short _VTMT_disable_count;
+  static unsigned short _VTMT_disable_count; // VTMT is disabled while it is non-zero
 
   static void disable_VTMT();
   static void enable_VTMT();
