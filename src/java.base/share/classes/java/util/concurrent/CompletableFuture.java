@@ -37,13 +37,13 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Objects;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /**
  * A {@link Future} that may be explicitly completed (setting its
@@ -1795,7 +1795,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         public final void setRawResult(Void v) {}
         public final boolean exec() { run(); return false; }
 
-        private void doRun() {
+        public void run() {
             CompletableFuture<Void> d; Runnable f;
             if ((d = dep) != null && (f = fn) != null) {
                 dep = null; fn = null;
@@ -1809,10 +1809,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 }
                 d.postComplete();
             }
-        }
-
-        public void run() {
-            doRun();
         }
     }
 
