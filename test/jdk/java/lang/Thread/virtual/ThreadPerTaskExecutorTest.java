@@ -670,7 +670,7 @@ public class ThreadPerTaskExecutorTest {
             assertFalse(notDone);
 
             // check results
-            List<String> results = list.stream().map(Future::resultNow).collect(Collectors.toList());
+            List<String> results = list.stream().map(Future::completedResult).collect(Collectors.toList());
             assertEquals(results, List.of("foo", "bar"));
         }
     }
@@ -724,7 +724,7 @@ public class ThreadPerTaskExecutorTest {
             assertFalse(notDone);
 
             // check results
-            List<String> results = list.stream().map(Future::resultNow).collect(Collectors.toList());
+            List<String> results = list.stream().map(Future::completedResult).collect(Collectors.toList());
             assertEquals(results, List.of("foo", "bar"));
         }
     }
