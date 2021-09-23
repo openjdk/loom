@@ -121,7 +121,7 @@ public class InvokeAllTest {
 
             // check results
             List<String> results = list.stream()
-                    .map(Future::resultNow)
+                    .map(Future::completedResult)
                     .toList();
             assertEquals(results, List.of("foo", "bar"));
         }

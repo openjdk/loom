@@ -116,7 +116,7 @@ public class SubmitTasksTest {
         try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
-                    .map(Future::resultNow)
+                    .map(Future::completedResult)
                     .collect(Collectors.toSet());
             assertEquals(results, Set.of("foo", "bar"));
         }
@@ -138,7 +138,7 @@ public class SubmitTasksTest {
         try (executor) {
             Set<String> results = executor.submit(List.of(task1, task2))
                     .peek(f -> assertTrue(f.isDone()))
-                    .map(Future::resultNow)
+                    .map(Future::completedResult)
                     .collect(Collectors.toSet());
             assertEquals(results, Set.of("foo", "bar"));
         }
@@ -166,7 +166,7 @@ public class SubmitTasksTest {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 Set<String> results = stream
                         .peek(f -> assertTrue(f.isDone()))
-                        .map(Future::resultNow)
+                        .map(Future::completedResult)
                         .collect(Collectors.toSet());
                 assertEquals(results, Set.of("foo", "bar"));
             }
@@ -196,7 +196,7 @@ public class SubmitTasksTest {
             try (Stream<Future<String>> stream = executor.submit(List.of(task1, task2))) {
                 String first = stream
                         .peek(f -> assertTrue(f.isDone()))
-                        .map(Future::resultNow)
+                        .map(Future::completedResult)
                         .findFirst()
                         .orElseThrow();
                 assertEquals(first, "foo");
