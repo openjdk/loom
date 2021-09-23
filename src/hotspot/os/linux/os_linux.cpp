@@ -308,19 +308,6 @@ bool os::Linux::get_tick_information(CPUPerfTicks* pticks, int which_logical_cpu
   return true;
 }
 
-// Return true if user is running as root.
-
-bool os::have_special_privileges() {
-  static bool init = false;
-  static bool privileges = false;
-  if (!init) {
-    privileges = (getuid() != geteuid()) || (getgid() != getegid());
-    init = true;
-  }
-  return privileges;
-}
-
-
 #ifndef SYS_gettid
 // i386: 224, ia64: 1105, amd64: 186, sparc: 143
   #ifdef __ia64__
@@ -2325,6 +2312,16 @@ bool os::Linux::print_container_info(outputStream* st) {
     st->print_cr(JLONG_FORMAT, j);
   } else {
     st->print_cr("%s", j == OSCONTAINER_ERROR ? "not supported" : "unlimited");
+  }
+
+  j = OSContainer::OSContainer::pids_current();
+  st->print("current number of tasks: ");
+  if (j > 0) {
+    st->print_cr(JLONG_FORMAT, j);
+  } else {
+    if (j == OSCONTAINER_ERROR) {
+      st->print_cr("not supported");
+    }
   }
 
   return true;

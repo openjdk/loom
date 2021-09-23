@@ -1109,7 +1109,6 @@ void Universe::verify(VerifyOption option, const char* prefix) {
     StringTable::verify();
   }
   if (should_verify_subset(Verify_CodeCache)) {
-    MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
     log_debug(gc, verify)("CodeCache");
     CodeCache::verify();
   }
