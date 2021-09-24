@@ -31,7 +31,8 @@ import java.util.concurrent.ThreadFactory;
 
 public class JDIThreadFactory {
 
-    private static ThreadFactory threadFactory = r -> new Thread(r);
+    private static ThreadFactory threadFactory = "Virtual".equals(System.getProperty("main.wrapper"))
+            ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
 
     public static Thread newThread(NamedTask task) {
         return newThread(task, task.getName());

@@ -535,10 +535,10 @@ void JvmtiThreadState::leave_interp_only_mode() {
 int JvmtiThreadState::count_frames() {
   JavaThread* thread = get_thread_or_saved();
   javaVFrame *jvf;
+  ResourceMark rm;
   if (thread == NULL) {
     oop thread_obj = get_thread_oop();
     jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
-    jvf = JvmtiEnvBase::check_and_skip_hidden_frames(thread_obj, jvf);
   } else {
 #ifdef ASSERT
     Thread *current_thread = Thread::current();
@@ -548,7 +548,6 @@ int JvmtiThreadState::count_frames() {
         thread->is_handshake_safe_for(current_thread),
            "call by myself / at safepoint / at handshake");
     if (!thread->has_last_Java_frame()) return 0;  // no Java frames
-    ResourceMark rm;
     RegisterMap reg_map(thread, false, false, true);
     jvf = thread->last_java_vframe(&reg_map);
     jvf = JvmtiEnvBase::check_and_skip_hidden_frames(thread, jvf);
