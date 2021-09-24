@@ -284,15 +284,15 @@ void OopMapSort::print() {
     OopMapValue omv = _values[i];
     if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value) {
       if (omv.reg()->is_reg()) {
-        tty->print_cr("[%c][%d] -> reg (%ld)", omv.type() == OopMapValue::narrowoop_value ? 'n' : 'o', i, omv.reg()->value());
+        tty->print_cr("[%c][%d] -> reg (" INTPTR_FORMAT ")", omv.type() == OopMapValue::narrowoop_value ? 'n' : 'o', i, omv.reg()->value());
       } else {
-        tty->print_cr("[%c][%d] -> stack (%lx)", omv.type() == OopMapValue::narrowoop_value ? 'n' : 'o', i, omv.reg()->reg2stack() * VMRegImpl::stack_slot_size);
+        tty->print_cr("[%c][%d] -> stack ("  INTPTR_FORMAT ")", omv.type() == OopMapValue::narrowoop_value ? 'n' : 'o', i, omv.reg()->reg2stack() * VMRegImpl::stack_slot_size);
       }
     } else {
       if (omv.content_reg()->is_reg()) {
-        tty->print_cr("[d][%d] -> reg (%ld) stack (%lx)", i, omv.content_reg()->value(), omv.reg()->reg2stack() * VMRegImpl::stack_slot_size);
+        tty->print_cr("[d][%d] -> reg (" INTPTR_FORMAT ") stack (" INTPTR_FORMAT ")", i, omv.content_reg()->value(), omv.reg()->reg2stack() * VMRegImpl::stack_slot_size);
       } else if (omv.reg()->is_reg()) {
-        tty->print_cr("[d][%d] -> stack (%lx) reg (%ld)", i, omv.content_reg()->reg2stack() * VMRegImpl::stack_slot_size, omv.reg()->value());
+        tty->print_cr("[d][%d] -> stack (" INTPTR_FORMAT ") reg (" INTPTR_FORMAT ")", i, omv.content_reg()->reg2stack() * VMRegImpl::stack_slot_size, omv.reg()->value());
       } else {
         int derived_offset = omv.reg()->reg2stack() * VMRegImpl::stack_slot_size;
         int base_offset = omv.content_reg()->reg2stack() * VMRegImpl::stack_slot_size;
@@ -403,9 +403,6 @@ class AddDerivedOop : public DerivedOopClosure {
   };
 
   virtual void do_derived_oop(oop* base, derived_pointer* derived) {
-#if !defined(TIERED) && !INCLUDE_JVMCI
-    COMPILER1_PRESENT(ShouldNotReachHere();)
-#endif // !defined(TIERED) && !INCLUDE_JVMCI
 #if COMPILER2_OR_JVMCI
     DerivedPointerTable::add(derived, base);
 #endif // COMPILER2_OR_JVMCI

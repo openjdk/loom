@@ -612,7 +612,7 @@ void TemplateInterpreterGenerator::lock_method() {
   __ lock_object(lockreg);
 
   Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
-  NOT_LP64(get_thread(rthread);)
+  NOT_LP64(__ get_thread(rthread);)
   __ inc_held_monitor_count(rthread);
 }
 
@@ -680,8 +680,9 @@ address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) 
 
   return entry;
 #else
-  Unimplemented();
-  return NULL;
+  // Not implemented. Allow startup of legacy Java code that does not touch
+  // Continuation.doYield yet. Throw AbstractMethodError on access.
+  return generate_abstract_entry();
 #endif
 }
 

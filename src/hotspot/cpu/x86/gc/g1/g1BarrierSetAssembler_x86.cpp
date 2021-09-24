@@ -125,8 +125,17 @@ void G1BarrierSetAssembler::load_at(MacroAssembler* masm, DecoratorSet decorator
   bool on_reference = on_weak || on_phantom;
   ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
   if (on_oop && on_reference) {
-    const Register thread = NOT_LP64(tmp_thread) LP64_ONLY(r15_thread);
-    NOT_LP64(__ get_thread(thread));
+    Register thread = NOT_LP64(tmp_thread) LP64_ONLY(r15_thread);
+
+#ifndef _LP64
+    // Work around the x86_32 bug that only manifests with Loom for some reason.
+    // MacroAssembler::resolve_weak_handle calls this barrier with tmp_thread == noreg.
+    if (thread == noreg) {
+      thread = rcx;
+    }
+    __ push(thread);
+    __ get_thread(thread);
+#endif
 
     // Generate the G1 pre-barrier code to log the value of
     // the referent field in an SATB buffer.
@@ -137,6 +146,10 @@ void G1BarrierSetAssembler::load_at(MacroAssembler* masm, DecoratorSet decorator
                          tmp1 /* tmp */,
                          true /* tosca_live */,
                          true /* expand_call */);
+
+#ifndef _LP64
+    __ pop(thread);
+#endif
   }
 }
 

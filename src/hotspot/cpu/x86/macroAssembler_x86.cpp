@@ -2720,6 +2720,7 @@ void MacroAssembler::movdqa(XMMRegister dst, AddressLiteral src) {
   }
 }
 
+#ifdef _LP64
   // Move Aligned, possibly non-temporal
   void MacroAssembler::movqa(Address dst, Register src, bool nt) {
     if (nt) {
@@ -2772,6 +2773,7 @@ void MacroAssembler::movdqa(XMMRegister dst, AddressLiteral src) {
       Assembler::evmovdqul(dst, src, vector_len); // use unaligned load
     }
   }
+#endif
 
 void MacroAssembler::movsd(XMMRegister dst, AddressLiteral src) {
   if (reachable(src)) {

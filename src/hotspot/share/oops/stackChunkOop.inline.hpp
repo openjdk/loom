@@ -245,7 +245,7 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
   log_develop_trace(jvmcont)("Chunk bounds: " INTPTR_FORMAT "(%d) - " INTPTR_FORMAT "(%d) (%d words, %d bytes)",
     p2i(start_address()), to_offset(start_address()), p2i(end_address()), to_offset(end_address() - 1) + 1, stack_size(), stack_size() << LogBytesPerWord);
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(from), p2i(from + size), size, size << LogBytesPerWord);
-  log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT "(%ld,%ld) - " INTPTR_FORMAT "(%ld,%ld) (%d words, %d bytes)", 
+  log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(to), to - start_address(), relative_base() - to, p2i(to + size), to + size - start_address(), relative_base() - (to + size), size, size << LogBytesPerWord);
 
   assert (to >= start_address(), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(start_address()));
@@ -256,7 +256,7 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
 
 template <bool dword_aligned>
 inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size) {
-  log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(%ld,%ld) - " INTPTR_FORMAT "(%ld,%ld) (%d words, %d bytes)", 
+  log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(from), from - start_address(), relative_base() - from, p2i(from + size), from + size - start_address(), relative_base() - (from + size), size, size << LogBytesPerWord);
   log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(to), p2i(to + size), size, size << LogBytesPerWord);
 
