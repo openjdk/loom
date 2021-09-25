@@ -520,6 +520,9 @@ vmTestbase/nsk/jdi/Event/request/request001/TestDescription.java
 vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
 vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
 vmTestbase/nsk/jdb/set/set002/set002.java
+vmTestbase/nsk/jdi/StackFrame/setValue/setvalue001/setvalue001.java
+vmTestbase/nsk/jdi/StackFrame/setValue/setvalue003/setvalue003.java
+vmTestbase/nsk/jdi/StackFrame/setValue/setvalue004/setvalue004.java
 
 ####
 ## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
@@ -533,6 +536,11 @@ vmTestbase/nsk/jdi/BScenarios/hotswap/tc04x002/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc06x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc08x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc10x002/TestDescription.java
+
+vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
+vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
+vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
+vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
 
 ####
 ## JVMTI ForceEarlyReturn not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
