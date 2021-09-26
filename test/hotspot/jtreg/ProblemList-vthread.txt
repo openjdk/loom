@@ -507,14 +507,6 @@ vmTestbase/nsk/jdb/where/where005/where005.java
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 
 ####
-## Occasionally fails with:
-##  Got ThreadStartEvent for wrong thread: ThreadStartEvent in thread ForkJoinPool-1-worker-15
-## This is likely the result of a spurious cthread startup that the test needs to account for.
-
-vmTestbase/nsk/jdi/Event/request/request001/TestDescription.java
-
-
-####
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
 
 vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
