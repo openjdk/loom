@@ -203,14 +203,14 @@ class StackChunkFrameStream : public StackObj {
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
 
-#ifdef ASSERT
+#ifndef PRODUCT
   stackChunkOop _chunk;
   int _index;
   int _has_stub;
 #endif
 
  public:
-  StackChunkFrameStream() { DEBUG_ONLY(_chunk = nullptr; _index = -1; _has_stub = false;) }
+  StackChunkFrameStream() { NOT_PRODUCT(_chunk = nullptr; _index = -1; _has_stub = false;) }
   inline StackChunkFrameStream(stackChunkOop chunk, bool gc = false);
   inline StackChunkFrameStream(stackChunkOop chunk, const frame& f);
 
@@ -227,7 +227,7 @@ class StackChunkFrameStream : public StackObj {
   inline address   pc() const  { return get_pc(); }
   inline intptr_t* fp() const;
   inline intptr_t* unextended_sp() const { return mixed ? _unextended_sp : _sp; }
-  DEBUG_ONLY(int index() { return _index; })
+  NOT_PRODUCT(int index() { return _index; })
   inline address orig_pc() const;
 
   inline bool is_interpreted() const;

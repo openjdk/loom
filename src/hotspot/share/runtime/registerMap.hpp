@@ -82,7 +82,7 @@ class RegisterMap : public StackObj {
   bool        _process_frames;          // Should frames be processed by stack watermark barriers?
   bool        _walk_cont;               // whether to walk frames on a continuation stack
 
-  DEBUG_ONLY(bool  _skip_missing;)
+  NOT_PRODUCT(bool  _skip_missing;)
 
 #ifdef ASSERT
   void check_location_valid();
@@ -91,7 +91,7 @@ class RegisterMap : public StackObj {
 #endif
 
  public:
-  DEBUG_ONLY(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
+  NOT_PRODUCT(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
   RegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false);
   RegisterMap(oop continuation, bool update_map = true);
   RegisterMap(const RegisterMap* map);
@@ -157,7 +157,7 @@ class RegisterMap : public StackObj {
   void print_on(outputStream* st) const;
   void print() const;
 
-#ifdef ASSERT
+#ifndef PRODUCT
   void set_skip_missing(bool value) { _skip_missing = value; }
   bool should_skip_missing() const  { return _skip_missing; }
 
