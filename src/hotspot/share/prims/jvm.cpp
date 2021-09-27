@@ -3888,11 +3888,14 @@ JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
+#if INCLUDE_JVMTI
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
   assert(thread->is_in_VTMT(), "VTMT sanity check");
+#if INCLUDE_JVMTI
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt = JNIHandles::resolve(vthread);
 
@@ -3913,9 +3916,11 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   if (JvmtiExport::should_post_vthread_mount()) {
     JvmtiExport::post_vthread_mount(vthread);
   }
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
+#if INCLUDE_JVMTI
   HandleMark hm(thread);
   Handle ct(thread, thread->threadObj());
 
@@ -3938,9 +3943,12 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
   assert(thread->is_in_VTMT(), "VTMT sanity check");
+#if INCLUDE_JVMTI
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
+#endif
 JVM_END

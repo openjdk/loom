@@ -24,7 +24,6 @@
 
 #include "precompiled.hpp"
 #include "classfile/javaClasses.hpp"
-#include "gc/g1/g1CollectedHeap.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oopsHierarchy.hpp"
@@ -74,8 +73,6 @@
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
-
-#include "gc/g1/g1CollectedHeap.inline.hpp"
 
 #define CONT_JFR false
 
