@@ -22,10 +22,10 @@
  *
  */
 
+#include "precompiled.hpp"
+
 // Old code. Might be deleted later if no uses appear.
 #if 0
-
-#include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "code/codeCache.hpp"
 #include "code/vmreg.inline.hpp"
