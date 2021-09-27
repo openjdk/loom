@@ -7614,7 +7614,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
 
   __ ldr(rscratch2, Address(sp, ContinuationEntry::parent_offset()));
   __ str(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
-  __ add(rfp, sp, (intptr_t)ContinuationEntry::size());
+  __ add(rfp, sp, (int)ContinuationEntry::size());
 }
 
 #undef __
