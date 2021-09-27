@@ -25,7 +25,6 @@
 #ifndef CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 #define CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 
-#include "compiler/oopMapStubGenerator.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"

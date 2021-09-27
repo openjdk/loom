@@ -29,7 +29,6 @@
 #include "code/scopeDesc.hpp"
 #include "compiler/oopMap.hpp"
 #include "compiler/oopMap.inline.hpp"
-#include "compiler/oopMapStubGenerator.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
