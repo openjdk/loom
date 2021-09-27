@@ -7561,7 +7561,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
   stack_slots += (int)ContinuationEntry::size()/wordSize;
-  __ sub(sp, sp, (intptr_t)ContinuationEntry::size()); // place Continuation metadata
+  __ sub(sp, sp, (int)ContinuationEntry::size()); // place Continuation metadata
 
   OopMap* map = new OopMap(((int)ContinuationEntry::size() + wordSize)/ VMRegImpl::stack_slot_size, 0 /* arg_slots*/);
   ContinuationEntry::setup_oopmap(map);
