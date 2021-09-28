@@ -1776,26 +1776,19 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   this->interrupt();
 }
 
-void JavaThread::set_is_in_VTMT(bool val) {
 #if INCLUDE_JVMTI
+void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
   if (val) {
     assert(JvmtiVTMTDisabler::VTMT_disable_count() == 0, "must be 0");
   }
-#else
-  fatal("Should only be called with JVMTI enabled");
-#endif
 }
 
 void JavaThread::set_is_VTMT_disabler(bool val) {
-#if INCLUDE_JVMTI
   _is_VTMT_disabler = val;
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
-#else
-  fatal("Should only be called with JVMTI enabled");
-#endif
 }
-
+#endif
 
 // External suspension mechanism.
 //
@@ -1804,9 +1797,11 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
+#if INCLUDE_JVMTI
   // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
+#endif
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {

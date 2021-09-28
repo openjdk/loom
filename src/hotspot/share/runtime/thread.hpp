@@ -1249,26 +1249,13 @@ private:
     return (_suspend_flags & _thread_suspended) != 0;
   }
 
-  bool is_VTMT_disabler() const {
 #if INCLUDE_JVMTI
-    return _is_VTMT_disabler;
-#else
-    fatal("Should only be called with JVMTI enabled");
-    return false;
-#endif
-  }
-
-  bool is_in_VTMT() const {
-#if INCLUDE_JVMTI
-    return _is_in_VTMT;
-#else
-    fatal("Should only be called with JVMTI enabled");
-    return false;
-#endif
-  }
+  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
+  bool is_in_VTMT() const                        { return _is_in_VTMT; }
 
   void set_is_in_VTMT(bool val);
   void set_is_VTMT_disabler(bool val);
+#endif
 
   bool is_cont_force_yield() { return cont_preempt(); }
 
