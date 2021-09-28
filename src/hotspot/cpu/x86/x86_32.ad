@@ -1819,12 +1819,14 @@ encode %{
       emit_d32_reloc(cbuf, ($meth$$method - (int)(cbuf.insts_end()) - 4),
                      runtime_call_Relocation::spec(),
                      RELOC_IMM32);
+      __ post_call_nop();
     } else {
       int method_index = resolved_method_index(cbuf);
       RelocationHolder rspec = _optimized_virtual ? opt_virtual_call_Relocation::spec(method_index)
                                                   : static_call_Relocation::spec(method_index);
       emit_d32_reloc(cbuf, ($meth$$method - (int)(cbuf.insts_end()) - 4),
                      rspec, RELOC_DISP32);
+      __ post_call_nop();
       // Emit stubs for static call.
       address stub = CompiledStaticCall::emit_to_interp_stub(cbuf);
       if (stub == NULL) {
@@ -1832,7 +1834,6 @@ encode %{
         return;
       }
     }
-    __ post_call_nop();
   %}
 
   enc_class Java_Dynamic_Call (method meth) %{    // JAVA DYNAMIC CALL
@@ -2886,10 +2887,12 @@ encode %{
   %}
 
   enc_class enc_rethrow() %{
+    MacroAssembler _masm(&cbuf);
     cbuf.set_insts_mark();
     emit_opcode(cbuf, 0xE9);        // jmp    entry
     emit_d32_reloc(cbuf, (int)OptoRuntime::rethrow_stub() - ((int)cbuf.insts_end())-4,
                    runtime_call_Relocation::spec(), RELOC_IMM32 );
+    __ post_call_nop();
   %}
 
 
