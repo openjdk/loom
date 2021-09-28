@@ -550,13 +550,6 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
 vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 
 ###
-# The test fails because it tries to call Thread.setDaemon(false) on a vthread, which is not
-# supported (vthreads are always daemon). It seems the only reason the test does this is because
-# it has a mix of what it refers to as "user and daemon threads", since it wants to test both.
-# It should be ok to just skip the setDaemon call for vthreads.
-vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java
-
-###
 # These 2 tests try to create 10 vthreads and have them all block on a synchornized
 # method call, but on some hosts there are not enough cthreads to support pinning
 # all 10 vthreads, so the test deadlocks. -Djdk.defaultScheduler.parallelism=<n>
