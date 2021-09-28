@@ -74,10 +74,6 @@ import sun.nio.cs.StreamEncoder;
  */
 
 public class OutputStreamWriter extends Writer {
-
-    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     private final StreamEncoder se;
 
     /**

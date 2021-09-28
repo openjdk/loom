@@ -382,7 +382,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @param     len the number of bytes to read.
      * @throws    IOException If an I/O error has occurred.
      */
-    private native int readBytes(byte[] b, int off, int len) throws IOException;
+    private int readBytes(byte[] b, int off, int len) throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            return Blocker.managedBlock(() -> readBytes0(b, off, len));
+        } else {
+            return readBytes0(b, off, len);
+        }
+    }
+
+    private native int readBytes0(byte[] b, int off, int len) throws IOException;
 
     /**
      * Reads up to {@code len} bytes of data from this file into an
@@ -548,7 +556,15 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @param     len the number of bytes that are written
      * @throws    IOException If an I/O error has occurred.
      */
-    private native void writeBytes(byte[] b, int off, int len) throws IOException;
+    private void writeBytes(byte[] b, int off, int len) throws IOException {
+        if (Thread.currentThread().isVirtual()) {
+            Blocker.managedBlock(() -> writeBytes0(b, off, len));
+        } else {
+            writeBytes0(b, off, len);
+        }
+    }
+
+    private native void writeBytes0(byte[] b, int off, int len) throws IOException;
 
     /**
      * Writes {@code b.length} bytes from the specified byte array
@@ -571,11 +587,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte[] b, int off, int len) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes(b, off, len));
-        } else {
-            writeBytes(b, off, len);
-        }
+        writeBytes(b, off, len);
     }
 
     // 'Random access' stuff

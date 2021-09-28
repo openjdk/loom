@@ -61,10 +61,6 @@ import sun.nio.cs.StreamDecoder;
  */
 
 public class InputStreamReader extends Reader {
-
-    // Legacy/undocumented behavior was to the wrapped InputStream as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     private final StreamDecoder sd;
 
     /**
