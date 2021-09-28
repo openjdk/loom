@@ -557,11 +557,6 @@ vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referrin
 vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq002/TestDescription.java
 vmTestbase/nsk/jdi/EventRequestManager/deleteEventRequests/delevtreqs002/TestDescription.java
 
-###
-# The test relies on the underlying JVMTI GetObjectMonitorUsage() API, which currently
-# does not support vthreads, and will claim the cthread is owner of the monitor.
-vmTestbase/nsk/jdi/ObjectReference/owningThread/owningthread002/TestDescription.java
-
 ####
 ## NSK JMX Tests
 
