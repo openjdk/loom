@@ -1022,8 +1022,10 @@ JavaThread::JavaThread() :
   _in_deopt_handler(0),
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
+#if INCLUDE_JVMTI
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
+#endif
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1775,20 +1777,25 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
 }
 
 void JavaThread::set_is_in_VTMT(bool val) {
+#if INCLUDE_JVMTI
   _is_in_VTMT = val;
   if (val) {
-#if INCLUDE_JVMTI
     assert(JvmtiVTMTDisabler::VTMT_disable_count() == 0, "must be 0");
-#endif
   }
+#else
+  fatal("Should only be called with JVMTI enabled");
+#endif
 }
 
 void JavaThread::set_is_VTMT_disabler(bool val) {
-  _is_VTMT_disabler = val;
 #if INCLUDE_JVMTI
+  _is_VTMT_disabler = val;
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
+#else
+  fatal("Should only be called with JVMTI enabled");
 #endif
 }
+
 
 // External suspension mechanism.
 //
@@ -2365,9 +2372,9 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
+#if INCLUDE_JVMTI
 // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
-#if INCLUDE_JVMTI
   set_mounted_vthread(thread_oop);
 
   // unbind current JvmtiThreadState from JavaThread
@@ -2377,11 +2384,8 @@ JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   java_lang_Thread::jvmti_thread_state(thread_oop)->bind_to(this);
 
   return jvmti_thread_state();
-#else
-  ShouldNotReachHere();
-  return NULL;
-#endif
 }
+#endif
 
 // JVMTI PopFrame support
 void JavaThread::popframe_preserve_args(ByteSize size_in_bytes, void* start) {

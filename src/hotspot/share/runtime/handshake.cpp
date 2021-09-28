@@ -619,7 +619,7 @@ void HandshakeState::do_self_suspend() {
   assert(_handshakee->thread_state() == _thread_blocked, "Caller should have transitioned to _thread_blocked");
 
   while (is_suspended_or_blocked()) {
-    assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");
+    JVMTI_ONLY(assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");)
     log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " suspended", p2i(_handshakee));
     _lock.wait_without_safepoint_check();
   }
@@ -706,7 +706,7 @@ public:
 };
 
 bool HandshakeState::suspend() {
-  assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");
+  JVMTI_ONLY(assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");)
   JavaThread* self = JavaThread::current();
   if (_handshakee == self) {
     // If target is the current thread we can bypass the handshake machinery

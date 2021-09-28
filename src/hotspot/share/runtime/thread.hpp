@@ -926,8 +926,10 @@ class JavaThread: public Thread {
   volatile bool         _doing_unsafe_access;    // Thread may fault due to unsafe access
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
+#if INCLUDE_JVMTI
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
+#endif
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -1247,8 +1249,23 @@ private:
     return (_suspend_flags & _thread_suspended) != 0;
   }
 
-  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
-  bool is_in_VTMT() const                        { return _is_in_VTMT; }
+  bool is_VTMT_disabler() const {
+#if INCLUDE_JVMTI
+    return _is_VTMT_disabler;
+#else
+    fatal("Should only be called with JVMTI enabled");
+    return false;
+#endif
+  }
+
+  bool is_in_VTMT() const {
+#if INCLUDE_JVMTI
+    return _is_in_VTMT;
+#else
+    fatal("Should only be called with JVMTI enabled");
+    return false;
+#endif
+  }
 
   void set_is_in_VTMT(bool val);
   void set_is_VTMT_disabler(bool val);
@@ -1590,8 +1607,10 @@ private:
   JvmtiThreadState *jvmti_thread_state() const                                   { return _jvmti_thread_state; }
   static ByteSize jvmti_thread_state_offset()                                    { return byte_offset_of(JavaThread, _jvmti_thread_state); }
 
+#if INCLUDE_JVMTI
   // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
   JvmtiThreadState *rebind_to_jvmti_thread_state_of(oop thread_oop);
+#endif
 
   // JVMTI PopFrame support
   // Setting and clearing popframe_condition

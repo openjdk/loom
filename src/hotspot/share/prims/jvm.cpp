@@ -3890,12 +3890,14 @@ JVM_END
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
+#else
+  fatal("Should only be called with JVMTI enabled");
 #endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
-  assert(thread->is_in_VTMT(), "VTMT sanity check");
 #if INCLUDE_JVMTI
+  assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt = JNIHandles::resolve(vthread);
 
@@ -3916,6 +3918,8 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   if (JvmtiExport::should_post_vthread_mount()) {
     JvmtiExport::post_vthread_mount(vthread);
   }
+#else
+  fatal("Should only be called with JVMTI enabled");
 #endif
 JVM_END
 
@@ -3943,12 +3947,16 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+#else
+  fatal("Should only be called with JVMTI enabled");
 #endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
-  assert(thread->is_in_VTMT(), "VTMT sanity check");
 #if INCLUDE_JVMTI
+  assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
+#else
+  fatal("Should only be called with JVMTI enabled");
 #endif
 JVM_END
