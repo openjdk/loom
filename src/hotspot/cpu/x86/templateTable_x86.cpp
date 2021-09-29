@@ -4440,7 +4440,7 @@ void TemplateTable::monitorexit() {
   __ push_ptr(rax); // make sure object is on stack (contract with oopMaps)
   __ unlock_object(rtop);
   
-  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rax);
   NOT_LP64(__ get_thread(rthread);)
   __ dec_held_monitor_count(rthread);
 

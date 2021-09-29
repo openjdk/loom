@@ -611,7 +611,7 @@ void TemplateInterpreterGenerator::lock_method() {
   __ movptr(lockreg, rsp); // object address
   __ lock_object(lockreg);
 
-  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
+  Register rthread = NOT_LP64(rax) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(rthread);)
   __ inc_held_monitor_count(rthread);
 }
