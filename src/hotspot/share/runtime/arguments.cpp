@@ -1604,6 +1604,12 @@ void Arguments::set_conservative_max_heap_alignment() {
                                           GCArguments::compute_heap_alignment());
 }
 
+void Arguments::set_use_chunk_bitmaps() {
+  if (FLAG_IS_DEFAULT(UseChunkBitmaps)) {
+    FLAG_SET_ERGO(UseChunkBitmaps, UseG1GC || UseParallelGC || UseSerialGC);
+  }
+}
+
 jint Arguments::set_ergonomics_flags() {
   GCConfig::initialize();
 
@@ -1619,6 +1625,8 @@ jint Arguments::set_ergonomics_flags() {
   // Also checks that certain machines are slower with compressed oops
   // in vm_version initialization code.
 #endif // _LP64
+
+  set_use_chunk_bitmaps();
 
   return JNI_OK;
 }
