@@ -1795,10 +1795,10 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
 bool JavaThread::java_suspend() {
   // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
-#if ASSERT
+#ifdef ASSERT
   if (is_VTMT_disabler()) { // TMP debugging code, should be removed after this assert is observed
-    printf("DBG: JavaThread::java_suspend: suspended jt: %p current jt: %p\n", (void*)this, (void*)JavaThread::current()); 
-    printf("DBG: JavaThread::java_suspend: VTMT_disable_count: %d\n", JvmtiVTMTDisabler::VTMT_disable_count()); 
+    printf("DBG: JavaThread::java_suspend: suspended jt: %p current jt: %p\n", (void*)this, (void*)JavaThread::current());
+    printf("DBG: JavaThread::java_suspend: VTMT_disable_count: %d\n", JvmtiVTMTDisabler::VTMT_disable_count());
   }
 #endif
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
