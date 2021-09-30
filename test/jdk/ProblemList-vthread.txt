@@ -17,9 +17,8 @@ java/lang/invoke/modules/Driver1.java
 
 
 ####
-# Incorrect stackwalking epxectations for main thread stack trace
+# Incorrect stackwalking expectations for main thread stack trace
 
-java/lang/StackTraceElement/WithClassLoaderName.java
 java/lang/StackWalker/StackWalkTest.java
 java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
@@ -63,7 +62,7 @@ jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 
 
 ####
-# OOME in unextpected thread
+# OOME in unexpected thread
 
 java/lang/ref/OOMEInReferenceHandler.java
 
@@ -161,7 +160,7 @@ java/util/logging/modules/GetResourceBundleTest.java
 
 #####
 # Following tests failing of ProcessTools wrapper
-# cutom classpath, jars, no main class etc
+# custom classpath, jars, no main class etc
 
 jdk/modules/etc/DefaultModules.java
 jdk/modules/incubator/ServiceBinding.java

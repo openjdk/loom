@@ -373,6 +373,7 @@ class Arguments : AllStatic {
   static size_t limit_heap_by_allocatable_memory(size_t size);
   // Setup heap size
   static void set_heap_size();
+  static void set_use_chunk_bitmaps();
 
   // Bytecode rewriting
   static void set_bytecode_flags();
