@@ -91,7 +91,7 @@ class RegisterMap : public StackObj {
 #endif
 
  public:
-  NOT_PRODUCT(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
+  DEBUG_ONLY(intptr_t* _update_for_id;) // Assert that RegisterMap is not updated twice for same frame
   RegisterMap(JavaThread *thread, bool update_map = true, bool process_frames = true, bool walk_cont = false);
   RegisterMap(oop continuation, bool update_map = true);
   RegisterMap(const RegisterMap* map);
