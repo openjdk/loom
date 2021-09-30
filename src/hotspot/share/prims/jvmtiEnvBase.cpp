@@ -1368,7 +1368,7 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       // This monitor is owned so we have to find the owning JavaThread.
       owning_thread = Threads::owning_thread_from_monitor_owner(tlh.list(), owner);
       assert(owning_thread != NULL, "owning JavaThread must not be NULL");
-      Handle     th(current_thread, owning_thread->threadObj());
+      Handle     th(current_thread, get_vthread_or_thread_oop(owning_thread));
       ret.owner = (jthread)jni_reference(calling_thread, th);
     }
 
