@@ -185,7 +185,7 @@ template<int x> NOINLINE static bool do_verify_after_thaw1(JavaThread* thread) {
 static void print_vframe(frame f, const RegisterMap* map = nullptr, outputStream* st = tty);
 void do_deopt_after_thaw(JavaThread* thread);
 
-#ifdef ASSERT
+#ifndef PRODUCT
   template <bool relative>
   static void print_frame_layout(const frame& f, outputStream* st = tty);
   static void print_frames(JavaThread* thread, outputStream* st = tty);
@@ -2242,7 +2242,7 @@ private:
 
   int _align_size;
 
-  DEBUG_ONLY(int _frames;)
+  NOT_PRODUCT(int _frames;)
 
   inline frame new_entry_frame();
   template<typename FKind> frame new_frame(const frame& hf, frame& caller, bool bottom);
@@ -3485,6 +3485,7 @@ void Continuation::describe(FrameValues &values) {
   }
 }
 
+#ifdef ASSERT
 bool Continuation::debug_is_stack_chunk(Klass* k) {
   return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
 }
@@ -3565,6 +3566,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
   // st->print_cr("frames: %d interpreted frames: %d oops: %d", cont.num_frames(), cont.num_interpreted_frames(), cont.num_oops());
 }
+#endif // ASSERT
 
 static jlong java_tid(JavaThread* thread) {
   return java_lang_Thread::thread_id(thread->threadObj());
