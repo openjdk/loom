@@ -596,7 +596,9 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_encodeISOArray:
   case vmIntrinsics::_encodeByteISOArray:
-    return inline_encodeISOArray();
+    return inline_encodeISOArray(false);
+  case vmIntrinsics::_encodeAsciiArray:
+    return inline_encodeISOArray(true);
 
   case vmIntrinsics::_updateCRC32:
     return inline_updateCRC32();
@@ -5206,8 +5208,8 @@ LibraryCallKit::tightly_coupled_allocation(Node* ptr) {
 }
 
 //-------------inline_encodeISOArray-----------------------------------
-// encode char[] to byte[] in ISO_8859_1
-bool LibraryCallKit::inline_encodeISOArray() {
+// encode char[] to byte[] in ISO_8859_1 or ASCII
+bool LibraryCallKit::inline_encodeISOArray(bool ascii) {
   assert(callee()->signature()->size() == 5, "encodeISOArray has 5 parameters");
   // no receiver since it is static method
   Node *src         = argument(0);
@@ -5242,7 +5244,7 @@ bool LibraryCallKit::inline_encodeISOArray() {
   // 'dst_start' points to dst array + scaled offset
 
   const TypeAryPtr* mtype = TypeAryPtr::BYTES;
-  Node* enc = new EncodeISOArrayNode(control(), memory(mtype), src_start, dst_start, length);
+  Node* enc = new EncodeISOArrayNode(control(), memory(mtype), src_start, dst_start, length, ascii);
   enc = _gvn.transform(enc);
   Node* res_mem = _gvn.transform(new SCMemProjNode(enc));
   set_memory(res_mem, mtype);
@@ -7113,11 +7115,23 @@ bool LibraryCallKit::inline_galoisCounterMode_AESCrypt() {
   Node* state_start = array_element_address(state, intcon(0), T_LONG);
   Node* subkeyHtbl_start = array_element_address(subkeyHtbl, intcon(0), T_LONG);
 
+  ciKlass* klass = ciTypeArrayKlass::make(T_LONG);
+  Node* klass_node = makecon(TypeKlassPtr::make(klass));
+
+  // htbl entries is set to 96 only fox x86-64
+  if (Matcher::htbl_entries == -1) return false;
+
+  // new array to hold 48 computed htbl entries
+  Node* subkeyHtbl_48_entries = new_array(klass_node, intcon(Matcher::htbl_entries), 0);
+  if (subkeyHtbl_48_entries == NULL) return false;
+
+  Node* subkeyHtbl_48_entries_start = array_element_address(subkeyHtbl_48_entries, intcon(0), T_LONG);
+
   // Call the stub, passing params
   Node* gcmCrypt = make_runtime_call(RC_LEAF|RC_NO_FP,
                                OptoRuntime::galoisCounterMode_aescrypt_Type(),
                                stubAddr, stubName, TypePtr::BOTTOM,
-                               in_start, len, ct_start, out_start, k_start, state_start, subkeyHtbl_start, cnt_start);
+                               in_start, len, ct_start, out_start, k_start, state_start, subkeyHtbl_start, subkeyHtbl_48_entries_start, cnt_start);
 
   // return cipher length (int)
   Node* retvalue = _gvn.transform(new ProjNode(gcmCrypt, TypeFunc::Parms));

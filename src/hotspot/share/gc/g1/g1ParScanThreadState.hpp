@@ -38,6 +38,7 @@
 #include "utilities/ticks.hpp"
 
 class G1CardTable;
+class G1EvacFailureRegions;
 class G1EvacuationRootClosures;
 class G1OopStarChunkedList;
 class G1PLABAllocator;
@@ -98,9 +99,14 @@ class G1ParScanThreadState : public CHeapObj<mtGC> {
   size_t* _obj_alloc_stat;
 
   // Per-thread evacuation failure data structures.
+#ifndef PRODUCT
+  size_t _evac_failure_inject_counter;
+#endif
   PreservedMarks* _preserved_marks;
   EvacuationFailedInfo _evacuation_failed_info;
   G1EvacFailureRegions* _evac_failure_regions;
+
+  bool inject_evacuation_failure() PRODUCT_RETURN_( return false; );
 
 public:
   G1ParScanThreadState(G1CollectedHeap* g1h,
