@@ -318,6 +318,8 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   }
 #ifdef ASSERT
   if (attempts == 0) {
+    tty->print_cr("DBG: start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
+                  thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
     print_info();
     assert(false, "stuck in VTMT disabler for 10 seconds.");
   }
