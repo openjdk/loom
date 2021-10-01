@@ -554,8 +554,20 @@ vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referrin
 # method call, but on some hosts there are not enough cthreads to support pinning
 # all 10 vthreads, so the test deadlocks. -Djdk.defaultScheduler.parallelism=<n>
 # could be used with the debuggee to ensure there are enough vthreads.
+
 vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq002/TestDescription.java
 vmTestbase/nsk/jdi/EventRequestManager/deleteEventRequests/delevtreqs002/TestDescription.java
+
+###
+# For some reason that is not well understood, this test always times out on windows
+# when run with the vthread wrapper. It appears that the VMOutOfMemoryException is thrown
+# and caught as expected, but the test then times out waiting for the debuggee to exit. On the
+# debuggee side you see the following output, which might be related to the issue:
+#    Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "Read-Poller"
+# And the Read-Poller thread is no longer around. Also the main debuggee thread seems
+# to have exited.
+
+vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java windows-all
 
 ####
 ## NSK JMX Tests
