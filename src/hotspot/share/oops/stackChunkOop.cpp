@@ -32,7 +32,7 @@
 #include "runtime/frame.hpp"
 #include "runtime/registerMap.hpp"
 
-#ifndef PRODUCT
+#ifdef ASSERT
 bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {
   return InstanceStackChunkKlass::verify(this, out_size, out_oops, out_frames, out_interpreted_frames);
 }
