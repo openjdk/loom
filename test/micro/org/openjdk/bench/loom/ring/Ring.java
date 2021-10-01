@@ -48,6 +48,7 @@ import java.util.function.Predicate;
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Mode.AverageTime)
 @State(Scope.Thread)
+@SuppressWarnings("preview")
 public class Ring {
 
     public static class Worker<T> implements Runnable {

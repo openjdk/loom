@@ -31,7 +31,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * @test JNIMonitor
  * @summary Tests that JNI monitors works correctly for native threads
  * @library /test/lib
- * @run main/native/othervm JNIMonitor
+ * @compile --enable-preview -source ${jdk.version} JNIMonitor.java
+ * @run main/native/othervm --enable-preview JNIMonitor
  */
 
 public class JNIMonitor {

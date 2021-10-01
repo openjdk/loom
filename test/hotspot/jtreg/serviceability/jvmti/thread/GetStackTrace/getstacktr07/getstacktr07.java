@@ -37,7 +37,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:getstacktr07 getstacktr07
+ * @compile --enable-preview -source ${jdk.version} getstacktr07.java
+ * @run main/othervm/native --enable-preview -agentlib:getstacktr07 getstacktr07
  */
 
 import java.io.*;

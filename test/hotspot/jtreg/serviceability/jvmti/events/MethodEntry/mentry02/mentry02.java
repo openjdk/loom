@@ -40,7 +40,8 @@ import java.io.PrintStream;
  *     Ported from JVMDI test /nsk/regression/b4248826.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mentry02 mentry02
+ * @compile --enable-preview -source ${jdk.version} mentry02.java
+ * @run main/othervm/native --enable-preview -agentlib:mentry02 mentry02
  */
 
 

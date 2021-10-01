@@ -39,7 +39,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:GetStackTraceCurrentThreadTest GetStackTraceCurrentThreadTest
+ * @compile --enable-preview -source ${jdk.version} GetStackTraceCurrentThreadTest.java
+ * @run main/othervm/native --enable-preview -agentlib:GetStackTraceCurrentThreadTest GetStackTraceCurrentThreadTest
  */
 
 public class GetStackTraceCurrentThreadTest {

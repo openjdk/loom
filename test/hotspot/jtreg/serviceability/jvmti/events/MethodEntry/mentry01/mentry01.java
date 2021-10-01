@@ -42,7 +42,8 @@ import java.io.PrintStream;
  *     Fixed the 5004632 bug.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mentry01 mentry01
+ * @compile --enable-preview -source ${jdk.version} mentry01.java
+ * @run main/othervm/native --enable-preview -agentlib:mentry01 mentry01
  */
 
 

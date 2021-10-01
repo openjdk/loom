@@ -26,8 +26,10 @@
  * @summary Test SuspendThread/ResumeThread, SuspendThreadList/ResumeThreadList
  *          for virtual threads.
  * @library /test/lib
+ * @compile --enable-preview -source ${jdk.version} SuspendResume1.java
  * @run driver jdk.test.lib.FileInstaller . .
  * @run main/othervm/native
+ *      --enable-preview
  *      -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
  *      -agentlib:SuspendResume1
  *      SuspendResume1

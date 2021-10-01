@@ -43,7 +43,8 @@ import java.io.*;
  *     Fixed the 5031200 bug.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:classload01 classload01
+ * @compile --enable-preview -source ${jdk.version} classload01.java
+ * @run main/othervm/native --enable-preview -agentlib:classload01 classload01
  */
 
 

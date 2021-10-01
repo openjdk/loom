@@ -60,7 +60,8 @@
  *       - enhanced descripton
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:contmon01 contmon01
+ * @compile --enable-preview -source ${jdk.version} contmon01.java
+ * @run main/othervm/native --enable-preview -agentlib:contmon01 contmon01
  */
 
 public class contmon01 {

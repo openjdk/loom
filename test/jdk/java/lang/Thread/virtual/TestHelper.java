@@ -21,10 +21,12 @@
  * questions.
  */
 
+import java.lang.reflect.Field;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Runs tasks in virtual threads.
+ * Helper class for testing virtual threads.
  */
 
 class TestHelper {
@@ -83,6 +85,21 @@ class TestHelper {
 
     static void runInVirtualThread(ThrowingRunnable task) throws Exception {
         run(null, 0, task);
+    }
+
+    static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual();
+        try {
+            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
+            Field field = clazz.getDeclaredField("scheduler");
+            field.setAccessible(true);
+            field.set(builder, scheduler);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return builder;
     }
 
     static void scheduleInterrupt(Thread thread, long delay) {

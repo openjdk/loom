@@ -25,8 +25,8 @@
 /**
  * @test
  * @summary Test JVMTI Monitor functions for virtual threads
- * @compile VThreadMonitorTest.java
- * @run main/othervm/native -agentlib:VThreadMonitorTest VThreadMonitorTest
+ * @compile --enable-preview -source ${jdk.version} VThreadMonitorTest.java
+ * @run main/othervm/native --enable-preview -agentlib:VThreadMonitorTest VThreadMonitorTest
  */
 
 import java.io.PrintStream;

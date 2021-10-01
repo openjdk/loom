@@ -39,7 +39,8 @@
  *
  * @library /test/lib
  * @compile excatch01a.jasm
- * @run main/othervm/native -agentlib:excatch01 excatch01
+ * @compile --enable-preview -source ${jdk.version} excatch01.java
+ * @run main/othervm/native --enable-preview -agentlib:excatch01 excatch01
  */
 
 

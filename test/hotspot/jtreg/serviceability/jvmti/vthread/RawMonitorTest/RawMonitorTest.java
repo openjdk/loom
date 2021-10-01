@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Verifies JVMTI RawMoitor functions works correctly on virtual threads
- * @run main/othervm/native -agentlib:RawMonitorTest RawMonitorTest
+ * @compile --enable-preview -source ${jdk.version} RawMonitorTest.java
+ * @run main/othervm/native --enable-preview -agentlib:RawMonitorTest RawMonitorTest
  */
 
 import java.util.List;

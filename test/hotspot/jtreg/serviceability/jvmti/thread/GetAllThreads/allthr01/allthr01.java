@@ -37,7 +37,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:allthr01 allthr01
+ * @compile --enable-preview -source ${jdk.version} allthr01.java
+ * @run main/othervm/native --enable-preview -agentlib:allthr01 allthr01
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;

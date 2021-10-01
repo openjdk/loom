@@ -25,13 +25,15 @@
  * @test
  * @summary Stress test Thread.sleep
  * @requires vm.debug != true
- * @run main/othervm SleepALot
+ * @compile --enable-preview -source ${jdk.version} SleepALot.java
+ * @run main/othervm --enable-preview SleepALot
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=300 SleepALot 200000
+ * @compile --enable-preview -source ${jdk.version} SleepALot.java
+ * @run main/othervm/timeout=300 --enable-preview SleepALot 200000
  */
 
 import java.time.Duration;

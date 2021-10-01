@@ -24,8 +24,8 @@
 /**
  * @test
  * @summary Verifies that JVMTI function return correct info in Breakpoint events in Continuation.yield0().
- * @compile BreakpointInYieldTest.java
- * @run main/othervm/native -agentlib:BreakpointInYieldTest -Djdk.defaultScheduler.parallelism=2 BreakpointInYieldTest
+ * @compile --enable-preview -source ${jdk.version} BreakpointInYieldTest.java
+ * @run main/othervm/native --enable-preview -agentlib:BreakpointInYieldTest -Djdk.defaultScheduler.parallelism=2 BreakpointInYieldTest
  */
 
 import java.util.concurrent.*;

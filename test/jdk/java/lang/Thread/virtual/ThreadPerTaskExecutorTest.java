@@ -24,7 +24,8 @@
 /*
  * @test
  * @summary Basic tests for new thread-per-task executors
- * @run testng/othervm/timeout=300 ThreadPerTaskExecutorTest
+ * @compile --enable-preview -source ${jdk.version} ThreadPerTaskExecutorTest.java
+ * @run testng/othervm/timeout=300 --enable-preview ThreadPerTaskExecutorTest
  */
 
 import java.time.Duration;

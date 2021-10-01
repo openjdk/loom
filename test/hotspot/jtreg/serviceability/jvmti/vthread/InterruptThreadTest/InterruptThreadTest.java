@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Verifies JVMTI InterruptThread works for virtual threads.
- * @run main/othervm/native -agentlib:InterruptThreadTest InterruptThreadTest
+ * @compile --enable-preview -source ${jdk.version} InterruptThreadTest.java
+ * @run main/othervm/native --enable-preview -agentlib:InterruptThreadTest InterruptThreadTest
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;

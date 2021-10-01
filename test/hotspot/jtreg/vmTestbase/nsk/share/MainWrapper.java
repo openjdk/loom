@@ -45,26 +45,29 @@ public final class MainWrapper {
         Finalizer finalizer = new Finalizer(new FinalizableObject());
         finalizer.activate();
 
-        Thread.Builder tb;
+
+
+        Runnable task = () -> {
+            try {
+                Class<?> c = Class.forName(className);
+                Method mainMethod = c.getMethod("main", new Class[] { String[].class });
+                mainMethod.setAccessible(true);
+                mainMethod.invoke(null, new Object[] { classArgs });
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+                ue.set(e.getCause());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        };
+
+        Thread t;
         if (wrapperName.equals("Virtual")) {
-            tb = Thread.ofVirtual();
+            t = unstartedVirtualThread(task);
         } else {
-            tb = Thread.ofPlatform();
+            t = new Thread(task);
         }
-        tb.name("main");
-        Thread t = tb.unstarted(() -> {
-                try {
-                    Class c = Class.forName(className);
-                    Method mainMethod = c.getMethod("main", new Class[] { String[].class });
-                    mainMethod.setAccessible(true);
-                    mainMethod.invoke(null, new Object[] { classArgs });
-                } catch (InvocationTargetException e) {
-                    e.printStackTrace();
-                    ue.set(e.getCause());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
+        t.setName("main");
         Thread.currentThread().setName("old-m-a-i-n");
         t.start();
         t.join();
@@ -72,4 +75,18 @@ public final class MainWrapper {
             throw ue.get();
         }
     }
+
+    static Thread unstartedVirtualThread(Runnable task) {
+        try {
+            Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+            Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+            Method start = clazz.getMethod("unstarted", Runnable.class);
+            return (Thread) start.invoke(builder, task);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

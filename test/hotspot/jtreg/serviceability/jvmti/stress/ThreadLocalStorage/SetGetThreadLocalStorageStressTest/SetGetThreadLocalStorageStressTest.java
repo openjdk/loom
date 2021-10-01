@@ -40,7 +40,8 @@
  *
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:SetGetThreadLocalStorageStress SetGetThreadLocalStorageStressTest
+ * @compile --enable-preview -source ${jdk.version} SetGetThreadLocalStorageStressTest.java
+ * @run main/othervm/native --enable-preview -agentlib:SetGetThreadLocalStorageStress SetGetThreadLocalStorageStressTest
  */
 
 

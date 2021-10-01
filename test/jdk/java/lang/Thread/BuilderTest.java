@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Unit test for Thread.Builder
- * @run testng BuilderTest
+ * @compile --enable-preview -source ${jdk.version} BuilderTest.java
+ * @run testng/othervm --enable-preview BuilderTest
  */
 
 import java.util.concurrent.*;

@@ -24,7 +24,9 @@
 /**
  * @test
  * @summary Test Thread API with virtual threads
- * @run testng ThreadAPI
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} ThreadAPI.java TestHelper.java
+ * @run testng/othervm --enable-preview ThreadAPI
  */
 
 import java.time.Duration;
@@ -1047,7 +1049,8 @@ public class ThreadAPI {
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1073,7 +1076,8 @@ public class ThreadAPI {
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1568,7 +1572,7 @@ public class ThreadAPI {
     public void testGetState3() throws Exception {
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder.OfVirtual builder = Thread.ofVirtual().scheduler(scheduler);
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
             Thread t1 = builder.start(() -> {
                 Thread t2 = builder.unstarted(LockSupport::park);
                 assertTrue(t2.getState() == Thread.State.NEW);
@@ -1781,7 +1785,8 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();
@@ -1877,7 +1882,8 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();
