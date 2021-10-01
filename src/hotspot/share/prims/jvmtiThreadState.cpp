@@ -227,7 +227,7 @@ JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
 #ifdef ASSERT
 void
 JvmtiVTMTDisabler::print_info() {
-  tty->print_cr("VTMT disabled with count = %d.\n", _VTMT_count);
+  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n", _VTMT_disable_count, _VTMT_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
     tty->print_cr("Thread %s, is_in_VTMT = %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
