@@ -332,9 +332,9 @@ public:
 
 template <bool store, bool compressedOopsWithBitmap>
 class BarrierClosure: public OopClosure {
-  DEBUG_ONLY(intptr_t* _sp;)
+  NOT_PRODUCT(intptr_t* _sp;)
 public:
-  BarrierClosure(intptr_t* sp) DEBUG_ONLY(: _sp(sp)) {}
+  BarrierClosure(intptr_t* sp) NOT_PRODUCT(: _sp(sp)) {}
 
   virtual void do_oop(oop* p)       override { compressedOopsWithBitmap ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }

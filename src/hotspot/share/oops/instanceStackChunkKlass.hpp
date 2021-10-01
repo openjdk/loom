@@ -102,9 +102,10 @@ public:
   static inline void assert_mixed_correct(stackChunkOop chunk, bool mixed) PRODUCT_RETURN;
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st) override;
-  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL);
 #endif
-  
+
+  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
+
   // Stack offset is an offset into the Heap
   static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
   static inline HeapWord* start_of_bitmap(oop obj);
@@ -203,14 +204,17 @@ class StackChunkFrameStream : public StackObj {
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
 
-#ifdef ASSERT
+#ifndef PRODUCT
   stackChunkOop _chunk;
   int _index;
+#endif
+
+#ifdef ASSERT
   int _has_stub;
 #endif
 
- public:
-  StackChunkFrameStream() { DEBUG_ONLY(_chunk = nullptr; _index = -1; _has_stub = false;) }
+public:
+  StackChunkFrameStream() { NOT_PRODUCT(_chunk = nullptr; _index = -1;) DEBUG_ONLY(_has_stub = false;) }
   inline StackChunkFrameStream(stackChunkOop chunk, bool gc = false);
   inline StackChunkFrameStream(stackChunkOop chunk, const frame& f);
 
@@ -227,7 +231,7 @@ class StackChunkFrameStream : public StackObj {
   inline address   pc() const  { return get_pc(); }
   inline intptr_t* fp() const;
   inline intptr_t* unextended_sp() const { return mixed ? _unextended_sp : _sp; }
-  DEBUG_ONLY(int index() { return _index; })
+  NOT_PRODUCT(int index() { return _index; })
   inline address orig_pc() const;
 
   inline bool is_interpreted() const;

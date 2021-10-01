@@ -1022,8 +1022,10 @@ JavaThread::JavaThread() :
   _in_deopt_handler(0),
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
+#if INCLUDE_JVMTI
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
+#endif
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1774,6 +1776,7 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   this->interrupt();
 }
 
+#if INCLUDE_JVMTI
 void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
   if (val) {
@@ -1785,6 +1788,7 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
   _is_VTMT_disabler = val;
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
 }
+#endif
 
 // External suspension mechanism.
 //
@@ -1793,9 +1797,17 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
+#if INCLUDE_JVMTI
   // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
+#ifdef ASSERT
+  if (is_VTMT_disabler()) { // TMP debugging code, should be removed after this assert is observed
+    printf("DBG: JavaThread::java_suspend: suspended jt: %p current jt: %p\n", (void*)this, (void*)JavaThread::current());
+    printf("DBG: JavaThread::java_suspend: VTMT_disable_count: %d\n", JvmtiVTMTDisabler::VTMT_disable_count());
+  }
+#endif
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
+#endif
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {
@@ -2361,6 +2373,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
+#if INCLUDE_JVMTI
 // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_mounted_vthread(thread_oop);
@@ -2373,6 +2386,7 @@ JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
 
   return jvmti_thread_state();
 }
+#endif
 
 // JVMTI PopFrame support
 void JavaThread::popframe_preserve_args(ByteSize size_in_bytes, void* start) {

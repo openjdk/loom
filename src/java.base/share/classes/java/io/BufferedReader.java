@@ -69,10 +69,6 @@ import jdk.internal.misc.InternalLock;
  */
 
 public class BufferedReader extends Reader {
-
-    // Legacy/undocumented behavior was to the wrapped Reader as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     private Reader in;
 
     private char[] cb;

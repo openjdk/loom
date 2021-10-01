@@ -68,10 +68,6 @@ import jdk.internal.misc.VM;
  */
 
 public class BufferedWriter extends Writer {
-
-    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     private static final int DEFAULT_INITIAL_BUFFER_SIZE = 512;
     private static final int DEFAULT_MAX_BUFFER_SIZE = 8192;
 
@@ -256,10 +252,8 @@ public class BufferedWriter extends Writer {
 
     private void lockedWrite(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
-        if ((off < 0) || (off > cbuf.length) || (len < 0) ||
-            ((off + len) > cbuf.length) || ((off + len) < 0)) {
-            throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
+        Objects.checkFromIndexSize(off, len, cbuf.length);
+        if (len == 0) {
             return;
         }
 

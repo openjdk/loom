@@ -63,9 +63,6 @@ import jdk.internal.misc.InternalLock;
 
 public class PrintWriter extends Writer {
 
-    // Legacy/undocumented behavior was to the wrapped Writer as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     /**
      * The underlying character-output stream of this
      * {@code PrintWriter}.
