@@ -450,9 +450,16 @@ class frame {
   int adjust_offset(Method* method, int index); // helper for above fn
  public:
   // Memory management
-  void oops_do(OopClosure* f, CodeBlobClosure* cf, const RegisterMap* map) { oops_do_internal(f, cf, NULL, DerivedPointerTable::is_active() ?
-                                                                                                           DerivedPointerIterationMode::_with_table :
-                                                                                                           DerivedPointerIterationMode::_ignore, map, true); }
+  void oops_do(OopClosure* f, CodeBlobClosure* cf, const RegisterMap* map) {
+#if COMPILER2_OR_JVMCI
+    DerivedPointerIterationMode dpim = DerivedPointerTable::is_active() ?
+                                       DerivedPointerIterationMode::_with_table :
+                                       DerivedPointerIterationMode::_ignore;
+#else
+    DerivedPointerIterationMode dpim = DerivedPointerIterationMode::_ignore;;
+#endif
+    oops_do_internal(f, cf, NULL, dpim, map, true);
+  }
   void oops_do(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosure* df, const RegisterMap* map) { oops_do_internal(f, cf, df, DerivedPointerIterationMode::_ignore, map, true); }
   void oops_do(OopClosure* f, CodeBlobClosure* cf, const RegisterMap* map, DerivedPointerIterationMode derived_mode) const { oops_do_internal(f, cf, NULL, derived_mode, map, true); }
   void nmethods_do(CodeBlobClosure* cf) const;

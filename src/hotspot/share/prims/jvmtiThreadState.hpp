@@ -95,8 +95,8 @@ class JvmtiVTMTDisabler {
   void set_self_suspend() { _self_suspend = true; }
   static void start_VTMT(jthread vthread, int callsite_tag);
   static void finish_VTMT(jthread vthread, int callsite_tag);
-  static int  VTMT_disable_count() { return _VTMT_disable_count; };
-  static int  VTMT_count() { return _VTMT_count; }
+  static int  VTMT_disable_count();
+  static int  VTMT_count();
 };
 
 ///////////////////////////////////////////////////////////////
