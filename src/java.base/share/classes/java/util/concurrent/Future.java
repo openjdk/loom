@@ -174,7 +174,7 @@ public interface Future<V> {
      * did not complete with a result
      * @since 99
      */
-    default V completedResult() {
+    default V completedResultNow() {
         if (!isDone())
             throw new IllegalStateException();
         boolean interrupted = false;
@@ -207,7 +207,7 @@ public interface Future<V> {
      * completed normally
      * @since 99
      */
-    default Throwable completedException() {
+    default Throwable completedExceptionNow() {
         if (!isDone())
             throw new IllegalStateException();
         if (isCancelled())
@@ -240,12 +240,12 @@ public interface Future<V> {
         RUNNING,
         /**
          * The task completed with a result.
-         * @see Future#completedResult() ()
+         * @see Future#completedResultNow()
          */
         SUCCESS,
         /**
          * The task completed with an exception.
-         * @see Future#completedResult() ()
+         * @see Future#completedExceptionNow()
          */
         FAILED,
         /**
