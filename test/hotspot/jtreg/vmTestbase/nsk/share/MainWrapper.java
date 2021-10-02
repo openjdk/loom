@@ -80,8 +80,8 @@ public final class MainWrapper {
         try {
             Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
             Class<?> clazz = Class.forName("java.lang.Thread$Builder");
-            Method start = clazz.getMethod("unstarted", Runnable.class);
-            return (Thread) start.invoke(builder, task);
+            Method unstarted = clazz.getMethod("unstarted", Runnable.class);
+            return (Thread) unstarted.invoke(builder, task);
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Exception e) {
