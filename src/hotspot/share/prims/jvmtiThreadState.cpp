@@ -230,7 +230,8 @@ JvmtiVTMTDisabler::print_info() {
   tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n", _VTMT_disable_count, _VTMT_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
-    tty->print_cr("Thread %s, is_in_VTMT = %s. Stacktrace:", java_thread->name(), (java_thread->is_in_VTMT() ? "true": "false"));
+    tty->print_cr("JavaThread %s, is_VTMT_disabler: %d, is_in_VTMT = %d Stacktrace:",
+                  java_thread->name(), java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
     // Handshake with target
     PrintStackTraceClosure pstc;
     Handshake::execute(&pstc, java_thread);
@@ -266,7 +267,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
 #ifdef ASSERT
   if (attempts == 0) {
     print_info();
-    assert(false, "stuck in VTMT disabler for 10 seconds.");
+    assert(false, "stuck in JvmtiVTMTDisabler::disable_VTMT for 10 seconds.");
   }
 #endif
 }
@@ -321,7 +322,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     tty->print_cr("DBG: start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
                   thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
     print_info();
-    assert(false, "stuck in VTMT disabler for 10 seconds.");
+    assert(false, "stuck in JvmtiVTMTDisabler::start_VTMT for 10 seconds.");
   }
 #endif
 }
