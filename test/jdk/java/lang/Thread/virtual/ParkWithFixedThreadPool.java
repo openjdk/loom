@@ -58,7 +58,7 @@ public class ParkWithFixedThreadPool {
                     }
                 }
             };
-            
+
             ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler)
                     .name("vthread-", 0)
                     .factory();

@@ -38,7 +38,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -156,15 +155,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of
- * {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
- * a number of properties from the parent thread:
- * <ul>
- *     <li> Platform threads inherit the daemon status, priority, and thread-group.
- *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
- *          when the parent thread is a virtual thread. Virtual threads use the default
- *          scheduler when the parent thread is a platform thread and the scheduler has
- *          not been selected.
- * </ul>
+ * {@linkplain InheritableThreadLocal inheritable-thread-local} variables.
+ * Platform threads also inherit the daemon status, priority, and thread-group.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -726,61 +718,6 @@ public class Thread implements Runnable {
     }
 
     /**
-     * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
-     * to a custom {@link Thread.Builder.OfVirtual#scheduler(Executor) scheduler}.
-     *
-     * @apiNote The following example creates a scheduler that uses a small set of
-     * platform threads. It prints the name of each virtual thread before executing
-     * its task.
-     * <pre>{@code
-     *     ExecutorService pool = Executors.newFixedThreadPool(4);
-     *     Executor scheduler = (task) -> {
-     *         Thread vthread = ((Thread.VirtualThreadTask) task).thread();
-     *         System.out.println(vthread);
-     *         pool.execute(task);
-     *     };
-     * }</pre>
-     *
-     * @see Thread.Builder.OfVirtual#scheduler(Executor)
-     * @since 99
-     */
-    public interface VirtualThreadTask extends Runnable {
-        /**
-         * Return the virtual thread that this task was submitted to run
-         * @return the virtual thread
-         */
-        Thread thread();
-
-        /**
-         * Attaches the given object to this task.
-         * @param att the object to attach
-         * @return the previously-attached object, if any, otherwise {@code null}
-         */
-        Object attach(Object att);
-
-        /**
-         * Retrieves the current attachment.
-         * @return the object currently attached to this task or {@code null} if
-         *         there is no attachment
-         */
-        Object attachment();
-
-        /**
-         * Runs the task on the current thread as the carrier thread.
-         *
-         * <p> Invoking this method with the interrupt status set will first
-         * clear the interrupt status. Interrupting the carrier thread while
-         * running the task leads to unspecified behavior.
-         *
-         * @throws IllegalStateException if the virtual thread is not in a state to
-         *         run on the current thread
-         * @throws IllegalCallerException if the current thread is a virtual thread
-         */
-        @Override
-        void run();
-    }
-
-    /**
      * Returns a builder for creating a platform {@code Thread} or {@code ThreadFactory}
      * that creates platform threads.
      *
@@ -1058,23 +995,6 @@ public class Thread implements Runnable {
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
-
-            /**
-             * Sets the scheduler.
-             * The thread will be scheduled by the Java virtual machine with the given
-             * scheduler. The scheduler's {@link Executor#execute(Runnable) execute}
-             * method is invoked with tasks of type {@link Thread.VirtualThreadTask}. It may
-             * be invoked in the context of a virtual thread. The scheduler should
-             * arrange to execute these tasks on a platform thread. Attempting to execute
-             * the task on a virtual thread causes an exception to be thrown (see
-             * {@link Thread.VirtualThreadTask#run()}). The {@code execute} method may be
-             * invoked at sensitive times (e.g. when unparking a thread) so care should
-             * be taken to not directly execute the task on the <em>current thread</em>.
-             *
-             * @param scheduler the scheduler or {@code null} for the default scheduler
-             * @return this builder
-             */
-            OfVirtual scheduler(Executor scheduler);
         }
     }
 

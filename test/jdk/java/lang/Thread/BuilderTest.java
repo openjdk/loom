@@ -366,42 +366,6 @@ public class BuilderTest {
         Thread.ofPlatform().stackSize(-1);
     }
 
-    // scheduler
-    @Test
-    public void testScheduler() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(1);
-        try {
-            Thread carrierThread = pool.submit(Thread::currentThread).get();
-
-            // wrap the executor to capture the carrier thread
-            var threads = new ArrayBlockingQueue<Thread>(10);
-            Executor wrapper = task -> pool.execute(() -> {
-                try {
-                    threads.put(Thread.currentThread());
-                    pool.execute(task);
-                } catch (InterruptedException ignore) { }
-            });
-
-            Thread.Builder builder = Thread.ofVirtual().scheduler(wrapper::execute);
-
-            Thread thread1 = builder.unstarted(() -> { });
-            thread1.start();
-            thread1.join();
-
-            Thread thread2 = builder.start(() -> { });
-            thread2.join();
-
-            Thread thread3 = builder.factory().newThread(() -> { });
-            thread3.start();
-            thread3.join();
-
-            assertTrue(threads.size() == 3);
-            threads.forEach(t -> assertTrue(t == carrierThread));
-        } finally {
-            pool.shutdown();
-        }
-    }
-
     // uncaught exception handler
     @Test
     public void testUncaughtExceptionHandler1() throws Exception {

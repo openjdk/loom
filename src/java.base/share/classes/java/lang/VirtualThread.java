@@ -123,13 +123,6 @@ class VirtualThread extends Thread {
     private volatile CountDownLatch termination;
 
     /**
-     * Returns the default scheduler.
-     */
-    static Executor defaultScheduler() {
-        return DEFAULT_SCHEDULER;
-    }
-
-    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -164,11 +157,7 @@ class VirtualThread extends Thread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        if (scheduler == DEFAULT_SCHEDULER) {
-            this.runContinuation = this::runContinuation;
-        } else {
-            this.runContinuation = new CustomRunner(this);
-        }
+        this.runContinuation = this::runContinuation;
     }
 
     /**
@@ -184,46 +173,6 @@ class VirtualThread extends Thread {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
                 PinnedThreadPrinter.printStackTrace(System.out, printAll);
             }
-        }
-    }
-
-    /**
-     * The task to execute when using a custom scheduler.
-     */
-    private static class CustomRunner implements VirtualThreadTask {
-        private final VirtualThread vthread;
-        private static final VarHandle ATTACHMENT;
-        static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                ATTACHMENT = l.findVarHandle(CustomRunner.class, "attachment", Object.class);
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
-        }
-        private volatile Object attachment;
-        CustomRunner(VirtualThread vthread) {
-            this.vthread = vthread;
-        }
-        @Override
-        public void run() {
-            vthread.runContinuation();
-        }
-        @Override
-        public Thread thread() {
-            return vthread;
-        }
-        @Override
-        public Object attach(Object ob) {
-            return ATTACHMENT.getAndSet(this, ob);
-        }
-        @Override
-        public Object attachment() {
-            return attachment;
-        }
-        @Override
-        public String toString() {
-            return vthread.toString();
         }
     }
 
