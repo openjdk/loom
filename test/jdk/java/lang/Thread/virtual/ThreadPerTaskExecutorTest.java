@@ -344,12 +344,6 @@ public class ThreadPerTaskExecutorTest {
         executor.submit((Callable<String>) null);
     }
 
-    @Test(dataProvider = "factories", expectedExceptions = { NullPointerException.class })
-    public void testSubmitNulls3(ThreadFactory factory) {
-        var executor = Executors.newThreadPerTaskExecutor(factory);
-        executor.submit((Collection<? extends Callable<String>>) null);
-    }
-
     /**
      * Test invokeAny where all tasks complete normally.
      */
@@ -769,88 +763,6 @@ public class ThreadPerTaskExecutorTest {
     }
 
     /**
-     * Test invokeAll with waitAll=false, last task should be cancelled
-     */
-    @Test(dataProvider = "executors")
-    public void testInvokeAll5(ExecutorService executor) throws Exception {
-        try (executor) {
-            class BarException extends Exception { }
-            Callable<String> task1 = () -> "foo";
-            Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofMillis(500));
-                throw new BarException();
-            };
-            Callable<String> task3 = () -> {
-                Thread.sleep(Duration.ofDays(1));
-                return "baz";
-            };
-
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
-
-            // list should have three elements, all should be done
-            assertTrue(list.size() == 3);
-            boolean notDone = list.stream().anyMatch(r -> !r.isDone());
-            assertFalse(notDone);
-
-            // task1 should have a result or be cancelled
-            Future<String> future = list.get(0);
-            if (future.state() == SUCCESS) {
-                assertEquals(future.get(), "foo");
-            } else {
-                expectThrows(CancellationException.class, future::get);
-            }
-
-            // task2 should have failed with an exception
-            Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
-            assertTrue(e2.getCause() instanceof BarException);
-
-            // task3 should be cancelled
-            expectThrows(CancellationException.class, () -> list.get(2).get());
-        }
-    }
-
-    /**
-     * Test invokeAll with waitAll=false, first task should be cancelled
-     */
-    @Test(dataProvider = "executors")
-    public void testInvokeAll6(ExecutorService executor) throws Exception {
-        try (executor) {
-            class BarException extends Exception { }
-            Callable<String> task1 = () -> {
-                Thread.sleep(Duration.ofDays(1));
-                return "foo";
-            };
-            Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofMillis(500));
-                throw new BarException();
-            };
-            Callable<String> task3 = () -> "baz";
-
-            List<Future<String>> list = executor.invokeAll(List.of(task1, task2, task3), false);
-
-            // list should have three elements, all should be done
-            assertTrue(list.size() == 3);
-            boolean notDone = list.stream().anyMatch(r -> !r.isDone());
-            assertFalse(notDone);
-
-            // task1 should be cancelled
-            expectThrows(CancellationException.class, () -> list.get(0).get());
-
-            // task2 should have failed with an exception
-            Throwable e2 = expectThrows(ExecutionException.class, () -> list.get(1).get());
-            assertTrue(e2.getCause() instanceof BarException);
-
-            // task3 should have a result or be cancelled
-            Future<String> future = list.get(2);
-            if (future.state() == SUCCESS) {
-                assertEquals(future.get(), "baz");
-            } else {
-                expectThrows(CancellationException.class, future::get);
-            }
-        }
-    }
-
-    /**
      * Test invokeAll with interrupt status set.
      */
     @Test(dataProvider = "executors")
@@ -865,30 +777,6 @@ public class ThreadPerTaskExecutorTest {
             Thread.currentThread().interrupt();
             try {
                 executor.invokeAll(List.of(task1, task2));
-                assertTrue(false);
-            } catch (InterruptedException expected) {
-                assertFalse(Thread.currentThread().isInterrupted());
-            } finally {
-                Thread.interrupted(); // clear interrupt
-            }
-        }
-    }
-
-    /**
-     * Test invokeAll waitAll=false and with interrupt status set.
-     */
-    @Test(dataProvider = "executors")
-    public void testInvokeAllInterrupt2(ExecutorService executor) throws Exception {
-        try (executor) {
-            Callable<String> task1 = () -> "foo";
-            Callable<String> task2 = () -> {
-                Thread.sleep(Duration.ofMinutes(1));
-                return "bar";
-            };
-
-            Thread.currentThread().interrupt();
-            try {
-                executor.invokeAll(List.of(task1, task2), false);
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.currentThread().isInterrupted());
@@ -949,32 +837,6 @@ public class ThreadPerTaskExecutorTest {
     }
 
     /**
-     * Test interrupt with thread blocked in invokeAll waitAll=false
-     */
-    @Test(dataProvider = "executors")
-    public void testInvokeAllInterrupt5(ExecutorService executor) throws Exception {
-        try (executor) {
-            Callable<String> task1 = () -> "foo";
-            DelayedResult<String> task2 = new DelayedResult("bar", Duration.ofMinutes(1));
-            scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
-            try {
-                executor.invokeAll(Set.of(task1, task2), false);
-                assertTrue(false);
-            } catch (InterruptedException expected) {
-                assertFalse(Thread.currentThread().isInterrupted());
-
-                // task2 should have been interrupted
-                while (!task2.isDone()) {
-                    Thread.sleep(Duration.ofMillis(100));
-                }
-                assertTrue(task2.exception() instanceof InterruptedException);
-            } finally {
-                Thread.interrupted(); // clear interrupt
-            }
-        }
-    }
-
-    /**
      * Test interrupt with thread blocked in timed-invokeAll
      */
     @Test(dataProvider = "executors")
@@ -1018,15 +880,6 @@ public class ThreadPerTaskExecutorTest {
 
         Callable<String> task1 = () -> "foo";
         Callable<String> task2 = () -> "bar";
-        executor.invokeAll(Set.of(task1, task2), false);
-    }
-
-    @Test(dataProvider = "executors", expectedExceptions = { RejectedExecutionException.class })
-    public void testInvokeAllAfterShutdown3(ExecutorService executor) throws Exception {
-        executor.shutdown();
-
-        Callable<String> task1 = () -> "foo";
-        Callable<String> task2 = () -> "bar";
         executor.invokeAll(Set.of(task1, task2), 1, TimeUnit.SECONDS);
     }
 
@@ -1043,14 +896,6 @@ public class ThreadPerTaskExecutorTest {
 
     @Test(dataProvider = "executors")
     public void testInvokeAllEmpty2(ExecutorService executor) throws Exception {
-        try (executor) {
-            List<Future<Object>> list = executor.invokeAll(Set.of(), false);
-            assertTrue(list.size() == 0);
-        }
-    }
-
-    @Test(dataProvider = "executors")
-    public void testInvokeAllEmpty3(ExecutorService executor) throws Exception {
         try (executor) {
             List<Future<Object>> list = executor.invokeAll(Set.of(), 1, TimeUnit.SECONDS);
             assertTrue(list.size() == 0);

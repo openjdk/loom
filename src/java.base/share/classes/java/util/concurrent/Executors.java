@@ -272,16 +272,6 @@ public class Executors {
     }
 
     /**
-     * Creates an Executor that starts a new virtual Thread for each task.
-     * @deprecated Use {@link #newVirtualThreadPerTaskExecutor()} instead.
-     * @return a newly created executor
-     */
-    @Deprecated(forRemoval = true)
-    public static ExecutorService newVirtualThreadExecutor() {
-        return newVirtualThreadPerTaskExecutor();
-    }
-
-    /**
      * Creates a single-threaded executor that can schedule commands
      * to run after a given delay, or to execute periodically.
      * (Note however that if this single
