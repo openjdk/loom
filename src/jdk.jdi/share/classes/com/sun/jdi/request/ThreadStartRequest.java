@@ -29,6 +29,7 @@ import com.sun.jdi.ThreadReference;
 import com.sun.jdi.event.EventQueue;
 import com.sun.jdi.event.EventSet;
 import com.sun.jdi.event.ThreadStartEvent;
+import jdk.internal.javac.PreviewFeature;
 
 /**
  * Request for notification when a thread starts execution in the target VM.
@@ -75,6 +76,7 @@ public interface ThreadStartRequest extends EventRequest {
      *
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     default void addPlatformThreadsOnlyFilter() {
         throw new UnsupportedOperationException("Method not implemented");
     }
