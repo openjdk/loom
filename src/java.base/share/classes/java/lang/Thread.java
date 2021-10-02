@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
+import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -737,6 +738,7 @@ public class Thread implements Runnable {
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
         return new ThreadBuilders.PlatformThreadBuilder();
     }
@@ -757,6 +759,7 @@ public class Thread implements Runnable {
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
         return new ThreadBuilders.VirtualThreadBuilder();
     }
@@ -789,6 +792,7 @@ public class Thread implements Runnable {
      * @see Thread#ofVirtual()
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public sealed interface Builder
             permits Builder.OfPlatform,
                     Builder.OfVirtual,
@@ -915,6 +919,7 @@ public class Thread implements Runnable {
          * @see Thread#ofPlatform()
          * @since 99
          */
+        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfPlatform extends Builder
                 permits ThreadBuilders.PlatformThreadBuilder {
 
@@ -986,6 +991,7 @@ public class Thread implements Runnable {
          * @see Thread#ofVirtual()
          * @since 99
          */
+        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfVirtual extends Builder
                 permits ThreadBuilders.VirtualThreadBuilder {
 
@@ -1374,6 +1380,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
         var thread = new VirtualThread(null, null, 0, task);
         thread.start();
@@ -1388,6 +1395,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
         return (this instanceof VirtualThread);
     }

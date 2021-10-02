@@ -45,6 +45,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import jdk.internal.javac.PreviewFeature;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -251,6 +252,7 @@ public class Executors {
      * @throws NullPointerException if threadFactory is null
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
         return new ThreadPerTaskExecutor(threadFactory);
     }
@@ -266,6 +268,7 @@ public class Executors {
      * @return a new executor that creates a new virtual Thread for each task
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newVirtualThreadPerTaskExecutor() {
         ThreadFactory factory = Thread.ofVirtual().factory();
         return newThreadPerTaskExecutor(factory);
