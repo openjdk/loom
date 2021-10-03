@@ -2123,24 +2123,28 @@ void java_lang_Thread::set_name(oop java_thread, oop name) {
 
 ThreadPriority java_lang_Thread::priority(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   return java_lang_Thread_FieldHolder::priority(holder);
 }
 
 
 void java_lang_Thread::set_priority(oop java_thread, ThreadPriority priority) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   java_lang_Thread_FieldHolder::set_priority(holder, priority);
 }
 
 
 oop java_lang_Thread::threadGroup(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   return java_lang_Thread_FieldHolder::threadGroup(holder);
 }
 
 
 bool java_lang_Thread::is_stillborn(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   return java_lang_Thread_FieldHolder::is_stillborn(holder);
 }
 
@@ -2148,6 +2152,7 @@ bool java_lang_Thread::is_stillborn(oop java_thread) {
 // We never have reason to turn the stillborn bit off
 void java_lang_Thread::set_stillborn(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   java_lang_Thread_FieldHolder::set_stillborn(holder);
 }
 
@@ -2160,11 +2165,13 @@ bool java_lang_Thread::is_alive(oop java_thread) {
 
 bool java_lang_Thread::is_daemon(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   return java_lang_Thread_FieldHolder::is_daemon(holder);
 }
 
 void java_lang_Thread::set_daemon(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   java_lang_Thread_FieldHolder::set_daemon(holder);
 }
 
@@ -2179,12 +2186,14 @@ oop java_lang_Thread::inherited_access_control_context(oop java_thread) {
 
 jlong java_lang_Thread::stackSize(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   return java_lang_Thread_FieldHolder::stackSize(holder);
 }
 
 // Write the thread status value to threadStatus field in java.lang.Thread java class.
 void java_lang_Thread::set_thread_status(oop java_thread, JavaThreadStatus status) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   java_lang_Thread_FieldHolder::set_thread_status(holder, status);
 }
 
@@ -2196,7 +2205,11 @@ JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
          JavaThread::current()->thread_state() == _thread_in_vm,
          "Java Thread is not running in vm");
   oop holder = java_lang_Thread::holder(java_thread);
-  return java_lang_Thread_FieldHolder::get_thread_status(holder);
+  if (holder == NULL) {
+    return JavaThreadStatus::NEW;  // Java Thread not initialized
+  } else {
+    return java_lang_Thread_FieldHolder::get_thread_status(holder);
+  }
 }
 
 jlong java_lang_Thread::thread_id(oop java_thread) {
@@ -2329,6 +2342,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
 
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
+  assert(holder != NULL, "Java Thread not initialized");
   JavaThreadStatus status = java_lang_Thread_FieldHolder::get_thread_status(holder);
   switch (status) {
     case JavaThreadStatus::NEW                      : return "NEW";
