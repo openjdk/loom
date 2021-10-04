@@ -271,6 +271,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(String str, int off, int len) throws IOException {
+        Objects.checkFromIndexSize(off, len, str.length());
         char cbuf[] = new char[len];
         str.getChars(off, (off + len), cbuf, 0);
         write(cbuf, 0, len);
