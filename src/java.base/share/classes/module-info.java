@@ -145,6 +145,7 @@ module java.base {
         java.compiler,
         jdk.compiler,
         jdk.jdi,
+        jdk.jfr,
         jdk.jshell,
         jdk.management;
     exports jdk.internal.access to
