@@ -367,7 +367,7 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
         address runtime_entry) {
   address entry = __ pc();
   
-  const Register rthread = NOT_LP64(rdi) LP64_ONLY(r15_thread);
+  const Register rthread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
 
   __ push(state);
   NOT_LP64(__ get_thread(rthread);)
