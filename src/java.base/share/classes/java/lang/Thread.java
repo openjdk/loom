@@ -113,7 +113,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * of the time blocked, often waiting for I/O operations to complete. Virtual threads
  * are not intended for long running CPU intensive operations.
  *
- * <p> Virtual threads typically employ a small set of platform threads are use
+ * <p> Virtual threads typically employ a small set of platform threads used
  * as <em>carrier threads</em>. Locking and I/O operations are the <i>scheduling
  * points</i> where a carrier thread is re-scheduled from one virtual thread to
  * another. Code executing in a virtual thread will usually not be aware of the
@@ -600,7 +600,7 @@ public class Thread implements Runnable {
         }
 
         Thread parent = currentThread();
-        boolean primordial = (parent == this);
+        boolean attached = (parent == this);
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
@@ -635,11 +635,15 @@ public class Thread implements Runnable {
         }
 
         this.name = name;
-        this.tid = primordial ? 1 : ThreadIdentifiers.next();
+        if (attached && VM.initLevel() < 1) {
+            this.tid = 1;  // primordial thread
+        } else {
+            this.tid = ThreadIdentifiers.next();
+        }
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
         // thread locals and scoped variables
-        if (!primordial) {
+        if (!attached) {
             if ((characteristics & NO_THREAD_LOCALS) != 0) {
                 this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
                 this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
@@ -666,7 +670,7 @@ public class Thread implements Runnable {
 
         int priority;
         boolean daemon;
-        if (primordial) {
+        if (attached) {
             // primordial or attached thread
             priority = NORM_PRIORITY;
             daemon = false;
@@ -1065,7 +1069,7 @@ public class Thread implements Runnable {
     /**
      * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
-     * {@code (group, task, gname)} ,where {@code gname} is a newly generated
+     * {@code (group, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
      *
@@ -2468,8 +2472,8 @@ public class Thread implements Runnable {
     private native Object getStackTrace0();
 
     /**
-     * Returns a map of stack traces for all live threads that are scheduled
-     * by the operating system. The map does not include virtual threads.
+     * Returns a map of stack traces for all live platform threads. The map
+     * does not include virtual threads.
      * The map keys are threads and each map value is an array of
      * {@code StackTraceElement} that represents the stack dump
      * of the corresponding {@code Thread}.
