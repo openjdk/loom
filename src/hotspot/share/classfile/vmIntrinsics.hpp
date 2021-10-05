@@ -364,6 +364,9 @@ class methodHandle;
                                                                                                                         \
   do_intrinsic(_encodeByteISOArray,     java_lang_StringCoding, encodeISOArray_name, indexOfI_signature,         F_S)   \
                                                                                                                         \
+  do_intrinsic(_encodeAsciiArray,       java_lang_StringCoding, encodeAsciiArray_name, encodeISOArray_signature, F_S)   \
+   do_name(     encodeAsciiArray_name,                           "implEncodeAsciiArray")                                \
+                                                                                                                        \
   do_class(java_math_BigInteger,                      "java/math/BigInteger")                                           \
   do_intrinsic(_multiplyToLen,      java_math_BigInteger, multiplyToLen_name, multiplyToLen_signature, F_S)             \
    do_name(     multiplyToLen_name,                             "implMultiplyToLen")                                    \
@@ -425,6 +428,11 @@ class methodHandle;
   do_class(com_sun_crypto_provider_counterMode,      "com/sun/crypto/provider/CounterMode")                             \
    do_intrinsic(_counterMode_AESCrypt, com_sun_crypto_provider_counterMode, crypt_name, byteArray_int_int_byteArray_int_signature, F_R)   \
    do_name(     crypt_name,                                 "implCrypt")                                                    \
+                                                                                                                        \
+  do_class(com_sun_crypto_provider_galoisCounterMode, "com/sun/crypto/provider/GaloisCounterMode")                      \
+   do_intrinsic(_galoisCounterMode_AESCrypt, com_sun_crypto_provider_galoisCounterMode, gcm_crypt_name, aes_gcm_signature, F_S)   \
+   do_name(gcm_crypt_name, "implGCMCrypt0")                                                                                 \
+   do_signature(aes_gcm_signature, "([BII[BI[BILcom/sun/crypto/provider/GCTR;Lcom/sun/crypto/provider/GHASH;)I")                                                             \
                                                                                                                         \
   /* support for sun.security.provider.MD5 */                                                                           \
   do_class(sun_security_provider_md5,                              "sun/security/provider/MD5")                         \
@@ -496,15 +504,15 @@ class methodHandle;
   do_intrinsic(_updateByteBufferAdler32,  java_util_zip_Adler32,  updateByteBuffer_A_name,  updateByteBuffer_signature,  F_SN) \
    do_name(     updateByteBuffer_A_name,                          "updateByteBuffer")                                   \
                                                                                                                         \
-  /* java/lang/Continuation */                                                                                                \
-  do_class(java_lang_Continuation,                      "java/lang/Continuation")                                             \
-  do_intrinsic(_Continuation_enter,  java_lang_Continuation,       enter_name,    continuationEnter_signature, F_S)           \
-    do_signature(continuationEnter_signature,                        "(Ljava/lang/Continuation;Z)V")                          \
-  do_intrinsic(_Continuation_enterSpecial, java_lang_Continuation, enterSpecial_name,    continuationEnter_signature, F_SN)   \
-  do_signature(continuationGetStacks_signature,                   "(III)V")                                                   \
-  do_alias(continuationOnPinned_signature,                        int_void_signature)                                         \
-  do_intrinsic(_Continuation_doYield,     java_lang_Continuation,  doYield_name,       continuationDoYield_signature, F_S)    \
-    do_alias(continuationDoYield_signature,                          int_int_signature)                                       \
+  /* jdk/internal/vm/Continuation */                                                                                    \
+  do_class(jdk_internal_vm_Continuation, "jdk/internal/vm/Continuation")                                                \
+  do_intrinsic(_Continuation_enter,  jdk_internal_vm_Continuation, enter_name,    continuationEnter_signature, F_S)     \
+    do_signature(continuationEnter_signature,   "(Ljdk/internal/vm/Continuation;Z)V")                                   \
+  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnter_signature, F_SN) \
+  do_signature(continuationGetStacks_signature, "(III)V")                                                               \
+  do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
+  do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \
+    do_alias(continuationDoYield_signature,     int_int_signature)                                                      \
                                                                                                                         \
   /* support for UnsafeConstants */                                                                                     \
   do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \

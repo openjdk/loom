@@ -354,7 +354,7 @@ public class BufferedInputStream extends FilterInputStream {
      *                          invoking its {@link #close()} method,
      *                          or an I/O error occurs.
      */
-    public int read(byte b[], int off, int len) throws IOException {
+    public int read(byte[] b, int off, int len) throws IOException {
         if (lock != null) {
             lock.lock();
             try {
@@ -369,7 +369,7 @@ public class BufferedInputStream extends FilterInputStream {
         }
     }
 
-    private int lockedRead(byte b[], int off, int len) throws IOException {
+    private int lockedRead(byte[] b, int off, int len) throws IOException {
         getBufIfOpen(); // Check for closed stream
         if ((off | len | (off + len) | (b.length - (off + len))) < 0) {
             throw new IndexOutOfBoundsException();

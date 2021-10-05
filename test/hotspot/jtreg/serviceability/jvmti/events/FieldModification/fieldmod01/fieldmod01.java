@@ -40,7 +40,8 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile fieldmod01a.jasm
- * @run main/othervm/native -agentlib:fieldmod01 fieldmod01
+ * @compile --enable-preview -source ${jdk.version} fieldmod01.java
+ * @run main/othervm/native --enable-preview -agentlib:fieldmod01 fieldmod01
  */
 
 public class fieldmod01 {

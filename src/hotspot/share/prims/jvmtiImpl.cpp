@@ -207,9 +207,7 @@ JvmtiBreakpoint::JvmtiBreakpoint(Method* m_method, jlocation location)
 }
 
 JvmtiBreakpoint::~JvmtiBreakpoint() {
-  if (_class_holder.peek() != NULL) {
-    _class_holder.release(JvmtiExport::jvmti_oop_storage());
-  }
+  _class_holder.release(JvmtiExport::jvmti_oop_storage());
 }
 
 void JvmtiBreakpoint::copy(JvmtiBreakpoint& bp) {
@@ -823,7 +821,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   javaVFrame* jvf = NULL;
 
   assert(cont != NULL, "vthread contintuation must not be NULL");
-  if (java_lang_Continuation::is_mounted(cont)) {
+  if (jdk_internal_vm_Continuation::is_mounted(cont)) {
     oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));

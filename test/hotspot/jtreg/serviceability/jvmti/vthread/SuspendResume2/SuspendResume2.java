@@ -25,8 +25,10 @@
  * @test
  * @summary Test SuspendAllVirtualThreads/ResumeAllVirtualThreads
  * @library /test/lib
+ * @compile --enable-preview -source ${jdk.version} SuspendResume2.java
  * @run driver jdk.test.lib.FileInstaller . .
  * @run main/othervm/native
+ *      --enable-preview
  *      -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
  *      -agentlib:SuspendResume2
  *      SuspendResume2
@@ -66,7 +68,7 @@ public class SuspendResume2 extends DebugeeClass {
         return new SuspendResume2().runIt(argv, out);
     }
 
-    private static final int VTHREADS_CNT = 30;
+    private static final int VTHREADS_CNT = 20;
     int status = DebugeeClass.TEST_PASSED;
 
     // run debuggee

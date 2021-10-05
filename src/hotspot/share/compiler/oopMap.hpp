@@ -284,8 +284,6 @@ class ImmutableOopMap {
   friend class ImmutableOopMapBuilder;
 #endif
 private:
-  mutable address _freeze_stub;
-  mutable address _thaw_stub;
   int _count; // contains the number of entries in this OopMap
   int _num_oops;
   bool _has_derived_oops;
@@ -312,10 +310,6 @@ public:
   // Printing
   void print_on(outputStream* st) const;
   void print() const;
-
-  void generate_stub(const CodeBlob* cb) const;
-  address freeze_stub() const { return _freeze_stub; }
-  address thaw_stub() const { return _thaw_stub; }
 };
 
 class ImmutableOopMapSet;

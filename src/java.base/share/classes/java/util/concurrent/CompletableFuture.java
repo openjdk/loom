@@ -37,13 +37,13 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Objects;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /**
  * A {@link Future} that may be explicitly completed (setting its
@@ -479,15 +479,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         /** Returns true if possibly still triggerable. Used by cleanStack. */
         abstract boolean isLive();
 
-        public final void run() {
-            tryFire(ASYNC);
-        }
-        public final boolean exec() {
-            run();
-            return false;
-        }
-
-    public final Void getRawResult()       { return null; }
+        public final void run()                { tryFire(ASYNC); }
+        public final boolean exec()            { tryFire(ASYNC); return false; }
+        public final Void getRawResult()       { return null; }
         public final void setRawResult(Void v) {}
     }
 
@@ -1801,7 +1795,7 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         public final void setRawResult(Void v) {}
         public final boolean exec() { run(); return false; }
 
-        private void doRun() {
+        public void run() {
             CompletableFuture<Void> d; Runnable f;
             if ((d = dep) != null && (f = fn) != null) {
                 dep = null; fn = null;
@@ -1815,10 +1809,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                 }
                 d.postComplete();
             }
-        }
-
-        public void run() {
-            doRun();
         }
     }
 
@@ -2142,6 +2132,30 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     public T getNow(T valueIfAbsent) {
         Object r;
         return ((r = result) == null) ? valueIfAbsent : (T) reportJoin(r);
+    }
+
+    @Override
+    public T completedResultNow() {
+        Object r = result;
+        if (r != null) {
+            if (r instanceof AltResult alt) {
+                if (alt.ex == null) return null;
+            } else {
+                @SuppressWarnings("unchecked")
+                T t = (T) r;
+                return t;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public Throwable completedExceptionNow() {
+        Object r = result;
+        if (r instanceof AltResult alt && alt.ex != null) {
+            return alt.ex;
+        }
+        throw new IllegalStateException();
     }
 
     /**
@@ -2505,17 +2519,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     /**
-     * Returns {@code true} if this CompletableFuture completed normally.
-     *
-     * @return {@code true} if this CompletableFuture completed normally
-     */
-    public boolean isCompletedNormally() {
-        Object r;
-        return ((r = result) != null
-                && (r == NIL || !(r instanceof AltResult)));
-    }
-
-    /**
      * Returns {@code true} if this CompletableFuture completed
      * exceptionally, in any way. Possible causes include
      * cancellation, explicit invocation of {@code
@@ -2528,6 +2531,20 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     public boolean isCompletedExceptionally() {
         Object r;
         return ((r = result) instanceof AltResult) && r != NIL;
+    }
+
+    @Override
+    public State state() {
+        Object r = result;
+        if (r == null)
+            return State.RUNNING;
+        if (r != NIL && r instanceof AltResult alt) {
+            if (alt.ex instanceof CancellationException)
+                return State.CANCELLED;
+            else
+                return State.FAILED;
+        }
+        return State.SUCCESS;
     }
 
     /**
@@ -2933,6 +2950,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public T join() {
             throw new UnsupportedOperationException(); }
+        @Override public T completedResultNow() {
+            throw new UnsupportedOperationException(); }
+        @Override public Throwable completedExceptionNow() {
+            throw new UnsupportedOperationException(); }
         @Override public boolean complete(T value) {
             throw new UnsupportedOperationException(); }
         @Override public boolean completeExceptionally(Throwable ex) {
@@ -2947,9 +2968,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCancelled() {
             throw new UnsupportedOperationException(); }
-        @Override public boolean isCompletedNormally() {
-            throw new UnsupportedOperationException(); }
         @Override public boolean isCompletedExceptionally() {
+            throw new UnsupportedOperationException(); }
+        @Override public State state() {
             throw new UnsupportedOperationException(); }
         @Override public int getNumberOfDependents() {
             throw new UnsupportedOperationException(); }

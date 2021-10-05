@@ -31,8 +31,13 @@
  * @modules java.compiler
  *          java.instrument
  *          jdk.jartool/sun.tools.jar
+ * @compile --enable-preview -source ${jdk.version} RedefineRunningMethods.java
  * @run main RedefineClassHelper
- * @run main/othervm/timeout=180 -javaagent:redefineagent.jar -Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace,class+loader+data=debug,safepoint+cleanup,gc+phases=debug:rt.log RedefineRunningMethods
+ * @run main/othervm/timeout=180
+ *         --enable-preview
+ *         -javaagent:redefineagent.jar
+ *         -Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace,class+loader+data=debug,safepoint+cleanup,gc+phases=debug:rt.log
+ *         RedefineRunningMethods
  */
 
 

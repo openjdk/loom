@@ -1,0 +1,3 @@
+#Loom specific problem list.
+
+javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java

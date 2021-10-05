@@ -860,7 +860,7 @@ void JavaThread::collect_counters(jlong* array, int length) {
   for (int i = 0; i < length; i++) {
     array[i] = _jvmci_old_thread_counters[i];
   }
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *tp = jtiwh.next(); ) {
+  for (JavaThread* tp : ThreadsListHandle()) {
     if (jvmci_counters_include(tp)) {
       for (int i = 0; i < length; i++) {
         array[i] += tp->_jvmci_counters[i];
@@ -921,7 +921,7 @@ class VM_JVMCIResizeCounters : public VM_Operation {
     }
 
     // Now resize each threads array
-    for (JavaThreadIteratorWithHandle jtiwh; JavaThread *tp = jtiwh.next(); ) {
+    for (JavaThread* tp : ThreadsListHandle()) {
       if (!tp->resize_counters(JVMCICounterSize, _new_size)) {
         _failed = true;
         break;
@@ -954,6 +954,15 @@ void JavaThread::check_possible_safepoint() {
   // Clear unhandled oops in JavaThreads so we get a crash right away.
   clear_unhandled_oops();
 #endif // CHECK_UNHANDLED_OOPS
+
+  // Macos/aarch64 should be in the right state for safepoint (e.g.
+  // deoptimization needs WXWrite).  Crashes caused by the wrong state rarely
+  // happens in practice, making such issues hard to find and reproduce.
+#if defined(__APPLE__) && defined(AARCH64)
+  if (AssertWXAtThreadSync) {
+    assert_wx_state(WXWrite);
+  }
+#endif
 }
 
 void JavaThread::check_for_valid_safepoint_state() {
@@ -1013,9 +1022,10 @@ JavaThread::JavaThread() :
   _in_deopt_handler(0),
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
+#if INCLUDE_JVMTI
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
-  _hide_over_cont_yield(false),
+#endif
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1025,8 +1035,8 @@ JavaThread::JavaThread() :
   _pending_failed_speculation(0),
   _jvmci{nullptr},
   _jvmci_counters(nullptr),
-  _jvmci_reserved0(nullptr),
-  _jvmci_reserved1(nullptr),
+  _jvmci_reserved0(0),
+  _jvmci_reserved1(0),
   _jvmci_reserved_oop0(nullptr),
 #endif // INCLUDE_JVMCI
 
@@ -1244,7 +1254,9 @@ void JavaThread::run() {
 
   // Thread is now sufficiently initialized to be handled by the safepoint code as being
   // in the VM. Change thread state from _thread_new to _thread_in_vm
-  ThreadStateTransition::transition(this, _thread_new, _thread_in_vm);
+  assert(this->thread_state() == _thread_new, "wrong thread state");
+  set_thread_state(_thread_in_vm);
+
   // Before a thread is on the threads list it is always safe, so after leaving the
   // _thread_new we should emit a instruction barrier. The distance to modified code
   // from here is probably far enough, but this is consistent and safe.
@@ -1664,7 +1676,7 @@ void JavaThread::check_and_handle_async_exceptions() {
     case _thread_in_Java: {
       ThreadInVMfromJava tiv(this);
       JavaThread* THREAD = this;
-      Exceptions::throw_unsafe_access_internal_error(THREAD, __FILE__, __LINE__, "a fault occurred in a recent unsafe memory access operation in compiled Java code");
+      Exceptions::throw_unsafe_access_internal_error(THREAD, __FILE__, __LINE__, "a fault occurred in an unsafe memory access operation in compiled Java code");
       return;
     }
     default:
@@ -1688,15 +1700,12 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
     check_and_handle_async_exceptions();
   }
 
-  if (is_cont_force_yield()) {
-    log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
-    set_cont_preempt(false);
-    assert(thread_state() == _thread_in_Java, "can only continue from Java state");
-    StackWatermarkSet::after_unwind(this);
-    StubRoutines::cont_jump_from_sp_C()();
-  }
-
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)
+
+  if (is_cont_force_yield()) {
+    Continuation::jump_from_safepoint(this); // does not return
+    ShouldNotReachHere();
+  }
 }
 
 class InstallAsyncExceptionClosure : public HandshakeClosure {
@@ -1767,6 +1776,7 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   this->interrupt();
 }
 
+#if INCLUDE_JVMTI
 void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
   if (val) {
@@ -1778,6 +1788,7 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
   _is_VTMT_disabler = val;
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
 }
+#endif
 
 // External suspension mechanism.
 //
@@ -1786,9 +1797,17 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
+#if INCLUDE_JVMTI
   // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
+#ifdef ASSERT
+  if (is_VTMT_disabler()) { // TMP debugging code, should be removed after this assert is observed
+    printf("DBG: JavaThread::java_suspend: suspended jt: %p current jt: %p\n", (void*)this, (void*)JavaThread::current());
+    printf("DBG: JavaThread::java_suspend: VTMT_disable_count: %d\n", JvmtiVTMTDisabler::VTMT_disable_count());
+  }
+#endif
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
+#endif
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {
@@ -2354,6 +2373,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
+#if INCLUDE_JVMTI
 // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_mounted_vthread(thread_oop);
@@ -2366,6 +2386,7 @@ JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
 
   return jvmti_thread_state();
 }
+#endif
 
 // JVMTI PopFrame support
 void JavaThread::popframe_preserve_args(ByteSize size_in_bytes, void* start) {

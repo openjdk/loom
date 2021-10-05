@@ -316,7 +316,7 @@ JNIEXPORT jobjectArray JNICALL
 JVM_DumpThreads(JNIEnv *env, jclass threadClass, jobjectArray threads);
 
 /*
- * java.lang.Continuation
+ * jdk.internal.vm.Continuation
  */
 JNIEXPORT void JNICALL
 JVM_RegisterContinuationMethods(JNIEnv *env, jclass cls);

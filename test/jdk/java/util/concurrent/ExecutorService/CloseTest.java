@@ -24,7 +24,8 @@
 /*
  * @test
  * @summary Test ExecutorService.close, including default implementation
- * @run testng CloseTest
+ * @compile --enable-preview -source ${jdk.version} CloseTest.java
+ * @run testng/othervm --enable-preview CloseTest
  */
 
 import java.time.Duration;

@@ -23,6 +23,9 @@
  */
 
 #include "precompiled.hpp"
+
+// Old code. Might be deleted later if no uses appear.
+#if 0
 #include "asm/macroAssembler.hpp"
 #include "code/codeCache.hpp"
 #include "code/vmreg.inline.hpp"
@@ -1413,3 +1416,5 @@ void OopMapStubGenerator::free() {
 address OopMapStubGenerator::thaw_stub(address freeze_stub_address) {
   return *((address*)freeze_stub_address - 1);
 }
+
+#endif

@@ -692,7 +692,7 @@ JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
   return JNIHandles::make_local(THREAD, new_obj());
 JVM_END
 
-// java.lang.Continuation /////////////////////////////////////////////////////
+// jdk.internal.vm.Continuation /////////////////////////////////////////////////////
 
 JVM_ENTRY(void, JVM_RegisterContinuationMethods(JNIEnv *env, jclass cls))
   CONT_RegisterNativeMethods(env, cls);
@@ -3888,11 +3888,15 @@ JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
+#if INCLUDE_JVMTI
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
-  thread->set_hide_over_cont_yield(false);
+#else
+  fatal("Should only be called with JVMTI enabled");
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
+#if INCLUDE_JVMTI
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt = JNIHandles::resolve(vthread);
@@ -3914,9 +3918,13 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   if (JvmtiExport::should_post_vthread_mount()) {
     JvmtiExport::post_vthread_mount(vthread);
   }
+#else
+  fatal("Should only be called with JVMTI enabled");
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
+#if INCLUDE_JVMTI
   HandleMark hm(thread);
   Handle ct(thread, thread->threadObj());
 
@@ -3939,18 +3947,16 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+#else
+  fatal("Should only be called with JVMTI enabled");
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
+#if INCLUDE_JVMTI
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
-  if (!last_unmount) {
-    oop vt_oop = JNIHandles::resolve(vthread);
-    JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt_oop);
-
-    if (vstate != NULL) {
-      vstate->set_hide_over_cont_yield(true);
-    }
-    thread->set_hide_over_cont_yield(true);
-  }
+#else
+  fatal("Should only be called with JVMTI enabled");
+#endif
 JVM_END

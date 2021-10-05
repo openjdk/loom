@@ -25,13 +25,18 @@
  * @test
  * @summary Stress test asynchronous Thread.getStackTrace
  * @requires vm.debug != true
- * @run main/othervm GetStackTraceALot
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} GetStackTraceALot.java ../TestHelper.java
+ * @run main/othervm --enable-preview GetStackTraceALot
+ *
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=300 GetStackTraceALot 1000
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} GetStackTraceALot.java ../TestHelper.java
+ * @run main/othervm/timeout=300 --enable-preview GetStackTraceALot 1000
  */
 
 import java.time.Duration;
@@ -80,7 +85,7 @@ public class GetStackTraceALot {
         AtomicInteger count = new AtomicInteger();
 
         try (RoundRobinExecutor executor = new RoundRobinExecutor()) {
-            Thread thread = Thread.ofVirtual().scheduler(executor).start(() -> {
+            Thread thread = TestHelper.virtualThreadBuilder(executor).start(() -> {
                 while (count.incrementAndGet() < ITERATIONS) {
                     long start = System.nanoTime();
                     while ((System.nanoTime() - start) < SPIN_NANOS) {

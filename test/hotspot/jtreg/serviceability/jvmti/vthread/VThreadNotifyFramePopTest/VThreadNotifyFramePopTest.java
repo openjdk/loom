@@ -24,8 +24,12 @@
 /**
  * @test
  * @summary Verifies that FRAME_POP event is delivered when called from URL.openStream().
- * @compile VThreadNotifyFramePopTest.java
- * @run main/othervm/native -agentlib:VThreadNotifyFramePopTest -Djdk.defaultScheduler.parallelism=2 -Djdk.defaultScheduler.maxPoolSize=2 VThreadNotifyFramePopTest
+ * @compile --enable-preview -source ${jdk.version}  VThreadNotifyFramePopTest.java
+ * @run main/othervm/native
+ *     --enable-preview
+ *     -agentlib:VThreadNotifyFramePopTest
+ *     -Djdk.defaultScheduler.parallelism=2 -Djdk.defaultScheduler.maxPoolSize=2
+ *     VThreadNotifyFramePopTest
  */
 
 /*

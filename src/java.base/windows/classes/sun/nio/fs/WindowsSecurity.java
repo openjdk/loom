@@ -25,6 +25,8 @@
 
 package sun.nio.fs;
 
+import jdk.internal.vm.Continuation;
+
 import static sun.nio.fs.WindowsNativeDispatcher.*;
 import static sun.nio.fs.WindowsConstants.*;
 

@@ -269,7 +269,7 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
   LOG("enableEvents: started\n");
 
   jclass k1 = find_class(jvmti, jni, NULL, "Ljava/lang/VirtualThread;");
-  jclass k2 = find_class(jvmti, jni, NULL, "Ljava/lang/Continuation;");
+  jclass k2 = find_class(jvmti, jni, NULL, "Ljdk/internal/vm/Continuation;");
   if (k1 == NULL || k2 == NULL) {
     jni->FatalError("Did not find one of the classes by name: VirtualThread or Continuation");
   }

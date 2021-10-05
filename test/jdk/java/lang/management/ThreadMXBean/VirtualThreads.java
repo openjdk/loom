@@ -23,8 +23,9 @@
 
 /**
  * @test
- * @run testng VirtualThreads
  * @summary Test java.lang.management.ThreadMXBean with virtual threads
+ * @compile --enable-preview -source ${jdk.version} VirtualThreads.java
+ * @run testng/othervm --enable-preview VirtualThreads
  */
 
 import java.lang.management.ManagementFactory;

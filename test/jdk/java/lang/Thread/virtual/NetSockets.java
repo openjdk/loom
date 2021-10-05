@@ -24,13 +24,16 @@
 /**
  * @test
  * @summary Basic tests for virtual threads using java.net sockets.
- * @run testng/othervm/timeout=300 NetSockets
+ * @compile --enable-preview -source ${jdk.version} NetSockets.java
+ * @run testng/othervm/timeout=300 --enable-preview NetSockets
  */
 
 /**
  * @test
  * @requires (os.family == "windows")
- * @run testng/othervm/timeout=300 -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
+ * @compile --enable-preview -source ${jdk.version} NetSockets.java
+ * @run testng/othervm/timeout=300 --enable-preview
+ *     -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
  */
 
 import java.io.Closeable;

@@ -42,7 +42,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:thrinfo01 thrinfo01
+ * @compile --enable-preview -source ${jdk.version} thrinfo01.java
+ * @run main/othervm/native --enable-preview -agentlib:thrinfo01 thrinfo01
  */
 
 

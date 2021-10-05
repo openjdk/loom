@@ -72,7 +72,6 @@ char** Arguments::_jvm_args_array               = NULL;
 int    Arguments::_num_jvm_args                 = 0;
 char*  Arguments::_java_command                 = NULL;
 SystemProperty* Arguments::_system_properties   = NULL;
-const char*  Arguments::_gc_log_filename        = NULL;
 size_t Arguments::_conservative_max_heap_alignment = 0;
 Arguments::Mode Arguments::_mode                = _mixed;
 bool   Arguments::_java_compiler                = false;
@@ -92,6 +91,8 @@ bool   Arguments::_enable_preview               = false;
 
 char*  Arguments::SharedArchivePath             = NULL;
 char*  Arguments::SharedDynamicArchivePath      = NULL;
+
+LegacyGCLogging Arguments::_legacyGCLogging     = { 0, 0 };
 
 AgentLibraryList Arguments::_libraryList;
 AgentLibraryList Arguments::_agentList;
@@ -534,6 +535,7 @@ static SpecialFlag const special_jvm_flags[] = {
 
   // -------------- Obsolete Flags - sorted by expired_in --------------
   { "CriticalJNINatives",           JDK_Version::jdk(16), JDK_Version::jdk(18), JDK_Version::jdk(19) },
+  { "InlineFrequencyCount",         JDK_Version::undefined(), JDK_Version::jdk(18), JDK_Version::jdk(19) },
   { "G1RSetRegionEntries",          JDK_Version::undefined(), JDK_Version::jdk(18), JDK_Version::jdk(19) },
   { "G1RSetSparseRegionEntries",    JDK_Version::undefined(), JDK_Version::jdk(18), JDK_Version::jdk(19) },
   { "AlwaysLockClassLoader",        JDK_Version::jdk(17), JDK_Version::jdk(18), JDK_Version::jdk(19) },
@@ -1602,6 +1604,12 @@ void Arguments::set_conservative_max_heap_alignment() {
                                           GCArguments::compute_heap_alignment());
 }
 
+void Arguments::set_use_chunk_bitmaps() {
+  if (FLAG_IS_DEFAULT(UseChunkBitmaps)) {
+    FLAG_SET_ERGO(UseChunkBitmaps, UseG1GC || UseParallelGC || UseSerialGC);
+  }
+}
+
 jint Arguments::set_ergonomics_flags() {
   GCConfig::initialize();
 
@@ -1617,6 +1625,8 @@ jint Arguments::set_ergonomics_flags() {
   // Also checks that certain machines are slower with compressed oops
   // in vm_version initialization code.
 #endif // _LP64
+
+  set_use_chunk_bitmaps();
 
   return JNI_OK;
 }
@@ -2331,7 +2341,9 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(module, load));
         LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(module, unload));
       } else if (!strcmp(tail, ":gc")) {
-        LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(gc));
+        if (_legacyGCLogging.lastFlag == 0) {
+          _legacyGCLogging.lastFlag = 1;
+        }
       } else if (!strcmp(tail, ":jni")) {
         LogConfiguration::configure_stdout(LogLevel::Debug, true, LOG_TAGS(jni, resolve));
       }
@@ -2738,7 +2750,8 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     } else if (match_option(option, "-Xloggc:", &tail)) {
       // Deprecated flag to redirect GC output to a file. -Xloggc:<filename>
       log_warning(gc)("-Xloggc is deprecated. Will use -Xlog:gc:%s instead.", tail);
-      _gc_log_filename = os::strdup_check_oom(tail);
+      _legacyGCLogging.lastFlag = 2;
+      _legacyGCLogging.file = os::strdup_check_oom(tail);
     } else if (match_option(option, "-Xlog", &tail)) {
       bool ret = false;
       if (strcmp(tail, ":help") == 0) {
@@ -3726,14 +3739,14 @@ bool Arguments::handle_deprecated_print_gc_flags() {
     log_warning(gc)("-XX:+PrintGCDetails is deprecated. Will use -Xlog:gc* instead.");
   }
 
-  if (_gc_log_filename != NULL) {
+  if (_legacyGCLogging.lastFlag == 2) {
     // -Xloggc was used to specify a filename
     const char* gc_conf = PrintGCDetails ? "gc*" : "gc";
 
     LogTarget(Error, logging) target;
     LogStream errstream(target);
-    return LogConfiguration::parse_log_arguments(_gc_log_filename, gc_conf, NULL, NULL, &errstream);
-  } else if (PrintGC || PrintGCDetails) {
+    return LogConfiguration::parse_log_arguments(_legacyGCLogging.file, gc_conf, NULL, NULL, &errstream);
+  } else if (PrintGC || PrintGCDetails || (_legacyGCLogging.lastFlag == 1)) {
     LogConfiguration::configure_stdout(LogLevel::Info, !PrintGCDetails, LOG_TAGS(gc));
   }
   return true;
@@ -4017,9 +4030,21 @@ jint Arguments::apply_ergo() {
     return code;
   }
 
+  if (_mode == _int) {
+    if (SegmentedCodeCache) {
+      warning("SegmentedCodeCache has no meaningful effect with -Xint");
+      FLAG_SET_DEFAULT(SegmentedCodeCache, false);
+    }
+  }
+
 #ifdef ZERO
   // Clear flags not supported on zero.
   FLAG_SET_DEFAULT(ProfileInterpreter, false);
+
+  if (LogTouchedMethods) {
+    warning("LogTouchedMethods is not supported for Zero");
+    FLAG_SET_DEFAULT(LogTouchedMethods, false);
+  }
 #endif // ZERO
 
   if (PrintAssembly && FLAG_IS_DEFAULT(DebugNonSafepoints)) {

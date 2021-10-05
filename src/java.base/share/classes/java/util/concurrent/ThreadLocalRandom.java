@@ -388,7 +388,7 @@ public class ThreadLocalRandom extends Random {
     private static final long THREADLOCALS
         = U.objectFieldOffset(Thread.class, "threadLocals");
     private static final long INHERITABLETHREADLOCALS
-            = U.objectFieldOffset(Thread.class, "inheritableThreadLocals");
+        = U.objectFieldOffset(Thread.class, "inheritableThreadLocals");
     private static final long INHERITEDACCESSCONTROLCONTEXT
         = U.objectFieldOffset(Thread.class, "inheritedAccessControlContext");
 

@@ -30,7 +30,8 @@ import jdk.jfr.consumer.RecordingStream;
  * @summary Tests ObjectAllocationSampleEvent
  * @requires vm.hasJFR
  * @library /test/lib
- * @run main/othervm TestObjectAllocationSampleEvent
+ * @compile --enable-preview -source ${jdk.version} TestObjectAllocationSampleEvent.java
+ * @run main/othervm --enable-preview TestObjectAllocationSampleEvent
  */
 public class TestObjectAllocationSampleEvent {
 

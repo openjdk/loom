@@ -25,11 +25,14 @@
 /**
  * @test
  * @summary Test JVMTI Monitor functions for virtual threads
- * @compile VThreadMonitorTest.java
- * @run main/othervm/native -agentlib:VThreadMonitorTest VThreadMonitorTest
+ * @compile --enable-preview -source ${jdk.version} VThreadMonitorTest.java
+ * @run main/othervm/native --enable-preview -agentlib:VThreadMonitorTest VThreadMonitorTest
  */
 
 import java.io.PrintStream;
+
+class MonitorClass0 {}
+class MonitorClass2 {}
 
 public class VThreadMonitorTest {
 
@@ -50,9 +53,9 @@ public class VThreadMonitorTest {
     private static void log(String str) { System.out.println(str); }
     private static String thrName() { return Thread.currentThread().getName(); }
 
-    private static final VThreadMonitorTest lock0 = new VThreadMonitorTest();
+    private static final Object lock0 = new MonitorClass0();
     private static final Object lock1 = new Object();
-    private static final Object lock2 = new Object();
+    private static final Object lock2 = new MonitorClass2();
 
     static void sleep(long millis) {
         try {
@@ -120,16 +123,14 @@ public class VThreadMonitorTest {
             // Wait for the MonitorContendedEnter event.
             while (!hasEventPosted()) {
                 log("Main thread is waiting for event\n");
-                sleep(100);
+                sleep(10);
             }
             // One of the VT threads is blocked at lock0, another - at lock2.
             for (int i = 0; i < VT_COUNT; i++) {
                 checkContendedMonitor(vthreads[i], lock0, lock2);
             }
-            // SLEEPING_VT threads do not grab any monitors.
-            for (int i = VT_COUNT; i < VT_TOTAL; i++) {
-                checkContendedMonitor(vthreads[i], null, null);
-            }
+            // SLEEPING_VT threads can be contended on some system  monitors,
+            // so we should not check they have no contention.
         }
 
         for (int i = 0; i < VT_TOTAL; i++) {

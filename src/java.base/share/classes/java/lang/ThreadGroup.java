@@ -392,7 +392,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      */
-    public int enumerate(Thread list[]) {
+    public int enumerate(Thread[] list) {
         return enumerate(list, true);
     }
 
@@ -432,7 +432,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      */
-    public int enumerate(Thread list[], boolean recurse) {
+    public int enumerate(Thread[] list, boolean recurse) {
         Objects.requireNonNull(list);
         checkAccess();
         int n = 0;
@@ -491,7 +491,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      */
-    public int enumerate(ThreadGroup list[]) {
+    public int enumerate(ThreadGroup[] list) {
         return enumerate(list, true);
     }
 
@@ -525,7 +525,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          if {@linkplain #checkAccess checkAccess} determines that
      *          the current thread cannot access this thread group
      */
-    public int enumerate(ThreadGroup list[], boolean recurse) {
+    public int enumerate(ThreadGroup[] list, boolean recurse) {
         Objects.requireNonNull(list);
         checkAccess();
         return enumerate(list, 0, recurse);
@@ -535,7 +535,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Add a reference to each subgroup to the given array, starting at
      * the given index. Returns the new index.
      */
-    private int enumerate(ThreadGroup list[], int i, boolean recurse) {
+    private int enumerate(ThreadGroup[] list, int i, boolean recurse) {
         List<ThreadGroup> subgroups = synchronizedSubgroups();
         for (int j = 0; j < subgroups.size() && i < list.length; j++) {
             ThreadGroup group = subgroups.get(j);

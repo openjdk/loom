@@ -34,7 +34,6 @@ import javax.naming.directory.*;
 import javax.naming.spi.DirectoryManager;
 
 import com.sun.jndi.toolkit.ctx.*;
-import com.sun.jndi.toolkit.ctx.Continuation;
 
 
 /**

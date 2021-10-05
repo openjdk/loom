@@ -24,7 +24,9 @@
 /**
  * @test
  * @summary Basic test for JFR jdk.VirtualThreadXXX events.
- * @run testng/othervm JfrEvents
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} JfrEvents.java TestHelper.java
+ * @run testng/othervm --enable-preview JfrEvents
  */
 
 import java.io.IOException;
@@ -98,13 +100,13 @@ public class JfrEvents {
                     Object lock = new Object();
                     synchronized (lock) {
                         // pinned, duration < 500ms
-                        LockSupport.parkNanos(1);
+                        Thread.sleep(1);
 
                         // pinned, duration > 500ms
-                        long nanos = Duration.ofSeconds(1).toNanos();
-                        LockSupport.parkNanos(nanos);
-                        LockSupport.parkNanos(nanos);
+                        Thread.sleep(Duration.ofSeconds(3));
+                        Thread.sleep(Duration.ofSeconds(3));
                     }
+                    return null;
                 });
             } finally {
                 recording.stop();
@@ -130,7 +132,9 @@ public class JfrEvents {
             recording.start();
             try (ExecutorService pool = Executors.newCachedThreadPool()) {
                 Executor scheduler = task -> pool.execute(task);
-                ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+
+                // create virtual thread that uses custom scheduler
+                ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler).factory();
 
                 // start a thread
                 Thread thread = factory.newThread(LockSupport::park);
@@ -147,15 +151,13 @@ public class JfrEvents {
                 try {
                     LockSupport.unpark(thread);
                     assertTrue(false);
-                } catch (RejectedExecutionException expected) {
-                }
+                } catch (RejectedExecutionException expected) { }
 
                 // start another thread, it should fail and an event should be recorded
                 try {
                     factory.newThread(LockSupport::park).start();
                     throw new RuntimeException("RejectedExecutionException expected");
-                } catch (RejectedExecutionException expected) {
-                }
+                } catch (RejectedExecutionException expected) { }
             } finally {
                 recording.stop();
             }

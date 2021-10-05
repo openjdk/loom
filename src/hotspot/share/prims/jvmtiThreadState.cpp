@@ -33,7 +33,9 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/safepointVerifiers.hpp"
+#include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/vframe.hpp"
+#include "prims/jvmtiEnvBase.hpp"
 
 // marker for when the stack depth has been reset and is now unknown.
 // any negative number would work but small ones might obscure an
@@ -81,7 +83,6 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   _jvmti_event_queue = NULL;
   _is_in_VTMT = false;
-  _hide_over_cont_yield = false;
   _is_virtual = false;
 
   _thread_oop_h = OopHandle(JvmtiExport::jvmti_oop_storage(), thread_oop);
@@ -223,21 +224,52 @@ JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
   }
 }
 
+#ifdef ASSERT
+void
+JvmtiVTMTDisabler::print_info() {
+  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n", _VTMT_disable_count, _VTMT_count);
+  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
+    ResourceMark rm;
+    tty->print_cr("JavaThread %s, is_VTMT_disabler: %d, is_in_VTMT = %d Stacktrace:",
+                  java_thread->name(), java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
+    // Handshake with target
+    PrintStackTraceClosure pstc;
+    Handshake::execute(&pstc, java_thread);
+    tty->print_cr("");
+  }
+}
+#endif
+
 void
 JvmtiVTMTDisabler::disable_VTMT() {
   JavaThread* thread = JavaThread::current();
-  ThreadBlockInVM tbivm(thread);
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  int attempts = 10;
+  {
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  assert(!thread->is_in_VTMT(), "VTMT sanity check");
-  _VTMT_disable_count++;
+    assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    _VTMT_disable_count++;
 
-  // Block while some mount/unmount transitions are in progress.
-  while (_VTMT_count > 0) {
-    ml.wait();
+    // Block while some mount/unmount transitions are in progress.
+    // Debug version fails and print diagnostic information
+    while (_VTMT_count > 0) {
+      if (ml.wait(1000)) {
+        attempts--;
+      }
+      DEBUG_ONLY(if (attempts == 0) break;)
+    }
+    assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
+    if (attempts != 0) {
+      thread->set_is_VTMT_disabler(true);
+    }
   }
-  assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
-  thread->set_is_VTMT_disabler(true);
+#ifdef ASSERT
+  if (attempts == 0) {
+    print_info();
+    assert(false, "stuck in JvmtiVTMTDisabler::disable_VTMT for 10 seconds.");
+  }
+#endif
 }
 
 void
@@ -260,6 +292,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
   // Do not allow suspends inside VTMT transitions.
   // Block while transitions are disabled or there are suspend requests.
+  int attempts = 10 * 100;
   while (true) {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
@@ -267,33 +300,50 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     // block while transitions are disabled or there are suspend requests
     if (_VTMT_disable_count > 0 ||
         thread->is_suspended() ||
-        thread->is_thread_suspended() ||
         JvmtiVTSuspender::is_vthread_suspended(vth())
     ) {
-      ml.wait(10);
+      if (ml.wait(10)) {
+        attempts--;
+      }
+      DEBUG_ONLY(if (attempts == 0) break;)
       continue; // ~ThreadBlockInVM has handshake-based suspend point
     }
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
     thread->set_is_in_VTMT(true);
+    JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
+    if (vstate != NULL) {
+      vstate->set_is_in_VTMT(true);
+    }
     _VTMT_count++;
     break;
   }
+#ifdef ASSERT
+  if (attempts == 0) {
+    tty->print_cr("DBG: start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
+                  thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
+    print_info();
+    assert(false, "stuck in JvmtiVTMTDisabler::start_VTMT for 10 seconds.");
+  }
+#endif
 }
 
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
-  {
-    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-    _VTMT_count--;
+  _VTMT_count--;
 
-    // unblock waiting VTMT disablers
-    if (_VTMT_disable_count > 0) {
-      ml.notify_all();
-    }
-    assert(thread->is_in_VTMT(), "sanity check");
-    thread->set_is_in_VTMT(false);
+  // unblock waiting VTMT disablers
+  if (_VTMT_disable_count > 0) {
+    ml.notify_all();
+  }
+  assert(thread->is_in_VTMT(), "sanity check");
+  thread->set_is_in_VTMT(false);
+  oop vt = JNIHandles::resolve_external_guard(vthread);
+  JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt);
+  if (vstate != NULL) {
+    vstate->set_is_in_VTMT(false);
   }
 }
 
@@ -487,22 +537,24 @@ void JvmtiThreadState::leave_interp_only_mode() {
 // Helper routine used in several places
 int JvmtiThreadState::count_frames() {
   JavaThread* thread = get_thread_or_saved();
-
-#ifdef ASSERT
-  Thread *current_thread = Thread::current();
-#endif
-  assert(SafepointSynchronize::is_at_safepoint() ||
-         thread->is_handshake_safe_for(current_thread),
-         "call by myself / at safepoint / at handshake");
-
-  if (!thread->has_last_Java_frame()) return 0;  // no Java frames
-
-  // TBD: This might need to be corrected for detached carrier threads.
+  javaVFrame *jvf;
   ResourceMark rm;
-  RegisterMap reg_map(thread, false, false, true);
-  javaVFrame *jvf = thread->last_java_vframe(&reg_map);
-
-  jvf = JvmtiEnvBase::check_and_skip_hidden_frames(thread, jvf);
+  if (thread == NULL) {
+    oop thread_obj = get_thread_oop();
+    jvf = JvmtiEnvBase::get_vthread_jvf(thread_obj);
+  } else {
+#ifdef ASSERT
+    Thread *current_thread = Thread::current();
+#endif
+    assert(SafepointSynchronize::is_at_safepoint() ||
+        thread->is_handshake_safe_for(current_thread),
+           "call by myself / at safepoint / at handshake");
+    if (!thread->has_last_Java_frame()) return 0;  // no Java frames
+    // TBD: This might need to be corrected for detached carrier threads.
+    RegisterMap reg_map(thread, false, false, true);
+    jvf = thread->last_java_vframe(&reg_map);
+    jvf = JvmtiEnvBase::check_and_skip_hidden_frames(thread, jvf);
+  }
   return (int)JvmtiEnvBase::get_frame_count(jvf);
 }
 
@@ -737,3 +789,12 @@ void JvmtiThreadState::set_thread(JavaThread* thread) {
   }
   _thread = thread;
 }
+
+int JvmtiVTMTDisabler::VTMT_disable_count() {
+  return _VTMT_disable_count;
+}
+
+int JvmtiVTMTDisabler::VTMT_count() {
+  return _VTMT_count;
+}
+

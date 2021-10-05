@@ -39,35 +39,37 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:framepop02 framepop02
+ * @compile --enable-preview -source ${jdk.version} framepop02.java
+ * @run main/othervm/native --enable-preview -agentlib:framepop02 framepop02 platform
  */
-
-
+/*
+ * @test
+ * @library /test/lib
+ * @compile --enable-preview -source ${jdk.version} framepop02.java
+ * @run main/othervm/native --enable-preview -agentlib:framepop02 framepop02 virtual
+ */
 
 public class framepop02 {
 
-    final static int THREADS_LIMIT = 20;
-    final static int NESTING_DEPTH = 100;
+    final static int MAX_THREADS_LIMIT = 32;
+    final static int NESTING_DEPTH = 20;
     final static String TEST_THREAD_NAME_BASE = "Test Thread #";
 
     static {
-        try {
-            System.loadLibrary("framepop02");
-        } catch (UnsatisfiedLinkError ule) {
-            System.err.println("Could not load framepop02 library");
-            System.err.println("java.library.path:"
-                + System.getProperty("java.library.path"));
-            throw ule;
-        }
+        System.loadLibrary("framepop02");
     }
 
     native static void getReady();
-    native static int check();
+    native static void check();
 
     public static void main(String args[]) {
+        boolean isVirtual = args.length > 0 && args[0].equals("virtual");
+        final int THREADS_LIMIT = Math.min(Runtime.getRuntime().availableProcessors() + 1, MAX_THREADS_LIMIT);
         Thread[] t = new Thread[THREADS_LIMIT];
         getReady();
-        Thread.Builder builder = Thread.ofVirtual().name(TEST_THREAD_NAME_BASE, 0);
+        Thread.Builder builder = (isVirtual ? Thread.ofVirtual() : Thread.ofPlatform())
+                .name(TEST_THREAD_NAME_BASE, 0);
+        System.out.println("Builder: " + builder);
         for (int i = 0; i < THREADS_LIMIT; i++) {
             t[i] = builder.start(new TestTask());
         }
@@ -78,10 +80,7 @@ public class framepop02 {
                 throw new Error("Unexpected: " + e);
             }
         }
-        int res = check();
-        if (res != 0) {
-            throw new RuntimeException("Check() returned " + res);
-        }
+        check();
     }
 
     static class TestTask implements Runnable {

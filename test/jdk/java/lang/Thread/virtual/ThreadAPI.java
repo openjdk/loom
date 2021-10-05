@@ -24,7 +24,9 @@
 /**
  * @test
  * @summary Test Thread API with virtual threads
- * @run testng ThreadAPI
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} ThreadAPI.java TestHelper.java
+ * @run testng/othervm --enable-preview ThreadAPI
  */
 
 import java.time.Duration;
@@ -1047,7 +1049,8 @@ public class ThreadAPI {
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1073,7 +1076,8 @@ public class ThreadAPI {
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1209,7 +1213,7 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread interrupt when sleeping.
+     * Test interrupting Thread.sleep
      */
     @Test
     public void testSleep5() throws Exception {
@@ -1284,6 +1288,63 @@ public class ThreadAPI {
         if (e != null) {
             throw e;
         }
+    }
+
+    /**
+     * Test Thread.sleep when pinned
+     */
+    @Test
+    public void testSleep8() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            long start = millisTime();
+            Object lock = new Object();
+            synchronized (lock) {
+                Thread.sleep(2000);
+            }
+            expectDuration(start, /*min*/1900, /*max*/4000);
+        });
+    }
+
+    /**
+     * Test Thread.sleep when pinned and with interrupt status set
+     */
+    @Test
+    public void testSleep9() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread me = Thread.currentThread();
+            me.interrupt();
+            try {
+                Object lock = new Object();
+                synchronized (lock) {
+                    Thread.sleep(2000);
+                }
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // expected
+                assertFalse(me.isInterrupted());
+            }
+        });
+    }
+
+    /**
+     * Test interrupting Thread.sleep when pinned
+     */
+    @Test
+    public void testSleep10() throws Exception {
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            TestHelper.scheduleInterrupt(t, 2000);
+            try {
+                Object lock = new Object();
+                synchronized (lock) {
+                    Thread.sleep(20 * 1000);
+                }
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // interrupt status should be clearer
+                assertFalse(t.isInterrupted());
+            }
+        });
     }
 
     /**
@@ -1511,7 +1572,7 @@ public class ThreadAPI {
     public void testGetState3() throws Exception {
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder.OfVirtual builder = Thread.ofVirtual().scheduler(scheduler);
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
             Thread t1 = builder.start(() -> {
                 Thread t2 = builder.unstarted(LockSupport::park);
                 assertTrue(t2.getState() == Thread.State.NEW);
@@ -1661,18 +1722,22 @@ public class ThreadAPI {
         try {
             Thread target = null;
 
-            // start virtual threads that are CPU bound until we find
-            // a thread that does not run
-            while (target == null) {
-                CountDownLatch latch = new CountDownLatch(1);
-                Thread vthread = Thread.ofVirtual().start(() -> {
-                    latch.countDown();
-                    while (!done.get()) { }
-                });
-                threads.add(vthread);
-                if (!latch.await(3, TimeUnit.SECONDS)) {
-                    // thread did not run
-                    target = vthread;
+            // start virtual threads that are CPU bound until we find a thread
+            // that does not run. This is done while holding a monitor to
+            // allow this test run in the context of a virtual thread.
+            Object lock = new Object();
+            synchronized (this) {
+                while (target == null) {
+                    CountDownLatch latch = new CountDownLatch(1);
+                    Thread vthread = Thread.ofVirtual().start(() -> {
+                        latch.countDown();
+                        while (!done.get()) { }
+                    });
+                    threads.add(vthread);
+                    if (!latch.await(3, TimeUnit.SECONDS)) {
+                        // thread did not run
+                        target = vthread;
+                    }
                 }
             }
 
@@ -1724,7 +1789,8 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();
@@ -1820,7 +1886,8 @@ public class ThreadAPI {
             };
 
             Object lock = new Object();
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
+            Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
                         lock.wait();

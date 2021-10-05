@@ -47,6 +47,8 @@ import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.ConstantPool;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -360,6 +362,15 @@ public interface JavaLangAccess {
     int decodeASCII(byte[] src, int srcOff, char[] dst, int dstOff, int len);
 
     /**
+     * Encodes ASCII codepoints as possible from the source array into
+     * the destination byte array, assuming that the encoding is ASCII
+     * compatible
+     *
+     * @return the number of bytes successfully encoded, or 0 if none
+     */
+    int encodeASCII(char[] src, int srcOff, byte[] dst, int dstOff, int len);
+
+    /**
      * Set the cause of Throwable
      * @param cause set t's cause to new value
      */
@@ -426,8 +437,9 @@ public interface JavaLangAccess {
 
     /**
      * Pushes a thread container to the top of the current thread's stack.
+     * @return the current thread's scope local bindings
      */
-    void pushThreadContainer(ThreadContainer container);
+    Object pushThreadContainer(ThreadContainer container);
 
     /**
      * Pops a thread container from the current thread's stack.
@@ -456,6 +468,26 @@ public interface JavaLangAccess {
     <T> void setCarrierThreadLocal(ThreadLocal<T> local, T value);
 
     /**
+     * Returns the current thread's scope locals cache
+     */
+    Object[] scopeLocalCache();
+
+    /**
+     * Sets the current thread's scope locals cache
+     */
+    void setScopeLocalCache(Object[] cache);
+
+    /**
+     * Returns the innermost mounted continuation
+     */
+     Continuation getContinuation(Thread thread);
+
+    /**
+     * Sets the innermost mounted continuation
+     */
+    void setContinuation(Thread thread, Continuation continuation);
+
+    /**
      * Parks the current virtual thread.
      */
     void parkVirtualThread();
@@ -472,4 +504,11 @@ public interface JavaLangAccess {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unparkVirtualThread(Thread thread, boolean tryPush);
+
+    /**
+     * Creates a new StackWalker
+     */
+    StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
+                                       ContinuationScope contScope,
+                                       Continuation continuation);
 }

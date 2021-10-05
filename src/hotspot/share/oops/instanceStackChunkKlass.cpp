@@ -94,7 +94,7 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
 
 int InstanceStackChunkKlass::oop_size(oop obj) const {
   // see oopDesc::size_given_klass
-  return instance_size(jdk_internal_misc_StackChunk::size(obj));
+  return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
 
 template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
@@ -192,7 +192,7 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
                  : Copy::aligned_conjoint_words(from_addr, to_addr, header);
       }
 
-      jdk_internal_misc_StackChunk::set_size(to_addr, to_stack_size);
+      jdk_internal_vm_StackChunk::set_size(to_addr, to_stack_size);
       to_chunk->set_sp(metadata_words());
       break;
     case 1: // copy stack
@@ -332,9 +332,9 @@ public:
 
 template <bool store, bool compressedOopsWithBitmap>
 class BarrierClosure: public OopClosure {
-  DEBUG_ONLY(intptr_t* _sp;)
+  NOT_PRODUCT(intptr_t* _sp;)
 public:
-  BarrierClosure(intptr_t* sp) DEBUG_ONLY(: _sp(sp)) {}
+  BarrierClosure(intptr_t* sp) NOT_PRODUCT(: _sp(sp)) {}
 
   virtual void do_oop(oop* p)       override { compressedOopsWithBitmap ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }
@@ -410,7 +410,8 @@ public:
     _num_frames++;
     assert (_closure != nullptr, "");
 
-    assert (!f.is_deoptimized(), ""); // if (f.is_compiled()) f.handle_deopted();
+    assert (mixed || !f.is_deoptimized(), "");
+    if (mixed && f.is_compiled()) f.handle_deopted();
 
     // For unload method debugging
     // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);
@@ -855,8 +856,8 @@ public:
 
     oop base = (_chunk->has_bitmap() && UseCompressedOops) ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc)) : Atomic::load((oop*)base_loc);
     // (oop)NativeAccess<>::oop_load((oop*)base_loc); //
-    assert (base == nullptr || is_good_oop(base), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(base_loc), p2i((oopDesc*)base));
     if (base != nullptr) {
+      ZGC_ONLY(if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) return;)
       assert (!CompressedOops::is_base(base), "");
       assert (oopDesc::is_oop(base), "");
       ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)

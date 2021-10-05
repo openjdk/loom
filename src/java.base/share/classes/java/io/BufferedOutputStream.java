@@ -191,7 +191,7 @@ public class BufferedOutputStream extends FilterOutputStream {
      * @throws     IOException  if an I/O error occurs.
      */
     @Override
-    public void write(byte b[], int off, int len) throws IOException {
+    public void write(byte[] b, int off, int len) throws IOException {
         if (lock != null) {
             lock.lock();
             try {
@@ -206,7 +206,7 @@ public class BufferedOutputStream extends FilterOutputStream {
         }
     }
 
-    private void lockedWrite(byte b[], int off, int len) throws IOException {
+    private void lockedWrite(byte[] b, int off, int len) throws IOException {
         int max = (maxBufSize > 0) ? maxBufSize : buf.length;
         if (len >= max) {
             /* If the request length exceeds the max size of the output buffer,

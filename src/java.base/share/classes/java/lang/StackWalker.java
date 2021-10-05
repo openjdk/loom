@@ -33,6 +33,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 /**
  * A stack walker.
@@ -343,7 +345,7 @@ public final class StackWalker {
      * no {@linkplain Option#RETAIN_CLASS_REFERENCE class reference} is retained.
      *
      */
-    public static StackWalker getInstance(ContinuationScope contScope) {
+    static StackWalker getInstance(ContinuationScope contScope) {
         return getInstance(EnumSet.noneOf(Option.class), contScope);
     }
 
@@ -386,7 +388,7 @@ public final class StackWalker {
      * @throws SecurityException if a security manager exists and its
      *         {@code checkPermission} method denies access.
      */
-    public static StackWalker getInstance(Option option, ContinuationScope contScope) {
+    static StackWalker getInstance(Option option, ContinuationScope contScope) {
         return getInstance(EnumSet.of(Objects.requireNonNull(option)), contScope);
     }
 
@@ -435,7 +437,7 @@ public final class StackWalker {
      * @throws SecurityException if a security manager exists and its
      *         {@code checkPermission} method denies access.
      */
-    public static StackWalker getInstance(Set<Option> options, ContinuationScope contScope) {
+    static StackWalker getInstance(Set<Option> options, ContinuationScope contScope) {
         if (options.isEmpty() && contScope == null) {
             return DEFAULT_WALKER;
         }

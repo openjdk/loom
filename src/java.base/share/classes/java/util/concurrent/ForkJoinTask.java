@@ -898,6 +898,40 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         return (status & (DONE | ABNORMAL)) == DONE;
     }
 
+    @Override
+    public State state() {
+        int s = status;
+        if (s < 0) {
+            if ((s & (DONE | ABNORMAL)) == DONE)
+                return State.SUCCESS;
+            if ((s & (ABNORMAL | THROWN)) == (ABNORMAL | THROWN))
+                return State.FAILED;
+            else
+                return State.CANCELLED;
+        } else {
+            return State.RUNNING;
+        }
+    }
+
+    @Override
+    public V completedResultNow() {
+        if ((status & (DONE | ABNORMAL)) == DONE) {
+            return getRawResult();
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public Throwable completedExceptionNow() {
+        Throwable ex = getException(status);
+        if (ex != null) {
+            return ex;
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
     /**
      * Returns the exception thrown by the base computation, or a
      * {@code CancellationException} if cancelled, or {@code null} if
@@ -1444,8 +1478,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         implements RunnableFuture<T> {
         @SuppressWarnings("serial") // Conditionally serializable
         final Callable<? extends T> callable;
-        @SuppressWarnings("serial") // Conditionally serializable
         transient volatile Thread runner;
+        @SuppressWarnings("serial") // Conditionally serializable
         T result;
         AdaptedInterruptibleCallable(Callable<? extends T> callable) {
             if (callable == null) throw new NullPointerException();

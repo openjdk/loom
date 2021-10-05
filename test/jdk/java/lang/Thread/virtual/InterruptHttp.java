@@ -24,6 +24,8 @@
 /**
  * @test
  * @summary Test that HTTP connections can be interrupted
+ * @compile --enable-preview -source ${jdk.version} InterruptHttp.java
+ * @run testng/othervm --enable-preview InterruptHttp
  */
 
 import java.io.Closeable;
@@ -55,7 +57,9 @@ public class InterruptHttp {
             });
 
             // give time for thread to block waiting for HTTP server
-            Thread.sleep(1000);
+            while (server.connectionCount() == 0) {
+                Thread.sleep(100);
+            }
             thread.interrupt();
             thread.join();
 

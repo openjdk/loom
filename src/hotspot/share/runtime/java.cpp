@@ -349,10 +349,6 @@ void print_statistics() {
 
 void print_statistics() {
 
-  if (UseNewCode2) {
-    Continuations::print_statistics();
-  }
-
   if (PrintMethodData) {
     print_method_profiling_data();
   }

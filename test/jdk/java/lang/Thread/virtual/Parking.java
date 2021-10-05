@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Test virtual threads using park/unpark
- * @run testng Parking
+ * @compile --enable-preview -source ${jdk.version} Parking.java
+ * @run testng/othervm --enable-preview Parking
  */
 
 import java.time.Duration;

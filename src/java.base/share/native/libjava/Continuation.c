@@ -25,15 +25,15 @@
 #include "jni.h"
 #include "jvm.h"
 
-#include "java_lang_Continuation.h"
+#include "jdk_internal_vm_Continuation.h"
 
 /*
- * Class:     java_lang_Continuation
+ * Class:     jdk_internal_vm_Continuation
  * Method:    registerNatives
  * Signature: ()
  */
 JNIEXPORT void JNICALL
-Java_java_lang_Continuation_registerNatives(JNIEnv *env, jclass cls)
+Java_jdk_internal_vm_Continuation_registerNatives(JNIEnv *env, jclass cls)
 {
     JVM_RegisterContinuationMethods(env, cls);
 }

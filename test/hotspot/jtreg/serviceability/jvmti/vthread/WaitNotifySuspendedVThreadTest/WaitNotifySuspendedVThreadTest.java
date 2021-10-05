@@ -40,7 +40,11 @@
  *
  *
  * @library /test/lib
- * @run main/othervm/native -Djava.util.concurrent.ForkJoinPool.common.parallelism=1 -agentlib:WaitNotifySuspendedVThread WaitNotifySuspendedVThreadTest
+ * @compile --enable-preview -source ${jdk.version} WaitNotifySuspendedVThreadTest.java
+ * @run main/othervm/native
+ *     --enable-preview
+ *     -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
+ *     -agentlib:WaitNotifySuspendedVThread WaitNotifySuspendedVThreadTest
  */
 
 

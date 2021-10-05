@@ -52,7 +52,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_StackStreamFactory_checkStackWalkModes
 /*
  * Class:     java_lang_StackStreamFactory_AbstractStackWalker
  * Method:    callStackWalk
- * Signature: (JILjava/lang/ContinuationScope;Ljava/lang/Continuation;II[Ljava/lang/Object;)Ljava/lang/Object;
+ * Signature: (JILjdk/internal/vm/ContinuationScope;Ljdk/internal/vm/Continuation;II[Ljava/lang/Object;)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalker_callStackWalk
   (JNIEnv *env, jobject stackstream, jlong mode, jint skipFrames, jobject contScope, jobject cont,
@@ -79,7 +79,7 @@ JNIEXPORT jint JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalke
 /*
  * Class:     java_lang_StackStreamFactory_AbstractStackWalker
  * Method:    setContinuation
- * Signature: (J[Ljava/lang/Object;Ljava/lang/Continuation;)V
+ * Signature: (J[Ljava/lang/Object;Ljdk/internal/vm/Continuation;)V
  */
 JNIEXPORT void JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalker_setContinuation
   (JNIEnv *env, jobject stackstream, jlong anchor, jobjectArray frames, jobject cont)

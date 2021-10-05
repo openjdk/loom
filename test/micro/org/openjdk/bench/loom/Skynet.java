@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Thread)
+@SuppressWarnings("preview")
 public class Skynet {
 
     @Param({"1000000"})

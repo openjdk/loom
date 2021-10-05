@@ -44,8 +44,9 @@ import java.io.PrintStream;
  *       and save JNIEnv pointer now passed as argument.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:monitorwaited01 monitorwaited01 kernel
- * @run main/othervm/native -agentlib:monitorwaited01 monitorwaited01 virtual
+ * @compile --enable-preview -source ${jdk.version} monitorwaited01.java
+ * @run main/othervm/native --enable-preview -agentlib:monitorwaited01 monitorwaited01 platform
+ * @run main/othervm/native --enable-preview -agentlib:monitorwaited01 monitorwaited01 virtual
  */
 
 

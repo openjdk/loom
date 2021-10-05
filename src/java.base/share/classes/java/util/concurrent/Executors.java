@@ -45,6 +45,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import jdk.internal.javac.PreviewFeature;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -247,10 +248,11 @@ public class Executors {
      * executing the task.
      *
      * @param threadFactory the factory to use when creating new threads
-     * @return a newly created executor
+     * @return a new executor that creates a new Thread for each task
      * @throws NullPointerException if threadFactory is null
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
         return new ThreadPerTaskExecutor(threadFactory);
     }
@@ -259,15 +261,15 @@ public class Executors {
      * Creates an Executor that starts a new virtual Thread for each task.
      * The number of threads created by the Executor is unbounded.
      *
-     * @apiNote
-     * This method will probably be removed so that newThreadPerTaskExecutor
-     * is the only method to create a thread-per-task executor for
-     * unstructured usages.
+     * <p> This method is equivalent to invoking
+     * {@link #newThreadPerTaskExecutor(ThreadFactory)} with a thread factory
+     * that creates virtual threads.
      *
-     * @return a newly created executor
+     * @return a new executor that creates a new virtual Thread for each task
      * @since 99
      */
-    public static ExecutorService newVirtualThreadExecutor() {
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
+    public static ExecutorService newVirtualThreadPerTaskExecutor() {
         ThreadFactory factory = Thread.ofVirtual().factory();
         return newThreadPerTaskExecutor(factory);
     }

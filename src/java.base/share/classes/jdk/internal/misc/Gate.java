@@ -34,13 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * A set of threads to track those that are inside to avoid using ThreadLocals.
  */
 public class Gate {
-    // holder class with thread set to allow it be lazily created
-    private static class Holder {
-        private static final Set<Thread> threads = ConcurrentHashMap.newKeySet();
-        static Set<Thread> threads() {
-            return threads;
-        }
-    }
+    private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
 
     private Gate() { }
 
@@ -57,7 +51,6 @@ public class Gate {
      * @return true if the current thread entered, false if already inside.
      */
     public boolean tryEnter() {
-        Set<Thread> threads = Holder.threads();
         return threads.add(Thread.currentThread());
     }
 
@@ -75,7 +68,6 @@ public class Gate {
      * @throws IllegalStateException if the current thread is not inside
      */
     public void exit() {
-        Set<Thread> threads = Holder.threads();
         boolean removed = threads.remove(Thread.currentThread());
         if (!removed)
             throw new IllegalStateException();
@@ -85,7 +77,6 @@ public class Gate {
      * Returns true if the current thread is inside.
      */
     public boolean inside() {
-        Set<Thread> threads = Holder.threads();
         return threads.contains(Thread.currentThread());
     }
 }

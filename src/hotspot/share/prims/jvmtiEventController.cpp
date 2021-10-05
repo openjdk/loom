@@ -210,12 +210,13 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     JavaThread* jt = JavaThread::cast(th);
     JvmtiThreadState* state = jt->jvmti_thread_state();
 
-    // Set up the current stack depth for later tracking
-    state->invalidate_cur_stack_depth();
-
+    // invalidate_cur_stack_depth is called in enter_interp_only_mode
     state->enter_interp_only_mode();
 
-    Continuation::set_cont_fastpath_thread_state(state->get_thread()); // TODO LOOM: find out why the other place where this is called is insufficient 
+    if (state->get_thread() != NULL) {
+      // TODO LOOM: find out why the other place where this is called is insufficient 
+      Continuation::set_cont_fastpath_thread_state(state->get_thread());
+    }
 
     if (jt->has_last_Java_frame()) {
       // If running in fullspeed mode, single stepping is implemented

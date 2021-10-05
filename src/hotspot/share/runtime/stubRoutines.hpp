@@ -213,6 +213,7 @@ class StubRoutines: AllStatic {
   static address _electronicCodeBook_encryptAESCrypt;
   static address _electronicCodeBook_decryptAESCrypt;
   static address _counterMode_AESCrypt;
+  static address _galoisCounterMode_AESCrypt;
   static address _ghash_processBlocks;
   static address _base64_encodeBlock;
   static address _base64_decodeBlock;
@@ -437,6 +438,7 @@ class StubRoutines: AllStatic {
   static address montgomerySquare()    { return _montgomerySquare; }
   static address bigIntegerRightShift() { return _bigIntegerRightShiftWorker; }
   static address bigIntegerLeftShift()  { return _bigIntegerLeftShiftWorker; }
+  static address galoisCounterMode_AESCrypt()   { return _galoisCounterMode_AESCrypt; }
 
   static address vectorizedMismatch()  { return _vectorizedMismatch; }
 
@@ -451,8 +453,6 @@ class StubRoutines: AllStatic {
   static address dlibm_tan_cot_huge()  { return _dlibm_tan_cot_huge; }
   static address dtan()                { return _dtan; }
 
-  typedef void (*cont_jump_from_sp_t)();
-
   static RuntimeStub* cont_doYield_stub() { return _cont_doYield_stub; }
   static address cont_doYield()        { return _cont_doYield; }
   static address cont_jump_from_sp()   { return _cont_jump_from_sp; }
@@ -460,7 +460,6 @@ class StubRoutines: AllStatic {
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
   static address cont_interpreter_forced_preempt_return() { return _cont_interpreter_forced_preempt_return; }
-  static cont_jump_from_sp_t  cont_jump_from_sp_C() { return CAST_TO_FN_PTR(cont_jump_from_sp_t, _cont_jump_from_sp); }
 
   JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })
   JFR_ONLY(static address jfr_get_event_writer() { return _jfr_get_event_writer; })

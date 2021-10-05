@@ -988,7 +988,7 @@ public class Socket implements java.io.Closeable {
             return (n > 0) ? (a[0] & 0xff) : -1;
         }
         @Override
-        public int read(byte b[], int off, int len) throws IOException {
+        public int read(byte[] b, int off, int len) throws IOException {
             try {
                 return in.read(b, off, len);
             } catch (SocketTimeoutException e) {
@@ -1072,7 +1072,7 @@ public class Socket implements java.io.Closeable {
             write(a, 0, 1);
         }
         @Override
-        public void write(byte b[], int off, int len) throws IOException {
+        public void write(byte[] b, int off, int len) throws IOException {
             try {
                 out.write(b, off, len);
             } catch (InterruptedIOException e) {

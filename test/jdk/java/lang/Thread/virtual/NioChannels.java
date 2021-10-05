@@ -24,13 +24,16 @@
 /**
  * @test
  * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
- * @run testng/othervm/timeout=300 NioChannels
+ * @compile --enable-preview -source ${jdk.version} NioChannels.java
+ * @run testng/othervm/timeout=300 --enable-preview NioChannels
  */
 
 /**
  * @test
  * @requires (os.family == "windows")
- * @run testng/othervm/timeout=300 -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
+ * @compile --enable-preview -source ${jdk.version} NioChannels.java
+ * @run testng/othervm/timeout=300 --enable-preview
+ *     -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
  */
 
 import java.io.Closeable;

@@ -69,10 +69,6 @@ import jdk.internal.misc.InternalLock;
  */
 
 public class BufferedReader extends Reader {
-
-    // Legacy/undocumented behavior was to the wrapped Reader as the lock.
-    // New behavior is to use "this" or an "internal lock" for trusted classes.
-
     private Reader in;
 
     private char[] cb;
@@ -293,7 +289,7 @@ public class BufferedReader extends Reader {
      * @throws     IndexOutOfBoundsException {@inheritDoc}
      * @throws     IOException  {@inheritDoc}
      */
-    public int read(char cbuf[], int off, int len) throws IOException {
+    public int read(char[] cbuf, int off, int len) throws IOException {
         Object lock = this.lock;
         if (lock instanceof InternalLock locker) {
             locker.lock();
@@ -309,7 +305,7 @@ public class BufferedReader extends Reader {
         }
     }
 
-    private int lockedRead(char cbuf[], int off, int len) throws IOException {
+    private int lockedRead(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         Objects.checkFromIndexSize(off, len, cbuf.length);
         if (len == 0) {

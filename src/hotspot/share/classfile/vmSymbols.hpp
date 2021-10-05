@@ -72,9 +72,9 @@
   template(java_lang_ClassLoader,                     "java/lang/ClassLoader")                    \
   template(java_lang_ThreadDeath,                     "java/lang/ThreadDeath")                    \
   template(java_lang_Runnable,                        "java/lang/Runnable")                       \
-  /*template(java_lang_Continuation,                    "java/lang/Continuation")                 */\
-  template(java_lang_ContinuationScope,               "java/lang/ContinuationScope")              \
-  template(jdk_internal_misc_StackChunk,              "jdk/internal/misc/StackChunk")             \
+  /*template(jdk_internal_vm_Continuation,            "jdk/internal/vm/Continuation")           */\
+  template(jdk_internal_vm_ContinuationScope,         "jdk/internal/vm/ContinuationScope")        \
+  template(jdk_internal_vm_StackChunk,                "jdk/internal/vm/StackChunk")               \
   template(java_lang_Boolean,                         "java/lang/Boolean")                        \
   template(java_lang_Character,                       "java/lang/Character")                      \
   template(java_lang_Character_CharacterCache,        "java/lang/Character$CharacterCache")       \
@@ -124,6 +124,7 @@
   template(java_security_ProtectionDomain,            "java/security/ProtectionDomain")           \
   template(java_security_SecureClassLoader,           "java/security/SecureClassLoader")          \
   template(java_net_URL,                              "java/net/URL")                             \
+  template(java_net_URLClassLoader,                   "java/net/URLClassLoader")                  \
   template(java_util_jar_Manifest,                    "java/util/jar/Manifest")                   \
   template(java_io_OutputStream,                      "java/io/OutputStream")                     \
   template(java_io_Reader,                            "java/io/Reader")                           \
@@ -381,6 +382,7 @@
   template(class_initializer_name,                    "<clinit>")                                 \
   template(println_name,                              "println")                                  \
   template(printStackTrace_name,                      "printStackTrace")                          \
+  template(getStackTrace_name,                        "getStackTrace")                            \
   template(main_name,                                 "main")                                     \
   template(name_name,                                 "name")                                     \
   template(priority_name,                             "priority")                                 \
@@ -569,9 +571,9 @@
   template(int_array_signature,                       "[I")                                       \
   template(long_array_signature,                      "[J")                                       \
   template(runnable_signature,                        "Ljava/lang/Runnable;")                     \
-  template(continuation_signature,                    "Ljava/lang/Continuation;")                 \
-  template(continuationscope_signature,               "Ljava/lang/ContinuationScope;")            \
-  template(stackchunk_signature,                      "Ljdk/internal/misc/StackChunk;")           \
+  template(continuation_signature,                    "Ljdk/internal/vm/Continuation;")           \
+  template(continuationscope_signature,               "Ljdk/internal/vm/ContinuationScope;")      \
+  template(stackchunk_signature,                      "Ljdk/internal/vm/StackChunk;")             \
   template(vthread_signature,                         "Ljava/lang/VirtualThread;")                \
   template(object_void_signature,                     "(Ljava/lang/Object;)V")                    \
   template(object_int_signature,                      "(Ljava/lang/Object;)I")                    \
@@ -598,6 +600,7 @@
   template(threadgroup_runnable_void_signature,       "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;)V")           \
   template(threadgroup_string_void_signature,         "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V")             \
   template(string_class_signature,                    "(Ljava/lang/String;)Ljava/lang/Class;")                    \
+  template(string_boolean_class_signature,            "(Ljava/lang/String;Z)Ljava/lang/Class;")                   \
   template(object_object_object_signature,            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;") \
   template(string_string_string_signature,            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") \
   template(string_string_signature,                   "(Ljava/lang/String;)Ljava/lang/String;")                   \
@@ -646,7 +649,9 @@
   template(int_String_signature,                      "(I)Ljava/lang/String;")                                    \
   template(boolean_boolean_int_signature,             "(ZZ)I")                                                    \
   template(big_integer_shift_worker_signature,        "([I[IIII)V")                                               \
-  template(reflect_method_signature,                  "Ljava/lang/reflect/Method;")                                                    \
+  template(reflect_method_signature,                  "Ljava/lang/reflect/Method;")                               \
+  template(getStackTrace_signature,                    "()[Ljava/lang/StackTraceElement;")                        \
+                                                                                                                  \
   /* signature symbols needed by intrinsics */                                                                    \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, VM_SYMBOL_IGNORE, template, VM_ALIAS_IGNORE)            \
                                                                                                                   \
@@ -742,7 +747,7 @@
                                                                                                                   \
   /* CDS */                                                                                                       \
   template(dumpSharedArchive,                               "dumpSharedArchive")                                  \
-  template(dumpSharedArchive_signature,                     "(ZLjava/lang/String;)V")                             \
+  template(dumpSharedArchive_signature,                     "(ZLjava/lang/String;)Ljava/lang/String;")            \
   template(generateLambdaFormHolderClasses,                 "generateLambdaFormHolderClasses")                    \
   template(generateLambdaFormHolderClasses_signature,       "([Ljava/lang/String;)[Ljava/lang/Object;")           \
   template(java_lang_invoke_Invokers_Holder,                "java/lang/invoke/Invokers$Holder")                   \
@@ -756,6 +761,7 @@
   template(toFileURL_name,                                  "toFileURL")                                          \
   template(toFileURL_signature,                             "(Ljava/lang/String;)Ljava/net/URL;")                 \
   template(url_void_signature,                              "(Ljava/net/URL;)V")                                  \
+  template(url_array_classloader_void_signature,            "([Ljava/net/URL;Ljava/lang/ClassLoader;)V")          \
                                                                                                                   \
   /* JavaThread.dump jcmd */                                                                                      \
   template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
