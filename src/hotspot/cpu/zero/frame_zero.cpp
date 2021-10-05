@@ -98,7 +98,12 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return get_interpreterState()->monitor_base();
 }
 
-BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+// Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
+template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+
+template <bool relative>
+inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return (BasicObjectLock*) get_interpreterState()->stack_base();
 }
 
@@ -181,15 +186,12 @@ BasicType frame::interpreter_frame_result(oop* oop_result,
   return type;
 }
 
-int frame::frame_size(RegisterMap* map) const {
-#ifdef PRODUCT
-  ShouldNotCallThis();
-#endif // PRODUCT
-  return 0; // make javaVFrame::print_value work
-}
+template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
 
+template <bool relative>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
-  int index = (Interpreter::expr_offset_in_bytes(offset) / wordSize);
+  int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
   return &interpreter_frame_tos_address()[index];
 }
 
@@ -380,6 +382,10 @@ void ZeroFrame::identify_vp_word(int       frame_index,
 #ifndef PRODUCT
 
 void frame::describe_pd(FrameValues& values, int frame_no) {
+
+}
+
+void frame::describe_top_pd(FrameValues& values) {
 
 }
 

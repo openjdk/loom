@@ -123,6 +123,11 @@ class frame {
   int frame_index() const { return _frame_index; }
   void set_frame_index( int index ) { _frame_index = index; }
 
+  static int sender_sp_ret_address_offset();
+
+  template <typename RegisterMapT>
+  static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
+
   CodeBlob* cb() const           { return _cb; }
   inline CodeBlob* get_cb() const;
   // inline void set_cb(CodeBlob* cb);

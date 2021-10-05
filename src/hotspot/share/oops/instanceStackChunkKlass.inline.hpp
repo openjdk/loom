@@ -28,7 +28,7 @@
 
 #include "classfile/javaClasses.hpp"
 #include "code/codeBlob.hpp"
-#include "code/codeCache.hpp"
+#include "code/codeCache.inline.hpp"
 #include "code/nativeInst.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"

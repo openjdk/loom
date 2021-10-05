@@ -41,6 +41,10 @@ inline frame::frame() {
   _deopt_state = unknown;
 }
 
+inline frame::frame(intptr_t* sp) {
+  Unimplemented();
+}
+
 inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _sp = sp;
   _unextended_sp = sp;
@@ -170,6 +174,7 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   intptr_t* last_sp = interpreter_frame_last_sp();
   if (last_sp == NULL ) {
@@ -195,6 +200,7 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end-1;
@@ -211,15 +217,67 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 // Compiled frames
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
-  oop* result_adr = (oop*) map->location(R0->as_VMReg());
+  oop* result_adr = (oop*) map->location(R0->as_VMReg(), (intptr_t*) NULL);
   guarantee(result_adr != NULL, "bad register save location");
   return (*result_adr);
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
-  oop* result_adr = (oop*) map->location(R0->as_VMReg());
+  oop* result_adr = (oop*) map->location(R0->as_VMReg(), (intptr_t*) NULL);
   guarantee(result_adr != NULL, "bad register save location");
   *result_adr = obj;
+}
+
+inline int frame::frame_size() const {
+  return sender_sp() - sp();
+}
+
+inline const ImmutableOopMap* frame::get_oop_map() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::compiled_frame_stack_argsize() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
+  Unimplemented();
+}
+
+inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
+  Unimplemented();
+  return 0;
+}
+
+template <bool relative>
+inline intptr_t* frame::interpreter_frame_last_sp() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::sender_sp_ret_address_offset() {
+  Unimplemented();
+  return 0;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  Unimplemented();
+}
+
+inline void frame::set_unextended_sp(intptr_t* value) {
+  Unimplemented();
+}
+
+inline int frame::offset_unextended_sp() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::set_offset_unextended_sp(int value) {
+  Unimplemented();
 }
 
 #endif // CPU_ARM_FRAME_ARM_INLINE_HPP

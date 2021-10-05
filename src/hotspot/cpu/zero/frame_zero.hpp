@@ -33,7 +33,9 @@
     pc_return_offset = 0
   };
 
-  // Constructor
+ const ImmutableOopMap* get_oop_map() const;
+
+ // Constructor
  public:
   frame(ZeroFrame* zeroframe, intptr_t* sp);
 
@@ -72,5 +74,10 @@
                            int           buflen) const;
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }
+
+  inline address* sender_pc_addr() const;
+
+  template <bool relative = false>
+  inline intptr_t* interpreter_frame_last_sp() const;
 
 #endif // CPU_ZERO_FRAME_ZERO_HPP
