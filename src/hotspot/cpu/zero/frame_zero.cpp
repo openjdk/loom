@@ -191,7 +191,7 @@ template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
 
 template <bool relative>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
-  int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
+  int index = (Interpreter::expr_offset_in_bytes(offset) / wordSize);
   return &interpreter_frame_tos_address()[index];
 }
 

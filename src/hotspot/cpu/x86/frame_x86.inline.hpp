@@ -389,7 +389,7 @@ inline bool frame::is_interpreted_frame() const {
   return Interpreter::contains(pc());
 }
 
-int frame::sender_sp_ret_address_offset() {
+inline int frame::sender_sp_ret_address_offset() {
   return frame::sender_sp_offset - frame::return_addr_offset;
 }
 

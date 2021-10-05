@@ -463,10 +463,9 @@
   inline void find_codeblob_and_set_pc_and_deopt_state(address pc);
   const ImmutableOopMap* get_oop_map() const;
 
-// Constructors
+ // Constructors
 
  public:
-//  inline frame(intptr_t* sp);
   // To be used, if sp was not extended to match callee's calling convention.
   inline frame(intptr_t* sp, address pc);
   inline frame(intptr_t* sp, address pc, intptr_t* unextended_sp);
@@ -490,7 +489,10 @@
   template <bool relative = false>
   inline intptr_t* interpreter_frame_last_sp() const;
 
-// Additional interface for interpreter frames:
+  template <typename RegisterMapT>
+  static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
+
+  // Additional interface for interpreter frames:
   static int interpreter_frame_interpreterstate_size_in_bytes();
   static int interpreter_frame_monitor_size_in_bytes();
 

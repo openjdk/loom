@@ -274,6 +274,19 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
+// Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
+template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+
+template <bool relative>
+inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+  BasicObjectLock* result = (BasicObjectLock*) *addr_at(interpreter_frame_monitor_block_top_offset);
+  // make sure the pointer points inside the frame
+  assert((intptr_t) fp() >  (intptr_t) result, "result must <  than frame pointer");
+  assert((intptr_t) sp() <= (intptr_t) result, "result must >= than stack pointer");
+  return result;
+}
+
 void frame::interpreter_frame_set_monitor_end(BasicObjectLock* value) {
   *((BasicObjectLock**)addr_at(interpreter_frame_monitor_block_top_offset)) = value;
 }
@@ -535,6 +548,15 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
+template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
+
+template <bool relative>
+inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
+  int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
+  return &interpreter_frame_tos_address()[index];
+}
+
 #ifndef PRODUCT
 
 #define DESCRIBE_FP_OFFSET(name) \
@@ -591,26 +613,4 @@ intptr_t* frame::real_fp() const {
   // else rely on fp()
   assert(! is_compiled_frame(), "unknown compiled frame size");
   return fp();
-}
-
-// Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
-
-template <bool relative>
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) *addr_at(interpreter_frame_monitor_block_top_offset);
-  // make sure the pointer points inside the frame
-  assert((intptr_t) fp() >  (intptr_t) result, "result must <  than frame pointer");
-  assert((intptr_t) sp() <= (intptr_t) result, "result must >= than stack pointer");
-  return result;
-}
-
-template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
-
-template <bool relative>
-inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
-  int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address()[index];
 }

@@ -135,7 +135,7 @@ class SmallRegisterMap {
 public:
   static constexpr SmallRegisterMap* instance = nullptr;
 private:
-  static void assert_is_rfp(VMReg r) PRODUCT_RETURN 
+  static void assert_is_rfp(VMReg r) PRODUCT_RETURN
                                      DEBUG_ONLY({ Unimplemented(); })
 public:
   // as_RegisterMap is used when we didn't want to templatize and abstract over RegisterMap type to support SmallRegisterMap
@@ -147,7 +147,7 @@ public:
     Unimplemented();
     return map;
   }
-  
+
   SmallRegisterMap() {}
 
   SmallRegisterMap(const RegisterMap* map) {
@@ -163,7 +163,7 @@ public:
 
   JavaThread* thread() const {
   #ifndef ASSERT
-    guarantee (false, ""); 
+    guarantee (false, "");
   #endif
     return nullptr;
   }
@@ -174,7 +174,7 @@ public:
   void set_include_argument_oops(bool f)  {}
   bool in_cont()       const { return false; }
   stackChunkHandle stack_chunk() const { return stackChunkHandle(); }
-  
+
 #ifdef ASSERT
   bool should_skip_missing() const  { return false; }
   VMReg find_register_spilled_here(void* p, intptr_t* sp) {
