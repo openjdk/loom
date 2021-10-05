@@ -25,8 +25,12 @@
  * @test
  * @summary Verifies JVMTI support for Continuations
  * @compile ContinuationTest.java
+ * @modules java.base/jdk.internal.vm
  * @run main/othervm/native -agentlib:ContinuationTest ContinuationTest
  */
+
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 public class ContinuationTest {
     private static final String agentLib = "ContinuationTest";

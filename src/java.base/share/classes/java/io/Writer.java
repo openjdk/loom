@@ -204,7 +204,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      * @throws  IOException
      *          If an I/O error occurs
      */
-    public void write(char cbuf[]) throws IOException {
+    public void write(char[] cbuf) throws IOException {
         write(cbuf, 0, cbuf.length);
     }
 
@@ -229,7 +229,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      * @throws  IOException
      *          If an I/O error occurs
      */
-    public abstract void write(char cbuf[], int off, int len) throws IOException;
+    public abstract void write(char[] cbuf, int off, int len) throws IOException;
 
     /**
      * Writes a string.
@@ -271,6 +271,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(String str, int off, int len) throws IOException {
+        Objects.checkFromIndexSize(off, len, str.length());
         char cbuf[] = new char[len];
         str.getChars(off, (off + len), cbuf, 0);
         write(cbuf, 0, len);

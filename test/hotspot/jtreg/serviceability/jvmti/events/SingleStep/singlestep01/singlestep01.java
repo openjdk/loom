@@ -45,7 +45,8 @@ import java.io.*;
  * COMMENTS
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:singlestep01 singlestep01
+ * @compile --enable-preview -source ${jdk.version} singlestep01.java
+ * @run main/othervm/native --enable-preview -agentlib:singlestep01 singlestep01
  */
 
 public class singlestep01 {

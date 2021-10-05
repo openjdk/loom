@@ -431,8 +431,6 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     /** The number of pending tasks until completion */
     volatile int pending;
 
-    private ScopeLocal.Snapshot snapshot = ScopeLocal.snapshot();
-
     /**
      * Creates a new CountedCompleter with the given completer
      * and initial pending count.
@@ -753,11 +751,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      */
     @Override
     protected final boolean exec() {
-        if (snapshot != ScopeLocal.snapshot()) {
-            snapshot.run(this::compute);
-        } else {
-            compute();
-        }
+        compute();
         return false;
     }
 

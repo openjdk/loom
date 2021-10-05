@@ -433,6 +433,6 @@ oop StackChunkAllocator::initialize(HeapWord* mem) const {
 
   assert(_stack_size > 0, "");
   assert(_word_size > (size_t)_stack_size, "");
-  jdk_internal_misc_StackChunk::set_size(mem, _stack_size);
+  jdk_internal_vm_StackChunk::set_size(mem, _stack_size);
   return finish(mem);
 }

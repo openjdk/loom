@@ -1,69 +1,6 @@
 # Filed bugs
-java/lang/Continuation/Basic.java                                                               8241633 generic-all
-java/lang/Continuation/LiveFramesDriver.java                                                    8241633 generic-all
 
-jdk/jfr/api/consumer/recordingstream/TestBasics.java                                            8253378 generic-all
-jdk/jfr/api/recording/event/TestLoadEventAfterStart.java                                        8253378 generic-all
-jdk/jfr/event/compiler/TestCompilerCompile.java                                                 8253378 generic-all
-jdk/jfr/event/gc/collection/TestGCGarbageCollectionEvent.java                                   8253378 generic-all
-jdk/jfr/event/os/TestCPULoad.java                                                               8253378 generic-all
-jdk/jfr/event/runtime/TestClassLoadEvent.java                                                   8253378 generic-all
-jdk/jfr/event/runtime/TestJavaBlockedEvent.java                                                 8253378 generic-all
-jdk/jfr/jcmd/TestJcmdStartStopDefault.java                                                      8253378 generic-all
-
-jdk/jfr/event/allocation/TestObjectAllocationSampleEvent.java                                   8261379 generic-all
-java/lang/Thread/virtual/JfrEvents.java                                                         8261379 generic-all
-
-java/lang/invoke/condy/CondyNestedTest.java                                                     8253670 generic-all
-
-java/util/stream/boottest/java.base/java/util/stream/SpinedBufferTest.java                      8254093 generic-all
-
-java/lang/Thread/UncaughtExceptionsTest.java                                                    0000000 generic-all
-
-java/lang/Thread/virtual/stress/PinALot.java#id2                                                8255275 generic-all
-
-java/lang/annotation/LoaderLeakTest.java                                                        8263758 generic-all
-
-java/foreign/TestMismatch.java                                                                  8253918 generic-all
-jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
-java/lang/Continuation/Basic.java#id0                                                           8253918 generic-all
-java/lang/Continuation/Fuzz.java                                                                8253918 generic-all
-java/lang/Thread/virtual/stress/SleepALot.java#id2                                              8253918 generic-all
-java/lang/StackWalker/LocalsAndOperands.java#id0                                                8253918 generic-all
-java/lang/invoke/LFCaching/LFSingleThreadCachingTest.java                                       8253918 generic-all
-java/util/Arrays/Sorting.java                                                                   8253918 generic-all
-java/util/Calendar/CalendarTestScripts/JapaneseTests.java                                       8253918 generic-all
-java/util/PluggableLocale/TimeZoneNameProviderTest.java                                         8253918 generic-all
-java/util/concurrent/ScheduledThreadPoolExecutor/BasicCancelTest.java                           8253918 generic-all
-java/util/concurrent/tck/JSR166TestCase.java                                                    8253918 generic-all
-java/util/stream/boottest/java.base/java/util/stream/FlagOpTest.java                            8253918 generic-all
-java/util/stream/boottest/java.base/java/util/stream/NodeTest.java                              8253918 generic-all
-java/util/stream/boottest/java.base/java/util/stream/StreamReuseTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/CollectorsTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ConcatOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/DistinctOpTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FilterOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FindFirstOpTest.java                   8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/FlatMapOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/GroupByOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/IntSliceOpTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/IntUniqOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/MapOpTest.java                         8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/MatchOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ReduceTest.java                        8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SequentialOpTest.java                  8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SliceOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/SortedOpTest.java                      8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/StreamLinkTest.java                    8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/StreamSpliteratorTest.java             8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/ToArrayOpTest.java                     8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/WhileOpTest.java                       8253918 generic-all
-java/util/stream/test/org/openjdk/tests/java/util/stream/mapMultiOpTest.java                    8253918 generic-all
-jdk/javadoc/doclet/testRecordTypes/TestRecordTypes.java                                         8253918 generic-all
-sun/util/resources/cldr/TimeZoneNamesTest.java                                                  8253918 generic-all
-
-# Failed because of known bug but reproduced only in loom-tier3 with wrapper only now
-java/lang/invoke/MethodHandles/CatchExceptionTest.java                                          8146623 generic-all
+java/foreign/channels/TestSocketChannels.java                                                   8272749 windows-all
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
@@ -80,28 +17,27 @@ java/lang/invoke/modules/Driver1.java
 
 
 ####
-# Incorrect stackwalking epxectations for main thread stack trace
+# Incorrect stackwalking expectations for main thread stack trace
 
-java/lang/StackTraceElement/WithClassLoaderName.java
 java/lang/StackWalker/StackWalkTest.java
 java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
-java/lang/Continuation/Scoped.java
-java/lang/Continuation/PreemptLiveFramesDriver.java
-java/lang/Continuation/Preempt.java
+jdk/internal/vm/Continuation/Scoped.java
+jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
+jdk/internal/vm/Continuation/Preempt.java
 
 ####
 # Thread-sensitive threads
 
 java/lang/Thread/BuilderTest.java
-java/lang/ThreadGroup/SetMaxPriority.java
-java/lang/ThreadGroup/Suspend.java
 java/lang/Thread/virtual/CustomScheduler.java
+java/lang/Thread/UncaughtExceptionsTest.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
-com/sun/net/httpserver/bugs/B6431193.java #HttpServer inherit thread properies (daemon, but sure not virtuality)
+com/sun/net/httpserver/bugs/B6431193.java
+#B6431193.java: HttpServer inherit thread properies (daemon, but sure not virtuality)
 
 ####
 # Other virtual threads tests, failing with wrapper
@@ -126,7 +62,7 @@ jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 
 
 ####
-# OOME in unextpected thread
+# OOME in unexpected thread
 
 java/lang/ref/OOMEInReferenceHandler.java
 
@@ -141,6 +77,7 @@ runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 # Tests failing while setting custom Permissions
 
 java/util/Properties/LoadAndStoreXML.java
+java/util/Properties/StoreReproducibilityTest.java
 sun/reflect/ReflectionFactory/ReflectionFactoryTest.java
 java/io/FilePermission/MergeName.java
 java/lang/System/SecurityRace.java
@@ -212,7 +149,7 @@ jdk/jfr/startupargs/TestDumpOnExit.java
 java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
 java/lang/annotation/ParameterAnnotations.java
-
+sun/security/util/Resources/early/EarlyResources.java
 
 #####
 # Tests failing because of ProcessTools wrapper
@@ -224,7 +161,7 @@ java/util/logging/modules/GetResourceBundleTest.java
 
 #####
 # Following tests failing of ProcessTools wrapper
-# cutom classpath, jars, no main class etc
+# custom classpath, jars, no main class etc
 
 jdk/modules/etc/DefaultModules.java
 jdk/modules/incubator/ServiceBinding.java
@@ -267,6 +204,13 @@ tools/launcher/modules/validate/ValidateModulesTest.java
 java/rmi/module/ModuleTest.java
 javax/crypto/SecretKeyFactory/TestFailOver.java
 javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
+tools/jimage/JImageToolTest.java
+tools/jpackage/junit/junit.java
+jdk/security/JavaDotSecurity/MakeJavaSecurityTest.java
+javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
+
+java/io/Serializable/class/NonSerializableTest.java
+java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 
 ####
 # No expected StackOverflow

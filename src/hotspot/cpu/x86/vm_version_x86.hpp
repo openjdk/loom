@@ -25,9 +25,9 @@
 #ifndef CPU_X86_VM_VERSION_X86_HPP
 #define CPU_X86_VM_VERSION_X86_HPP
 
-#include "memory/universe.hpp"
 #include "runtime/abstract_vm_version.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/sizes.hpp"
 
 class VM_Version : public Abstract_VM_Version {
   friend class VMStructs;
@@ -269,7 +269,9 @@ class VM_Version : public Abstract_VM_Version {
              avx512_4vnniw : 1,
              avx512_4fmaps : 1,
         fast_short_rep_mov : 1,
-                           : 27;
+                           : 9,
+                 serialize : 1,
+                           : 17;
     } bits;
   };
 
@@ -368,10 +370,11 @@ protected:
     decl(AVX512_VBMI2,      "avx512_vbmi2",      44) /* VBMI2 shift left double instructions */ \
     decl(AVX512_VBMI,       "avx512_vbmi",       45) /* Vector BMI instructions */ \
     decl(HV,                "hv",                46) /* Hypervisor instructions */ \
+    decl(SERIALIZE,         "serialize",         47) /* CPU SERIALIZE */ \
                                                      \
-    decl(RDTSCP,            "rdtscp",            47) /* RDTSCP instruction */ \
-    decl(RDPID,             "rdpid",             48) /* RDPID instruction */ \
-    decl(FSRM,              "fsrm",              49) /* Fast Short REP MOV */
+    decl(RDTSCP,            "rdtscp",            48) /* RDTSCP instruction */ \
+    decl(RDPID,             "rdpid",             49) /* RDPID instruction */ \
+    decl(FSRM,              "fsrm",              50) /* Fast Short REP MOV */
 
 #define DECLARE_CPU_FEATURE_FLAG(id, name, bit) CPU_##id = (1ULL << bit),
     CPU_FEATURE_FLAGS(DECLARE_CPU_FEATURE_FLAG)
@@ -664,6 +667,8 @@ enum Extended_Family {
       if (_cpuid_info.sef_cpuid7_ebx.bits.clwb != 0) {
         result |= CPU_CLWB;
       }
+      if (_cpuid_info.sef_cpuid7_edx.bits.serialize != 0)
+        result |= CPU_SERIALIZE;
     }
 
     // ZX features.
@@ -917,6 +922,7 @@ public:
   static bool supports_avx512_vbmi()  { return (_features & CPU_AVX512_VBMI) != 0; }
   static bool supports_avx512_vbmi2() { return (_features & CPU_AVX512_VBMI2) != 0; }
   static bool supports_hv()           { return (_features & CPU_HV) != 0; }
+  static bool supports_serialize()    { return (_features & CPU_SERIALIZE) != 0; }
 
   // Intel features
   static bool is_intel_family_core() { return is_intel() &&
@@ -1048,19 +1054,8 @@ public:
   // and trailing StoreStore fences.
 
 #ifdef _LP64
-  static bool supports_clflush() {
-    // clflush should always be available on x86_64
-    // if not we are in real trouble because we rely on it
-    // to flush the code cache.
-    // Unfortunately, Assembler::clflush is currently called as part
-    // of generation of the code cache flush routine. This happens
-    // under Universe::init before the processor features are set
-    // up. Assembler::flush calls this routine to check that clflush
-    // is allowed. So, we give the caller a free pass if Universe init
-    // is still in progress.
-    assert ((!Universe::is_fully_initialized() || (_features & CPU_FLUSH) != 0), "clflush should be available");
-    return true;
-  }
+
+  static bool supports_clflush(); // Can't inline due to header file conflict
 #else
   static bool supports_clflush() { return  ((_features & CPU_FLUSH) != 0); }
 #endif // _LP64

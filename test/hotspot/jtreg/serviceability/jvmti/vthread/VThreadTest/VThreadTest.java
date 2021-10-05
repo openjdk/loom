@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Verifies JVMTI support for VThreads.
- * @run main/othervm/native -agentlib:VThreadTest VThreadTest
+ * @compile --enable-preview -source ${jdk.version} VThreadTest.java
+ * @run main/othervm/native --enable-preview -agentlib:VThreadTest VThreadTest
  */
 
 import java.util.concurrent.*;

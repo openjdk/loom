@@ -196,7 +196,7 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
 
   // Symbol* kname = m->klass_name();
   // Symbol* name = m->name();
-  // if (kname == vmSymbols::java_lang_Continuation()) {
+  // if (kname == vmSymbols::jdk_internal_vm_Continuation()) {
   //   if (name == vmSymbols::enter_name()) {
   //     return java_lang_continuation_enter;
   //   }

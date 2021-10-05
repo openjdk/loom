@@ -37,8 +37,8 @@ import jdk.test.lib.jfr.Events;
  * @key jfr
  * @requires vm.hasJFR
  * @library /test/lib
- * @build jdk.jfr.event.runtime.LatchedThread
- * @run main/othervm jdk.jfr.event.runtime.TestThreadStartEvent
+ * @compile --enable-preview -source ${jdk.version} TestThreadStartEvent.java LatchedThread.java
+ * @run main/othervm --enable-preview jdk.jfr.event.runtime.TestThreadStartEvent
  */
 public class TestThreadStartEvent {
     private final static String EVENT_NAME_THREAD_START = EventNames.ThreadStart;

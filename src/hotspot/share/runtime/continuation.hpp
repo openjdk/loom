@@ -38,18 +38,7 @@ class ContinuationEntry;
 
 // TODO: remove
 class Continuations : public AllStatic {
-private:
-  static volatile intptr_t _exploded_miss;
-  static volatile intptr_t _exploded_hit;
-  static volatile intptr_t _nmethod_hit;
-  static volatile intptr_t _nmethod_miss;
-
 public:
-  static void exploded_miss();
-  static void exploded_hit();
-  static void nmethod_miss();
-  static void nmethod_hit();
-
   static void print_statistics();
   static void init();
 };
@@ -67,6 +56,7 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
+  static void jump_from_safepoint(JavaThread* thread);
 
   static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
@@ -89,6 +79,10 @@ public:
   static stackChunkOop last_nonempty_chunk(oop continuation);
   static frame last_frame(oop continuation, RegisterMap *map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
+
+  // pins/unpins the innermost mounted continuation; returns true on success or false if there's no continuation or the operation failed
+  static bool pin(JavaThread* current);
+  static bool unpin(JavaThread* current);
 
   // access frame data
   static bool is_in_usable_stack(address addr, const RegisterMap* map);

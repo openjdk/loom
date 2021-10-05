@@ -82,6 +82,7 @@ jboolean threadControl_isKnownVThread(jthread vthread);
 
 #ifdef DEBUG
 void threadControl_dumpAllThreads();
+void threadControl_dumpThread(jthread thread);
 #endif
 
 #endif

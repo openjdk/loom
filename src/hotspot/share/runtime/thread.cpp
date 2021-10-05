@@ -95,7 +95,6 @@
 #include "runtime/objectMonitor.hpp"
 #include "runtime/orderAccess.hpp"
 #include "runtime/osThread.hpp"
-#include "runtime/prefetch.inline.hpp"
 #include "runtime/safepoint.hpp"
 #include "runtime/safepointMechanism.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
@@ -861,7 +860,7 @@ void JavaThread::collect_counters(jlong* array, int length) {
   for (int i = 0; i < length; i++) {
     array[i] = _jvmci_old_thread_counters[i];
   }
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *tp = jtiwh.next(); ) {
+  for (JavaThread* tp : ThreadsListHandle()) {
     if (jvmci_counters_include(tp)) {
       for (int i = 0; i < length; i++) {
         array[i] += tp->_jvmci_counters[i];
@@ -922,7 +921,7 @@ class VM_JVMCIResizeCounters : public VM_Operation {
     }
 
     // Now resize each threads array
-    for (JavaThreadIteratorWithHandle jtiwh; JavaThread *tp = jtiwh.next(); ) {
+    for (JavaThread* tp : ThreadsListHandle()) {
       if (!tp->resize_counters(JVMCICounterSize, _new_size)) {
         _failed = true;
         break;
@@ -955,6 +954,15 @@ void JavaThread::check_possible_safepoint() {
   // Clear unhandled oops in JavaThreads so we get a crash right away.
   clear_unhandled_oops();
 #endif // CHECK_UNHANDLED_OOPS
+
+  // Macos/aarch64 should be in the right state for safepoint (e.g.
+  // deoptimization needs WXWrite).  Crashes caused by the wrong state rarely
+  // happens in practice, making such issues hard to find and reproduce.
+#if defined(__APPLE__) && defined(AARCH64)
+  if (AssertWXAtThreadSync) {
+    assert_wx_state(WXWrite);
+  }
+#endif
 }
 
 void JavaThread::check_for_valid_safepoint_state() {
@@ -1014,9 +1022,10 @@ JavaThread::JavaThread() :
   _in_deopt_handler(0),
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
+#if INCLUDE_JVMTI
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),
-  _hide_over_cont_yield(false),
+#endif
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
   _pending_deoptimization(-1),
@@ -1026,8 +1035,8 @@ JavaThread::JavaThread() :
   _pending_failed_speculation(0),
   _jvmci{nullptr},
   _jvmci_counters(nullptr),
-  _jvmci_reserved0(nullptr),
-  _jvmci_reserved1(nullptr),
+  _jvmci_reserved0(0),
+  _jvmci_reserved1(0),
   _jvmci_reserved_oop0(nullptr),
 #endif // INCLUDE_JVMCI
 
@@ -1245,7 +1254,9 @@ void JavaThread::run() {
 
   // Thread is now sufficiently initialized to be handled by the safepoint code as being
   // in the VM. Change thread state from _thread_new to _thread_in_vm
-  ThreadStateTransition::transition(this, _thread_new, _thread_in_vm);
+  assert(this->thread_state() == _thread_new, "wrong thread state");
+  set_thread_state(_thread_in_vm);
+
   // Before a thread is on the threads list it is always safe, so after leaving the
   // _thread_new we should emit a instruction barrier. The distance to modified code
   // from here is probably far enough, but this is consistent and safe.
@@ -1665,7 +1676,7 @@ void JavaThread::check_and_handle_async_exceptions() {
     case _thread_in_Java: {
       ThreadInVMfromJava tiv(this);
       JavaThread* THREAD = this;
-      Exceptions::throw_unsafe_access_internal_error(THREAD, __FILE__, __LINE__, "a fault occurred in a recent unsafe memory access operation in compiled Java code");
+      Exceptions::throw_unsafe_access_internal_error(THREAD, __FILE__, __LINE__, "a fault occurred in an unsafe memory access operation in compiled Java code");
       return;
     }
     default:
@@ -1689,15 +1700,12 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
     check_and_handle_async_exceptions();
   }
 
-  if (is_cont_force_yield()) {
-    log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
-    set_cont_preempt(false);
-    assert(thread_state() == _thread_in_Java, "can only continue from Java state");
-    StackWatermarkSet::after_unwind(this);
-    StubRoutines::cont_jump_from_sp_C()();
-  }
-
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)
+
+  if (is_cont_force_yield()) {
+    Continuation::jump_from_safepoint(this); // does not return
+    ShouldNotReachHere();
+  }
 }
 
 class InstallAsyncExceptionClosure : public HandshakeClosure {
@@ -1768,6 +1776,7 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
   this->interrupt();
 }
 
+#if INCLUDE_JVMTI
 void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
   if (val) {
@@ -1779,6 +1788,7 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
   _is_VTMT_disabler = val;
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
 }
+#endif
 
 // External suspension mechanism.
 //
@@ -1787,9 +1797,17 @@ void JavaThread::set_is_VTMT_disabler(bool val) {
 //   - Target thread will not enter any new monitors.
 //
 bool JavaThread::java_suspend() {
+#if INCLUDE_JVMTI
   // Suspending a JavaThread in VTMT or disabling VTMT can cause deadlocks.
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
+#ifdef ASSERT
+  if (is_VTMT_disabler()) { // TMP debugging code, should be removed after this assert is observed
+    printf("DBG: JavaThread::java_suspend: suspended jt: %p current jt: %p\n", (void*)this, (void*)JavaThread::current());
+    printf("DBG: JavaThread::java_suspend: VTMT_disable_count: %d\n", JvmtiVTMTDisabler::VTMT_disable_count());
+  }
+#endif
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
+#endif
 
   ThreadsListHandle tlh;
   if (!tlh.includes(this)) {
@@ -2131,14 +2149,12 @@ const char* _get_thread_state_name(JavaThreadState _thread_state) {
   }
 }
 
-#ifndef PRODUCT
 void JavaThread::print_thread_state_on(outputStream *st) const {
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
 };
 const char* JavaThread::thread_state_name() const {
   return _get_thread_state_name(_thread_state);
 }
-#endif // PRODUCT
 
 // Called by Threads::print() for VM_PrintThreads operation
 void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
@@ -2357,6 +2373,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   }
 }
 
+#if INCLUDE_JVMTI
 // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_mounted_vthread(thread_oop);
@@ -2369,6 +2386,7 @@ JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
 
   return jvmti_thread_state();
 }
+#endif
 
 // JVMTI PopFrame support
 void JavaThread::popframe_preserve_args(ByteSize size_in_bytes, void* start) {
@@ -2587,28 +2605,6 @@ size_t      JavaThread::_stack_size_at_create = 0;
 bool        Threads::_vm_complete = false;
 #endif
 
-static inline void *prefetch_and_load_ptr(void **addr, intx prefetch_interval) {
-  Prefetch::read((void*)addr, prefetch_interval);
-  return *addr;
-}
-
-// Possibly the ugliest for loop the world has seen. C++ does not allow
-// multiple types in the declaration section of the for loop. In this case
-// we are only dealing with pointers and hence can cast them. It looks ugly
-// but macros are ugly and therefore it's fine to make things absurdly ugly.
-#define DO_JAVA_THREADS(LIST, X)                                                                                          \
-    for (JavaThread *MACRO_scan_interval = (JavaThread*)(uintptr_t)PrefetchScanIntervalInBytes,                           \
-             *MACRO_list = (JavaThread*)(LIST),                                                                           \
-             **MACRO_end = ((JavaThread**)((ThreadsList*)MACRO_list)->threads()) + ((ThreadsList*)MACRO_list)->length(),  \
-             **MACRO_current_p = (JavaThread**)((ThreadsList*)MACRO_list)->threads(),                                     \
-             *X = (JavaThread*)prefetch_and_load_ptr((void**)MACRO_current_p, (intx)MACRO_scan_interval);                 \
-         MACRO_current_p != MACRO_end;                                                                                    \
-         MACRO_current_p++,                                                                                               \
-             X = (JavaThread*)prefetch_and_load_ptr((void**)MACRO_current_p, (intx)MACRO_scan_interval))
-
-// All JavaThreads
-#define ALL_JAVA_THREADS(X) DO_JAVA_THREADS(ThreadsSMRSupport::get_java_thread_list(), X)
-
 // All NonJavaThreads (i.e., every non-JavaThread in the system).
 void Threads::non_java_threads_do(ThreadClosure* tc) {
   NoSafepointVerifier nsv;
@@ -2616,6 +2612,10 @@ void Threads::non_java_threads_do(ThreadClosure* tc) {
     tc->do_thread(njti.current());
   }
 }
+
+// All JavaThreads
+#define ALL_JAVA_THREADS(X) \
+  for (JavaThread* X : *ThreadsSMRSupport::get_java_thread_list())
 
 // All JavaThreads
 void Threads::java_threads_do(ThreadClosure* tc) {
@@ -2834,6 +2834,11 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Note: this internally calls os::init_container_support()
   jint parse_result = Arguments::parse(args);
   if (parse_result != JNI_OK) return parse_result;
+
+#if INCLUDE_NMT
+  // Initialize NMT right after argument parsing to keep the pre-NMT-init window small.
+  MemTracker::initialize();
+#endif // INCLUDE_NMT
 
   os::init_before_ergo();
 
@@ -3750,7 +3755,7 @@ GrowableArray<JavaThread*>* Threads::get_pending_threads(ThreadsList * t_list,
   GrowableArray<JavaThread*>* result = new GrowableArray<JavaThread*>(count);
 
   int i = 0;
-  DO_JAVA_THREADS(t_list, p) {
+  for (JavaThread* p : *t_list) {
     if (!p->can_call_java()) continue;
 
     // The first stage of async deflation does not affect any field
@@ -3771,7 +3776,7 @@ JavaThread *Threads::owning_thread_from_monitor_owner(ThreadsList * t_list,
   // NULL owner means not locked so we can skip the search
   if (owner == NULL) return NULL;
 
-  DO_JAVA_THREADS(t_list, p) {
+  for (JavaThread* p : *t_list) {
     // first, see if owner is the address of a Java thread
     if (owner == (address)p) return p;
   }
@@ -3786,7 +3791,7 @@ JavaThread *Threads::owning_thread_from_monitor_owner(ThreadsList * t_list,
   // Lock Word in the owning Java thread's stack.
   //
   JavaThread* the_owner = NULL;
-  DO_JAVA_THREADS(t_list, q) {
+  for (JavaThread* q : *t_list) {
     if (q->is_lock_owned(owner)) {
       the_owner = q;
       break;

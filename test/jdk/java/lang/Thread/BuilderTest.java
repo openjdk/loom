@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Unit test for Thread.Builder
- * @run testng BuilderTest
+ * @compile --enable-preview -source ${jdk.version} BuilderTest.java
+ * @run testng/othervm --enable-preview BuilderTest
  */
 
 import java.util.concurrent.*;
@@ -363,42 +364,6 @@ public class BuilderTest {
     @Test(expectedExceptions = { IllegalArgumentException.class })
     public void testStackSize3() {
         Thread.ofPlatform().stackSize(-1);
-    }
-
-    // scheduler
-    @Test
-    public void testScheduler() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(1);
-        try {
-            Thread carrierThread = pool.submit(Thread::currentThread).get();
-
-            // wrap the executor to capture the carrier thread
-            var threads = new ArrayBlockingQueue<Thread>(10);
-            Executor wrapper = task -> pool.execute(() -> {
-                try {
-                    threads.put(Thread.currentThread());
-                    pool.execute(task);
-                } catch (InterruptedException ignore) { }
-            });
-
-            Thread.Builder builder = Thread.ofVirtual().scheduler(wrapper::execute);
-
-            Thread thread1 = builder.unstarted(() -> { });
-            thread1.start();
-            thread1.join();
-
-            Thread thread2 = builder.start(() -> { });
-            thread2.join();
-
-            Thread thread3 = builder.factory().newThread(() -> { });
-            thread3.start();
-            thread3.join();
-
-            assertTrue(threads.size() == 3);
-            threads.forEach(t -> assertTrue(t == carrierThread));
-        } finally {
-            pool.shutdown();
-        }
     }
 
     // uncaught exception handler

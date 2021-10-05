@@ -25,11 +25,14 @@
  * @test
  * @summary Verifies JVMTI support for Continuations
  * @compile ContStackDepthTest.java
+ * @modules java.base/jdk.internal.vm
  * @run main/othervm/native -agentlib:ContStackDepthTest ContStackDepthTest
  */
 
 import java.math.BigInteger;
 import java.math.BigInteger.*;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 public class ContStackDepthTest {
     private static final String agentLib = "ContStackDepthTest";

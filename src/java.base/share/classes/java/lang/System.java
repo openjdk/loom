@@ -81,6 +81,8 @@ import jdk.internal.logger.LoggerFinderLoader;
 import jdk.internal.logger.LazyLoggers;
 import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
@@ -802,6 +804,15 @@ public final class System {
      *     <td>The module name of the initial/main module</td></tr>
      * <tr><th scope="row">{@systemProperty jdk.module.main.class}</th>
      *     <td>The main class name of the initial module</td></tr>
+     * <tr><th scope="row">{@systemProperty file.encoding}</th>
+     *     <td>The name of the default charset, defaults to {@code UTF-8}.
+     *     The property may be set on the command line to the value
+     *     {@code UTF-8} or {@code COMPAT}. If set on the command line to
+     *     the value {@code COMPAT} then the value is replaced with the
+     *     value of the {@code native.encoding} property during startup.
+     *     Setting the property to a value other than {@code UTF-8} or
+     *     {@code COMPAT} leads to unspecified behavior.
+     *     </td></tr>
      * </tbody>
      * </table>
      *
@@ -2117,9 +2128,9 @@ public final class System {
         setIn0(new BufferedInputStream(fdIn));
         // sun.stdout/err.encoding are set when the VM is associated with the terminal,
         // thus they are equivalent to Console.charset(), otherwise the encoding
-        // defaults to Charset.defaultCharset()
-        setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding")));
-        setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding")));
+        // defaults to native.encoding
+        setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding", StaticProperty.nativeEncoding())));
+        setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding", StaticProperty.nativeEncoding())));
 
 //        setIn0(new BufferedInputStream(ConsoleStreams.in));
 //        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
@@ -2413,6 +2424,10 @@ public final class System {
                 return String.decodeASCII(src, srcOff, dst, dstOff, len);
             }
 
+            public int encodeASCII(char[] src, int srcOff, byte[] dst, int dstOff, int len) {
+                return StringCoding.implEncodeAsciiArray(src, srcOff, dst, dstOff, len);
+            }
+
             public void setCause(Throwable t, Throwable cause) {
                 t.setCause(cause);
             }
@@ -2467,8 +2482,8 @@ public final class System {
                 return thread.headThreadContainer();
             }
 
-            public void pushThreadContainer(ThreadContainer container) {
-                Thread.currentThread().pushThreadContainer(container);
+            public Object pushThreadContainer(ThreadContainer container) {
+                return Thread.currentThread().pushThreadContainer(container);
             }
 
             public void popThreadContainer(ThreadContainer container) {
@@ -2503,6 +2518,22 @@ public final class System {
                 local.setCarrierThreadLocal(value);
             }
 
+            public Object[] scopeLocalCache() {
+                return Thread.scopeLocalCache();
+            }
+
+            public void setScopeLocalCache(Object[] cache) {
+                Thread.setScopeLocalCache(cache);
+            }
+
+            public Continuation getContinuation(Thread thread) {
+                return thread.getContinuation();
+            }
+
+            public void setContinuation(Thread thread, Continuation continuation) {
+                thread.setContinuation(continuation);
+            }
+
             public void parkVirtualThread() {
                 ((VirtualThread) Thread.currentThread()).park();
             }
@@ -2513,6 +2544,12 @@ public final class System {
 
             public void unparkVirtualThread(Thread thread, boolean tryPush) {
                 ((VirtualThread) thread).unpark(tryPush);
+            }
+
+            public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
+                                                      ContinuationScope contScope,
+                                                      Continuation continuation) {
+                return StackWalker.newInstance(options, null, contScope, continuation);
             }
         });
     }

@@ -23,6 +23,9 @@
 
 package org.openjdk.bench.loom.obsolete;
 
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
+
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 

@@ -371,11 +371,46 @@ public class PushbackInputStream extends FilterInputStream {
      *
      * @throws     IOException  if an I/O error occurs.
      */
-    public synchronized void close() throws IOException {
-        if (in == null)
-            return;
-        in.close();
-        in = null;
-        buf = null;
+    public void close() throws IOException {
+        synchronized (this) {
+            waitIfClosing();
+            if (in == null) {
+                // closed by another thread
+                return;
+            }
+            closing = true;
+        }
+        try {
+            in.close();
+        } finally {
+            in = null;
+            buf = null;
+
+            // notify anyone waiting for close
+            closing = false;
+            synchronized (this) {
+                notifyAll();
+            }
+        }
+    }
+
+    private volatile boolean closing;
+
+    private void waitIfClosing() {
+        assert Thread.holdsLock(this);
+        boolean interrupted = false;
+        try {
+            while (closing) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }

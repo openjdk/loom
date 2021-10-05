@@ -767,7 +767,7 @@ public final class ProcessTools {
         if (wrapper.equals("Virtual")) {
             MainThreadGroup tg = new MainThreadGroup();
             // TODO fix to set virtual scheduler group when become available
-            Thread vthread = Thread.ofVirtual().start(() -> {
+            Thread vthread = startVirtualThread(() -> {
                     try {
                         mainMethod.invoke(null, new Object[] { classArgs });
                     } catch (InvocationTargetException e) {
@@ -811,5 +811,18 @@ public final class ProcessTools {
             uncaughtThrowable = e;
         }
         Throwable uncaughtThrowable = null;
+    }
+
+    static Thread startVirtualThread(Runnable task) {
+        try {
+            Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+            Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+            Method start = clazz.getMethod("start", Runnable.class);
+            return (Thread) start.invoke(builder, task);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

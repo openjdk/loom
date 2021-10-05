@@ -31,7 +31,7 @@ import java.lang.invoke.MethodType;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -39,6 +39,7 @@ import java.util.concurrent.ForkJoinPool.ManagedBlocker;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
@@ -207,11 +208,20 @@ public class Blocker {
      */
     public static <V> V runInThreadPool(Callable<V> task) {
         Future<V> future = ThreadPool.THREAD_POOL.submit(task);
+        boolean interrupted = false;
         try {
-            return future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
-            return null;
+            for (;;) {
+                try {
+                    return future.get();
+                } catch (ExecutionException e) {
+                    U.throwException(e.getCause());
+                    return null;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 
@@ -220,10 +230,19 @@ public class Blocker {
      */
     public static void runInThreadPool(Runnable task) {
         Future<?> future = ThreadPool.THREAD_POOL.submit(task);
+        boolean interrupted = false;
         try {
-            future.join();
-        } catch (CompletionException e) {
-            U.throwException(e.getCause());
+            for (;;) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    U.throwException(e.getCause());
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 

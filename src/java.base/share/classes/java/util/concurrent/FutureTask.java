@@ -161,10 +161,6 @@ public class FutureTask<V> implements RunnableFuture<V> {
         return state != NEW;
     }
 
-    public boolean isCompletedNormally() {
-        return state == NORMAL;
-    }
-
     public boolean cancel(boolean mayInterruptIfRunning) {
         if (!(state == NEW && STATE.compareAndSet
               (this, NEW, mayInterruptIfRunning ? INTERRUPTING : CANCELLED)))
@@ -209,31 +205,46 @@ public class FutureTask<V> implements RunnableFuture<V> {
         return report(s);
     }
 
-    /**
-     * @throws CancellationException {@inheritDoc}
-     * @throws CompletionException {@inheritDoc}
-     */
-    public V join() {
-        boolean interrupted = false;
-        int s = state;
-        while (s <= COMPLETING) {
-            try {
-                s = awaitDone(false, 0L);
-            } catch (InterruptedException e) {
-                interrupted = true;
-            }
-        }
-        if (interrupted)
-            Thread.currentThread().interrupt();
-        Object x = outcome;
-        if (s == NORMAL) {
+    @Override
+    public V completedResultNow() {
+        if (state == NORMAL) {
             @SuppressWarnings("unchecked")
-            V result = (V)x;
+            V result = (V) outcome;
             return result;
+        } else {
+            throw new IllegalStateException();
         }
-        if (s >= CANCELLED)
-            throw new CancellationException();
-        throw new CompletionException((Throwable)x);
+    }
+
+    @Override
+    public Throwable completedExceptionNow() {
+        switch (state) {
+            case EXCEPTIONAL:
+                Object x = outcome;
+                return (Throwable) x;
+            case CANCELLED:
+            case INTERRUPTING:
+            case INTERRUPTED:
+                return new CancellationException();
+            default:
+                throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public State state() {
+        switch (state) {
+            case NORMAL:
+                return State.SUCCESS;
+            case EXCEPTIONAL:
+                return State.FAILED;
+            case CANCELLED:
+            case INTERRUPTING:
+            case INTERRUPTED:
+                return State.CANCELLED;
+            default:
+                return State.RUNNING;
+        }
     }
 
     /**

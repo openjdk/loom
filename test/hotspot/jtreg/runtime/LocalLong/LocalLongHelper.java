@@ -76,7 +76,7 @@ public class LocalLongHelper {
         getMethodType.setAccessible(true);
 
         Class<?> extendedOptionClass = Class.forName("java.lang.StackWalker$ExtendedOption");
-        Method ewsNI = StackWalker.class.getDeclaredMethod("newInstance", Set.class, extendedOptionClass, ContinuationScope.class);
+        Method ewsNI = StackWalker.class.getDeclaredMethod("newInstance", Set.class, extendedOptionClass, jdk.internal.vm.ContinuationScope.class);
         ewsNI.setAccessible(true);
         Field f = extendedOptionClass.getDeclaredField("LOCALS_AND_OPERANDS");
         f.setAccessible(true);

@@ -41,7 +41,8 @@ import java.io.PrintStream;
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:classprep01 classprep01
+ * @compile --enable-preview -source ${jdk.version} classprep01.java
+ * @run main/othervm/native --enable-preview -agentlib:classprep01 classprep01
  */
 
 public class classprep01 {

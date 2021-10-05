@@ -573,7 +573,7 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _bci = jvf->bci();
   _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
   _locked_monitors = NULL;
-  _cont_scope_name = OopHandle(Universe::vm_global(), (jvf->continuation() != NULL) ? java_lang_ContinuationScope::name(java_lang_Continuation::scope(jvf->continuation())) : (oop)NULL);
+  _cont_scope_name = OopHandle(_thread_service_storage, (jvf->continuation() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
     Thread* current_thread = Thread::current();
     ResourceMark rm(current_thread);
@@ -621,18 +621,14 @@ void StackFrameInfo::print_on(outputStream* st) const {
 class InflatedMonitorsClosure: public MonitorClosure {
 private:
   ThreadStackTrace* _stack_trace;
-  Thread* _thread;
 public:
-  InflatedMonitorsClosure(Thread* t, ThreadStackTrace* st) {
-    _thread = t;
+  InflatedMonitorsClosure(ThreadStackTrace* st) {
     _stack_trace = st;
   }
   void do_monitor(ObjectMonitor* mid) {
-    if (mid->owner() == _thread) {
-      oop object = mid->object();
-      if (!_stack_trace->is_owned_monitor_on_stack(object)) {
-        _stack_trace->add_jni_locked_monitor(object);
-      }
+    oop object = mid->object();
+    if (!_stack_trace->is_owned_monitor_on_stack(object)) {
+      _stack_trace->add_jni_locked_monitor(object);
     }
   }
 };
@@ -694,8 +690,8 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, bool full) {
   if (_with_locked_monitors) {
     // Iterate inflated monitors and find monitors locked by this thread
     // not found in the stack
-    InflatedMonitorsClosure imc(_thread, this);
-    ObjectSynchronizer::monitors_iterate(&imc);
+    InflatedMonitorsClosure imc(this);
+    ObjectSynchronizer::monitors_iterate(&imc, _thread);
   }
 }
 
@@ -881,7 +877,10 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   _sleep_ticks = stat->sleep_ticks();
   _sleep_count = stat->sleep_count();
 
-  _thread_status = java_lang_Thread::get_thread_status(threadObj);
+  // If thread is still attaching then threadObj will be NULL.
+  _thread_status = threadObj == NULL ? JavaThreadStatus::NEW
+                                     : java_lang_Thread::get_thread_status(threadObj);
+
   _is_suspended = thread->is_suspended();
   _is_in_native = (thread->thread_state() == _thread_in_native);
 

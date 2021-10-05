@@ -22,6 +22,9 @@
  *
  */
 
+// Old code. Might be deleted later if no uses appear.
+#if 0
+
 #ifndef SHARE_COMPILER_OOPMAPSTUBGENERATOR_HPP
 #define SHARE_COMPILER_OOPMAPSTUBGENERATOR_HPP
 
@@ -50,4 +53,8 @@ public:
   static CodeBlob* code_blob(address thaw_stub_address);
 };
 
+#endif
+
+#else
+#error This code is not used
 #endif

@@ -4644,7 +4644,7 @@ class StubGenerator: public StubCodeGenerator {
   }
 
   address generate_upper_word_mask() {
-    __ align(64);
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "upper_word_mask");
     address start = __ pc();
     __ emit_data64(0x0000000000000000, relocInfo::none);
@@ -4653,7 +4653,7 @@ class StubGenerator: public StubCodeGenerator {
   }
 
   address generate_shuffle_byte_flip_mask() {
-    __ align(64);
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "shuffle_byte_flip_mask");
     address start = __ pc();
     __ emit_data64(0x08090a0b0c0d0e0f, relocInfo::none);
@@ -4698,7 +4698,7 @@ class StubGenerator: public StubCodeGenerator {
   }
 
   address generate_pshuffle_byte_flip_mask() {
-    __ align(64);
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "pshuffle_byte_flip_mask");
     address start = __ pc();
     __ emit_data64(0x0405060700010203, relocInfo::none);
@@ -4818,9 +4818,103 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
+  address ghash_polynomial512_addr() {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", "_ghash_poly512_addr");
+    address start = __ pc();
+    __ emit_data64(0x00000001C2000000, relocInfo::none); // POLY for reduction
+    __ emit_data64(0xC200000000000000, relocInfo::none);
+    __ emit_data64(0x00000001C2000000, relocInfo::none);
+    __ emit_data64(0xC200000000000000, relocInfo::none);
+    __ emit_data64(0x00000001C2000000, relocInfo::none);
+    __ emit_data64(0xC200000000000000, relocInfo::none);
+    __ emit_data64(0x00000001C2000000, relocInfo::none);
+    __ emit_data64(0xC200000000000000, relocInfo::none);
+    __ emit_data64(0x0000000000000001, relocInfo::none); // POLY
+    __ emit_data64(0xC200000000000000, relocInfo::none);
+    __ emit_data64(0x0000000000000001, relocInfo::none); // TWOONE
+    __ emit_data64(0x0000000100000000, relocInfo::none);
+    return start;
+}
+
+  // Vector AES Galois Counter Mode implementation. Parameters:
+  // Windows regs            |  Linux regs
+  // in = c_rarg0 (rcx)      |  c_rarg0 (rsi)
+  // len = c_rarg1 (rdx)     |  c_rarg1 (rdi)
+  // ct = c_rarg2 (r8)       |  c_rarg2 (rdx)
+  // out = c_rarg3 (r9)      |  c_rarg3 (rcx)
+  // key = r10               |  c_rarg4 (r8)
+  // state = r13             |  c_rarg5 (r9)
+  // subkeyHtbl = r14        |  r11
+  // counter = rsi           |  r12
+  // return - number of processed bytes
+  address generate_galoisCounterMode_AESCrypt() {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", "galoisCounterMode_AESCrypt");
+    address start = __ pc();
+    const Register in = c_rarg0;
+    const Register len = c_rarg1;
+    const Register ct = c_rarg2;
+    const Register out = c_rarg3;
+    // and updated with the incremented counter in the end
+#ifndef _WIN64
+    const Register key = c_rarg4;
+    const Register state = c_rarg5;
+    const Address subkeyH_mem(rbp, 2 * wordSize);
+    const Register subkeyHtbl = r11;
+    const Address avx512_subkeyH_mem(rbp, 3 * wordSize);
+    const Register avx512_subkeyHtbl = r13;
+    const Address counter_mem(rbp, 4 * wordSize);
+    const Register counter = r12;
+#else
+    const Address key_mem(rbp, 6 * wordSize);
+    const Register key = r10;
+    const Address state_mem(rbp, 7 * wordSize);
+    const Register state = r13;
+    const Address subkeyH_mem(rbp, 8 * wordSize);
+    const Register subkeyHtbl = r14;
+    const Address avx512_subkeyH_mem(rbp, 9 * wordSize);
+    const Register avx512_subkeyHtbl = r12;
+    const Address counter_mem(rbp, 10 * wordSize);
+    const Register counter = rsi;
+#endif
+    __ enter();
+   // Save state before entering routine
+    __ push(r12);
+    __ push(r13);
+    __ push(r14);
+    __ push(r15);
+    __ push(rbx);
+#ifdef _WIN64
+    // on win64, fill len_reg from stack position
+    __ push(rsi);
+    __ movptr(key, key_mem);
+    __ movptr(state, state_mem);
+#endif
+    __ movptr(subkeyHtbl, subkeyH_mem);
+    __ movptr(avx512_subkeyHtbl, avx512_subkeyH_mem);
+    __ movptr(counter, counter_mem);
+
+    __ aesgcm_encrypt(in, len, ct, out, key, state, subkeyHtbl, avx512_subkeyHtbl, counter);
+
+    // Restore state before leaving routine
+#ifdef _WIN64
+    __ pop(rsi);
+#endif
+    __ pop(rbx);
+    __ pop(r15);
+    __ pop(r14);
+    __ pop(r13);
+    __ pop(r12);
+
+    __ leave(); // required for proper stackwalking of RuntimeStub frame
+    __ ret(0);
+     return start;
+  }
+
   // This mask is used for incrementing counter value(linc0, linc4, etc.)
   address counter_mask_addr() {
-    __ align(64);
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "counter_mask_addr");
     address start = __ pc();
     __ emit_data64(0x08090a0b0c0d0e0f, relocInfo::none);//lbswapmask
@@ -5739,7 +5833,7 @@ address generate_avx_ghash_processBlocks() {
 
   address base64_shuffle_addr()
   {
-    __ align(64, (unsigned long long)__ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "shuffle_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -5799,7 +5893,7 @@ address generate_avx_ghash_processBlocks() {
 
   address base64_encoding_table_addr()
   {
-    __ align(64, (unsigned long long)__ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "encoding_table_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0, "Alignment problem (0x%08llx)", (unsigned long long)start);
@@ -6206,7 +6300,7 @@ address generate_avx_ghash_processBlocks() {
 
   // base64 AVX512vbmi tables
   address base64_vbmi_lookup_lo_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "lookup_lo_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6223,7 +6317,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_lookup_hi_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "lookup_hi_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6239,7 +6333,7 @@ address generate_avx_ghash_processBlocks() {
     return start;
   }
   address base64_vbmi_lookup_lo_url_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "lookup_lo_base64url");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6256,7 +6350,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_lookup_hi_url_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "lookup_hi_base64url");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6273,7 +6367,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_pack_vec_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "pack_vec_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6290,7 +6384,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_join_0_1_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "join_0_1_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6307,7 +6401,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_join_1_2_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "join_1_2_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -6324,7 +6418,7 @@ address generate_avx_ghash_processBlocks() {
   }
 
   address base64_vbmi_join_2_3_addr() {
-    __ align(64, (unsigned long long) __ pc());
+    __ align64();
     StubCodeMark mark(this, "StubRoutines", "join_2_3_base64");
     address start = __ pc();
     assert(((unsigned long long)start & 0x3f) == 0,
@@ -8371,13 +8465,20 @@ RuntimeStub* generate_cont_doYield() {
         StubRoutines::_cipherBlockChaining_decryptAESCrypt = generate_cipherBlockChaining_decryptVectorAESCrypt();
         StubRoutines::_electronicCodeBook_encryptAESCrypt = generate_electronicCodeBook_encryptAESCrypt();
         StubRoutines::_electronicCodeBook_decryptAESCrypt = generate_electronicCodeBook_decryptAESCrypt();
+        StubRoutines::x86::_counter_mask_addr = counter_mask_addr();
+        StubRoutines::x86::_ghash_poly512_addr = ghash_polynomial512_addr();
+        StubRoutines::x86::_ghash_long_swap_mask_addr = generate_ghash_long_swap_mask();
+        StubRoutines::_galoisCounterMode_AESCrypt = generate_galoisCounterMode_AESCrypt();
       } else {
         StubRoutines::_cipherBlockChaining_decryptAESCrypt = generate_cipherBlockChaining_decryptAESCrypt_Parallel();
       }
     }
+
     if (UseAESCTRIntrinsics) {
       if (VM_Version::supports_avx512_vaes() && VM_Version::supports_avx512bw() && VM_Version::supports_avx512vl()) {
-        StubRoutines::x86::_counter_mask_addr = counter_mask_addr();
+        if (StubRoutines::x86::_counter_mask_addr == NULL) {
+          StubRoutines::x86::_counter_mask_addr = counter_mask_addr();
+        }
         StubRoutines::_counterMode_AESCrypt = generate_counterMode_VectorAESCrypt();
       } else {
         StubRoutines::x86::_counter_shuffle_mask_addr = generate_counter_shuffle_mask();
@@ -8417,7 +8518,9 @@ RuntimeStub* generate_cont_doYield() {
 
     // Generate GHASH intrinsics code
     if (UseGHASHIntrinsics) {
-    StubRoutines::x86::_ghash_long_swap_mask_addr = generate_ghash_long_swap_mask();
+      if (StubRoutines::x86::_ghash_long_swap_mask_addr == NULL) {
+        StubRoutines::x86::_ghash_long_swap_mask_addr = generate_ghash_long_swap_mask();
+      }
     StubRoutines::x86::_ghash_byte_swap_mask_addr = generate_ghash_byte_swap_mask();
       if (VM_Version::supports_avx()) {
         StubRoutines::x86::_ghash_shuffmask_addr = ghash_shufflemask_addr();

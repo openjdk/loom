@@ -30,7 +30,7 @@ extern "C" {
 
 /* ============================================================================= */
 
-#define VTHREAD_CNT   30
+#define VTHREAD_CNT   20
 
 static const char* CTHREAD_NAME_START = "ForkJoinPool";
 static const int CTHREAD_NAME_START_LEN = (int)strlen("ForkJoinPool");

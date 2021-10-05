@@ -612,9 +612,9 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame* jvf) {
-  // The second condition is needed to hide notification methods. 
-  if (!disable_jvmti_events && !jvf->method()->jvmti_mount_transition()) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
+  // The second condition is needed to hide notification methods.
+  if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf; // no frames to skip
   }
   javaVFrame* jvf_saved = jvf;
@@ -642,7 +642,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool disable_jvmti_events, javaVFrame
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  jvf = check_and_skip_hidden_frames(jt->disable_jvmti_events(), jvf);
+  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
   return jvf;
 }
 
@@ -652,16 +652,21 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   if (state == NULL) {
     return jvf; // nothing to skip
   }
-  jvf = check_and_skip_hidden_frames(state->hide_over_cont_yield(), jvf);
+  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
   return jvf;
+}
+
+bool
+JvmtiEnvBase::is_vthread_alive(oop vt) {
+  assert(java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW, "sanity check");
+  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
 }
 
 javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   assert(java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::NEW, "sanity check");
-  if (java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::TERMINATED) {
-    return NULL;
-  }
+  assert(java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::TERMINATED, "sanity check");
+
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
@@ -671,7 +676,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
   // Returned carrier_thread can be NULL for a mounted continuation.
   // Then treat it as an unmounted case.
-  if (java_lang_Continuation::is_mounted(cont) && carrier_thread != NULL) {
+  if (jdk_internal_vm_Continuation::is_mounted(cont) && carrier_thread != NULL) {
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
 
     if (!java_thread->has_last_Java_frame()) {
@@ -913,8 +918,8 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
   }
 
   // Get off stack monitors. (e.g. acquired via jni MonitorEnter).
-  JvmtiMonitorClosure jmc(java_thread, calling_thread, owned_monitors_list, this);
-  ObjectSynchronizer::monitors_iterate(&jmc);
+  JvmtiMonitorClosure jmc(calling_thread, owned_monitors_list, this);
+  ObjectSynchronizer::monitors_iterate(&jmc, java_thread);
   err = jmc.error();
 
   return err;
@@ -943,8 +948,8 @@ JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_th
   }
 
   // Get off stack monitors. (e.g. acquired via jni MonitorEnter).
-  JvmtiMonitorClosure jmc(java_thread, calling_thread, owned_monitors_list, this);
-  ObjectSynchronizer::monitors_iterate(&jmc);
+  JvmtiMonitorClosure jmc(calling_thread, owned_monitors_list, this);
+  ObjectSynchronizer::monitors_iterate(&jmc, java_thread);
   err = jmc.error();
 
   return err;
@@ -1168,6 +1173,9 @@ JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
 
 jvmtiError
 JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
+  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
+    return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
   Thread *current_thread = Thread::current();
   ResourceMark rm(current_thread);
   javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
@@ -1216,6 +1224,9 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
 jvmtiError
 JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
                                  jmethodID* method_ptr, jlocation* location_ptr) {
+  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
+    return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
@@ -1286,7 +1297,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
     }
     if (java_thread == NULL && java_lang_VirtualThread::is_instance(thread_oop)) {
       oop cont = java_lang_VirtualThread::continuation(thread_oop);
-      if (java_lang_Continuation::is_mounted(cont)) {
+      if (jdk_internal_vm_Continuation::is_mounted(cont)) {
         oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
         // Returned carrier_thread can be NULL for a mounted continuation.
         if (carrier_thread != NULL) {
@@ -1357,7 +1368,7 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       // This monitor is owned so we have to find the owning JavaThread.
       owning_thread = Threads::owning_thread_from_monitor_owner(tlh.list(), owner);
       assert(owning_thread != NULL, "owning JavaThread must not be NULL");
-      Handle     th(current_thread, owning_thread->threadObj());
+      Handle     th(current_thread, get_vthread_or_thread_oop(owning_thread));
       ret.owner = (jthread)jni_reference(calling_thread, th);
     }
 
@@ -1485,7 +1496,7 @@ JvmtiEnvBase::is_in_thread_list(jint count, const jthread* list, oop jt_oop) {
     if (thread_oop == jt_oop) {
       return true;
     }
-  } 
+  }
   return false;
 }
 
@@ -1673,7 +1684,7 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
   jint state = 0;
   struct StackInfoNode *node = NEW_RESOURCE_OBJ(struct StackInfoNode);
   jvmtiStackInfo *infop = &(node->info);
-  
+
   node->next = head();
   set_head(node);
   infop->frame_count = 0;
@@ -1770,7 +1781,7 @@ void
 GetSingleStackTraceClosure::do_thread(Thread *target) {
     JavaThread *jt = JavaThread::cast(target);
     oop thread_oop = jt->threadObj();
-    
+
     if (!jt->is_exiting() && thread_oop != NULL) {
         ResourceMark rm;
         _collector.fill_frames(_jthread, jt, thread_oop);
@@ -1953,34 +1964,32 @@ JvmtiMonitorClosure::do_monitor(ObjectMonitor* mon) {
     // to the list.
     return;
   }
-  if (mon->owner() == _java_thread ) {
-    // Filter out on stack monitors collected during stack walk.
-    oop obj = mon->object();
-    bool found = false;
-    for (int j = 0; j < _owned_monitors_list->length(); j++) {
-      jobject jobj = ((jvmtiMonitorStackDepthInfo*)_owned_monitors_list->at(j))->monitor;
-      oop check = JNIHandles::resolve(jobj);
-      if (check == obj) {
-        // On stack monitor already collected during the stack walk.
-        found = true;
-        break;
-      }
+  // Filter out on stack monitors collected during stack walk.
+  oop obj = mon->object();
+  bool found = false;
+  for (int j = 0; j < _owned_monitors_list->length(); j++) {
+    jobject jobj = ((jvmtiMonitorStackDepthInfo*)_owned_monitors_list->at(j))->monitor;
+    oop check = JNIHandles::resolve(jobj);
+    if (check == obj) {
+      // On stack monitor already collected during the stack walk.
+      found = true;
+      break;
     }
-    if (found == false) {
-      // This is off stack monitor (e.g. acquired via jni MonitorEnter).
-      jvmtiError err;
-      jvmtiMonitorStackDepthInfo *jmsdi;
-      err = _env->allocate(sizeof(jvmtiMonitorStackDepthInfo), (unsigned char **)&jmsdi);
-      if (err != JVMTI_ERROR_NONE) {
-        _error = err;
-        return;
-      }
-      Handle hobj(Thread::current(), obj);
-      jmsdi->monitor = _env->jni_reference(_calling_thread, hobj);
-      // stack depth is unknown for this monitor.
-      jmsdi->stack_depth = -1;
-      _owned_monitors_list->append(jmsdi);
+  }
+  if (found == false) {
+    // This is off stack monitor (e.g. acquired via jni MonitorEnter).
+    jvmtiError err;
+    jvmtiMonitorStackDepthInfo *jmsdi;
+    err = _env->allocate(sizeof(jvmtiMonitorStackDepthInfo), (unsigned char **)&jmsdi);
+    if (err != JVMTI_ERROR_NONE) {
+      _error = err;
+      return;
     }
+    Handle hobj(Thread::current(), obj);
+    jmsdi->monitor = _env->jni_reference(_calling_thread, hobj);
+    // stack depth is unknown for this monitor.
+    jmsdi->stack_depth = -1;
+    _owned_monitors_list->append(jmsdi);
   }
 }
 
@@ -2169,6 +2178,10 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
 
 void
 VM_VThreadGetStackTrace::doit() {
+  if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
+    _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+    return;
+  }
   ResourceMark rm;
   javaVFrame* jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
 
@@ -2186,6 +2199,29 @@ GetStackTraceClosure::do_thread(Thread *target) {
                                                       _frame_buffer, _count_ptr);
   }
 }
+
+#ifdef ASSERT
+void
+PrintStackTraceClosure::do_thread(Thread *target) {
+  JavaThread *java_thread = JavaThread::cast(target);
+  Thread *current_thread = Thread::current();
+  assert(SafepointSynchronize::is_at_safepoint() ||
+      java_thread->is_handshake_safe_for(current_thread),
+         "call by myself / at safepoint / at handshake");
+  if (java_thread->has_last_Java_frame()) {
+    RegisterMap reg_map(java_thread, true, true);
+    ResourceMark rm(current_thread);
+    HandleMark hm(current_thread);
+    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    while (jvf != NULL) {
+      tty->print_cr("  %s:%d",
+                    jvf->method()->external_name(),
+                    jvf->method()->line_number_from_bci(jvf->bci()));
+      jvf = jvf->java_sender();
+    }
+  }
+}
+#endif
 
 void
 VM_VThreadGetFrameCount::doit() {
@@ -2212,6 +2248,10 @@ GetFrameLocationClosure::do_thread(Thread *target) {
 
 void
 VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
+  if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
+    _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+    return;
+  }
   JavaThread* java_thread = JavaThread::cast(target);
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
@@ -2246,9 +2286,14 @@ VThreadGetThreadClosure::do_thread(Thread *target) {
 void
 VThreadGetStackTraceClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
+  if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
+    _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+    return;
+  }
   Thread* cur_thread = Thread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
+
   javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
   _result = ((JvmtiEnvBase *)_env)->get_stack_trace(jvf,
                                                     _start_depth, _max_count,

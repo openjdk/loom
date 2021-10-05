@@ -1400,7 +1400,7 @@ nmethod* CompileBroker::compile_method(const methodHandle& method, int osr_bci,
 
   assert(!HAS_PENDING_EXCEPTION, "No exception should be present");
   // some prerequisites that are compiler specific
-  if (comp->is_c2()) {
+  if (comp->is_c2() || comp->is_jvmci()) {
     method->constants()->resolve_string_constants(CHECK_AND_CLEAR_NONASYNC_NULL);
     // Resolve all classes seen in the signature of the method
     // we are compiling.
@@ -2126,8 +2126,6 @@ void CompileBroker::post_compile(CompilerThread* thread, CompileTask* task, bool
       fatal("Never compilable: %s", failure_reason);
     }
   }
-  // simulate crash during compilation
-  assert(task->compile_id() != CICrashAt, "just as planned");
 }
 
 static void post_compilation_event(EventCompilation& event, CompileTask* task) {

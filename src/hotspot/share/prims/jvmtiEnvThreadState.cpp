@@ -282,6 +282,9 @@ class VM_VThreadGetCurrentLocation : public VM_Operation {
 
   VMOp_Type type() const { return VMOp_VThreadGetCurrentLocation; }
   void doit() {
+    if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
+      return; // _completed remains false
+    }
     ResourceMark rm;
     javaVFrame* jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
 
@@ -379,8 +382,11 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
       HandleMark hm(cur_thread);
       VM_VThreadGetCurrentLocation op(Handle(cur_thread, thread_oop));
       VMThread::execute(&op);
-      op.get_current_location(&method_id, &bci);
-      set_current_location(method_id, bci);
+      // do nothing if virtual thread has been already terminated
+      if (op.completed()) {
+        op.get_current_location(&method_id, &bci);
+        set_current_location(method_id, bci);
+      }
       return;
     }
     if (event_type == JVMTI_EVENT_SINGLE_STEP && thread->has_last_Java_frame()) {

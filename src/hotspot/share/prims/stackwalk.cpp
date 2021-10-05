@@ -125,7 +125,7 @@ void LiveFrameStream::next() {
 
   oop cont = this->cont();
   if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {    
-    oop scope = java_lang_Continuation::scope(cont);
+    oop scope = jdk_internal_vm_Continuation::scope(cont);
     if (_cont_scope.not_null() && scope == _cont_scope()) {
       _jvf = NULL;
       return;

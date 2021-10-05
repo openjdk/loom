@@ -563,7 +563,7 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
 
             if (eventFilterRestricted_passesFilter(env, classname,
                                                    evinfo, node,
-                                                   &shouldDelete, JNI_FALSE /* filterOnly */)) {
+                                                   &shouldDelete)) {
                 HandlerFunction func = HANDLER_FUNCTION(node);
                 if (func == NULL) {
                     EXIT_ERROR(AGENT_ERROR_INTERNAL,"handler function NULL");

@@ -143,7 +143,7 @@ public class SunCommandLineLauncher extends AbstractLauncher {
                 ARG_VM_NOTIFY_VTHREADS,
                 getString("sun.vm_notify_vthreads.label"),
                 getString("sun.vm_notify_vthreads"),
-                "n",
+                "y",
                 false);
     }
 

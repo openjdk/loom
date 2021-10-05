@@ -29,17 +29,17 @@ import java.util.concurrent.atomic.AtomicReference;
 @SuppressWarnings("preview")
 public class ScopeLocalsData {
 
-    static final ScopeLocal<Integer> sl1 = ScopeLocal.forType(Integer.class);
+    static final ScopeLocal<Integer> sl1 = ScopeLocal.newInstance();
     static final ThreadLocal<Integer> tl1 = new ThreadLocal<>();
 
-    static final ScopeLocal<Integer> sl2 = ScopeLocal.forType(Integer.class);
-    static final ScopeLocal<Integer> sl3 = ScopeLocal.forType(Integer.class);
-    static final ScopeLocal<Integer> sl4 = ScopeLocal.forType(Integer.class);
-    static final ScopeLocal<Integer> sl5 = ScopeLocal.forType(Integer.class);
-    static final ScopeLocal<Integer> sl6 = ScopeLocal.forType(Integer.class);
-    static final ScopeLocal<AtomicInteger> sl_atomicInt = ScopeLocal.forType(AtomicInteger.class);
+    static final ScopeLocal<Integer> sl2 = ScopeLocal.newInstance();
+    static final ScopeLocal<Integer> sl3 = ScopeLocal.newInstance();
+    static final ScopeLocal<Integer> sl4 = ScopeLocal.newInstance();
+    static final ScopeLocal<Integer> sl5 = ScopeLocal.newInstance();
+    static final ScopeLocal<Integer> sl6 = ScopeLocal.newInstance();
+    static final ScopeLocal<AtomicInteger> sl_atomicInt = ScopeLocal.newInstance();
 
-    static final ScopeLocal<AtomicReference<Integer>> sl_atomicRef = ScopeLocal.forType(AtomicReference.class);
+    static final ScopeLocal<AtomicReference<Integer>> sl_atomicRef = ScopeLocal.newInstance();
 
     static final ThreadLocal<Integer> tl2 = new ThreadLocal<>();
     static final ThreadLocal<Integer> tl3 = new ThreadLocal<>();
@@ -47,17 +47,6 @@ public class ScopeLocalsData {
     static final ThreadLocal<Integer> tl5 = new ThreadLocal<>();
     static final ThreadLocal<Integer> tl6 = new ThreadLocal<>();
     static final ThreadLocal<AtomicInteger> tl_atomicInt = new ThreadLocal<>();
-
-    static final ScopeLocal.Snapshot aSnapshot;
-
-    static {
-        try {
-            aSnapshot = ScopeLocal.where(sl1, 99,
-                    () -> ScopeLocal.snapshot());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     static final ScopeLocal.Carrier VALUES = ScopeLocal
             .where(sl1, 42).where(sl2, 2).where(sl3, 3)

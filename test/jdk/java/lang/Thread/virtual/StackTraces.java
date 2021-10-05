@@ -26,8 +26,9 @@
  * @summary Test that the stack traces for carrier threads are hidden by
  *     exceptions and the StackWalker API
  * @modules java.management
- * @run testng StackTraces
- * @run testng/othervm -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
+ * @compile --enable-preview -source ${jdk.version} StackTraces.java
+ * @run testng/othervm --enable-preview StackTraces
+ * @run testng/othervm --enable-preview -XX:+UnlockDiagnosticVMOptions -XX:+ShowCarrierFrames StackTraces
  */
 
 import java.lang.management.ManagementFactory;

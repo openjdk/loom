@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -459,8 +459,10 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* vthread fixme: add vthread support */
+    /* vthread fixme: We should just call throught to JVMTI and let the failure come from
+       there, but first we need a test that exercises this code for vthreads. */
     if (isVThread(thread)) {
+        tty_message("ThreadReferenceImpl::stop() not supported.");
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }
@@ -488,8 +490,10 @@ interrupt(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* vthread fixme: add vthread support */
+    /* vthread fixme: This should work. Need to disable this forced failure,
+       but first we need a test that exercises this code for vthreads. */
     if (isVThread(thread)) {
+        tty_message("ThreadReferenceImpl::interrupt() not supported.");
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }
@@ -596,13 +600,6 @@ forceEarlyReturn(PacketInputStream *in, PacketOutputStream *out)
     }
 
     if (threadControl_isDebugThread(thread)) {
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
-    /* vthread fixme: add vthread support. This should work for vthreads that are
-       mounted and suspended. */
-    if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }

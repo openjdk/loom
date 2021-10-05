@@ -116,17 +116,6 @@ class ThreadBuilders {
 
         @Override
         @SuppressWarnings("unchecked")
-        public T inheritInheritableScopeLocals(boolean inherit) {
-            if (inherit) {
-                characteristics &= ~Thread.NO_INHERIT_SCOPE_LOCALS;
-            } else {
-                characteristics |= Thread.NO_INHERIT_SCOPE_LOCALS;
-            }
-            return (T) this;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
         public T uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             this.uhe = Objects.requireNonNull(ueh);
             return (T) this;
@@ -207,17 +196,7 @@ class ThreadBuilders {
      */
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder<OfVirtual> implements OfVirtual {
-        private Executor scheduler;
-
-        @Override
-        public OfVirtual scheduler(Executor scheduler) {
-            if (scheduler == null) {
-                this.scheduler = VirtualThread.defaultScheduler();
-            } else {
-                this.scheduler = scheduler;
-            }
-            return this;
-        }
+        private Executor scheduler;  // set by tests
 
         @Override
         public Thread unstarted(Runnable task) {

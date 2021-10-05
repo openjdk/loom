@@ -1728,6 +1728,10 @@ jvmtiEnv *jvmti;
     <function id="SuspendAllVirtualThreads" num="118" since="16">
       <synopsis>Suspend All Virtual Threads</synopsis>
       <description>
+        <b> SuspendAllVirtualThreads is a preview API of the Java platform. </b>
+        <i>Preview features may be removed in a future release, or upgraded to
+        permanent features of the Java platform.</i>.
+        <p/>
         Suspend all virtual threads except those already suspended.
         Virtual threads may be resumed with
         <functionlink id="ResumeAllVirtualThreads"></functionlink> or
@@ -1852,6 +1856,10 @@ jvmtiEnv *jvmti;
    <function id="ResumeAllVirtualThreads" num="119" since="16">
       <synopsis>Resume All Virtual Threads</synopsis>
       <description>
+        <b> SuspendAllVirtualThreads is a preview API of the Java platform. </b>
+        <i>Preview features may be removed in a future release, or upgraded to
+        permanent features of the Java platform.</i>.
+        <p/>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
         <functionlink id="SuspendAllVirtualThreads"></functionlink> or
@@ -10571,6 +10579,10 @@ myInit() {
       </capabilityfield>
       <capabilityfield id="can_support_virtual_threads" since="14">
         <description>
+          <b> can_support_virtual_threads is a preview API of the Java platform. </b>
+          <i>Preview features may be removed in a future release, or upgraded to
+          permanent features of the Java platform.</i>.
+          <p/>
           Can support virtual threads.
           If this capability is enabled then the following functions can be called:
           <functionlink id="SuspendAllVirtualThreads"></functionlink>, 
@@ -12939,6 +12951,10 @@ myInit() {
  <event label="Virtual Thread Start"
          id="VirtualThreadStart" const="JVMTI_EVENT_VIRTUAL_THREAD_START" filtered="thread" num="87" phase="start" since="14">
     <description>
+      <b> VirtualThreadStart is a preview API of the Java platform. </b>
+      <i>Preview features may be removed in a future release, or upgraded to
+      permanent features of the Java platform.</i>.
+      <p/>
       Virtual thread started events are generated before its initial method executes.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.
@@ -12968,6 +12984,10 @@ myInit() {
   <event label="Virtual Thread End"
          id="VirtualThreadEnd" const="JVMTI_EVENT_VIRTUAL_THREAD_END" filtered="thread" num="88" phase="start" since="14">
     <description>
+      <b> VirtualThreadEnd is a preview API of the Java platform. </b>
+      <i>Preview features may be removed in a future release, or upgraded to
+      permanent features of the Java platform.</i>.
+      <p/>
       Virtual thread end events are generated after its initial method has finished execution.
       <p/>
       The event is sent on the <paramlink id="thread"></paramlink>.

@@ -27,7 +27,7 @@
  * @summary Redefine EMCP and non-EMCP methods that are running in an infinite loop
  * @requires vm.jvmti
  * @library /test/lib
- * @modules java.base/jdk.internal.misc
+ * @modules java.base/jdk.internal.misc java.base/jdk.internal.vm
  * @modules java.compiler
  *          java.instrument
  *          jdk.jartool/sun.tools.jar
@@ -35,6 +35,8 @@
  * @run main/othervm/timeout=180 -Xint -javaagent:redefineagent.jar -Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace,class+loader+data=debug,safepoint+cleanup,gc+phases=debug:rt.log RedefineRunningMethods
  */
 
+import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ContinuationScope;
 
 class RedefineContinuation {
     static final ContinuationScope FOO = new ContinuationScope() {};

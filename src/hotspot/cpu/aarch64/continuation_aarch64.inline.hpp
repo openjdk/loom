@@ -25,7 +25,6 @@
 #ifndef CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 #define CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 
-#include "compiler/oopMapStubGenerator.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
@@ -346,7 +345,9 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     }
 
     assert (hf.cb() != nullptr && hf.oop_map() != nullptr, "");
-    intptr_t* fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+    intptr_t* fp = FKind::stub 
+      ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
+      : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
   }
 }

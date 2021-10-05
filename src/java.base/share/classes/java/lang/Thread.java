@@ -38,17 +38,18 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
+import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
@@ -112,7 +113,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * of the time blocked, often waiting for I/O operations to complete. Virtual threads
  * are not intended for long running CPU intensive operations.
  *
- * <p> Virtual threads typically employ a small set of platform threads are use
+ * <p> Virtual threads typically employ a small set of platform threads used
  * as <em>carrier threads</em>. Locking and I/O operations are the <i>scheduling
  * points</i> where a carrier thread is re-scheduled from one virtual thread to
  * another. Code executing in a virtual thread will usually not be aware of the
@@ -154,17 +155,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, {@linkplain
- * ScopeLocal#inheritableForType(Class) inheritable-scope-local} variables, the initial
- * value of {@linkplain InheritableThreadLocal inheritable-thread-local} variables, and
- * a number of properties from the parent thread:
- * <ul>
- *     <li> Platform threads inherit the daemon status, priority, and thread-group.
- *     <li> Virtual threads are scheduled by the same scheduler as the parent thread
- *          when the parent thread is a virtual thread. Virtual threads use the default
- *          scheduler when the parent thread is a platform thread and the scheduler has
- *          not been selected.
- * </ul>
+ * Creating a {@code Thread} will inherit, by default, the initial values of
+ * {@linkplain InheritableThreadLocal inheritable-thread-local} variables.
+ * Platform threads also inherit the daemon status, priority, and thread-group.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -249,8 +242,7 @@ public class Thread implements Runnable {
     // cache entries from the scoped variable cache.
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    ScopeLocal.Snapshot noninheritableScopeLocalBindings;
-    ScopeLocal.Snapshot inheritableScopeLocalBindings;
+    ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -324,12 +316,6 @@ public class Thread implements Runnable {
      * the constructing thread.
      */
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
-
-    /**
-     * Characteristic value signifying that {@link ScopeLocal#inheritableForType(Class)
-     * inheritable-scope-locals} are not inherited from the constructing thread.
-     */
-    static final int NO_INHERIT_SCOPE_LOCALS = 1 << 3;
 
     // current inner-most continuation
     private Continuation cont;
@@ -614,7 +600,7 @@ public class Thread implements Runnable {
         }
 
         Thread parent = currentThread();
-        boolean primordial = (parent == this);
+        boolean attached = (parent == this);
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
@@ -634,14 +620,14 @@ public class Thread implements Runnable {
             }
         }
 
-        /* checkAccess regardless of whether or not threadgroup is
-           explicitly passed in. */
-        g.checkAccess();
-
         /*
          * Do we have the required permissions?
          */
         if (security != null) {
+            /* checkAccess regardless of whether or not threadgroup is
+               explicitly passed in. */
+            security.checkAccess(g);
+
             if (isCCLOverridden(getClass())) {
                 security.checkPermission(
                         SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
@@ -649,11 +635,15 @@ public class Thread implements Runnable {
         }
 
         this.name = name;
-        this.tid = primordial ? 1 : ThreadIdentifiers.next();
+        if (attached && VM.initLevel() < 1) {
+            this.tid = 1;  // primordial thread
+        } else {
+            this.tid = ThreadIdentifiers.next();
+        }
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
         // thread locals and scoped variables
-        if (!primordial) {
+        if (!attached) {
             if ((characteristics & NO_THREAD_LOCALS) != 0) {
                 this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
                 this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
@@ -676,20 +666,11 @@ public class Thread implements Runnable {
                 // default CCL to the system class loader when not inheriting
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
-
-            // scoped variables
-            if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-                this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-                ThreadContainer container = this.container;
-                if (container != null && container.owner() != null) {
-                    this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-                }
-            }
         }
 
         int priority;
         boolean daemon;
-        if (primordial) {
+        if (attached) {
             // primordial or attached thread
             priority = NORM_PRIORITY;
             daemon = false;
@@ -737,71 +718,8 @@ public class Thread implements Runnable {
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
-        // scoped variables
-        if ((characteristics & NO_INHERIT_SCOPE_LOCALS) == 0) {
-            this.inheritableScopeLocalBindings = parent.inheritableScopeLocalBindings;
-            if (container != null && container.owner() != null) {
-                this.noninheritableScopeLocalBindings = parent.noninheritableScopeLocalBindings;
-            }
-        }
-
         // no additional fields
         this.holder = null;
-    }
-
-    /**
-     * The task {@link java.util.concurrent.Executor#execute(Runnable) submitted}
-     * to a custom {@link Thread.Builder.OfVirtual#scheduler(Executor) scheduler}.
-     *
-     * @apiNote The following example creates a scheduler that uses a small set of
-     * platform threads. It prints the name of each virtual thread before executing
-     * its task.
-     * <pre>{@code
-     *     ExecutorService pool = Executors.newFixedThreadPool(4);
-     *     Executor scheduler = (task) -> {
-     *         Thread vthread = ((Thread.VirtualThreadTask) task).thread();
-     *         System.out.println(vthread);
-     *         pool.execute(task);
-     *     };
-     * }</pre>
-     *
-     * @see Thread.Builder.OfVirtual#scheduler(Executor)
-     * @since 99
-     */
-    public interface VirtualThreadTask extends Runnable {
-        /**
-         * Return the virtual thread that this task was submitted to run
-         * @return the virtual thread
-         */
-        Thread thread();
-
-        /**
-         * Attaches the given object to this task.
-         * @param att the object to attach
-         * @return the previously-attached object, if any, otherwise {@code null}
-         */
-        Object attach(Object att);
-
-        /**
-         * Retrieves the current attachment.
-         * @return the object currently attached to this task or {@code null} if
-         *         there is no attachment
-         */
-        Object attachment();
-
-        /**
-         * Runs the task on the current thread as the carrier thread.
-         *
-         * <p> Invoking this method with the interrupt status set will first
-         * clear the interrupt status. Interrupting the carrier thread while
-         * running the task leads to unspecified behavior.
-         *
-         * @throws IllegalStateException if the virtual thread is not in a state to
-         *         run on the current thread
-         * @throws IllegalCallerException if the current thread is a virtual thread
-         */
-        @Override
-        void run();
     }
 
     /**
@@ -824,6 +742,7 @@ public class Thread implements Runnable {
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
         return new ThreadBuilders.PlatformThreadBuilder();
     }
@@ -844,6 +763,7 @@ public class Thread implements Runnable {
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
         return new ThreadBuilders.VirtualThreadBuilder();
     }
@@ -876,6 +796,7 @@ public class Thread implements Runnable {
      * @see Thread#ofVirtual()
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public sealed interface Builder
             permits Builder.OfPlatform,
                     Builder.OfVirtual,
@@ -948,15 +869,6 @@ public class Thread implements Runnable {
         Builder inheritInheritableThreadLocals(boolean inherit);
 
         /**
-         * Sets whether the thread inherits {@linkplain ScopeLocal#inheritableForType(Class)
-         * inheritable-scope-local} variables. The default is to inherit.
-         *
-         * @param inherit {@code true} to inherit, {@code false} to not inherit
-         * @return this builder
-         */
-        Builder inheritInheritableScopeLocals(boolean inherit);
-
-        /**
          * Sets the uncaught exception handler.
          * @param ueh uncaught exception handler
          * @return this builder
@@ -1011,6 +923,7 @@ public class Thread implements Runnable {
          * @see Thread#ofPlatform()
          * @since 99
          */
+        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfPlatform extends Builder
                 permits ThreadBuilders.PlatformThreadBuilder {
 
@@ -1082,6 +995,7 @@ public class Thread implements Runnable {
          * @see Thread#ofVirtual()
          * @since 99
          */
+        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfVirtual extends Builder
                 permits ThreadBuilders.VirtualThreadBuilder {
 
@@ -1091,23 +1005,6 @@ public class Thread implements Runnable {
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
-
-            /**
-             * Sets the scheduler.
-             * The thread will be scheduled by the Java virtual machine with the given
-             * scheduler. The scheduler's {@link Executor#execute(Runnable) execute}
-             * method is invoked with tasks of type {@link Thread.VirtualThreadTask}. It may
-             * be invoked in the context of a virtual thread. The scheduler should
-             * arrange to execute these tasks on a platform thread. Attempting to execute
-             * the task on a virtual thread causes an exception to be thrown (see
-             * {@link Thread.VirtualThreadTask#run()}). The {@code execute} method may be
-             * invoked at sensitive times (e.g. when unparking a thread) so care should
-             * be taken to not directly execute the task on the <em>current thread</em>.
-             *
-             * @param scheduler the scheduler or {@code null} for the default scheduler
-             * @return this builder
-             */
-            OfVirtual scheduler(Executor scheduler);
         }
     }
 
@@ -1172,7 +1069,7 @@ public class Thread implements Runnable {
     /**
      * Allocates a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
-     * {@code (group, task, gname)} ,where {@code gname} is a newly generated
+     * {@code (group, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
      * {@code "Thread-"+}<i>n</i>, where <i>n</i> is an integer.
      *
@@ -1487,6 +1384,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
         var thread = new VirtualThread(null, null, 0, task);
         thread.start();
@@ -1501,6 +1399,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
         return (this instanceof VirtualThread);
     }
@@ -1518,24 +1417,47 @@ public class Thread implements Runnable {
      *             is virtual and the scheduler cannot accept a task
      */
     public void start() {
-        start(null);
+        synchronized (this) {
+            // zero status corresponds to state "NEW".
+            if (holder.threadStatus != 0)
+                throw new IllegalThreadStateException();
+            start0();
+        }
     }
 
     /**
      * Schedules this thread to begin execution in the given thread container.
-     *
-     * This method is not invoked for the main thread or other system threads
-     * created by the VM during startup.
+     * @throws IllegalStateException if the container is shutdown or closed
+     * @throws IllegalThreadStateException if the thread has already been started
      */
     void start(ThreadContainer container) {
         synchronized (this) {
-            // zero status  corresponds to state "NEW".
+            // zero status corresponds to state "NEW".
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
-            // bind thread to container
-            if (container != null)
-                this.container = container;
-            start0();
+
+            boolean started = false;
+            container.onStart(this);  // may throw
+            try {
+                // inherit scope locals from structured container
+                Object bindings = container.scopeLocalBindings();
+                if (bindings != null) {
+                    if (Thread.currentThread().scopeLocalBindings != bindings) {
+                        throw new IllegalStateException("Scope local bindings have changed");
+                    }
+                    this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+                }
+
+                // bind thread to container
+                setThreadContainer(container);
+
+                start0();
+                started = true;
+            } finally {
+                if (!started) {
+                    container.onExit(this);
+                }
+            }
         }
     }
 
@@ -1582,6 +1504,11 @@ public class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        ThreadContainer container = threadContainer();
+        if (container != null) {
+            container.onExit(this);
+        }
+
         try {
             if (threadLocals != null && TerminatingThreadLocal.REGISTRY.isPresent()) {
                 TerminatingThreadLocal.threadTerminated();
@@ -2061,7 +1988,7 @@ public class Thread implements Runnable {
      *     ThreadGroup#enumerate(Thread[])} method.
      */
     @Deprecated(since = "99")
-    public static int enumerate(Thread tarray[]) {
+    public static int enumerate(Thread[] tarray) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
 
@@ -2545,8 +2472,8 @@ public class Thread implements Runnable {
     private native Object getStackTrace0();
 
     /**
-     * Returns a map of stack traces for all live threads that are scheduled
-     * by the operating system. The map does not include virtual threads.
+     * Returns a map of stack traces for all live platform threads. The map
+     * does not include virtual threads.
      * The map keys are threads and each map value is an array of
      * {@code StackTraceElement} that represents the stack dump
      * of the corresponding {@code Thread}.
@@ -3084,9 +3011,10 @@ public class Thread implements Runnable {
     ThreadContainer headThreadContainer() {
         return headThreadContainer;
     }
-    void pushThreadContainer(ThreadContainer container) {
+    ScopeLocal.Snapshot pushThreadContainer(ThreadContainer container) {
         container.setPrevious(headThreadContainer);
         headThreadContainer = container;
+        return scopeLocalBindings;
     }
     void popThreadContainer(ThreadContainer container) {
         ThreadContainer head = headThreadContainer;

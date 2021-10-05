@@ -29,6 +29,7 @@ import jdk.internal.loader.BuiltinClassLoader;
 import jdk.internal.misc.VM;
 import jdk.internal.module.ModuleHashes;
 import jdk.internal.module.ModuleReferenceImpl;
+import jdk.internal.vm.Continuation;
 
 import java.lang.module.ModuleDescriptor.Version;
 import java.lang.module.ModuleReference;

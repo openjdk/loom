@@ -328,6 +328,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static javaVFrame* check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf);
   static javaVFrame* check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf);
 
+  // check if virtual thread is not terminated (alive)
+  static bool is_vthread_alive(oop vt);
+
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);
 
@@ -538,6 +541,16 @@ public:
   void do_thread(Thread *target);
 };
 
+#ifdef ASSERT
+// HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
+class PrintStackTraceClosure : public HandshakeClosure {
+ public:
+  PrintStackTraceClosure()
+      : HandshakeClosure("PrintStackTraceClosure") {}
+  void do_thread(Thread *target);
+};
+#endif
+
 // forward declaration
 struct StackInfoNode;
 
@@ -644,7 +657,7 @@ public:
 };
 
 class VM_VThreadGetFrameCount : public VM_Operation {
-private: 
+private:
   JvmtiEnv *_env;
   Handle _vthread_h;
   jint* _count_ptr;
@@ -656,7 +669,7 @@ public:
       _count_ptr(count_ptr),
       _result(JVMTI_ERROR_NONE)
   {}
-  
+
   VMOp_Type type() const { return VMOp_VThreadGetFrameCount; }
   void doit();
   jvmtiError result() { return _result; }
@@ -788,7 +801,7 @@ private:
 public:
   VThreadGetStackTraceClosure(JvmtiEnv *env, Handle vthread_h,
                               jint start_depth, jint max_count,
-                              jvmtiFrameInfo* frame_buffer, jint* count_ptr) 
+                              jvmtiFrameInfo* frame_buffer, jint* count_ptr)
     : HandshakeClosure("VThreadGetStackTrace"),
       _env(env),
       _vthread_h(vthread_h),
@@ -896,17 +909,15 @@ class ResourceTracker : public StackObj {
 // Jvmti monitor closure to collect off stack monitors.
 class JvmtiMonitorClosure: public MonitorClosure {
  private:
-  JavaThread *_java_thread;
   JavaThread *_calling_thread;
   GrowableArray<jvmtiMonitorStackDepthInfo*> *_owned_monitors_list;
   jvmtiError _error;
   JvmtiEnvBase *_env;
 
  public:
-  JvmtiMonitorClosure(JavaThread* thread, JavaThread *calling_thread,
+  JvmtiMonitorClosure(JavaThread *calling_thread,
                       GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors,
                       JvmtiEnvBase *env) {
-    _java_thread = thread;
     _calling_thread = calling_thread;
     _owned_monitors_list = owned_monitors;
     _error = JVMTI_ERROR_NONE;

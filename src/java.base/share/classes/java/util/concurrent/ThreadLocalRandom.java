@@ -305,7 +305,7 @@ public class ThreadLocalRandom extends Random {
         // early in the lifetime of a ForkJoinPool thread that we don't expect
         // any ScopeLocals to have yet been bound by this thread, so the
         // ScopedCache should be empty at this point.
-        U.putReference(thread, INHERITABLESCOPELOCALBINDINGS, null);
+        // U.putReference(thread, INHERITABLESCOPELOCALBINDINGS, null);
     }
 
     static final void setInheritedAccessControlContext(Thread thread,
@@ -388,9 +388,7 @@ public class ThreadLocalRandom extends Random {
     private static final long THREADLOCALS
         = U.objectFieldOffset(Thread.class, "threadLocals");
     private static final long INHERITABLETHREADLOCALS
-            = U.objectFieldOffset(Thread.class, "inheritableThreadLocals");
-    private static final long INHERITABLESCOPELOCALBINDINGS
-            = U.objectFieldOffset(Thread.class, "inheritableScopeLocalBindings");
+        = U.objectFieldOffset(Thread.class, "inheritableThreadLocals");
     private static final long INHERITEDACCESSCONTROLCONTEXT
         = U.objectFieldOffset(Thread.class, "inheritedAccessControlContext");
 

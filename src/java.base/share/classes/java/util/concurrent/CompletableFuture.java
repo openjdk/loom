@@ -37,17 +37,13 @@ package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Collection;
-import java.util.Objects;
-import java.util.Spliterator;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
+import java.util.Objects;
 
 /**
  * A {@link Future} that may be explicitly completed (setting its
@@ -472,8 +468,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         implements Runnable, AsynchronousCompletionTask {
         volatile Completion next;      // Treiber stack link
 
-        private ScopeLocal.Snapshot snapshot = ScopeLocal.snapshot();
-
         /**
          * Performs completion action if triggered, returning a
          * dependent that may need propagation, if one exists.
@@ -485,19 +479,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         /** Returns true if possibly still triggerable. Used by cleanStack. */
         abstract boolean isLive();
 
-        public final void run() {
-            if (snapshot != ScopeLocal.snapshot()) {
-                snapshot.run(() -> tryFire(ASYNC));
-            } else {
-                tryFire(ASYNC);
-            }
-        }
-        public final boolean exec() {
-            run();
-            return false;
-        }
-
-    public final Void getRawResult()       { return null; }
+        public final void run()                { tryFire(ASYNC); }
+        public final boolean exec()            { tryFire(ASYNC); return false; }
+        public final Void getRawResult()       { return null; }
         public final void setRawResult(Void v) {}
     }
 
@@ -1807,13 +1791,11 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             this.dep = dep; this.fn = fn;
         }
 
-        private ScopeLocal.Snapshot snapshot = ScopeLocal.snapshot();
-
         public final Void getRawResult() { return null; }
         public final void setRawResult(Void v) {}
         public final boolean exec() { run(); return false; }
 
-        private void doRun() {
+        public void run() {
             CompletableFuture<Void> d; Runnable f;
             if ((d = dep) != null && (f = fn) != null) {
                 dep = null; fn = null;
@@ -1826,14 +1808,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
                     }
                 }
                 d.postComplete();
-            }
-        }
-
-        public void run() {
-            if (snapshot != ScopeLocal.snapshot()) {
-                snapshot.run(this::doRun);
-            } else {
-                doRun();
             }
         }
     }
@@ -2158,6 +2132,30 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     public T getNow(T valueIfAbsent) {
         Object r;
         return ((r = result) == null) ? valueIfAbsent : (T) reportJoin(r);
+    }
+
+    @Override
+    public T completedResultNow() {
+        Object r = result;
+        if (r != null) {
+            if (r instanceof AltResult alt) {
+                if (alt.ex == null) return null;
+            } else {
+                @SuppressWarnings("unchecked")
+                T t = (T) r;
+                return t;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public Throwable completedExceptionNow() {
+        Object r = result;
+        if (r instanceof AltResult alt && alt.ex != null) {
+            return alt.ex;
+        }
+        throw new IllegalStateException();
     }
 
     /**
@@ -2521,17 +2519,6 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     }
 
     /**
-     * Returns {@code true} if this CompletableFuture completed normally.
-     *
-     * @return {@code true} if this CompletableFuture completed normally
-     */
-    public boolean isCompletedNormally() {
-        Object r;
-        return ((r = result) != null
-                && (r == NIL || !(r instanceof AltResult)));
-    }
-
-    /**
      * Returns {@code true} if this CompletableFuture completed
      * exceptionally, in any way. Possible causes include
      * cancellation, explicit invocation of {@code
@@ -2544,6 +2531,20 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     public boolean isCompletedExceptionally() {
         Object r;
         return ((r = result) instanceof AltResult) && r != NIL;
+    }
+
+    @Override
+    public State state() {
+        Object r = result;
+        if (r == null)
+            return State.RUNNING;
+        if (r != NIL && r instanceof AltResult alt) {
+            if (alt.ex instanceof CancellationException)
+                return State.CANCELLED;
+            else
+                return State.FAILED;
+        }
+        return State.SUCCESS;
     }
 
     /**
@@ -2949,6 +2950,10 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public T join() {
             throw new UnsupportedOperationException(); }
+        @Override public T completedResultNow() {
+            throw new UnsupportedOperationException(); }
+        @Override public Throwable completedExceptionNow() {
+            throw new UnsupportedOperationException(); }
         @Override public boolean complete(T value) {
             throw new UnsupportedOperationException(); }
         @Override public boolean completeExceptionally(Throwable ex) {
@@ -2963,9 +2968,9 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
             throw new UnsupportedOperationException(); }
         @Override public boolean isCancelled() {
             throw new UnsupportedOperationException(); }
-        @Override public boolean isCompletedNormally() {
-            throw new UnsupportedOperationException(); }
         @Override public boolean isCompletedExceptionally() {
+            throw new UnsupportedOperationException(); }
+        @Override public State state() {
             throw new UnsupportedOperationException(); }
         @Override public int getNumberOfDependents() {
             throw new UnsupportedOperationException(); }
@@ -3011,142 +3016,4 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
         // LockSupport.park: https://bugs.openjdk.java.net/browse/JDK-8074773
         Class<?> ensureLoaded = LockSupport.class;
     }
-
-    /**
-     * Returns a stream that is lazily populated with the given CompletableFutures
-     * when they complete.
-     *
-     * <p> If a thread is interrupted while waiting on the stream for a task to
-     * complete then {@link CancellationException} is thrown with the interrupt
-     * status set.
-     *
-     * @apiNote The following example has a list of CompletableFuture objects. It
-     * selects the result of the first to complete and then cancels the remaining
-     * (that have not completed).
-     * <pre> {@code
-     *     List<CompletableFuture<String>> cfs = ...
-     *     try {
-     *         String first = CompletableFuture.completed(cfs)
-     *                     .filter(Predicate.not(CompletableFuture::isCompletedExceptionally))
-     *                     .map(CompletableFuture::join)
-     *                     .findFirst()
-     *                     .orElse(null);
-     *     } finally {
-     *         cfs.forEach(cf -> cf.cancel(true));
-     *     }
-     * }</pre>
-     *
-     * <p> The following example partitions the CompletableFutures into two sets,
-     * one for the tasks that completed successfully, the other for the tasks that
-     * completed with an exception.
-     * <pre>{@code
-     *     List<CompletableFuture<String>> cfs = ...
-     *     Map<Boolean, Set<CompletableFuture<String>>> map = CompletableFuture.completed(cfs)
-     *             .collect(Collectors.partitioningBy(CompletableFuture::isCompletedExceptionally,
-     *                                                Collectors.toSet()));
-     * }</pre>
-     *
-     * @param cfs the CompletableFutures
-     * @param <T> the result type returned by completable future's {@code join}
-     * @return stream of completed CompletableFutures
-     * @throws NullPointerException if the collection or any of its elements are null
-     * @since 99
-     */
-//    public static <T> Stream<CompletableFuture<T>> completed(Collection<? extends CompletableFuture<T>> cfs) {
-//        if (cfs.size() == 0)
-//            return Stream.empty();
-//        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
-//        int count = 0;
-//        for (CompletableFuture<T> cf : cfs) {
-//            cf.handle((result, exc) -> {
-//                queue.add(cf);
-//                return null;
-//            });
-//            count++;
-//        }
-//        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, count);
-//        return StreamSupport.stream(s, false);
-//    }
-
-    /**
-     * Returns a stream that is lazily populated with the given CompletableFutures
-     * when they complete.
-     *
-     * <p> If a thread is interrupted while waiting on the stream for a task to
-     * complete then {@link CancellationException} is thrown with the interrupt
-     * status set.
-     *
-     * @param cfs the CompletableFutures
-     * @param <T> the result type returned by completable future's {@code join}
-     * @return stream of completed CompletableFutures
-     * @throws NullPointerException if the array or any of its elements are null
-     * @since 99
-     */
-//    @SafeVarargs
-//    @SuppressWarnings("varargs")
-//    public static <T> Stream<CompletableFuture<T>> completed(CompletableFuture<T>... cfs) {
-//        int size = cfs.length;
-//        if (size == 0)
-//            return Stream.empty();
-//        var queue = new LinkedTransferQueue<CompletableFuture<T>>();
-//        for (CompletableFuture<T> cf : cfs) {
-//            cf.handle((result, exc) -> {
-//                queue.add(cf);
-//                return null;
-//            });
-//        }
-//        Spliterator<CompletableFuture<T>> s = new BlockingQueueSpliterator<>(queue, size);
-//        return StreamSupport.stream(s, false);
-//    }
-
-    /**
-     * Simple Spliterator with a BlockingQueue as its source. This implementation
-     * will be replaced if the APIs go forward beyond prototype.
-     */
-//    private static class BlockingQueueSpliterator<T>
-//            implements Spliterator<CompletableFuture<T>> {
-//
-//        final BlockingQueue<CompletableFuture<T>> queue;
-//        final int size;
-//        int taken;   // running count of the number of elements taken
-//
-//        BlockingQueueSpliterator(BlockingQueue<CompletableFuture<T>> queue, int size) {
-//            this.queue = queue;
-//            this.size = size;
-//        }
-//
-//        @Override
-//        public boolean tryAdvance(Consumer<? super CompletableFuture<T>> action) {
-//            Objects.requireNonNull(action);
-//            if (taken >= size) {
-//                return false;
-//            } else {
-//                CompletableFuture<T> cf;
-//                try {
-//                    cf = queue.take();
-//                } catch (InterruptedException e) {
-//                    Thread.currentThread().interrupt();
-//                    throw new CancellationException("Thread interrupted");
-//                }
-//                taken++;
-//                action.accept(cf);
-//                return true;
-//            }
-//        }
-//
-//        @Override
-//        public Spliterator<CompletableFuture<T>> trySplit() {
-//            return null;
-//        }
-//
-//        @Override
-//        public int characteristics() {
-//            return Spliterator.SIZED + Spliterator.NONNULL;
-//        }
-//
-//        @Override
-//        public long estimateSize() {
-//            return size;
-//        }
-//    }
 }

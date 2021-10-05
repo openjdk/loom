@@ -25,7 +25,8 @@
  * @test
  * @library /test/lib
  * @summary Shutdown hook is called with virtual thread
- * @run main ShutdownHook test
+ * @compile --enable-preview -source ${jdk.version} ShutdownHook.java
+ * @run main/othervm --enable-preview ShutdownHook test
  */
 
 import jdk.test.lib.process.OutputAnalyzer;
@@ -36,17 +37,18 @@ public class ShutdownHook {
 
     public static void main(String[] args) throws Exception {
         if (args.length > 0) {
-            ProcessBuilder pb = createTestJvm("ShutdownHook");
+            ProcessBuilder pb = createTestJvm("--enable-preview", "ShutdownHook");
             OutputAnalyzer output = executeProcess(pb);
             output.shouldContain("Shutdown Hook");
             output.shouldHaveExitValue(0);
             return;
         }
 
-        Runtime.getRuntime().addShutdownHook(Thread.ofVirtual().unstarted(()-> {
-                    System.out.println("Shutdown Hook");
-                    System.out.flush();
-                }));
+        Thread thread = Thread.ofVirtual().unstarted(()-> {
+            System.out.println("Shutdown Hook");
+            System.out.flush();
+        });
+        Runtime.getRuntime().addShutdownHook(thread);
         System.exit(0);
     }
 }

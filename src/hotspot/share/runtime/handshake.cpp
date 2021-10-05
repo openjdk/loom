@@ -408,7 +408,7 @@ void Handshake::execute(AsyncHandshakeClosure* hs_cl, JavaThread* target) {
 HandshakeState::HandshakeState(JavaThread* target) :
   _handshakee(target),
   _queue(),
-  _lock(Monitor::leaf, "HandshakeState", Mutex::_allow_vm_block_flag, Monitor::_safepoint_check_never),
+  _lock(Monitor::nosafepoint, "HandshakeState_lock", Monitor::_safepoint_check_never),
   _active_handshaker(),
   _caller(nullptr),
   _suspended(false),
@@ -616,15 +616,13 @@ void HandshakeState::do_self_suspend() {
   assert(Thread::current() == _handshakee, "should call from _handshakee");
   assert(_lock.owned_by_self(), "Lock must be held");
   assert(!_handshakee->has_last_Java_frame() || _handshakee->frame_anchor()->walkable(), "should have walkable stack");
-  JavaThreadState jts = _handshakee->thread_state();
+  assert(_handshakee->thread_state() == _thread_blocked, "Caller should have transitioned to _thread_blocked");
+
   while (is_suspended_or_blocked()) {
-    assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");
-    _handshakee->set_thread_state(_thread_blocked);
+    JVMTI_ONLY(assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");)
     log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " suspended", p2i(_handshakee));
     _lock.wait_without_safepoint_check();
   }
-  _handshakee->set_thread_state(jts);
-  set_async_suspend_handshake(false);
   log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " resumed", p2i(_handshakee));
 }
 
@@ -636,7 +634,12 @@ class ThreadSelfSuspensionHandshake : public AsyncHandshakeClosure {
   void do_thread(Thread* thr) {
     JavaThread* current = JavaThread::cast(thr);
     assert(current == Thread::current(), "Must be self executed.");
+    JavaThreadState jts = current->thread_state();
+
+    current->set_thread_state(_thread_blocked);
     current->handshake_state()->do_self_suspend();
+    current->set_thread_state(jts);
+    current->handshake_state()->set_async_suspend_handshake(false);
   }
   virtual bool is_suspend() { return true; }
 };
@@ -703,17 +706,21 @@ public:
 };
 
 bool HandshakeState::suspend() {
-  assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");
+  JVMTI_ONLY(assert(!_handshakee->is_in_VTMT(), "no suspend allowed in VTMT transition");)
   JavaThread* self = JavaThread::current();
-  SuspendThreadHandshake st(nullptr);
-  Handshake::execute(&st, _handshakee);
   if (_handshakee == self) {
-    // If target is the current thread we need to call this to do the
-    // actual suspend since Handshake::execute() above only installed
-    // the asynchronous handshake.
-    SafepointMechanism::process_if_requested(self);
+    // If target is the current thread we can bypass the handshake machinery
+    // and just suspend directly
+    ThreadBlockInVM tbivm(self);
+    MutexLocker ml(&_lock, Mutex::_no_safepoint_check_flag);
+    set_suspended(true);
+    do_self_suspend();
+    return true;
+  } else {
+    SuspendThreadHandshake st(nullptr);
+    Handshake::execute(&st, _handshakee);
+    return st.did_suspend();
   }
-  return st.did_suspend();
 }
 
 bool HandshakeState::resume() {

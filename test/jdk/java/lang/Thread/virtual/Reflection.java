@@ -24,7 +24,9 @@
 /**
  * @test
  * @summary Test virtual threads using core reflection
- * @run testng Reflection
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} Reflection.java TestHelper.java
+ * @run testng/othervm --enable-preview Reflection
  */
 
 import java.lang.reflect.Constructor;
@@ -124,7 +126,7 @@ public class Reflection {
     public void testInvokeStatic6() throws Exception {
         Method parkMethod = Parker.class.getDeclaredMethod("park");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler).factory();
 
             Thread vthread = factory.newThread(() -> {
                 try {
@@ -274,7 +276,7 @@ public class Reflection {
     public void testNewInstance6() throws Exception {
         Constructor<?> ctor = Parker.class.getDeclaredConstructor();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+            ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler).factory();
 
             Thread vthread = factory.newThread(() -> {
                 try {

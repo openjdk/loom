@@ -79,9 +79,9 @@ class RecordComponent;
   f(java_lang_StackTraceElement) \
   f(java_lang_StackFrameInfo) \
   f(java_lang_LiveStackFrameInfo) \
-  f(java_lang_ContinuationScope) \
-  f(java_lang_Continuation) \
-  f(jdk_internal_misc_StackChunk) \
+  f(jdk_internal_vm_ContinuationScope) \
+  f(jdk_internal_vm_Continuation) \
+  f(jdk_internal_vm_StackChunk) \
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
   f(jdk_internal_invoke_NativeEntryPoint) \
   f(jdk_internal_misc_UnsafeConstants) \
@@ -246,9 +246,8 @@ class java_lang_String : AllStatic {
   static Symbol* as_symbol(oop java_string);
   static Symbol* as_symbol_or_null(oop java_string);
 
-  // Testers
-  static bool is_instance(oop obj);
-  static inline bool is_instance_inlined(oop obj);
+  // Tester
+  static inline bool is_instance(oop obj);
 
   // Debugging
   static void print(oop java_string, outputStream* st);
@@ -331,7 +330,6 @@ class java_lang_Class : AllStatic {
 
   // Conversion
   static Klass* as_Klass(oop java_class);
-  static Klass* as_Klass_raw(oop java_class);
   static void set_klass(oop java_class, Klass* klass);
   static BasicType as_BasicType(oop java_class, Klass** reference_klass = NULL);
   static Symbol* as_signature(oop java_class, bool intern_if_not_found);
@@ -377,10 +375,8 @@ class java_lang_Class : AllStatic {
   static void set_source_file(oop java_class, oop source_file);
 
   static int oop_size(oop java_class);
-  static int oop_size_raw(oop java_class);
   static void set_oop_size(HeapWord* java_class, int size);
   static int static_oop_field_count(oop java_class);
-  static int static_oop_field_count_raw(oop java_class);
   static void set_static_oop_field_count(oop java_class, int size);
 
   static GrowableArray<Klass*>* fixup_mirror_list() {
@@ -421,8 +417,7 @@ class java_lang_Thread : AllStatic {
   static int _tid_offset;
   static int _continuation_offset;
   static int _park_blocker_offset;
-  static int _noninheritableScopeLocalBindings_offset;
-  static int _inheritableScopeLocalBindings_offset;
+  static int _scopeLocalBindings_offset;
 
   static void compute_offsets();
 
@@ -701,6 +696,10 @@ class java_lang_Throwable: AllStatic {
 
   // Programmatic access to stack trace
   static void get_stack_trace_elements(int depth, Handle backtrace, objArrayHandle stack_trace, TRAPS);
+
+  // For recreating class initialization error exceptions.
+  static Handle get_cause_with_stack_trace(Handle throwable, TRAPS);
+
   // Printing
   static void print(oop throwable, outputStream* st);
   static void print_stack_trace(Handle throwable, outputStream* st);
@@ -1085,8 +1084,8 @@ class java_lang_ref_SoftReference: public java_lang_ref_Reference {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 };
 
-// Interface to java.lang.ContinuationScope objects
-class java_lang_ContinuationScope: AllStatic {
+// Interface to jdk.internal.vm.ContinuationScope objects
+class jdk_internal_vm_ContinuationScope: AllStatic {
   friend class JavaClasses;
  private:
   static int _name_offset;
@@ -1098,8 +1097,8 @@ class java_lang_ContinuationScope: AllStatic {
   static inline oop name(oop ref);
 };
 
-// Interface to java.lang.Continuation objects
-class java_lang_Continuation: AllStatic {
+// Interface to jdk.internal.vm.Continuation objects
+class jdk_internal_vm_Continuation: AllStatic {
   friend class JavaClasses;
  private:
   static int _scope_offset;
@@ -1125,6 +1124,7 @@ class java_lang_Continuation: AllStatic {
   static inline stackChunkOop tail(oop ref);
   static inline void set_tail(oop ref, stackChunkOop value);
   static inline jshort critical_section(oop ref);
+  static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
   static inline bool is_reset(oop ref);
   static inline bool is_mounted(oop ref);
@@ -1133,8 +1133,8 @@ class java_lang_Continuation: AllStatic {
   static inline void set_preempted(oop ref, bool value);
 };
 
-// Interface to jdk.internal.misc.StackChunk objects
-class jdk_internal_misc_StackChunk: AllStatic {
+// Interface to jdk.internal.vm.StackChunk objects
+class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
  private:
   static int _parent_offset;
@@ -1597,7 +1597,7 @@ class java_lang_ClassLoader : AllStatic {
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
   static ClassLoaderData* loader_data_acquire(oop loader);
-  static ClassLoaderData* loader_data_raw(oop loader);
+  static ClassLoaderData* loader_data(oop loader);
   static void release_set_loader_data(oop loader, ClassLoaderData* new_data);
 
   static oop parent(oop loader);

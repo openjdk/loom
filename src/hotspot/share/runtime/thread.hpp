@@ -352,10 +352,6 @@ class Thread: public ThreadShadow {
   virtual bool is_monitor_deflation_thread() const   { return false; }
   virtual bool is_hidden_from_external_view() const  { return false; }
   virtual bool is_jvmti_agent_thread() const         { return false; }
-  // True iff the thread can perform GC operations at a safepoint.
-  // Generally will be true only of VM thread and parallel GC WorkGang
-  // threads.
-  virtual bool is_GC_task_thread() const             { return false; }
   virtual bool is_Watcher_thread() const             { return false; }
   virtual bool is_ConcurrentGC_thread() const        { return false; }
   virtual bool is_Named_thread() const               { return false; }
@@ -930,10 +926,10 @@ class JavaThread: public Thread {
   volatile bool         _doing_unsafe_access;    // Thread may fault due to unsafe access
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
+#if INCLUDE_JVMTI
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
-  bool                  _hide_over_cont_yield;   // thread is in a mode to hide activity around Continuation.yield
-                                                 // from JVMTI (set at unmount and cleared at mount)
+#endif
 
   // JNI attach states:
   enum JNIAttachStates {
@@ -985,8 +981,8 @@ class JavaThread: public Thread {
   jlong*    _jvmci_counters;
 
   // Fast thread locals for use by JVMCI
-  intptr_t*  _jvmci_reserved0;
-  intptr_t*  _jvmci_reserved1;
+  jlong      _jvmci_reserved0;
+  jlong      _jvmci_reserved1;
   oop        _jvmci_reserved_oop0;
 
  public:
@@ -996,6 +992,30 @@ class JavaThread: public Thread {
   bool resize_counters(int current_size, int new_size);
 
   static bool resize_all_jvmci_counters(int new_size);
+
+  void set_jvmci_reserved_oop0(oop value) {
+    _jvmci_reserved_oop0 = value;
+  }
+
+  oop get_jvmci_reserved_oop0() {
+    return _jvmci_reserved_oop0;
+  }
+
+  void set_jvmci_reserved0(jlong value) {
+    _jvmci_reserved0 = value;
+  }
+
+  jlong get_jvmci_reserved0() {
+    return _jvmci_reserved0;
+  }
+
+  void set_jvmci_reserved1(jlong value) {
+    _jvmci_reserved1 = value;
+  }
+
+  jlong get_jvmci_reserved1() {
+    return _jvmci_reserved1;
+  }
 
  private:
 #endif // INCLUDE_JVMCI
@@ -1051,9 +1071,9 @@ private:
  public:
   oop _mounted_vthread;
   jlong _scopeLocal_hash_table_shift;
-    
+
   void allocate_scopeLocal_hash_table(int count);
-    
+
  public:
   // Constructor
   JavaThread();                            // delegating constructor
@@ -1169,7 +1189,7 @@ private:
   void set_do_not_unlock_if_synchronized(bool val) { _do_not_unlock_if_synchronized = val; }
 
   SafepointMechanism::ThreadData* poll_data() { return &_poll_data; }
-    
+
   void set_requires_cross_modify_fence(bool val) PRODUCT_RETURN NOT_PRODUCT({ _requires_cross_modify_fence = val; })
 
   // Continuation support
@@ -1224,21 +1244,18 @@ private:
 
   inline void set_thread_suspended();
   inline void clear_thread_suspended();
- 
+
   bool is_thread_suspended() const {
     return (_suspend_flags & _thread_suspended) != 0;
   }
- 
+
+#if INCLUDE_JVMTI
   bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
-  bool hide_over_cont_yield() const              { return _hide_over_cont_yield; }
-  bool disable_jvmti_events() const {
-    return is_in_VTMT() || hide_over_cont_yield();
-  }
 
   void set_is_in_VTMT(bool val);
   void set_is_VTMT_disabler(bool val);
-  void set_hide_over_cont_yield(bool val)        { _hide_over_cont_yield = val; }
+#endif
 
   bool is_cont_force_yield() { return cont_preempt(); }
 
@@ -1488,8 +1505,8 @@ private:
   void print_on(outputStream* st, bool print_extended_info) const;
   void print_on(outputStream* st) const { print_on(st, false); }
   void print() const;
-  void print_thread_state_on(outputStream*) const      PRODUCT_RETURN;
-  DEBUG_ONLY(const char* thread_state_name() const;)
+  void print_thread_state_on(outputStream*) const;
+  const char* thread_state_name() const;
   void print_on_error(outputStream* st, char* buf, int buflen) const;
   void print_name_on_error(outputStream* st, char* buf, int buflen) const;
   void verify();
@@ -1577,8 +1594,10 @@ private:
   JvmtiThreadState *jvmti_thread_state() const                                   { return _jvmti_thread_state; }
   static ByteSize jvmti_thread_state_offset()                                    { return byte_offset_of(JavaThread, _jvmti_thread_state); }
 
-  // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier. 
+#if INCLUDE_JVMTI
+  // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
   JvmtiThreadState *rebind_to_jvmti_thread_state_of(oop thread_oop);
+#endif
 
   // JVMTI PopFrame support
   // Setting and clearing popframe_condition

@@ -331,7 +331,7 @@ public class FileOutputStream extends OutputStream
      *     end of file
      * @throws    IOException If an I/O error has occurred.
      */
-    private native void writeBytes(byte b[], int off, int len, boolean append)
+    private native void writeBytes(byte[] b, int off, int len, boolean append)
         throws IOException;
 
     /**
@@ -341,7 +341,7 @@ public class FileOutputStream extends OutputStream
      * @param      b   the data.
      * @throws     IOException  if an I/O error occurs.
      */
-    public void write(byte b[]) throws IOException {
+    public void write(byte[] b) throws IOException {
         boolean append = fdAccess.getAppend(fd);
         if (Thread.currentThread().isVirtual()) {
             Blocker.managedBlock(() -> writeBytes(b, 0, b.length, append));
@@ -359,7 +359,7 @@ public class FileOutputStream extends OutputStream
      * @param      len   the number of bytes to write.
      * @throws     IOException  if an I/O error occurs.
      */
-    public void write(byte b[], int off, int len) throws IOException {
+    public void write(byte[] b, int off, int len) throws IOException {
         boolean append = fdAccess.getAppend(fd);
         if (Thread.currentThread().isVirtual()) {
             Blocker.managedBlock(() -> writeBytes(b, off, len, append));

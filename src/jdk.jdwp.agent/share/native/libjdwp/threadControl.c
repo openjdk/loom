@@ -731,6 +731,11 @@ pendingAppResume(jboolean includeSuspended)
             }
         }
         node = node->next;
+        if (node == NULL && list == &runningThreads) {
+            // We need to look at runningVThreads after we are done with runningThreads.
+            list = &runningVThreads;
+            node = list->first;
+        }
     }
     return JNI_FALSE;
 }
@@ -763,14 +768,11 @@ handleAppResumeCompletion(JNIEnv *env, EventInfo *evinfo,
     ThreadNode *node;
     jthread     thread;
 
-    /* vthread fixme: it's unclear how this is used and if anything special needs to be done for vthreads. */
-    JDI_ASSERT(!evinfo->is_vthread);
-
     thread = evinfo->thread;
 
     debugMonitorEnter(threadLock);
 
-    node = findThread(&runningThreads, thread);
+    node = findRunningThread(thread);
     if (node != NULL) {
         if (node->resumeFrameDepth > 0) {
             jint compareDepth = getStackDepth(thread);
@@ -1703,20 +1705,9 @@ threadControl_suspendAll(void)
             error = AGENT_ERROR_OUT_OF_MEMORY;
             goto err;
         }
-        if (canSuspendResumeThreadLists()) {
-            error = commonSuspendList(env, count, threads);
-            if (error != JVMTI_ERROR_NONE) {
-                goto err;
-            }
-        } else {
-            int i;
-            for (i = 0; i < count; i++) {
-                error = commonSuspend(env, threads[i], JNI_FALSE);
-
-                if (error != JVMTI_ERROR_NONE) {
-                    goto err;
-                }
-            }
+        error = commonSuspendList(env, count, threads);
+        if (error != JVMTI_ERROR_NONE) {
+            goto err;
         }
 
         /*
@@ -2861,6 +2852,17 @@ threadControl_dumpAllThreads()
     dumpThreadList(&runningVThreads);
     tty_message("\nDumping otherThreads:");
     dumpThreadList(&otherThreads);
+}
+
+void
+threadControl_dumpThread(jthread thread)
+{
+    ThreadNode* node = findThread(NULL, thread);
+    if (node == NULL) {
+        tty_message("Thread not found");
+    } else {
+        dumpThread(node);
+    }
 }
 
 static void

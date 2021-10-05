@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Verifies that specific JVMTI functions returns JVMTI_ERROR_INVALID_THREAD if called with virtual threads.
- * @run main/othervm/native -agentlib:VThreadUnsupportedTest VThreadUnsupportedTest
+ * @compile --enable-preview -source ${jdk.version} VThreadUnsupportedTest.java
+ * @run main/othervm/native --enable-preview -agentlib:VThreadUnsupportedTest VThreadUnsupportedTest
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;

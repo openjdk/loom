@@ -75,14 +75,29 @@ public class ThreadsRunner implements MultiRunner, LogAware, RunParamsAware {
         }
 
         public Thread newThread(Runnable runnable, String name, int num) {
-            Thread.Builder builder;
+            Thread t;
             if (this.params.useVirtualThreads()) {
-                builder = Thread.ofVirtual();
+                t = unstartedVirtualThread(runnable);
             } else {
-                builder = Thread.ofPlatform();
+                t = new Thread(runnable);
             }
-            return builder.name(name).unstarted(runnable);
+            t.setName(name);
+            return t;
         }
+
+        private Thread unstartedVirtualThread(Runnable task) {
+            try {
+                Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+                Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+                java.lang.reflect.Method unstarted = clazz.getMethod("unstarted", Runnable.class);
+                return (Thread) unstarted.invoke(builder, task);
+            } catch (RuntimeException | Error e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 
     private class ManagedThread implements Runnable {

@@ -36,36 +36,36 @@
 
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)
 
-inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (stackChunkOopDesc*)(oopDesc*)jdk_internal_misc_StackChunk::parent(as_oop()); }
-inline void stackChunkOopDesc::set_parent(stackChunkOopDesc* value) { jdk_internal_misc_StackChunk::set_parent(this, (oop)value); }
-template<typename P> inline void stackChunkOopDesc::set_parent_raw(oop value) { jdk_internal_misc_StackChunk::set_parent_raw<P>(this, value); }
-template<typename P> inline bool stackChunkOopDesc::is_parent_null() const    { return jdk_internal_misc_StackChunk::is_parent_null<P>(as_oop()); }
-inline int stackChunkOopDesc::stack_size() const         { return jdk_internal_misc_StackChunk::size(as_oop()); }
-inline int stackChunkOopDesc::sp() const                 { return jdk_internal_misc_StackChunk::sp(as_oop()); }
-inline void stackChunkOopDesc::set_sp(int value)         { jdk_internal_misc_StackChunk::set_sp(this, value); }
-inline address stackChunkOopDesc::pc() const             { return (address)jdk_internal_misc_StackChunk::pc(as_oop()); }
-inline void stackChunkOopDesc::set_pc(address value)     { jdk_internal_misc_StackChunk::set_pc(this, (jlong)value); }
-inline int stackChunkOopDesc::argsize() const            { return jdk_internal_misc_StackChunk::argsize(as_oop()); }
-inline void stackChunkOopDesc::set_argsize(int value)    { jdk_internal_misc_StackChunk::set_argsize(as_oop(), value); }
-inline uint8_t stackChunkOopDesc::flags() const          { return (uint8_t)jdk_internal_misc_StackChunk::flags(as_oop()); }
-inline void stackChunkOopDesc::set_flags(uint8_t value)  { jdk_internal_misc_StackChunk::set_flags(this, (jbyte)value); }
-inline int stackChunkOopDesc::max_size() const           { return (int)jdk_internal_misc_StackChunk::maxSize(as_oop()); }
-inline void stackChunkOopDesc::set_max_size(int value)   { jdk_internal_misc_StackChunk::set_maxSize(this, (jint)value); }
-inline int stackChunkOopDesc::numFrames() const          { return jdk_internal_misc_StackChunk::numFrames(as_oop()); }
-inline void stackChunkOopDesc::set_numFrames(int value)  { jdk_internal_misc_StackChunk::set_numFrames(this, value); }
-inline int stackChunkOopDesc::numOops() const            { return jdk_internal_misc_StackChunk::numOops(as_oop()); }
-inline void stackChunkOopDesc::set_numOops(int value)    { jdk_internal_misc_StackChunk::set_numOops(this, value); }
-inline int stackChunkOopDesc::gc_sp() const              { return jdk_internal_misc_StackChunk::gc_sp(as_oop()); }
-inline void stackChunkOopDesc::set_gc_sp(int value)      { jdk_internal_misc_StackChunk::set_gc_sp(this, value); }
-inline uint64_t stackChunkOopDesc::mark_cycle() const         { return (uint64_t)jdk_internal_misc_StackChunk::mark_cycle(as_oop()); }
-inline void stackChunkOopDesc::set_mark_cycle(uint64_t value) { jdk_internal_misc_StackChunk::set_mark_cycle(this, (jlong)value); }
+inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (stackChunkOopDesc*)(oopDesc*)jdk_internal_vm_StackChunk::parent(as_oop()); }
+inline void stackChunkOopDesc::set_parent(stackChunkOopDesc* value) { jdk_internal_vm_StackChunk::set_parent(this, (oop)value); }
+template<typename P> inline void stackChunkOopDesc::set_parent_raw(oop value) { jdk_internal_vm_StackChunk::set_parent_raw<P>(this, value); }
+template<typename P> inline bool stackChunkOopDesc::is_parent_null() const    { return jdk_internal_vm_StackChunk::is_parent_null<P>(as_oop()); }
+inline int stackChunkOopDesc::stack_size() const         { return jdk_internal_vm_StackChunk::size(as_oop()); }
+inline int stackChunkOopDesc::sp() const                 { return jdk_internal_vm_StackChunk::sp(as_oop()); }
+inline void stackChunkOopDesc::set_sp(int value)         { jdk_internal_vm_StackChunk::set_sp(this, value); }
+inline address stackChunkOopDesc::pc() const             { return (address)jdk_internal_vm_StackChunk::pc(as_oop()); }
+inline void stackChunkOopDesc::set_pc(address value)     { jdk_internal_vm_StackChunk::set_pc(this, (jlong)value); }
+inline int stackChunkOopDesc::argsize() const            { return jdk_internal_vm_StackChunk::argsize(as_oop()); }
+inline void stackChunkOopDesc::set_argsize(int value)    { jdk_internal_vm_StackChunk::set_argsize(as_oop(), value); }
+inline uint8_t stackChunkOopDesc::flags() const          { return (uint8_t)jdk_internal_vm_StackChunk::flags(as_oop()); }
+inline void stackChunkOopDesc::set_flags(uint8_t value)  { jdk_internal_vm_StackChunk::set_flags(this, (jbyte)value); }
+inline int stackChunkOopDesc::max_size() const           { return (int)jdk_internal_vm_StackChunk::maxSize(as_oop()); }
+inline void stackChunkOopDesc::set_max_size(int value)   { jdk_internal_vm_StackChunk::set_maxSize(this, (jint)value); }
+inline int stackChunkOopDesc::numFrames() const          { return jdk_internal_vm_StackChunk::numFrames(as_oop()); }
+inline void stackChunkOopDesc::set_numFrames(int value)  { jdk_internal_vm_StackChunk::set_numFrames(this, value); }
+inline int stackChunkOopDesc::numOops() const            { return jdk_internal_vm_StackChunk::numOops(as_oop()); }
+inline void stackChunkOopDesc::set_numOops(int value)    { jdk_internal_vm_StackChunk::set_numOops(this, value); }
+inline int stackChunkOopDesc::gc_sp() const              { return jdk_internal_vm_StackChunk::gc_sp(as_oop()); }
+inline void stackChunkOopDesc::set_gc_sp(int value)      { jdk_internal_vm_StackChunk::set_gc_sp(this, value); }
+inline uint64_t stackChunkOopDesc::mark_cycle() const         { return (uint64_t)jdk_internal_vm_StackChunk::mark_cycle(as_oop()); }
+inline void stackChunkOopDesc::set_mark_cycle(uint64_t value) { jdk_internal_vm_StackChunk::set_mark_cycle(this, (jlong)value); }
 
-inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_misc_StackChunk::set_cont(this, value); }
-template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_misc_StackChunk::set_cont_raw<P>(this, value); }
-inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_misc_StackChunk::cont(as_oop()); */ }
+inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_vm_StackChunk::set_cont(this, value); }
+template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_vm_StackChunk::set_cont_raw<P>(this, value); }
+inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
 template<typename P> inline oop stackChunkOopDesc::cont() const { 
   // this is a special field used to detect GC processing status (see should_fix) and so we don't want to invoke a barrier directly on it
-  oop obj = jdk_internal_misc_StackChunk::cont_raw<P>(as_oop()); 
+  oop obj = jdk_internal_vm_StackChunk::cont_raw<P>(as_oop()); 
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
 }
@@ -138,7 +138,7 @@ template <typename OopT, bool concurrent_gc>
 inline bool stackChunkOopDesc::should_fix() const {
   if (UNLIKELY(is_gc_mode())) return true;
   // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
-  if (concurrent_gc) return !is_oop_fixed<OopT>(as_oop(), jdk_internal_misc_StackChunk::cont_offset());
+  if (concurrent_gc) return !is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset());
   return false;
 }
 

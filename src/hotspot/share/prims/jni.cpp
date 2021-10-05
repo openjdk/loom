@@ -2718,6 +2718,10 @@ JNI_ENTRY(jint, jni_MonitorEnter(JNIEnv *env, jobject jobj))
 
   Handle obj(thread, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_enter(obj, thread);
+  if (!Continuation::pin(thread)) {
+    ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
+    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+  }
   ret = JNI_OK;
   return ret;
 JNI_END
@@ -2737,7 +2741,9 @@ JNI_ENTRY(jint, jni_MonitorExit(JNIEnv *env, jobject jobj))
 
   Handle obj(THREAD, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
-
+  if (!Continuation::unpin(thread)) {
+    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+  }
   ret = JNI_OK;
   return ret;
 JNI_END
@@ -3667,7 +3673,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
 #endif
 
     // Since this is not a JVM_ENTRY we have to set the thread state manually before leaving.
-    ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
+    ThreadStateTransition::transition_from_vm(thread, _thread_in_native);
     MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
   } else {
     // If create_vm exits because of a pending exception, exit with that
@@ -3887,11 +3893,8 @@ static jint attach_current_thread(JavaVM *vm, void **penv, void *_args, bool dae
   *(JNIEnv**)penv = thread->jni_environment();
 
   // Now leaving the VM, so change thread_state. This is normally automatically taken care
-  // of in the JVM_ENTRY. But in this situation we have to do it manually. Notice, that by
-  // using ThreadStateTransition::transition, we do a callback to the safepoint code if
-  // needed.
-
-  ThreadStateTransition::transition(thread, _thread_in_vm, _thread_in_native);
+  // of in the JVM_ENTRY. But in this situation we have to do it manually.
+  ThreadStateTransition::transition_from_vm(thread, _thread_in_native);
   MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
 
   // Perform any platform dependent FPU setup

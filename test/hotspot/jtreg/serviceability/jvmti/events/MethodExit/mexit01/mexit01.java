@@ -44,7 +44,8 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile mexit01a.jasm
- * @run main/othervm/native -agentlib:mexit01 mexit01
+ * @compile --enable-preview -source ${jdk.version} mexit01.java
+ * @run main/othervm/native --enable-preview -agentlib:mexit01 mexit01
  */
 
 public class mexit01 {

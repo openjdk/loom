@@ -42,20 +42,13 @@ public class Basic {
 
     @Test(expectedExceptions = { NoSuchElementException.class })
     public void testUnbound1() {
-        ScopeLocal<String> v = ScopeLocal.forType(String.class);
-        assertFalse(v.isBound());
-        v.get();
-    }
-
-    @Test(expectedExceptions = { NoSuchElementException.class })
-    public void testUnbound2() {
-        ScopeLocal<String> v = ScopeLocal.inheritableForType(String.class);
+        ScopeLocal<String> v = ScopeLocal.newInstance();
         assertFalse(v.isBound());
         v.get();
     }
 
     public void testOrElse() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
         assertTrue(name.orElse(null) == null);
         assertEquals(name.orElse("default"), "default");
@@ -66,7 +59,7 @@ public class Basic {
     }
 
     public void testOrElseThrow() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
         assertThrows(IllegalStateException.class, () -> name.orElseThrow(IllegalStateException::new));
         assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
@@ -80,16 +73,15 @@ public class Basic {
      * Test runWithBinding with non-inheritable scope variable.
      */
     public void testRunWithBinding1() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
-            ensureNotInherited(name);
         });
     }
 
     public void testRunWithBinding2() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
@@ -97,12 +89,10 @@ public class Basic {
             ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 assertTrue("joe".equals(name.get()));
-                ensureNotInherited(name);
             });
 
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
-            ensureNotInherited(name);
         });
     }
 
@@ -110,16 +100,15 @@ public class Basic {
      * Test runWithBinding with non-inheritable scope variable, null value.
      */
     public void testRunWithBinding3() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
-            ensureNotInherited(name);
         });
     }
 
     public void testRunWithBinding4() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
@@ -127,81 +116,23 @@ public class Basic {
             ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
-                ensureNotInherited(name);
             });
 
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
-            ensureNotInherited(name);
         });
     }
 
     /**
      * Test runWithBinding with inheritable scope variable.
      */
-    public void testRunWithBinding5() {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            assertTrue("fred".equals(name.get()));
-            ensureInherited(name);
-        });
-    }
-
-    public void testRunWithBinding6() {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            assertTrue("fred".equals(name.get()));
-
-            ScopeLocal.where(name, "joe", () -> {
-                assertTrue(name.isBound());
-                assertTrue("joe".equals(name.get()));
-                ensureInherited(name);
-            });
-
-            assertTrue(name.isBound());
-            assertTrue("fred".equals(name.get()));
-            ensureInherited(name);
-        });
-    }
-
-    /**
-     * Test runWithBinding with inheritable scope variable, null value.
-     */
-    public void testRunWithBinding7() {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal.where(name, null, () -> {
-            assertTrue(name.isBound());
-            assertTrue(name.get() == null);
-            ensureInherited(name);
-        });
-    }
-
-    public void testRunWithBinding8() {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            assertTrue("fred".equals(name.get()));
-
-            ScopeLocal.where(name, null, () -> {
-                assertTrue(name.isBound());
-                assertTrue(name.get() == null);
-                ensureInherited(name);
-            });
-
-            assertTrue(name.isBound());
-            assertTrue("fred".equals(name.get()));
-            ensureInherited(name);
-        });
-    }
 
     /**
      * Test runWithBinding with null operation
      */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testRunWithBinding9() {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Runnable)null);
     }
 
@@ -209,24 +140,22 @@ public class Basic {
      * Test callWithBinding with non-inheritable scope variable.
      */
     public void testCallWithBinding1() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value = name.get();
             assertTrue("fred".equals(value));
-            ensureNotInherited(name);
             return 1;
         });
         assertTrue(result == 1);
     }
 
     public void testCallWithBinding2() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
-            ensureNotInherited(name);
 
             int result2 = ScopeLocal.where(name, "joe", () -> {
                 assertTrue(name.isBound());
@@ -245,93 +174,21 @@ public class Basic {
      * Test callWithBinding with non-inheritable scope variable, null value.
      */
     public void testCallWithBinding3() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
-            ensureNotInherited(name);
             return 1;
         });
         assertTrue(result == 1);
     }
 
     public void testCallWithBinding4() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
-            ensureNotInherited(name);
-
-            int result2 = ScopeLocal.where(name, null, () -> {
-                assertTrue(name.isBound());
-                assertTrue(name.get() == null);
-                return 2;
-            });
-            assertTrue(result2 == 2);
-
-            return 1;
-        });
-        assertTrue(result1 == 1);
-    }
-
-    /**
-     * Test callWithBinding with inheritable scope variable.
-     */
-    public void testCallWithBinding5() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result = ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            String value = name.get();
-            assertTrue("fred".equals(value));
-            ensureInherited(name);
-            return 1;
-        });
-        assertTrue(result == 1);
-    }
-
-    public void testCallWithBinding6() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result1 = ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            String value1 = name.get();
-            assertTrue("fred".equals(value1));
-            ensureInherited(name);
-
-            int result2 = ScopeLocal.where(name, "joe", () -> {
-                assertTrue(name.isBound());
-                String value2 = name.get();
-                assertTrue("joe".equals(value2));
-                return 2;
-            });
-            assertTrue(result2 == 2);
-
-            return 1;
-        });
-        assertTrue(result1 == 1);
-    }
-
-    /**
-     * Test callWithBinding with inheritable scope variable, null value.
-     */
-    public void testCallWithBinding7() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result = ScopeLocal.where(name, null, () -> {
-            assertTrue(name.isBound());
-            assertTrue(name.get() == null);
-            ensureInherited(name);
-            return 1;
-        });
-        assertTrue(result == 1);
-    }
-
-    public void testCallWithBinding8() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        int result1 = ScopeLocal.where(name, "fred", () -> {
-            assertTrue(name.isBound());
-            String value1 = name.get();
-            assertTrue("fred".equals(value1));
-            ensureInherited(name);
 
             int result2 = ScopeLocal.where(name, null, () -> {
                 assertTrue(name.isBound());
@@ -350,129 +207,7 @@ public class Basic {
      */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testCallWithBinding9() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
+        ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Callable)null);
-    }
-
-    /**
-     * Test that inheritable scope variable are inherited at Thread create time.
-     */
-    public void testInheritAtCreateTime() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal.where(name, "fred", () -> {
-            AtomicReference<String> ref = new AtomicReference<>();
-            Thread thread = new Thread(() -> ref.set(name.get()));
-            // start thread with name set to joe
-            ScopeLocal.where(name, "joe", thread::start);
-            thread.join();
-            assertEquals(ref.get(), "fred");
-            return null;
-        });
-    }
-
-    /**
-     * Test snapshot inheritance.
-     */
-    public void testSnapshotInheritance() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.inheritableForType(String.class);
-        ScopeLocal<String> occupation = ScopeLocal.inheritableForType(String.class);
-        var snapshot = ScopeLocal.where(name, "aristotle", () -> ScopeLocal.snapshot());
-        assertFalse(name.isBound());
-        assertBoundInSnapshot(snapshot, name, true);
-        ScopeLocal.where(occupation, "undertaker", () -> {
-            assertBoundInSnapshot(snapshot, occupation, false);
-            assertEquals(occupation.get(), "undertaker");
-            assertTrue(occupation.isBound());
-            return null;
-        });
-        assertEqualsInSnapshot(snapshot, name, "aristotle");
-    }
-
-    /**
-     * Test for snapshot non-inheritance.
-     */
-    public void testSnapshotNonInheritance() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.forType(String.class);
-        ScopeLocal<String> occupation = ScopeLocal.forType(String.class);
-        var snapshot = ScopeLocal.where(name, "aristotle", () -> ScopeLocal.snapshot());
-        assertFalse(name.isBound());
-        assertBoundInSnapshot(snapshot, name, false);
-        ScopeLocal.where(occupation, "undertaker", () -> {
-            assertBoundInSnapshot(snapshot, occupation, true);
-            assertEquals(occupation.get(), "undertaker");
-            assertEqualsInSnapshot(snapshot, occupation, "undertaker");
-            assertTrue(occupation.isBound());
-            return null;
-        });
-        ScopeLocal.where(name, "joe", () -> {
-            assertEqualsInSnapshot(snapshot, name, "joe");
-            return null;
-        });
-    }
-
-    private <R> R callWithSnapshot(ScopeLocal.Snapshot snapshot, Callable<R> c) {
-        try {
-            return snapshot.call(c);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private <T> void assertEqualsInSnapshot(ScopeLocal.Snapshot snapshot, ScopeLocal<T> var, T expected)
-            throws Exception {
-        callWithSnapshot(snapshot, () -> {
-            assertEquals(var.get(), expected);
-            return null;
-        });
-    }
-
-    private <T> void assertBoundInSnapshot(ScopeLocal.Snapshot snapshot, ScopeLocal<T> var, boolean expected)
-            throws Exception {
-        callWithSnapshot(snapshot, () -> {
-            assertEquals(var.isBound(), expected);
-            return null;
-        });
-    }
-
-    /**
-     * Ensures that a inheritable scope variable is inherited
-     */
-    private void ensureInherited(ScopeLocal<?> v) {
-        Object valueInParent = v.get();
-
-        // check inherited by platform thread
-        var platformThreadFactory = Thread.ofPlatform().factory();
-        try (var executor = Executors.newThreadPerTaskExecutor(platformThreadFactory)) {
-            Object valueInChild = executor.submit(v::get).join();
-            assertEquals(valueInChild, valueInParent);
-        }
-
-        // check inherited by virtual thread
-        var virtualThreadFactory = Thread.ofVirtual().factory();
-        try (var executor = Executors.newThreadPerTaskExecutor(virtualThreadFactory)) {
-            Object valueInChild = executor.submit(v::get).join();
-            assertEquals(valueInChild, valueInParent);
-        }
-    }
-
-    /**
-     * Ensures that a non-inheritable scope variable is not inherited
-     */
-    private void ensureNotInherited(ScopeLocal<?> v) {
-        assertTrue(v.isBound());
-
-        // check not inherited by platform thread
-        var platformThreadFactory = Thread.ofPlatform().factory();
-        try (var executor = Executors.newThreadPerTaskExecutor(platformThreadFactory)) {
-            boolean boundInChild = executor.submit(v::isBound).join();
-            assertFalse(boundInChild);
-        }
-
-        // check no inherited by virtual thread
-        var virtualThreadFactory = Thread.ofVirtual().factory();
-        try (var executor = Executors.newThreadPerTaskExecutor(virtualThreadFactory)) {
-            boolean boundInChild = executor.submit(v::isBound).join();
-            assertFalse(boundInChild);
-        }
     }
 }

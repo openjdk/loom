@@ -25,16 +25,19 @@
  * @test
  * @summary Stress test Thread.sleep
  * @requires vm.debug != true
- * @run main/othervm SleepALot
+ * @compile --enable-preview -source ${jdk.version} SleepALot.java
+ * @run main/othervm --enable-preview SleepALot
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=300 SleepALot 200000
+ * @compile --enable-preview -source ${jdk.version} SleepALot.java
+ * @run main/othervm/timeout=300 --enable-preview SleepALot 200000
  */
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SleepALot {
@@ -58,8 +61,8 @@ public class SleepALot {
 
         boolean terminated;
         do {
-            terminated = thread.join(Duration.ofMillis(500));
-            System.out.println(count.get());
+            terminated = thread.join(Duration.ofSeconds(1));
+            System.out.println(Instant.now() + " => " + count.get());
         } while (!terminated);
 
         int countValue = count.get();

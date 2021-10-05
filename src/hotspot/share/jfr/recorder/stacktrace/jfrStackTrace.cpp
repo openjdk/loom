@@ -183,12 +183,12 @@ inline bool JfrVframeStream::at_continuation_entry_frame() const {
 }
 
 inline void JfrVframeStream::set_parent_continuation() {
-  _continuation = java_lang_Continuation::parent(_continuation);
+  _continuation = jdk_internal_vm_Continuation::parent(_continuation);
 }
 
 inline void JfrVframeStream::set_continuation_scope() {
   if (_continuation != (oop)NULL) {
-    _continuation_scope = java_lang_Continuation::scope(_continuation);
+    _continuation_scope = jdk_internal_vm_Continuation::scope(_continuation);
   }
 }
 
@@ -205,7 +205,7 @@ inline bool JfrVframeStream::at_continuation_scope_entry_frame() {
   if (!at_continuation_entry_frame()) {
     return false;
   }
-  if (_continuation_scope != (oop)NULL && java_lang_Continuation::scope(_continuation) == _continuation_scope) {
+  if (_continuation_scope != (oop)NULL && jdk_internal_vm_Continuation::scope(_continuation) == _continuation_scope) {
     return true;
   }
   set_parent_continuation();
