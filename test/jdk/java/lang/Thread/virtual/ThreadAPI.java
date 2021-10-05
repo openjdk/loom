@@ -1722,18 +1722,22 @@ public class ThreadAPI {
         try {
             Thread target = null;
 
-            // start virtual threads that are CPU bound until we find
-            // a thread that does not run
-            while (target == null) {
-                CountDownLatch latch = new CountDownLatch(1);
-                Thread vthread = Thread.ofVirtual().start(() -> {
-                    latch.countDown();
-                    while (!done.get()) { }
-                });
-                threads.add(vthread);
-                if (!latch.await(3, TimeUnit.SECONDS)) {
-                    // thread did not run
-                    target = vthread;
+            // start virtual threads that are CPU bound until we find a thread
+            // that does not run. This is done while holding a monitor to
+            // allow this test run in the context of a virtual thread.
+            Object lock = new Object();
+            synchronized (this) {
+                while (target == null) {
+                    CountDownLatch latch = new CountDownLatch(1);
+                    Thread vthread = Thread.ofVirtual().start(() -> {
+                        latch.countDown();
+                        while (!done.get()) { }
+                    });
+                    threads.add(vthread);
+                    if (!latch.await(3, TimeUnit.SECONDS)) {
+                        // thread did not run
+                        target = vthread;
+                    }
                 }
             }
 
