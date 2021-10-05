@@ -147,7 +147,7 @@ public:
     Unimplemented();
     return map;
   }
-  
+
   SmallRegisterMap() {}
 
   SmallRegisterMap(const RegisterMap* map) {
