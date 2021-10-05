@@ -32,12 +32,11 @@ import java.util.concurrent.ThreadFactory;
 public class JDIThreadFactory {
 
     private static ThreadFactory threadFactory = "Virtual".equals(System.getProperty("main.wrapper"))
-            ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
+            ? virtualThreadFactory() : platformThreadFactory();
 
     public static Thread newThread(NamedTask task) {
         return newThread(task, task.getName());
     }
-
 
     public static Thread newThread(Runnable task) {
         return threadFactory.newThread(task);
@@ -47,5 +46,22 @@ public class JDIThreadFactory {
         Thread t = threadFactory.newThread(task);
         t.setName(name);
         return t;
+    }
+
+    private static ThreadFactory platformThreadFactory() {
+        return task -> new Thread(task);
+    }
+
+    private static ThreadFactory virtualThreadFactory() {
+        try {
+            Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+            Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+            java.lang.reflect.Method factory = clazz.getMethod("factory");
+            return (ThreadFactory) factory.invoke(builder);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

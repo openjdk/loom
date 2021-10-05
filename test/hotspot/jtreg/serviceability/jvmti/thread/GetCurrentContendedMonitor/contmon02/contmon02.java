@@ -41,7 +41,8 @@
  *       - enhanced descripton
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:contmon02 contmon02
+ * @compile --enable-preview -source ${jdk.version} contmon02.java
+ * @run main/othervm/native --enable-preview -agentlib:contmon02 contmon02
  */
 
 public class contmon02 {

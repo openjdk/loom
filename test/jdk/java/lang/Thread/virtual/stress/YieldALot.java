@@ -25,13 +25,15 @@
  * @test
  * @summary Stress test Thread.yield
  * @requires vm.debug != true
- * @run main/othervm YieldALot
+ * @compile --enable-preview -source ${jdk.version} YieldALot.java
+ * @run main/othervm --enable-preview YieldALot
  */
 
 /**
  * @test
  * @requires vm.debug == true
- * @run main/othervm/timeout=360 YieldALot 200000
+ * @compile --enable-preview -source ${jdk.version} YieldALot.java
+ * @run main/othervm/timeout=360 --enable-preview YieldALot 200000
  */
 
 import java.time.Duration;

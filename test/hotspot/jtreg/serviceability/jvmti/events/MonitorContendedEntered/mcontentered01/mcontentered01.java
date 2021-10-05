@@ -43,8 +43,9 @@ import java.io.PrintStream;
  *       and save JNIEnv pointer now passed as argument.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mcontentered01 mcontentered01 kernel
- * @run main/othervm/native -agentlib:mcontentered01 mcontentered01 virtual
+ * @compile --enable-preview -source ${jdk.version} mcontentered01.java
+ * @run main/othervm/native --enable-preview -agentlib:mcontentered01 mcontentered01 platform
+ * @run main/othervm/native --enable-preview -agentlib:mcontentered01 mcontentered01 virtual
  */
 
 public class mcontentered01 extends DebugeeClass {

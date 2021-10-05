@@ -24,7 +24,9 @@
 /**
  * @test
  * @summary Basic test for JFR jdk.VirtualThreadXXX events.
- * @run testng/othervm JfrEvents
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} JfrEvents.java TestHelper.java
+ * @run testng/othervm --enable-preview JfrEvents
  */
 
 import java.io.IOException;
@@ -130,7 +132,9 @@ public class JfrEvents {
             recording.start();
             try (ExecutorService pool = Executors.newCachedThreadPool()) {
                 Executor scheduler = task -> pool.execute(task);
-                ThreadFactory factory = Thread.ofVirtual().scheduler(scheduler).factory();
+
+                // create virtual thread that uses custom scheduler
+                ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler).factory();
 
                 // start a thread
                 Thread thread = factory.newThread(LockSupport::park);

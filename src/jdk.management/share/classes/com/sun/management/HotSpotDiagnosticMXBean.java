@@ -27,6 +27,7 @@ package com.sun.management;
 
 import java.io.IOException;
 import java.lang.management.PlatformManagedObject;
+import jdk.internal.javac.PreviewFeature;
 
 /**
  * Diagnostic management interface for the HotSpot Virtual Machine.
@@ -145,6 +146,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *         ManagementPermission("control")} is denied.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         throw new UnsupportedOperationException();
     }
@@ -153,6 +155,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      * Thread dump format.
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static enum ThreadDumpFormat {
         /**
          * Plain text format.

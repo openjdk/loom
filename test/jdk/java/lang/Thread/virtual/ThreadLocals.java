@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Test Virtual threads using thread locals
- * @run testng ThreadLocals
+ * @compile --enable-preview -source ${jdk.version} ThreadLocals.java
+ * @run testng/othervm --enable-preview ThreadLocals
  */
 
 import org.testng.annotations.Test;

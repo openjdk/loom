@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ThreadFactory;
 
 import nsk.share.TestFailure;
 import nsk.share.gc.GCTestBase;
@@ -170,7 +171,7 @@ public class StressRedefine extends GCTestBase {
         bytecode = generateAndCompile();
 
         List<Thread> threads = new LinkedList<Thread>();
-        var threadFactory = virtualThreads ? Thread.ofVirtual().factory() : Thread.ofPlatform().factory();
+        var threadFactory = virtualThreads ? virtualThreadFactory() : platformThreadFactory();
         for (int i = 0; i < staticMethodCallersNumber; i++) {
             threads.add(threadFactory.newThread(new StaticMethodCaller()));
         }
@@ -190,6 +191,23 @@ public class StressRedefine extends GCTestBase {
             } catch (InterruptedException e) {
                 throw new TestFailure("Thread " + Thread.currentThread() + " was interrupted:", e);
             }
+        }
+    }
+
+    private static ThreadFactory platformThreadFactory() {
+        return task -> new Thread(task);
+    }
+
+    private static ThreadFactory virtualThreadFactory() {
+        try {
+            Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+            Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+            java.lang.reflect.Method factory = clazz.getMethod("factory");
+            return (ThreadFactory) factory.invoke(builder);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

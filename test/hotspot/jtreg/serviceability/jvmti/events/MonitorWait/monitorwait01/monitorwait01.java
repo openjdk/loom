@@ -43,8 +43,9 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *       and save JNIEnv pointer now passed as argument.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:monitorwait01 monitorwait01 kernel
- * @run main/othervm/native -agentlib:monitorwait01 monitorwait01 virtual
+ * @compile --enable-preview -source ${jdk.version} monitorwait01.java
+ * @run main/othervm/native --enable-preview -agentlib:monitorwait01 monitorwait01 platform
+ * @run main/othervm/native --enable-preview -agentlib:monitorwait01 monitorwait01 virtual
  */
 
 

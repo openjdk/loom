@@ -25,7 +25,8 @@
  * @test
  * @summary Test verifies that selfsuspend doesn' block unmount by VTMTDisabler
  * @library /test/lib
- * @run main/othervm/native -agentlib:SelfSuspendDisablerTest SelfSuspendDisablerTest
+ * @compile --enable-preview -source ${jdk.version} SelfSuspendDisablerTest.java
+ * @run main/othervm/native --enable-preview -agentlib:SelfSuspendDisablerTest SelfSuspendDisablerTest
  */
 
 public class SelfSuspendDisablerTest {

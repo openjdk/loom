@@ -25,8 +25,10 @@
  * @test
  * @summary Test SuspendAllVirtualThreads/ResumeAllVirtualThreads
  * @library /test/lib
+ * @compile --enable-preview -source ${jdk.version} SuspendResumeAll.java
  * @run driver jdk.test.lib.FileInstaller . .
  * @run main/othervm/native
+ *      --enable-preview
  *      -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
  *      -agentlib:SuspendResumeAll
  *      SuspendResumeAll

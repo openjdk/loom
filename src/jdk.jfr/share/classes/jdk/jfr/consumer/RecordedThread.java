@@ -26,6 +26,7 @@
 package jdk.jfr.consumer;
 
 import jdk.jfr.internal.consumer.ObjectContext;
+import jdk.internal.javac.PreviewFeature;
 
 /**
  * A recorded thread.
@@ -105,10 +106,11 @@ public final class RecordedThread extends RecordedObject {
     }
 
     /**
-     * Returns {@code true} if this is a virtual Thread, {@code false} otherwise.
+     * {@return {@code true} if this is a virtual Thread, {@code false} otherwise}
      *
-     * @return {@code true} if this is a virtual Thread, {@code false} otherwise.
+     * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public boolean isVirtual() {
         return getTyped("isVirtual", Boolean.class, Boolean.FALSE);
     }

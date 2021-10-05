@@ -22,8 +22,10 @@
 
 /*
  * @test
- * @run testng ParkWithFixedThreadPool
- * @summary Test virtual thread park when scheduler is fixed thread pool
+ * @summary Test virtual thread park when scheduler is a fixed thread pool
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} ParkWithFixedThreadPool.java TestHelper.java
+ * @run testng/othervm --enable-preview ParkWithFixedThreadPool
  */
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
@@ -35,38 +37,41 @@ public class ParkWithFixedThreadPool {
     @Test
     public static void multipleThreadPoolParkTest() throws Exception {
         try (ExecutorService scheduler = Executors.newFixedThreadPool(8)) {
-            int vt_count = 300;
-            Thread[] vts = new Thread[vt_count];
+            int vthreadCount = 300;
+            Thread[] vthreads = new Thread[vthreadCount];
             Runnable target = new Runnable() {
                 public void run() {
                     int myIndex = -1;
-                    for (int i = 0; i < vt_count; i++) {
-                        if (vts[i] == Thread.currentThread()) {
+                    for (int i = 0; i < vthreadCount; i++) {
+                        if (vthreads[i] == Thread.currentThread()) {
                             myIndex = i;
                             break;
                         }
                     }
 
                     if (myIndex > 0) {
-                        LockSupport.unpark(vts[myIndex - 1]);
+                        LockSupport.unpark(vthreads[myIndex - 1]);
                     }
 
-                    if (myIndex != (vt_count - 1)) {
+                    if (myIndex != (vthreadCount - 1)) {
                         LockSupport.park();
                     }
                 }
             };
 
-            ThreadFactory f = Thread.ofVirtual().scheduler(scheduler).name("vt", 0).factory();
-            for (int i = 0; i < vt_count; i++) {
-                vts[i] = f.newThread(target);
+            ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler)
+                    .name("vthread-", 0)
+                    .factory();
+
+            for (int i = 0; i < vthreadCount; i++) {
+                vthreads[i] = factory.newThread(target);
             }
-            for (int i = 0; i < vt_count; i++) {
-                vts[i].start();
+            for (int i = 0; i < vthreadCount; i++) {
+                vthreads[i].start();
             }
 
-            for (int i = 0; i < vt_count; i++) {
-                vts[i].join();
+            for (int i = 0; i < vthreadCount; i++) {
+                vthreads[i].join();
             }
         }
     }

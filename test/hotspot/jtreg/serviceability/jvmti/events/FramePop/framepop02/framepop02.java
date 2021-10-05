@@ -39,12 +39,14 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:framepop02 framepop02 platform
+ * @compile --enable-preview -source ${jdk.version} framepop02.java
+ * @run main/othervm/native --enable-preview -agentlib:framepop02 framepop02 platform
  */
 /*
  * @test
  * @library /test/lib
- * @run main/othervm/native -agentlib:framepop02 framepop02 virtual
+ * @compile --enable-preview -source ${jdk.version} framepop02.java
+ * @run main/othervm/native --enable-preview -agentlib:framepop02 framepop02 virtual
  */
 
 public class framepop02 {

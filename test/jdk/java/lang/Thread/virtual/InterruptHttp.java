@@ -24,6 +24,8 @@
 /**
  * @test
  * @summary Test that HTTP connections can be interrupted
+ * @compile --enable-preview -source ${jdk.version} InterruptHttp.java
+ * @run testng/othervm --enable-preview InterruptHttp
  */
 
 import java.io.Closeable;

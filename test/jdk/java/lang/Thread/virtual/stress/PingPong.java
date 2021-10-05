@@ -25,8 +25,9 @@
  * @test
  * @summary Stress test virtual threads with SynchronousQueue and LinkedTransferQueue
  * @requires vm.debug != true
- * @run main/othervm PingPong SQ 1000000
- * @run main/othervm PingPong LTQ 1000000
+ * @compile --enable-preview -source ${jdk.version} PingPong.java
+ * @run main/othervm --enable-preview PingPong SQ 1000000
+ * @run main/othervm --enable-preview PingPong LTQ 1000000
  */
 
 import java.time.Duration;

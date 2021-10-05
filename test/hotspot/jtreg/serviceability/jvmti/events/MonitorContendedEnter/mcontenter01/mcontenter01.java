@@ -42,8 +42,9 @@ import jdk.test.lib.jvmti.DebugeeClass;
  *     1000 ms of sleep added to main thread to reduce probability of bad racing.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:mcontenter01 mcontenter01 kernel
- * @run main/othervm/native -agentlib:mcontenter01 mcontenter01 virtual
+ * @compile --enable-preview -source ${jdk.version} mcontenter01.java
+ * @run main/othervm/native --enable-preview -agentlib:mcontenter01 mcontenter01 platform
+ * @run main/othervm/native --enable-preview -agentlib:mcontenter01 mcontenter01 virtual
  */
 
 

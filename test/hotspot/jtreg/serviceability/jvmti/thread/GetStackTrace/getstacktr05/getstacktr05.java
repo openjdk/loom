@@ -37,7 +37,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @run main/othervm/native -agentlib:getstacktr05 getstacktr05
+ * @compile --enable-preview -source ${jdk.version} getstacktr05.java
+ * @run main/othervm/native --enable-preview -agentlib:getstacktr05 getstacktr05
  */
 
 public class getstacktr05 {

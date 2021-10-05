@@ -24,7 +24,8 @@
 /**
  * @test
  * @summary Verifies JVMTI hadles pinned virtual threads correctly.
- * @run main/othervm/native -agentlib:PinnedTaskTest PinnedTaskTest
+ * @compile --enable-preview -source ${jdk.version} PinnedTaskTest.java
+ * @run main/othervm/native --enable-preview -agentlib:PinnedTaskTest PinnedTaskTest
  */
 
 import java.util.concurrent.atomic.AtomicBoolean;

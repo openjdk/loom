@@ -37,7 +37,8 @@
  *
  * @library /test/lib
  * @compile fieldacc01a.jasm
- * @run main/othervm/native -agentlib:fieldacc01 fieldacc01
+ * @compile --enable-preview -source ${jdk.version} fieldacc01.java
+ * @run main/othervm/native --enable-preview -agentlib:fieldacc01 fieldacc01
  */
 
 

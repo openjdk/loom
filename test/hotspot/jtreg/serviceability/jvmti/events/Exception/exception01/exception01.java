@@ -41,7 +41,8 @@ import java.io.PrintStream;
  *
  * @library /test/lib
  * @compile exception01a.jasm
- * @run main/othervm/native -agentlib:exception01 exception01
+ * @compile --enable-preview -source ${jdk.version} exception01.java
+ * @run main/othervm/native --enable-preview -agentlib:exception01 exception01
  */
 
 

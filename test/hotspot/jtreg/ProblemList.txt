@@ -221,3 +221,8 @@ vmTestbase/nsk/stress/strace/strace012.java                                   82
 vmTestbase/nsk/stress/strace/strace013.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace014.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace015.java                                   8254188 generic-all
+
+# Needs --enable-preview
+runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java                 0000000 generic-all
+vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java 0000000 generic-all
+vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java                  0000000 generic-all

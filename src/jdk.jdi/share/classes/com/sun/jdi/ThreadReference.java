@@ -26,8 +26,8 @@
 package com.sun.jdi;
 
 import java.util.List;
-
 import com.sun.jdi.event.EventSet;
+import jdk.internal.javac.PreviewFeature;
 
 /**
  * A thread object from the target VM.
@@ -487,6 +487,7 @@ public interface ThreadReference extends ObjectReference {
      *
      * @since 99
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     default boolean isVirtual() {
         throw new UnsupportedOperationException("Method not implemented");
     }

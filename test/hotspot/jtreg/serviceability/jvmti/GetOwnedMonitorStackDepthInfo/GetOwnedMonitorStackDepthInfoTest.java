@@ -27,8 +27,8 @@
  * @bug 8153629
  * @summary Need to cover JVMTI's GetOwnedMonitorStackDepthInfo function
  * @requires vm.jvmti
- * @compile GetOwnedMonitorStackDepthInfoTest.java
- * @run main/othervm/native -agentlib:GetOwnedMonitorStackDepthInfoTest GetOwnedMonitorStackDepthInfoTest
+ * @compile --enable-preview -source ${jdk.version} GetOwnedMonitorStackDepthInfoTest.java
+ * @run main/othervm/native --enable-preview -agentlib:GetOwnedMonitorStackDepthInfoTest GetOwnedMonitorStackDepthInfoTest
  */
 
 

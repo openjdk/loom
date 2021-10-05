@@ -196,17 +196,7 @@ class ThreadBuilders {
      */
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder<OfVirtual> implements OfVirtual {
-        private Executor scheduler;
-
-        @Override
-        public OfVirtual scheduler(Executor scheduler) {
-            if (scheduler == null) {
-                this.scheduler = VirtualThread.defaultScheduler();
-            } else {
-                this.scheduler = scheduler;
-            }
-            return this;
-        }
+        private Executor scheduler;  // set by tests
 
         @Override
         public Thread unstarted(Runnable task) {

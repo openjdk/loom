@@ -41,11 +41,9 @@ import java.io.*;
  * @library /test/lib
  *
  * @comment make sure breakpoint01 is compiled with full debug info
- * @build breakpoint01
  * @clean breakpoint01
- * @compile -g:lines,source,vars breakpoint01.java
- *
- * @run main/othervm/native -agentlib:breakpoint01 breakpoint01
+ * @compile --enable-preview -source ${jdk.version} -g:lines,source,vars breakpoint01.java
+ * @run main/othervm/native --enable-preview -agentlib:breakpoint01 breakpoint01
  */
 
 

@@ -39,8 +39,8 @@
  *     Ported from JVMDI.
  *
  * @library /test/lib
- * @compile framepop01a.java
- * @run main/othervm/native -agentlib:framepop01 framepop01
+ * @compile --enable-preview -source ${jdk.version} framepop01a.java
+ * @run main/othervm/native --enable-preview -agentlib:framepop01 framepop01
  */
 
 public class framepop01 {

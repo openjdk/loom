@@ -31,23 +31,25 @@ import java.util.List;
 /**
  * @test
  * @summary Verifies that when the VM event is sent, sampled events are also collected.
- * @build Frame HeapMonitor
- * @compile HeapMonitorVMEventsTest.java
  * @requires vm.jvmti
  * @requires !vm.graal.enabled
- * @run main/othervm/native -XX:+UnlockDiagnosticVMOptions
+ * @build Frame HeapMonitor
+ * @compile --enable-preview -source ${jdk.version} HeapMonitorVMEventsTest.java
+ * @run main/othervm/native --enable-preview
+ *                          -XX:+UnlockDiagnosticVMOptions
  *                          -XX:DisableIntrinsic=_clone
- *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest kernel
+ *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest platform
  */
 
 /**
  * @test
  * @summary Verifies that when the VM event is sent, sampled events are also collected.
- * @build Frame HeapMonitor
- * @compile HeapMonitorVMEventsTest.java
  * @requires vm.jvmti
  * @requires !vm.graal.enabled
- * @run main/othervm/native -XX:+UnlockDiagnosticVMOptions
+ * @build Frame HeapMonitor
+ * @compile --enable-preview -source ${jdk.version} HeapMonitorVMEventsTest.java
+ * @run main/othervm/native --enable-preview
+ *                          -XX:+UnlockDiagnosticVMOptions
  *                          -XX:DisableIntrinsic=_clone
  *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest virtual
  */

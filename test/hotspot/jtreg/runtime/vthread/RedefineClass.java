@@ -25,7 +25,8 @@
 /**
  * @test
  * @summary Regression test based on runtime/Metaspace/DefineClass.java
- * @run main/othervm -Djdk.attach.allowAttachSelf RedefineClass
+ * @compile --enable-preview -source ${jdk.version} RedefineClass.java
+ * @run main/othervm --enable-preview -Djdk.attach.allowAttachSelf RedefineClass
  */
 
 import java.io.ByteArrayOutputStream;
