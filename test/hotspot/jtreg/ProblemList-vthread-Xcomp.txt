@@ -27,12 +27,6 @@
 #
 #############################################################################
 
-
-####
-## OOME in CodeCache for adapters
-compiler/profiling/spectrapredefineclass_classloaders/Launcher.java
-compiler/profiling/spectrapredefineclass/Launcher.java
-
 ####
 ## Unexpected results
 compiler/uncommontrap/TestUnstableIfTrap.java
