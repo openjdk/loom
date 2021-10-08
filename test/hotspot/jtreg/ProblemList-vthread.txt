@@ -367,8 +367,6 @@ runtime/cds/appcds/HelloTest.java
 runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
 runtime/cds/BootAppendTests.java
 runtime/BootstrapMethod/BSMCalledTwice.java
-compiler/aot/fingerprint/SelfChangedCDS.java
-compiler/aot/verification/ClassAndLibraryNotMatchTest.java
 
 
 ####
@@ -593,32 +591,8 @@ vmTestbase/nsk/monitoring/MemoryUsage/from/from001/TestDescription.java
 
 
 ####
-## JVMCI/AOT/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.
+## JVMCI/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.
 
-compiler/aot/TestHeapBase.java
-compiler/aot/TestHeapBase.java
-compiler/aot/cli/MultipleAOTLibraryTest.java
-compiler/aot/cli/MultipleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTOptionTest.java
-compiler/aot/cli/SingleAOTOptionTest.java
-compiler/aot/cli/jaotc/AtFileTest.java
-compiler/aot/cli/jaotc/AtFileTest.java
-compiler/aot/cli/jaotc/CompileAbsoluteDirectoryTest.java
-compiler/aot/cli/jaotc/CompileAbsoluteDirectoryTest.java
-compiler/aot/cli/jaotc/CompileClassTest.java
-compiler/aot/cli/jaotc/CompileClassTest.java
-compiler/aot/cli/jaotc/CompileClassWithDebugTest.java
-compiler/aot/cli/jaotc/CompileClassWithDebugTest.java
-compiler/aot/cli/jaotc/CompileDirectoryTest.java
-compiler/aot/cli/jaotc/CompileDirectoryTest.java
-compiler/aot/cli/jaotc/CompileJarTest.java
-compiler/aot/cli/jaotc/CompileJarTest.java
-compiler/aot/cli/jaotc/ListOptionTest.java
-compiler/aot/cli/jaotc/ListOptionTest.java
-compiler/aot/cli/jaotc/ListOptionWrongFileTest.java
-compiler/aot/cli/jaotc/ListOptionWrongFileTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java
