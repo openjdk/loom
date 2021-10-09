@@ -1081,12 +1081,19 @@ class VirtualThread extends Thread {
      * Creates the ScheduledThreadPoolExecutor used for timed unpark.
      */
     private static ScheduledExecutorService createDelayedTaskScheduler() {
-        int poolSize = Math.max(Runtime.getRuntime().availableProcessors()/4, 1);
+        String propValue = GetPropertyAction.privilegedGetProperty("jdk.unparker.maxPoolSize");
+        int poolSize;
+        if (propValue != null) {
+            poolSize = Integer.parseInt(propValue);
+        } else {
+            poolSize = 1;
+        }
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(poolSize, task -> {
-                int id = nextUnparkerId();
-                var thread = InnocuousThread.newThread("VirtualThread-unparker-" + id, task);
-                thread.setDaemon(true);
+                String name = "VirtualThread-unparker";
+                if (poolSize > 1)
+                    name += "-" + nextUnparkerId();
+                var thread = InnocuousThread.newThread(name, task);
                 return thread;
             });
         stpe.setRemoveOnCancelPolicy(true);
