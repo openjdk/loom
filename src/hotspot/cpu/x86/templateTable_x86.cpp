@@ -4378,7 +4378,7 @@ void TemplateTable::monitorenter() {
 
   // The object is stored so counter should be increased even if stackoverflow is generated
   Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
-  NOT_LP64(get_thread(rthread);)
+  NOT_LP64(__ get_thread(rthread);)
   __ inc_held_monitor_count(rthread);
 
   // check to make sure this monitor doesn't cause stack overflow after locking
@@ -4440,8 +4440,8 @@ void TemplateTable::monitorexit() {
   __ push_ptr(rax); // make sure object is on stack (contract with oopMaps)
   __ unlock_object(rtop);
   
-  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rbx);
-  NOT_LP64(get_thread(rthread);)
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rax);
+  NOT_LP64(__ get_thread(rthread);)
   __ dec_held_monitor_count(rthread);
 
   __ pop_ptr(rax); // discard object

@@ -3015,7 +3015,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   // bit shift and mask
   Node* const epoch_shift = _gvn.intcon(jfr_epoch_shift);
-  Node* const tid_mask = _gvn.MakeConX(jfr_id_mask);
+  Node* const tid_mask = _gvn.longcon(jfr_id_mask);
 
   // mask off the epoch information from the thread id
   Node* const vthread_obj_tid = _gvn.transform(new AndLNode(vthread_obj_tid_value, tid_mask));
