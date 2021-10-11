@@ -72,7 +72,7 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   intptr_t* la = (intptr_t*)Frame::callee_link_address(f);
   intptr_t new_value = fp - la;
   *la = new_value;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative %ld", p2i(Frame::callee_link_address(f)), new_value);
+  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), new_value);
 }
 
 inline address* Interpreted::return_pc_address(const frame& f) {
@@ -193,7 +193,7 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr) 
                                        : (intptr_t)hf.fp();
 
-  log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: %ld", p2i(hf.pc()), *fp_addr);
+  log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(hf.pc()), *fp_addr);
 }
 
 template <typename ConfigT>

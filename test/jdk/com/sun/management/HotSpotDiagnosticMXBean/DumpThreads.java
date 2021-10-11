@@ -25,7 +25,8 @@
 /**
  * @test
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
- * @run testng DumpThreads
+ * @compile --enable-preview -source ${jdk.version} DumpThreads.java
+ * @run testng/othervm --enable-preview DumpThreads
  */
 
 import java.lang.management.ManagementFactory;

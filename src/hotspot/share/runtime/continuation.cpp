@@ -649,7 +649,7 @@ void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEnt
 
   assert (thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
 }
 
@@ -663,7 +663,7 @@ void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
   set_anchor_pd(anchor, sp);
 
   assert (thread->has_last_Java_frame(), "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
   assert(thread->last_frame().cb() != nullptr, "");
 }
@@ -940,7 +940,7 @@ public:
     assert((intptr_t)_bottom_address % 16 == 0, "");
   #endif
 
-    log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: %ld", p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
+    log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT, p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
     assert (_bottom_address != nullptr && _bottom_address <= _cont.entrySP(), "");
   }
 
@@ -972,7 +972,7 @@ public:
     _cont.copy_to_chunk<aligned>(from, to, size);
   #ifdef ASSERT
     stackChunkOop chunk = _cont.tail();
-    assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: %ld to+size: %ld",
+    assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: " PTR_FORMAT " to+size: " PTR_FORMAT,
       p2i(_last_write), p2i(to + size), chunk->stack_size(), _last_write - chunk->start_address(), to + size - chunk->start_address());
     _last_write = to;
     // tty->print_cr(">>> copy_to_chunk _last_write: %p", _last_write);
@@ -1164,7 +1164,7 @@ public:
     log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), chunk->stack_size(), sp, argsize);
     assert (sp >= size, "");
     sp -= size;
-    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "mismatched size calculation: orig_sp - sp: %ld size: %d argsize: %d is_chunk_available_size: %d empty: %d allocated: %d", orig_chunk_sp - (chunk->start_address() + sp), size, argsize, is_chunk_available_size, empty, allocated);
+    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "mismatched size calculation: orig_sp - sp: " PTR_FORMAT " size: %d argsize: %d is_chunk_available_size: %d empty: %d allocated: %d", orig_chunk_sp - (chunk->start_address() + sp), size, argsize, is_chunk_available_size, empty, allocated);
 
     intptr_t* chunk_top = chunk->start_address() + sp;
     assert (empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "corig_chunk_sp - frame::sender_sp_ret_address_offset(): %p *(address*)(orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET): %p chunk->pc(): %p", orig_chunk_sp - frame::sender_sp_ret_address_offset(), *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()), chunk->pc());
@@ -2501,7 +2501,7 @@ public:
 
   #ifdef ASSERT
     {
-      log_develop_debug(jvmcont)("Jumping to frame (thaw): [%ld]", java_tid(_thread));
+      log_develop_debug(jvmcont)("Jumping to frame (thaw): [" JLONG_FORMAT "]", java_tid(_thread));
       frame f(sp);
       if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
       assert (f.is_interpreted_frame() || f.is_compiled_frame() || f.is_safepoint_blob_frame(), "");
@@ -2707,7 +2707,7 @@ public:
     int fsize = Compiled::size(hf);
     log_develop_trace(jvmcont)("fsize: %d", fsize);
     fsize += (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-    assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d %ld", fsize, caller.unextended_sp() - f.unextended_sp());
+    assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d " INTPTR_FORMAT, fsize, caller.unextended_sp() - f.unextended_sp());
 
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
     intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
@@ -3148,7 +3148,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
     // log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
@@ -3564,7 +3564,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
   ContMirror cont(contOop);
 
-  st->print_cr("CONTINUATION: 0x%lx done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
+  st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
   st->print_cr("CHUNKS:");
   for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
     st->print("* ");

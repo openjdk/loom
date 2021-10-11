@@ -24,6 +24,7 @@
 /**
  * @test
  * @summary Test java.lang.management.ThreadMXBean with virtual threads
+ * @modules java.base/java.lang:+open
  * @compile --enable-preview -source ${jdk.version} VirtualThreads.java
  * @run testng/othervm --enable-preview VirtualThreads
  */
@@ -31,6 +32,7 @@
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.lang.reflect.Field;
 import java.nio.channels.Selector;
 import java.util.Arrays;
 import java.util.concurrent.Executor;
@@ -84,13 +86,13 @@ public class VirtualThreads {
             };
 
             // start virtual thread so carrier Thread can be captured
-            Thread.ofVirtual().scheduler(scheduler).start(() -> { }).join();
+            virtualThreadBuilder(scheduler).start(() -> { }).join();
             Thread carrier = carrierRef.get();
             assertTrue(carrier != null && !carrier.isVirtual());
 
             try (Selector sel = Selector.open()) {
                 // start virtual thread that blocks in a native method
-                Thread.ofVirtual().scheduler(scheduler).start(() -> {
+                virtualThreadBuilder(scheduler).start(() -> {
                     try {
                         sel.select();
                     } catch (Exception e) { }
@@ -194,5 +196,20 @@ public class VirtualThreads {
         return Arrays.stream(stack)
                 .map(StackTraceElement::getClassName)
                 .anyMatch(className::equals);
+    }
+
+    private static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual();
+        try {
+            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
+            Field field = clazz.getDeclaredField("scheduler");
+            field.setAccessible(true);
+            field.set(builder, scheduler);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return builder;
     }
 }

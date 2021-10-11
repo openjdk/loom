@@ -3536,18 +3536,32 @@ void LIR_Assembler::emit_lock(LIR_OpLock* op) {
     // will be skipped. Solution is
     // 1. Increase only in fastpath
     // 2. Runtime1::monitorenter increase count after locking
-    NOT_LP64(Register scratch = op->scratch_opr()->as_register();)
-    Register thread = LP64_ONLY(r15_thread) NOT_LP64(scratch);
-    NOT_LP64(__ get_thread(thread);)
+#ifndef _LP64
+    Register thread = rsi;
+    __ push(thread);
+    __ get_thread(thread);
+#else
+    Register thread = r15_thread;
+#endif
     __ inc_held_monitor_count(thread);
+#ifndef _LP64
+    __ pop(thread);
+#endif
   }
   __ bind(*op->stub()->continuation());
   if (op->code() == lir_unlock) {
     // unlock in slowpath is JRT_Leaf stub, no deoptimization can happen
-    NOT_LP64(Register scratch = op->scratch_opr()->as_register();)
-    Register thread = LP64_ONLY(r15_thread) NOT_LP64(scratch);
-    NOT_LP64(__ get_thread(thread);)
+#ifndef _LP64
+    Register thread = rsi;
+    __ push(thread);
+    __ get_thread(thread);
+#else
+    Register thread = r15_thread;
+#endif
     __ dec_held_monitor_count(thread);
+#ifndef _LP64
+    __ pop(thread);
+#endif
   }
 }
 

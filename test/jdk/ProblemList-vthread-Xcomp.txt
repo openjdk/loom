@@ -26,31 +26,3 @@
 # List of quarantined tests for testing in Xcomp mode with wrapper.
 #
 #############################################################################
-
-
-####
-## OOME in CodeCache for method handle intrinsic
-java/foreign/TestUpcall.java
-java/foreign/TestIntrinsics.java
-java/foreign/TestDowncall.java
-java/foreign/TestByteBuffer.java
-java/foreign/StdLibTest.java
-java/util/stream/test/org/openjdk/tests/java/util/stream/StreamBuilderTest.java
-java/util/stream/test/org/openjdk/tests/java/util/stream/SpliteratorTest.java
-
-####
-## OOME in CodeCache for adapters
-java/foreign/TestAddressHandle.java
-java/foreign/TestAdaptVarHandles.java
-java/foreign/TestMemoryAccess.java
-java/lang/invoke/VarHandles/VarHandleTestExact.java
-java/lang/invoke/MethodHandlesInsertArgumentsTest.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeBoolean.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeByte.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeChar.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeDouble.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeFloat.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeInt.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeLong.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeShort.java
-java/lang/invoke/VarHandles/VarHandleTestMethodTypeString.java

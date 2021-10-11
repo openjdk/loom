@@ -856,8 +856,8 @@ public class Thread implements Runnable {
 
         /**
          * Sets whether the thread inherits the initial values of {@linkplain
-         * InheritableThreadLocal inheritable-thread-local} variables. The default
-         * is to inherit.
+         * InheritableThreadLocal inheritable-thread-local} variables from the
+         * constructing thread. The default is to inherit.
          *
          * <p> The initial values of {@code InheritableThreadLocal}s are never inherited
          * when {@link #allowSetThreadLocals(boolean)} is used to disallow the thread
