@@ -105,6 +105,11 @@ tier1_loom_serviceability = \
   serviceability/jvmti/vthread \
   serviceability/jvmti/events
 
+hotspot_loom = \
+  :tier1_loom \
+  runtime/jni/IsVirtualThread \
+  serviceability/dcmd/thread
+
 tier1_common = \
   sanity/BasicVMTest.java \
   gtest/GTestWrapper.java \
