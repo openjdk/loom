@@ -96,11 +96,9 @@ jdk_loom = \
     com/sun/management/HotSpotDiagnosticMXBean/ \
     java/lang/Thread \
     java/lang/ThreadGroup \
-    java/lang/Throwable \
     java/lang/ScopeLocal \
     java/lang/management/ThreadMXBean \
-    java/util/concurrent/ExecutorService \
-    java/util/concurrent/Future \
+    java/util/concurrent/ \
     jdk/internal/vm/Continuation \
     jdk/jfr/threading
 
