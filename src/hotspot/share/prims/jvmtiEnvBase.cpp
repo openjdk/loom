@@ -2202,12 +2202,24 @@ GetStackTraceClosure::do_thread(Thread *target) {
 
 #ifdef ASSERT
 void
-PrintStackTraceClosure::do_thread(Thread *target) {
+PrintStackTraceClosure::do_thread_impl(Thread *target) {
   JavaThread *java_thread = JavaThread::cast(target);
   Thread *current_thread = Thread::current();
   assert(SafepointSynchronize::is_at_safepoint() ||
       java_thread->is_handshake_safe_for(current_thread),
          "call by myself / at safepoint / at handshake");
+
+  ResourceMark rm (current_thread);
+  const char* tname = JvmtiTrace::safe_get_thread_name(java_thread);
+  oop t_oop = java_thread->mounted_vthread();
+  t_oop = t_oop == NULL ? java_thread->threadObj() : t_oop;
+  bool is_vt_suspended = java_lang_VirtualThread::is_instance(t_oop) && JvmtiVTSuspender::is_vthread_suspended(t_oop);
+
+  tty->print_cr("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d is_VTMT_disabler: %d, is_in_VTMT = %d",
+                tname, java_thread->name(), java_thread->is_exiting(),
+                java_thread->is_suspended(), java_thread->is_thread_suspended(), is_vt_suspended,
+                java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
+
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, true, true);
     ResourceMark rm(current_thread);
@@ -2220,6 +2232,12 @@ PrintStackTraceClosure::do_thread(Thread *target) {
       jvf = jvf->java_sender();
     }
   }
+  tty->print_cr("");
+}
+
+void
+PrintStackTraceClosure::do_thread(Thread *target) {
+  PrintStackTraceClosure::do_thread_impl(target);
 }
 #endif
 

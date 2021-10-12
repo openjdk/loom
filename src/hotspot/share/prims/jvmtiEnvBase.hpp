@@ -545,6 +545,8 @@ public:
 // HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
 class PrintStackTraceClosure : public HandshakeClosure {
  public:
+  static void do_thread_impl(Thread *target);
+
   PrintStackTraceClosure()
       : HandshakeClosure("PrintStackTraceClosure") {}
   void do_thread(Thread *target);

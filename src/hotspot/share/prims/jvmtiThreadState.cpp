@@ -211,31 +211,63 @@ JvmtiThreadState::periodic_clean_up() {
 
 /* Virtual Threads Mount Transition (VTMT) mechanism */
 
+#ifdef ASSERT
+// used for debugging
+volatile unsigned short JvmtiVTMTDisabler::_suspend_count = 0;
+#endif
+
 // VTMT can not be disabled while this counter is positive
-unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
+volatile unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
 
 // VTMT is disabled while this counter is positive
-unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
+volatile unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
+
+JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_suspender) {
+  _self_suspend = false;
+  _is_suspender = is_suspender;
+#ifdef ASSERT
+  {
+    ThreadBlockInVM tbivm(JavaThread::current());
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+    if (_is_suspender) {
+      _suspend_count++;
+    }
+  }
+#endif
+  disable_VTMT();
+}
 
 JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+#ifdef ASSERT
+  {
+    ThreadBlockInVM tbivm(JavaThread::current());
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+    if (_is_suspender) {
+      _suspend_count--;
+    }
+  }
+#endif
   enable_VTMT();
   if (_self_suspend) {
     JvmtiSuspendControl::suspend(JavaThread::current());
   }
 }
 
+void
+JvmtiVTMTDisabler::set_self_suspend() {
+  _self_suspend = true;
+}
+
 #ifdef ASSERT
 void
 JvmtiVTMTDisabler::print_info() {
-  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n", _VTMT_disable_count, _VTMT_count);
+  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d _suspend_count: %d\n",
+                _VTMT_disable_count, _VTMT_count, _suspend_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
-    tty->print_cr("JavaThread %s, is_VTMT_disabler: %d, is_in_VTMT = %d Stacktrace:",
-                  java_thread->name(), java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
     // Handshake with target
     PrintStackTraceClosure pstc;
     Handshake::execute(&pstc, java_thread);
-    tty->print_cr("");
   }
 }
 #endif
@@ -250,6 +282,10 @@ JvmtiVTMTDisabler::disable_VTMT() {
 
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
     _VTMT_disable_count++;
+#if 0
+    assert(_suspend_count < 2, "TMP assert if we ever have multiple suspenders");
+    assert(_suspend_count == 0 || _VTMT_disable_count < 2, "TMP assert if we ever have disablers with suspender");
+#endif
 
     // Block while some mount/unmount transitions are in progress.
     // Debug version fails and print diagnostic information
@@ -277,6 +313,11 @@ JvmtiVTMTDisabler::enable_VTMT() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
   assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
 
+#if 0
+    assert(_suspend_count < 2, "TMP assert if we ever have multiple suspenders");
+    assert(_suspend_count == 0 || _VTMT_disable_count < 2, "TMP assert if we ever have disablers with suspender");
+#endif
+ 
   if (--_VTMT_disable_count == 0) {
     ml.notify_all();
   }
@@ -297,6 +338,10 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
+#if 0
+    assert(_suspend_count < 2, "TMP assert if we ever have multiple suspenders");
+    assert(_suspend_count == 0 || _VTMT_disable_count < 2, "TMP assert if we ever have disablers with suspender");
+#endif
     // block while transitions are disabled or there are suspend requests
     if (_VTMT_disable_count > 0 ||
         thread->is_suspended() ||
@@ -332,6 +377,10 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
+#if 0
+    assert(_suspend_count < 2, "TMP assert if we ever have multiple suspenders");
+    assert(_suspend_count == 0 || _VTMT_disable_count < 2, "TMP assert if we ever have disablers with suspender");
+#endif
   _VTMT_count--;
 
   // unblock waiting VTMT disablers
