@@ -407,7 +407,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         }
         else {
             internal = false;
-            p = ForkJoinPool.common;
+            p = ForkJoinPool.CommonPool.common;
             if (pool == null)
                 pool = p;
             if (pool == p && p != null)
@@ -649,7 +649,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         if ((t = Thread.currentThread()) instanceof ForkJoinWorkerThread)
             (w = (ForkJoinWorkerThread)t).workQueue.push(this, w.pool);
         else
-            ForkJoinPool.common.externalPush(this);
+            ForkJoinPool.CommonPool.common.externalPush(this);
         return this;
     }
 
@@ -1104,7 +1104,7 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
             (p = (w = (ForkJoinWorkerThread)t).pool) != null)
             p.helpQuiescePool(w.workQueue, Long.MAX_VALUE, false);
         else
-            ForkJoinPool.common.externalHelpQuiescePool(Long.MAX_VALUE, false);
+            ForkJoinPool.CommonPool.common.externalHelpQuiescePool(Long.MAX_VALUE, false);
     }
 
     /**

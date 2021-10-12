@@ -72,17 +72,19 @@ class VirtualThread extends Thread {
     private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
 
-    private static final VarHandle STATE;
-    private static final VarHandle PARK_PERMIT;
-    private static final VarHandle CARRIER_THREAD;
+    private static final long CARRIER_THREAD;
+    private static final long STATE;
+    private static final long PARK_PERMIT;
     private static final VarHandle TERMINATION;
     private static final VarHandle NEXT_UNPARKER_ID;
     static {
         try {
+            // Used in sensitive places where a VarHandle bootstrap should not be called
+            CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread"); // this one is especially sensitive
+            STATE = U.objectFieldOffset(VirtualThread.class, "state");
+            PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
+
             MethodHandles.Lookup l = MethodHandles.lookup();
-            STATE = l.findVarHandle(VirtualThread.class, "state", int.class);
-            PARK_PERMIT = l.findVarHandle(VirtualThread.class, "parkPermit", boolean.class);
-            CARRIER_THREAD = l.findVarHandle(VirtualThread.class, "carrierThread", Thread.class);
             TERMINATION = l.findVarHandle(VirtualThread.class, "termination", CountDownLatch.class);
             NEXT_UNPARKER_ID = l.findStaticVarHandle(VirtualThread.class, "nextUnparkerId", int.class);
         } catch (Exception e) {
@@ -287,7 +289,7 @@ class VirtualThread extends Thread {
 
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
-        CARRIER_THREAD.setRelease(this, carrier);
+        U.putReferenceRelease(this, CARRIER_THREAD, carrier);
 
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
@@ -317,7 +319,7 @@ class VirtualThread extends Thread {
 
         // break connection to carrier thread
         synchronized (interruptLock) {   // synchronize with interrupt
-            CARRIER_THREAD.setRelease(this, null);
+            U.putReferenceRelease(this, CARRIER_THREAD, null);
         }
         carrier.clearInterrupt();
     }
@@ -897,11 +899,11 @@ class VirtualThread extends Thread {
     }
 
     private void setReleaseState(int newValue) {
-        STATE.setRelease(this, newValue);
+        U.putIntRelease(this, STATE, newValue);
     }
 
     private boolean compareAndSetState(int expectedValue, int newValue) {
-        return STATE.compareAndSet(this, expectedValue, newValue);
+        return U.compareAndSetInt(this, STATE, expectedValue, newValue);
     }
 
     private void setParkPermit(boolean newValue) {
@@ -912,7 +914,7 @@ class VirtualThread extends Thread {
 
     private boolean getAndSetParkPermit(boolean newValue) {
         if (parkPermit != newValue) {
-            return (boolean) PARK_PERMIT.getAndSet(this, newValue);
+            return U.getAndSetBoolean(this, PARK_PERMIT, newValue);
         } else {
             return newValue;
         }

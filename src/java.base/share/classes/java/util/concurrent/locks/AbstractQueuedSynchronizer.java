@@ -1575,7 +1575,7 @@ public abstract class AbstractQueuedSynchronizer
                         if (rejected)
                             node.block();
                         else
-                            ForkJoinPool.managedBlock(node);
+                            ForkJoinPoolHelper.managedBlock(node);
                     } catch (RejectedExecutionException ex) {
                         rejected = true;
                     } catch (InterruptedException ie) {
@@ -1620,7 +1620,7 @@ public abstract class AbstractQueuedSynchronizer
                         if (rejected)
                             node.block();
                         else
-                            ForkJoinPool.managedBlock(node);
+                            ForkJoinPoolHelper.managedBlock(node);
                     } catch (RejectedExecutionException ex) {
                         rejected = true;
                     } catch (InterruptedException ie) {

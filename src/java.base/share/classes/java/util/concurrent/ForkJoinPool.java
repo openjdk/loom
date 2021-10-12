@@ -1324,27 +1324,6 @@ public class ForkJoinPool extends AbstractExecutorService {
     static final RuntimePermission modifyThreadPermission;
 
     /**
-     * Common (static) pool. Non-null for public use unless a static
-     * construction exception, but internal usages null-check on use
-     * to paranoically avoid potential initialization circularities
-     * as well as to simplify generated code.
-     */
-    static final ForkJoinPool common;
-
-    /**
-     * Common pool parallelism. To allow simpler use and management
-     * when common pool threads are disabled, we allow the underlying
-     * common.parallelism field to be zero, but in that case still report
-     * parallelism as 1 to reflect resulting caller-runs mechanics.
-     */
-    static final int COMMON_PARALLELISM;
-
-    /**
-     * Limit on spare thread construction in tryCompensate.
-     */
-    private static final int COMMON_MAX_SPARES;
-
-    /**
      * Sequence number for creating worker names
      */
     private static volatile int poolIds;
@@ -1361,16 +1340,6 @@ public class ForkJoinPool extends AbstractExecutorService {
      * Undershoot tolerance for idle timeouts
      */
     private static final long TIMEOUT_SLOP = 20L;
-
-    /**
-     * The default value for COMMON_MAX_SPARES.  Overridable using the
-     * "java.util.concurrent.ForkJoinPool.common.maximumSpares" system
-     * property.  The default value is far in excess of normal
-     * requirements, but also far short of MAX_CAP and typical OS
-     * thread limits, so allows JVMs to catch misuse/abuse before
-     * running out of resources needed to do so.
-     */
-    private static final int DEFAULT_COMMON_MAX_SPARES = 256;
 
     /*
      * Bits and masks for field ctl, packed with 4 16 bit subfields:
@@ -2233,7 +2202,7 @@ public class ForkJoinPool extends AbstractExecutorService {
     static WorkQueue commonQueue() {
         ForkJoinPool p; WorkQueue[] qs;
         int r = ThreadLocalRandom.getProbe(), n;
-        return ((p = common) != null && (qs = p.queues) != null &&
+        return ((p = CommonPool.common) != null && (qs = p.queues) != null &&
                 (n = qs.length) > 0 && r != 0) ?
             qs[(n - 1) & (r << 1)] : null;
     }
@@ -2615,7 +2584,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         this.mode = p;
         if (p > 0) {
             size = 1 << (33 - Integer.numberOfLeadingZeros(p - 1));
-            this.bounds = ((1 - p) & SMASK) | (COMMON_MAX_SPARES << SWIDTH);
+            this.bounds = ((1 - p) & SMASK) | (CommonPool.COMMON_MAX_SPARES << SWIDTH);
             this.ctl = ((((long)(-p) << TC_SHIFT) & TC_MASK) |
                         (((long)(-p) << RC_SHIFT) & RC_MASK));
         } else {  // zero min, max, spare counts, 1 slot
@@ -2647,7 +2616,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     public static ForkJoinPool commonPool() {
         // assert common != null : "static init error";
-        return common;
+        return CommonPool.common;
     }
 
     // Execution methods
@@ -2967,7 +2936,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      * @since 1.8
      */
     public static int getCommonPoolParallelism() {
-        return COMMON_PARALLELISM;
+        return CommonPool.COMMON_PARALLELISM;
     }
 
     /**
@@ -3228,7 +3197,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     public void shutdown() {
         checkPermission();
-        if (this != common)
+        if (this != CommonPool.common)
             tryTerminate(false, true);
     }
 
@@ -3252,7 +3221,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     public List<Runnable> shutdownNow() {
         checkPermission();
-        if (this != common)
+        if (this != CommonPool.common)
             tryTerminate(true, true);
         return Collections.emptyList();
     }
@@ -3311,7 +3280,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         ReentrantLock lock; Condition cond;
         long nanos = unit.toNanos(timeout);
         boolean terminated = false;
-        if (this == common) {
+        if (this == CommonPool.common) {
             Thread t; ForkJoinWorkerThread wt; int q;
             if ((t = Thread.currentThread()) instanceof ForkJoinWorkerThread &&
                 (wt = (ForkJoinWorkerThread)t).pool == this)
@@ -3528,24 +3497,59 @@ public class ForkJoinPool extends AbstractExecutorService {
         // LockSupport.park: https://bugs.openjdk.java.net/browse/JDK-8074773
         Class<?> ensureLoaded = LockSupport.class;
 
-        int commonMaxSpares = DEFAULT_COMMON_MAX_SPARES;
-        try {
-            String p = System.getProperty
-                ("java.util.concurrent.ForkJoinPool.common.maximumSpares");
-            if (p != null)
-                commonMaxSpares = Integer.parseInt(p);
-        } catch (Exception ignore) {}
-        COMMON_MAX_SPARES = commonMaxSpares;
-
-        defaultForkJoinWorkerThreadFactory =
-            new DefaultForkJoinWorkerThreadFactory();
+        defaultForkJoinWorkerThreadFactory = new DefaultForkJoinWorkerThreadFactory();
         modifyThreadPermission = new RuntimePermission("modifyThread");
-        @SuppressWarnings("removal")
-        ForkJoinPool tmp = AccessController.doPrivileged(new PrivilegedAction<>() {
-            public ForkJoinPool run() {
-                return new ForkJoinPool((byte)0); }});
-        common = tmp;
+    }
 
-        COMMON_PARALLELISM = Math.max(common.mode & SMASK, 1);
+    static class CommonPool {
+        /**
+         * Common (static) pool. Non-null for public use unless a static
+         * construction exception, but internal usages null-check on use
+         * to paranoically avoid potential initialization circularities
+         * as well as to simplify generated code.
+         */
+        static final ForkJoinPool common;
+
+        /**
+         * Common pool parallelism. To allow simpler use and management
+         * when common pool threads are disabled, we allow the underlying
+         * common.parallelism field to be zero, but in that case still report
+         * parallelism as 1 to reflect resulting caller-runs mechanics.
+         */
+        static final int COMMON_PARALLELISM;
+
+        /**
+         * Limit on spare thread construction in tryCompensate.
+         */
+        private static final int COMMON_MAX_SPARES;
+
+        /**
+         * The default value for COMMON_MAX_SPARES.  Overridable using the
+         * "java.util.concurrent.ForkJoinPool.common.maximumSpares" system
+         * property.  The default value is far in excess of normal
+         * requirements, but also far short of MAX_CAP and typical OS
+         * thread limits, so allows JVMs to catch misuse/abuse before
+         * running out of resources needed to do so.
+         */
+        private static final int DEFAULT_COMMON_MAX_SPARES = 256;
+
+        static {
+            int commonMaxSpares = DEFAULT_COMMON_MAX_SPARES;
+            try {
+                String p = System.getProperty
+                    ("java.util.concurrent.ForkJoinPool.common.maximumSpares");
+                if (p != null)
+                    commonMaxSpares = Integer.parseInt(p);
+            } catch (Exception ignore) {}
+            COMMON_MAX_SPARES = commonMaxSpares;
+
+            @SuppressWarnings("removal")
+            ForkJoinPool tmp = AccessController.doPrivileged(new PrivilegedAction<>() {
+                public ForkJoinPool run() {
+                    return new ForkJoinPool((byte)0); }});
+            common = tmp;
+
+            COMMON_PARALLELISM = Math.max(common.mode & SMASK, 1);
+        }
     }
 }

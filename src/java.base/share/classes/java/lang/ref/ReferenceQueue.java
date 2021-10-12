@@ -25,6 +25,9 @@
 
 package java.lang.ref;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import jdk.internal.misc.VM;
 
@@ -52,13 +55,15 @@ public class ReferenceQueue<T> {
     static final ReferenceQueue<Object> NULL = new Null();
     static final ReferenceQueue<Object> ENQUEUED = new Null();
 
-    private static class Lock { };
-    private final Lock lock = new Lock();
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition notEmpty = lock.newCondition();
+
     private volatile Reference<? extends T> head;
     private long queueLength = 0;
 
     boolean enqueue(Reference<? extends T> r) { /* Called only by Reference class */
-        synchronized (lock) {
+        lock.lock();
+        try {
             // Check that since getting the lock this reference hasn't already been
             // enqueued (and even then removed)
             ReferenceQueue<?> queue = r.queue;
@@ -77,8 +82,10 @@ public class ReferenceQueue<T> {
             if (r instanceof FinalReference) {
                 VM.addFinalRefCount(1);
             }
-            lock.notifyAll();
+            notEmpty.signalAll();
             return true;
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -116,8 +123,11 @@ public class ReferenceQueue<T> {
     public Reference<? extends T> poll() {
         if (head == null)
             return null;
-        synchronized (lock) {
+        lock.lock();
+        try {
             return reallyPoll();
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -141,27 +151,30 @@ public class ReferenceQueue<T> {
      * @throws  InterruptedException
      *          If the timeout wait is interrupted
      */
-    public Reference<? extends T> remove(long timeout)
-        throws IllegalArgumentException, InterruptedException
-    {
+    public Reference<? extends T> remove(long timeout) throws IllegalArgumentException, InterruptedException {
         if (timeout < 0) {
             throw new IllegalArgumentException("Negative timeout value");
         }
-        synchronized (lock) {
+
+        if (timeout == 0) return remove();
+
+        lock.lock();
+        try {
             Reference<? extends T> r = reallyPoll();
             if (r != null) return r;
-            long start = (timeout == 0) ? 0 : System.nanoTime();
+            long start = System.nanoTime();
             for (;;) {
-                lock.wait(timeout);
+                notEmpty.await(timeout, TimeUnit.MILLISECONDS);
                 r = reallyPoll();
                 if (r != null) return r;
-                if (timeout != 0) {
-                    long end = System.nanoTime();
-                    timeout -= (end - start) / 1000_000;
-                    if (timeout <= 0) return null;
-                    start = end;
-                }
+
+                long end = System.nanoTime();
+                timeout -= (end - start) / 1000_000;
+                if (timeout <= 0) return null;
+                start = end;
             }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -173,7 +186,16 @@ public class ReferenceQueue<T> {
      * @throws  InterruptedException  If the wait is interrupted
      */
     public Reference<? extends T> remove() throws InterruptedException {
-        return remove(0);
+        lock.lock();
+        try {
+            for (;;) {
+                var r = reallyPoll();
+                if (r != null) return r;
+                notEmpty.await();
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
