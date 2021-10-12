@@ -40,6 +40,10 @@ inline frame::frame() {
 
 inline address  frame::sender_pc()           const { ShouldNotCallThis(); return NULL; }
 
+inline frame::frame(intptr_t* sp) {
+  Unimplemented();
+}
+
 inline frame::frame(ZeroFrame* zf, intptr_t* sp) {
   _zeroframe = zf;
   _sp = sp;
@@ -111,6 +115,7 @@ inline intptr_t* frame::interpreter_frame_mdp_addr() const {
   return NULL; // silence compiler warnings
 }
 
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return get_interpreterState()->_stack + 1;
 }
@@ -124,6 +129,7 @@ inline int frame::interpreter_frame_monitor_size() {
   return BasicObjectLock::size();
 }
 
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end - 1;
@@ -161,6 +167,66 @@ inline intptr_t* frame::entry_frame_argument_at(int offset) const {
 
 inline intptr_t* frame::unextended_sp() const {
   return (intptr_t *) -1;
+}
+
+inline const ImmutableOopMap* frame::get_oop_map() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::compiled_frame_stack_argsize() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
+  Unimplemented();
+}
+
+inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
+  Unimplemented();
+  return 0;
+}
+
+template <bool relative>
+inline intptr_t* frame::interpreter_frame_last_sp() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::sender_sp_ret_address_offset() {
+  Unimplemented();
+  return 0;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  Unimplemented();
+}
+
+inline void frame::set_unextended_sp(intptr_t* value) {
+  Unimplemented();
+}
+
+inline int frame::offset_unextended_sp() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::set_offset_unextended_sp(int value) {
+  Unimplemented();
+}
+
+inline int frame::frame_size() const {
+#ifdef PRODUCT
+  ShouldNotCallThis();
+#endif // PRODUCT
+  return 0; // make javaVFrame::print_value work
+}
+
+inline address* frame::sender_pc_addr() const {
+  ShouldNotCallThis();
+  return NULL;
 }
 
 #endif // CPU_ZERO_FRAME_ZERO_INLINE_HPP

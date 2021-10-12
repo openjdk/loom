@@ -230,6 +230,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap *map) const {
   return frame(sender_sp(), sender_pc(), (intptr_t*)(ijava_state()->sender_sp));
 }
 
+template <bool stub>
 frame frame::sender_for_compiled_frame(RegisterMap *map) const {
   assert(map != NULL, "map must be set");
   // Frame owned by compiler.
@@ -272,7 +273,7 @@ frame frame::sender(RegisterMap* map) const {
   }
   assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
   if (_cb != NULL) {
-    return sender_for_compiled_frame(map);
+    return sender_for_compiled_frame<false>(map);
   }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
@@ -628,9 +629,30 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
   }
 }
 
+void frame::describe_top_pd(FrameValues& values) {
+  Unimplemented();
+}
 #endif // !PRODUCT
 
 intptr_t *frame::initial_deoptimization_info() {
   // Used to reset the saved FP.
   return fp();
 }
+
+// Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
+template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+
+template <bool relative>
+inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+  return interpreter_frame_monitors();
+}
+
+template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
+
+template <bool relative>
+inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
+  return &interpreter_frame_tos_address()[offset];
+}
+

@@ -784,7 +784,11 @@ public:
 
   bool do_bit(BitMap::idx_t index) override {
     OopT* p = _chunk->address_for_bit<OopT>(index);
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     if ((intptr_t*)p < _top && (intptr_t*)p != _chunk->sp_address() - frame::sender_sp_offset) return true; // skip oops that are not seen by the oopmap scan
+#else
+    Unimplemented();
+#endif
 
     log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
             p2i(p), index, _chunk->bit_offset());
@@ -807,7 +811,12 @@ public:
       InterpreterOopMap mask;
       frame fr = f.to_frame();
       fr.interpreted_frame_oop_map(&mask);
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
       _top = fr.addr_at(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
+#else
+      Unimplemented();
+      _top = 0;
+#endif
     } else if (f.is_compiled()) {
       Method* callee = f.cb()->as_compiled_method()->attached_method_before_pc(f.pc());
       if (callee != nullptr) {
@@ -815,7 +824,12 @@ public:
         _top = f.unextended_sp() + outgoing_args_words;
       } else {
         _top = f.unextended_sp();
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
         _next = _top + f.cb()->frame_size() - frame::sender_sp_offset;
+#else
+        Unimplemented();
+        _next = 0;
+#endif
         _exact = false;
       }
     } else {

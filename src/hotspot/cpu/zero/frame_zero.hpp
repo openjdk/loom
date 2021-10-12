@@ -33,6 +33,8 @@
     pc_return_offset = 0
   };
 
+ const ImmutableOopMap* get_oop_map() const;
+
   // Constructor
  public:
   frame(ZeroFrame* zeroframe, intptr_t* sp);
@@ -72,5 +74,13 @@
                            int           buflen) const;
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }
+
+  inline address* sender_pc_addr() const;
+
+  template <bool relative = false>
+  inline intptr_t* interpreter_frame_last_sp() const;
+
+  template <typename RegisterMapT>
+  static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
 
 #endif // CPU_ZERO_FRAME_ZERO_HPP

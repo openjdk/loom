@@ -35,7 +35,7 @@ const int ContinuationHelper::align_wiggle = 1;
 #ifdef ASSERT
 bool Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
   assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
   assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
@@ -407,7 +407,7 @@ intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
 
   sp -= ContinuationHelper::frame_metadata;
-  *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;
 }

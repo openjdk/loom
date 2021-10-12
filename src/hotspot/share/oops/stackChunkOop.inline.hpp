@@ -103,7 +103,12 @@ inline bool stackChunkOopDesc::is_in_chunk(void* p) const {
 
 bool stackChunkOopDesc::is_usable_in_chunk(void* p) const {
   assert (is_stackChunk(), "");
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   HeapWord* start = (HeapWord*)start_address() + sp() - frame::sender_sp_offset;
+#else
+  Unimplemented();
+  HeapWord* start = NULL;
+#endif
   HeapWord* end = start + stack_size();
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }

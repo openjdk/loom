@@ -399,6 +399,10 @@ inline bool frame::is_interpreted_frame() const {
   return Interpreter::contains(pc());
 }
 
+inline int frame::sender_sp_ret_address_offset() {
+  return frame::sender_sp_offset - frame::return_addr_offset;
+}
+
 inline const ImmutableOopMap* frame::get_oop_map() const {
   if (_cb == NULL) return NULL;
   if (_cb->oop_maps() != NULL) {

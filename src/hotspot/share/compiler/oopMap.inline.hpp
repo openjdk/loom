@@ -122,8 +122,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
         narrowOop *nl = (narrowOop*)loc;
 #ifndef VM_LITTLE_ENDIAN
         VMReg vmReg = omv.reg();
-        // Don't do this on SPARC float registers as they can be individually addressed
-        if (!vmReg->is_stack() SPARC_ONLY(&& !vmReg->is_FloatRegister())) {
+        if (!vmReg->is_stack()) {
           // compressed oops in registers only take up 4 bytes of an
           // 8 byte register but they are in the wrong part of the
           // word so adjust loc to point at the right place.
