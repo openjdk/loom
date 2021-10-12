@@ -94,16 +94,6 @@ public final class VirtualThreads {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     public static void unpark(Thread thread) {
-        JLA.unparkVirtualThread(thread, true);
-    }
-
-    /**
-     * Unparks a virtual thread.
-     * @param tryPush true to push the thread's task to the current carrier thread's
-     *     work queue when invoked from a virtual thread.
-     * @throws RejectedExecutionException if the scheduler cannot accept a task
-     */
-    public static void unpark(Thread thread, boolean tryPush) {
-        JLA.unparkVirtualThread(thread, tryPush);
+        JLA.unparkVirtualThread(thread);
     }
 }

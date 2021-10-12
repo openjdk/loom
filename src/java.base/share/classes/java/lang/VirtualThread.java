@@ -45,7 +45,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadLocalRandom;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
@@ -214,14 +213,17 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. If {@code tryPush} is true
-     * then it pushes the task to the current carrier thread's work queue if possible.
+     * Submits the runContinuation task to the scheduler.
+     * In the case of the default scheduler, and the current carrier thread is one
+     * of FJP worker threads, then the task is queued to the current thread's queue.
+     * In that case, the parameter {@code signalOnEmpty} indicates if workers are
+     * signalled when its queue is empty.
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation(boolean tryPush) {
+    private void submitRunContinuationAndSignal(boolean signalOnEmpty) {
         try {
-            if (tryPush && (scheduler == DEFAULT_SCHEDULER)) {
-                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation);
+            if (scheduler == DEFAULT_SCHEDULER) {
+                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER,runContinuation, signalOnEmpty);
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -237,8 +239,12 @@ class VirtualThread extends Thread {
         }
     }
 
+    /**
+     * Submits the runContinuation task to the scheduler.
+     * @throws RejectedExecutionException
+     */
     private void submitRunContinuation() {
-        submitRunContinuation(true);
+        submitRunContinuationAndSignal(true);
     }
 
     /**
@@ -355,7 +361,8 @@ class VirtualThread extends Thread {
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                submitRunContinuation();
+                // re-submit to continue on this carrier thread if possible
+                submitRunContinuationAndSignal(false);
             }
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
@@ -363,9 +370,8 @@ class VirtualThread extends Thread {
             // notify JVMTI that unmount has completed, thread is runnable
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
-            // submit to random queue periodically
-            int r = ThreadLocalRandom.current().nextInt(8);
-            submitRunContinuation(r != 0);   // 1 in 8
+            // re-submit to continue on this carrier thread if possible
+            submitRunContinuationAndSignal(false);
         }
     }
 
@@ -590,26 +596,24 @@ class VirtualThread extends Thread {
      * {@link #park() parked} then it will be unblocked, otherwise its next call
      * to {@code park} or {@linkplain #parkNanos(long) parkNanos} is guaranteed
      * not to block.
-     * @param tryPush true to push the task to the current carrier thread's work queue
-     *     when invoked from a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     @ChangesCurrentThread
-    void unpark(boolean tryPush) {
+    void unpark() {
         Thread currentThread = Thread.currentThread();
-        if (!getAndSetParkPermit(true) && currentThread!= this) {
+        if (!getAndSetParkPermit(true) && currentThread != this) {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
                 if (currentThread instanceof VirtualThread vthread) {
                     Thread carrier = vthread.carrierThread;
                     carrier.setCurrentThread(carrier);
                     try {
-                        submitRunContinuation(tryPush);
+                        submitRunContinuation();
                     } finally {
                         carrier.setCurrentThread(vthread);
                     }
                 } else {
-                    submitRunContinuation(tryPush);
+                    submitRunContinuation();
                 }
             } else if (s == PINNED) {
                 // unpark carrier thread when pinned.
@@ -621,15 +625,6 @@ class VirtualThread extends Thread {
                 }
             }
         }
-    }
-
-    /**
-     * Re-enables this virtual thread for scheduling. The task is pushed to the
-     * current carrier thread's work queue when invoked from a virtual thread.
-     * @throws RejectedExecutionException if the scheduler cannot accept a task
-     */
-    private void unpark() {
-        unpark(true);
     }
 
     /**
@@ -992,7 +987,7 @@ class VirtualThread extends Thread {
                     MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
                 @SuppressWarnings("removal")
                 MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                MethodType methodType = MethodType.methodType(void.class, Runnable.class);
+                MethodType methodType = MethodType.methodType(void.class, Runnable.class, boolean.class);
                 externalExecuteTask = l.findVirtual(ForkJoinPool.class, "externalExecuteTask", methodType);
             } catch (Exception e) {
                 throw new InternalError(e);
@@ -1002,9 +997,9 @@ class VirtualThread extends Thread {
          * Invokes the non-public ForkJoinPool.externalExecuteTask method to
          * submit the task to the current carrier thread's work queue.
          */
-        static void externalExecuteTask(ForkJoinPool pool, Runnable task) {
+        static void externalExecuteTask(ForkJoinPool pool, Runnable task, boolean signalOnEmpty) {
             try {
-                externalExecuteTask.invoke(pool, task);
+                externalExecuteTask.invoke(pool, task, signalOnEmpty);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable e) {

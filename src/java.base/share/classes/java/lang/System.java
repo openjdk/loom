@@ -2542,8 +2542,8 @@ public final class System {
                 ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
             }
 
-            public void unparkVirtualThread(Thread thread, boolean tryPush) {
-                ((VirtualThread) thread).unpark(tryPush);
+            public void unparkVirtualThread(Thread thread) {
+                ((VirtualThread) thread).unpark();
             }
 
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
