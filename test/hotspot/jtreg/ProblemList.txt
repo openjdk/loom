@@ -178,10 +178,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom specific
 
-#compiler/runtime/StackOverflowBug.java                                        8242064 generic-all
-#compiler/startup/SmallCodeCacheStartup.java                                   8242064 generic-all
-#compiler/exceptions/TestRecursiveReplacedException.java	                   8242065 generic-all
-#compiler/vectorization/TestMacroLogicVector.java                              8253919 windows-all
 compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
 # Sets SegmentedCodeCache with -Xint
@@ -189,29 +185,21 @@ compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      00
 compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           0000000 generic-all
 compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              0000000 generic-all
 
-#runtime/clinit/ClassInitBarrier.java                                          8254936 generic-all
-#runtime/vthread/TestObjectAllocationSampleEvent.java                          8261379 generic-all
-
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
-#runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java 8271008 generic-all
-#runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java                8271008 generic-all
-
 # Needs --enable-preview
-runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java                 0000000 generic-all
+runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
 serviceability/jvmti/negative/thrstat04/thrstat04.java                         8275001 generic-all
 
 serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
 
-#vmTestbase/nsk/jvmti/GarbageCollectionStart/gcstart001/TestDescription.java   8242890 generic-all
-#vmTestbase/nsk/stress/stack/stack008.java	8252468 generic-all
-vmTestbase/nsk/stress/stack/stack018.java	8252468 generic-all
-#vmTestbase/gc/memory/Nio/Nio.java 8249549 generic-all
+#vmTestbase/nsk/stress/stack/stack008.java	                                   8252468 generic-all
+vmTestbase/nsk/stress/stack/stack018.java	                                  8252468 generic-all
 
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
+vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
 #vmTestbase/nsk/stress/strace/strace003.java                                   8254188 generic-all
 #vmTestbase/nsk/stress/strace/strace004.java                                   8254188 generic-all
 #vmTestbase/nsk/stress/strace/strace005.java                                   8254188 generic-all
