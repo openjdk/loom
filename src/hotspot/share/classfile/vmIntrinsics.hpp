@@ -512,7 +512,7 @@ class methodHandle;
   do_signature(continuationGetStacks_signature, "(III)V")                                                               \
   do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
   do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \
-    do_alias(continuationDoYield_signature,     int_int_signature)                                                      \
+    do_alias(continuationDoYield_signature,     void_int_signature)                                                     \
                                                                                                                         \
   /* support for UnsafeConstants */                                                                                     \
   do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \

@@ -727,15 +727,16 @@ const TypeFunc* OptoRuntime::void_void_Type() {
  }
 
  const TypeFunc* OptoRuntime::continuation_doYield_Type() {
+   // create input type (domain)
    const Type **fields = TypeTuple::fields(0);
-  //  fields[TypeFunc::Parms+0] = TypeInt::INT;
-   const TypeTuple *args = TypeTuple::make(TypeFunc::Parms+0, fields);
+   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+0, fields);
 
+   // create result type (range)
    fields = TypeTuple::fields(1);
    fields[TypeFunc::Parms+0] = TypeInt::INT;
-   const TypeTuple *result = TypeTuple::make(TypeFunc::Parms+1, fields);
+   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+1, fields);
 
-   return TypeFunc::make(args, result);
+   return TypeFunc::make(domain, range);
  }
 
  const TypeFunc* OptoRuntime::continuation_jump_Type() {
