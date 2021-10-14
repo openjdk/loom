@@ -7940,6 +7940,7 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
+    __ get_thread(r15_thread);
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
     
