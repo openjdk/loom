@@ -109,6 +109,7 @@ serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
 serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
+serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.java
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java
 serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java
 serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
@@ -443,11 +444,7 @@ vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 ####
 ## Tests for functionality which currently is not supported for virtual threads
 
-vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon001/TestDescription.java
-vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon002/TestDescription.java
 vmTestbase/nsk/jvmti/GetCurrentThreadCpuTime/curthrcputime001/TestDescription.java
-vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage003/TestDescription.java
-vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage004/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop002/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop003/TestDescription.java
 vmTestbase/nsk/jvmti/PopFrame/popframe004/TestDescription.java
@@ -468,6 +465,9 @@ vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
 
 vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
+####
+## assert in /scratch/sspitsyn/loom2/open/src/hotspot/share/oops/instanceStackChunkKlass.cpp:1042
+vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage006/TestDescription.java
 
 ####
 ## NSK JDWP Tests failing with wrapper
