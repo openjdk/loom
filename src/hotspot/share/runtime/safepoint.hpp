@@ -132,7 +132,6 @@ class SafepointSynchronize : AllStatic {
     switch(state) {
       case _thread_in_vm:
       case _thread_in_Java:        // From compiled code
-      case _thread_in_native_trans:
       case _thread_blocked_trans:
         return true;
       default:

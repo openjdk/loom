@@ -132,7 +132,7 @@ inline bool stackChunkOopDesc::requires_barriers() const {
 
 template <typename OopT>
 inline static bool is_oop_fixed(oop obj, int offset) {
-  OopT value = *obj->obj_field_addr<OopT>(offset);
+  OopT value = *obj->field_addr<OopT>(offset);
   intptr_t before = *(intptr_t*)&value;
   intptr_t after  = cast_from_oop<intptr_t>(NativeAccess<>::oop_load(&value));
   // tty->print_cr(">>> fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before == after, before, after);

@@ -318,9 +318,7 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
             StackFrame frame = frame(0);
             Location location = frame.location();
             List<BreakpointRequest> requests = vm.eventRequestManager().breakpointRequests();
-            Iterator<BreakpointRequest> iter = requests.iterator();
-            while (iter.hasNext()) {
-                BreakpointRequest request = iter.next();
+            for (BreakpointRequest request : requests) {
                 if (location.equals(request.location())) {
                     return true;
                 }
