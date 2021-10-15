@@ -7867,15 +7867,6 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-static Register get_thread() {
-#ifdef _LP64
-  return r15_thread;
-#else
-  get_thread(rdi);
-  return rdi;
-#endif // LP64
-}
-
 RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
@@ -7907,15 +7898,12 @@ RuntimeStub* generate_cont_doYield() {
     __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
     if (ContPerfTest > 5) {
-      Register thread = get_thread();
-      NOT_LP64(__ push(thread));
-      LP64_ONLY(__ movptr(c_rarg0, thread));
+      __ movptr(c_rarg0, r15_thread);
       __ set_last_Java_frame(rsp, rbp, the_pc);
 
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
       
       __ reset_last_Java_frame(true);
-      NOT_LP64(__ pop(rdi));
     }
 
     Label pinned;
@@ -8077,8 +8065,8 @@ RuntimeStub* generate_cont_doYield() {
       // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
       // see InterpreterMacroAssembler::restore_bcp/restore_locals
       // TODO: use InterpreterMacroAssembler
-      static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
-      static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);
+      static const Register _locals_register = r14;
+      static const Register _bcp_register    = r13;
 
       __ pop(rbp);
 
@@ -8093,33 +8081,31 @@ RuntimeStub* generate_cont_doYield() {
 
 #if INCLUDE_JFR
 
-  static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
+  static void jfr_set_last_java_frame(MacroAssembler* _masm) {
     Register last_java_pc = c_rarg0;
     Register last_java_sp = c_rarg2;
     __ movptr(last_java_pc, Address(rsp, 0));
     __ lea(last_java_sp, Address(rsp, wordSize));
     __ vzeroupper();
-    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
+    Address anchor_java_pc(r15_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
     __ movptr(anchor_java_pc, last_java_pc);
-    __ movptr(Address(thread, JavaThread::last_Java_sp_offset()), last_java_sp);
+    __ movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
   }
 
-  static void jfr_prologue(MacroAssembler* _masm, Register thread) {
-    jfr_set_last_java_frame(_masm, thread);
-    NOT_LP64(__ push(thread));
-    LP64_ONLY(__ movptr(c_rarg0, thread));
+  static void jfr_prologue(MacroAssembler* _masm) {
+    jfr_set_last_java_frame(_masm);
+    __ movptr(c_rarg0, r15_thread);
   }
 
   // Handle is dereference here using correct load constructs.
-  static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
-    NOT_LP64(__ pop(rdi));
+  static void jfr_epilogue(MacroAssembler* _masm) {
     __ reset_last_Java_frame(false);
     Label null_jobject;
     __ testq(rax, rax);
     __ jcc(Assembler::zero, null_jobject);
     DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
     BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, thread);
+    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, r15_thread);
     __ bind(null_jobject);
   }
 
@@ -8130,10 +8116,9 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
 
     address start = __ pc();
-    Register thread = get_thread();
-    jfr_prologue(_masm, thread);
+    jfr_prologue(_masm);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
-    jfr_epilogue(_masm, thread);
+    jfr_epilogue(_masm);
     __ ret(0);
 
     return start;
@@ -8144,11 +8129,10 @@ RuntimeStub* generate_cont_doYield() {
   address generate_jfr_get_event_writer() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
-    
-    Register thread = get_thread();
-    jfr_prologue(_masm, thread);
+
+    jfr_prologue(_masm);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
-    jfr_epilogue(_masm, thread);
+    jfr_epilogue(_masm);
     __ ret(0);
 
     return start;
