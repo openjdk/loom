@@ -352,7 +352,7 @@ public class Continuation {
     }
 
     @IntrinsicCandidate
-    private static int doYield(int scopes) { throw new Error("Intrinsic not installed"); };
+    private static int doYield() { throw new Error("Intrinsic not installed"); };
 
     @IntrinsicCandidate
     private native static void enterSpecial(Continuation c, boolean isContinue);
@@ -411,7 +411,7 @@ public class Continuation {
 
         if (scope != this.scope)
             this.yieldInfo = scope;
-        int res = doYield(0);
+        int res = doYield();
         unsafe.storeFence(); // needed to prevent certain transformations by the compiler
         
         if (TRACE) System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);

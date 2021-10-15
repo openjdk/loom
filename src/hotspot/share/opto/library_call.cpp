@@ -7280,8 +7280,6 @@ Node* LibraryCallKit::inline_digestBase_implCompressMB_predicate(int predicate) 
 
 bool LibraryCallKit::inline_continuation_do_yield() {
   address call_addr = StubRoutines::cont_doYield();
-  // Node* arg0 = argument(0); // type int - scopes
-  // Node* arg0 = intcon(0); // type int - from interpreter
   const TypeFunc* tf = OptoRuntime::continuation_doYield_Type();
   Node* call = make_runtime_call(RC_NO_LEAF, tf, call_addr, "doYield", TypeRawPtr::BOTTOM);
   Node* result = _gvn.transform(new ProjNode(call, TypeFunc::Parms));
