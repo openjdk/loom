@@ -968,18 +968,26 @@ public class ForkJoinPool extends AbstractExecutorService {
          *
          * @param task the task. Caller must ensure non-null.
          * @param pool (no-op if null)
+         * @param signalOnEmpty signal a worker if queue was empty
          * @throws RejectedExecutionException if array cannot be resized
          */
-        final void push(ForkJoinTask<?> task, ForkJoinPool pool) {
+        final void push(ForkJoinTask<?> task, ForkJoinPool pool, boolean signalOnEmpty) {
             ForkJoinTask<?>[] a = array;
             int s = top++, d = s - base, cap, m; // skip insert if disabled
             if (a != null && pool != null && (cap = a.length) > 0) {
                 setSlotVolatile(a, (m = cap - 1) & s, task);
-                if (d == m)
+                if (d == m) {
                     growArray();
-                if (d == m || a[m & (s - 1)] == null)
-                    pool.signalWork(); // signal if was empty or resized
+                    pool.signalWork();  // signal if resized
+                } else {
+                    if (signalOnEmpty && a[m & (s - 1)] == null)
+                        pool.signalWork(); // signal if was empty
+                }
             }
+        }
+
+        final void push(ForkJoinTask<?> task, ForkJoinPool pool) {
+            push(task, pool, true);
         }
 
         /**
@@ -2201,14 +2209,17 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     /**
-     * Pushes an external submission to the current thread's work queue if possible.
-     * This method is invoked (reflectively) by the virtual thread implementation.
+     * Pushes an external submission to the current carrier thread's work queue if
+     * possible. This method is invoked (reflectively) by the virtual thread
+     * implementation.
+     *
+     * @param signalOnEmpty true to signal a worker when the queue is empty
      */
-    private void externalExecuteTask(Runnable task) {
+    private void externalExecuteTask(Runnable task, boolean signalOnEmpty) {
         var forkJoinTask = new ForkJoinTask.RunnableExecuteAction(task);
         Thread t = VirtualThreads.currentCarrierThread();
         if (t instanceof ForkJoinWorkerThread wt && wt.pool == this) {
-            wt.workQueue.push(forkJoinTask, this);
+            wt.workQueue.push(forkJoinTask, this, signalOnEmpty);
         } else {
             externalPush(forkJoinTask);
         }

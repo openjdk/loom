@@ -3207,7 +3207,12 @@ frame Continuation::continuation_parent_frame(RegisterMap* map) {
 
   map->set_stack_chunk(nullptr);
 
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
+#else
+  frame sender = frame();
+  Unimplemented();
+#endif
 
   // tty->print_cr("continuation_parent_frame");
   // print_vframe(sender, map, nullptr);

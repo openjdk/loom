@@ -2205,9 +2205,6 @@ void
 PrintStackTraceClosure::do_thread_impl(Thread *target) {
   JavaThread *java_thread = JavaThread::cast(target);
   Thread *current_thread = Thread::current();
-  assert(SafepointSynchronize::is_at_safepoint() ||
-      java_thread->is_handshake_safe_for(current_thread),
-         "call by myself / at safepoint / at handshake");
 
   ResourceMark rm (current_thread);
   const char* tname = JvmtiTrace::safe_get_thread_name(java_thread);
@@ -2237,6 +2234,13 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
 
 void
 PrintStackTraceClosure::do_thread(Thread *target) {
+  JavaThread *java_thread = JavaThread::cast(target);
+  Thread *current_thread = Thread::current();
+
+  assert(SafepointSynchronize::is_at_safepoint() ||
+      java_thread->is_handshake_safe_for(current_thread),
+         "call by myself / at safepoint / at handshake");
+
   PrintStackTraceClosure::do_thread_impl(target);
 }
 #endif

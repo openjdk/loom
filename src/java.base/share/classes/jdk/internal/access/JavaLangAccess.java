@@ -499,11 +499,9 @@ public interface JavaLangAccess {
 
     /**
      * Unparks a virtual thread.
-     * @param tryPush true to push the thread's task to the current carrier thread's
-     *     work queue when invoked from a virtual thread.
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    void unparkVirtualThread(Thread thread, boolean tryPush);
+    void unparkVirtualThread(Thread thread);
 
     /**
      * Creates a new StackWalker

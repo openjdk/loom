@@ -3897,11 +3897,12 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
-  assert(thread->is_in_VTMT(), "VTMT sanity check");
-  JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt = JNIHandles::resolve(vthread);
 
   thread->rebind_to_jvmti_thread_state_of(vt);
+
+  assert(thread->is_in_VTMT(), "VTMT sanity check");
+  JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
 
   if (first_mount) {
     // thread start
@@ -3943,10 +3944,10 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
     }
     thread->set_mounted_vthread(NULL);
   }
-  thread->rebind_to_jvmti_thread_state_of(ct());
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+  thread->rebind_to_jvmti_thread_state_of(ct());
 #else
   fatal("Should only be called with JVMTI enabled");
 #endif
