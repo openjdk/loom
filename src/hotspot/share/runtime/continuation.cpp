@@ -2310,6 +2310,7 @@ public:
     assert (!chunk->is_empty(), "");
     assert (!chunk->has_mixed_frames(), "");
     assert (!chunk->requires_barriers(), "");
+    assert (!chunk->has_bitmap(), "");
     assert (!_thread->is_interp_only_mode(), "");
 
     log_develop_trace(jvmcont)("thaw_fast");
@@ -2636,6 +2637,13 @@ public:
     assert (!bottom || (_cont.is_empty() != Continuation::is_cont_barrier_frame(f)), "cont.is_empty(): %d is_cont_barrier_frame(f): %d ", _cont.is_empty(), Continuation::is_cont_barrier_frame(f));
   }
 
+  void clear_bitmap_bits(intptr_t* start, int range) {
+    // we need to clear the bits that correspond to arguments as they reside in the caller frame
+    log_develop_trace(jvmcont)("clearing bitmap bits for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start + range));
+    stackChunkOop chunk = _cont.tail();
+    chunk->bitmap().clear_range(chunk->bit_index_for((typename ConfigT::OopT*)start), chunk->bit_index_for((typename ConfigT::OopT*)(start+range)));
+  }
+
   NOINLINE void recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
     assert (hf.is_interpreted_frame(), "");
 
@@ -2678,6 +2686,8 @@ public:
     if (!bottom) {
       log_develop_trace(jvmcont)("fix thawed caller");
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    } else if (_cont.tail()->has_bitmap() && locals > 0) {
+      clear_bitmap_bits(Interpreted::frame_bottom<true>(hf) - locals, locals);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2706,7 +2716,8 @@ public:
 
     int fsize = Compiled::size(hf);
     log_develop_trace(jvmcont)("fsize: %d", fsize);
-    fsize += (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
+    const int added_argsize = (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
+    fsize += added_argsize;
     assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d " INTPTR_FORMAT, fsize, caller.unextended_sp() - f.unextended_sp());
 
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
@@ -2742,6 +2753,8 @@ public:
     if (!bottom) {
       log_develop_trace(jvmcont)("fix thawed caller");
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
+      clear_bitmap_bits(hsp + Compiled::size(hf), added_argsize);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)

@@ -259,10 +259,3 @@ com/sun/jdi/Vars.java
 com/sun/jdi/redefineMethod/RedefineTest.java
 com/sun/jdi/sde/MangleTest.java
 com/sun/jdi/sde/TemperatureTableTest.java
-
-####
-# Should go away once JEP 416 is in
-java/lang/ClassLoader/loadLibraryUnload/LoadLibraryUnload.java
-java/lang/annotation/LoaderLeakTest.java
-java/lang/invoke/defineHiddenClass/UnloadingTest.java
-java/lang/ref/CleanerTest.java
