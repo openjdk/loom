@@ -805,6 +805,9 @@ JvmtiExport::cv_external_thread_to_JavaThread(ThreadsList * t_list,
 
   if (!thread_oop->is_a(vmClasses::Thread_klass())) {
     // The oop is not a java.lang.Thread.
+    if (thread_oop_p != NULL) {
+      *thread_oop_p = NULL;
+    }
     return JVMTI_ERROR_INVALID_THREAD;
   }
   // Looks like a java.lang.Thread oop at this point.
