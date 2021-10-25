@@ -272,7 +272,6 @@ class VirtualThread extends Thread {
             // last unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin(true);
             unmount();
-            if (notifyJvmti) notifyJvmtiUnmountEnd(true);
 
             // final state
             setState(TERMINATED);
@@ -404,6 +403,7 @@ class VirtualThread extends Thread {
             // clear references to thread locals
             clearReferences();
         }
+        if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
     }
 
     /**
