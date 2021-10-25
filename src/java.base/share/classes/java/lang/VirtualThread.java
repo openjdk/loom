@@ -402,8 +402,9 @@ class VirtualThread extends Thread {
 
             // clear references to thread locals
             clearReferences();
+
+            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
         }
-        if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
     }
 
     /**
