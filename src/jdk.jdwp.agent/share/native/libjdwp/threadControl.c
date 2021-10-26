@@ -1688,6 +1688,9 @@ threadControl_suspendAll(void)
                 if (error != JVMTI_ERROR_NONE) {
                     EXIT_ERROR(error, "cannot suspend all virtual threads");
                 }
+                // We need a notify here just like we do any time we suspend a thread.
+                // See commonSuspendList() and suspendThreadByNode().
+                debugMonitorNotifyAll(threadLock);
             }
 
             /*
@@ -1822,6 +1825,9 @@ threadControl_resumeAll(void)
             if (error != JVMTI_ERROR_NONE) {
                 EXIT_ERROR(error, "cannot resume all virtual threads");
             }
+            // We need a notify here just like we do any time we resume a thread.
+            // See commonResumeList() and resumeThreadByNode().
+            debugMonitorNotifyAll(threadLock);
         }
     }
 
