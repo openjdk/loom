@@ -27,7 +27,6 @@ package java.lang;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -72,25 +71,10 @@ class VirtualThread extends Thread {
     private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
 
-    private static final long CARRIER_THREAD;
-    private static final long STATE;
-    private static final long PARK_PERMIT;
-    private static final VarHandle TERMINATION;
-    private static final VarHandle NEXT_UNPARKER_ID;
-    static {
-        try {
-            // Used in sensitive places where a VarHandle bootstrap should not be called
-            CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread"); // this one is especially sensitive
-            STATE = U.objectFieldOffset(VirtualThread.class, "state");
-            PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
-
-            MethodHandles.Lookup l = MethodHandles.lookup();
-            TERMINATION = l.findVarHandle(VirtualThread.class, "termination", CountDownLatch.class);
-            NEXT_UNPARKER_ID = l.findStaticVarHandle(VirtualThread.class, "nextUnparkerId", int.class);
-        } catch (Exception e) {
-            throw new InternalError(e);
-        }
-    }
+    private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
+    private static final long PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
+    private static final long CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread");
+    private static final long TERMINATION = U.objectFieldOffset(VirtualThread.class, "termination");
 
     // scheduler and continuation
     private final Executor scheduler;
@@ -883,7 +867,7 @@ class VirtualThread extends Thread {
         CountDownLatch termination = this.termination;
         if (termination == null) {
             termination = new CountDownLatch(1);
-            if (!TERMINATION.compareAndSet(this, null, termination)) {
+            if (!U.compareAndSetReference(this, TERMINATION, null, termination)) {
                 termination = this.termination;
             }
         }
@@ -898,10 +882,6 @@ class VirtualThread extends Thread {
 
     private void setState(int newValue) {
         state = newValue;  // volatile write
-    }
-
-    private void setReleaseState(int newValue) {
-        U.putIntRelease(this, STATE, newValue);
     }
 
     private boolean compareAndSetState(int expectedValue, int newValue) {
@@ -1090,19 +1070,10 @@ class VirtualThread extends Thread {
         }
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(poolSize, task -> {
-                String name = "VirtualThread-unparker";
-                if (poolSize > 1)
-                    name += "-" + nextUnparkerId();
-                var thread = InnocuousThread.newThread(name, task);
-                return thread;
+                return InnocuousThread.newThread("VirtualThread-unparker", task);
             });
         stpe.setRemoveOnCancelPolicy(true);
         return stpe;
-    }
-
-    private static volatile int nextUnparkerId;
-    private static int nextUnparkerId() {
-        return (int) NEXT_UNPARKER_ID.getAndAdd(1) + 1;
     }
 
     /**
