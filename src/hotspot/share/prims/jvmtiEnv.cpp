@@ -1332,10 +1332,7 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
       return JVMTI_ERROR_OUT_OF_MEMORY;
     }
 
-    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
-      // Carrier thread with a mounted continuation case.
-      // No contended monitor can be owned by carrier thread in this case.
-    } else if (java_thread == calling_thread) {
+    if (java_thread == calling_thread) {
       // It is only safe to make a direct call on the current thread.
       // All other usage needs to use a direct handshake for safety.
       err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list);
@@ -1410,10 +1407,7 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
       return JVMTI_ERROR_OUT_OF_MEMORY;
     }
 
-    if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
-      // Carrier thread with a mounted continuation case.
-      // No contended monitor can be owned by carrier thread in this case.
-    } else if (java_thread == calling_thread) {
+    if (java_thread == calling_thread) {
       // It is only safe to make a direct call on the current thread.
       // All other usage needs to use a direct handshake for safety.
       err = get_owned_monitors(calling_thread, java_thread, owned_monitors_list);
@@ -1484,14 +1478,10 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
     }
     return err;
   }
-  if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
-    // Carrier thread with a mounted continuation case.
-    // No contended monitor can be owned by carrier thread in this case.
-    *monitor_ptr = NULL;
-  } else if (java_thread == calling_thread) {
+  if (java_thread == calling_thread) {
     // It is only safe to make a direct call on the current thread.
     // All other usage needs to use a direct handshake for safety.
-    err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr);
+    err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr, false);
   } else {
     // get contended monitor information with handshake
     GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);

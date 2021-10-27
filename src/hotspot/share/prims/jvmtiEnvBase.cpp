@@ -851,10 +851,17 @@ JvmtiEnvBase::count_locked_objects(JavaThread *java_thread, Handle hobj) {
 }
 
 jvmtiError
-JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread, jobject *monitor_ptr) {
+JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThread *java_thread,
+                                            jobject *monitor_ptr, bool is_virtual) {
   Thread *current_thread = Thread::current();
   assert(java_thread->is_handshake_safe_for(current_thread),
          "call by myself or at handshake");
+  if (!is_virtual && JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+    // Carrier thread with a mounted continuation case.
+    // No contended monitor can be owned by carrier thread in this case.
+    *monitor_ptr = nullptr;
+    return JVMTI_ERROR_NONE;
+  }
   oop obj = NULL;
   // The ObjectMonitor* can't be async deflated since we are either
   // at a safepoint or the calling thread is operating on itself so
@@ -898,6 +905,11 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
   assert(java_thread->is_handshake_safe_for(current_thread),
          "call by myself or at handshake");
 
+  if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+    // Carrier thread with a mounted continuation case.
+    // No contended monitor can be owned by carrier thread in this case.
+    return JVMTI_ERROR_NONE;
+  }
   if (java_thread->has_last_Java_frame()) {
     ResourceMark rm(current_thread);
     HandleMark   hm(current_thread);
@@ -2172,7 +2184,8 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
   if (!jt->is_exiting() && (jt->threadObj() != NULL)) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
                                                                     jt,
-                                                                    _owned_monitor_ptr);
+                                                                    _owned_monitor_ptr,
+                                                                    false);
   }
 }
 
@@ -2296,7 +2309,8 @@ VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
   if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread*)target,
                                                                     java_thread,
-                                                                    _owned_monitor_ptr);
+                                                                    _owned_monitor_ptr,
+                                                                    true);
   }
 }
 

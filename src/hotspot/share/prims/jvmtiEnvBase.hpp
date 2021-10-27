@@ -367,7 +367,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                            jint stack_depth, jint max_count,
                                            jvmtiFrameInfo* frame_buffer, jint* count_ptr);
   jvmtiError get_current_contended_monitor(JavaThread* calling_thread, JavaThread *java_thread,
-                                           jobject *monitor_ptr);
+                                           jobject *monitor_ptr, bool is_virtual);
   jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
