@@ -1311,6 +1311,7 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
 
   err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
   if (err != JVMTI_ERROR_NONE) {
+    delete owned_monitors_list;
     return err;
   }
 
@@ -1327,6 +1328,7 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   } else {
     EscapeBarrier eb(true, calling_thread, java_thread);
     if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
+      delete owned_monitors_list;
       return JVMTI_ERROR_OUT_OF_MEMORY;
     }
 
@@ -1387,6 +1389,7 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
 
   err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
   if (err != JVMTI_ERROR_NONE) {
+    delete owned_monitors_list;
     return err;
   }
 
@@ -1403,6 +1406,7 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
   } else {
     EscapeBarrier eb(true, calling_thread, java_thread);
     if (!eb.deoptimize_objects(MaxJavaStackTraceDepth)) {
+      delete owned_monitors_list;
       return JVMTI_ERROR_OUT_OF_MEMORY;
     }
 
