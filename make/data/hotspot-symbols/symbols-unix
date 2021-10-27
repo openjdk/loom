@@ -187,6 +187,7 @@ JVM_RegisterContinuationMethods
 JVM_RegisterLambdaProxyClassForArchiving
 JVM_RegisterSignal
 JVM_ReleaseUTF
+JVM_ReportFinalizationComplete
 JVM_ResumeThread
 JVM_ScopeLocalCache
 JVM_SetScopeLocalCache
