@@ -49,6 +49,7 @@ import jdk.internal.module.ServicesCatalog;
 import jdk.internal.reflect.ConstantPool;
 import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
+import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -431,20 +432,14 @@ public interface JavaLangAccess {
     void start(Thread thread, ThreadContainer container);
 
     /**
-     * Returns the thread container at the head/top of the stack.
+     * Returns the top of the given thread's stackable scope stack.
      */
-    ThreadContainer headThreadContainer(Thread thread);
+    StackableScope headStackableScope(Thread thread);
 
     /**
-     * Pushes a thread container to the top of the current thread's stack.
-     * @return the current thread's scope local bindings
+     * Sets the top of the current thread's stackable scope stack.
      */
-    Object pushThreadContainer(ThreadContainer container);
-
-    /**
-     * Pops a thread container from the current thread's stack.
-     */
-    void popThreadContainer(ThreadContainer container);
+    void setHeadStackableScope(StackableScope scope);
 
     /**
      * Returns a reference to the Thread object for the currently executing

@@ -36,7 +36,7 @@ import jdk.internal.access.SharedSecrets;
  * A "shared" thread container. A shared thread container doesn't have an owner
  * and is intended for unstructured uses, e.g. thread pools.
  */
-public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
+public class SharedThreadContainer extends ThreadContainer implements AutoCloseable {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle CLOSED;
     static {
@@ -63,7 +63,7 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
             this.threadsSupplier = null;
             this.threadCount = new LongAdder();
         }
-        this.key = ThreadContainers.registerSharedContainer(this);
+        this.key = ThreadContainers.registerContainer(this);
     }
 
     /**
@@ -82,8 +82,18 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
     }
 
     @Override
+    public ThreadContainer push() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String name() {
         return name;
+    }
+
+    @Override
+    public Thread owner() {
+        return null;
     }
 
     @Override
@@ -134,9 +144,10 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
      * throw IllegalStateException. This method has no impact on threads that are
      * still running or starting around the time that this method is invoked.
      */
+    @Override
     public void close() {
         if (!closed && CLOSED.compareAndSet(this, false, true)) {
-            ThreadContainers.deregisterSharedContainer(key);
+            ThreadContainers.deregisterContainer(key);
         }
     }
 

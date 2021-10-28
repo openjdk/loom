@@ -28,76 +28,58 @@ package jdk.internal.vm;
 import java.util.stream.Stream;
 
 /**
- * A container of threads. Thread containers can be arranged in linked list.
+ * A container of threads.
  */
-public interface ThreadContainer {
+public abstract class ThreadContainer extends StackableScope {
 
     /**
      * Return the container name, null if not named.
      */
-    default String name() {
-        return null;
-    }
+    public abstract String name();
 
     /**
      * Return the owner, null if not owned.
      */
-    default Thread owner() {
-        return null;
-    }
+    public abstract Thread owner();
 
     /**
      * Returns the parent of this container or null if this is the root container.
      */
-    default ThreadContainer parent() {
+    public final ThreadContainer parent() {
         return ThreadContainers.parent(this);
     }
 
     /**
      * Return the stream of children of this container.
      */
-    default Stream<ThreadContainer> children() {
+     public final Stream<ThreadContainer> children() {
         return ThreadContainers.children(this);
     }
     
     /**
      * Return a count of the number of threads in this container.
      */
-    default long threadCount() {
+    public long threadCount() {
         return threads().mapToLong(e -> 1L).sum();
     }
 
     /**
      * Returns a stream of the threads in this container.
      */
-    Stream<Thread> threads();
+    public abstract Stream<Thread> threads();
 
     /**
-     * Invoked when thread starts in the container.
+     * Invoked when a thread is started in the container
      */
-    default void onStart(Thread thread) { }
+    public abstract void onStart(Thread thread);
 
     /**
      * Invoked when thread in container terminates.
      */
-    default void onExit(Thread thread) { }
+    public abstract void onExit(Thread thread);
 
     /**
      * The scope locals captured when the thread container was created.
      */
-    default Object scopeLocalBindings() { return null; }
-
-    /**
-     * Returns the previous thread container in the list.
-     */
-    default ThreadContainer previous() {
-        return null;
-    }
-
-    /**
-     * Sets the previous thread container in the list.
-     */
-    default void setPrevious(ThreadContainer container) {
-        throw new UnsupportedOperationException();
-    }
+    public Object scopeLocalBindings() { return null; }
 }
