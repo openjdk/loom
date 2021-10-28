@@ -385,6 +385,10 @@ class VirtualThread extends Thread {
     private void afterTerminate(boolean executed) {
         assert (state() == TERMINATED) && (carrierThread == null);
 
+        if (executed) {
+            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
+        }
+
         // notify anyone waiting for this virtual thread to terminate
         CountDownLatch termination = this.termination;
         if (termination != null) {
@@ -404,8 +408,6 @@ class VirtualThread extends Thread {
 
             // clear references to thread locals
             clearReferences();
-
-            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
         }
     }
 
