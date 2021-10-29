@@ -176,7 +176,7 @@ public interface Future<V> {
      */
     default V resultNow() {
         if (!isDone())
-            throw new IllegalStateException();
+            throw new IllegalStateException("Task has not completed");
         boolean interrupted = false;
         try {
             while (true) {
@@ -184,8 +184,10 @@ public interface Future<V> {
                     return get();
                 } catch (InterruptedException e) {
                     interrupted = true;
-                } catch (ExecutionException | CancellationException e) {
-                    throw new IllegalStateException();
+                } catch (ExecutionException e) {
+                    throw new IllegalStateException("Task completed with exception");
+                } catch (CancellationException e) {
+                    throw new IllegalStateException("Task was cancelled");
                 }
             }
         } finally {
