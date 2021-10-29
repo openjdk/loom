@@ -25,6 +25,8 @@
 
 package jdk.internal.access;
 
+import java.lang.ref.ReferenceQueue;
+
 public interface JavaLangRefAccess {
 
     /**
@@ -43,4 +45,11 @@ public interface JavaLangRefAccess {
      * Invoked by Runtime.runFinalization()
      */
     void runFinalization();
+
+    /**
+     * Constructs a new NativeReferenceQueue.
+     *
+     * Invoked by MethodType.ConcurrentWeakInternSet
+     */
+    <T> ReferenceQueue<T> newNativeReferenceQueue();
 }
