@@ -183,8 +183,6 @@ runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               82
 # Needs --enable-preview
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
-serviceability/jvmti/negative/thrstat04/thrstat04.java                         8275001 generic-all
-
 serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
 
 #vmTestbase/nsk/stress/stack/stack008.java	                                   8252468 generic-all
