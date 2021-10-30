@@ -884,7 +884,3 @@ com/sun/jdi/EATests.java#id0                                    8264699 generic-
 jdk/jfr/event/runtime/TestVirtualThreadStartEvent.java                 0000000 generic-all
 jdk/jfr/event/runtime/TestVirtualThreadEndEvent.java                   0000000 generic-all
 
-java/awt/AppContext/ApplicationThreadsStop/ApplicationThreadsStop.java 8264674 generic-all
-sun/awt/AppContext/8012933/Test8012933.java                            8264674 generic-all
-javax/swing/plaf/metal/MetalUtils/bug6190373.java                      8264674 generic-all
-javax/swing/system/6799345/TestShutdown.java                           8264674 generic-all
