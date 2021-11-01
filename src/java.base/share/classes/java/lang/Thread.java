@@ -2267,9 +2267,9 @@ public class Thread implements Runnable {
 
     /**
      * Returns a string representation of this thread. The string representation
-     * will usually include the thread's name. The default implementation for
-     * platform threads includes the thread's identifier, name, priority, and
-     * the name of the thread group.
+     * will usually include the thread's {@linkplain #getId() identifier} and name.
+     * The default implementation for platform threads includes the thread's
+     * identifier, name, priority, and the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
