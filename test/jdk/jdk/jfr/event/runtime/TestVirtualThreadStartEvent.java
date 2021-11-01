@@ -37,8 +37,8 @@ import jdk.test.lib.jfr.Events;
  * @key jfr
  * @requires vm.hasJFR
  * @library /test/lib
- * @build jdk.jfr.event.runtime.LatchedThread
- * @run main/othervm jdk.jfr.event.runtime.TestVirtualThreadStartEvent
+ * @compile --enable-preview -source ${jdk.version} TestVirtualThreadStartEvent.java LatchedThread.java
+ * @run main/othervm --enable-preview jdk.jfr.event.runtime.TestVirtualThreadStartEvent
  */
 public class TestVirtualThreadStartEvent {
     private final static String EVENT_NAME_THREAD_START = EventNames.VirtualThreadStart;
@@ -80,12 +80,8 @@ public class TestVirtualThreadStartEvent {
         RecordedEvent event = findEventByThreadName(events, thread.getName());
         System.out.println(event);
         RecordedThread t = event.getThread();
-        // TODO Check parent thread and stack?
-        //        Thread current = Thread.currentThread();
-        //        Events.assertFrame(event, java.lang.VirtualThread.class, "run");
-        Asserts.assertEquals(event.getThread("thread").getJavaName(), thread.getName());
-        //Asserts.assertEquals(event.getThread("parentThread").getJavaName(), current.getName());
-        Asserts.assertEquals(t.isVirtual(), true);
+        Asserts.assertEquals(event.getLong("javaThreadId"), thread.getId());
+        Asserts.assertTrue(t.isVirtual());
         Asserts.assertEquals(t.getThreadGroup().getName(), "VirtualThreads");
     }
 

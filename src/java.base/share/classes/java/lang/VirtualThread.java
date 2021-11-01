@@ -250,6 +250,13 @@ class VirtualThread extends Thread {
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
+        // emit JFR event when starting
+        if (VirtualThreadStartEvent.isTurnedOn()) {
+            var event = new VirtualThreadStartEvent();
+            event.javaThreadId = getId();
+            event.commit();
+        }
+
         try {
             task.run();
         } catch (Throwable exc) {
@@ -258,6 +265,13 @@ class VirtualThread extends Thread {
 
             // pop any remaining scopes from the stack, this may block
             StackableScope.popAll();
+
+            // emit JFR event when terminating
+            if (VirtualThreadEndEvent.isTurnedOn()) {
+                var event = new VirtualThreadEndEvent();
+                event.javaThreadId = getId();
+                event.commit();
+            }
 
             // last unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin(true);
@@ -384,12 +398,6 @@ class VirtualThread extends Thread {
             termination.countDown();
         }
 
-        if (VirtualThreadEndEvent.isTurnedOn()) {
-            var event = new VirtualThreadEndEvent();
-            event.javaThreadId = getId();
-            event.commit();
-        }
-
         if (executed) {
             // notify container if thread executed
             threadContainer().onExit(this);
@@ -461,11 +469,6 @@ class VirtualThread extends Thread {
 
             // bind thread to container
             setThreadContainer(container);
-            if (VirtualThreadStartEvent.isTurnedOn()) {
-                var event = new VirtualThreadStartEvent();
-                event.javaThreadId = getId();
-                event.commit();
-            }
 
             // submit task to run thread
             submitRunContinuation();
