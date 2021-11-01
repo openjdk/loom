@@ -105,9 +105,9 @@ public:
 };
 
 class StackChunkAllocator : public MemAllocator {
-  const int _stack_size;
+  const size_t _stack_size;
 public:
-  StackChunkAllocator(Klass* klass, size_t word_size, int stack_size, Thread* thread = Thread::current())
+  StackChunkAllocator(Klass* klass, size_t word_size, size_t stack_size, Thread* thread = Thread::current())
     : MemAllocator(klass, word_size, thread),
       _stack_size(stack_size) {}
   virtual oop initialize(HeapWord* mem) const;

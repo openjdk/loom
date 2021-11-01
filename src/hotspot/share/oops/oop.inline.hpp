@@ -153,13 +153,13 @@ bool oopDesc::is_a(Klass* k) const {
   return klass()->is_subtype_of(k);
 }
 
-int oopDesc::size()  {
+size_t oopDesc::size()  {
   return size_given_klass(klass());
 }
 
-int oopDesc::size_given_klass(Klass* klass)  {
+size_t oopDesc::size_given_klass(Klass* klass)  {
   int lh = klass->layout_helper();
-  int s;
+  size_t s;
 
   // lh is now a value computed at class initialization that may hint
   // at the size.  For instances, this is positive and equal to the
@@ -192,7 +192,7 @@ int oopDesc::size_given_klass(Klass* klass)  {
       // This code could be simplified, but by keeping array_header_in_bytes
       // in units of bytes and doing it this way we can round up just once,
       // skipping the intermediate round to HeapWordSize.
-      s = (int)(align_up(size_in_bytes, MinObjAlignmentInBytes) / HeapWordSize);
+      s = align_up(size_in_bytes, MinObjAlignmentInBytes) / HeapWordSize;
 
 
       assert(s == klass->oop_size(this) || size_might_change(), "wrong array object size");
@@ -202,20 +202,20 @@ int oopDesc::size_given_klass(Klass* klass)  {
     }
   }
 
-  assert(s > 0, "Oop size must be greater than zero, not %d", s);
-  assert(is_object_aligned(s), "Oop size is not properly aligned: %d", s);
+  assert(s > 0, "Oop size must be greater than zero, not " SIZE_FORMAT, s);
+  assert(is_object_aligned(s), "Oop size is not properly aligned: " SIZE_FORMAT, s);
   return s;
 }
 
-int oopDesc::compact_size()  {
+size_t oopDesc::compact_size()  {
   return compact_size_given_klass(klass());
 }
 
-int oopDesc::compact_size(int size)  {
+size_t oopDesc::compact_size(size_t size)  {
   return compact_size_given_klass(klass(), size);
 }
 
-int oopDesc::compact_size_given_klass(Klass* klass) {
+size_t oopDesc::compact_size_given_klass(Klass* klass) {
   int lh = klass->layout_helper();
   if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     return klass->compact_oop_size(this);
@@ -223,7 +223,7 @@ int oopDesc::compact_size_given_klass(Klass* klass) {
   return size_given_klass(klass);
 }
 
-int oopDesc::compact_size_given_klass(Klass* klass, int size) {
+size_t oopDesc::compact_size_given_klass(Klass* klass, size_t size) {
   int lh = klass->layout_helper();
   if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     return klass->compact_oop_size(this);
@@ -352,17 +352,17 @@ void oopDesc::oop_iterate(OopClosureType* cl, MemRegion mr) {
 }
 
 template <typename OopClosureType>
-int oopDesc::oop_iterate_size(OopClosureType* cl) {
+size_t oopDesc::oop_iterate_size(OopClosureType* cl) {
   Klass* k = klass();
-  int size = size_given_klass(k);
+  size_t size = size_given_klass(k);
   OopIteratorClosureDispatch::oop_oop_iterate(cl, this, k);
   return size;
 }
 
 template <typename OopClosureType>
-int oopDesc::oop_iterate_size(OopClosureType* cl, MemRegion mr) {
+size_t oopDesc::oop_iterate_size(OopClosureType* cl, MemRegion mr) {
   Klass* k = klass();
-  int size = size_given_klass(k);
+  size_t size = size_given_klass(k);
   OopIteratorClosureDispatch::oop_oop_iterate(cl, this, k, mr);
   return size;
 }

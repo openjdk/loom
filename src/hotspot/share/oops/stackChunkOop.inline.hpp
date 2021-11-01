@@ -277,7 +277,7 @@ inline BitMapView stackChunkOopDesc::bitmap() const {
 #ifdef ASSERT
   BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
   assert (bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
-  assert (bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "bm.size_in_words(): %zu InstanceStackChunkKlass::bitmap_size(stack_size()): %d", bm.size_in_words(), InstanceStackChunkKlass::bitmap_size(stack_size()));
+  assert (bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "bm.size_in_words(): %zu InstanceStackChunkKlass::bitmap_size(stack_size()): %zu", bm.size_in_words(), InstanceStackChunkKlass::bitmap_size(stack_size()));
   bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
 #endif
   return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);

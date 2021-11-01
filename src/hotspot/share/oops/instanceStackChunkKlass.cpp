@@ -92,7 +92,7 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
   //  resolve_memcpy_functions(); -- too early here
 }
 
-int InstanceStackChunkKlass::oop_size(oop obj) const {
+size_t InstanceStackChunkKlass::oop_size(oop obj) const {
   // see oopDesc::size_given_klass
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
@@ -124,7 +124,7 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
 template size_t InstanceStackChunkKlass::copy<false>(oop obj, HeapWord* to_addr, size_t word_size);
 template size_t InstanceStackChunkKlass::copy<true>(oop obj, HeapWord* to_addr, size_t word_size);
 
-int InstanceStackChunkKlass::compact_oop_size(oop obj) const {
+size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   // tty->print_cr(">>>> InstanceStackChunkKlass::compact_oop_size");
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
@@ -147,8 +147,8 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (chunk->verify(), "");
 
 #ifdef ASSERT
-  int old_compact_size = obj->compact_size();
-  int old_size = obj->size();
+  size_t old_compact_size = obj->compact_size();
+  size_t old_size = obj->size();
   assert (old_compact_size <= old_size, "");
 #endif
 
@@ -164,10 +164,11 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   const int header = size_helper();
   const int from_stack_size = chunk->stack_size();
   const int to_stack_size = from_stack_size - from_sp + metadata_words();
-  const int from_bitmap_size = bitmap_size(from_stack_size);
-  const int to_bitmap_size = bitmap_size(to_stack_size);
+  const size_t from_bitmap_size = bitmap_size(from_stack_size);
+  const size_t to_bitmap_size = bitmap_size(to_stack_size);
   const bool has_bitmap = chunk->has_bitmap();
   assert (to_stack_size >= 0, "");
+  assert (to_stack_size <= from_stack_size, "");
   assert (to_stack_size > 0 || chunk->argsize() == 0, "");
 #ifdef ASSERT
   HeapWord* const start_of_stack0 = start_of_stack(obj);
@@ -317,13 +318,13 @@ public:
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset < 0) {
         offset = -offset;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
+        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "");
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
   #ifdef ASSERT
       else { // DEBUG ONLY
         offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: " PTR_FORMAT " size: %d", offset, (base->size() << LogHeapWordSize));
+        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "offset: " PTR_FORMAT " size: %zu", offset, (base->size() << LogHeapWordSize));
       }
   #endif
     }

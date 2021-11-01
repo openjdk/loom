@@ -423,7 +423,7 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   // concurrent GC.
   assert(_word_size > 0, "oop_size must be positive.");
   mem_clear(mem);
-  java_lang_Class::set_oop_size(mem, (int)_word_size);
+  java_lang_Class::set_oop_size(mem, _word_size);
   return finish(mem);
 }
 
@@ -432,7 +432,8 @@ oop StackChunkAllocator::initialize(HeapWord* mem) const {
   // Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
 
   assert(_stack_size > 0, "");
-  assert(_word_size > (size_t)_stack_size, "");
-  jdk_internal_vm_StackChunk::set_size(mem, _stack_size);
+  assert(_stack_size <= max_jint, "");
+  assert(_word_size > _stack_size, "");
+  jdk_internal_vm_StackChunk::set_size(mem, (jint)_stack_size);
   return finish(mem);
 }
