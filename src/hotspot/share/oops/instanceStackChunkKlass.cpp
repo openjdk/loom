@@ -773,69 +773,25 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
 template <typename OopT>
 class StackChunkVerifyBitmapClosure : public BitMapClosure {
   stackChunkOop _chunk;
-  intptr_t* _top;
-  intptr_t* _next;
 public:
   int _count;
-  bool _exact; // whether or not the top, and therefore the count, is exact
-  StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {
-    find_frame_top(StackChunkFrameStream<true>(chunk));
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap stack top: " INTPTR_FORMAT, p2i(_top));
-  }
+
+  StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {}
 
   bool do_bit(BitMap::idx_t index) override {
     OopT* p = _chunk->address_for_bit<OopT>(index);
-#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
-    if ((intptr_t*)p < _top && (intptr_t*)p != _chunk->sp_address() - frame::sender_sp_offset) return true; // skip oops that are not seen by the oopmap scan
-#else
-    Unimplemented();
-#endif
-
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
-            p2i(p), index, _chunk->bit_offset());
     _count++;
-    if (SafepointSynchronize::is_at_safepoint()) return true;
 
-    oop obj = safe_load(p);
-    assert ((!_exact && (intptr_t*)p < _next) || obj == nullptr || is_good_oop(obj),
-            "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
-            p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
-    return true; // continue processing
-  }
-
-  void find_frame_top(const StackChunkFrameStream<true>& f) {
-    // We do this just so that the count is the same as the oopmap scan for verification purposes, but for GC traveral it's not important.
-    _next = nullptr;
-    _exact = true;
-    if (f.is_interpreted()) {
-      ResourceMark rm;
-      InterpreterOopMap mask;
-      frame fr = f.to_frame();
-      fr.interpreted_frame_oop_map(&mask);
-#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
-      _top = fr.addr_at(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
-#else
-      Unimplemented();
-      _top = 0;
-#endif
-    } else if (f.is_compiled()) {
-      Method* callee = f.cb()->as_compiled_method()->attached_method_before_pc(f.pc());
-      if (callee != nullptr) {
-        int outgoing_args_words = (callee->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
-        _top = f.unextended_sp() + outgoing_args_words;
-      } else {
-        _top = f.unextended_sp();
-#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
-        _next = _top + f.cb()->frame_size() - frame::sender_sp_offset;
-#else
-        Unimplemented();
-        _next = 0;
-#endif
-        _exact = false;
-      }
-    } else {
-      _top = f.unextended_sp();
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap p: " INTPTR_FORMAT " i: " SIZE_FORMAT, p2i(p), index);
+    
+    if (!SafepointSynchronize::is_at_safepoint()) {
+      oop obj = safe_load(p);
+      assert (obj == nullptr || is_good_oop(obj),
+              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
+              p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
     }
+
+    return true; // continue processing
   }
 };
 
@@ -1041,20 +997,17 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
   if (chunk->has_bitmap()) {
     assert (chunk->bitmap().size() == chunk->bit_offset() + (size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)), "bitmap().size(): %zu bit_offset: %zu stack_size: %d", chunk->bitmap().size(), chunk->bit_offset(), chunk->stack_size());
-    bool exact;
     int oop_count;
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(chunk);
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((narrowOop*)chunk->end_address()));
-      exact = bitmap_closure._exact;
       oop_count = bitmap_closure._count;
     } else {
       StackChunkVerifyBitmapClosure<oop> bitmap_closure(chunk);
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((oop*)chunk->end_address()));
-      exact = bitmap_closure._exact;
       oop_count = bitmap_closure._count;
     }
-    assert (exact ? oop_count == closure._num_oops : oop_count >= closure._num_oops, "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
+    assert (oop_count == closure._num_oops, "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
   }
 
   return true;
