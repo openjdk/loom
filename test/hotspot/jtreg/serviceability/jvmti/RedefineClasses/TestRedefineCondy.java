@@ -32,6 +32,7 @@
  *          java.instrument
  *          jdk.jartool/sun.tools.jar
  * @compile RedefineCondy.jasm
+ * @build jdk.test.lib.helpers.ClassFileInstaller jdk.test.lib.compiler.InMemoryJavaCompiler
  * @run main RedefineClassHelper
  * @run main/othervm -javaagent:redefineagent.jar TestRedefineCondy
  */
