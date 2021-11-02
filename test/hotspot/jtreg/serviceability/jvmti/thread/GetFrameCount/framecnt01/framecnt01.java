@@ -78,6 +78,9 @@ public class framecnt01 {
         while (!vThread1Started) {
             Thread.sleep(1);
         }
+        // Let vthread1 to park
+        Thread.sleep(10);
+
         checkFrames(vThread1, false, 14);
         LockSupport.unpark(vThread1);
         vThread1.join();
