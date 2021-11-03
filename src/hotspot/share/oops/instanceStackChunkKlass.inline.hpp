@@ -548,6 +548,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
   if (LIKELY(chunk->has_bitmap())) {
     intptr_t* start = chunk->sp_address() - metadata_words();
     intptr_t* end = chunk->end_address();
+    // mr.end() can actually be less than start. In that case, we only walk the metadata
     if ((intptr_t*)mr.start() > start) start = (intptr_t*)mr.start();
     if ((intptr_t*)mr.end()   < end)   end   = (intptr_t*)mr.end();
     oop_oop_iterate_stack_helper(chunk, closure, start, end);
@@ -583,12 +584,14 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
     mark_methods(chunk, closure);
   }
 
-  if (UseCompressedOops) {
-    StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
-  } else {
-    StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+  if (end > start) {
+    if (UseCompressedOops) {
+      StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
+    } else {
+      StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+    }
   }
 }
 
