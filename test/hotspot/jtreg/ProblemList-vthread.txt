@@ -321,7 +321,7 @@ runtime/cds/appcds/sharedStrings/SharedStringsBasicPlus.java
 runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java
 runtime/cds/appcds/sharedStrings/SharedStringsStress.java
 runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java
-
+runtime/cds/appcds/LambdaContainsOldInf.java
 runtime/cds/appcds/NonJarInClasspath.java
 runtime/cds/appcds/OldInfExtendsInfDefMeth.java
 runtime/cds/appcds/OldSuperClass.java
