@@ -95,23 +95,13 @@ public class ThreadContainers {
      * The parent of the root container is null.
      */
     public static ThreadContainer parent(ThreadContainer container) {
-        ThreadContainer parent = null;
-        StackableScope scope = container.previous();
-        while (parent == null && scope != null) {
-            if (scope instanceof ThreadContainer tc) {
-                parent = tc;
-            } else {
-                scope = scope.previous();
-            }
-        }
-        if (parent != null)
-            return parent;
-
-        Thread owner = container.owner();
-        if (owner != null && (parent = JLA.threadContainer(owner)) != null)
-            return parent;
         ThreadContainer root = root();
-        return (container != root) ? root : null;
+        if (container == root) {
+            return null;
+        } else {
+            ThreadContainer parent = container.enclosingScope(ThreadContainer.class);
+            return (parent != null) ? parent : root;
+        }
     }
 
     /**
@@ -193,6 +183,9 @@ public class ThreadContainers {
     private static class RootContainer extends ThreadContainer {
         static final RootContainer INSTANCE = new RootContainer();
         private static final LongAdder VTHREAD_COUNT = new LongAdder();
+        private RootContainer() {
+            super(true);
+        }
         @Override
         public ThreadContainer push() {
             throw new UnsupportedOperationException();

@@ -55,6 +55,7 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
     private volatile boolean closed;
 
     private SharedThreadContainer(String name, Supplier<Stream<Thread>> threadsSupplier) {
+        super(true);
         this.name = name;
         if (threadsSupplier != null) {
             this.threadsSupplier = threadsSupplier;

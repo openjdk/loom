@@ -33,14 +33,25 @@ import java.util.stream.Stream;
 public abstract class ThreadContainer extends StackableScope {
 
     /**
+     * Creates a ThreadContainer owned by the current thread.
+     */
+    protected ThreadContainer() {
+        super(false);
+    }
+
+    /**
+     * Creates a ThreadContainer.
+     * @param shared true for a shared container, false for a container
+     * owned by the current thread
+     */
+    ThreadContainer(boolean shared) {
+        super(shared);
+    }
+
+    /**
      * Return the container name, null if not named.
      */
     public abstract String name();
-
-    /**
-     * Return the owner, null if not owned.
-     */
-    public abstract Thread owner();
 
     /**
      * Returns the parent of this container or null if this is the root container.

@@ -458,14 +458,8 @@ class VirtualThread extends Thread {
         boolean started = false;
         container.onStart(this); // may throw
         try {
-            // inherit scope locals from structured container
-            Object bindings = container.scopeLocalBindings();
-            if (bindings != null) {
-                if (Thread.currentThread().scopeLocalBindings != bindings) {
-                    throw new IllegalStateException("Scope local bindings have changed");
-                }
-                this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-            }
+            // scope locals may be inherited
+            inheritScopeLocalBindings(container);
 
             // bind thread to container
             setThreadContainer(container);

@@ -32,20 +32,61 @@ import jdk.internal.access.SharedSecrets;
  */
 public class StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
+    private final Thread owner;
     private volatile StackableScope previous;
 
     /**
-     * Creates a new stackable scope.
+     * Creates a stackable scope.
      */
-    public StackableScope() { }
+    StackableScope(boolean shared) {
+        if (shared) {
+            this.owner = null;
+        } else {
+            this.owner = Thread.currentThread();
+        }
+    }
+
+    /**
+     * Creates a stackable scope owned by the current thread.
+     */
+    public StackableScope() {
+        this(false);
+    }
+
+    /**
+     * Returns the scope owner or null is not owned.
+     */
+    public Thread owner() {
+        return owner;
+    }
 
     /**
      * Pushes this scope onto the current thread's scope stack.
      */
     public StackableScope push() {
+        if (owner == null)
+            throw new UnsupportedOperationException();
+        assert Thread.currentThread() == owner;
         previous = head();
         setHead(this);
         return this;
+    }
+
+    /**
+     * Pops this scope from the current thread's scope stack if the scope is
+     * at the top of stack.
+     * @return true if the pop succeeded, false if this scope is not the top of stack
+     */
+    public boolean tryPop() {
+        assert Thread.currentThread() == owner;
+        if (head() == this) {
+            setHead(previous);
+            previous = null;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -54,19 +95,20 @@ public class StackableScope {
      * For well behaved usages, this scope is at the top of the stack. It is popped
      * from the stack and the method returns {@code true}.
      *
-     * If not used correctly, and this scope is not at the top of the stack, then
-     * the intermediate scopes between this scope and the top of the stack are
-     * removed and closed if possible. At this time, only thread containers can be
-     * forcefully closed and removed from the stack. This scope is then removed
-     * from the stack and the method returns {@code false}.
+     * If this scope is not at the top of the stack then this method attempts to
+     * close each of the intermediate scopes by invoking their {@link #tryClose()}
+     * method. If tryClose succeeds then the scope is removed from the stack. When
+     * done, this scope is removed from the stack and {@code false} is returned.
      *
-     * @return true if this cope was at the top of the stack, false if this scope
-     * was not at the top of the stack
+     * This method does nothing, and returns {@code false}, if this scope is not
+     * on the current thread's scope stack.
+     *
+     * @return true if this scope was at the top of the stack, otherwise false
      */
-    public boolean pop() {
+    public boolean popForcefully() {
+        assert Thread.currentThread() == owner;
         final StackableScope head = head();
         if (head == this) {
-            // restore ref to previous scope
             setHead(previous);
             previous = null;
             return true;
@@ -96,6 +138,7 @@ public class StackableScope {
         if (head != null) {
             StackableScope current = head;
             while (current != null) {
+                assert Thread.currentThread() == current.owner();
                 current.tryClose();
                 current = current.previous();
             }
@@ -104,16 +147,44 @@ public class StackableScope {
     }
 
     /**
-     * Returns the scope that this scope encloses, null if none.
+     * Returns the scope that encloses this scope.
+     */
+    public StackableScope enclosingScope() {
+        StackableScope previous = this.previous;
+        if (previous != null)
+            return previous;
+        if (owner != null)
+            return JLA.threadContainer(owner);
+        return null;
+    }
+
+    /**
+     * Returns the scope of the given type that encloses this scope.
+     */
+    public <T extends StackableScope> T enclosingScope(Class<T> type) {
+        StackableScope current = enclosingScope();
+        while (current != null) {
+            if (type.isInstance(current)) {
+                @SuppressWarnings("unchecked")
+                T tmp = (T) current;
+                return tmp;
+            }
+            current = current.enclosingScope();
+        }
+        return null;
+    }
+
+    /**
+     * Returns the scope that directly encloses this scope, null if none.
      */
     StackableScope previous() {
         return previous;
     }
 
     /**
-     * Returns the scope that encloses this scope, null if not enclosed.
+     * Returns the scope that this scope directly encloses, null if none.
      */
-    StackableScope next() {
+    private StackableScope next() {
         assert contains(this);
         StackableScope current = head();
         StackableScope next = null;
@@ -129,7 +200,11 @@ public class StackableScope {
      * This method should not pop the scope from the stack.
      * @return true if this method closed the scope, false if it failed
      */
-    public boolean tryClose() {
+    protected boolean tryClose() {
+        if (owner == null)
+            throw new UnsupportedOperationException();
+        if (Thread.currentThread() != owner)
+            throw new IllegalCallerException();
         return false;
     }
 

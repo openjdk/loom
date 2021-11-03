@@ -245,6 +245,20 @@ public class Thread implements Runnable {
 
     ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
 
+    ScopeLocal.Snapshot scopeLocalBindings() {
+        return scopeLocalBindings;
+    }
+
+    void inheritScopeLocalBindings(ThreadContainer container) {
+        Object bindings = container.scopeLocalBindings();
+        if (bindings != null) {
+            if (Thread.currentThread().scopeLocalBindings != bindings) {
+                throw new IllegalStateException("Scope local bindings have changed");
+            }
+            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+        }
+    }
+
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
      * at 2 as this class cannot be used during early startup to generate the
@@ -1440,14 +1454,8 @@ public class Thread implements Runnable {
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // inherit scope locals from structured container
-                Object bindings = container.scopeLocalBindings();
-                if (bindings != null) {
-                    if (Thread.currentThread().scopeLocalBindings != bindings) {
-                        throw new IllegalStateException("Scope local bindings have changed");
-                    }
-                    this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-                }
+                // scope locals may be inherited
+                inheritScopeLocalBindings(container);
 
                 // bind thread to container
                 setThreadContainer(container);
