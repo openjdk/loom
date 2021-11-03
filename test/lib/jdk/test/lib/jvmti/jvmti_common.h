@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -210,7 +210,7 @@ print_thread_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread_obj) {
   check_jvmti_status(jni, jvmti->GetThreadInfo(thread_obj, &thread_info), "Error in GetThreadInfo");
   check_jvmti_status(jni, jvmti->GetThreadState(thread_obj, &thread_state), "Error in GetThreadInfo");
   const char* state = TranslateState(thread_state);
-  LOG("Thread: %p, name: %s, state: %s, attrs: %s %s\n", thread_obj, thread_info.name, TranslateState(thread_state),
+  LOG("Thread: %p, name: %s, state(%x): %s, attrs: %s %s\n", thread_obj, thread_info.name, thread_state, TranslateState(thread_state),
          (jni->IsVirtualThread(thread_obj)? "virtual": "kernel"), (thread_info.is_daemon ? "daemon": ""));
 }
 

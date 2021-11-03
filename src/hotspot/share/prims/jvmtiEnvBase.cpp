@@ -719,7 +719,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
     JavaThreadState jts = jt->thread_state();
 
     if (jt->is_thread_suspended() ||
-        (jt->vthread() == thread_oop && jt->is_suspended())) {
+        ((jt->mounted_vthread() == NULL || jt->mounted_vthread() == thread_oop) && jt->is_suspended())) {
       // Suspended non-virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
@@ -2317,7 +2317,8 @@ VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
 void
 VThreadGetThreadClosure::do_thread(Thread *target) {
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(target, carrier_thread);}
+  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(target, carrier_thread);
+}
 
 void
 VThreadGetStackTraceClosure::do_thread(Thread *target) {
