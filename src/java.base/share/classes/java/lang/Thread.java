@@ -671,11 +671,11 @@ public class Thread implements Runnable {
                     this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
                 }
                 ClassLoader parentLoader = contextClassLoader(parent);
-                if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
-                    this.contextClassLoader = parentLoader;
-                } else if (VM.isBooted()) {
+                if (VM.isBooted() && parentLoader == ClassLoaders.NOT_SUPPORTED) {
                     // parent does not support thread locals so no CCL to inherit
                     this.contextClassLoader = ClassLoader.getSystemClassLoader();
+                } else {
+                    this.contextClassLoader = parentLoader;
                 }
             } else if (VM.isBooted()) {
                 // default CCL to the system class loader when not inheriting
@@ -2383,7 +2383,6 @@ public class Thread implements Runnable {
             NOT_SUPPORTED = AccessController.doPrivileged(pa);
         }
     }
-
 
     /**
      * Returns {@code true} if and only if the current thread holds the
