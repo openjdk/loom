@@ -25,6 +25,8 @@
 
 package java.lang.ref;
 
+import jdk.internal.misc.Unsafe;
+import jdk.internal.misc.VM;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.access.JavaLangRefAccess;
@@ -191,26 +193,26 @@ public abstract class Reference<T> {
      */
     private static class ReferenceHandler extends Thread {
 
-        private static void ensureClassInitialized(Class<?> clazz) {
-            try {
-                Class.forName(clazz.getName(), true, clazz.getClassLoader());
-            } catch (ClassNotFoundException e) {
-                throw (Error) new NoClassDefFoundError(e.getMessage()).initCause(e);
-            }
-        }
-
-        static {
-            // pre-load and initialize Cleaner class so that we don't
-            // get into trouble later in the run loop if there's
-            // memory shortage while loading/initializing it lazily.
-            ensureClassInitialized(Cleaner.class);
-        }
-
         ReferenceHandler(ThreadGroup g, String name) {
             super(g, null, name, 0, false);
         }
 
         public void run() {
+
+            // delay until init phase 1 completes
+            while (VM.initLevel() < 1) {
+                try {
+                    VM.awaitInitLevel(1);
+                } catch (InterruptedException x) {
+                    // ignore and continue
+                }
+            }
+
+            // pre-load and initialize Cleaner class so that we don't
+            // get into trouble later in the run loop if there's
+            // memory shortage while loading/initializing it lazily.
+            Unsafe.getUnsafe().ensureClassInitialized(Cleaner.class);
+
             while (true) {
                 processPendingReferences();
             }

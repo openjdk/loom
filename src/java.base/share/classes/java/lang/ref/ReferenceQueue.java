@@ -128,7 +128,7 @@ public class ReferenceQueue<T> {
     }
 
     final Reference<? extends T> remove0(long timeout) 
-        throws IllegalArgumentException, InterruptedException { // must hold lock
+            throws IllegalArgumentException, InterruptedException { // must hold lock
         Reference<? extends T> r = poll0();
         if (r != null) return r;
         long start = System.nanoTime();

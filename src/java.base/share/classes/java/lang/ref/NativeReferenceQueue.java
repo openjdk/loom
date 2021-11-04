@@ -23,14 +23,7 @@
  * questions.
  */
 
-
 package java.lang.ref;
-
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
-import jdk.internal.misc.VM;
 
 /**
  * An implementation of a ReferenceQueue that uses native monitors.
@@ -71,9 +64,11 @@ final class NativeReferenceQueue<T> extends ReferenceQueue<T> {
 
     @Override
     public Reference<? extends T> remove(long timeout) 
-        throws IllegalArgumentException, InterruptedException {
-        if (timeout < 0) throw new IllegalArgumentException("Negative timeout value");
-        if (timeout == 0) return remove();
+            throws IllegalArgumentException, InterruptedException {
+        if (timeout < 0)
+            throw new IllegalArgumentException("Negative timeout value");
+        if (timeout == 0)
+            return remove();
 
         synchronized(lock) {
             return remove0(timeout);
