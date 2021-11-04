@@ -41,14 +41,14 @@ static int system_threads_count;
 static const char *names0[] = {"main"};
 static const char *names1[] = {"main", "thread1"};
 static const char *names2[] = {"main", "Thread-"};
-static const char *names3[] = {"main", "ForkJoinPool-", "VirtualThread-unparker"};
+static const char *names3[] = {"main", "ForkJoinPool-"};
 
 /*
  * Expected number and names of threads started by test for each test point
  */
 static info expected_thread_info[] = {
     {1, names0}, {1, names0}, {2, names1},
-    {1, names0}, {2, names2},  {3, names3}
+    {1, names0}, {2, names2},  {2, names3}
 };
 
 const char VTHREAD_PREFIX[] = "ForkJoinPool";

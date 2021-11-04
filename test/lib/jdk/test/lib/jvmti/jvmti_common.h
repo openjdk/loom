@@ -677,7 +677,11 @@ isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
   static const char *graal_management_bean_registration_thread_name =
                         "HotSpotGraalManagement Bean Registration";
   static const char *graal_compiler_thread_name_prefix = "JVMCI CompilerThread";
-  static const size_t prefixLength = strlen(graal_compiler_thread_name_prefix);
+  static const size_t graal_prefix_length = strlen(graal_compiler_thread_name_prefix);
+
+  static const char *unparker_thread_name_prefix = "VirtualThread-unparker";
+  static const size_t unparker_prefix_length = strlen(unparker_thread_name_prefix);
+
 
   jvmtiThreadInfo threadinfo;
   jvmtiError err = jvmti->GetThreadInfo(thread, &threadinfo);
@@ -693,8 +697,11 @@ isThreadExpected(jvmtiEnv *jvmti, jthread thread) {
   if (strcmp(threadinfo.name, graal_management_bean_registration_thread_name) == 0)
     return 0;
 
-  if ((strlen(threadinfo.name) > prefixLength) &&
-      strncmp(threadinfo.name, graal_compiler_thread_name_prefix, prefixLength) == 0) {
+  if ((strlen(threadinfo.name) > graal_prefix_length) &&
+      strncmp(threadinfo.name, graal_compiler_thread_name_prefix, graal_prefix_length) == 0) {
+    return 0;
+  }
+  if (strncmp(threadinfo.name, unparker_thread_name_prefix, unparker_prefix_length) == 0) {
     return 0;
   }
   return 1;
