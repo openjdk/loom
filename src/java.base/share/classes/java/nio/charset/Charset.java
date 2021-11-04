@@ -372,7 +372,13 @@ public abstract class Charset
     }
 
     // gate to prevent recursive provider lookups
-    private static final Gate LOOKUP_GATE = Gate.create();
+    private static class Holder {
+        static final Gate LOOKUP_GATE = Gate.create();
+    }
+
+    private static Gate gate() {
+        return Holder.LOOKUP_GATE;
+    }
 
     @SuppressWarnings("removal")
     private static Charset lookupViaProviders(final String charsetName) {
@@ -388,7 +394,7 @@ public abstract class Charset
         if (!VM.isBooted())
             return null;
 
-        if (!LOOKUP_GATE.tryEnter())
+        if (!gate().tryEnter())
             // Avoid recursive provider lookups
             return null;
         try {
@@ -407,7 +413,7 @@ public abstract class Charset
                 });
 
         } finally {
-            LOOKUP_GATE.exit();
+            gate().exit();
         }
     }
 
