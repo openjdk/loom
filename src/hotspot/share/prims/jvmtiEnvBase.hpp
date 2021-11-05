@@ -87,6 +87,14 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
   static jvmtiError check_thread_list(jint count, const jthread* list);
   static bool is_in_thread_list(jint count, const jthread* list, oop jt_oop);
+
+  // check if thread_oop represents a passive carrier thread
+  static bool is_passive_carrier_thread(JavaThread* java_thread, oop thread_oop) {
+     return java_thread != NULL && java_thread->mounted_vthread() != NULL
+                                && java_thread->threadObj() == thread_oop
+                                && java_thread->vthread() != thread_oop;
+  }
+
  private:
 
   enum {

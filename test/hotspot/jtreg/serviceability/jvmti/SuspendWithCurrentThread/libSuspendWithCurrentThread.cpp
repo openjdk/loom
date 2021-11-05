@@ -53,8 +53,9 @@ JNIEXPORT void JNICALL
 Java_ThreadToSuspend_suspendTestedThreads(JNIEnv *jni, jclass cls) {
   jvmtiError* results = NULL;
   jvmtiError err;
+  const char* tname = get_thread_name(jvmti, jni, NULL); // current thread name
 
-  LOG("\nsuspendTestedThreads: started\n");
+  LOG("\nsuspendTestedThreads: started by thread: %s\n", tname);
   err = jvmti->Allocate((threads_count * sizeof(jvmtiError)),
                         (unsigned char**)&results);
   check_jvmti_status(jni, err, "suspendTestedThreads: error in JVMTI Allocate results array");
@@ -66,13 +67,14 @@ Java_ThreadToSuspend_suspendTestedThreads(JNIEnv *jni, jclass cls) {
 
   LOG("suspendTestedThreads: check and print SuspendThreadList results:\n");
   for (int i = 0; i < threads_count; i++) {
-    LOG("  thread #%d: (%d)\n", i, (int)results[i]);
+    LOG("  thread #%d suspend errcode: (%d)\n", i, (int)results[i]);
     check_jvmti_status(jni, results[i], "suspendTestedThreads: error in SuspendThreadList results[i]");
   }
-  LOG("suspendTestedThreads: finished\n");
+  LOG("suspendTestedThreads: finished by thread: %s\n", tname);
 
   err = jvmti->Deallocate((unsigned char*)results);
   check_jvmti_status(jni, err, "suspendTestedThreads: error in JVMTI Deallocate results");
+  err = jvmti->Deallocate((unsigned char*)tname);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -117,7 +119,7 @@ Java_SuspendWithCurrentThread_resumeTestedThreads(JNIEnv *jni, jclass cls) {
 
   LOG("resumeTestedThreads: check and print ResumeThreadList results:\n");
   for (int i = 0; i < threads_count; i++) {
-    LOG("  thread #%d: (%d)\n", i, (int)results[i]);
+    LOG("  thread #%d resume errcode: (%d)\n", i, (int)results[i]);
     check_jvmti_status(jni, results[i], "resumeTestedThreads: error in ResumeThreadList results[i]");
   }
 

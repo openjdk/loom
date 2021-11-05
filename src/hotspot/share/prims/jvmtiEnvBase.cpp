@@ -1545,11 +1545,13 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
+  bool is_passive_cthread = is_passive_carrier_thread(java_thread, thread_h());
+
   // A case of non-virtual thread.
   if (!is_virtual) {
     // Thread.suspend() is used in some tests. It sets jt->is_suspended() only.
-    if (java_thread->is_thread_suspended() ||
-        (thread_h() == java_thread->vthread() && java_thread->is_suspended())) {
+    if (java_thread->is_thread_suspended() || 
+        (!is_passive_cthread && java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }
     java_thread->set_thread_suspended();
@@ -1565,7 +1567,12 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
           (is_virtual && JvmtiVTSuspender::is_vthread_suspended(thread_h())),
          "sanity check");
 
-  if (is_virtual || thread_h() == java_thread->vthread()) {
+  // Avoid deadlock in JvmtiSuspendControl::suspend for current thread.
+  // It needs to exit jvmtiVTMTDisabler before self suspending.
+  // An attempt to suspend in handshake a passive carrier thread will result
+  // in suspension of a mounted virtual thread. So, we just mark it as suspended,
+  // so it will be suspended in handshake at virtual thread unmount transition.
+  if (java_thread != current && !is_passive_cthread) {
     assert(single_suspend || is_virtual, "SuspendAllVirtualThreads should never suspend non-virtual threads");
     // Case of mounted virtual or attached carrier thread.
     if (!JvmtiSuspendControl::suspend(java_thread)) {
@@ -2051,7 +2058,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
   JavaThread* java_thread = JavaThread::cast(target);
   assert(java_thread == _state->get_thread(), "Must be");
 
-  if (!self && !java_thread->is_suspended()) {
+  if (!self && !java_thread->is_suspended() && !java_thread->is_thread_suspended()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     return;
   }

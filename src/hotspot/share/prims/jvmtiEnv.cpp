@@ -944,14 +944,18 @@ jvmtiError
 JvmtiEnv::SuspendThread(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   ThreadsListHandle tlh;
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
-  if (java_thread != NULL && java_thread == JavaThread::current()) {
+  // An attempt to suspend in handshake a passive carrier thread will result
+  // in suspension of a mounted virtual thread. So, we just mark it as suspended,
+  // so it will be suspended in handshake at virtual thread unmount transition.
+  if (java_thread == JavaThread::current() &&
+      !is_passive_carrier_thread(java_thread, thread_oop)) {
     // current thread will be suspended in the ~JvmtiVTMTDisabler
     vtmt_disabler.set_self_suspend();
   }
@@ -968,14 +972,13 @@ JvmtiEnv::SuspendThread(jthread thread) {
 // results - pre-checked for NULL
 jvmtiError
 JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
-  oop thread_oop = NULL;
-  JavaThread *java_thread = NULL;
   JavaThread* current = JavaThread::current();
-
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   ThreadsListHandle tlh(current);
 
   for (int i = 0; i < request_count; i++) {
+    JavaThread *java_thread = NULL;
+    oop thread_oop = NULL;
     jthread thread = request_list[i];
     jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
     if (err != JVMTI_ERROR_NONE) {
@@ -984,7 +987,11 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
         continue;
       }
     }
-    if (java_thread == current) {
+    // An attempt to suspend in handshake a passive carrier thread will result
+    // in suspension of a mounted virtual thread. So, we just mark it as suspended,
+    // so it will be suspended in handshake at virtual thread unmount transition.
+    if (java_thread == JavaThread::current() &&
+        !is_passive_carrier_thread(java_thread, thread_oop)) {
       // current thread will be suspended in the ~JvmtiVTMTDisabler
       vtmt_disabler.set_self_suspend();
     }
@@ -1008,7 +1015,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
     return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
   }
   ResourceMark rm;
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   GrowableArray<jthread>* elist = new GrowableArray<jthread>(except_count);
 
   // Collect threads from except_list which resumed status must be restored.
@@ -1056,7 +1063,7 @@ jvmtiError
 JvmtiEnv::ResumeThread(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   ThreadsListHandle tlh;
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
@@ -1075,7 +1082,7 @@ jvmtiError
 JvmtiEnv::ResumeThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
   oop thread_oop = NULL;
   JavaThread* java_thread = NULL;
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   ThreadsListHandle tlh;
 
   for (int i = 0; i < request_count; i++) {
@@ -1104,7 +1111,7 @@ JvmtiEnv::ResumeAllVirtualThreads(jint except_count, const jthread* except_list)
     return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
   }
   ResourceMark rm;
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMTDisabler vtmt_disabler(true);
   GrowableArray<jthread>* elist = new GrowableArray<jthread>(except_count);
 
   // Collect threads from except_list which suspended status must be restored.
@@ -1818,6 +1825,7 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
 // java_thread - protected by ThreadsListHandle and pre-checked
 jvmtiError
 JvmtiEnv::PopFrame(JavaThread* java_thread) {
+  JvmtiVTMTDisabler vtmt_disabler;
   // retrieve or create the state
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
