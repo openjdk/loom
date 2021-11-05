@@ -205,6 +205,7 @@ runtime/cds/appcds/StaticArchiveWithLambda.java
 runtime/cds/appcds/TestCombinedCompressedFlags.java
 runtime/cds/appcds/TestWithProfiler.java
 runtime/cds/appcds/TestEpsilonGCWithCDS.java
+runtime/cds/appcds/TestSerialGCWithCDS.java
 runtime/cds/appcds/TestZGCWithCDS.java
 runtime/cds/appcds/UnusedCPDuringDump.java
 runtime/cds/appcds/VerifierTest_1A.java
@@ -224,6 +225,7 @@ runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java
 runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
 runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
 runtime/cds/appcds/cacheObject/RedefineClassTest.java
+runtime/cds/appcds/cacheObject/VerifyArchivedFields.java
 runtime/cds/appcds/condy/CondyHelloTest.java
 runtime/cds/appcds/customLoader/CustomClassListDump.java
 runtime/cds/appcds/customLoader/HelloCustom.java
@@ -251,6 +253,7 @@ runtime/cds/appcds/dynamicArchive/HelloDynamic.java
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java
 runtime/cds/appcds/dynamicArchive/JITInteraction.java
+runtime/cds/appcds/dynamicArchive/LambdaContainsOldInf.java
 runtime/cds/appcds/dynamicArchive/LambdaCustomLoader.java
 runtime/cds/appcds/dynamicArchive/LambdaForClassInBaseArchive.java
 runtime/cds/appcds/dynamicArchive/LambdaInBaseArchive.java
@@ -305,6 +308,7 @@ runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java
 runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java
 runtime/cds/appcds/redefineClass/RedefineBasicTest.java
