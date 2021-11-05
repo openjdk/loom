@@ -180,9 +180,9 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
 # Sets SegmentedCodeCache with -Xint
-compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      0000000 generic-all
-compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           0000000 generic-all
-compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              0000000 generic-all
+compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      8276711 generic-all
+compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           8276711 generic-all
+compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              8276711 generic-all
 
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
@@ -200,7 +200,7 @@ vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.j
 vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java                  0000000 generic-all
 
 # Stratum mismatch
-vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            0000000 generic-all
-vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            0000000 generic-all
+vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
+vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
 gtest/GTestWrapper.java                                                       0000000 generic-all
