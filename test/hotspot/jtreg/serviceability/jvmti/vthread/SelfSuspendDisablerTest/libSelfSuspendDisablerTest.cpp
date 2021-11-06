@@ -50,14 +50,12 @@ Java_SelfSuspendDisablerTest_isSuspended(JNIEnv* jni, jclass cls, jthread thread
 
 JNIEXPORT void JNICALL
 Java_SelfSuspendDisablerTest_suspendAllVirtualThreads(JNIEnv* jni, jclass cls) {
-  jthread except_list[0] = {};
-  check_jvmti_status(jni, jvmti->SuspendAllVirtualThreads(0, except_list), "Error in SuspendAllVirtualThreads");
+  check_jvmti_status(jni, jvmti->SuspendAllVirtualThreads(0, NULL), "Error in SuspendAllVirtualThreads");
 }
 
 JNIEXPORT void JNICALL
 Java_SelfSuspendDisablerTest_resumeAllVirtualThreads(JNIEnv* jni, jclass cls) {
-  jthread except_list[0] = {};
-  check_jvmti_status(jni, jvmti->ResumeAllVirtualThreads(0, except_list), "Error in ResumeAllVirtualThreads");
+  check_jvmti_status(jni, jvmti->ResumeAllVirtualThreads(0, NULL), "Error in ResumeAllVirtualThreads");
 }
 
 }
