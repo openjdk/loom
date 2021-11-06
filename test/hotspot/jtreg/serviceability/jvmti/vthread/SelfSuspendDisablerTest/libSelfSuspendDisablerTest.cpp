@@ -30,7 +30,7 @@ static jvmtiEnv *jvmti = NULL;
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_SelfSuspendDisablerTest_resume(JNIEnv* jni, jclass cls,jthread thread) {
+Java_SelfSuspendDisablerTest_resume(JNIEnv* jni, jclass cls, jthread thread) {
   check_jvmti_status(jni, jvmti->ResumeThread(thread), "Error in ResumeThread");
 }
 
@@ -46,6 +46,18 @@ Java_SelfSuspendDisablerTest_isSuspended(JNIEnv* jni, jclass cls, jthread thread
   jint state;
   check_jvmti_status(jni, jvmti->GetThreadState(thread, &state), "Error in GetThreadState");
   return (state & JVMTI_THREAD_STATE_SUSPENDED) != 0;
+}
+
+JNIEXPORT void JNICALL
+Java_SelfSuspendDisablerTest_suspendAllVirtualThreads(JNIEnv* jni, jclass cls) {
+  jthread except_list[0] = {};
+  check_jvmti_status(jni, jvmti->SuspendAllVirtualThreads(0, except_list), "Error in SuspendAllVirtualThreads");
+}
+
+JNIEXPORT void JNICALL
+Java_SelfSuspendDisablerTest_resumeAllVirtualThreads(JNIEnv* jni, jclass cls) {
+  jthread except_list[0] = {};
+  check_jvmti_status(jni, jvmti->ResumeAllVirtualThreads(0, except_list), "Error in ResumeAllVirtualThreads");
 }
 
 }
@@ -64,6 +76,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   memset(&caps, 0, sizeof(caps));
   caps.can_suspend = 1;
+  caps.can_support_virtual_threads = 1;
 
   err = jvmti->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {

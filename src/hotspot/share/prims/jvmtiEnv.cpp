@@ -956,7 +956,7 @@ JvmtiEnv::SuspendThread(jthread thread) {
       return err;
     }
 
-    // Do not use JvmtiVTMTDisabler in context of self suspend as it will cause deadlocks.
+    // Do not use JvmtiVTMTDisabler in context of self suspend to avoid deadlocks.
     if (java_thread != current) {
       err = suspend_thread(thread_oop, java_thread, true, NULL); // single suspend
       return err;
@@ -976,7 +976,7 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
   JavaThread* current = JavaThread::current();
   ThreadsListHandle tlh(current);
   HandleMark hm(current);
-  Handle self_tobj;
+  Handle self_tobj = Handle(current, NULL);
   int self_idx = -1;
 
   {
@@ -1002,8 +1002,8 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
     }
   }
   // Self suspend after all other suspends if necessary.
-  // Do not use JvmtiVTMTDisabler in context of self suspend as it will cause deadlocks.
-  if (self_idx != -1) {
+  // Do not use JvmtiVTMTDisabler in context of self suspend to avoid deadlocks.
+  if (self_tobj() != NULL) {
     // there should not be any error for current java_thread
     results[self_idx] = suspend_thread(self_tobj(), current, true, NULL); // single suspend
   }
@@ -1014,6 +1014,7 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
 
 jvmtiError
 JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list) {
+  JavaThread* current = JavaThread::current();
   jvmtiError err = JvmtiEnvBase::check_thread_list(except_count, except_list);
   if (err != JVMTI_ERROR_NONE) {
     return err;
@@ -1021,43 +1022,57 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
   if (!JvmtiExport::can_support_virtual_threads()) {
     return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
   }
-  ResourceMark rm;
-  JvmtiVTMTDisabler vtmt_disabler(true);
-  GrowableArray<jthread>* elist = new GrowableArray<jthread>(except_count);
+  HandleMark hm(current);
+  Handle self_tobj = Handle(current, NULL);
 
-  // Collect threads from except_list which resumed status must be restored.
-  for (int idx = 0; idx < except_count; idx++) {
-    jthread thread = except_list[idx];
-    oop thread_oop = JNIHandles::resolve_external_guard(thread);
-    if (!JvmtiVTSuspender::is_vthread_suspended(thread_oop)) {
-        // is resumed, so its resumed status must be restored
-        elist->append(except_list[idx]);
+  {
+    ResourceMark rm(current);
+    JvmtiVTMTDisabler vtmt_disabler(true);
+    GrowableArray<jthread>* elist = new GrowableArray<jthread>(except_count);
+
+    // Collect threads from except_list which resumed status must be restored.
+    for (int idx = 0; idx < except_count; idx++) {
+      jthread thread = except_list[idx];
+      oop thread_oop = JNIHandles::resolve_external_guard(thread);
+      if (!JvmtiVTSuspender::is_vthread_suspended(thread_oop)) {
+          // is resumed, so its resumed status must be restored
+          elist->append(except_list[idx]);
+      }
+    }
+
+    for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
+      oop vt_oop = java_thread->mounted_vthread();
+      if (!java_thread->is_exiting() &&
+          !java_thread->is_jvmti_agent_thread() &&
+          !java_thread->is_hidden_from_external_view() &&
+          vt_oop != NULL &&
+          java_lang_VirtualThread::is_instance(vt_oop) &&
+          JvmtiEnvBase::is_vthread_alive(vt_oop) &&
+          !JvmtiVTSuspender::is_vthread_suspended(vt_oop) &&
+          !is_in_thread_list(except_count, except_list, vt_oop)
+      ) {
+        if (java_thread == current) {
+          self_tobj = Handle(current, vt_oop);
+          continue; // self suspend after all other suspends
+        }
+        suspend_thread(vt_oop, java_thread, false, NULL); // suspend all mode
+      }
+    }
+    JvmtiVTSuspender::register_all_vthreads_suspend();
+
+    // Restore resumed state for threads from except list that were resumed before.
+    for (int idx = 0; idx < elist->length(); idx++) {
+      jthread thread = elist->at(idx);
+      oop thread_oop = JNIHandles::resolve_external_guard(thread);
+      if (JvmtiVTSuspender::is_vthread_suspended(thread_oop)) {
+        JvmtiVTSuspender::register_vthread_resume(thread_oop);
+      }
     }
   }
-
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
-    oop vt_oop = java_thread->mounted_vthread();
-    if (!java_thread->is_exiting() &&
-        !java_thread->is_jvmti_agent_thread() &&
-        !java_thread->is_hidden_from_external_view() &&
-        vt_oop != NULL &&
-        java_lang_VirtualThread::is_instance(vt_oop) &&
-        JvmtiEnvBase::is_vthread_alive(vt_oop) &&
-        !JvmtiVTSuspender::is_vthread_suspended(vt_oop) &&
-        !is_in_thread_list(except_count, except_list, vt_oop)
-    ) {
-      suspend_thread(vt_oop, java_thread, false /* suspend all */, NULL);
-    }
-  }
-  JvmtiVTSuspender::register_all_vthreads_suspend();
-
-  // Restore resumed state for threads from except list that were resumed before.
-  for (int idx = 0; idx < elist->length(); idx++) {
-    jthread thread = elist->at(idx);
-    oop thread_oop = JNIHandles::resolve_external_guard(thread);
-    if (JvmtiVTSuspender::is_vthread_suspended(thread_oop)) {
-      JvmtiVTSuspender::register_vthread_resume(thread_oop);
-    }
+  // Self suspend after all other suspends if necessary.
+  // Do not use JvmtiVTMTDisabler in context of self suspend to avoid deadlocks.
+  if (self_tobj() != NULL) {
+    suspend_thread(self_tobj(), current, false, NULL); // suspend all
   }
   return JVMTI_ERROR_NONE;
 } /* end SuspendAllVirtualThreads */
