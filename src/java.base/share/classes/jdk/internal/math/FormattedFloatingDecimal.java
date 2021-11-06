@@ -50,12 +50,8 @@ public class FormattedFloatingDecimal{
                 }
             };
 
-    private static char[] getBuffer() {
-        if (Thread.currentThread().isVirtual()) {
-            return new char[20];
-        } else {
-            return (char[]) threadLocalCharBuffer.get();
-        }
+    private static char[] getBuffer(){
+        return (char[]) threadLocalCharBuffer.get();
     }
 
     private FormattedFloatingDecimal(int precision, Form form, FloatingDecimal.BinaryToASCIIConverter fdConverter) {
