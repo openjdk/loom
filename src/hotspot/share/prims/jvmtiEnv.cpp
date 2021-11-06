@@ -942,27 +942,28 @@ JvmtiEnv::GetAllThreads(jint* threads_count_ptr, jthread** threads_ptr) {
 
 jvmtiError
 JvmtiEnv::SuspendThread(jthread thread) {
+  JavaThread* current = JavaThread::current();
+  ThreadsListHandle tlh(current);
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
-  JvmtiVTMTDisabler vtmt_disabler(true);
-  ThreadsListHandle tlh;
+  jvmtiError err;
 
-  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
+  {
+    JvmtiVTMTDisabler vtmt_disabler(true);
+
+    err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+
+    // Do not use JvmtiVTMTDisabler in context of self suspend as it will cause deadlocks.
+    if (java_thread != current) {
+      err = suspend_thread(thread_oop, java_thread, true, NULL); // single suspend
+      return err;
+    } 
   }
-  // An attempt to suspend in handshake a passive carrier thread will result
-  // in suspension of a mounted virtual thread. So, we just mark it as suspended,
-  // so it will be suspended in handshake at virtual thread unmount transition.
-  if (java_thread == JavaThread::current() &&
-      !is_passive_carrier_thread(java_thread, thread_oop)) {
-    // current thread will be suspended in the ~JvmtiVTMTDisabler
-    vtmt_disabler.set_self_suspend();
-  }
-  err = suspend_thread(thread_oop,
-                       java_thread,
-                       true,  // single suspend
-                       NULL); // no need for extra safepoint
+  // Do self suspend for current JavaThread.
+  err = suspend_thread(thread_oop, current, true, NULL); // single suspend
   return err;
 } /* end SuspendThread */
 
@@ -973,32 +974,38 @@ JvmtiEnv::SuspendThread(jthread thread) {
 jvmtiError
 JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvmtiError* results) {
   JavaThread* current = JavaThread::current();
-  JvmtiVTMTDisabler vtmt_disabler(true);
   ThreadsListHandle tlh(current);
+  HandleMark hm(current);
+  Handle self_tobj;
+  int self_idx = -1;
 
-  for (int i = 0; i < request_count; i++) {
-    JavaThread *java_thread = NULL;
-    oop thread_oop = NULL;
-    jthread thread = request_list[i];
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-    if (err != JVMTI_ERROR_NONE) {
-      if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
-        results[i] = err;
-        continue;
+  {
+    JvmtiVTMTDisabler vtmt_disabler(true);
+
+    for (int i = 0; i < request_count; i++) {
+      JavaThread *java_thread = NULL;
+      oop thread_oop = NULL;
+      jthread thread = request_list[i];
+      jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+      if (err != JVMTI_ERROR_NONE) {
+        if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
+          results[i] = err;
+          continue;
+        }
       }
+      if (java_thread == current) {
+        self_idx = i;
+        self_tobj = Handle(current, thread_oop);
+        continue; // self suspend after all other suspends
+      }
+      results[i] = suspend_thread(thread_oop, java_thread, true, NULL); // single suspend
     }
-    // An attempt to suspend in handshake a passive carrier thread will result
-    // in suspension of a mounted virtual thread. So, we just mark it as suspended,
-    // so it will be suspended in handshake at virtual thread unmount transition.
-    if (java_thread == JavaThread::current() &&
-        !is_passive_carrier_thread(java_thread, thread_oop)) {
-      // current thread will be suspended in the ~JvmtiVTMTDisabler
-      vtmt_disabler.set_self_suspend();
-    }
-    results[i] = suspend_thread(thread_oop,
-                                java_thread,
-                                true, // single suspend
-                                NULL);
+  }
+  // Self suspend after all other suspends if necessary.
+  // Do not use JvmtiVTMTDisabler in context of self suspend as it will cause deadlocks.
+  if (self_idx != -1) {
+    // there should not be any error for current java_thread
+    results[self_idx] = suspend_thread(self_tobj(), current, true, NULL); // single suspend
   }
   // per-thread suspend results returned via results parameter
   return JVMTI_ERROR_NONE;
@@ -1039,10 +1046,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
         !JvmtiVTSuspender::is_vthread_suspended(vt_oop) &&
         !is_in_thread_list(except_count, except_list, vt_oop)
     ) {
-      suspend_thread(vt_oop,
-                     java_thread,
-                     false, // suspend all
-                     NULL);
+      suspend_thread(vt_oop, java_thread, false /* suspend all */, NULL);
     }
   }
   JvmtiVTSuspender::register_all_vthreads_suspend();

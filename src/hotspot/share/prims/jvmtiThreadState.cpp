@@ -221,11 +221,6 @@ volatile unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 volatile bool JvmtiVTMTDisabler::_SR_mode = false;
 
 
-void
-JvmtiVTMTDisabler::set_self_suspend() {
-  _self_suspend = true;
-}
-
 #ifdef ASSERT
 void
 JvmtiVTMTDisabler::print_info() {
@@ -241,9 +236,7 @@ JvmtiVTMTDisabler::print_info() {
 #endif
 
 JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
-  _self_suspend = false;
   _is_SR = is_SR;
-
   disable_VTMT();
 }
 
@@ -306,11 +299,6 @@ JvmtiVTMTDisabler::enable_VTMT() {
       ml.notify_all();
     }
     current->set_is_VTMT_disabler(false);
-  }
-  // Do self suspend if necessary.
-  if (_self_suspend) {
-    // TBD: there is a lack of sync here, resume can come before this suspend
-    JvmtiSuspendControl::suspend(current);
   }
 }
 

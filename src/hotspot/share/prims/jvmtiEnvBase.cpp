@@ -1559,20 +1559,14 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
-  if (java_thread == current) {
-    // java_thread will be suspended in the ~JvmtiVTMTDisabler.
-    return JVMTI_ERROR_NONE;
-  }
   assert(!single_suspend || (!is_virtual && java_thread->is_thread_suspended()) ||
           (is_virtual && JvmtiVTSuspender::is_vthread_suspended(thread_h())),
          "sanity check");
 
-  // Avoid deadlock in JvmtiSuspendControl::suspend for current thread.
-  // It needs to exit jvmtiVTMTDisabler before self suspending.
-  // An attempt to suspend in handshake a passive carrier thread will result
-  // in suspension of a mounted virtual thread. So, we just mark it as suspended,
-  // so it will be suspended in handshake at virtual thread unmount transition.
-  if (java_thread != current && !is_passive_cthread) {
+  // An attempt to handshake-suspend a passive carrier thread will result in
+  // suspension of mounted virtual thread. So, we just mark it as suspended
+  // and it will be actually suspended at virtual thread unmount transition.
+  if (!is_passive_cthread) {
     assert(single_suspend || is_virtual, "SuspendAllVirtualThreads should never suspend non-virtual threads");
     // Case of mounted virtual or attached carrier thread.
     if (!JvmtiSuspendControl::suspend(java_thread)) {

@@ -82,7 +82,6 @@ class JvmtiVTMTDisabler {
   static volatile unsigned short _VTMT_disable_count; // VTMT is disabled while it is non-zero
 
   bool _is_SR;                // is suspender or resumer
-  bool _self_suspend;         // need self suspend in desctructor
 
   void disable_VTMT();
   void enable_VTMT();
@@ -93,7 +92,6 @@ class JvmtiVTMTDisabler {
   JvmtiVTMTDisabler(bool is_SR = false);
   ~JvmtiVTMTDisabler();
 
-  void set_self_suspend();
   static void start_VTMT(jthread vthread, int callsite_tag);
   static void finish_VTMT(jthread vthread, int callsite_tag);
   static int  VTMT_disable_count();
