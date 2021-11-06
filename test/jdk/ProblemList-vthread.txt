@@ -212,6 +212,7 @@ javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
 
 java/io/Serializable/class/NonSerializableTest.java
 java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
+java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
 ####
 # No expected StackOverflow
