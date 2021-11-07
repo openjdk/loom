@@ -26,6 +26,7 @@ package jdk.internal.vm;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -49,37 +50,32 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
     }
 
     private final String name;
-    private final Supplier<Stream<Thread>> threadsSupplier;
     private final LongAdder threadCount;
-    private final Object key;
+    private volatile Supplier<Stream<Thread>> threadsSupplier;
+    private volatile Object key;
     private volatile boolean closed;
 
-    private SharedThreadContainer(String name, Supplier<Stream<Thread>> threadsSupplier) {
+    private SharedThreadContainer(String name, boolean countThreads) {
         super(true);
         this.name = name;
-        if (threadsSupplier != null) {
-            this.threadsSupplier = threadsSupplier;
-            this.threadCount = null;
-        } else {
-            this.threadsSupplier = null;
-            this.threadCount = new LongAdder();
-        }
-        this.key = ThreadContainers.registerContainer(this);
+        this.threadCount = (countThreads) ? new LongAdder() : null;
+    }
+
+    /**
+     * Creates a shared thread container with the given name.
+     * @param countThreads true to count threads, false to not count threads
+     */
+    public static SharedThreadContainer create(String name, boolean countThreads) {
+        var container = new SharedThreadContainer(name, countThreads);
+        container.key = ThreadContainers.registerContainer(container);
+        return container;
     }
 
     /**
      * Creates a shared thread container with the given name.
      */
     public static SharedThreadContainer create(String name) {
-        return new SharedThreadContainer(name, null);
-    }
-
-    /**
-     * Creates a shared thread container with the given name and threads supplier.
-     */
-    public static SharedThreadContainer create(String name,
-                                               Supplier<Stream<Thread>> threadsSupplier) {
-        return new SharedThreadContainer(name, threadsSupplier);
+        return create(name, true);
     }
 
     @Override
@@ -120,8 +116,16 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
         }
     }
 
+    /**
+     * Sets the object that enumerates the threads in the container.
+     */
+    public void threadsSupplier(Supplier<Stream<Thread>> threadsSupplier) {
+        this.threadsSupplier = Objects.requireNonNull(threadsSupplier);
+    }
+
     @Override
     public Stream<Thread> threads() {
+        Supplier<Stream<Thread>> threadsSupplier = this.threadsSupplier;
         if (threadsSupplier != null) {
             return threadsSupplier.get();
         } else {
