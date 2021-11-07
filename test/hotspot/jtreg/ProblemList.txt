@@ -192,6 +192,10 @@ runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0
 
 serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
 
+# SA needs update
+resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java	       0000000 generic-all
+resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0000000 generic-all
+
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
 
