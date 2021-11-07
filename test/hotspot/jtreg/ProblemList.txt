@@ -190,9 +190,9 @@ runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               82
 # Needs --enable-preview
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
-serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
-
 # SA needs update
+serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
+serviceability/sa/TestObjectMonitorIterate.java                                0000000 generic-all
 resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java	       0000000 generic-all
 resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0000000 generic-all
 
