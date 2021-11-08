@@ -157,8 +157,9 @@ public class Parking {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
-            LockSupport.park();
-            assertTrue(t.isInterrupted());
+            while (!Thread.currentThread().isInterrupted()) {
+                LockSupport.park();
+            }
         });
     }
 
@@ -187,10 +188,11 @@ public class Parking {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
             Object lock = new Object();
-            synchronized (lock) {
-                LockSupport.park();
+            while (!Thread.currentThread().isInterrupted()) {
+                synchronized (lock) {
+                    LockSupport.park();
+                }
             }
-            assertTrue(t.isInterrupted());
         });
     }
 
@@ -306,8 +308,9 @@ public class Parking {
         TestHelper.runInVirtualThread(() -> {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
-            LockSupport.parkNanos(Duration.ofDays(1).toNanos());
-            assertTrue(t.isInterrupted());
+            while (!Thread.currentThread().isInterrupted()) {
+                LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            }
         });
     }
 
@@ -336,10 +339,11 @@ public class Parking {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 1000);
             Object lock = new Object();
-            synchronized (lock) {
-                LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+            while (!Thread.currentThread().isInterrupted()) {
+                synchronized (lock) {
+                    LockSupport.parkNanos(Duration.ofDays(1).toNanos());
+                }
             }
-            assertTrue(t.isInterrupted());
         });
     }
 }
