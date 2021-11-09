@@ -1193,13 +1193,16 @@ void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>*
   CompiledMethodIterator iter(CompiledMethodIterator::only_alive_and_not_unloading);
   while(iter.next()) {
     CompiledMethod* nm = iter.method();
-    if (nm->is_marked_for_deoptimization()) {
+    if (nm->is_marked_for_deoptimization() && !nm->has_been_deoptimized()) {
       if (!nm->make_not_entrant()) {
         // if the method is not entrant already then it is needed run barrier
         // to don't allow method become zombie before deoptimization even without safepoint
         nm->run_nmethod_entry_barrier();
       }
-      marked->append(nm);
+      // Native methods won't be deoptimized but I suppose need to be marked not entrant.
+      if (nm->can_be_deoptimized()) {
+        marked->append(nm);
+      }
     }
   }
 }

@@ -144,13 +144,14 @@ class CompiledMethod : public CodeBlob {
 
   void init_defaults();
 protected:
-  enum MarkForDeoptimizationStatus {
+  enum MarkForDeoptimizationStatus : u1 {
     not_marked,
     deoptimize,
     deoptimize_noupdate
   };
 
   MarkForDeoptimizationStatus _mark_for_deoptimization_status; // Used for stack deoptimization
+  unsigned int _has_been_deoptimized:1;
 
   // set during construction
   unsigned int _has_unsafe_access:1;         // May fault due to unsafe access.
@@ -243,6 +244,9 @@ public:
 
   bool  is_marked_for_deoptimization() const { return _mark_for_deoptimization_status != not_marked; }
   void  mark_for_deoptimization(bool inc_recompile_counts = true);
+
+  bool  has_been_deoptimized() const { assert(is_marked_for_deoptimization(), "sanity"); return _has_been_deoptimized; }
+  void  mark_deoptimized() { _has_been_deoptimized = true; /* done */ }
 
   virtual void  make_deoptimized() { assert(false, "not supported"); };
 

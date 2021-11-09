@@ -67,6 +67,7 @@ CompiledMethod::CompiledMethod(Method* method, const char* name, CompilerType ty
   : CodeBlob(name, type, CodeBlobLayout((address) this, size, header_size, cb), cb,
              frame_complete_offset, frame_size, oop_maps, caller_must_gc_arguments, compiled),
     _mark_for_deoptimization_status(not_marked),
+    _has_been_deoptimized(false),
     _method(method),
     _gc_data(NULL)
 {
