@@ -457,7 +457,7 @@ void InstanceStackChunkKlass::assert_mixed_correct(stackChunkOop chunk, bool mix
 }
 #endif
 
-inline int InstanceStackChunkKlass::instance_size(int stack_size_in_words) const {
+inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }
 
@@ -465,18 +465,18 @@ inline HeapWord* InstanceStackChunkKlass::start_of_bitmap(oop obj) {
   return start_of_stack(obj) + jdk_internal_vm_StackChunk::size(obj);
 }
 
-inline int InstanceStackChunkKlass::bitmap_size(int stack_size_in_words) {
+inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   if (!UseChunkBitmaps) return 0;
-  int size_in_bits = bitmap_size_in_bits(stack_size_in_words);
-  static const int mask = BitsPerWord - 1;
+  size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
+  static const size_t mask = BitsPerWord - 1;
   int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
-  int res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert (size_in_bits + (int)bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "size_in_bits: %d bit_offset: %d res << LogBitsPerWord: %d", size_in_bits, (int)bit_offset(stack_size_in_words), (res << LogBitsPerWord));
+  size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
+  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "size_in_bits: %zu bit_offset: %d res << LogBitsPerWord: %zu", size_in_bits, (int)bit_offset(stack_size_in_words), (res << LogBitsPerWord));
   return res;
 }
 
-inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(int stack_size_in_words) {
-  static const int mask = BitsPerWord - 1;
+inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_words) {
+  static const size_t mask = BitsPerWord - 1;
   // tty->print_cr(">>> BitsPerWord: %d MASK: %d stack_size_in_words: %d stack_size_in_words & mask: %d", BitsPerWord, mask, stack_size_in_words, stack_size_in_words & mask);
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
@@ -548,6 +548,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
   if (LIKELY(chunk->has_bitmap())) {
     intptr_t* start = chunk->sp_address() - metadata_words();
     intptr_t* end = chunk->end_address();
+    // mr.end() can actually be less than start. In that case, we only walk the metadata
     if ((intptr_t*)mr.start() > start) start = (intptr_t*)mr.start();
     if ((intptr_t*)mr.end()   < end)   end   = (intptr_t*)mr.end();
     oop_oop_iterate_stack_helper(chunk, closure, start, end);
@@ -583,12 +584,14 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
     mark_methods(chunk, closure);
   }
 
-  if (UseCompressedOops) {
-    StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
-  } else {
-    StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+  if (end > start) {
+    if (UseCompressedOops) {
+      StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
+    } else {
+      StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+    }
   }
 }
 

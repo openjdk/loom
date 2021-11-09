@@ -32,6 +32,7 @@
  *          java.instrument
  *          jdk.jartool/sun.tools.jar
  * @compile --enable-preview -source ${jdk.version} RedefineRunningMethodsWithBacktrace.java
+ * @build jdk.test.lib.helpers.ClassFileInstaller jdk.test.lib.compiler.InMemoryJavaCompiler
  * @run main RedefineClassHelper
  * @run main/othervm --enable-preview -javaagent:redefineagent.jar RedefineRunningMethodsWithBacktrace platform
  * @run main/othervm --enable-preview -javaagent:redefineagent.jar RedefineRunningMethodsWithBacktrace virtual

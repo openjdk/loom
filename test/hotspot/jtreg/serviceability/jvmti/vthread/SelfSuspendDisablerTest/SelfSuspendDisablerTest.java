@@ -35,23 +35,39 @@ public class SelfSuspendDisablerTest {
         System.loadLibrary("SelfSuspendDisablerTest");
     }
 
-    native static void resume(Thread thread);
-
-    native static void selfSuspend();
-
     native static boolean isSuspended(Thread thread);
+    native static void selfSuspend();
+    native static void resume(Thread thread);
+    native static void suspendAllVirtualThreads();
+    native static void resumeAllVirtualThreads();
+
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+            // ignore InterruptedException
+        }
+    }
 
     public static void main(String argv[]) throws Exception {
         Thread t1 = Thread.ofPlatform().start(() -> {
             selfSuspend();
         });
         Thread t2 = Thread.ofVirtual().start(() -> {
-            while(!SelfSuspendDisablerTest.isSuspended(t1)) {
+            while(!isSuspended(t1)) {
               Thread.yield();
             }
             Thread.yield(); // provoke unmount
-            SelfSuspendDisablerTest.resume(t1);
+            resume(t1);
+            suspendAllVirtualThreads();
         });
+
+        while(!isSuspended(t2)) {
+            sleep(100);
+        }
+        resumeAllVirtualThreads();
+
         t2.join();
         t1.join();
     }

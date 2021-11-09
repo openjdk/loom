@@ -504,7 +504,12 @@ public final class AppContext {
 
         // Then, we stop any remaining Threads
         AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
-            threadGroup.stop();
+            int threadCount = threadGroup.activeCount() + 16;
+            Thread[] threads = new Thread[threadCount];
+            threadCount = threadGroup.enumerate(threads);
+            for (int i = 0; i < threadCount; i++) {
+                threads[i].stop();
+            }
             return null;
         });
 

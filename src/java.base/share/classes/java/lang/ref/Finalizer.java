@@ -35,7 +35,7 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
                                                           same package as the Reference
                                                           class */
 
-    private static ReferenceQueue<Object> queue = new ReferenceQueue<>();
+    private static ReferenceQueue<Object> queue = new NativeReferenceQueue<>();
 
     /** Head of doubly linked list of Finalizers awaiting finalization. */
     private static Finalizer unfinalized = null;

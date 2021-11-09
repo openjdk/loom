@@ -54,6 +54,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class ThreadAPI {
+    private static final Object lock = new Object();
 
     /**
      * Test Thread.currentThread before/after park.
@@ -82,7 +83,6 @@ public class ThreadAPI {
         var ref1 = new AtomicReference<Thread>();
         var ref2 = new AtomicReference<Thread>();
         var ref3 = new AtomicReference<Thread>();
-        var lock = new Object();
         var thread = Thread.ofVirtual().unstarted(() -> {
             ref1.set(Thread.currentThread());
             synchronized (lock) {
@@ -675,7 +675,6 @@ public class ThreadAPI {
     @Test
     public void testJoin31() throws Exception {
         Thread thread = Thread.ofVirtual().start(() -> {
-            Object lock = new Object();
             synchronized (lock) {
                 for (int i=0; i<10; i++) {
                     LockSupport.parkNanos(Duration.ofMillis(100).toNanos());
@@ -703,7 +702,6 @@ public class ThreadAPI {
     public void testJoin33() throws Exception {
         AtomicBoolean done = new AtomicBoolean();
         Thread thread = Thread.ofVirtual().start(() -> {
-            Object lock = new Object();
             synchronized (lock) {
                 while (!done.get()) {
                     LockSupport.parkNanos(Duration.ofMillis(100).toNanos());
@@ -857,7 +855,6 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
             me.interrupt();
-            Object lock = new Object();
             synchronized (lock) {
                 try {
                     lock.wait();
@@ -1084,7 +1081,6 @@ public class ThreadAPI {
                     list.add("B");
                 });
                 child.start();
-                Object lock = new Object();
                 synchronized (lock) {
                     Thread.yield();   // pinned so will be a no-op
                     list.add("A");
@@ -1297,7 +1293,6 @@ public class ThreadAPI {
     public void testSleep8() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             long start = millisTime();
-            Object lock = new Object();
             synchronized (lock) {
                 Thread.sleep(2000);
             }
@@ -1314,7 +1309,6 @@ public class ThreadAPI {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
-                Object lock = new Object();
                 synchronized (lock) {
                     Thread.sleep(2000);
                 }
@@ -1335,7 +1329,6 @@ public class ThreadAPI {
             Thread t = Thread.currentThread();
             TestHelper.scheduleInterrupt(t, 2000);
             try {
-                Object lock = new Object();
                 synchronized (lock) {
                     Thread.sleep(20 * 1000);
                 }
@@ -1615,7 +1608,6 @@ public class ThreadAPI {
     @Test
     public void testGetState5() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
-            var lock = new Object();
             synchronized (lock) {
                 LockSupport.park();
             }
@@ -1633,7 +1625,6 @@ public class ThreadAPI {
     @Test
     public void testGetState6() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
-            var lock = new Object();
             synchronized (lock) {
                 try { lock.wait(); } catch (InterruptedException e) { }
             }
@@ -1725,7 +1716,6 @@ public class ThreadAPI {
             // start virtual threads that are CPU bound until we find a thread
             // that does not run. This is done while holding a monitor to
             // allow this test run in the context of a virtual thread.
-            Object lock = new Object();
             synchronized (this) {
                 while (target == null) {
                     CountDownLatch latch = new CountDownLatch(1);
@@ -1788,7 +1778,6 @@ public class ThreadAPI {
                 });
             };
 
-            Object lock = new Object();
             Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
             Thread vthread = builder.start(() -> {
                 synchronized (lock) {
@@ -1885,7 +1874,6 @@ public class ThreadAPI {
                 });
             };
 
-            Object lock = new Object();
             Thread.Builder builder = TestHelper.virtualThreadBuilder(scheduler);
             Thread vthread = builder.start(() -> {
                 synchronized (lock) {

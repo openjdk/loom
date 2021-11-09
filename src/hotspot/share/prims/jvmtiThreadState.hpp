@@ -77,23 +77,21 @@ class JvmtiEnvThreadStateIterator : public StackObj {
 //
 class JvmtiVTMTDisabler {
  private:
-#ifdef ASSERT
-  static volatile unsigned short _suspend_count;
-#endif
+  static volatile bool _SR_mode;                      // there is an active suspender or resumer
   static volatile unsigned short _VTMT_count;
   static volatile unsigned short _VTMT_disable_count; // VTMT is disabled while it is non-zero
 
-  static void disable_VTMT();
-  static void enable_VTMT();
-  bool _is_suspender;
-  bool _self_suspend;
+  bool _is_SR;                // is suspender or resumer
+
+  void disable_VTMT();
+  void enable_VTMT();
 
   DEBUG_ONLY(static void print_info();)
  public:
-  JvmtiVTMTDisabler(bool is_suspender = false);
+  // parameter is_SR: suspender or resumer
+  JvmtiVTMTDisabler(bool is_SR = false);
   ~JvmtiVTMTDisabler();
 
-  void set_self_suspend();
   static void start_VTMT(jthread vthread, int callsite_tag);
   static void finish_VTMT(jthread vthread, int callsite_tag);
   static int  VTMT_disable_count();

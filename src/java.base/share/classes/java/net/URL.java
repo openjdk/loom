@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.spi.URLStreamHandlerProvider;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -1344,11 +1345,17 @@ public final class URL implements java.io.Serializable {
     }
 
     // gate to prevent recursive provider lookups
-    private static final Gate LOOKUP_GATE = Gate.create();
+    private static class Holder {
+        static final Gate LOOKUP_GATE = Gate.create();
+    }
+
+    private static Gate gate() {
+        return Holder.LOOKUP_GATE;
+    }
 
     @SuppressWarnings("removal")
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (!LOOKUP_GATE.tryEnter())
+        if (!gate().tryEnter())
             throw new Error("Circular loading of URL stream handler providers detected");
         try {
             return AccessController.doPrivileged(
@@ -1365,7 +1372,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            LOOKUP_GATE.exit();
+            gate().exit();
         }
     }
 
@@ -1761,7 +1768,7 @@ final class UrlDeserializedState {
 
     String reconstituteUrlString() {
 
-        // pre-compute length of StringBuffer
+        // pre-compute length of StringBuilder
         int len = protocol.length() + 1;
         if (authority != null && !authority.isEmpty())
             len += 2 + authority.length();

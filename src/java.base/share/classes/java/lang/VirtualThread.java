@@ -27,7 +27,6 @@ package java.lang;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.invoke.VarHandle;
 import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -53,6 +52,7 @@ import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
+import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
@@ -72,25 +72,10 @@ class VirtualThread extends Thread {
     private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
 
-    private static final long CARRIER_THREAD;
-    private static final long STATE;
-    private static final long PARK_PERMIT;
-    private static final VarHandle TERMINATION;
-    private static final VarHandle NEXT_UNPARKER_ID;
-    static {
-        try {
-            // Used in sensitive places where a VarHandle bootstrap should not be called
-            CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread"); // this one is especially sensitive
-            STATE = U.objectFieldOffset(VirtualThread.class, "state");
-            PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
-
-            MethodHandles.Lookup l = MethodHandles.lookup();
-            TERMINATION = l.findVarHandle(VirtualThread.class, "termination", CountDownLatch.class);
-            NEXT_UNPARKER_ID = l.findStaticVarHandle(VirtualThread.class, "nextUnparkerId", int.class);
-        } catch (Exception e) {
-            throw new InternalError(e);
-        }
-    }
+    private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
+    private static final long PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
+    private static final long CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread");
+    private static final long TERMINATION = U.objectFieldOffset(VirtualThread.class, "termination");
 
     // scheduler and continuation
     private final Executor scheduler;
@@ -265,11 +250,28 @@ class VirtualThread extends Thread {
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
+        // emit JFR event when starting
+        if (VirtualThreadStartEvent.isTurnedOn()) {
+            var event = new VirtualThreadStartEvent();
+            event.javaThreadId = getId();
+            event.commit();
+        }
+
         try {
             task.run();
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
+
+            // pop any remaining scopes from the stack, this may block
+            StackableScope.popAll();
+
+            // emit JFR event when terminating
+            if (VirtualThreadEndEvent.isTurnedOn()) {
+                var event = new VirtualThreadEndEvent();
+                event.javaThreadId = getId();
+                event.commit();
+            }
 
             // last unmount
             if (notifyJvmti) notifyJvmtiUnmountBegin(true);
@@ -396,12 +398,6 @@ class VirtualThread extends Thread {
             termination.countDown();
         }
 
-        if (VirtualThreadEndEvent.isTurnedOn()) {
-            var event = new VirtualThreadEndEvent();
-            event.javaThreadId = getId();
-            event.commit();
-        }
-
         if (executed) {
             // notify container if thread executed
             threadContainer().onExit(this);
@@ -462,22 +458,11 @@ class VirtualThread extends Thread {
         boolean started = false;
         container.onStart(this); // may throw
         try {
-            // inherit scope locals from structured container
-            Object bindings = container.scopeLocalBindings();
-            if (bindings != null) {
-                if (Thread.currentThread().scopeLocalBindings != bindings) {
-                    throw new IllegalStateException("Scope local bindings have changed");
-                }
-                this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-            }
+            // scope locals may be inherited
+            inheritScopeLocalBindings(container);
 
             // bind thread to container
             setThreadContainer(container);
-            if (VirtualThreadStartEvent.isTurnedOn()) {
-                var event = new VirtualThreadStartEvent();
-                event.javaThreadId = getId();
-                event.commit();
-            }
 
             // submit task to run thread
             submitRunContinuation();
@@ -883,7 +868,7 @@ class VirtualThread extends Thread {
         CountDownLatch termination = this.termination;
         if (termination == null) {
             termination = new CountDownLatch(1);
-            if (!TERMINATION.compareAndSet(this, null, termination)) {
+            if (!U.compareAndSetReference(this, TERMINATION, null, termination)) {
                 termination = this.termination;
             }
         }
@@ -898,10 +883,6 @@ class VirtualThread extends Thread {
 
     private void setState(int newValue) {
         state = newValue;  // volatile write
-    }
-
-    private void setReleaseState(int newValue) {
-        U.putIntRelease(this, STATE, newValue);
     }
 
     private boolean compareAndSetState(int expectedValue, int newValue) {
@@ -1090,19 +1071,10 @@ class VirtualThread extends Thread {
         }
         ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
             Executors.newScheduledThreadPool(poolSize, task -> {
-                String name = "VirtualThread-unparker";
-                if (poolSize > 1)
-                    name += "-" + nextUnparkerId();
-                var thread = InnocuousThread.newThread(name, task);
-                return thread;
+                return InnocuousThread.newThread("VirtualThread-unparker", task);
             });
         stpe.setRemoveOnCancelPolicy(true);
         return stpe;
-    }
-
-    private static volatile int nextUnparkerId;
-    private static int nextUnparkerId() {
-        return (int) NEXT_UNPARKER_ID.getAndAdd(1) + 1;
     }
 
     /**

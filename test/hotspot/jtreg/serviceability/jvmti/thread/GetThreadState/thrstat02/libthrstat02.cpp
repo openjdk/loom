@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2004, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -175,7 +175,7 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
     LOG("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
   }
   if ((thrState & state[statInd]) == 0) {
-    LOG("Wrong thread \"tested_thread_thr1\" (0x%p%s) state:\n", thr_ptr, suspStr);
+    LOG("#1: Wrong thread \"tested_thread_thr1\" (0x%p%s) state:\n", thr_ptr, suspStr);
     LOG("    expected: %s (%d)\n",
            TranslateState(state[statInd]), state[statInd]);
     LOG("      actual: %s (%d)\n",
@@ -183,7 +183,7 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
     result = JNI_FALSE;
   }
   if (suspState != right_stat) {
-    LOG("Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n",
+    LOG("#2: Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n",
            thr_ptr, suspStr);
     LOG("    expected:");
     printStateFlags(right_stat);
@@ -194,7 +194,7 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
 
   err = jvmti->SuspendThread(thr_ptr);
   if (err != right_ans) {
-    LOG("Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n",
+    LOG("#3: Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n",
            thr_ptr, suspStr);
     LOG("    expected: %s (%d), actual: %s (%d)\n",
            TranslateError(right_ans), right_ans, TranslateError(err), err);
@@ -225,13 +225,13 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
       LOG("Error: timeout (%d secs) has been reached\n", waited_millis / 1000);
     }
     if ((thrState & state[statInd]) == 0) {
-      LOG("Wrong thread \"tested_thread_thr1\" (0x%p) state after SuspendThread:\n", thr_ptr);
+      LOG("#4: Wrong thread \"tested_thread_thr1\" (0x%p) state after SuspendThread:\n", thr_ptr);
       LOG("    expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
       LOG("      actual: %s (%d)\n", TranslateState(thrState), thrState);
       result = JNI_FALSE;
     }
     if (suspState != JVMTI_THREAD_STATE_SUSPENDED) {
-      LOG("Wrong thread \"tested_thread_thr1\" (0x%p) state flags", thr_ptr);
+      LOG("#5: Wrong thread \"tested_thread_thr1\" (0x%p) state flags", thr_ptr);
       LOG(" after SuspendThread:\n");
       LOG("    expected:");
       printStateFlags(JVMTI_THREAD_STATE_SUSPENDED);

@@ -50,6 +50,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
+import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
@@ -243,6 +244,20 @@ public class Thread implements Runnable {
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
+
+    ScopeLocal.Snapshot scopeLocalBindings() {
+        return scopeLocalBindings;
+    }
+
+    void inheritScopeLocalBindings(ThreadContainer container) {
+        Object bindings = container.scopeLocalBindings();
+        if (bindings != null) {
+            if (Thread.currentThread().scopeLocalBindings != bindings) {
+                throw new IllegalStateException("Scope local bindings have changed");
+            }
+            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+        }
+    }
 
     /**
      * Helper class to generate unique thread identifiers. The identifiers start
@@ -656,11 +671,11 @@ public class Thread implements Runnable {
                     this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
                 }
                 ClassLoader parentLoader = contextClassLoader(parent);
-                if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
-                    this.contextClassLoader = parentLoader;
-                } else if (VM.isBooted()) {
+                if (VM.isBooted() && parentLoader == ClassLoaders.NOT_SUPPORTED) {
                     // parent does not support thread locals so no CCL to inherit
                     this.contextClassLoader = ClassLoader.getSystemClassLoader();
+                } else {
+                    this.contextClassLoader = parentLoader;
                 }
             } else if (VM.isBooted()) {
                 // default CCL to the system class loader when not inheriting
@@ -1439,14 +1454,8 @@ public class Thread implements Runnable {
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // inherit scope locals from structured container
-                Object bindings = container.scopeLocalBindings();
-                if (bindings != null) {
-                    if (Thread.currentThread().scopeLocalBindings != bindings) {
-                        throw new IllegalStateException("Scope local bindings have changed");
-                    }
-                    this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
-                }
+                // scope locals may be inherited
+                inheritScopeLocalBindings(container);
 
                 // bind thread to container
                 setThreadContainer(container);
@@ -1504,6 +1513,10 @@ public class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
+        // pop any remaining scopes from the stack, this may block
+        StackableScope.popAll();
+
+        // notify container that thread is exiting
         ThreadContainer container = threadContainer();
         if (container != null) {
             container.onExit(this);
@@ -2262,9 +2275,9 @@ public class Thread implements Runnable {
 
     /**
      * Returns a string representation of this thread. The string representation
-     * will usually include the thread's name. The default implementation for
-     * platform threads includes the thread's identifier, name, priority, and
-     * the name of the thread group.
+     * will usually include the thread's {@linkplain #getId() identifier} and name.
+     * The default implementation for platform threads includes the thread's
+     * identifier, name, priority, and the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
@@ -2370,7 +2383,6 @@ public class Thread implements Runnable {
             NOT_SUPPORTED = AccessController.doPrivileged(pa);
         }
     }
-
 
     /**
      * Returns {@code true} if and only if the current thread holds the
@@ -3006,35 +3018,13 @@ public class Thread implements Runnable {
         this.container = container;
     }
 
-    /** The top of this stack of thread containers owned by this thread */
-    private volatile ThreadContainer headThreadContainer;
-    ThreadContainer headThreadContainer() {
-        return headThreadContainer;
+    /** The top of this stack of stackable scopes owned by this thread */
+    private volatile StackableScope headStackableScopes;
+    StackableScope headStackableScopes() {
+        return headStackableScopes;
     }
-    ScopeLocal.Snapshot pushThreadContainer(ThreadContainer container) {
-        container.setPrevious(headThreadContainer);
-        headThreadContainer = container;
-        return scopeLocalBindings;
-    }
-    void popThreadContainer(ThreadContainer container) {
-        ThreadContainer head = headThreadContainer;
-        if (head == container) {
-            // restore ref to previous executor
-            headThreadContainer = head.previous();
-        } else {
-            // pop out of order, uncommon path
-            if (head == null)
-                throw new InternalError();
-            ThreadContainer next = head;
-            ThreadContainer current = head.previous();
-            while (current != container) {
-                if (current == null)
-                    throw new InternalError();
-                next = current;
-                current = current.previous();
-            }
-            next.setPrevious(current.previous());
-        }
+    static void setHeadStackableScope(StackableScope scope) {
+        currentThread().headStackableScopes = scope;
     }
 
     /* Some private helper methods */

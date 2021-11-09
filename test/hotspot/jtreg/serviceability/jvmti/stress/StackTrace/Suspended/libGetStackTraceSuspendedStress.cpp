@@ -95,6 +95,7 @@ check_link_consistency(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
 
   if (cthread != NULL) {
     jthread cthread_to_vthread = get_virtual_thread(jvmti, jni, cthread);
+
     if (!jni->IsSameObject(vthread, cthread_to_vthread)) {
       LOG("\nCarrier: ");
       print_thread_info(jvmti, jni, cthread);
@@ -111,13 +112,13 @@ static void
 check_vthread_consistency_suspended(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   jvmtiError err;
   jboolean is_virtual = jni->IsVirtualThread(vthread);
-  char* name = get_thread_name(jvmti, jni, vthread);
+  //const char* name = get_thread_name(jvmti, jni, vthread);
 
   if (!is_virtual) {
     jni->FatalError("Agent: check_vthread_consistency_suspended: vthread is expected to be virtual");
   }
   jthread cthread = get_carrier_thread(jvmti, jni, vthread);
-  const char* cname = (cthread == NULL) ? "<no cthread>" : get_thread_name(jvmti, jni, cthread);
+  //const char* cname = (cthread == NULL) ? "<no cthread>" : get_thread_name(jvmti, jni, cthread);
 
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, vthread);
   check_jvmti_status(jni, err, "Error in JVMTI SetEventNotificationMode: enable SINGLE_STEP");
@@ -192,8 +193,8 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       }
       check_jvmti_status(jni, err,  "Error in GetVirtualThread");
       if (iter > 50 && vthread != NULL) {
-        char* cname = get_thread_name(jvmti, jni, cthread);
-        char* vname = get_thread_name(jvmti, jni, vthread);
+        // char* cname = get_thread_name(jvmti, jni, cthread);
+        // char* vname = get_thread_name(jvmti, jni, vthread);
 
         check_jvmti_status(jni, jvmti->SuspendThread(vthread), "Error in SuspendThread");
         // LOG("Agent: suspended vt: %s ct: %s\n", vname, cname);
@@ -205,6 +206,8 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
       }
     }
     check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) threads), "Error in Deallocate");
+  //check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) cname), "Error in Deallocate");
+  //check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) vname), "Error in Deallocate");
 
     iter++;
     millisleep(20);

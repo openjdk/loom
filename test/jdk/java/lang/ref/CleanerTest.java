@@ -58,8 +58,12 @@ import org.testng.annotations.Test;
  * @modules java.base/jdk.internal.misc
  *          java.base/jdk.internal.ref
  *          java.management
+ * @compile --enable-preview -source ${jdk.version} CleanerTest.java
  * @run driver jdk.test.lib.helpers.ClassFileInstaller sun.hotspot.WhiteBox
- * @run testng/othervm
+ * @run testng/othervm --enable-preview
+ *      -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:.
+ *      -verbose:gc CleanerTest
+ * @run testng/othervm --enable-preview -Dtest.virtualThread=true
  *      -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:.
  *      -verbose:gc CleanerTest
  */
@@ -71,6 +75,14 @@ public class CleanerTest {
 
     // Access to WhiteBox utilities
     static final WhiteBox whitebox = WhiteBox.getWhiteBox();
+
+    static final boolean VIRTUAL = Boolean.getBoolean("test.virtualThread");
+
+    Cleaner create() {
+        return VIRTUAL
+            ? Cleaner.create(Thread.ofVirtual().factory())
+            : Cleaner.create();
+    }
 
     /**
      * Test that sequences of the various actions on a Reference
@@ -85,7 +97,7 @@ public class CleanerTest {
     @Test
     @SuppressWarnings("unchecked")
     void testCleanableActions() {
-        Cleaner cleaner = Cleaner.create();
+        Cleaner cleaner = create();
 
         // Individually
         generateCases(cleaner, c -> c.clearRef());
@@ -112,7 +124,7 @@ public class CleanerTest {
     @Test
     @SuppressWarnings("unchecked")
     void testRefSubtypes() {
-        Cleaner cleaner = Cleaner.create();
+        Cleaner cleaner = create();
 
         // Individually
         generateCasesInternal(cleaner, c -> c.clearRef());
@@ -251,7 +263,7 @@ public class CleanerTest {
     @Test
     void testCleanerTermination() {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
-        Cleaner service = Cleaner.create();
+        Cleaner service = create();
 
         PhantomReference<Object> ref = new PhantomReference<>(service, queue);
         System.gc();
@@ -522,7 +534,7 @@ public class CleanerTest {
     @Test
     @SuppressWarnings("rawtypes")
     void testReferentNotAvailable() {
-        Cleaner cleaner = Cleaner.create();
+        Cleaner cleaner = create();
         Semaphore s1 = new Semaphore(0);
 
         Object obj = new String("a new string");

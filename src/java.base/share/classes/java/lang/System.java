@@ -83,6 +83,7 @@ import jdk.internal.logger.LocalizedLoggerWrapper;
 import jdk.internal.util.SystemProps;
 import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
+import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
@@ -368,9 +369,11 @@ public final class System {
      * the method simply returns.
      *
      * @implNote In the JDK implementation, if the Java virtual machine is
-     * started with the system property {@code java.security.manager} set to
+     * started with the system property {@code java.security.manager} not set or set to
      * the special token "{@code disallow}" then the {@code setSecurityManager}
-     * method cannot be used to set a security manager.
+     * method cannot be used to set a security manager. See the following
+     * <a href="SecurityManager.html#set-security-manager">section of the
+     * {@code SecurityManager} class specification</a> for more details.
      *
      * @param  sm the security manager or {@code null}
      * @throws SecurityException
@@ -2242,7 +2245,7 @@ public final class System {
                     allowSecurityManager = MAYBE;
             }
         } else {
-            allowSecurityManager = MAYBE;
+            allowSecurityManager = NEVER;
         }
 
         if (needWarning) {
@@ -2478,16 +2481,12 @@ public final class System {
                 thread.start(container);
             }
 
-            public ThreadContainer headThreadContainer(Thread thread) {
-                return thread.headThreadContainer();
+            public StackableScope headStackableScope(Thread thread) {
+                return thread.headStackableScopes();
             }
 
-            public Object pushThreadContainer(ThreadContainer container) {
-                return Thread.currentThread().pushThreadContainer(container);
-            }
-
-            public void popThreadContainer(ThreadContainer container) {
-                Thread.currentThread().popThreadContainer(container);
+            public void setHeadStackableScope(StackableScope scope) {
+                Thread.setHeadStackableScope(scope);
             }
 
             public Thread currentCarrierThread() {

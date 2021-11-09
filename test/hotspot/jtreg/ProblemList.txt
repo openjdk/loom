@@ -38,6 +38,12 @@
 #
 #############################################################################
 
+vmTestbase/nsk/jvmti/AttachOnDemand/attach002a/TestDescription.java 8265795 generic-all
+vmTestbase/nsk/jvmti/AttachOnDemand/attach022/TestDescription.java 8265795 generic-all
+vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java 8265796  generic-all
+
+#############################################################################
+
 # :hotspot_compiler
 
 compiler/ciReplay/TestSAServer.java 8029528 generic-all
@@ -100,7 +106,7 @@ runtime/os/TestTracePageSizes.java#G1 8267460 linux-aarch64
 runtime/os/TestTracePageSizes.java#Parallel 8267460 linux-aarch64
 runtime/os/TestTracePageSizes.java#Serial 8267460 linux-aarch64
 
-applications/jcstress/copy.java 8229852 linux-x64
+applications/jcstress/copy.java 8229852 linux-all
 
 #############################################################################
 
@@ -152,6 +158,7 @@ vmTestbase/nsk/jvmti/scenarios/jni_interception/JI06/ji06t001/TestDescription.ja
 vmTestbase/nsk/jvmti/SetJNIFunctionTable/setjniftab001/TestDescription.java 8219652 aix-ppc64
 vmTestbase/nsk/jvmti/SuspendThread/suspendthrd003/TestDescription.java 8264605 generic-all
 vmTestbase/nsk/jvmti/PopFrame/popframe011/TestDescription.java 8266593 generic-all
+vmTestbase/nsk/jvmti/RedefineClasses/StressRedefineWithoutBytecodeCorruption/TestDescription.java 8272800 generic-all
 
 vmTestbase/gc/lock/jni/jnilock002/TestDescription.java 8192647 generic-all
 
@@ -173,9 +180,9 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
 # Sets SegmentedCodeCache with -Xint
-compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      0000000 generic-all
-compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           0000000 generic-all
-compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              0000000 generic-all
+compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      8276711 generic-all
+compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           8276711 generic-all
+compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              8276711 generic-all
 
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
@@ -183,35 +190,21 @@ runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               82
 # Needs --enable-preview
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
-serviceability/jvmti/negative/thrstat04/thrstat04.java                         8275001 generic-all
-
+# SA needs update
 serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
-
-#vmTestbase/nsk/stress/stack/stack008.java	                                   8252468 generic-all
-vmTestbase/nsk/stress/stack/stack018.java	                                  8252468 generic-all
+serviceability/sa/TestObjectMonitorIterate.java                                0000000 generic-all
+resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java	       0000000 generic-all
+resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0000000 generic-all
 
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace003.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace004.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace005.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace006.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace007.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace008.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace009.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace010.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace011.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace012.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace013.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace014.java                                   8254188 generic-all
-#vmTestbase/nsk/stress/strace/strace015.java                                   8254188 generic-all
 
 # Needs --enable-preview
 vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java 0000000 generic-all
 vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java                  0000000 generic-all
 
 # Stratum mismatch
-vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            0000000 generic-all
-vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            0000000 generic-all
+vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
+vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
 gtest/GTestWrapper.java                                                       0000000 generic-all

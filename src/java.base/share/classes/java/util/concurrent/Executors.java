@@ -254,7 +254,7 @@ public class Executors {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
-        return new ThreadPerTaskExecutor(threadFactory);
+        return ThreadPerTaskExecutor.create(threadFactory);
     }
 
     /**

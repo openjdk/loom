@@ -30,12 +30,12 @@
 #include "runtime/prefetch.hpp"
 
 
-inline void Prefetch::read (void *loc, intx interval) {
+inline void Prefetch::read (const void *loc, intx interval) {
   if (interval >= 0)
     asm("prfm PLDL1KEEP, [%0, %1]" : : "r"(loc), "r"(interval));
 }
 
-inline void Prefetch::read_streaming(void *loc, intx interval) {
+inline void Prefetch::read_streaming(const void *loc, intx interval) {
   read (loc, interval);
 }
 

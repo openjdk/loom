@@ -36,6 +36,8 @@ serviceability/sa/ClhsdbJhisto.java                           8220624   generic-
 serviceability/sa/ClhsdbCDSCore.java                          8268722   macosx-x64
 serviceability/sa/ClhsdbFindPC.java#xcomp-core                8268722   macosx-x64
 serviceability/sa/ClhsdbFindPC.java#no-xcomp-core             8268722   macosx-x64
+serviceability/sa/ClhsdbFindPC.java#xcomp-process             8276402   generic-all
+serviceability/sa/ClhsdbJstack.java#id0                       8276402   generic-all
 serviceability/sa/ClhsdbPmap.java#core                        8268722   macosx-x64
 serviceability/sa/ClhsdbPstack.java#core                      8268722   macosx-x64
 serviceability/sa/TestJmapCore.java                           8268722,8268283,8270202   macosx-x64,linux-aarch64,linux-x64

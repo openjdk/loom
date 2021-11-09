@@ -539,7 +539,7 @@ private:
 
 public:
   inline void post_safepoint(Handle conth);
-  stackChunkOop allocate_stack_chunk(int stack_size, bool is_preempt);
+  stackChunkOop allocate_stack_chunk(size_t stack_size, bool is_preempt);
 
 private:
   ContMirror(const ContMirror& cont); // no copy constructor
@@ -1734,14 +1734,14 @@ public:
     *addr = value;
   }
 
-  stackChunkOop allocate_chunk(int size) {
+  stackChunkOop allocate_chunk(size_t size) {
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
     stackChunkOop chunk = _cont.allocate_stack_chunk(size, _preempt);
     if (chunk == nullptr) { // OOM
       return nullptr;
     }
-    assert (chunk->stack_size() == size, "");
-    assert (chunk->size() >= size, "chunk->size(): %d size: %d", chunk->size(), size);
+    assert (chunk->stack_size() == (int)size, "");
+    assert (chunk->size() >= size, "chunk->size(): %zu size: %zu", chunk->size(), size);
     assert ((intptr_t)chunk->start_address() % 8 == 0, "");
 
     stackChunkOop chunk0 = _cont.tail();
@@ -3331,9 +3331,9 @@ inline void ContMirror::post_safepoint(Handle conth) {
 
 /* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
  * method. In the later case we might have done a safepoint and need to reload our oops */
-stackChunkOop ContMirror::allocate_stack_chunk(int stack_size, bool is_preempt) {
+stackChunkOop ContMirror::allocate_stack_chunk(size_t stack_size, bool is_preempt) {
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
-  int size_in_words = klass->instance_size(stack_size);
+  size_t size_in_words = klass->instance_size(stack_size);
 
   assert(is_preempt || _thread == JavaThread::current(), "should be current");
   JavaThread* current = is_preempt ? JavaThread::current() : _thread;

@@ -26,6 +26,7 @@ package jdk.internal.vm;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -36,7 +37,7 @@ import jdk.internal.access.SharedSecrets;
  * A "shared" thread container. A shared thread container doesn't have an owner
  * and is intended for unstructured uses, e.g. thread pools.
  */
-public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
+public class SharedThreadContainer extends ThreadContainer implements AutoCloseable {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final VarHandle CLOSED;
     static {
@@ -49,41 +50,47 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
     }
 
     private final String name;
-    private final Supplier<Stream<Thread>> threadsSupplier;
     private final LongAdder threadCount;
-    private final Object key;
+    private volatile Supplier<Stream<Thread>> threadsSupplier;
+    private volatile Object key;
     private volatile boolean closed;
 
-    private SharedThreadContainer(String name, Supplier<Stream<Thread>> threadsSupplier) {
+    private SharedThreadContainer(String name, boolean countThreads) {
+        super(true);
         this.name = name;
-        if (threadsSupplier != null) {
-            this.threadsSupplier = threadsSupplier;
-            this.threadCount = null;
-        } else {
-            this.threadsSupplier = null;
-            this.threadCount = new LongAdder();
-        }
-        this.key = ThreadContainers.registerSharedContainer(this);
+        this.threadCount = (countThreads) ? new LongAdder() : null;
+    }
+
+    /**
+     * Creates a shared thread container with the given name.
+     * @param countThreads true to count threads, false to not count threads
+     */
+    public static SharedThreadContainer create(String name, boolean countThreads) {
+        var container = new SharedThreadContainer(name, countThreads);
+        container.key = ThreadContainers.registerContainer(container);
+        return container;
     }
 
     /**
      * Creates a shared thread container with the given name.
      */
     public static SharedThreadContainer create(String name) {
-        return new SharedThreadContainer(name, null);
+        return create(name, true);
     }
 
-    /**
-     * Creates a shared thread container with the given name and threads supplier.
-     */
-    public static SharedThreadContainer create(String name,
-                                               Supplier<Stream<Thread>> threadsSupplier) {
-        return new SharedThreadContainer(name, threadsSupplier);
+    @Override
+    public ThreadContainer push() {
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public String name() {
         return name;
+    }
+
+    @Override
+    public Thread owner() {
+        return null;
     }
 
     @Override
@@ -109,8 +116,16 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
         }
     }
 
+    /**
+     * Sets the object that enumerates the threads in the container.
+     */
+    public void threadsSupplier(Supplier<Stream<Thread>> threadsSupplier) {
+        this.threadsSupplier = Objects.requireNonNull(threadsSupplier);
+    }
+
     @Override
     public Stream<Thread> threads() {
+        Supplier<Stream<Thread>> threadsSupplier = this.threadsSupplier;
         if (threadsSupplier != null) {
             return threadsSupplier.get();
         } else {
@@ -134,9 +149,10 @@ public class SharedThreadContainer implements ThreadContainer, AutoCloseable {
      * throw IllegalStateException. This method has no impact on threads that are
      * still running or starting around the time that this method is invoked.
      */
+    @Override
     public void close() {
         if (!closed && CLOSED.compareAndSet(this, false, true)) {
-            ThreadContainers.deregisterSharedContainer(key);
+            ThreadContainers.deregisterContainer(key);
         }
     }
 

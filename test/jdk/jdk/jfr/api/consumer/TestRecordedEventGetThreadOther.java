@@ -93,7 +93,5 @@ public class TestRecordedEventGetThreadOther {
         Asserts.assertEquals(recordedThread.getJavaThreadId(), thread.getId());
         Asserts.assertNotNull(recordedThread.getId());
         Asserts.assertEquals(recordedThread.getOSName(), MY_THREAD_NAME);
-        Asserts.assertFalse(recordedThread.isVirtual());
-
     }
 }
