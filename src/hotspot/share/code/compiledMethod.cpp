@@ -67,7 +67,6 @@ CompiledMethod::CompiledMethod(Method* method, const char* name, CompilerType ty
   : CodeBlob(name, type, CodeBlobLayout((address) this, size, header_size, cb), cb,
              frame_complete_offset, frame_size, oop_maps, caller_must_gc_arguments, compiled),
     _mark_for_deoptimization_status(not_marked),
-    _has_been_deoptimized(false),
     _method(method),
     _gc_data(NULL)
 {
@@ -122,6 +121,7 @@ void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
   // assert (can_be_deoptimized(), ""); // in some places we check before marking, in others not.
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock,
                  Mutex::_no_safepoint_check_flag);
+  assert(_mark_for_deoptimization_status != deoptimize_done, "can't go backwards");
   _mark_for_deoptimization_status = (inc_recompile_counts ? deoptimize : deoptimize_noupdate);
 }
 
