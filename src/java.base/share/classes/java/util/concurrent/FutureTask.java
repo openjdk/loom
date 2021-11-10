@@ -207,16 +207,14 @@ public class FutureTask<V> implements RunnableFuture<V> {
 
     @Override
     public V resultNow() {
-        switch (state) {
-            case NORMAL:
+        switch (state()) {    // Future.State
+            case SUCCESS:
                 @SuppressWarnings("unchecked")
                 V result = (V) outcome;
                 return result;
-            case EXCEPTIONAL:
+            case FAILED:
                 throw new IllegalStateException("Task completed with exception");
             case CANCELLED:
-            case INTERRUPTING:
-            case INTERRUPTED:
                 throw new IllegalStateException("Task was cancelled");
             default:
                 throw new IllegalStateException("Task has not completed");
@@ -225,15 +223,13 @@ public class FutureTask<V> implements RunnableFuture<V> {
 
     @Override
     public Throwable exceptionNow() {
-        switch (state) {
-            case NORMAL:
+        switch (state()) {    // Future.State
+            case SUCCESS:
                 throw new IllegalStateException("Task completed with a result");
-            case EXCEPTIONAL:
+            case FAILED:
                 Object x = outcome;
                 return (Throwable) x;
             case CANCELLED:
-            case INTERRUPTING:
-            case INTERRUPTED:
                 return new CancellationException();
             default:
                 throw new IllegalStateException("Task has not completed");
@@ -242,7 +238,13 @@ public class FutureTask<V> implements RunnableFuture<V> {
 
     @Override
     public State state() {
-        switch (state) {
+        int s = state;
+        while (s == COMPLETING) {
+            // waiting for transition to NORMAL or EXCEPTIONAL
+            Thread.yield();
+            s = state;
+        }
+        switch (s) {
             case NORMAL:
                 return State.SUCCESS;
             case EXCEPTIONAL:
