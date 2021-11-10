@@ -121,8 +121,9 @@ void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
   // assert (can_be_deoptimized(), ""); // in some places we check before marking, in others not.
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock,
                  Mutex::_no_safepoint_check_flag);
-  assert(_mark_for_deoptimization_status != deoptimize_done, "can't go backwards");
-  _mark_for_deoptimization_status = (inc_recompile_counts ? deoptimize : deoptimize_noupdate);
+  if (_mark_for_deoptimization_status != deoptimize_done) { // can't go backwards
+     _mark_for_deoptimization_status = (inc_recompile_counts ? deoptimize : deoptimize_noupdate);
+  }
 }
 
 //-----------------------------------------------------------------------------
