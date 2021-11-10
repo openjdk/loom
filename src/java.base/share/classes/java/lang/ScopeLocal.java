@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
+import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
@@ -227,6 +227,12 @@ public final class ScopeLocal<T> {
          * get the value of the scope local. The scope locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
+         * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
+         * operation creates {@link java.util.concurrent.TaskSession TaskSession}s but does
+         * not close them, then exiting the operation causes the underlying construct of each
+         * session to be closed (in the reverse order that they were created in), and
+         * {@link StructureViolationException} to be thrown.
+         *
          * @param op    the operation to run
          * @param <R>   the type of the result of the function
          * @return the result
@@ -236,13 +242,37 @@ public final class ScopeLocal<T> {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
+            Throwable ex = null;
+            R result = null;
+            var scope = new StackableScope().push();
+            boolean atTop;
             try {
-                return op.call();
+                result = op.call();
+            } catch (Throwable e) {
+                ex = e;
             } finally {
-                Thread currentThread = Thread.currentThread();
-                currentThread.scopeLocalBindings = prevBindings;
+                atTop = scope.popForcefully();  // may block
+                Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
+            // re-throw exception if op completed with exception
+            // throw exception if a structure mismatch was detected
+            if (ex != null || !atTop) {
+                if (!atTop) {
+                    var e = new StructureViolationException();
+                    if (ex == null) {
+                        ex = e;
+                    } else {
+                        ex.addSuppressed(e);
+                    }
+                }
+                if (ex instanceof Exception e)
+                    throw e;
+                if (ex instanceof Error e)
+                    throw e;
+                assert false;
+            }
+            return result;
         }
 
         /**
@@ -270,18 +300,46 @@ public final class ScopeLocal<T> {
          * get the value of the scope local. The scope locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
+         * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
+         * operation creates {@link java.util.concurrent.TaskSession TaskSession}s but does
+         * not close them, then exiting the operation causes the underlying construct of each
+         * session to be closed (in the reverse order that they were created in), and
+         * {@link StructureViolationException} to be thrown.
+         *
          * @param op    the operation to run
          */
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
+            Throwable ex = null;
+            boolean atTop;
+            var scope = new StackableScope().push();
             try {
                 op.run();
+            } catch (Throwable e) {
+                ex = e;
             } finally {
-                Thread currentThread = Thread.currentThread();
-                currentThread.scopeLocalBindings = prevBindings;
+                atTop = scope.popForcefully();  // may block
+                Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
+            }
+            // re-throw exception if op completed with exception
+            // throw exception if a structure mismatch was detected
+            if (ex != null || !atTop) {
+                if (!atTop) {
+                    var e = new StructureViolationException();
+                    if (ex == null) {
+                        ex = e;
+                    } else {
+                        ex.addSuppressed(e);
+                    }
+                }
+                if (ex instanceof RuntimeException e)
+                    throw e;
+                if (ex instanceof Error e)
+                    throw e;
+                assert false;
             }
         }
 

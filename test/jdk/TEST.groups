@@ -99,6 +99,7 @@ jdk_loom = \
     java/lang/ScopeLocal \
     java/lang/management/ThreadMXBean \
     java/util/concurrent/ \
+    jdk/internal/misc/ThreadFlock \
     jdk/internal/vm/Continuation \
     jdk/jfr/threading
 
