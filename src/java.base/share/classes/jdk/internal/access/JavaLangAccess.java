@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import jdk.internal.module.ServicesCatalog;
@@ -471,6 +472,11 @@ public interface JavaLangAccess {
      * Sets the current thread's scope locals cache
      */
     void setScopeLocalCache(Object[] cache);
+
+    /**
+     * Return the current thread's scope local bindings.
+     */
+    Object scopeLocalBindings();
 
     /**
      * Returns the innermost mounted continuation

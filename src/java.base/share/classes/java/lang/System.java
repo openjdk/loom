@@ -2525,6 +2525,10 @@ public final class System {
                 Thread.setScopeLocalCache(cache);
             }
 
+            public Object scopeLocalBindings() {
+                return Thread.scopeLocalBindings();
+            }
+
             public Continuation getContinuation(Thread thread) {
                 return thread.getContinuation();
             }

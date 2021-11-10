@@ -79,7 +79,8 @@ public class StackableScope {
      * @return true if the pop succeeded, false if this scope is not the top of stack
      */
     public boolean tryPop() {
-        assert Thread.currentThread() == owner;
+        if (Thread.currentThread() != owner)
+            throw new IllegalStateException("Not owner");
         if (head() == this) {
             setHead(previous);
             previous = null;
@@ -106,7 +107,8 @@ public class StackableScope {
      * @return true if this scope was at the top of the stack, otherwise false
      */
     public boolean popForcefully() {
-        assert Thread.currentThread() == owner;
+        if (Thread.currentThread() != owner)
+            throw new IllegalStateException("Not owner");
         final StackableScope head = head();
         if (head == this) {
             setHead(previous);
@@ -196,15 +198,13 @@ public class StackableScope {
     }
 
     /**
-     * Attempts to close this scope and release its resources.
+     * Override this method to close this scope and release its resources.
      * This method should not pop the scope from the stack.
+     * This method is guaranteed to execute on the owner thread.
      * @return true if this method closed the scope, false if it failed
      */
     protected boolean tryClose() {
-        if (owner == null)
-            throw new UnsupportedOperationException();
-        if (Thread.currentThread() != owner)
-            throw new IllegalCallerException();
+        assert Thread.currentThread() == owner;
         return false;
     }
 

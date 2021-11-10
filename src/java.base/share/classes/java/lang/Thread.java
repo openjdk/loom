@@ -245,8 +245,8 @@ public class Thread implements Runnable {
 
     ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
 
-    ScopeLocal.Snapshot scopeLocalBindings() {
-        return scopeLocalBindings;
+    static ScopeLocal.Snapshot scopeLocalBindings() {
+        return currentThread().scopeLocalBindings;
     }
 
     void inheritScopeLocalBindings(ThreadContainer container) {
