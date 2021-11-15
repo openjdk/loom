@@ -25,12 +25,12 @@
 package java.lang;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.TaskSession;
+import java.util.concurrent.StructuredExecutor;
 
 /**
  * Thrown when a structural violation is detected.
  *
- * @see TaskSession#close()
+ * @see StructuredExecutor#close()
  * @see ScopeLocal.Carrier#run(Runnable) 
  * @see ScopeLocal.Carrier#call(Callable) 
  * @since 99

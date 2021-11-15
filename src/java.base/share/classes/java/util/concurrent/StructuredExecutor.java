@@ -37,92 +37,92 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.ThreadFlock;
+import jdk.internal.javac.PreviewFeature;
 
 /**
- * A basic API for <em>structured concurrency</em>. TaskSession supports cases where a
- * task splits into several concurrent sub-tasks to be executed in their own threads and
- * where the sub-tasks must complete before the main task can continue.
+ * A basic API for <em>structured concurrency</em>. StructuredExecutor supports cases
+ * where a task splits into several concurrent sub-tasks to be executed in their own
+ * threads and where the sub-tasks must complete before the main task can continue.
  *
- * <p> <b>TaskSession is work-in-progress. It may be renamed to StructuredTaskSession
- * or something else!</b>
+ * <p> <b>StructuredExecutor is work-in-progress.</b>
  *
- * <p> TaskSession defines the {@link #open() open} method to open a new session, the
- * {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
+ * <p> StructuredExecutor defines the {@link #open() open} method to open a new executor,
+ * the {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
  * #join() join} method to wait for all threads to finish, and the {@link #close() close}
- * method to close the session. The API is intended to be used with the {@code
+ * method to close the executor. The API is intended to be used with the {@code
  * try-with-resources} construct. The intention is that code in the <em>block</em> uses
  * the {@code fork} method to fork threads to execute the sub-tasks, wait for the threads
  * to finish with the {@code join} method, and then <em>process the results</em>.
  * Processing of results may include handling or re-throwing of exceptions.
  * <pre>{@code
- *         try (var session = TaskSession.open()) {
- *             Future<String> future1 = session.fork(task1);
- *             Future<String> future2 = session.fork(task2);
+ *         try (var executor = StructuredExecutor.open()) {
+ *             Future<String> future1 = executor.fork(task1);
+ *             Future<String> future2 = executor.fork(task2);
  *
- *             session.join();
+ *             executor.join();
  *
  *             ... process results/exceptions ...
  *
  *         }
  * }</pre>
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
- * by the <em>session owner</em> (the thread that opened the session), and the {@code close}
+ * by the <em>executor owner</em> (the thread that opened the executor), and the {@code close}
  * method throws an exception after closing if the owner did not invoke the {@code join}
  * method.
  *
- * <p> A TaskSession defines the {@link #shutdown() shutdown} method to shut down a session
- * without closing it. Shutdown is useful for cases where a sub-task completes with a result
- * (or exception) and the results of other unfinished tasks are no longer needed. Invoking
- * {@code shutdown} while the owner is waiting in the {@code join} method will cause the
- * {@code join} to wakeup. It also interrupts all unfinished threads and prevents new
- * threads from starting in the session.
+ * <p> StructuredExecutor defines the {@link #shutdown() shutdown} method to shut down an
+ * executor without closing it. Shutdown is useful for cases where a sub-task completes with
+ * a result (or exception) and the results of other unfinished tasks are no longer needed.
+ * Invoking {@code shutdown} while the owner is waiting in the {@code join} method will cause
+ * the {@code join} to wakeup. It also interrupts all unfinished threads and prevents new
+ * threads from starting in the executor.
  *
- * <p> TaskSession defines the 2-arg {@link #fork(Callable, BiConsumer) fork} method for
- * cases where it is useful to execute an operation when a task completes. The operation
- * may queue or record results, it may shutdown the session.
+ * <p> StructuredExecutor defines the 2-arg {@link #fork(Callable, BiConsumer) fork} method
+ * for cases where it is useful to execute an operation when a task completes. The operation
+ * may queue or record results, it may shutdown the executor.
  * {@link ShutdownOnSuccess ShutdownOnSuccess} and {@link ShutdownOnFailure
  * ShutdownOnFailure} are two useful operations that capture the first result or
- * exception, then shutdown the session to interrupt unfinished threads and wakeup the
+ * exception, then shutdown the executor to interrupt unfinished threads and wakeup the
  * owner.
  *
- * <p> The following are two examples that fork a pair of tasks in a session to fetch
+ * <p> The following are two examples that fork a pair of tasks in an executor to fetch
  * resources from two URL locations "left" and "right". The first creates a ShutdownOnSuccess
  * object to capture the result of the first task to complete normally, cancelling the other
- * by way of shutting down the session. The main task waits in {@code join} until either task
- * completes with a result or both tasks fail.
+ * by way of shutting down the executor. The main task waits in {@code join} until either
+ * task completes with a result or both tasks fail.
  * <pre>{@code
- *         try (var session = TaskSession.open()) {
+ *         try (var executor = StructuredExecutor.open()) {
  *             var handler = new ShutdownOnSuccess<String>();
  *
- *             session.fork(() -> fetch(left), handler);
- *             session.fork(() -> fetch(right), handler);
+ *             executor.fork(() -> fetch(left), handler);
+ *             executor.fork(() -> fetch(right), handler);
  *
- *             session.join();
+ *             executor.join();
  *
  *             String result = handler.result(e -> new WebApplicationException(e));
  *
  *             :
  *         }
  * }</pre>
- * The second creates a ShutdownOnFailure operation to capture the exception of the first
- * task to fail, cancelling the other by way of shutting down the session. he main task waits
- * in {@link #joinUntil(Instant)} until both tasks complete with a result, either fails,
- * or a deadline is reached.
+ * The second creates a ShutdownOnFailure operation to capture the exception thrown by
+ * the first task to fail, cancelling the other by way of shutting down the executor. The
+ * main task waits in {@link #joinUntil(Instant)} until both tasks complete with a result,
+ * either fails, or a deadline is reached.
  * <pre>{@code
  *        Instant deadline = ...
  *
- *        try (var session = TaskSession.open()) {
+ *        try (var executor = StructuredExecutor.open()) {
  *             var handler = new ShutdownOnFailure();
  *
- *             Future<String> future1 = session.fork(() -> query(left), handler);
- *             Future<String> future2 = session.fork(() -> query(right), handler);
+ *             Future<String> future1 = executor.fork(() -> query(left), handler);
+ *             Future<String> future2 = executor.fork(() -> query(right), handler);
  *
- *             session.joinUntil(deadline);
+ *             executor.joinUntil(deadline);
  *
  *             handler.throwIfFailed(e -> new WebApplicationException(e));
  *
+ *             // all tasks completed with a result
  *             String result = Stream.of(future1, future2)
  *                 .map(Future::resultNow)
  *                 .collect(Collectors.join(", ", "{ ", " }"));
@@ -130,65 +130,32 @@ import jdk.internal.misc.ThreadFlock;
  *             :
  *         }
  * }</pre>
+ * The example uses {@link Future#resultNow()} to obtain the result of each task. It
+ * should be rare to need to use the {@link Future#get()} method to wait for a result
+ * when using a StructuredExecutor.
  *
- * <p> A TaskSession is conceptually a node in a tree. A thread started in session "A"
- * may itself open a new session "B", implicitly forming a tree where session "A" is
- * the parent of session "B". When nested, say where thread opens session "B" and then
- * invokes a method that opens session "C", then the enclosing session "B" is conceptually
- * the parent of the nested session "C". The phrase "threads contained in the session" in
- * method descriptions means threads in sessions in the tree. TaskSession does not define
- * APIs that exposes the tree structure at this time.
+ * <p> A StructuredExecutor is conceptually a node in a tree. A thread started in executor
+ * "A" may itself open a new executor "B", implicitly forming a tree where executor "A" is
+ * the parent of executor "B". When nested, say where thread opens executor "B" and then
+ * invokes a method that opens executor "C", then the enclosing executor "B" is conceptually
+ * the parent of the nested executor "C". The tree structure supports the inheritance of
+ * {@linkplain ScopeLocal scope-local} bindings. It also supports confinement checks.
+ * The phrase "threads contained in the executor" in method descriptions means threads in
+ * executors in the tree. StructuredExecutor does not define APIs that exposes the tree
+ * structure at this time.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
- * @apiNote
- * The following is a more advanced example that attempts to establish a connection to
- * a HTTP server. It looks up the host name and forks a thread to connect to each address.
- * The first connection to be established is the winner. The winner shuts down the session
- * (which will interrupt unfinished threads). If more than one connection is established
- * then the "losers" close their socket to avoid a resource leak.
- * <pre>{@code
- *         InetAddress[] addresses = InetAddress.getAllByName(hostname);
- *         int port = 80;
- *         Instant deadline = ...
- *
- *         try (var session = TaskSession.open()) {
- *
- *             var ref = new AtomicReference<Socket>();
- *
- *             for (InetAddress address : addresses) {
- *                 session.fork(() -> {
- *                     var s = new Socket();
- *                     s.connect(new InetSocketAddress(address, port));
- *                     if (ref.compareAndSet(null, s)) {
- *                         session.shutdown();
- *                     } else {
- *                         s.close();
- *                     }
- *                     return s;
- *                 });
- *             }
- *
- *             session.join();
- *
- *             Socket socket = ref.get();
- *             if (socket != null) {
- *                 :
- *             }
- *
- *         }
- * }</pre>
- *
  * @since 99
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-public class TaskSession implements AutoCloseable {
+public class StructuredExecutor implements Executor, AutoCloseable {
     private static final VarHandle FUTURES;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            FUTURES = l.findVarHandle(TaskSession.class, "futures", Set.class);
+            FUTURES = l.findVarHandle(StructuredExecutor.class, "futures", Set.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -210,7 +177,7 @@ public class TaskSession implements AutoCloseable {
     private static final int CLOSED   = 2;
     private volatile int state;
 
-    TaskSession(String name, ThreadFactory factory) {
+    StructuredExecutor(String name, ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory);
         this.flock = ThreadFlock.open(name);
     }
@@ -225,16 +192,16 @@ public class TaskSession implements AutoCloseable {
 
     /**
      * Throws IllegalStateException if the current thread is not the owner
-     * or a thread contained in the flock.
+     * or a thread contained in the tree.
      */
     private void ensureOwnerOrContainsThread() {
         Thread currentThread = Thread.currentThread();
         if (currentThread != flock.owner() && !flock.containsThread(currentThread))
-            throw new IllegalStateException("Current thread not owner or thread in session");
+            throw new IllegalStateException("Current thread not owner or thread in executor");
     }
 
     /**
-     * Tests if the session is shutdown.
+     * Tests if the executor is shutdown.
      */
     private boolean isShutdown() {
         return state >= SHUTDOWN;
@@ -265,67 +232,67 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Opens a new task session that creates threads with given thread factory
-     * to run tasks. The session is owned by the current thread. The session is
+     * Opens a new StructuredExecutor that creates threads with given thread factory
+     * to run tasks. The executor is owned by the current thread. The executor is
      * optionally named.
      *
      * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings for inheritance by threads created in the session.
+     * bindings for inheritance by threads created in the executor.
      *
-     * <p> For the purposes of containment, the parent of the new session is determined
-     * as follows:
+     * <p> For the purposes of confinement and inheritance of scope-local bindings, the
+     * parent of the executor is determined as follows:
      * <ul>
-     * <li> If the current thread is the owner of open sessions then the most recently
-     * created, and open, session is the parent of the new session. In other words, the
-     * <em>enclosing session</em> is the parent.
-     * <li> If the current thread is not the owner of any open sessions then the
-     * parent of the new session is the current thread's session. If the current thread
-     * was not started in a session then the new session does not have a parent.
+     * <li> If the current thread is the owner of open executors then the most recently
+     * created, and open, executor is the parent of the new executor. In other words, the
+     * <em>enclosing executor</em> is the parent.
+     * <li> If the current thread is not the owner of any open executors then the
+     * parent of the new executor is the current thread's executor. If the current thread
+     * was not started in an executor then the new executor does not have a parent.
      * </ul>
      *
-     * @param name the name of the session, can be null
+     * @param name the name of the executor, can be null
      * @param factory the thread factory
-     * @return a new TaskSession
+     * @return a new StructuredExecutor
      */
-    public static TaskSession open(String name, ThreadFactory factory) {
-        return new TaskSession(name, factory);
+    public static StructuredExecutor open(String name, ThreadFactory factory) {
+        return new StructuredExecutor(name, factory);
     }
 
     /**
-     * Opens a new task session that creates virtual threads to run tasks.
+     * Opens a new StructuredExecutor that creates virtual threads to run tasks.
      *
      * <p> This method is equivalent to invoking {@link #open(String, ThreadFactory)}
      * with the given name and a thread factory that creates virtual threads.
      *
-     * @param name the name of the session
-     * @return a new TaskSession
+     * @param name the name of the executor
+     * @return a new StructuredExecutor
      */
-    public static TaskSession open(String name) {
+    public static StructuredExecutor open(String name) {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new TaskSession(Objects.requireNonNull(name), factory);
+        return new StructuredExecutor(Objects.requireNonNull(name), factory);
     }
 
     /**
-     * Opens a new task session that creates virtual threads to run tasks.
-     * The session is unnamed.
+     * Opens a new StructuredExecutor that creates virtual threads to run tasks.
+     * The executor is unnamed.
      *
      * <p> This method is equivalent to invoking {@link #open(String, ThreadFactory)}
      * with a name of {@code null} and a thread factory that creates virtual threads.
      *
-     * @return a new TaskSession
+     * @return a new StructuredExecutor
      */
-    public static TaskSession open() {
+    public static StructuredExecutor open() {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new TaskSession(null, factory);
+        return new StructuredExecutor(null, factory);
     }
 
     /**
-     * Starts a new thread in this session to run the given task. If onComplete is
-     * non-null then it is invoked when the task completes and the session is not
+     * Starts a new thread in this executor to run the given task. If onComplete is
+     * non-null then it is invoked when the task completes and the executor is not
      * shutdown.
      */
     private <U, V extends U> Future<V> spawn(Callable<V> task,
-                                             BiConsumer<TaskSession, Future<U>> onComplete) {
+                                             BiConsumer<StructuredExecutor, Future<U>> onComplete) {
         Objects.requireNonNull(task);
 
         // create future
@@ -334,13 +301,11 @@ public class TaskSession implements AutoCloseable {
         // check state before creating thread
         int s = state;
         if (s >= SHUTDOWN) {
-            if (s == SHUTDOWN) {
-                // return cancelled Future
-                future.cancel(false);
-                return future;
-            } else {
-                throw new IllegalStateException("Session is closed");
-            }
+            // the executor is closed, shutdown, or in the process of shutting down
+            if (state == CLOSED)
+                throw new IllegalStateException("Executor is closed");
+            future.cancel(false);
+            return future;
         }
 
         // create thread
@@ -353,12 +318,10 @@ public class TaskSession implements AutoCloseable {
             flock.start(thread);
         } catch (IllegalStateException e) {
             if (flock.isShutdown()) {
-                // the session is closed, shutdown, or in the process of shutting down
-                if (state == CLOSED) {
-                    throw new IllegalStateException("Session is closed");
-                } else {
-                    future.cancel(false);
-                }
+                // the executor is closed, shutdown, or in the process of shutting down
+                if (state == CLOSED)
+                    throw new IllegalStateException("Executor is closed");
+                future.cancel(false);
             } else {
                 // scope-locals don't match
                 throw e;
@@ -369,43 +332,41 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Starts a new thread in this session to run the given task.
+     * Starts a new thread in this executor to run the given task.
      *
-     * <p> The thread is started with the {@linkplain ScopeLocal scope-local} bindings
-     * that were captured when opening the session. The bindings must match the current
-     * thread's bindings.
+     * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
+     * bindings and must match the bindings captured when the executor was created.
      *
-     * <p> If this session is {@linkplain #shutdown() shutdown} (or in the process of
+     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
      * shutting down) then this method returns a Future representing a {@link
      * Future.State#CANCELLED cancelled} task that was not run.
      *
-     * <p> This method may only be invoked by the session owner or threads contained
-     * in the session.
+     * <p> This method may only be invoked by the executor owner or threads contained
+     * in the executor.
      *
      * @param task the task to run
      * @param <V> the task return type
      * @return a future
-     * @throws IllegalStateException if this session is closed, the current
-     * scope-local bindings are not the same as when the session was created,
-     * or the caller thread is not the owner or a thread contained in the session
-     * @throws RejectedExecutionException if the session was created with a
-     * thread factory and it rejected creating a thread to run the task
+     * @throws IllegalStateException if this executor is closed, the current
+     * scope-local bindings are not the same as when the executor was created,
+     * or the caller thread is not the owner or a thread contained in the executor
+     * @throws RejectedExecutionException if the thread factory rejected creating a
+     * thread to run the task
      */
     public <V> Future<V> fork(Callable<V> task) {
         return spawn(task, null);
     }
 
     /**
-     * Starts a new thread in this session to run the given task and an operation to
+     * Starts a new thread in this executor to run the given task and an operation to
      * run when the task completes.
      *
-     * <p> The thread is started with the {@linkplain ScopeLocal scope-local} bindings
-     * that were captured when opening the session. The bindings must match the current
-     * thread's bindings.
+     * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
+     * bindings and must match the bindings captured when the executor was created.
      *
      * <p> The {@link BiFunction#apply(Object, Object) apply} method of the {@code
-     * onComplete} operation is invoked if the task completes before the session is
-     * {@link #shutdown() shutdown}. If the session shuts down at or around the same
+     * onComplete} operation is invoked if the task completes before the executor is
+     * {@link #shutdown() shutdown}. If the executor shuts down at or around the same
      * time that the task completes then {@code onComplete} may or may not be invoked.
      * The {@link BiFunction#andThen(Function) andThen} method can be used to compose
      * more than one operation where required. The {@code apply} method is run by the
@@ -413,12 +374,12 @@ public class TaskSession implements AutoCloseable {
      * Future#cancel(boolean) Future.cancel} is used to cancel a task then {@code apply}
      * method is run by the thread that invokes {@code cancel}.
      *
-     * <p> If this session is {@linkplain #shutdown() shutdown} (or in the process of
+     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
      * shutting down) then this method returns a Future representing a {@link
      * Future.State#CANCELLED cancelled} task that was not run.
      *
-     * <p> This method may only be invoked by the session owner or threads contained
-     * in the session.
+     * <p> This method may only be invoked by the executor owner or threads contained
+     * in the executor.
      *
      * @param task the task to run
      * @param onComplete the operation to run when the task completes
@@ -426,19 +387,43 @@ public class TaskSession implements AutoCloseable {
      * @param <U> the return type handled by the operation
      * @return a future
      *
-     * @throws IllegalStateException if this session is closed, the current
-     * scope-local bindings are not the same as when the session was created,
-     * or the caller thread is not the owner or a thread contained in the session
-     * @throws RejectedExecutionException if the session was created with a
-     * thread factory and it rejected creating a thread to run the task
+     * @throws IllegalStateException if this executor is closed, the current
+     * scope-local bindings are not the same as when the executor was created,
+     * or the caller thread is not the owner or a thread contained in the executor
+     * @throws RejectedExecutionException if the thread factory rejected creating a
+     * thread to run the task
      */
     public <U, V extends U> Future<V> fork(Callable<V> task,
-                                           BiConsumer<TaskSession, Future<U>> onComplete) {
+                                           BiConsumer<StructuredExecutor, Future<U>> onComplete) {
         return spawn(task, Objects.requireNonNull(onComplete));
     }
 
     /**
-     * Wait for all threads to finish or the session to shutdown.
+     * Starts a new thread in this executor to run the given task.
+     *
+     * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
+     * bindings and must match the bindings captured when the executor was created.
+     *
+     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
+     * shutting down) then the task does not run.
+     *
+     * <p> This method may only be invoked by the executor owner or threads contained
+     * in the executor.
+     *
+     * @param task the task to run
+     * @throws IllegalStateException if this executor is closed, the current
+     * scope-local bindings are not the same as when the executor was created,
+     * or the caller thread is not the owner or a thread contained in the executor
+     * @throws RejectedExecutionException if the thread factory rejected creating a
+     * thread to run the task
+     */
+    @Override
+    public void execute(Runnable task) {
+        spawn(Executors.callable(task), null);
+    }
+
+    /**
+     * Wait for all threads to finish or the executor to shutdown.
      */
     private void implJoin(Duration timeout)
         throws InterruptedException, TimeoutException
@@ -448,7 +433,7 @@ public class TaskSession implements AutoCloseable {
         int s = state;
         if (s >= SHUTDOWN) {
             if (s == CLOSED)
-                throw new IllegalStateException("Session is closed");
+                throw new IllegalStateException("Executor is closed");
             return;
         }
 
@@ -461,15 +446,15 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Wait for all unfinished threads or the session to shutdown. This method waits
-     * until all threads in the session finish their tasks (including {@linkplain
+     * Wait for all unfinished threads or the executor to shutdown. This method waits
+     * until all threads in the executor finish their tasks (including {@linkplain
      * #fork(Callable, BiConsumer) onComplete} operations), the {@link #shutdown()
-     * shutdown} method is invoked to shut down the session, or the current thread is
+     * shutdown} method is invoked to shut down the executor, or the current thread is
      * interrupted.
      *
-     * <p> This method may only be invoked by the session owner.
+     * <p> This method may only be invoked by the executor owner.
      *
-     * @throws IllegalStateException if this session is closed or the caller thread
+     * @throws IllegalStateException if this executor is closed or the caller thread
      * is not the owner
      * @throws InterruptedException if interrupted while waiting
      */
@@ -482,16 +467,16 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Wait for all unfinished threads or the session to shutdown, up to the given
-     * deadline. This method waits until all threads in the session finish their
+     * Wait for all unfinished threads or the executor to shutdown, up to the given
+     * deadline. This method waits until all threads in the executor finish their
      * tasks (including {@linkplain #fork(Callable, BiConsumer) onComplete} operations),
-     * the {@link #shutdown() shutdown} method is invoked to shut down the session,
+     * the {@link #shutdown() shutdown} method is invoked to shut down the executor,
      * the current thread is interrupted, or the deadline is reached.
      *
-     * <p> This method may only be invoked by the session owner.
+     * <p> This method may only be invoked by the executor owner.
      *
      * @param deadline the deadline
-     * @throws IllegalStateException if this session is closed or the caller thread
+     * @throws IllegalStateException if this executor is closed or the caller thread
      * is not the owner
      * @throws InterruptedException if interrupted while waiting
      * @throws TimeoutException if the deadline is reached while waiting
@@ -530,8 +515,8 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Shutdown the session if not already shutdown. Return true if this method
-     * shutdowns the session, false if already shutdown.
+     * Shutdown the executor if not already shutdown. Return true if this method
+     * shutdowns the executor, false if already shutdown.
      */
     private boolean implShutdown() {
         if (state < SHUTDOWN) {
@@ -560,7 +545,7 @@ public class TaskSession implements AutoCloseable {
     }
 
     /**
-     * Shutdown the session without closing it. Shutting down a session prevents new
+     * Shutdown the executor without closing it. Shutting down an executor prevents new
      * threads from starting, interrupts all unfinished threads, and causes the
      * {@link #join() join} method to wakeup. Shutdown is useful for cases where the
      * results of unfinished tasks are no longer needed.
@@ -570,7 +555,7 @@ public class TaskSession implements AutoCloseable {
      * <li> {@linkplain Future#cancel(boolean) Cancels} the tasks that have threads
      * {@linkplain Future#get() waiting} on a result so that the waiting threads wakeup.
      * <li> {@linkplain Thread#interrupt() Interrupts} all unfinished threads in the
-     * session (except the current thread).
+     * executor (except the current thread).
      * <li> Wakes up the owner if it is waiting in {@link #join()} or {@link
      * #joinUntil(Instant)}. If the owner is not waiting then its next call to {@code
      * join} or {@code joinUntil} will return immediately.
@@ -581,44 +566,44 @@ public class TaskSession implements AutoCloseable {
      * threads that have not finished because they are executing code that did not
      * respond (or respond promptly) to thread interrupt. This method does not wait
      * for these threads. When the owner invokes the {@link #close() close} method
-     * to close the session then it will wait for the remaining threads to finish.
+     * to close the executor then it will wait for the remaining threads to finish.
      *
-     * <p> This method may only be invoked by the session owner or threads contained
-     * in the session.
+     * <p> This method may only be invoked by the executor owner or threads contained
+     * in the executor.
      *
-     * @throws IllegalStateException if this session is closed, or the caller thread
-     * is not the owner or a thread contained in the session
+     * @throws IllegalStateException if this executor is closed, or the caller thread
+     * is not the owner or a thread contained in the executor
      */
     public void shutdown() {
         ensureOwnerOrContainsThread();
         if (state == CLOSED)
-            throw new IllegalStateException("Session is closed");
+            throw new IllegalStateException("Executor is closed");
         if (implShutdown())
             flock.wakeup();
     }
 
     /**
-     * Closes this session.
+     * Closes this executor.
      *
-     * <p> This method first shuts down the session (as if by invoking the {@link
+     * <p> This method first shuts down the executor (as if by invoking the {@link
      * #shutdown() shutdown} method). It then waits for the threads executing any
      * unfinished tasks to finish. If interrupted then this method will continue to
      * wait for the threads to finish before completing with the interrupt status set.
      *
-     * <p> This method may only be invoked by the session owner.
+     * <p> This method may only be invoked by the executor owner.
      *
-     * <p> A TaskSession is intended to be used in a <em>structured manner</em>. If
-     * this method is called to close a session before nested sessions are closed then
-     * it closes the underlying construct of each nested session (in the reverse order
-     * that they were created in), closes this session, and then throws {@link
+     * <p> A StructuredExecutor is intended to be used in a <em>structured manner</em>. If
+     * this method is called to close an executor before nested executors are closed then
+     * it closes the underlying construct of each nested executor (in the reverse order
+     * that they were created in), closes this executor, and then throws {@link
      * StructureViolationException}.
      *
-     * Similarly, if called to close a session that <em>encloses</em> {@linkplain
+     * Similarly, if called to close an executor that <em>encloses</em> {@linkplain
      * ScopeLocal.Carrier#run(Runnable) operations} with scope-local bindings then
-     * it also throws {@code StructureViolationException} after closing the session.
+     * it also throws {@code StructureViolationException} after closing the executor.
      *
      * @throws IllegalStateException if invoked by a thread that is not the owner,
-     * or thrown after closing the session if the owner did not join the session
+     * or thrown after closing the executor if the owner did not join the executor
      */
     @Override
     public void close() {
@@ -658,52 +643,52 @@ public class TaskSession implements AutoCloseable {
 
     /**
      * The Future implementation returned by the fork methods. Most methods are
-     * overridden to support cancellation when the session is shutdown.
-     * The blocking get methods register the Future with the session so that they
-     * are cancelled when the session shuts down.
+     * overridden to support cancellation when the executor is shutdown.
+     * The blocking get methods register the Future with the executor so that they
+     * are cancelled when the executor shuts down.
      */
     private class FutureImpl<U, V extends U>  extends FutureTask<V> {
-        private final TaskSession session;
-        private final BiConsumer<TaskSession, Future<U>> onComplete;
+        private final StructuredExecutor executor;
+        private final BiConsumer<StructuredExecutor, Future<U>> onComplete;
 
-        FutureImpl(TaskSession session,
+        FutureImpl(StructuredExecutor executor,
                    Callable<V> task,
-                   BiConsumer<TaskSession, Future<U>> onComplete) {
+                   BiConsumer<StructuredExecutor, Future<U>> onComplete) {
             super(task);
-            this.session = session;
+            this.executor = executor;
             this.onComplete = onComplete;
         }
 
         @Override
         protected void done() {
-            if (onComplete != null && !session.isShutdown()) {
+            if (onComplete != null && !executor.isShutdown()) {
                 @SuppressWarnings("unchecked")
                 Future<U> f = (Future<U>) this;
-                onComplete.accept(session, f);
+                onComplete.accept(executor, f);
             }
         }
 
-        private void cancelIfSessionShutdown() {
-            if (session.isShutdown() && !super.isDone()) {
+        private void cancelIfShutdown() {
+            if (executor.isShutdown() && !super.isDone()) {
                 super.cancel(false);
             }
         }
 
         @Override
         public boolean isDone() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.isDone();
         }
 
         @Override
         public boolean isCancelled() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.isCancelled();
         }
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.cancel(mayInterruptIfRunning);
         }
 
@@ -711,12 +696,12 @@ public class TaskSession implements AutoCloseable {
         public V get() throws InterruptedException, ExecutionException {
             if (super.isDone())
                 return super.get();
-            session.track(this);
+            executor.track(this);
             try {
-                cancelIfSessionShutdown();
+                cancelIfShutdown();
                 return super.get();
             } finally {
-                session.untrack(this);
+                executor.untrack(this);
             }
         }
 
@@ -726,43 +711,43 @@ public class TaskSession implements AutoCloseable {
             Objects.requireNonNull(unit);
             if (super.isDone())
                 return super.get();
-            session.track(this);
+            executor.track(this);
             try {
-                cancelIfSessionShutdown();
+                cancelIfShutdown();
                 return super.get(timeout, unit);
             } finally {
-                session.untrack(this);
+                executor.untrack(this);
             }
         }
 
         @Override
         public V resultNow() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.resultNow();
         }
 
         @Override
         public Throwable exceptionNow() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.exceptionNow();
         }
 
         @Override
         public State state() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.state();
         }
 
         @Override
         public String toString() {
-            cancelIfSessionShutdown();
+            cancelIfShutdown();
             return super.toString();
         }
     }
 
     /**
      * An operation for the {@link #fork(Callable, BiConsumer) fork} method that
-     * {@linkplain #shutdown() shuts down} the session when first invoked with a
+     * {@linkplain #shutdown() shuts down} the executor when first invoked with a
      * task that completed with a result. This operation can be used for cases where
      * it is not useful to wait for remaining tasks when one or more tasks
      * complete with a result.
@@ -775,7 +760,7 @@ public class TaskSession implements AutoCloseable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class ShutdownOnSuccess<V>
-            implements BiConsumer<TaskSession, Future<V>> {
+            implements BiConsumer<StructuredExecutor, Future<V>> {
         private static final VarHandle FIRST_SUCCESS;
         private static final VarHandle FIRST_FAILED;
         private static final VarHandle FIRST_CANCELLED;
@@ -799,25 +784,25 @@ public class TaskSession implements AutoCloseable {
         public ShutdownOnSuccess() { }
 
         /**
-         * Shutdown the given session when invoked for the first time with a task
+         * Shutdown the given executor when invoked for the first time with a task
          * that completed with a result.
          *
-         * @param session the session
+         * @param executor the executor
          * @param future the completed task
          * @throws IllegalArgumentException if the task has not completed
          * @see #shutdown()
          * @see Future.State#SUCCESS
          */
         @Override
-        public void accept(TaskSession session, Future<V> future) {
-            Objects.requireNonNull(session);
+        public void accept(StructuredExecutor executor, Future<V> future) {
+            Objects.requireNonNull(executor);
             switch (future.state()) {
                 case RUNNING -> throw new IllegalArgumentException("Task is not completed");
                 case SUCCESS -> {
                     // capture first task to complete normally
                     if (firstSuccess == null
                             && FIRST_SUCCESS.compareAndSet(this, null, future)) {
-                        session.shutdown();
+                        executor.shutdown();
                     }
                 }
                 case FAILED -> {
@@ -899,7 +884,7 @@ public class TaskSession implements AutoCloseable {
 
     /**
      * An operation for the {@link #fork(Callable, BiConsumer) fork} method that
-     * {@linkplain #shutdown() shuts down} the session when first invoked with a
+     * {@linkplain #shutdown() shuts down} the executor when first invoked with a
      * task that completed abnormally (with an exception or cancelled).
      * This operation can be used for cases where it is not useful to wait for
      * remaining tasks when one or more tasks fail.
@@ -911,7 +896,7 @@ public class TaskSession implements AutoCloseable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class ShutdownOnFailure
-            implements BiConsumer<TaskSession, Future<Object>> {
+            implements BiConsumer<StructuredExecutor, Future<Object>> {
         private static final VarHandle FIRST_FAILED;
         private static final VarHandle FIRST_CANCELLED;
         static {
@@ -932,10 +917,10 @@ public class TaskSession implements AutoCloseable {
         public ShutdownOnFailure() { }
 
         /**
-         * Shutdown the given session when invoked for the first time with a task
+         * Shutdown the given executor when invoked for the first time with a task
          * that completed abnormally (exception or cancelled).
          *
-         * @param session the session
+         * @param executor the executor
          * @param future the completed task
          * @throws IllegalArgumentException if the task has not completed
          * @see #shutdown()
@@ -943,8 +928,8 @@ public class TaskSession implements AutoCloseable {
          * @see Future.State#CANCELLED
          */
         @Override
-        public void accept(TaskSession session, Future<Object> future) {
-            Objects.requireNonNull(session);
+        public void accept(StructuredExecutor executor, Future<Object> future) {
+            Objects.requireNonNull(executor);
             Future.State state = future.state();
             if (state == Future.State.RUNNING)
                 throw new IllegalArgumentException("Task is not completed");
@@ -955,13 +940,13 @@ public class TaskSession implements AutoCloseable {
                 case FAILED -> {
                     if (firstFailed == null
                             && FIRST_FAILED.compareAndSet(this, null, future)) {
-                        session.shutdown();
+                        executor.shutdown();
                     }
                 }
                 case CANCELLED -> {
                     if (firstFailed == null && fistCancelled == null
                             && FIRST_CANCELLED.compareAndSet(this, null, future)) {
-                        session.shutdown();
+                        executor.shutdown();
                     }
                 }
             }

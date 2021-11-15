@@ -228,9 +228,9 @@ public final class ScopeLocal<T> {
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link java.util.concurrent.TaskSession TaskSession}s but does
-         * not close them, then exiting the operation causes the underlying construct of each
-         * session to be closed (in the reverse order that they were created in), and
+         * operation creates {@link java.util.concurrent.StructuredExecutor StructuredExecutor}s
+         * but does not close them, then exiting the operation causes the underlying construct
+         * of each executor to be closed (in the reverse order that they were created in), and
          * {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run
@@ -301,9 +301,9 @@ public final class ScopeLocal<T> {
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link java.util.concurrent.TaskSession TaskSession}s but does
-         * not close them, then exiting the operation causes the underlying construct of each
-         * session to be closed (in the reverse order that they were created in), and
+         * operation creates {@link java.util.concurrent.StructuredExecutor StructuredExecutor}s
+         * but does not close them, then exiting the operation causes the underlying construct
+         * of each executor to be closed (in the reverse order that they were created in), and
          * {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run

@@ -23,9 +23,9 @@
 
 /*
  * @test
- * @summary Basic tests for TaskSession
- * @compile --enable-preview -source ${jdk.version} TaskSessionTest.java
- * @run testng/othervm --enable-preview TaskSessionTest
+ * @summary Basic tests for StructuredExecutor
+ * @compile --enable-preview -source ${jdk.version} StructuredExecutorTest.java
+ * @run testng/othervm --enable-preview StructuredExecutorTest
  */
 
 import java.time.Duration;
@@ -45,7 +45,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class TaskSessionTest {
+public class StructuredExecutorTest {
 
     private ScheduledExecutorService scheduler;
 
@@ -85,11 +85,11 @@ public class TaskSessionTest {
     @Test(dataProvider = "factories")
     public void testFork1(ThreadFactory factory) throws Exception {
         AtomicInteger count = new AtomicInteger();
-        try (var session = TaskSession.open(null, factory)) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
             for (int i = 0; i < 100; i++) {
-                session.fork(() -> count.incrementAndGet());
+                executor.fork(() -> count.incrementAndGet());
             }
-            session.join();
+            executor.join();
         }
         assertTrue(count.get() == 100);
     }
@@ -104,80 +104,80 @@ public class TaskSessionTest {
             count.incrementAndGet();
             return factory.newThread(task);
         };
-        try (var session = TaskSession.open(null, countingFactory)) {
+        try (var executor = StructuredExecutor.open(null, countingFactory)) {
             for (int i = 0; i < 100; i++) {
-                session.fork(() -> null);
+                executor.fork(() -> null);
             }
-            session.join();
+            executor.join();
         }
         assertTrue(count.get() == 100);
     }
 
     /**
-     * Test fork is confined to threads in the session "tree".
+     * Test fork is confined to threads in the executor "tree".
      */
     public void testForkConfined() throws Exception {
-        try (var session1 = TaskSession.open();
-             var session2 = TaskSession.open()) {
+        try (var executor1 = StructuredExecutor.open();
+             var executor2 = StructuredExecutor.open()) {
 
-            // thread in session1 cannot fork thread in session2
-            Future<Void> future1 = session1.fork(() -> {
-                session2.fork(() -> null).get();
+            // thread in executor1 cannot fork thread in executor2
+            Future<Void> future1 = executor1.fork(() -> {
+                executor2.fork(() -> null).get();
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
             assertTrue(ex.getCause() instanceof IllegalStateException);
 
-            // thread in session2 can fork thread in session1
-            Future<Void> future2 = session2.fork(() -> {
-                session1.fork(() -> null).get();
+            // thread in executor2 can fork thread in executor1
+            Future<Void> future2 = executor2.fork(() -> {
+                executor1.fork(() -> null).get();
                 return null;
             });
             future2.get();
             assertTrue(future2.resultNow() == null);
 
             // random thread cannot fork
-            try (var executor = Executors.newCachedThreadPool()) {
-                Future<Void> future = executor.submit(() -> {
-                    session1.fork(() -> null);
+            try (var pool = Executors.newCachedThreadPool()) {
+                Future<Void> future = pool.submit(() -> {
+                    executor1.fork(() -> null);
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future::get);
                 assertTrue(ex.getCause() instanceof IllegalStateException);
             }
 
-            session2.join();
-            session1.join();
+            executor2.join();
+            executor1.join();
         }
     }
 
     /**
-     * Test fork when session is shutdown.
+     * Test fork when executor is shutdown.
      */
     @Test(dataProvider = "factories")
     public void testForkAfterShutdown(ThreadFactory factory) throws Exception {
         AtomicInteger count = new AtomicInteger();
-        try (var session = TaskSession.open(null, factory)) {
-            session.shutdown();
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            executor.shutdown();
+            Future<String> future = executor.fork(() -> {
                 count.incrementAndGet();
                 return "foo";
             });
             assertTrue(future.isCancelled());
-            session.join();
+            executor.join();
         }
         assertTrue(count.get() == 0);   // check that task did not run.
     }
 
     /**
-     * Test fork when session is closed.
+     * Test fork when executor is closed.
      */
     @Test(dataProvider = "factories")
     public void testForkAfterClose(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            session.join();
-            session.close();
-            expectThrows(IllegalStateException.class, () -> session.fork(() -> null));
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            executor.join();
+            executor.close();
+            expectThrows(IllegalStateException.class, () -> executor.fork(() -> null));
         }
     }
 
@@ -186,26 +186,26 @@ public class TaskSessionTest {
      */
     public void testForkReject() throws Exception {
         ThreadFactory factory = task -> null;
-        try (var session = TaskSession.open(null, factory)) {
-            expectThrows(RejectedExecutionException.class, () -> session.fork(() -> null));
-            session.join();
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            expectThrows(RejectedExecutionException.class, () -> executor.fork(() -> null));
+            executor.join();
         }
     }
 
     /**
      * BiConsumer that captures all Future objects notified to the accept method.
      */
-    private static class OnComplete<V> implements BiConsumer<TaskSession, Future<V>> {
-        final TaskSession session;
+    private static class OnComplete<V> implements BiConsumer<StructuredExecutor, Future<V>> {
+        final StructuredExecutor executor;
         final List<Future<V>> futures = new CopyOnWriteArrayList<>();
 
-        OnComplete(TaskSession session) {
-            this.session = session;
+        OnComplete(StructuredExecutor executor) {
+            this.executor = executor;
         }
 
         @Override
-        public void accept(TaskSession session, Future<V> future) {
-            assertTrue(session == this.session);
+        public void accept(StructuredExecutor executor, Future<V> future) {
+            assertTrue(executor == this.executor);
             assertTrue(future.isDone());
             futures.add(future);
         }
@@ -221,25 +221,25 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testForkOnCompleteOp1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            var onComplete = new OnComplete<String>(session);
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            var onComplete = new OnComplete<String>(executor);
 
             // completes normally
-            Future<String> future1 = session.fork(() -> "foo", onComplete);
+            Future<String> future1 = executor.fork(() -> "foo", onComplete);
 
             // completes with exception
-            Future<String> future2 = session.fork(() -> {
+            Future<String> future2 = executor.fork(() -> {
                 throw new FooException();
             }, onComplete);
 
             // cancelled
-            Future<String> future3 = session.fork(() -> {
+            Future<String> future3 = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             }, onComplete);
             future3.cancel(true);
 
-            session.join();
+            executor.join();
 
             Set<Future<String>> futures = onComplete.futures().collect(Collectors.toSet());
             assertEquals(futures, Set.of(future1, future2, future3));
@@ -248,17 +248,17 @@ public class TaskSessionTest {
 
     /**
      * Test fork with onComplete operation. It should not be invoked for tasks that
-     * complete after the session has been shutdown
+     * complete after the executor has been shutdown
      */
     @Test(dataProvider = "factories")
     public void testForkOnCompleteOp2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            var onComplete = new OnComplete<String>(session);
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            var onComplete = new OnComplete<String>(executor);
 
             var latch = new CountDownLatch(1);
 
             // start task that does not respond to interrupt
-            Future<String> future1 = session.fork(() -> {
+            Future<String> future1 = executor.fork(() -> {
                 boolean done = false;
                 while (!done) {
                     try {
@@ -269,14 +269,14 @@ public class TaskSessionTest {
                 return null;
             }, onComplete);
 
-            // start a second task to shutdown the session after 500ms
-            Future<String> future2 = session.fork(() -> {
+            // start a second task to shutdown the executor after 500ms
+            Future<String> future2 = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
-                session.shutdown();
+                executor.shutdown();
                 return null;
             });
 
-            session.join();
+            executor.join();
 
             // let task finish
             latch.countDown();
@@ -288,11 +288,58 @@ public class TaskSessionTest {
     }
 
     /**
+     * Test that each execute creates a thread.
+     */
+    @Test(dataProvider = "factories")
+    public void testExecute1(ThreadFactory factory) throws Exception {
+        AtomicInteger count = new AtomicInteger();
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            for (int i = 0; i < 100; i++) {
+                executor.execute(() -> count.incrementAndGet());
+            }
+            executor.join();
+        }
+        assertTrue(count.get() == 100);
+    }
+
+    /**
+     * Test that execute uses the specified thread factory.
+     */
+    @Test(dataProvider = "factories")
+    public void testExecute2(ThreadFactory factory) throws Exception {
+        AtomicInteger count = new AtomicInteger();
+        ThreadFactory countingFactory = task -> {
+            count.incrementAndGet();
+            return factory.newThread(task);
+        };
+        try (var executor = StructuredExecutor.open(null, countingFactory)) {
+            for (int i = 0; i < 100; i++) {
+                executor.execute(() -> { });
+            }
+            executor.join();
+        }
+        assertTrue(count.get() == 100);
+    }
+
+    /**
+     * Test execute throws when executor is shutdown.
+     */
+    public void testExecuteAfterShutdown() throws Exception {
+        AtomicInteger count = new AtomicInteger();
+        try (var executor = StructuredExecutor.open()) {
+            executor.shutdown();
+            executor.execute(() -> count.incrementAndGet());
+            executor.join();
+        }
+        assertTrue(count.get() == 0);   // check that task did not run.
+    }
+
+    /**
      * Test join with no threads.
      */
     public void testJoinWithNoThreads() throws Exception {
-        try (var session = TaskSession.open()) {
-            session.join();
+        try (var executor = StructuredExecutor.open()) {
+            executor.join();
         }
     }
 
@@ -301,12 +348,12 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinWithThreads(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return "foo";
             });
-            session.join();
+            executor.join();
             assertEquals(future.resultNow(), "foo");
         }
     }
@@ -315,26 +362,26 @@ public class TaskSessionTest {
      * Test join is owner confined.
      */
     public void testJoinConfined() throws Exception {
-        try (var session = TaskSession.open()) {
-            // attempt to join on thread in session
-            Future<Void> future1 = session.fork(() -> {
-                session.join();
+        try (var executor = StructuredExecutor.open()) {
+            // attempt to join on thread in executor
+            Future<Void> future1 = executor.fork(() -> {
+                executor.join();
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
             assertTrue(ex.getCause() instanceof IllegalStateException);
 
             // random thread cannot join
-            try (var executor = Executors.newCachedThreadPool()) {
-                Future<Void> future2 = executor.submit(() -> {
-                    session.join();
+            try (var pool = Executors.newCachedThreadPool()) {
+                Future<Void> future2 = pool.submit(() -> {
+                    executor.join();
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future2::get);
                 assertTrue(ex.getCause() instanceof IllegalStateException);
             }
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -343,8 +390,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoin1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
             });
@@ -352,14 +399,14 @@ public class TaskSessionTest {
             // join should throw
             Thread.currentThread().interrupt();
             try {
-                session.join();
+                executor.join();
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
 
             // join should complete
-            session.join();
+            executor.join();
             assertEquals(future.resultNow(), "foo");
         }
     }
@@ -369,8 +416,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoin2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
             });
@@ -378,30 +425,30 @@ public class TaskSessionTest {
             // join should throw
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
             try {
-                session.join();
+                executor.join();
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
 
             // join should complete
-            session.join();
+            executor.join();
             assertEquals(future.resultNow(), "foo");
         }
     }
 
     /**
-     * Test join when session is already shutdown.
+     * Test join when executor is already shutdown.
      */
     @Test(dataProvider = "factories")
     public void testJoinWithShutdown1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
             });
-            session.shutdown();  // interrupts task
-            session.join();
+            executor.shutdown();  // interrupts task
+            executor.join();
 
             // task should have completed abnormally
             assertTrue(future.isDone() && future.exceptionNow() != null);
@@ -413,18 +460,18 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinWithShutdown2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future1 = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future1 = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
             });
 
-            BiConsumer<TaskSession, Future<String>> onComplete = (s, f) -> s.shutdown();
-            Future<String> future2 = session.fork(() -> {
+            BiConsumer<StructuredExecutor, Future<String>> onComplete = (s, f) -> s.shutdown();
+            Future<String> future2 = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return null;
             }, onComplete);
-            session.join();
+            executor.join();
 
             // task1 should have completed abnormally
             assertTrue(future1.isDone() && future1.exceptionNow() != null);
@@ -435,24 +482,24 @@ public class TaskSessionTest {
     }
 
     /**
-     * Test join after session is shutdown.
+     * Test join after executor is shutdown.
      */
     public void testJoinAfterShutdown() throws Exception {
-        try (var session = TaskSession.open()) {
-            session.shutdown();
-            session.join();
+        try (var executor = StructuredExecutor.open()) {
+            executor.shutdown();
+            executor.join();
         }
     }
 
     /**
-     * Test join after session is closed.
+     * Test join after executor is closed.
      */
     public void testJoinAfterClose() throws Exception {
-        try (var session = TaskSession.open()) {
-            session.join();
-            session.close();
-            expectThrows(IllegalStateException.class, () -> session.join());
-            expectThrows(IllegalStateException.class, () -> session.joinUntil(Instant.now()));
+        try (var executor = StructuredExecutor.open()) {
+            executor.join();
+            executor.close();
+            expectThrows(IllegalStateException.class, () -> executor.join());
+            expectThrows(IllegalStateException.class, () -> executor.joinUntil(Instant.now()));
         }
     }
 
@@ -461,8 +508,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(2));
                 } catch (InterruptedException e) { }
@@ -470,7 +517,7 @@ public class TaskSessionTest {
             });
 
             long startMillis = millisTime();
-            session.joinUntil(Instant.now().plusSeconds(30));
+            executor.joinUntil(Instant.now().plusSeconds(30));
             assertTrue(future.isDone() && future.resultNow() == null);
             checkDuration(startMillis, 1900, 4000);
         }
@@ -481,8 +528,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
                 } catch (InterruptedException e) { }
@@ -491,7 +538,7 @@ public class TaskSessionTest {
 
             long startMillis = millisTime();
             try {
-                session.joinUntil(Instant.now().plusSeconds(2));
+                executor.joinUntil(Instant.now().plusSeconds(2));
             } catch (TimeoutException e) {
                 checkDuration(startMillis, 1900, 4000);
             }
@@ -504,8 +551,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil3(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
                 } catch (InterruptedException e) { }
@@ -515,7 +562,7 @@ public class TaskSessionTest {
             try {
                 for (int i = 0; i < 3; i++) {
                     try {
-                        session.joinUntil(Instant.now().plusSeconds(1));
+                        executor.joinUntil(Instant.now().plusSeconds(1));
                         assertTrue(false);
                     } catch (TimeoutException expected) {
                         assertFalse(future.isDone());
@@ -532,8 +579,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil4(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
                 } catch (InterruptedException e) { }
@@ -544,7 +591,7 @@ public class TaskSessionTest {
 
                 // now
                 try {
-                    session.joinUntil(Instant.now());
+                    executor.joinUntil(Instant.now());
                     assertTrue(false);
                 } catch (TimeoutException expected) {
                     assertFalse(future.isDone());
@@ -552,7 +599,7 @@ public class TaskSessionTest {
 
                 // in the past
                 try {
-                    session.joinUntil(Instant.now().minusSeconds(1));
+                    executor.joinUntil(Instant.now().minusSeconds(1));
                     assertTrue(false);
                 } catch (TimeoutException expected) {
                     assertFalse(future.isDone());
@@ -569,8 +616,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoinUntil1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
             });
@@ -578,14 +625,14 @@ public class TaskSessionTest {
             // join should throw
             Thread.currentThread().interrupt();
             try {
-                session.joinUntil(Instant.now().plusSeconds(10));
+                executor.joinUntil(Instant.now().plusSeconds(10));
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
 
             // join should complete
-            session.join();
+            executor.join();
             assertEquals(future.resultNow(), "foo");
         }
     }
@@ -595,8 +642,8 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoinUntil2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
             });
@@ -604,15 +651,212 @@ public class TaskSessionTest {
             // join should throw
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
             try {
-                session.joinUntil(Instant.now().plusSeconds(10));
+                executor.joinUntil(Instant.now().plusSeconds(10));
                 assertTrue(false);
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
 
             // join should complete
-            session.join();
+            executor.join();
             assertEquals(future.resultNow(), "foo");
+        }
+    }
+
+    /**
+     * Test shutdown after executor is closed.
+     */
+    public void testShutdownAfterClose() throws Exception {
+        try (var executor = StructuredExecutor.open()) {
+            executor.join();
+            executor.close();
+            expectThrows(IllegalStateException.class, () -> executor.shutdown());
+        }
+    }
+
+    /**
+     * Test close without join, no threads running.
+     */
+    public void testCloseWithoutJoin1() {
+        var executor = StructuredExecutor.open();
+        expectThrows(IllegalStateException.class, executor::close);
+    }
+
+    /**
+     * Test close without join, threads running.
+     */
+    @Test(dataProvider = "factories")
+    public void testCloseWithoutJoin2(ThreadFactory factory) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
+                Thread.sleep(Duration.ofDays(1));
+                return null;
+            });
+            expectThrows(IllegalStateException.class, executor::close);
+            assertTrue(future.isDone() && future.exceptionNow() != null);
+        }
+    }
+
+    /**
+     * Test close is owner confined.
+     */
+    public void testCloseConfined() throws Exception {
+        try (var executor = StructuredExecutor.open()) {
+            // attempt to close on thread in executor
+            Future<Void> future1 = executor.fork(() -> {
+                executor.close();
+                return null;
+            });
+            Throwable ex = expectThrows(ExecutionException.class, future1::get);
+            assertTrue(ex.getCause() instanceof IllegalStateException);
+
+            // random thread cannot close executor
+            try (var pool = Executors.newCachedThreadPool()) {
+                Future<Void> future2 = pool.submit(() -> {
+                    executor.close();
+                    return null;
+                });
+                ex = expectThrows(ExecutionException.class, future2::get);
+                assertTrue(ex.getCause() instanceof IllegalStateException);
+            }
+
+            executor.join();
+        }
+    }
+
+    /**
+     * Test close with interrupt status set.
+     */
+    @Test(dataProvider = "factories")
+    public void testInterruptClose1(ThreadFactory factory) throws Exception {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            var latch = new CountDownLatch(1);
+
+            // start task that does not respond to interrupt
+            executor.fork(() -> {
+                boolean done = false;
+                while (!done) {
+                    try {
+                        latch.await();
+                        done = true;
+                    } catch (InterruptedException e) { }
+                }
+                return null;
+            });
+
+            executor.shutdown();
+            executor.join();
+
+            // release task after a delay
+            scheduler.schedule(latch::countDown, 1, TimeUnit.SECONDS);
+
+            // invoke close with interrupt status set
+            Thread.currentThread().interrupt();
+            try {
+                executor.close();
+            } finally {
+                assertTrue(Thread.interrupted());   // clear interrupt status
+            }
+        }
+    }
+
+    /**
+     * Test interrupting thread waiting in close.
+     */
+    @Test(dataProvider = "factories")
+    public void testInterruptClose2(ThreadFactory factory) throws Exception {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            var latch = new CountDownLatch(1);
+
+            // start task that does not respond to interrupt
+            executor.fork(() -> {
+                boolean done = false;
+                while (!done) {
+                    try {
+                        latch.await();
+                        done = true;
+                    } catch (InterruptedException e) { }
+                }
+                return null;
+            });
+
+            executor.shutdown();
+            executor.join();
+
+            // release task after a delay
+            scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
+            scheduler.schedule(latch::countDown, 3, TimeUnit.SECONDS);
+            try {
+                executor.close();
+            } finally {
+                assertTrue(Thread.interrupted());   // clear interrupt status
+            }
+        }
+    }
+
+    /**
+     * Test that closing an enclosing executor closes the thread flock of a
+     * nested executor.
+     */
+    public void testStructureViolation1() throws Exception {
+        try (var executor1 = StructuredExecutor.open()) {
+            try (var executor2 = StructuredExecutor.open()) {
+
+                // join + close enclosing executor
+                executor1.join();
+                try {
+                    executor1.close();
+                    assertTrue(false);
+                } catch (StructureViolationException expected) { }
+
+
+                // underlying flock should be closed, fork should return a cancelled task
+                AtomicBoolean ran = new AtomicBoolean();
+                Future<String> future = executor2.fork(() -> {
+                    ran.set(true);
+                    return null;
+                });
+                assertTrue(future.isCancelled());
+                executor2.join();
+                assertFalse(ran.get());
+            }
+        }
+    }
+
+    /**
+     * Test exiting a scope local operation should close the thread flock
+     * is a nested executor.
+     */
+    public void testStructureViolation2() throws Exception {
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        class Box {
+            StructuredExecutor executor;
+        }
+        var box = new Box();
+        try {
+            try {
+                ScopeLocal.where(name, "x1").run(() -> {
+                    box.executor = StructuredExecutor.open();
+                });
+                assertTrue(false);
+            } catch (StructureViolationException expected) { }
+
+            // underlying flock should be closed, fork should return a cancelled task
+            StructuredExecutor executor = box.executor;
+            AtomicBoolean ran = new AtomicBoolean();
+            Future<String> future = executor.fork(() -> {
+                ran.set(true);
+                return null;
+            });
+            assertTrue(future.isCancelled());
+            executor.join();
+            assertFalse(ran.get());
+
+        } finally {
+            StructuredExecutor executor = box.executor;
+            if (executor != null) {
+                executor.close();
+            }
         }
     }
 
@@ -621,9 +865,9 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
 
-            Future<String> future = session.fork(() -> {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(100));
                 return "foo";
             });
@@ -632,7 +876,7 @@ public class TaskSessionTest {
             assertTrue(future.state() == Future.State.SUCCESS);
             assertEquals(future.resultNow(), "foo");
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -641,9 +885,9 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
 
-            Future<String> future = session.fork(() -> {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(100));
                 throw new FooException();
             });
@@ -653,7 +897,7 @@ public class TaskSessionTest {
             assertTrue(future.state() == Future.State.FAILED);
             assertTrue(future.exceptionNow() instanceof FooException);
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -662,9 +906,9 @@ public class TaskSessionTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture3(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
 
-            Future<String> future = session.fork(() -> {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
@@ -680,19 +924,19 @@ public class TaskSessionTest {
             assertTrue(future.state() == Future.State.CANCELLED);
             assertTrue(future.exceptionNow() instanceof CancellationException);
 
-            session.join();
+            executor.join();
         }
     }
 
     /**
-     * Test session shutdown with a thread blocked in Future::get.
+     * Test executor shutdown with a thread blocked in Future::get.
      */
     @Test(dataProvider = "factories")
     public void testFutureWithShutdown(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
+        try (var executor = StructuredExecutor.open(null, factory)) {
 
             // long running task
-            Future<String> future = session.fork(() -> {
+            Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
@@ -709,92 +953,87 @@ public class TaskSessionTest {
                 }
             });
 
-            // shutdown session
-            session.shutdown();
+            // shutdown executor
+            executor.shutdown();
 
             // Future should be done and thread should be awakened
             assertTrue(future.isDone());
             waiter.join();
             assertTrue(waitDone.get());
 
-            session.join();
+            executor.join();
         }
     }
 
     /**
-     * Test that closing an enclosing session closes the thread flock of a
-     * nested session.
+     * Test toString includes the executor name.
      */
-    public void testStructureViolation1() throws Exception {
-        try (var session1 = TaskSession.open()) {
-            try (var session2 = TaskSession.open()) {
+    public void testToString() throws Exception {
+        try (var executor = StructuredExecutor.open("xxx")) {
+            // open
+            assertTrue(executor.toString().contains("xxx"));
 
-                // join + close enclosing session
-                session1.join();
-                try {
-                    session1.close();
-                    assertTrue(false);
-                } catch (StructureViolationException expected) { }
+            // shutdown
+            executor.shutdown();
+            assertTrue(executor.toString().contains("xxx"));
 
-
-                // underlying flock should be closed, fork should return a cancelled task
-                AtomicBoolean ran = new AtomicBoolean();
-                Future<String> future = session2.fork(() -> {
-                    ran.set(true);
-                    return null;
-                });
-                assertTrue(future.isCancelled());
-                session2.join();
-                assertFalse(ran.get());
-            }
+            // closed
+            executor.join();
+            executor.close();
+            assertTrue(executor.toString().contains("xxx"));
         }
     }
 
     /**
-     * Test exiting a scope local operation should close the thread flock
-     * is a nested session.
+     * Test for NullPointerException.
      */
-    public void testStructureViolation2() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        class Box {
-            TaskSession session;
+    public void testNulls() throws Exception {
+        expectThrows(NullPointerException.class, () -> StructuredExecutor.open(null));
+        expectThrows(NullPointerException.class, () -> StructuredExecutor.open("", null));
+
+        try (var executor = StructuredExecutor.open()) {
+            expectThrows(NullPointerException.class, () -> executor.fork(null));
+            expectThrows(NullPointerException.class, () -> executor.fork(() -> null, null));
+            expectThrows(NullPointerException.class, () -> executor.joinUntil(null));
+            executor.join();
         }
-        var box = new Box();
-        try {
-            try {
-                ScopeLocal.where(name, "x1").run(() -> {
-                    box.session = TaskSession.open();
-                });
-                assertTrue(false);
-            } catch (StructureViolationException expected) { }
 
-            // underlying flock should be closed, fork should return a cancelled task
-            TaskSession session = box.session;
-            AtomicBoolean ran = new AtomicBoolean();
-            Future<String> future = session.fork(() -> {
-                ran.set(true);
-                return null;
-            });
-            assertTrue(future.isCancelled());
-            session.join();
-            assertFalse(ran.get());
-
-        } finally {
-            TaskSession session = box.session;
-            if (session != null) {
-                session.close();
-            }
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<Object>();
+            var future = new CompletableFuture<Object>();
+            future.complete(null);
+            expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
+            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
+            expectThrows(NullPointerException.class, () -> handler.result(null));
+            executor.join();
         }
-    }
 
-    /**
-     * Test shutdown after session is closed.
-     */
-    public void testShutdownAfterClose() throws Exception {
-        try (var session = TaskSession.open()) {
-            session.join();
-            session.close();
-            expectThrows(IllegalStateException.class, () -> session.shutdown());
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<Object>();
+            var future = new CompletableFuture<Object>();
+            future.completeExceptionally(new FooException());
+            handler.accept(executor, future);
+            expectThrows(NullPointerException.class, () -> handler.result(e -> null));
+            executor.join();
+        }
+
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var future = new CompletableFuture<Object>();
+            future.complete(null);
+            expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
+            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
+            expectThrows(NullPointerException.class, () -> handler.throwIfFailed(null));
+            executor.join();
+        }
+
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var future = new CompletableFuture<Object>();
+            future.completeExceptionally(new FooException());
+            handler.accept(executor, future);
+            expectThrows(NullPointerException.class, () -> handler.throwIfFailed(e -> null));
+            executor.join();
         }
     }
 
@@ -802,18 +1041,18 @@ public class TaskSessionTest {
      * Test ShutdownOnSuccess with no completed tasks.
      */
     public void testShutdownOnSuccess1() throws Exception {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<String>();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
 
             // invoke accept with task that has not completed
             var future = new CompletableFuture<String>();
-            expectThrows(IllegalArgumentException.class, () -> handler.accept(session, future));
+            expectThrows(IllegalArgumentException.class, () -> handler.accept(executor, future));
 
             // no tasks completed
             expectThrows(IllegalStateException.class, () -> handler.result());
             expectThrows(IllegalStateException.class, () -> handler.result(e -> null));
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -821,21 +1060,21 @@ public class TaskSessionTest {
      * Test ShutdownOnSuccess with tasks that completed normally.
      */
     public void testShutdownOnSuccess2() throws Exception {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<String>();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
             var future2 = new CompletableFuture<String>();
             future1.complete("foo");
             future2.complete("bar");
-            handler.accept(session, future1);   // first
-            handler.accept(session, future2);
+            handler.accept(executor, future1);   // first
+            handler.accept(executor, future2);
 
             assertEquals(handler.result(), "foo");
             assertEquals(handler.result(e -> null), "foo");
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -843,21 +1082,21 @@ public class TaskSessionTest {
      * Test ShutdownOnSuccess with tasks that completed normally and abnormally.
      */
     public void testShutdownOnSuccess3() throws Exception {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<String>();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
             var future2 = new CompletableFuture<String>();
             future1.completeExceptionally(new ArithmeticException());
             future2.complete("foo");
-            handler.accept(session, future1);   // first
-            handler.accept(session, future2);
+            handler.accept(executor, future1);   // first
+            handler.accept(executor, future2);
 
             assertEquals(handler.result(), "foo");
             assertEquals(handler.result(e -> null), "foo");
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -865,13 +1104,13 @@ public class TaskSessionTest {
      * Test ShutdownOnSuccess with a task that completed with an exception.
      */
     public void testShutdownOnSuccess4() throws Exception {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<String>();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
 
             // failed task
             var future = new CompletableFuture<String>();
             future.completeExceptionally(new ArithmeticException());
-            handler.accept(session, future);
+            handler.accept(executor, future);
 
             Throwable ex = expectThrows(ExecutionException.class, () -> handler.result());
             assertTrue(ex.getCause() instanceof  ArithmeticException);
@@ -879,7 +1118,7 @@ public class TaskSessionTest {
             ex = expectThrows(FooException.class, () -> handler.result(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof  ArithmeticException);
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -887,20 +1126,20 @@ public class TaskSessionTest {
      * Test ShutdownOnSuccess with a cancelled task.
      */
     public void testShutdownOnSuccess5() throws Exception {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<String>();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
 
             // cancelled task
             var future = new CompletableFuture<String>();
             future.cancel(false);
-            handler.accept(session, future);
+            handler.accept(executor, future);
 
             expectThrows(CancellationException.class, () -> handler.result());
             Throwable ex = expectThrows(FooException.class,
                                         () -> handler.result(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -908,19 +1147,19 @@ public class TaskSessionTest {
      * Test ShutdownOnFailure with no completed tasks.
      */
     public void testShutdownOnFailure1() throws Throwable {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
 
             // invoke accept with task that has not completed
             var future = new CompletableFuture<Object>();
-            expectThrows(IllegalArgumentException.class, () -> handler.accept(session, future));
+            expectThrows(IllegalArgumentException.class, () -> handler.accept(executor, future));
 
             // no exception
             assertTrue(handler.exception().isEmpty());
             handler.throwIfFailed();
             handler.throwIfFailed(e -> new FooException(e));
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -928,20 +1167,20 @@ public class TaskSessionTest {
      * Test ShutdownOnFailure with tasks that completed normally.
      */
     public void testShutdownOnFailure2() throws Throwable {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
 
             // tasks complete with result
             var future = new CompletableFuture<Object>();
             future.complete("foo");
-            handler.accept(session, future);
+            handler.accept(executor, future);
 
             // no exception
             assertTrue(handler.exception().isEmpty());
             handler.throwIfFailed();
             handler.throwIfFailed(e -> new FooException(e));
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -949,16 +1188,16 @@ public class TaskSessionTest {
      * Test ShutdownOnFailure with tasks that completed normally and abnormally.
      */
     public void testShutdownOnFailure3() throws Throwable {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
 
             // tasks complete with result
             var future1 = new CompletableFuture<Object>();
             var future2 = new CompletableFuture<Object>();
             future1.complete("foo");
             future2.completeExceptionally(new ArithmeticException());
-            handler.accept(session, future1);
-            handler.accept(session, future2);
+            handler.accept(executor, future1);
+            handler.accept(executor, future2);
 
             Throwable ex = handler.exception().orElse(null);
             assertTrue(ex instanceof ArithmeticException);
@@ -970,7 +1209,7 @@ public class TaskSessionTest {
                     () -> handler.throwIfFailed(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof ArithmeticException);
 
-            session.join();
+            executor.join();
         }
     }
 
@@ -978,13 +1217,13 @@ public class TaskSessionTest {
      * Test ShutdownOnFailure with a cancelled task.
      */
     public void testShutdownOnFailure4() throws Throwable {
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
+        try (var executor = StructuredExecutor.open()) {
+            var handler = new StructuredExecutor.ShutdownOnFailure();
 
             // cancelled task
             var future = new CompletableFuture<Object>();
             future.cancel(false);
-            handler.accept(session, future);
+            handler.accept(executor, future);
 
             Throwable ex = handler.exception().orElse(null);
             assertTrue(ex instanceof CancellationException);
@@ -995,199 +1234,7 @@ public class TaskSessionTest {
                     () -> handler.throwIfFailed(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
 
-            session.join();
-        }
-    }
-
-    /**
-     * Test close without join, no threads running.
-     */
-    public void testCloseWithoutJoin1() {
-        var session = TaskSession.open();
-        expectThrows(IllegalStateException.class, session::close);
-    }
-
-    /**
-     * Test close without join, threads running.
-     */
-    @Test(dataProvider = "factories")
-    public void testCloseWithoutJoin2(ThreadFactory factory) {
-        try (var session = TaskSession.open(null, factory)) {
-            Future<String> future = session.fork(() -> {
-                Thread.sleep(Duration.ofDays(1));
-                return null;
-            });
-            expectThrows(IllegalStateException.class, session::close);
-            assertTrue(future.isDone() && future.exceptionNow() != null);
-        }
-    }
-
-    /**
-     * Test close is owner confined.
-     */
-    public void testCloseConfined() throws Exception {
-        try (var session = TaskSession.open()) {
-            // attempt to close on thread in session
-            Future<Void> future1 = session.fork(() -> {
-                session.close();
-                return null;
-            });
-            Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalStateException);
-
-            // random thread cannot close session
-            try (var executor = Executors.newCachedThreadPool()) {
-                Future<Void> future2 = executor.submit(() -> {
-                    session.close();
-                    return null;
-                });
-                ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof IllegalStateException);
-            }
-
-            session.join();
-        }
-    }
-
-    /**
-     * Test close with interrupt status set.
-     */
-    @Test(dataProvider = "factories")
-    public void testInterruptClose1(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            var latch = new CountDownLatch(1);
-
-            // start task that does not respond to interrupt
-            session.fork(() -> {
-                boolean done = false;
-                while (!done) {
-                    try {
-                        latch.await();
-                        done = true;
-                    } catch (InterruptedException e) { }
-                }
-                return null;
-            });
-
-            session.shutdown();
-            session.join();
-
-            // release task after a delay
-            scheduler.schedule(latch::countDown, 1, TimeUnit.SECONDS);
-
-            // invoke close with interrupt status set
-            Thread.currentThread().interrupt();
-            try {
-                session.close();
-            } finally {
-                assertTrue(Thread.interrupted());   // clear interrupt status
-            }
-        }
-    }
-
-    /**
-     * Test interrupting thread waiting in close.
-     */
-    @Test(dataProvider = "factories")
-    public void testInterruptClose2(ThreadFactory factory) throws Exception {
-        try (var session = TaskSession.open(null, factory)) {
-            var latch = new CountDownLatch(1);
-
-            // start task that does not respond to interrupt
-            session.fork(() -> {
-                boolean done = false;
-                while (!done) {
-                    try {
-                        latch.await();
-                        done = true;
-                    } catch (InterruptedException e) { }
-                }
-                return null;
-            });
-
-            session.shutdown();
-            session.join();
-
-            // release task after a delay
-            scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
-            scheduler.schedule(latch::countDown, 3, TimeUnit.SECONDS);
-            try {
-                session.close();
-            } finally {
-                assertTrue(Thread.interrupted());   // clear interrupt status
-            }
-        }
-    }
-
-    /**
-     * Test toString includes the session name.
-     */
-    public void testToString() throws Exception {
-        try (var session = TaskSession.open("xxx")) {
-            // open
-            assertTrue(session.toString().contains("xxx"));
-
-            // shutdown
-            session.shutdown();
-            assertTrue(session.toString().contains("xxx"));
-
-            // closed
-            session.join();
-            session.close();
-            assertTrue(session.toString().contains("xxx"));
-        }
-    }
-
-    /**
-     * Test for NullPointerException.
-     */
-    public void testNulls() throws Exception {
-        expectThrows(NullPointerException.class, () -> TaskSession.open(null));
-        expectThrows(NullPointerException.class, () -> TaskSession.open("", null));
-
-        try (var session = TaskSession.open()) {
-            expectThrows(NullPointerException.class, () -> session.fork(null));
-            expectThrows(NullPointerException.class, () -> session.fork(() -> null, null));
-            expectThrows(NullPointerException.class, () -> session.joinUntil(null));
-            session.join();
-        }
-
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<Object>();
-            var future = new CompletableFuture<Object>();
-            future.complete(null);
-            expectThrows(NullPointerException.class, () -> handler.accept(session, null));
-            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
-            expectThrows(NullPointerException.class, () -> handler.result(null));
-            session.join();
-        }
-
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnSuccess<Object>();
-            var future = new CompletableFuture<Object>();
-            future.completeExceptionally(new FooException());
-            handler.accept(session, future);
-            expectThrows(NullPointerException.class, () -> handler.result(e -> null));
-            session.join();
-        }
-
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
-            var future = new CompletableFuture<Object>();
-            future.complete(null);
-            expectThrows(NullPointerException.class, () -> handler.accept(session, null));
-            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
-            expectThrows(NullPointerException.class, () -> handler.throwIfFailed(null));
-            session.join();
-        }
-
-        try (var session = TaskSession.open()) {
-            var handler = new TaskSession.ShutdownOnFailure();
-            var future = new CompletableFuture<Object>();
-            future.completeExceptionally(new FooException());
-            handler.accept(session, future);
-            expectThrows(NullPointerException.class, () -> handler.throwIfFailed(e -> null));
-            session.join();
+            executor.join();
         }
     }
 
