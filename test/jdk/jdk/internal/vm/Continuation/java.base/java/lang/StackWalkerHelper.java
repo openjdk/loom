@@ -72,10 +72,12 @@ public final class StackWalkerHelper {
         if ( !(Objects.equals(a.getClassName(),     b.getClassName())
             && Objects.equals(a.getMethodName(),    b.getMethodName())
             // && Objects.equals(a.getByteCodeIndex(), b.getByteCodeIndex()) // TODO !!!!
-            && Objects.equals(a.getContinuationScopeName(), b.getContinuationScopeName())
+            // && Objects.equals(a.getContinuationScopeName(), b.getContinuationScopeName())
             )) {
-            System.out.println("XXXX\ta: " + a + " a.scope: " + a.getContinuationScopeName() + " a.bci: " + a.getByteCodeIndex() + " a.toSTE: " + a.toStackTraceElement()
-                               + "\n\tb: " + b + " b.scope: " + b.getContinuationScopeName() + " b.bci: " + b.getByteCodeIndex() + " b.toSTE: " + b.toStackTraceElement());
+            System.out.println("XXXX\ta: " + a + " a.bci: " + a.getByteCodeIndex() + " a.toSTE: " + a.toStackTraceElement()
+                               + "\n\tb: " + b + " b.bci: " + b.getByteCodeIndex() + " b.toSTE: " + b.toStackTraceElement());
+            // System.out.println("XXXX\ta: " + a + " a.scope: " + a.getContinuationScopeName() + " a.bci: " + a.getByteCodeIndex() + " a.toSTE: " + a.toStackTraceElement()
+            //                    + "\n\tb: " + b + " b.scope: " + b.getContinuationScopeName() + " b.bci: " + b.getByteCodeIndex() + " b.toSTE: " + b.toStackTraceElement());
             return false;
         }
         try {
