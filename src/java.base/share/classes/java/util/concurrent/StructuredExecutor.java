@@ -371,8 +371,9 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * The {@link BiFunction#andThen(Function) andThen} method can be used to compose
      * more than one operation where required. The {@code apply} method is run by the
      * thread when the task completes with a result or exception. If the {@link
-     * Future#cancel(boolean) Future.cancel} is used to cancel a task then {@code apply}
-     * method is run by the thread that invokes {@code cancel}.
+     * Future#cancel(boolean) Future.cancel} is used to cancel a task, and before the
+     * executor is shutdown, then the {@code apply} method is run by the thread that
+     * invokes {@code cancel}.
      *
      * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
      * shutting down) then this method returns a Future representing a {@link
