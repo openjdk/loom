@@ -44,6 +44,7 @@ public final class ThreadGroupUtils {
      * @return a root {@code ThreadGroup}
      */
     public static ThreadGroup getRootThreadGroup() {
+        @SuppressWarnings("deprecation")
         ThreadGroup currentTG = Thread.currentThread().getThreadGroup();
         ThreadGroup parentTG = currentTG.getParent();
         while (parentTG != null) {

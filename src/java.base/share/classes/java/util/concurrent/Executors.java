@@ -682,8 +682,8 @@ public class Executors {
         private final AtomicInteger threadNumber = new AtomicInteger(1);
         private final String namePrefix;
 
+        @SuppressWarnings({"deprecation", "removal"})
         DefaultThreadFactory() {
-            @SuppressWarnings("removal")
             SecurityManager s = System.getSecurityManager();
             group = (s != null) ? s.getThreadGroup() :
                                   Thread.currentThread().getThreadGroup();

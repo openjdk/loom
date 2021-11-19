@@ -843,6 +843,7 @@ final class RealTimeSequencer extends AbstractMidiDevice
     private static EventDispatcher getEventDispatcher() {
         // create and start the global event thread
         //TODO  need a way to stop this thread when the engine is done
+        @SuppressWarnings("deprecation")
         final ThreadGroup tg = Thread.currentThread().getThreadGroup();
         synchronized (dispatchers) {
             EventDispatcher eventDispatcher = dispatchers.get(tg);

@@ -276,6 +276,7 @@ public abstract class SunToolkit extends Toolkit
      * method to create an AppContext & EventQueue for an Applet.
      */
     public static AppContext createNewAppContext() {
+        @SuppressWarnings("deprecation")
         ThreadGroup threadGroup = Thread.currentThread().getThreadGroup();
         return createNewAppContext(threadGroup);
     }

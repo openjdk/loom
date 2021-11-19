@@ -89,6 +89,7 @@ final class ProcessHandleImpl implements ProcessHandle {
                 // of the processReaper threads.
                 ThreadLocalRandom.current();
 
+                @SuppressWarnings("deprecation")
                 ThreadGroup tg = Thread.currentThread().getThreadGroup();
                 while (tg.getParent() != null) tg = tg.getParent();
                 ThreadGroup systemThreadGroup = tg;

@@ -1920,8 +1920,11 @@ public class Thread implements Runnable {
      * Returns the thread group to which this thread belongs.
      * This method returns null if the thread has terminated.
      *
+     * @deprecated ThreadGroup is obsolete.
+     *
      * @return  this thread's thread group.
      */
+    @Deprecated
     public final ThreadGroup getThreadGroup() {
         if (getState() == State.TERMINATED) {
             return null;

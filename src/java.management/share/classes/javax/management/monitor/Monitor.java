@@ -1502,12 +1502,14 @@ public abstract class Monitor
             // calls "Monitor.start()".
             @SuppressWarnings("removal")
             SecurityManager s = System.getSecurityManager();
+            @SuppressWarnings("deprecation")
             ThreadGroup group = (s != null) ? s.getThreadGroup() :
                 Thread.currentThread().getThreadGroup();
             synchronized (executorsLock) {
                 for (ThreadPoolExecutor e : executors.keySet()) {
                     DaemonThreadFactory tf =
                             (DaemonThreadFactory) e.getThreadFactory();
+                    @SuppressWarnings("deprecation")
                     ThreadGroup tg = tf.getThreadGroup();
                     if (tg == group) {
                         executor = e;
@@ -1597,8 +1599,8 @@ public abstract class Monitor
         final String namePrefix;
         static final String nameSuffix = "]";
 
+        @SuppressWarnings({"deprecation", "removal"})
         public DaemonThreadFactory(String poolName) {
-            @SuppressWarnings("removal")
             SecurityManager s = System.getSecurityManager();
             group = (s != null) ? s.getThreadGroup() :
                                   Thread.currentThread().getThreadGroup();

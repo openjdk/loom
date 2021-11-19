@@ -261,6 +261,7 @@ public final class AppContext {
         // code is unaffected by the move to multiple AppContext ability.
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
             public Void run() {
+                @SuppressWarnings("deprecation")
                 ThreadGroup currentThreadGroup =
                         Thread.currentThread().getThreadGroup();
                 ThreadGroup parentThreadGroup = currentThreadGroup.getParent();
@@ -301,6 +302,7 @@ public final class AppContext {
                     // parents in the hash from ThreadGroup to AppContext --
                     // it should be found, because we use createNewContext()
                     // when new AppContext objects are created.
+                    @SuppressWarnings("deprecation")
                     ThreadGroup currentThreadGroup = Thread.currentThread().getThreadGroup();
                     ThreadGroup threadGroup = currentThreadGroup;
 
@@ -329,6 +331,7 @@ public final class AppContext {
                             // Try to get it from the security manager
                             SecurityManager securityManager = System.getSecurityManager();
                             if (securityManager != null) {
+                                @SuppressWarnings("deprecation")
                                 ThreadGroup smThreadGroup = securityManager.getThreadGroup();
                                 if (smThreadGroup != null) {
                                     /*
@@ -579,6 +582,7 @@ public final class AppContext {
         }
 
         public Thread run() {
+            @SuppressWarnings("deprecation")
             Thread t = new Thread(appContext.getThreadGroup(),
                                   runnable, "AppContext Disposer", 0, false);
             t.setContextClassLoader(appContext.getContextClassLoader());

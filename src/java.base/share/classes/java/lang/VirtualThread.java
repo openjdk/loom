@@ -1035,6 +1035,7 @@ class VirtualThread extends Thread {
         private static final ThreadGroup carrierThreadGroup() {
             return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
                 public ThreadGroup run() {
+                    @SuppressWarnings("deprecation")
                     ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )
                         group = p;

@@ -113,6 +113,7 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
         AccessController.doPrivileged(
             new PrivilegedAction<>() {
                 public Void run() {
+                    @SuppressWarnings("deprecation")
                     ThreadGroup tg = Thread.currentThread().getThreadGroup();
                     for (ThreadGroup tgn = tg;
                          tgn != null;
@@ -182,6 +183,7 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
     }
 
     static {
+        @SuppressWarnings("deprecation")
         ThreadGroup tg = Thread.currentThread().getThreadGroup();
         for (ThreadGroup tgn = tg;
              tgn != null;

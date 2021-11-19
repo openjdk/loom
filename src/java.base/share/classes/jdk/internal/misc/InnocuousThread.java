@@ -184,6 +184,7 @@ public final class InnocuousThread extends Thread {
                 (tk, "contextClassLoader");
 
             long gp = UNSAFE.objectFieldOffset(gk, "parent");
+            @SuppressWarnings("deprecation")
             ThreadGroup group = Thread.currentThread().getThreadGroup();
 
             while (group != null) {
