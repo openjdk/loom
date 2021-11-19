@@ -502,17 +502,25 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     /**
      * Interrupt all unfinished threads.
      */
+    private void implInterruptAll() {
+        flock.threads().forEach(t -> {
+            if (t != Thread.currentThread()) {
+                t.interrupt();
+            }
+        });
+    }
+
     @SuppressWarnings("removal")
     private void interruptAll() {
-        PrivilegedAction<Void> pa = () -> {
-            flock.threads().forEach(t -> {
-                if (t != Thread.currentThread()) {
-                    t.interrupt();
-                }
-            });
-            return null;
-        };
-        AccessController.doPrivileged(pa);
+        if (System.getSecurityManager() == null) {
+            implInterruptAll();
+        } else {
+            PrivilegedAction<Void> pa = () -> {
+                implInterruptAll();
+                return null;
+            };
+            AccessController.doPrivileged(pa);
+        }
     }
 
     /**
