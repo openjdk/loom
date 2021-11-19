@@ -203,14 +203,13 @@ class VirtualThread extends Thread {
      * Submits the runContinuation task to the scheduler.
      * In the case of the default scheduler, and the current carrier thread is one
      * of FJP worker threads, then the task is queued to the current thread's queue.
-     * In that case, the parameter {@code signalOnEmpty} indicates if workers are
-     * signalled when its queue is empty.
+     * @param {@code signalOnEmpty} to signal when the worker's queue is empty
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuationAndSignal(boolean signalOnEmpty) {
+    private void submitRunContinuation(boolean signalOnEmpty) {
         try {
             if (scheduler == DEFAULT_SCHEDULER) {
-                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER,runContinuation, signalOnEmpty);
+                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation, signalOnEmpty);
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -231,7 +230,15 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        submitRunContinuationAndSignal(true);
+        submitRunContinuation(true);
+    }
+
+    /**
+     * Submits the runContinuation task to the scheduler without signalling.
+     * @throws RejectedExecutionException
+     */
+    private void lazySubmitRunContinuation() {
+        submitRunContinuation(false);
     }
 
     /**
@@ -364,8 +371,8 @@ class VirtualThread extends Thread {
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                // re-submit to continue on this carrier thread if possible
-                submitRunContinuationAndSignal(false);
+                // lazy submit to continue on this carrier thread if possible
+                lazySubmitRunContinuation();
             }
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
@@ -373,8 +380,8 @@ class VirtualThread extends Thread {
             // notify JVMTI that unmount has completed, thread is runnable
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
-            // re-submit to continue on this carrier thread if possible
-            submitRunContinuationAndSignal(false);
+            // lazy submit to continue on this carrier thread if possible
+            lazySubmitRunContinuation();
         }
     }
 
