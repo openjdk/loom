@@ -212,33 +212,37 @@ JvmtiThreadState::periodic_clean_up() {
 /* Virtual Threads Mount Transition (VTMT) mechanism */
 
 // VTMT can not be disabled while this counter is positive
-unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
+volatile unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
 
 // VTMT is disabled while this counter is positive
-unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
+volatile unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
-JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
-  enable_VTMT();
-  if (_self_suspend) {
-    JvmtiSuspendControl::suspend(JavaThread::current());
-  }
-}
+// there is an active suspender or resumer
+volatile bool JvmtiVTMTDisabler::_SR_mode = false;
+
 
 #ifdef ASSERT
 void
 JvmtiVTMTDisabler::print_info() {
-  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n", _VTMT_disable_count, _VTMT_count);
+  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n",
+                _VTMT_disable_count, _VTMT_count);
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
-    tty->print_cr("JavaThread %s, is_VTMT_disabler: %d, is_in_VTMT = %d Stacktrace:",
-                  java_thread->name(), java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
     // Handshake with target
     PrintStackTraceClosure pstc;
     Handshake::execute(&pstc, java_thread);
-    tty->print_cr("");
   }
 }
 #endif
+
+JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
+  _is_SR = is_SR;
+  disable_VTMT();
+}
+
+JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  enable_VTMT();
+}
 
 void
 JvmtiVTMTDisabler::disable_VTMT() {
@@ -249,6 +253,15 @@ JvmtiVTMTDisabler::disable_VTMT() {
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
+    while (_SR_mode) { // suspender or resumer is a JvmtiVTMTDisabler monopolist
+      ml.wait(1000); // wait while there is an active suspender or resumer
+    }
+    if (_is_SR) {
+      _SR_mode = true;
+      while (_VTMT_disable_count > 0) {
+        ml.wait(1000); // wait while there is any active jvmtiVTMTDisabler
+      }
+    }
     _VTMT_disable_count++;
 
     // Block while some mount/unmount transitions are in progress.
@@ -267,21 +280,26 @@ JvmtiVTMTDisabler::disable_VTMT() {
 #ifdef ASSERT
   if (attempts == 0) {
     print_info();
-    assert(false, "stuck in JvmtiVTMTDisabler::disable_VTMT for 10 seconds.");
+    assert(false, "stuck in JvmtiVTMTDisabler::disable_VTMT for 10 seconds");
   }
 #endif
 }
 
 void
 JvmtiVTMTDisabler::enable_VTMT() {
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
-  assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
+  JavaThread* current = JavaThread::current();
+  {
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+    assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
 
-  if (--_VTMT_disable_count == 0) {
-    ml.notify_all();
+    if (_is_SR) { // disabler is suspender or resumer
+      _SR_mode = false;
+    }
+    if (--_VTMT_disable_count == 0 || _is_SR) {
+      ml.notify_all();
+    }
+    current->set_is_VTMT_disabler(false);
   }
-  JavaThread* thread = JavaThread::current();
-  thread->set_is_VTMT_disabler(false);
 }
 
 void
@@ -322,7 +340,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
     tty->print_cr("DBG: start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
                   thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
     print_info();
-    assert(false, "stuck in JvmtiVTMTDisabler::start_VTMT for 10 seconds.");
+    assert(false, "stuck in JvmtiVTMTDisabler::start_VTMT for 10 seconds");
   }
 #endif
 }

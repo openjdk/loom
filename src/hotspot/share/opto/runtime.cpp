@@ -302,7 +302,7 @@ JRT_BLOCK_ENTRY(void, OptoRuntime::new_array_nozero_C(Klass* array_type, int len
   if ((len > 0) && (result != NULL) &&
       is_deoptimized_caller_frame(current)) {
     // Zero array here if the caller is deoptimized.
-    int size = TypeArrayKlass::cast(array_type)->oop_size(result);
+    const size_t size = TypeArrayKlass::cast(array_type)->oop_size(result);
     BasicType elem_type = TypeArrayKlass::cast(array_type)->element_type();
     const size_t hs = arrayOopDesc::header_size(elem_type);
     // Align to next 8 bytes to avoid trashing arrays's length.
@@ -727,15 +727,16 @@ const TypeFunc* OptoRuntime::void_void_Type() {
  }
 
  const TypeFunc* OptoRuntime::continuation_doYield_Type() {
+   // create input type (domain)
    const Type **fields = TypeTuple::fields(0);
-  //  fields[TypeFunc::Parms+0] = TypeInt::INT;
-   const TypeTuple *args = TypeTuple::make(TypeFunc::Parms+0, fields);
+   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+0, fields);
 
+   // create result type (range)
    fields = TypeTuple::fields(1);
    fields[TypeFunc::Parms+0] = TypeInt::INT;
-   const TypeTuple *result = TypeTuple::make(TypeFunc::Parms+1, fields);
+   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+1, fields);
 
-   return TypeFunc::make(args, result);
+   return TypeFunc::make(domain, range);
  }
 
  const TypeFunc* OptoRuntime::continuation_jump_Type() {

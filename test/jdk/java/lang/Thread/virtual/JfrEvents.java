@@ -51,6 +51,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class JfrEvents {
+    private static final Object lock = new Object();
 
     /**
      * Test jdk.VirtualThreadStart and jdk.VirtualThreadEnd events.
@@ -97,7 +98,6 @@ public class JfrEvents {
             ThreadFactory factory = Thread.ofVirtual().factory();
             try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
                 executor.submit(() -> {
-                    Object lock = new Object();
                     synchronized (lock) {
                         // pinned, duration < 500ms
                         Thread.sleep(1);

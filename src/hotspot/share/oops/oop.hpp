@@ -31,7 +31,9 @@
 #include "oops/markWord.hpp"
 #include "oops/metadata.hpp"
 #include "runtime/atomic.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+#include <type_traits>
 
 // oopDesc is the top baseclass for objects classes. The {name}Desc classes describe
 // the format of Java objects so the fields can be accessed from C++.
@@ -57,7 +59,14 @@ class oopDesc {
     narrowKlass _compressed_klass;
   } _metadata;
 
+  // There may be ordering constraints on the initialization of fields that
+  // make use of the C++ copy/assign incorrect.
+  NONCOPYABLE(oopDesc);
+
  public:
+  // Must be trivial; see verifying static assert after the class.
+  oopDesc() = default;
+
   inline markWord  mark()          const;
   inline markWord  mark_acquire()  const;
   inline markWord* mark_addr() const;
@@ -93,19 +102,19 @@ class oopDesc {
   inline bool is_a(Klass* k) const;
 
   // Returns the actual oop size of the object in machine words
-  inline int size();
+  inline size_t size();
   // Returns the size of the object after possible compression during GC promotion/compaction
-  inline int compact_size();
+  inline size_t compact_size();
   // Returns the given size in the common case where there is no special compact size
-  inline int compact_size(int size);
+  inline size_t compact_size(size_t size);
 
   // Sometimes (for complicated concurrency-related reasons), it is useful
   // to be able to figure out the size of an object knowing its klass.
-  inline int size_given_klass(Klass* klass);
+  inline size_t size_given_klass(Klass* klass);
   // Returns the size of the object after possible compression during GC promotion/compaction
-  inline int compact_size_given_klass(Klass* klass);
+  inline size_t compact_size_given_klass(Klass* klass);
   // Returns the given size in the common case where there is no special compact size
-  inline int compact_size_given_klass(Klass* klass, int size);
+  inline size_t compact_size_given_klass(Klass* klass, size_t size);
 
   // Copies the object
   inline size_t copy_disjoint(HeapWord* to);
@@ -135,11 +144,8 @@ class oopDesc {
   inline oop        as_oop() const { return const_cast<oopDesc*>(this); }
 
  public:
-  // field addresses in oop
-  inline void* field_addr(int offset) const;
-
-  // Need this as public for garbage collection.
-  template <class T> inline T* obj_field_addr(int offset) const;
+  template<typename T>
+  inline T* field_addr(int offset) const;
 
   template <typename T> inline size_t field_offset(T* p) const;
 
@@ -286,10 +292,10 @@ class oopDesc {
   inline void oop_iterate(OopClosureType* cl, MemRegion mr);
 
   template <typename OopClosureType>
-  inline int oop_iterate_size(OopClosureType* cl);
+  inline size_t oop_iterate_size(OopClosureType* cl);
 
   template <typename OopClosureType>
-  inline int oop_iterate_size(OopClosureType* cl, MemRegion mr);
+  inline size_t oop_iterate_size(OopClosureType* cl, MemRegion mr);
 
   template <typename OopClosureType>
   inline void oop_iterate_backwards(OopClosureType* cl);
@@ -328,5 +334,12 @@ class oopDesc {
 
   DEBUG_ONLY(bool size_might_change();)
 };
+
+// An oopDesc is not initialized via a constructor.  Space is allocated in
+// the Java heap, and static functions provided here on HeapWord* are used
+// to fill in certain parts of that memory.  The allocated memory is then
+// treated as referring to an oopDesc.  For that to be valid, the oopDesc
+// class must have a trivial default constructor (C++14 3.8/1).
+static_assert(std::is_trivially_default_constructible<oopDesc>::value, "required");
 
 #endif // SHARE_OOPS_OOP_HPP

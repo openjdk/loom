@@ -126,7 +126,7 @@ class MyThread implements Runnable {
     }
 
     private void waitUntilThreadIsStarted() {
-        while (isStarted.get()) {
+        while (!isStarted.get()) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {

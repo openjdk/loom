@@ -63,6 +63,7 @@ public @interface PreviewFeature {
         SWITCH_PATTERN_MATCHING,
         SCOPE_LOCALS,
         VIRTUAL_THREADS,
+        STRUCTURED_CONCURRENCY,
         /**
          * A key for testing.
          */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021 Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,7 +35,7 @@ const int ContinuationHelper::align_wiggle = 1;
 #ifdef ASSERT
 bool Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
   assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
   assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
@@ -418,7 +418,7 @@ intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   assert((intptr_t)sp % 16 == 0, "");
 
   sp -= ContinuationHelper::frame_metadata;
-  *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;
 }

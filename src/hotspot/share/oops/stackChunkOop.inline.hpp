@@ -103,7 +103,12 @@ inline bool stackChunkOopDesc::is_in_chunk(void* p) const {
 
 bool stackChunkOopDesc::is_usable_in_chunk(void* p) const {
   assert (is_stackChunk(), "");
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   HeapWord* start = (HeapWord*)start_address() + sp() - frame::sender_sp_offset;
+#else
+  Unimplemented();
+  HeapWord* start = NULL;
+#endif
   HeapWord* end = start + stack_size();
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
@@ -127,7 +132,7 @@ inline bool stackChunkOopDesc::requires_barriers() const {
 
 template <typename OopT>
 inline static bool is_oop_fixed(oop obj, int offset) {
-  OopT value = *obj->obj_field_addr<OopT>(offset);
+  OopT value = *obj->field_addr<OopT>(offset);
   intptr_t before = *(intptr_t*)&value;
   intptr_t after  = cast_from_oop<intptr_t>(NativeAccess<>::oop_load(&value));
   // tty->print_cr(">>> fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before == after, before, after);
@@ -245,7 +250,7 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
   log_develop_trace(jvmcont)("Chunk bounds: " INTPTR_FORMAT "(%d) - " INTPTR_FORMAT "(%d) (%d words, %d bytes)",
     p2i(start_address()), to_offset(start_address()), p2i(end_address()), to_offset(end_address() - 1) + 1, stack_size(), stack_size() << LogBytesPerWord);
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(from), p2i(from + size), size, size << LogBytesPerWord);
-  log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT "(%ld,%ld) - " INTPTR_FORMAT "(%ld,%ld) (%d words, %d bytes)", 
+  log_develop_trace(jvmcont)("Copying to h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(to), to - start_address(), relative_base() - to, p2i(to + size), to + size - start_address(), relative_base() - (to + size), size, size << LogBytesPerWord);
 
   assert (to >= start_address(), "to: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(to), p2i(start_address()));
@@ -256,7 +261,7 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
 
 template <bool dword_aligned>
 inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size) {
-  log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(%ld,%ld) - " INTPTR_FORMAT "(%ld,%ld) (%d words, %d bytes)", 
+  log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(from), from - start_address(), relative_base() - from, p2i(from + size), from + size - start_address(), relative_base() - (from + size), size, size << LogBytesPerWord);
   log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(to), p2i(to + size), size, size << LogBytesPerWord);
 
@@ -272,7 +277,7 @@ inline BitMapView stackChunkOopDesc::bitmap() const {
 #ifdef ASSERT
   BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
   assert (bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
-  assert (bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "bm.size_in_words(): %zu InstanceStackChunkKlass::bitmap_size(stack_size()): %d", bm.size_in_words(), InstanceStackChunkKlass::bitmap_size(stack_size()));
+  assert (bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "bm.size_in_words(): %zu InstanceStackChunkKlass::bitmap_size(stack_size()): %zu", bm.size_in_words(), InstanceStackChunkKlass::bitmap_size(stack_size()));
   bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
 #endif
   return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);

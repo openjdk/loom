@@ -79,7 +79,7 @@ bool java_lang_String::is_latin1(oop java_string) {
 uint8_t* java_lang_String::flags_addr(oop java_string) {
   assert(_initialized, "Must be initialized");
   assert(is_instance(java_string), "Must be java string");
-  return java_string->obj_field_addr<uint8_t>(_flags_offset);
+  return java_string->field_addr<uint8_t>(_flags_offset);
 }
 
 bool java_lang_String::is_flag_set(oop java_string, uint8_t flag_mask) {
@@ -152,7 +152,7 @@ void java_lang_ref_Reference::clear_referent(oop ref) {
 }
 
 HeapWord* java_lang_ref_Reference::referent_addr_raw(oop ref) {
-  return ref->obj_field_addr<HeapWord>(_referent_offset);
+  return ref->field_addr<HeapWord>(_referent_offset);
 }
 
 oop java_lang_ref_Reference::next(oop ref) {
@@ -168,7 +168,7 @@ void java_lang_ref_Reference::set_next_raw(oop ref, oop value) {
 }
 
 HeapWord* java_lang_ref_Reference::next_addr_raw(oop ref) {
-  return ref->obj_field_addr<HeapWord>(_next_offset);
+  return ref->field_addr<HeapWord>(_next_offset);
 }
 
 oop java_lang_ref_Reference::discovered(oop ref) {
@@ -184,7 +184,7 @@ void java_lang_ref_Reference::set_discovered_raw(oop ref, oop value) {
 }
 
 HeapWord* java_lang_ref_Reference::discovered_addr_raw(oop ref) {
-  return ref->obj_field_addr<HeapWord>(_discovered_offset);
+  return ref->field_addr<HeapWord>(_discovered_offset);
 }
 
 bool java_lang_ref_Reference::is_final(oop ref) {
@@ -266,12 +266,12 @@ inline void jdk_internal_vm_StackChunk::set_parent(oop ref, oop value) {
 
 template<typename P>
 inline bool jdk_internal_vm_StackChunk::is_parent_null(oop ref) {
-  return (oop)RawAccess<>::oop_load((P*)ref->field_addr(_parent_offset)) == NULL;
+  return (oop)RawAccess<>::oop_load(ref->field_addr<P>(_parent_offset)) == NULL;
 }
 
 template<typename P>
 inline void jdk_internal_vm_StackChunk::set_parent_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_parent_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_parent_offset), value);
 }
 inline oop jdk_internal_vm_StackChunk::cont(oop ref) {
   return ref->obj_field(_cont_offset);
@@ -282,19 +282,19 @@ inline void jdk_internal_vm_StackChunk::set_cont(oop ref, oop value) {
 
 template<typename P>
 inline oop jdk_internal_vm_StackChunk::cont_raw(oop ref) {
-  return (oop)RawAccess<>::oop_load((P*)ref->field_addr(_cont_offset));
+  return (oop)RawAccess<>::oop_load(ref->field_addr<P>(_cont_offset));
 }
 
 template<typename P>
 inline void jdk_internal_vm_StackChunk::set_cont_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store((P*)ref->field_addr(_cont_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_cont_offset), value);
 }
 
 inline jint jdk_internal_vm_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
 inline void jdk_internal_vm_StackChunk::set_size(HeapWord* ref, jint value) {
-  *(jint*)(cast_to_oop(ref))->field_addr(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+  *(cast_to_oop(ref))->field_addr<jint>(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
 inline jint jdk_internal_vm_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);
@@ -423,7 +423,7 @@ inline bool java_lang_Class::is_primitive(oop java_class) {
   return is_primitive;
 }
 
-inline int java_lang_Class::oop_size(oop java_class) {
+inline size_t java_lang_Class::oop_size(oop java_class) {
   assert(_oop_size_offset != 0, "must be set");
   int size = java_class->int_field(_oop_size_offset);
   assert(size > 0, "Oop size must be greater than zero, not %d", size);

@@ -119,7 +119,7 @@ inline bool frame::is_older(intptr_t* id) const {
   return this->id() > id;
 }
 
-inline int frame::frame_size(RegisterMap* map) const {
+inline int frame::frame_size() const {
   // Stack grows towards smaller addresses on z/Linux: sender is at a higher address.
   return sender_sp() - sp();
 }
@@ -168,14 +168,10 @@ inline intptr_t* frame::interpreter_frame_mdp_addr() const {
 }
 
 // Bottom(base) of the expression stack (highest address).
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   return (intptr_t*)interpreter_frame_monitor_end() - 1;
 }
-
-inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
-  return &interpreter_frame_tos_address()[offset];
-}
-
 
 // monitor elements
 
@@ -206,6 +202,7 @@ inline intptr_t** frame::interpreter_frame_esp_addr() const {
 }
 
 // top of expression stack (lowest address)
+template <bool relative>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return *interpreter_frame_esp_addr() + 1;
 }
@@ -223,10 +220,6 @@ inline oop * frame::interpreter_frame_temp_oop_addr() const {
 // Beginning element is oldest element. Also begin is one past last monitor.
 inline BasicObjectLock * frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*)ijava_state();
-}
-
-inline BasicObjectLock * frame::interpreter_frame_monitor_end() const {
-  return interpreter_frame_monitors();
 }
 
 inline void frame::interpreter_frame_set_monitor_end(BasicObjectLock* monitors) {
@@ -277,15 +270,63 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 }
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
-  return *((oop*) map->location(Z_R2->as_VMReg()));  // R2 is return register.
+  return *((oop*) map->location(Z_R2->as_VMReg(), (intptr_t*) NULL));  // R2 is return register.
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
-  *((oop*) map->location(Z_R2->as_VMReg())) = obj;  // R2 is return register.
+  *((oop*) map->location(Z_R2->as_VMReg(), (intptr_t*) NULL)) = obj;  // R2 is return register.
 }
 
 inline intptr_t* frame::real_fp() const {
   return fp();
+}
+
+inline const ImmutableOopMap* frame::get_oop_map() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::compiled_frame_stack_argsize() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
+  Unimplemented();
+}
+
+inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
+  Unimplemented();
+  return 0;
+}
+
+template <bool relative>
+inline intptr_t* frame::interpreter_frame_last_sp() const {
+  Unimplemented();
+  return NULL;
+}
+
+inline int frame::sender_sp_ret_address_offset() {
+  Unimplemented();
+  return 0;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  Unimplemented();
+}
+
+inline void frame::set_unextended_sp(intptr_t* value) {
+  Unimplemented();
+}
+
+inline int frame::offset_unextended_sp() const {
+  Unimplemented();
+  return 0;
+}
+
+inline void frame::set_offset_unextended_sp(int value) {
+  Unimplemented();
 }
 
 #endif // CPU_S390_FRAME_S390_INLINE_HPP

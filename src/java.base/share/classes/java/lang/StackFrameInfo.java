@@ -134,8 +134,7 @@ class StackFrameInfo implements StackFrame {
         return JLIA.isNative(memberName);
     }
 
-    @Override
-    public java.lang.String getContinuationScopeName() {
+    private String getContinuationScopeName() {
         return contScope != null ? contScope.getName() : null;
     }
 

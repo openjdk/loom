@@ -32,12 +32,13 @@
  * @test
  * @summary
  * @library /test/lib
- * @run build ParallelTransformerLoaderAgent TestClass1 TestClass2 TestClass3
+ * @run build TestClass1 TestClass2 TestClass3
+ * @compile --enable-preview -source ${jdk.version} ParallelTransformerLoaderTest.java
  * @run driver jdk.test.lib.util.JavaAgentBuilder ParallelTransformerLoaderAgent ParallelTransformerLoaderAgent.jar
  * @run driver jdk.test.lib.helpers.ClassFileInstaller -jar Test.jar TestClass1 TestClass2 TestClass3
  * @run clean ParallelTransformerLoaderAgent TestClass1 TestClass2 TestClass3
- * @run main/othervm -javaagent:ParallelTransformerLoaderAgent.jar=Test.jar ParallelTransformerLoaderTest platform
- * @run main/othervm -javaagent:ParallelTransformerLoaderAgent.jar=Test.jar ParallelTransformerLoaderTest virtual
+ * @run main/othervm --enable-preview -javaagent:ParallelTransformerLoaderAgent.jar=Test.jar ParallelTransformerLoaderTest platform
+ * @run main/othervm --enable-preview -javaagent:ParallelTransformerLoaderAgent.jar=Test.jar ParallelTransformerLoaderTest virtual
  */
 public class ParallelTransformerLoaderTest {
     private static final int kNumIterations = 1000;

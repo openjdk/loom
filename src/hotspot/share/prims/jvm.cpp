@@ -105,6 +105,9 @@
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
+#if INCLUDE_MANAGEMENT
+#include "services/finalizerService.hpp"
+#endif
 
 #include <errno.h>
 
@@ -668,7 +671,7 @@ JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
   }
 
   // Make shallow object copy
-  const int size = obj->size();
+  const size_t size = obj->size();
   oop new_obj_oop = NULL;
   if (obj->is_array()) {
     const int length = ((arrayOop)obj())->length();
@@ -690,6 +693,12 @@ JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
   }
 
   return JNIHandles::make_local(THREAD, new_obj());
+JVM_END
+
+// java.lang.ref.Finalizer ////////////////////////////////////////////////////
+
+JVM_ENTRY(void, JVM_ReportFinalizationComplete(JNIEnv * env, jobject finalizee))
+  MANAGEMENT_ONLY(FinalizerService::on_complete(JNIHandles::resolve_non_null(finalizee), THREAD);)
 JVM_END
 
 // jdk.internal.vm.Continuation /////////////////////////////////////////////////////
@@ -2978,7 +2987,7 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
       THROW_OOP(java_throwable);
     } else {
       // Use a VM_Operation to throw the exception.
-      JavaThread::send_async_exception(java_thread, java_throwable);
+      JavaThread::send_async_exception(receiver, java_throwable);
     }
   } else {
     // Either:
@@ -3395,7 +3404,7 @@ JVM_END
 
 // Library support ///////////////////////////////////////////////////////////////////////////
 
-JVM_ENTRY_NO_ENV(void*, JVM_LoadLibrary(const char* name))
+JVM_ENTRY_NO_ENV(void*, JVM_LoadLibrary(const char* name, jboolean throwException))
   //%note jvm_ct
   char ebuf[1024];
   void *load_result;
@@ -3404,18 +3413,23 @@ JVM_ENTRY_NO_ENV(void*, JVM_LoadLibrary(const char* name))
     load_result = os::dll_load(name, ebuf, sizeof ebuf);
   }
   if (load_result == NULL) {
-    char msg[1024];
-    jio_snprintf(msg, sizeof msg, "%s: %s", name, ebuf);
-    // Since 'ebuf' may contain a string encoded using
-    // platform encoding scheme, we need to pass
-    // Exceptions::unsafe_to_utf8 to the new_exception method
-    // as the last argument. See bug 6367357.
-    Handle h_exception =
-      Exceptions::new_exception(thread,
-                                vmSymbols::java_lang_UnsatisfiedLinkError(),
-                                msg, Exceptions::unsafe_to_utf8);
+    if (throwException) {
+      char msg[1024];
+      jio_snprintf(msg, sizeof msg, "%s: %s", name, ebuf);
+      // Since 'ebuf' may contain a string encoded using
+      // platform encoding scheme, we need to pass
+      // Exceptions::unsafe_to_utf8 to the new_exception method
+      // as the last argument. See bug 6367357.
+      Handle h_exception =
+        Exceptions::new_exception(thread,
+                                  vmSymbols::java_lang_UnsatisfiedLinkError(),
+                                  msg, Exceptions::unsafe_to_utf8);
 
-    THROW_HANDLE_0(h_exception);
+      THROW_HANDLE_0(h_exception);
+    } else {
+      log_info(library)("Failed to load library %s", name);
+      return load_result;
+    }
   }
   log_info(library)("Loaded library %s, handle " INTPTR_FORMAT, name, p2i(load_result));
   return load_result;
@@ -3897,11 +3911,12 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
-  assert(thread->is_in_VTMT(), "VTMT sanity check");
-  JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   oop vt = JNIHandles::resolve(vthread);
 
   thread->rebind_to_jvmti_thread_state_of(vt);
+
+  assert(thread->is_in_VTMT(), "VTMT sanity check");
+  JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
 
   if (first_mount) {
     // thread start
@@ -3941,12 +3956,11 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_thread_end(thread);
       }
     }
-    thread->set_mounted_vthread(NULL);
   }
-  thread->rebind_to_jvmti_thread_state_of(ct());
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+  thread->rebind_to_jvmti_thread_state_of(ct());
 #else
   fatal("Should only be called with JVMTI enabled");
 #endif

@@ -99,11 +99,16 @@ tier1_loom = \
   :tier1_loom_serviceability
 
 tier1_loom_runtime = \
-  runtime/vthread
+  runtime/vthread \
+  runtime/jni/IsVirtualThread
 
 tier1_loom_serviceability = \
   serviceability/jvmti/vthread \
-  serviceability/jvmti/events
+  serviceability/jvmti/events \
+  serviceability/dcmd/thread
+
+hotspot_loom = \
+  :tier1_loom
 
 tier1_common = \
   sanity/BasicVMTest.java \
@@ -366,6 +371,7 @@ hotspot_appcds_dynamic = \
  -runtime/cds/appcds/DumpClassList.java \
  -runtime/cds/appcds/DumpClassListWithLF.java \
  -runtime/cds/appcds/ExtraSymbols.java \
+ -runtime/cds/appcds/LambdaContainsOldInf.java \
  -runtime/cds/appcds/LambdaEagerInit.java \
  -runtime/cds/appcds/LambdaProxyClasslist.java \
  -runtime/cds/appcds/LambdaVerificationFailedDuringDump.java \

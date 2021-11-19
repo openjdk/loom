@@ -161,7 +161,7 @@ public final class AppContext {
        contained in another AppContext. It is implicitly created for
        standalone apps only (i.e. not applets)
      */
-    private static volatile AppContext mainAppContext = null;
+    private static volatile AppContext mainAppContext;
 
     private static class GetAppContextLock {};
     private static final Object getAppContextLock = new GetAppContextLock();
@@ -504,7 +504,12 @@ public final class AppContext {
 
         // Then, we stop any remaining Threads
         AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
-            threadGroup.stop();
+            int threadCount = threadGroup.activeCount() + 16;
+            Thread[] threads = new Thread[threadCount];
+            threadCount = threadGroup.enumerate(threads);
+            for (int i = 0; i < threadCount; i++) {
+                threads[i].stop();
+            }
             return null;
         });
 

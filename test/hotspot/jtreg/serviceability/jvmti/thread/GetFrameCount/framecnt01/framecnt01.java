@@ -60,6 +60,8 @@ public class framecnt01 {
             throw ule;
         }
     }
+    static volatile boolean vThread1Started = false;
+    static volatile boolean pThread1Started = false;
 
     public static void main(String args[]) throws Exception {
 
@@ -71,9 +73,15 @@ public class framecnt01 {
 
         // Test GetFrameCount on virtual frozen thread
         Thread vThread1 = Thread.ofVirtual().name("VirtualThread-Frozen").start(() -> {
+            vThread1Started = true;
             LockSupport.park();
         });
+        while (!vThread1Started) {
+            Thread.sleep(1);
+        }
+        // Let vthread1 to park
         Thread.sleep(10);
+
         checkFrames(vThread1, false, 14);
         LockSupport.unpark(vThread1);
         vThread1.join();
@@ -86,8 +94,12 @@ public class framecnt01 {
 
         // Test GetFrameCount on parked platform thread
         Thread pThread1 = Thread.ofPlatform().name("PlatformThread-Parked").start(() -> {
-            LockSupport.park();
+                pThread1Started = true;
+                LockSupport.park();
         });
+        while (!pThread1Started) {
+            Thread.sleep(1);
+        }
         Thread.sleep(10);
         checkFrames(pThread1, false, 5);
         LockSupport.unpark(pThread1);

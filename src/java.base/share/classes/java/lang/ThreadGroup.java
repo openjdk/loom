@@ -106,8 +106,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
             parent.synchronizedAddWeak(this);
         } else {
             // keep strong reference to the "main" and other groups created
-            // early in the VM startup to avoid use weak references during
-            // when starting the reference handlers.
+            // early in the VM startup to avoid the use of weak references
+            // during when starting the reference handler thread.
             parent.synchronizedAddStrong(this);
         }
     }
@@ -413,11 +413,6 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * <p> Due to the inherent race condition in this method, it is recommended
      * that the method only be used for debugging and monitoring purposes.
-     *
-     * @apiNote {@linkplain java.lang.management.ThreadMXBean} supports
-     * monitoring and management of active threads in the Java virtual
-     * machine and may be a more suitable API some many debugging and
-     * monitoring purposes.
      *
      * @param  list
      *         an array into which to put the list of threads

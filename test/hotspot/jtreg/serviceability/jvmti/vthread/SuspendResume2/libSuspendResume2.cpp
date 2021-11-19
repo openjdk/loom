@@ -211,7 +211,7 @@ test_vthread_resume_half(JNIEnv* jni, const jthread* thread_list) {
 
 static void
 check_threads_resumed_state(JNIEnv* jni, const jthread* thread_list, int thread_cnt) {
-  LOG("\n## Agent: check_all_vthreads_resumed_state started\n");
+  LOG("\n## Agent: check_threads_resumed_state started\n");
   for (int idx = 0; idx < thread_cnt; idx++) {
     jthread thread = thread_list[idx];
     char* tname = get_thread_name(jvmti, jni, thread);
@@ -225,7 +225,6 @@ check_threads_resumed_state(JNIEnv* jni, const jthread* thread_list, int thread_
 JNIEXPORT void JNICALL
 Java_SuspendResume2_TestSuspendResume(JNIEnv* jni, jclass cls) { 
   jthread* tested_cthreads = NULL;
-  jint cthread_cnt = get_cthreads(jni, &tested_cthreads);
 
   LOG("\n## TestSuspendResume: started\n");
 
@@ -244,6 +243,7 @@ Java_SuspendResume2_TestSuspendResume(JNIEnv* jni, jclass cls) {
   check_threads_resumed_state(jni, tested_vthreads, VTHREAD_CNT);
 
   LOG("\n\n## TestSuspendResume: Check all carrier threads are resumed\n");
+  jint cthread_cnt = get_cthreads(jni, &tested_cthreads);
   check_threads_resumed_state(jni, tested_cthreads, cthread_cnt);
 
   for (int i = 0; i < VTHREAD_CNT; i++) {

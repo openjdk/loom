@@ -28,6 +28,7 @@ java/lang/StackWalker/NativeMethod.java
 jdk/internal/vm/Continuation/Scoped.java
 jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
 jdk/internal/vm/Continuation/Preempt.java
+jdk/internal/vm/Continuation/Fuzz.java
 
 ####
 # Thread-sensitive threads
@@ -211,6 +212,7 @@ javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java
 
 java/io/Serializable/class/NonSerializableTest.java
 java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
+java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
 ####
 # No expected StackOverflow

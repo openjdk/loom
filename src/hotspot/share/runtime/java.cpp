@@ -231,7 +231,6 @@ void print_statistics() {
   if ((PrintC1Statistics || LogVMOutput || LogCompilation) && UseCompiler) {
     FlagSetting fs(DisplayVMOutput, DisplayVMOutput && PrintC1Statistics);
     Runtime1::print_statistics();
-    Deoptimization::print_statistics();
     SharedRuntime::print_statistics();
   }
 #endif /* COMPILER1 */
@@ -240,8 +239,8 @@ void print_statistics() {
   if ((PrintOptoStatistics || LogVMOutput || LogCompilation) && UseCompiler) {
     FlagSetting fs(DisplayVMOutput, DisplayVMOutput && PrintOptoStatistics);
     Compile::print_statistics();
-#ifndef COMPILER1
     Deoptimization::print_statistics();
+#ifndef COMPILER1
     SharedRuntime::print_statistics();
 #endif //COMPILER1
     os::print_statistics();
@@ -307,10 +306,6 @@ void print_statistics() {
     CodeCache::print_internals();
   }
 
-  if (PrintVtableStats) {
-    klassVtable::print_statistics();
-    klassItable::print_statistics();
-  }
   if (VerifyOops && Verbose) {
     tty->print_cr("+VerifyOops count: %d", StubRoutines::verify_oop_count());
   }
@@ -356,6 +351,14 @@ void print_statistics() {
   if (CITime) {
     CompileBroker::print_times();
   }
+
+#ifdef COMPILER2_OR_JVMCI
+  if ((LogVMOutput || LogCompilation) && UseCompiler) {
+    // Only print the statistics to the log file
+    FlagSetting fs(DisplayVMOutput, false);
+    Deoptimization::print_statistics();
+  }
+#endif /* COMPILER2 || INCLUDE_JVMCI */
 
   if (PrintCodeCache) {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);

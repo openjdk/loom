@@ -28,7 +28,7 @@
 
 #include "classfile/javaClasses.hpp"
 #include "code/codeBlob.hpp"
-#include "code/codeCache.hpp"
+#include "code/codeCache.inline.hpp"
 #include "code/nativeInst.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
@@ -345,7 +345,9 @@ inline address  StackChunkFrameStream<mixed>::orig_pc() const {
     pc1 = *(address*)((address)unextended_sp() + cm->orig_pc_offset());
   }
 
-  assert (pc1 != nullptr && !cm->is_deopt_pc(pc1), "index: %d sp - start: %ld end - sp: %ld size: %d sp: %d", _index, sp() - _chunk->sp_address(), end() - sp(), _chunk->stack_size(), _chunk->sp());
+  assert (pc1 != nullptr && !cm->is_deopt_pc(pc1),
+          "index: %d sp - start: " INTPTR_FORMAT " end - sp: " INTPTR_FORMAT " size: %d sp: %d",
+          _index, sp() - _chunk->sp_address(), end() - sp(), _chunk->stack_size(), _chunk->sp());
   assert (_cb == CodeCache::find_blob_fast(pc1), "");
 
   return pc1;
@@ -403,7 +405,7 @@ inline void StackChunkFrameStream<mixed>::iterate_oops(OopClosureType* closure, 
       // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
       // if (!SkipNullValue::should_skip(*p))
-      log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: %ld", omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
+      log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
       omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
     }
     assert (oops == oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap()->num_oops());
@@ -455,7 +457,7 @@ void InstanceStackChunkKlass::assert_mixed_correct(stackChunkOop chunk, bool mix
 }
 #endif
 
-inline int InstanceStackChunkKlass::instance_size(int stack_size_in_words) const {
+inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }
 
@@ -463,18 +465,18 @@ inline HeapWord* InstanceStackChunkKlass::start_of_bitmap(oop obj) {
   return start_of_stack(obj) + jdk_internal_vm_StackChunk::size(obj);
 }
 
-inline int InstanceStackChunkKlass::bitmap_size(int stack_size_in_words) {
+inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   if (!UseChunkBitmaps) return 0;
-  int size_in_bits = bitmap_size_in_bits(stack_size_in_words);
-  static const int mask = BitsPerWord - 1;
+  size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
+  static const size_t mask = BitsPerWord - 1;
   int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
-  int res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert (size_in_bits + (int)bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "size_in_bits: %d bit_offset: %d res << LogBitsPerWord: %d", size_in_bits, (int)bit_offset(stack_size_in_words), (res << LogBitsPerWord));
+  size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
+  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "size_in_bits: %zu bit_offset: %d res << LogBitsPerWord: %zu", size_in_bits, (int)bit_offset(stack_size_in_words), (res << LogBitsPerWord));
   return res;
 }
 
-inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(int stack_size_in_words) {
-  static const int mask = BitsPerWord - 1;
+inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_words) {
+  static const size_t mask = BitsPerWord - 1;
   // tty->print_cr(">>> BitsPerWord: %d MASK: %d stack_size_in_words: %d stack_size_in_words & mask: %d", BitsPerWord, mask, stack_size_in_words, stack_size_in_words & mask);
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
@@ -519,8 +521,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure) {
-  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
-  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
+  T* parent_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
+  T* cont_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
   OrderAccess::storestore();
   Devirtualizer::do_oop(closure, parent_addr);
   OrderAccess::storestore();
@@ -529,8 +531,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClo
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
-  T* parent_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
-  T* cont_addr = (T*)chunk->obj_field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
+  T* parent_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
+  T* cont_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
   if (mr.contains(parent_addr)) {
     OrderAccess::storestore();
     Devirtualizer::do_oop(closure, parent_addr);
@@ -546,6 +548,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
   if (LIKELY(chunk->has_bitmap())) {
     intptr_t* start = chunk->sp_address() - metadata_words();
     intptr_t* end = chunk->end_address();
+    // mr.end() can actually be less than start. In that case, we only walk the metadata
     if ((intptr_t*)mr.start() > start) start = (intptr_t*)mr.start();
     if ((intptr_t*)mr.end()   < end)   end   = (intptr_t*)mr.end();
     oop_oop_iterate_stack_helper(chunk, closure, start, end);
@@ -581,12 +584,14 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
     mark_methods(chunk, closure);
   }
 
-  if (UseCompressedOops) {
-    StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
-  } else {
-    StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
-    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+  if (end > start) {
+    if (UseCompressedOops) {
+      StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
+    } else {
+      StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
+      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
+    }
   }
 }
 

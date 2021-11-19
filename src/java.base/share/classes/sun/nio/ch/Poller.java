@@ -169,19 +169,15 @@ public abstract class Poller {
     /**
      * Called by the polling facility when the file descriptor is polled
      */
-    final void polled(int fdVal, boolean tryPush) {
+    final void polled(int fdVal) {
         Thread t = map.remove(fdVal);
         if (t != null) {
-            VirtualThreads.unpark(t, tryPush);
+            VirtualThreads.unpark(t);
         }
     }
 
-    final void polled(int fdVal) {
-        polled(fdVal, false);
-    }
-
     /**
-     * Poll for events. The {@link #polled(int, boolean)} method is invoked for each
+     * Poll for events. The {@link #polled(int)} method is invoked for each
      * polled file descriptor.
      *
      * @param timeout if positive then block for up to {@code timeout} milliseconds,

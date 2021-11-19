@@ -28,10 +28,10 @@
 #include "runtime/prefetch.hpp"
 
 
-inline void Prefetch::read (void *loc, intx interval) {
+inline void Prefetch::read (const void *loc, intx interval) {
 }
 
-inline void Prefetch::read_streaming(void *loc, intx interval) {
+inline void Prefetch::read_streaming(const void *loc, intx interval) {
   read (loc, interval);
 }
 

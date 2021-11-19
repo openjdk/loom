@@ -35,7 +35,7 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
                                                           same package as the Reference
                                                           class */
 
-    private static ReferenceQueue<Object> queue = new ReferenceQueue<>();
+    private static ReferenceQueue<Object> queue = new NativeReferenceQueue<>();
 
     /** Head of doubly linked list of Finalizers awaiting finalization. */
     private static Finalizer unfinalized = null;
@@ -86,6 +86,7 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
             assert finalizee != null;
             if (!(finalizee instanceof java.lang.Enum)) {
                 jla.invokeFinalize(finalizee);
+                reportComplete(finalizee);
 
                 // Clear stack slot containing this variable, to decrease
                 // the chances of false retention with a conservative GC
@@ -94,6 +95,8 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
         } catch (Throwable x) { }
         super.clear();
     }
+
+    private static native void reportComplete(Object finalizee);
 
     /* Create a privileged secondary finalizer thread in the system thread
      * group for the given Runnable, and wait for it to complete.

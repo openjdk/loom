@@ -80,14 +80,14 @@ public:
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
-  inline int instance_size(int stack_size_in_words) const;
-  static inline int bitmap_size(int stack_size_in_words); // in words
+  inline size_t instance_size(size_t stack_size_in_words) const;
+  static inline size_t bitmap_size(size_t stack_size_in_words); // in words
   // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
-  static inline BitMap::idx_t bit_offset(int stack_size_in_words);
+  static inline BitMap::idx_t bit_offset(size_t stack_size_in_words);
 
   // Returns the size of the instance including the stack data.
-  virtual int oop_size(oop obj) const override;
-  virtual int compact_oop_size(oop obj) const override;
+  virtual size_t oop_size(oop obj) const override;
+  virtual size_t compact_oop_size(oop obj) const override;
 
   virtual size_t copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<true> (obj, to, word_size); }
   virtual size_t copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<false>(obj, to, word_size); }
@@ -151,7 +151,7 @@ public:
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
 private:
-  static int bitmap_size_in_bits(int stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
+  static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
   void build_bitmap(stackChunkOop chunk);
 
   template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);

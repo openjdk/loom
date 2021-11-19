@@ -356,7 +356,7 @@ public class FileInputStream extends InputStream
         int n;
         do {
             n = read(buf, nread, remaining);
-            if (n > 0 ) {
+            if (n > 0) {
                 nread += n;
                 remaining -= n;
             } else if (n == 0) {

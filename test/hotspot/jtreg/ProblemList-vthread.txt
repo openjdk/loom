@@ -109,6 +109,7 @@ serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
 serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
+serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.java
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java
 serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java
 serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
@@ -204,6 +205,7 @@ runtime/cds/appcds/StaticArchiveWithLambda.java
 runtime/cds/appcds/TestCombinedCompressedFlags.java
 runtime/cds/appcds/TestWithProfiler.java
 runtime/cds/appcds/TestEpsilonGCWithCDS.java
+runtime/cds/appcds/TestSerialGCWithCDS.java
 runtime/cds/appcds/TestZGCWithCDS.java
 runtime/cds/appcds/UnusedCPDuringDump.java
 runtime/cds/appcds/VerifierTest_1A.java
@@ -223,6 +225,7 @@ runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java
 runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
 runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
 runtime/cds/appcds/cacheObject/RedefineClassTest.java
+runtime/cds/appcds/cacheObject/VerifyArchivedFields.java
 runtime/cds/appcds/condy/CondyHelloTest.java
 runtime/cds/appcds/customLoader/CustomClassListDump.java
 runtime/cds/appcds/customLoader/HelloCustom.java
@@ -250,6 +253,7 @@ runtime/cds/appcds/dynamicArchive/HelloDynamic.java
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java
 runtime/cds/appcds/dynamicArchive/JITInteraction.java
+runtime/cds/appcds/dynamicArchive/LambdaContainsOldInf.java
 runtime/cds/appcds/dynamicArchive/LambdaCustomLoader.java
 runtime/cds/appcds/dynamicArchive/LambdaForClassInBaseArchive.java
 runtime/cds/appcds/dynamicArchive/LambdaInBaseArchive.java
@@ -304,6 +308,7 @@ runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java
 runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java
 runtime/cds/appcds/redefineClass/RedefineBasicTest.java
@@ -320,7 +325,7 @@ runtime/cds/appcds/sharedStrings/SharedStringsBasicPlus.java
 runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java
 runtime/cds/appcds/sharedStrings/SharedStringsStress.java
 runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java
-
+runtime/cds/appcds/LambdaContainsOldInf.java
 runtime/cds/appcds/NonJarInClasspath.java
 runtime/cds/appcds/OldInfExtendsInfDefMeth.java
 runtime/cds/appcds/OldSuperClass.java
@@ -367,8 +372,6 @@ runtime/cds/appcds/HelloTest.java
 runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
 runtime/cds/BootAppendTests.java
 runtime/BootstrapMethod/BSMCalledTwice.java
-compiler/aot/fingerprint/SelfChangedCDS.java
-compiler/aot/verification/ClassAndLibraryNotMatchTest.java
 
 
 ####
@@ -445,11 +448,7 @@ vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 ####
 ## Tests for functionality which currently is not supported for virtual threads
 
-vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon001/TestDescription.java
-vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon002/TestDescription.java
 vmTestbase/nsk/jvmti/GetCurrentThreadCpuTime/curthrcputime001/TestDescription.java
-vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage003/TestDescription.java
-vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage004/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop002/TestDescription.java
 vmTestbase/nsk/jvmti/NotifyFramePop/nframepop003/TestDescription.java
 vmTestbase/nsk/jvmti/PopFrame/popframe004/TestDescription.java
@@ -470,6 +469,9 @@ vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
 
 vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
 
+####
+## assert in /scratch/sspitsyn/loom2/open/src/hotspot/share/oops/instanceStackChunkKlass.cpp:1042
+vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage006/TestDescription.java
 
 ####
 ## NSK JDWP Tests failing with wrapper
@@ -559,13 +561,9 @@ vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq002/TestDescription.j
 vmTestbase/nsk/jdi/EventRequestManager/deleteEventRequests/delevtreqs002/TestDescription.java
 
 ###
-# For some reason that is not well understood, this test always times out on windows
-# when run with the vthread wrapper. It appears that the VMOutOfMemoryException is thrown
-# and caught as expected, but the test then times out waiting for the debuggee to exit. On the
-# debuggee side you see the following output, which might be related to the issue:
-#    Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "Read-Poller"
-# And the Read-Poller thread is no longer around. Also the main debuggee thread seems
-# to have exited.
+# This test always times out on windows. This is due to the test forcing OOME in the
+# debuggee, which has the side affect of making the Read-Poller thread exit. Because
+# of this no vthreads can complete their reads, and the test times out as a result.
 
 vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java windows-all
 
@@ -593,32 +591,8 @@ vmTestbase/nsk/monitoring/MemoryUsage/from/from001/TestDescription.java
 
 
 ####
-## JVMCI/AOT/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.
+## JVMCI/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.
 
-compiler/aot/TestHeapBase.java
-compiler/aot/TestHeapBase.java
-compiler/aot/cli/MultipleAOTLibraryTest.java
-compiler/aot/cli/MultipleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTLibraryTest.java
-compiler/aot/cli/SingleAOTOptionTest.java
-compiler/aot/cli/SingleAOTOptionTest.java
-compiler/aot/cli/jaotc/AtFileTest.java
-compiler/aot/cli/jaotc/AtFileTest.java
-compiler/aot/cli/jaotc/CompileAbsoluteDirectoryTest.java
-compiler/aot/cli/jaotc/CompileAbsoluteDirectoryTest.java
-compiler/aot/cli/jaotc/CompileClassTest.java
-compiler/aot/cli/jaotc/CompileClassTest.java
-compiler/aot/cli/jaotc/CompileClassWithDebugTest.java
-compiler/aot/cli/jaotc/CompileClassWithDebugTest.java
-compiler/aot/cli/jaotc/CompileDirectoryTest.java
-compiler/aot/cli/jaotc/CompileDirectoryTest.java
-compiler/aot/cli/jaotc/CompileJarTest.java
-compiler/aot/cli/jaotc/CompileJarTest.java
-compiler/aot/cli/jaotc/ListOptionTest.java
-compiler/aot/cli/jaotc/ListOptionTest.java
-compiler/aot/cli/jaotc/ListOptionWrongFileTest.java
-compiler/aot/cli/jaotc/ListOptionWrongFileTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java
 compiler/jvmci/compilerToVM/DebugOutputTest.java

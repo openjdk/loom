@@ -37,8 +37,8 @@ import jdk.test.lib.jfr.Events;
  * @key jfr
  * @requires vm.hasJFR
  * @library /test/lib
- * @build jdk.jfr.event.runtime.LatchedThread
- * @run main/othervm jdk.jfr.event.runtime.TestVirtualThreadEndEvent
+ * @compile --enable-preview -source ${jdk.version} TestVirtualThreadEndEvent.java LatchedThread.java
+ * @run main/othervm --enable-preview jdk.jfr.event.runtime.TestVirtualThreadEndEvent
  */
 public class TestVirtualThreadEndEvent {
     private final static String EVENT_NAME_THREAD_END = EventNames.VirtualThreadEnd;
@@ -79,8 +79,9 @@ public class TestVirtualThreadEndEvent {
         RecordedEvent event = findEventByThreadName(events, thread.getName());
         System.out.println(event);
         RecordedThread t = event.getThread();
-        Asserts.assertEquals(event.getThread("thread").getJavaName(), thread.getName());
-        Asserts.assertEquals(t.isVirtual(), true);
+        Asserts.assertEquals(event.getLong("javaThreadId"), thread.getId());
+        Asserts.assertTrue(t.isVirtual());
+        Asserts.assertEquals(t.getThreadGroup().getName(), "VirtualThreads");
     }
 
     private static RecordedEvent findEventByThreadName(List<RecordedEvent> events, String name) {

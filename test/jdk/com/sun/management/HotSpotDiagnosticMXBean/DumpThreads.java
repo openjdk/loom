@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -25,7 +24,8 @@
 /**
  * @test
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
- * @run testng DumpThreads
+ * @compile --enable-preview -source ${jdk.version} DumpThreads.java
+ * @run testng/othervm --enable-preview DumpThreads
  */
 
 import java.lang.management.ManagementFactory;

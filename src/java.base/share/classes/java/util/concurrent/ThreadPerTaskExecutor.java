@@ -66,14 +66,22 @@ class ThreadPerTaskExecutor implements ExecutorService {
     private static final int TERMINATED = 2;
     private volatile int state;
 
-    /**
-     * Constructs a thread-per-task executor that creates threads using the given
-     * factory
-     */
-    ThreadPerTaskExecutor(ThreadFactory factory) {
+    private ThreadPerTaskExecutor(ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory);
         String name = getClass().getName() + "@" + System.identityHashCode(this);
-        this.container = SharedThreadContainer.create(name, this::threads);
+        this.container = SharedThreadContainer.create(name, /*countThreads*/ false);
+    }
+
+    private ThreadPerTaskExecutor setThreadsSupplier() {
+        container.threadsSupplier(this::threads);
+        return this;
+    }
+
+    /**
+     * Creates a thread-per-task executor that creates threads using the given factory.
+     */
+    static ThreadPerTaskExecutor create(ThreadFactory factory) {
+        return new ThreadPerTaskExecutor(factory).setThreadsSupplier();
     }
 
     /**

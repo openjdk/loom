@@ -287,6 +287,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_multiplyExactI:           return inline_math_multiplyExactI();
   case vmIntrinsics::_multiplyExactL:           return inline_math_multiplyExactL();
   case vmIntrinsics::_multiplyHigh:             return inline_math_multiplyHigh();
+  case vmIntrinsics::_unsignedMultiplyHigh:     return inline_math_unsignedMultiplyHigh();
   case vmIntrinsics::_negateExactI:             return inline_math_negateExactI();
   case vmIntrinsics::_negateExactL:             return inline_math_negateExactL();
   case vmIntrinsics::_subtractExactI:           return inline_math_subtractExactI(false /* subtract */);
@@ -467,6 +468,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_loadFence:
   case vmIntrinsics::_storeFence:
+  case vmIntrinsics::_storeStoreFence:
   case vmIntrinsics::_fullFence:                return inline_unsafe_fence(intrinsic_id());
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
@@ -1898,6 +1900,11 @@ bool LibraryCallKit::inline_math_multiplyHigh() {
   return true;
 }
 
+bool LibraryCallKit::inline_math_unsignedMultiplyHigh() {
+  set_result(_gvn.transform(new UMulHiLNode(argument(0), argument(2))));
+  return true;
+}
+
 Node*
 LibraryCallKit::generate_min_max(vmIntrinsics::ID id, Node* x0, Node* y0) {
   // These are the candidate return value:
@@ -2720,6 +2727,9 @@ bool LibraryCallKit::inline_unsafe_fence(vmIntrinsics::ID id) {
     case vmIntrinsics::_storeFence:
       insert_mem_bar(Op_StoreFence);
       return true;
+    case vmIntrinsics::_storeStoreFence:
+      insert_mem_bar(Op_StoreStoreFence);
+      return true;
     case vmIntrinsics::_fullFence:
       insert_mem_bar(Op_MemBarVolatile);
       return true;
@@ -3015,7 +3025,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   // bit shift and mask
   Node* const epoch_shift = _gvn.intcon(jfr_epoch_shift);
-  Node* const tid_mask = _gvn.MakeConX(jfr_id_mask);
+  Node* const tid_mask = _gvn.longcon(jfr_id_mask);
 
   // mask off the epoch information from the thread id
   Node* const vthread_obj_tid = _gvn.transform(new AndLNode(vthread_obj_tid_value, tid_mask));
@@ -6529,7 +6539,7 @@ Node * LibraryCallKit::get_key_start_from_aescrypt_object(Node *aescrypt_object)
   if (objSessionK == NULL) {
     return (Node *) NULL;
   }
-  Node* objAESCryptKey = load_array_element(control(), objSessionK, intcon(0), TypeAryPtr::OOPS);
+  Node* objAESCryptKey = load_array_element(objSessionK, intcon(0), TypeAryPtr::OOPS, /* set_ctrl */ true);
 #else
   Node* objAESCryptKey = load_field_from_object(aescrypt_object, "K", "[I");
 #endif // PPC64
@@ -7118,14 +7128,19 @@ bool LibraryCallKit::inline_galoisCounterMode_AESCrypt() {
   ciKlass* klass = ciTypeArrayKlass::make(T_LONG);
   Node* klass_node = makecon(TypeKlassPtr::make(klass));
 
-  // htbl entries is set to 96 only fox x86-64
+  // Does this target support this intrinsic?
   if (Matcher::htbl_entries == -1) return false;
 
-  // new array to hold 48 computed htbl entries
-  Node* subkeyHtbl_48_entries = new_array(klass_node, intcon(Matcher::htbl_entries), 0);
-  if (subkeyHtbl_48_entries == NULL) return false;
-
-  Node* subkeyHtbl_48_entries_start = array_element_address(subkeyHtbl_48_entries, intcon(0), T_LONG);
+  Node* subkeyHtbl_48_entries_start;
+  if (Matcher::htbl_entries != 0) {
+    // new array to hold 48 computed htbl entries
+    Node* subkeyHtbl_48_entries = new_array(klass_node, intcon(Matcher::htbl_entries), 0);
+    if (subkeyHtbl_48_entries == NULL) return false;
+    subkeyHtbl_48_entries_start = array_element_address(subkeyHtbl_48_entries, intcon(0), T_LONG);
+  } else {
+    // This target doesn't need the extra-large Htbl.
+    subkeyHtbl_48_entries_start = ConvL2X(intcon(0));
+  }
 
   // Call the stub, passing params
   Node* gcmCrypt = make_runtime_call(RC_LEAF|RC_NO_FP,
@@ -7275,8 +7290,6 @@ Node* LibraryCallKit::inline_digestBase_implCompressMB_predicate(int predicate) 
 
 bool LibraryCallKit::inline_continuation_do_yield() {
   address call_addr = StubRoutines::cont_doYield();
-  // Node* arg0 = argument(0); // type int - scopes
-  // Node* arg0 = intcon(0); // type int - from interpreter
   const TypeFunc* tf = OptoRuntime::continuation_doYield_Type();
   Node* call = make_runtime_call(RC_NO_LEAF, tf, call_addr, "doYield", TypeRawPtr::BOTTOM);
   Node* result = _gvn.transform(new ProjNode(call, TypeFunc::Parms));

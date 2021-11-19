@@ -35,7 +35,7 @@ const int ContinuationHelper::align_wiggle = 1;
 #ifdef ASSERT
 bool Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
   assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
   assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
@@ -72,7 +72,7 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   intptr_t* la = (intptr_t*)Frame::callee_link_address(f);
   intptr_t new_value = fp - la;
   *la = new_value;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative %ld", p2i(Frame::callee_link_address(f)), new_value);
+  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), new_value);
 }
 
 inline address* Interpreted::return_pc_address(const frame& f) {
@@ -193,7 +193,7 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr) 
                                        : (intptr_t)hf.fp();
 
-  log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: %ld", p2i(hf.pc()), *fp_addr);
+  log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(hf.pc()), *fp_addr);
 }
 
 template <typename ConfigT>
@@ -407,7 +407,7 @@ intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
 
   sp -= ContinuationHelper::frame_metadata;
-  *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;
 }

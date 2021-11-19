@@ -46,7 +46,6 @@ import com.sun.jdi.ByteType;
 import com.sun.jdi.ByteValue;
 import com.sun.jdi.CharType;
 import com.sun.jdi.CharValue;
-import com.sun.jdi.ClassLoaderReference;
 import com.sun.jdi.ClassNotLoadedException;
 import com.sun.jdi.DoubleType;
 import com.sun.jdi.DoubleValue;
@@ -1188,9 +1187,7 @@ class VirtualMachineImpl extends MirrorImpl
 
     Type findBootType(String signature) throws ClassNotLoadedException {
         List<ReferenceType> types = retrieveClassesBySignature(signature);
-        Iterator<ReferenceType> iter = types.iterator();
-        while (iter.hasNext()) {
-            ReferenceType type = iter.next();
+        for (ReferenceType type : types) {
             if (type.classLoader() == null) {
                 return type;
             }

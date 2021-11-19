@@ -97,7 +97,7 @@ public class ThreadDumper {
 
     private static void dumpThreads(ThreadContainer container, PrintStream ps) {
         container.threads().forEach(t -> dumpThread(t, ps));
-        ThreadContainers.children(container).forEach(c -> dumpThreads(c, ps));
+        container.children().forEach(c -> dumpThreads(c, ps));
     }
 
     private static void dumpThread(Thread thread, PrintStream ps) {
@@ -148,7 +148,7 @@ public class ThreadDumper {
         out.println("      {");
         out.format("        \"container\": \"%s\",%n", escape(container.toString()));
 
-        ThreadContainer parent = ThreadContainers.parent(container);
+        ThreadContainer parent = container.parent();
         if (parent == null) {
             out.format("        \"parent\": null,%n");
         } else {
@@ -222,7 +222,7 @@ public class ThreadDumper {
 
     private static void collect(ThreadContainer container, List<ThreadContainer> containers) {
         containers.add(container);
-        ThreadContainers.children(container).forEach(c -> collect(c, containers));
+        container.children().forEach(c -> collect(c, containers));
     }
 
     /**

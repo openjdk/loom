@@ -174,9 +174,9 @@ public interface Future<V> {
      * did not complete with a result
      * @since 99
      */
-    default V completedResultNow() {
+    default V resultNow() {
         if (!isDone())
-            throw new IllegalStateException();
+            throw new IllegalStateException("Task has not completed");
         boolean interrupted = false;
         try {
             while (true) {
@@ -184,8 +184,10 @@ public interface Future<V> {
                     return get();
                 } catch (InterruptedException e) {
                     interrupted = true;
-                } catch (ExecutionException | CancellationException e) {
-                    throw new IllegalStateException();
+                } catch (ExecutionException e) {
+                    throw new IllegalStateException("Task completed with exception");
+                } catch (CancellationException e) {
+                    throw new IllegalStateException("Task was cancelled");
                 }
             }
         } finally {
@@ -207,9 +209,9 @@ public interface Future<V> {
      * completed normally
      * @since 99
      */
-    default Throwable completedExceptionNow() {
+    default Throwable exceptionNow() {
         if (!isDone())
-            throw new IllegalStateException();
+            throw new IllegalStateException("Task has not completed");
         if (isCancelled())
             return new CancellationException();
         boolean interrupted = false;
@@ -217,7 +219,7 @@ public interface Future<V> {
             while (true) {
                 try {
                     get();
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("Task completed with a result");
                 } catch (InterruptedException e) {
                     interrupted = true;
                 } catch (ExecutionException e) {
@@ -240,12 +242,12 @@ public interface Future<V> {
         RUNNING,
         /**
          * The task completed with a result.
-         * @see Future#completedResultNow()
+         * @see Future#resultNow()
          */
         SUCCESS,
         /**
          * The task completed with an exception.
-         * @see Future#completedExceptionNow()
+         * @see Future#exceptionNow()
          */
         FAILED,
         /**

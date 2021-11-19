@@ -87,6 +87,14 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
   static jvmtiError check_thread_list(jint count, const jthread* list);
   static bool is_in_thread_list(jint count, const jthread* list, oop jt_oop);
+
+  // check if thread_oop represents a passive carrier thread
+  static bool is_passive_carrier_thread(JavaThread* java_thread, oop thread_oop) {
+     return java_thread != NULL && java_thread->mounted_vthread() != NULL
+                                && java_thread->threadObj() == thread_oop
+                                && java_thread->vthread() != thread_oop;
+  }
+
  private:
 
   enum {
@@ -367,7 +375,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                            jint stack_depth, jint max_count,
                                            jvmtiFrameInfo* frame_buffer, jint* count_ptr);
   jvmtiError get_current_contended_monitor(JavaThread* calling_thread, JavaThread *java_thread,
-                                           jobject *monitor_ptr);
+                                           jobject *monitor_ptr, bool is_virtual);
   jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
@@ -545,6 +553,8 @@ public:
 // HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
 class PrintStackTraceClosure : public HandshakeClosure {
  public:
+  static void do_thread_impl(Thread *target);
+
   PrintStackTraceClosure()
       : HandshakeClosure("PrintStackTraceClosure") {}
   void do_thread(Thread *target);

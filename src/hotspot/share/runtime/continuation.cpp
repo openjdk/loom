@@ -76,8 +76,6 @@
 
 #define CONT_JFR false
 
-#define SENDER_SP_RET_ADDRESS_OFFSET (frame::sender_sp_offset - frame::return_addr_offset)
-
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 
 #ifdef __has_include
@@ -541,7 +539,7 @@ private:
 
 public:
   inline void post_safepoint(Handle conth);
-  stackChunkOop allocate_stack_chunk(int stack_size, bool is_preempt);
+  stackChunkOop allocate_stack_chunk(size_t stack_size, bool is_preempt);
 
 private:
   ContMirror(const ContMirror& cont); // no copy constructor
@@ -651,12 +649,12 @@ void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEnt
 
   assert (thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
 }
 
 void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   assert (pc != nullptr, "");
 
   JavaFrameAnchor* anchor = thread->frame_anchor();
@@ -665,7 +663,7 @@ void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
   set_anchor_pd(anchor, sp);
 
   assert (thread->has_last_Java_frame(), "");
-  log_develop_trace(jvmcont)("set_anchor: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
   print_vframe(thread->last_frame());
   assert(thread->last_frame().cb() != nullptr, "");
 }
@@ -942,7 +940,7 @@ public:
     assert((intptr_t)_bottom_address % 16 == 0, "");
   #endif
 
-    log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: %ld", p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
+    log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT, p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
     assert (_bottom_address != nullptr && _bottom_address <= _cont.entrySP(), "");
   }
 
@@ -974,7 +972,7 @@ public:
     _cont.copy_to_chunk<aligned>(from, to, size);
   #ifdef ASSERT
     stackChunkOop chunk = _cont.tail();
-    assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: %ld to+size: %ld",
+    assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: " PTR_FORMAT " to+size: " PTR_FORMAT,
       p2i(_last_write), p2i(to + size), chunk->stack_size(), _last_write - chunk->start_address(), to + size - chunk->start_address());
     _last_write = to;
     // tty->print_cr(">>> copy_to_chunk _last_write: %p", _last_write);
@@ -1087,7 +1085,7 @@ public:
 
       if (sp < chunk->stack_size()) { // we are copying into a non-empty chunk
         assert (sp < (chunk->stack_size() - chunk->argsize()), "");
-        assert (*(address*)(chunk->sp_address() - SENDER_SP_RET_ADDRESS_OFFSET) == chunk->pc(), "chunk->sp_address() - SENDER_SP_RET_ADDRESS_OFFSET: %p *(address*)(chunk->sp_address() - SENDER_SP_RET_ADDRESS_OFFSET): %p chunk->pc(): %p", chunk->sp_address() - SENDER_SP_RET_ADDRESS_OFFSET, *(address*)(chunk->sp_address() - SENDER_SP_RET_ADDRESS_OFFSET), chunk->pc());
+        assert (*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "chunk->sp_address() - frame::sender_sp_ret_address_offset(): %p *(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()): %p chunk->pc(): %p", chunk->sp_address() - frame::sender_sp_ret_address_offset(), *(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()), chunk->pc());
 
         DEBUG_ONLY(empty = false;)
         sp += argsize; // we overlap
@@ -1099,7 +1097,7 @@ public:
         intptr_t* const bottom_sp = bottom - argsize;
         log_develop_trace(jvmcont)("patching bottom sp: " INTPTR_FORMAT, p2i(bottom_sp));
         assert (bottom_sp == _bottom_address, "");
-        assert (*(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
+        assert (*(address*)(bottom_sp - frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
         patch_chunk_pd(bottom_sp, chunk->sp_address());
         // we don't patch the pc at this time, so as not to make the stack unwalkable
       } else { // the chunk is empty
@@ -1166,10 +1164,10 @@ public:
     log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d", p2i((oopDesc*)chunk), chunk->stack_size(), sp, argsize);
     assert (sp >= size, "");
     sp -= size;
-    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "mismatched size calculation: orig_sp - sp: %ld size: %d argsize: %d is_chunk_available_size: %d empty: %d allocated: %d", orig_chunk_sp - (chunk->start_address() + sp), size, argsize, is_chunk_available_size, empty, allocated);
+    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "mismatched size calculation: orig_sp - sp: " PTR_FORMAT " size: %d argsize: %d is_chunk_available_size: %d empty: %d allocated: %d", orig_chunk_sp - (chunk->start_address() + sp), size, argsize, is_chunk_available_size, empty, allocated);
 
     intptr_t* chunk_top = chunk->start_address() + sp;
-    assert (empty || *(address*)(orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET) == chunk->pc(), "corig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET: %p *(address*)(orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET): %p chunk->pc(): %p", orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET, *(address*)(orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET), chunk->pc());
+    assert (empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "corig_chunk_sp - frame::sender_sp_ret_address_offset(): %p *(address*)(orig_chunk_sp - SENDER_SP_RET_ADDRESS_OFFSET): %p chunk->pc(): %p", orig_chunk_sp - frame::sender_sp_ret_address_offset(), *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()), chunk->pc());
 
     log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(chunk->start_address()), sp, p2i(chunk_top));
     intptr_t* from = top       - ContinuationHelper::frame_metadata;
@@ -1178,14 +1176,14 @@ public:
 
     // patch pc
     intptr_t* chunk_bottom_sp = chunk_top + size - argsize;
-    log_develop_trace(jvmcont)("freeze_fast patching return address at: " INTPTR_FORMAT " to: " INTPTR_FORMAT, p2i(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(chunk->pc()));
-    assert (empty || *(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
-    *(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = chunk->pc();
+    log_develop_trace(jvmcont)("freeze_fast patching return address at: " INTPTR_FORMAT " to: " INTPTR_FORMAT, p2i(chunk_bottom_sp - frame::sender_sp_ret_address_offset()), p2i(chunk->pc()));
+    assert (empty || *(address*)(chunk_bottom_sp - frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
+    *(address*)(chunk_bottom_sp - frame::sender_sp_ret_address_offset()) = chunk->pc();
 
     // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
     OrderAccess::storestore();
     chunk->set_sp(sp);
-    chunk->set_pc(*(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
+    chunk->set_pc(*(address*)(top - frame::sender_sp_ret_address_offset()));
     chunk->set_gc_sp(sp);
     assert (chunk->sp_address() == chunk_top, "");
 
@@ -1286,7 +1284,11 @@ public:
   }
 
   frame freeze_start_frame_safepoint_stub(frame f) {
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     f.set_fp(f.real_fp()); // f.set_fp(*Frame::callee_link_address(f)); // ????
+#else
+    Unimplemented();
+#endif
     if (!Interpreter::contains(f.pc())) {
   #ifdef ASSERT
       if (!Frame::is_stub(f.cb())) { f.print_value_on(tty, JavaThread::current()); }
@@ -1545,11 +1547,15 @@ public:
   }
 
   NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     { // TODO PD
       assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
       intptr_t* real_unextended_sp = (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset);
       if (real_unextended_sp != nullptr) f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
     }
+#else
+    Unimplemented();
+#endif
 
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
     const int argsize = Interpreted::stack_argsize(f);
@@ -1728,14 +1734,14 @@ public:
     *addr = value;
   }
 
-  stackChunkOop allocate_chunk(int size) {
+  stackChunkOop allocate_chunk(size_t size) {
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
     stackChunkOop chunk = _cont.allocate_stack_chunk(size, _preempt);
     if (chunk == nullptr) { // OOM
       return nullptr;
     }
-    assert (chunk->stack_size() == size, "");
-    assert (chunk->size() >= size, "chunk->size(): %d size: %d", chunk->size(), size);
+    assert (chunk->stack_size() == (int)size, "");
+    assert (chunk->size() >= size, "chunk->size(): %zu size: %zu", chunk->size(), size);
     assert ((intptr_t)chunk->start_address() % 8 == 0, "");
 
     stackChunkOop chunk0 = _cont.tail();
@@ -2001,7 +2007,11 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   if (!safepoint) {
     f = f.sender(&map); // this is the yield frame
   } else { // safepoint yield
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     f.set_fp(f.real_fp()); // Instead of this, maybe in ContMirror::set_last_frame always use the real_fp?
+#else
+    Unimplemented();
+#endif
     if (!Interpreter::contains(f.pc())) {
       assert (Frame::is_stub(f.cb()), "must be");
       assert (f.oop_map() != nullptr, "must be");
@@ -2300,6 +2310,7 @@ public:
     assert (!chunk->is_empty(), "");
     assert (!chunk->has_mixed_frames(), "");
     assert (!chunk->requires_barriers(), "");
+    assert (!chunk->has_bitmap(), "");
     assert (!_thread->is_interp_only_mode(), "");
 
     log_develop_trace(jvmcont)("thaw_fast");
@@ -2360,7 +2371,7 @@ public:
         // chunk->set_pc(nullptr);
       } else {
         chunk->set_sp(chunk->sp() + size);
-        address top_pc = *(address*)(hsp + size - SENDER_SP_RET_ADDRESS_OFFSET);
+        address top_pc = *(address*)(hsp + size - frame::sender_sp_ret_address_offset());
         chunk->set_pc(top_pc);
         chunk->set_max_size(chunk->max_size() - size);
         log_develop_trace(jvmcont)("sub max_size: %d -- %d", size, chunk->max_size());
@@ -2391,7 +2402,7 @@ public:
     log_develop_trace(jvmcont)("setting entry argsize: %d", _cont.argsize());
     patch_chunk(bottom_sp, is_last);
 
-    DEBUG_ONLY(address pc = *(address*)(bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET);)
+    DEBUG_ONLY(address pc = *(address*)(bottom_sp - frame::sender_sp_ret_address_offset());)
     assert (is_last ? CodeCache::find_blob(pc)->as_compiled_method()->method()->is_continuation_enter_intrinsic() : pc == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
 
     assert (is_last == _cont.is_empty(), "is_last: %d _cont.is_empty(): %d", is_last, _cont.is_empty());
@@ -2434,8 +2445,8 @@ public:
     log_develop_trace(jvmcont)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp));
 
     address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
-    *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
-    log_develop_trace(jvmcont)("thaw_fast is_last: %d sp: " INTPTR_FORMAT " patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, is_last, p2i(sp), p2i(sp - SENDER_SP_RET_ADDRESS_OFFSET), p2i(pc));
+    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+    log_develop_trace(jvmcont)("thaw_fast is_last: %d sp: " INTPTR_FORMAT " patching pc at " INTPTR_FORMAT " to " INTPTR_FORMAT, is_last, p2i(sp), p2i(sp - frame::sender_sp_ret_address_offset()), p2i(pc));
 
     // patch_chunk_pd(sp);
   }
@@ -2491,7 +2502,7 @@ public:
 
   #ifdef ASSERT
     {
-      log_develop_debug(jvmcont)("Jumping to frame (thaw): [%ld]", java_tid(_thread));
+      log_develop_debug(jvmcont)("Jumping to frame (thaw): [" JLONG_FORMAT "]", java_tid(_thread));
       frame f(sp);
       if (log_develop_is_enabled(Debug, jvmcont)) f.print_on(tty);
       assert (f.is_interpreted_frame() || f.is_compiled_frame() || f.is_safepoint_blob_frame(), "");
@@ -2499,7 +2510,7 @@ public:
   #endif
 
     if (last_interpreted && _cont.is_preempted()) {
-      assert (f.pc() == *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET), "");
+      assert (f.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
       assert (Interpreter::contains(f.pc()), "");
       // InterpreterCodelet* codelet = Interpreter::codelet_containing(f.pc());
       // if (codelet != nullptr) {
@@ -2626,6 +2637,13 @@ public:
     assert (!bottom || (_cont.is_empty() != Continuation::is_cont_barrier_frame(f)), "cont.is_empty(): %d is_cont_barrier_frame(f): %d ", _cont.is_empty(), Continuation::is_cont_barrier_frame(f));
   }
 
+  void clear_bitmap_bits(intptr_t* start, int range) {
+    // we need to clear the bits that correspond to arguments as they reside in the caller frame
+    log_develop_trace(jvmcont)("clearing bitmap bits for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start + range));
+    stackChunkOop chunk = _cont.tail();
+    chunk->bitmap().clear_range(chunk->bit_index_for((typename ConfigT::OopT*)start), chunk->bit_index_for((typename ConfigT::OopT*)(start+range)));
+  }
+
   NOINLINE void recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
     assert (hf.is_interpreted_frame(), "");
 
@@ -2668,6 +2686,8 @@ public:
     if (!bottom) {
       log_develop_trace(jvmcont)("fix thawed caller");
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    } else if (_cont.tail()->has_bitmap() && locals > 0) {
+      clear_bitmap_bits(Interpreted::frame_bottom<true>(hf) - locals, locals);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2696,8 +2716,9 @@ public:
 
     int fsize = Compiled::size(hf);
     log_develop_trace(jvmcont)("fsize: %d", fsize);
-    fsize += (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-    assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d %ld", fsize, caller.unextended_sp() - f.unextended_sp());
+    const int added_argsize = (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
+    fsize += added_argsize;
+    assert (fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "%d " INTPTR_FORMAT, fsize, caller.unextended_sp() - f.unextended_sp());
 
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
     intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
@@ -2732,6 +2753,8 @@ public:
     if (!bottom) {
       log_develop_trace(jvmcont)("fix thawed caller");
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+    } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
+      clear_bitmap_bits(hsp + Compiled::size(hf), added_argsize);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2826,7 +2849,7 @@ public:
 
     intptr_t* sp = f.sp();
     address pc = f.raw_pc();
-    *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET) = pc;
+    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
     Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
     ContinuationHelper::push_pd(f);
 
@@ -2893,7 +2916,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
 #ifndef PRODUCT
   intptr_t* sp0 = sp;
-  address pc0 = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
   if (pc0 == StubRoutines::cont_interpreter_forced_preempt_return()) {
     sp0 += ContinuationHelper::frame_metadata; // see push_interpreter_return_frame
   }
@@ -3138,7 +3161,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [%ld] [%ld]", java_tid(thread), (long) thread->osthread()->thread_id());
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
     // log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
@@ -3197,7 +3220,12 @@ frame Continuation::continuation_parent_frame(RegisterMap* map) {
 
   map->set_stack_chunk(nullptr);
 
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
+#else
+  frame sender = frame();
+  Unimplemented();
+#endif
 
   // tty->print_cr("continuation_parent_frame");
   // print_vframe(sender, map, nullptr);
@@ -3303,9 +3331,9 @@ inline void ContMirror::post_safepoint(Handle conth) {
 
 /* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
  * method. In the later case we might have done a safepoint and need to reload our oops */
-stackChunkOop ContMirror::allocate_stack_chunk(int stack_size, bool is_preempt) {
+stackChunkOop ContMirror::allocate_stack_chunk(size_t stack_size, bool is_preempt) {
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
-  int size_in_words = klass->instance_size(stack_size);
+  size_t size_in_words = klass->instance_size(stack_size);
 
   assert(is_preempt || _thread == JavaThread::current(), "should be current");
   JavaThread* current = is_preempt ? JavaThread::current() : _thread;
@@ -3554,7 +3582,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
   ContMirror cont(contOop);
 
-  st->print_cr("CONTINUATION: 0x%lx done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
+  st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
   st->print_cr("CHUNKS:");
   for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
     st->print("* ");
@@ -3672,7 +3700,7 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
   }
 
   assert (sp != nullptr && sp <= cont->entry_sp(), "sp: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT " bottom_sender_sp: " INTPTR_FORMAT, p2i(sp), p2i(cont->entry_sp()), p2i(cont->bottom_sender_sp()));
-  address pc = *(address*)(sp - SENDER_SP_RET_ADDRESS_OFFSET);
+  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
 
   if (pc != StubRoutines::cont_returnBarrier()) {
     CodeBlob* cb = pc != nullptr ? CodeCache::find_blob(pc) : nullptr;

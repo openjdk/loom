@@ -1495,7 +1495,7 @@ class StubGenerator: public StubCodeGenerator {
         __ subq(temp1, loop_size[shift]);
 
         // Main loop with aligned copy block size of 192 bytes at 32 byte granularity.
-        __ align(32);
+        __ align32();
         __ BIND(L_main_loop);
            __ copy64_avx(to, from, temp4, xmm1, false, shift, 0);
            __ copy64_avx(to, from, temp4, xmm1, false, shift, 64);
@@ -1562,7 +1562,7 @@ class StubGenerator: public StubCodeGenerator {
 
         // Main loop with aligned copy block size of 192 bytes at
         // 64 byte copy granularity.
-        __ align(32);
+        __ align32();
         __ BIND(L_main_loop_64bytes);
            __ copy64_avx(to, from, temp4, xmm1, false, shift, 0 , true);
            __ copy64_avx(to, from, temp4, xmm1, false, shift, 64, true);
@@ -1702,7 +1702,7 @@ class StubGenerator: public StubCodeGenerator {
         __ BIND(L_main_pre_loop);
 
         // Main loop with aligned copy block size of 192 bytes at 32 byte granularity.
-        __ align(32);
+        __ align32();
         __ BIND(L_main_loop);
            __ copy64_avx(to, from, temp1, xmm1, true, shift, -64);
            __ copy64_avx(to, from, temp1, xmm1, true, shift, -128);
@@ -1735,7 +1735,7 @@ class StubGenerator: public StubCodeGenerator {
 
         // Main loop with aligned copy block size of 192 bytes at
         // 64 byte copy granularity.
-        __ align(32);
+        __ align32();
         __ BIND(L_main_loop_64bytes);
            __ copy64_avx(to, from, temp1, xmm1, true, shift, -64 , true);
            __ copy64_avx(to, from, temp1, xmm1, true, shift, -128, true);
@@ -2557,13 +2557,14 @@ class StubGenerator: public StubCodeGenerator {
 
     BLOCK_COMMENT("Entry:");
 
-    const Register to       = c_rarg0;  // source array address
+    const Register to       = c_rarg0;  // destination array address
     const Register value    = c_rarg1;  // value
     const Register count    = c_rarg2;  // elements count
+    __ mov(r11, count);
 
     __ enter(); // required for proper stackwalking of RuntimeStub frame
 
-    __ generate_fill(t, aligned, to, value, count, rax, xmm0);
+    __ generate_fill(t, aligned, to, value, r11, rax, xmm0);
 
     __ vzeroupper();
     __ leave(); // required for proper stackwalking of RuntimeStub frame
@@ -4724,7 +4725,7 @@ class StubGenerator: public StubCodeGenerator {
 
   //Mask for byte-swapping a couple of qwords in an XMM register using (v)pshufb.
   address generate_pshuffle_byte_flip_mask_sha512() {
-    __ align(32);
+    __ align32();
     StubCodeMark mark(this, "StubRoutines", "pshuffle_byte_flip_mask_sha512");
     address start = __ pc();
     if (VM_Version::supports_avx2()) {
@@ -5851,7 +5852,7 @@ address generate_avx_ghash_processBlocks() {
 
   address base64_avx2_shuffle_addr()
   {
-    __ align(32);
+    __ align32();
     StubCodeMark mark(this, "StubRoutines", "avx2_shuffle_base64");
     address start = __ pc();
     __ emit_data64(0x0809070805060405, relocInfo::none);
@@ -5863,7 +5864,7 @@ address generate_avx_ghash_processBlocks() {
 
   address base64_avx2_input_mask_addr()
   {
-    __ align(32);
+    __ align32();
     StubCodeMark mark(this, "StubRoutines", "avx2_input_mask_base64");
     address start = __ pc();
     __ emit_data64(0x8000000000000000, relocInfo::none);
@@ -5875,7 +5876,7 @@ address generate_avx_ghash_processBlocks() {
 
   address base64_avx2_lut_addr()
   {
-    __ align(32);
+    __ align32();
     StubCodeMark mark(this, "StubRoutines", "avx2_lut_base64");
     address start = __ pc();
     __ emit_data64(0xfcfcfcfcfcfc4741, relocInfo::none);
@@ -5980,7 +5981,7 @@ address generate_avx_ghash_processBlocks() {
       __ evmovdquq(xmm2, Address(encode_table, 0), Assembler::AVX_512bit);
       __ evpbroadcastq(xmm1, rax, Assembler::AVX_512bit);
 
-      __ align(32);
+      __ align32();
       __ BIND(L_vbmiLoop);
 
       __ vpermb(xmm0, xmm3, Address(source, start_offset), Assembler::AVX_512bit);
@@ -6180,7 +6181,7 @@ address generate_avx_ghash_processBlocks() {
       __ cmpl(length, 31);
       __ jcc(Assembler::belowEqual, L_process3);
 
-      __ align(32);
+      __ align32();
       __ BIND(L_32byteLoop);
 
       // Get next 32 bytes
@@ -6627,7 +6628,7 @@ address generate_avx_ghash_processBlocks() {
       __ evmovdquq(join12, ExternalAddress(StubRoutines::x86::base64_vbmi_join_1_2_addr()), Assembler::AVX_512bit, r13);
       __ evmovdquq(join23, ExternalAddress(StubRoutines::x86::base64_vbmi_join_2_3_addr()), Assembler::AVX_512bit, r13);
 
-      __ align(32);
+      __ align32();
       __ BIND(L_process256);
       // Grab input data
       __ evmovdquq(input0, Address(source, start_offset, Address::times_1, 0x00), Assembler::AVX_512bit);
@@ -6709,7 +6710,7 @@ address generate_avx_ghash_processBlocks() {
       __ cmpl(length, 63);
       __ jcc(Assembler::lessEqual, L_finalBit);
 
-      __ align(32);
+      __ align32();
       __ BIND(L_process64Loop);
 
       // Handle first 64-byte block
@@ -6845,7 +6846,7 @@ address generate_avx_ghash_processBlocks() {
       __ shrq(rax, 1);
       __ jmp(L_donePadding);
 
-      __ align(32);
+      __ align32();
       __ BIND(L_bruteForce);
     }   // End of if(avx512_vbmi)
 
@@ -6889,7 +6890,7 @@ address generate_avx_ghash_processBlocks() {
 
     __ jmp(L_bottomLoop);
 
-    __ align(32);
+    __ align32();
     __ BIND(L_forceLoop);
     __ shll(byte1, 18);
     __ shll(byte2, 12);
@@ -7867,15 +7868,6 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-static Register get_thread() {
-#ifdef _LP64
-  return r15_thread;
-#else
-  get_thread(rdi);
-  return rdi;
-#endif // LP64
-}
-
 RuntimeStub* generate_cont_doYield() {
     const char *name = "cont_doYield";
 
@@ -7907,15 +7899,12 @@ RuntimeStub* generate_cont_doYield() {
     __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
     if (ContPerfTest > 5) {
-      Register thread = get_thread();
-      NOT_LP64(__ push(thread));
-      LP64_ONLY(__ movptr(c_rarg0, thread));
+      __ movptr(c_rarg0, r15_thread);
       __ set_last_Java_frame(rsp, rbp, the_pc);
 
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
       
       __ reset_last_Java_frame(true);
-      NOT_LP64(__ pop(rdi));
     }
 
     Label pinned;
@@ -8077,8 +8066,8 @@ RuntimeStub* generate_cont_doYield() {
       // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
       // see InterpreterMacroAssembler::restore_bcp/restore_locals
       // TODO: use InterpreterMacroAssembler
-      static const Register _locals_register = LP64_ONLY(r14) NOT_LP64(rdi);
-      static const Register _bcp_register    = LP64_ONLY(r13) NOT_LP64(rsi);
+      static const Register _locals_register = r14;
+      static const Register _bcp_register    = r13;
 
       __ pop(rbp);
 
@@ -8093,33 +8082,31 @@ RuntimeStub* generate_cont_doYield() {
 
 #if INCLUDE_JFR
 
-  static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
+  static void jfr_set_last_java_frame(MacroAssembler* _masm) {
     Register last_java_pc = c_rarg0;
     Register last_java_sp = c_rarg2;
     __ movptr(last_java_pc, Address(rsp, 0));
     __ lea(last_java_sp, Address(rsp, wordSize));
     __ vzeroupper();
-    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
+    Address anchor_java_pc(r15_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
     __ movptr(anchor_java_pc, last_java_pc);
-    __ movptr(Address(thread, JavaThread::last_Java_sp_offset()), last_java_sp);
+    __ movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
   }
 
-  static void jfr_prologue(MacroAssembler* _masm, Register thread) {
-    jfr_set_last_java_frame(_masm, thread);
-    NOT_LP64(__ push(thread));
-    LP64_ONLY(__ movptr(c_rarg0, thread));
+  static void jfr_prologue(MacroAssembler* _masm) {
+    jfr_set_last_java_frame(_masm);
+    __ movptr(c_rarg0, r15_thread);
   }
 
   // Handle is dereference here using correct load constructs.
-  static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
-    NOT_LP64(__ pop(rdi));
+  static void jfr_epilogue(MacroAssembler* _masm) {
     __ reset_last_Java_frame(false);
     Label null_jobject;
     __ testq(rax, rax);
     __ jcc(Assembler::zero, null_jobject);
     DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
     BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, thread);
+    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, r15_thread);
     __ bind(null_jobject);
   }
 
@@ -8130,10 +8117,9 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
 
     address start = __ pc();
-    Register thread = get_thread();
-    jfr_prologue(_masm, thread);
+    jfr_prologue(_masm);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
-    jfr_epilogue(_masm, thread);
+    jfr_epilogue(_masm);
     __ ret(0);
 
     return start;
@@ -8144,11 +8130,10 @@ RuntimeStub* generate_cont_doYield() {
   address generate_jfr_get_event_writer() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
-    
-    Register thread = get_thread();
-    jfr_prologue(_masm, thread);
+
+    jfr_prologue(_masm);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
-    jfr_epilogue(_masm, thread);
+    jfr_epilogue(_masm);
     __ ret(0);
 
     return start;

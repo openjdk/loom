@@ -92,7 +92,7 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
   //  resolve_memcpy_functions(); -- too early here
 }
 
-int InstanceStackChunkKlass::oop_size(oop obj) const {
+size_t InstanceStackChunkKlass::oop_size(oop obj) const {
   // see oopDesc::size_given_klass
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
@@ -124,7 +124,7 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
 template size_t InstanceStackChunkKlass::copy<false>(oop obj, HeapWord* to_addr, size_t word_size);
 template size_t InstanceStackChunkKlass::copy<true>(oop obj, HeapWord* to_addr, size_t word_size);
 
-int InstanceStackChunkKlass::compact_oop_size(oop obj) const {
+size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   // tty->print_cr(">>>> InstanceStackChunkKlass::compact_oop_size");
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
@@ -147,8 +147,8 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (chunk->verify(), "");
 
 #ifdef ASSERT
-  int old_compact_size = obj->compact_size();
-  int old_size = obj->size();
+  size_t old_compact_size = obj->compact_size();
+  size_t old_size = obj->size();
   assert (old_compact_size <= old_size, "");
 #endif
 
@@ -164,10 +164,11 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   const int header = size_helper();
   const int from_stack_size = chunk->stack_size();
   const int to_stack_size = from_stack_size - from_sp + metadata_words();
-  const int from_bitmap_size = bitmap_size(from_stack_size);
-  const int to_bitmap_size = bitmap_size(to_stack_size);
+  const size_t from_bitmap_size = bitmap_size(from_stack_size);
+  const size_t to_bitmap_size = bitmap_size(to_stack_size);
   const bool has_bitmap = chunk->has_bitmap();
   assert (to_stack_size >= 0, "");
+  assert (to_stack_size <= from_stack_size, "");
   assert (to_stack_size > 0 || chunk->argsize() == 0, "");
 #ifdef ASSERT
   HeapWord* const start_of_stack0 = start_of_stack(obj);
@@ -317,13 +318,13 @@ public:
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset < 0) {
         offset = -offset;
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "");
+        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "");
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
   #ifdef ASSERT
       else { // DEBUG ONLY
         offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize));
+        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "offset: " PTR_FORMAT " size: %zu", offset, (base->size() << LogHeapWordSize));
       }
   #endif
     }
@@ -342,7 +343,7 @@ public:
   template <class T> inline void do_oop_work(T* p) {
     oop value = (oop)HeapAccess<>::oop_load(p);
     if (store) HeapAccess<>::oop_store(p, value);
-    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d p: " INTPTR_FORMAT " sp offset: %ld", sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
+    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
   }
 
 // virtual void do_oop(oop* p) override { *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p); }
@@ -401,7 +402,7 @@ public:
 
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: %ld pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
+    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
     // if (Continuation::is_return_barrier_entry(f.pc())) {
     //   assert ((int)(f.sp() - chunk->start_address(chunk)) < chunk->sp(), ""); // only happens when starting from gcSP
     //   return;
@@ -668,7 +669,7 @@ public:
       do_oop((narrowOop*)p);
     } else {
       BitMap::idx_t index = _bit_offset + (p - (oop*)_stack_start);
-      log_develop_trace(jvmcont)("Build bitmap wide oop p: " INTPTR_FORMAT " index: %lu bit_offset: %lu", p2i(p), index, _bit_offset);
+      log_develop_trace(jvmcont)("Build bitmap wide oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT, p2i(p), index, _bit_offset);
       assert (!_bm.at(index), "");
       _bm.set_bit(index);
     }
@@ -677,7 +678,7 @@ public:
   virtual void do_oop(narrowOop* p) override {
     assert (p >= (narrowOop*)_stack_start, "");
     BitMap::idx_t index = _bit_offset + (p - (narrowOop*)_stack_start);
-    log_develop_trace(jvmcont)("Build bitmap narrow oop p: " INTPTR_FORMAT " index: %lu bit_offset: %lu", p2i(p), index, _bit_offset);
+    log_develop_trace(jvmcont)("Build bitmap narrow oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT, p2i(p), index, _bit_offset);
     assert (!_bm.at(index), "");
     _bm.set_bit(index);
   }
@@ -772,52 +773,25 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
 template <typename OopT>
 class StackChunkVerifyBitmapClosure : public BitMapClosure {
   stackChunkOop _chunk;
-  intptr_t* _top;
-  intptr_t* _next;
 public:
   int _count;
-  bool _exact; // whether or not the top, and therefore the count, is exact
-  StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {
-    find_frame_top(StackChunkFrameStream<true>(chunk));
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap stack top: " INTPTR_FORMAT, p2i(_top));
-  }
+
+  StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {}
 
   bool do_bit(BitMap::idx_t index) override {
     OopT* p = _chunk->address_for_bit<OopT>(index);
-    if ((intptr_t*)p < _top && (intptr_t*)p != _chunk->sp_address() - frame::sender_sp_offset) return true; // skip oops that are not seen by the oopmap scan
-
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap oop p: " INTPTR_FORMAT " index: %lu bit_offset: %lu", p2i(p), index, _chunk->bit_offset());
     _count++;
-    if (SafepointSynchronize::is_at_safepoint()) return true;
 
-    oop obj = safe_load(p);
-    assert ((!_exact && (intptr_t*)p < _next) || obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: %lu bit_offset: %lu", p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
-    return true; // continue processing
-  }
-
-  void find_frame_top(const StackChunkFrameStream<true>& f) {
-    // We do this just so that the count is the same as the oopmap scan for verification purposes, but for GC traveral it's not important.
-    _next = nullptr;
-    _exact = true;
-    if (f.is_interpreted()) {
-      ResourceMark rm;
-      InterpreterOopMap mask;
-      frame fr = f.to_frame();
-      fr.interpreted_frame_oop_map(&mask);
-      _top = fr.addr_at(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
-    } else if (f.is_compiled()) {
-      Method* callee = f.cb()->as_compiled_method()->attached_method_before_pc(f.pc());
-      if (callee != nullptr) {
-        int outgoing_args_words = (callee->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
-        _top = f.unextended_sp() + outgoing_args_words;
-      } else {
-        _top = f.unextended_sp();
-        _next = _top + f.cb()->frame_size() - frame::sender_sp_offset;
-        _exact = false;
-      }
-    } else {
-      _top = f.unextended_sp();
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap p: " INTPTR_FORMAT " i: " SIZE_FORMAT, p2i(p), index);
+    
+    if (!SafepointSynchronize::is_at_safepoint()) {
+      oop obj = safe_load(p);
+      assert (obj == nullptr || is_good_oop(obj),
+              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
+              p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
     }
+
+    return true; // continue processing
   }
 };
 
@@ -840,7 +814,7 @@ public:
     assert (obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     if (_chunk->has_bitmap()) {
       BitMap::idx_t index = (p - (T*)_chunk->start_address()) + _chunk->bit_offset();
-      assert (_chunk->bitmap().at(index), "Bit not set at index %lu corresponding to " INTPTR_FORMAT, index, p2i(p));
+      assert (_chunk->bitmap().at(index), "Bit not set at index " SIZE_FORMAT " corresponding to " INTPTR_FORMAT, index, p2i(p));
     }
   }
 };
@@ -906,7 +880,7 @@ public:
     }
 
     // assert (!chunk->requires_barriers() || num_frames <= chunk->numFrames(), "");
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: %ld pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
     if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
     assert (f.pc() != nullptr,
       "young: %d chunk->numFrames(): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
@@ -1006,7 +980,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 
   if (!concurrent) {
-    assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: %ld start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
+    assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
     assert (chunk->argsize() == closure._argsize, "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d", chunk->argsize(), closure._argsize, closure._callee_interpreted);
 
     int max_size = closure._size + closure._num_i2c * align_wiggle();
@@ -1023,20 +997,17 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
   if (chunk->has_bitmap()) {
     assert (chunk->bitmap().size() == chunk->bit_offset() + (size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)), "bitmap().size(): %zu bit_offset: %zu stack_size: %d", chunk->bitmap().size(), chunk->bit_offset(), chunk->stack_size());
-    bool exact;
     int oop_count;
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(chunk);
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((narrowOop*)chunk->end_address()));
-      exact = bitmap_closure._exact;
       oop_count = bitmap_closure._count;
     } else {
       StackChunkVerifyBitmapClosure<oop> bitmap_closure(chunk);
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((oop*)chunk->end_address()));
-      exact = bitmap_closure._exact;
       oop_count = bitmap_closure._count;
     }
-    assert (exact ? oop_count == closure._num_oops : oop_count >= closure._num_oops, "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
+    assert (oop_count == closure._num_oops, "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
   }
 
   return true;
@@ -1116,7 +1087,7 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   assert(c->is_stackChunk(), "");
 
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
-  st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: 0x%lx", p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
+  st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT, p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
   st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT, c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
   st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT " num_frames: %d num_oops: %d", c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()), c->numFrames(), c->numOops());

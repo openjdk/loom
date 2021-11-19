@@ -372,7 +372,13 @@ public abstract class Charset
     }
 
     // gate to prevent recursive provider lookups
-    private static final Gate LOOKUP_GATE = Gate.create();
+    private static class Holder {
+        static final Gate LOOKUP_GATE = Gate.create();
+    }
+
+    private static Gate gate() {
+        return Holder.LOOKUP_GATE;
+    }
 
     @SuppressWarnings("removal")
     private static Charset lookupViaProviders(final String charsetName) {
@@ -388,7 +394,7 @@ public abstract class Charset
         if (!VM.isBooted())
             return null;
 
-        if (!LOOKUP_GATE.tryEnter())
+        if (!gate().tryEnter())
             // Avoid recursive provider lookups
             return null;
         try {
@@ -407,7 +413,7 @@ public abstract class Charset
                 });
 
         } finally {
-            LOOKUP_GATE.exit();
+            gate().exit();
         }
     }
 
@@ -523,6 +529,39 @@ public abstract class Charset
         if (cs != null)
             return cs;
         throw new UnsupportedCharsetException(charsetName);
+    }
+
+    /**
+     * Returns a charset object for the named charset. If the charset object
+     * for the named charset is not available or {@code charsetName} is not a
+     * legal charset name, then {@code fallback} is returned.
+     *
+     * @param  charsetName
+     *         The name of the requested charset; may be either
+     *         a canonical name or an alias
+     *
+     * @param  fallback
+     *         fallback charset in case the charset object for the named
+     *         charset is not available or {@code charsetName} is not a legal
+     *         charset name. May be {@code null}
+     *
+     * @return  A charset object for the named charset, or {@code fallback}
+     *          in case the charset object for the named charset is not
+     *          available or {@code charsetName} is not a legal charset name
+     *
+     * @throws  IllegalArgumentException
+     *          If the given {@code charsetName} is {@code null}
+     *
+     * @since 18
+     */
+    public static Charset forName(String charsetName,
+                                  Charset fallback) {
+        try {
+            Charset cs = lookup(charsetName);
+            return cs != null ? cs : fallback;
+        } catch (IllegalCharsetNameException icne) {
+            return fallback;
+        }
     }
 
     // Fold charsets from the given iterator into the given map, ignoring
@@ -811,14 +850,9 @@ public abstract class Charset
      * @return  A char buffer containing the decoded characters
      */
     public final CharBuffer decode(ByteBuffer bb) {
-        CharsetDecoder decoder;
-        if (Thread.currentThread().isVirtual()) {
-            decoder = newDecoder();
-        } else {
-            decoder = ThreadLocalCoders.decoderFor(this);
-        }
         try {
-            return decoder.onMalformedInput(CodingErrorAction.REPLACE)
+            return ThreadLocalCoders.decoderFor(this)
+                .onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE)
                 .decode(bb);
         } catch (CharacterCodingException x) {
@@ -852,14 +886,9 @@ public abstract class Charset
      * @return  A byte buffer containing the encoded characters
      */
     public final ByteBuffer encode(CharBuffer cb) {
-        CharsetEncoder encoder;
-        if (Thread.currentThread().isVirtual()) {
-            encoder = newEncoder();
-        } else {
-            encoder = ThreadLocalCoders.encoderFor(this);
-        }
         try {
-            return encoder.onMalformedInput(CodingErrorAction.REPLACE)
+            return ThreadLocalCoders.encoderFor(this)
+                .onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE)
                 .encode(cb);
         } catch (CharacterCodingException x) {

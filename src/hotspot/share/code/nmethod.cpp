@@ -70,6 +70,7 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/sweeper.hpp"
+#include "runtime/threadWXSetters.inline.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"
 #include "utilities/copy.hpp"
@@ -958,7 +959,7 @@ void nmethod::print_on(outputStream* st, const char* msg) const {
       CompileTask::print(st, this, msg, /*short_form:*/ true);
       st->print_cr(" (" INTPTR_FORMAT ")", p2i(this));
     } else {
-      CompileTask::print(st, this, msg, /*short_form:*/ false);
+      CompileTask::print(st, this, msg, /*short_form:*/ false, /* cr */ true, /* timestamp */ false);
     }
   }
 }
@@ -2631,7 +2632,7 @@ void nmethod::print(outputStream* st) const {
     st->print("(n/a) ");
   }
 
-  print_on(tty, NULL);
+  print_on(st, NULL);
 
   if (WizardMode) {
     st->print("((nmethod*) " INTPTR_FORMAT ") ", p2i(this));
@@ -2982,6 +2983,9 @@ void nmethod::decode2(outputStream* ost) const {
                                                                   AbstractDisassembler::show_block_comment());
 #endif
 
+  // Decoding an nmethod can write to a PcDescCache (see PcDescCache::add_pc_desc)
+  MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, Thread::current());)
+
   st->cr();
   this->print(st);
   st->cr();
@@ -2991,7 +2995,10 @@ void nmethod::decode2(outputStream* ost) const {
   //---<  Print real disassembly  >---
   //----------------------------------
   if (! use_compressed_format) {
+    st->print_cr("[Disassembly]");
     Disassembler::decode(const_cast<nmethod*>(this), st);
+    st->bol();
+    st->print_cr("[/Disassembly]");
     return;
   }
 #endif

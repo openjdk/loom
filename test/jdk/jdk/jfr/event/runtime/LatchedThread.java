@@ -55,6 +55,10 @@ public class LatchedThread implements Runnable {
         latch.await();
     }
 
+    public long getId() {
+        return thread.getId();
+    }
+
     public String getName() {
         return thread.getName();
     }

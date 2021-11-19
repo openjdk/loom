@@ -68,6 +68,7 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   jthread thread = NULL;
   jthread* vthread_ptr = NULL;
   JavaThread* java_thread = NULL;
+  oop cthread_oop = NULL;
   oop thread_oop = NULL;
   va_list ap;
 
@@ -85,8 +86,9 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   *vthread_ptr = NULL;
   if (thread == NULL) {
     java_thread = current_thread;
+    cthread_oop = java_thread->threadObj();
   } else {
-    err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, NULL);
+    err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &cthread_oop);
     if (err != JVMTI_ERROR_NONE) {
       return err;
     }
@@ -94,12 +96,15 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   if (vthread_ptr == NULL) {
     return JVMTI_ERROR_NULL_POINTER;
   }
+  if (cthread_oop == NULL || java_lang_VirtualThread::is_instance(cthread_oop)) {
+    return JVMTI_ERROR_INVALID_THREAD;
+  }
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
-  oop vthread_oop = java_thread->vthread();
+  oop vthread_oop = java_thread->mounted_vthread();
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) { // not a virtual thread
     vthread_oop = NULL;
   }

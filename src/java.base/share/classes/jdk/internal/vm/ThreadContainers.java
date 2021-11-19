@@ -42,41 +42,40 @@ import sun.nio.ch.Poller;
 public class ThreadContainers {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    // the set of shared thread containers
-    private static final Set<WeakReference<ThreadContainer>> SHARED_CONTAINERS = ConcurrentHashMap.newKeySet();
+    // the set of thread containers registered with this class
+    private static final Set<WeakReference<ThreadContainer>> CONTAINER_REGISTRY = ConcurrentHashMap.newKeySet();
     private static final ReferenceQueue<Object> QUEUE = new ReferenceQueue<>();
 
     private ThreadContainers() { }
 
     /**
-     * Expunge stale entries from set of shared thread containers.
+     * Expunge stale entries from the container registry.
      */
     private static void expungeStaleEntries() {
         Object key;
         while ((key = QUEUE.poll()) != null) {
-            SHARED_CONTAINERS.remove(key);
+            CONTAINER_REGISTRY.remove(key);
         }
     }
 
     /**
-     * Registers a shared thread container to be tracked this class, returning
-     * a key that is used to remove it from the registry.
+     * Registers a thread container to be tracked this class, returning a key
+     * that is used to remove it from the registry.
      */
-    public static Object registerSharedContainer(ThreadContainer container) {
-        assert container.owner() == null;
+    public static Object registerContainer(ThreadContainer container) {
         expungeStaleEntries();
         var ref = new WeakReference<>(container);
-        SHARED_CONTAINERS.add(ref);
+        CONTAINER_REGISTRY.add(ref);
         return ref;
     }
 
     /**
-     * Removes a shared thread container from being tracked by specifying the
-     * key returned when the thread container was registered.
+     * Removes a thread container from being tracked by specifying the key
+     * returned when the thread container was registered.
      */
-    public static void deregisterSharedContainer(Object key) {
+    public static void deregisterContainer(Object key) {
         assert key instanceof WeakReference;
-        SHARED_CONTAINERS.remove(key);
+        CONTAINER_REGISTRY.remove(key);
     }
 
     /**
@@ -92,29 +91,27 @@ public class ThreadContainers {
      * The parent of an owned container is the enclosing container when nested,
      * otherwise the parent of an owned container is the owner's container.
      *
-     * The root thread container is the parent of all unowned/shared thread
-     * containers. The parent of the root container is null.
+     * The root thread container is the parent of all registered containers.
+     * The parent of the root container is null.
      */
     public static ThreadContainer parent(ThreadContainer container) {
-        ThreadContainer parent = container.previous();
-        if (parent != null)
-            return parent;
-        Thread owner = container.owner();
-        if (owner != null && (parent = JLA.threadContainer(owner)) != null)
-            return parent;
         ThreadContainer root = root();
-        return (container != root) ? root : null;
+        if (container == root) {
+            return null;
+        } else {
+            ThreadContainer parent = container.enclosingScope(ThreadContainer.class);
+            return (parent != null) ? parent : root;
+        }
     }
 
     /**
      * Returns a stream of the given thread container's "children".
      *
      * An owned thread container is the parent of the thread container that is
-     * encloses. The "top most" container owned by threads in the container are also
-     * children.
+     * encloses. The "top most" container owned by threads in the container are
+     * also children.
      *
-     * Unowned/shared thread containers that are reachable from the root container
-     * are children of the root container.
+     * Unowned thread containers in the registry are children of the root container.
      */
     public static Stream<ThreadContainer> children(ThreadContainer container) {
         Stream<ThreadContainer> s1 = Stream.empty();
@@ -124,8 +121,8 @@ public class ThreadContainers {
             ThreadContainer next = next(container);
             s1 = Stream.ofNullable(next);
         } else if (container == root()) {
-            // the root container is the parent of all shared containers
-            s1 = SHARED_CONTAINERS.stream()
+            // the root container is the parent of registered containers
+            s1 = CONTAINER_REGISTRY.stream()
                     .map(WeakReference::get)
                     .filter(c -> c != null);
         }
@@ -150,30 +147,31 @@ public class ThreadContainers {
      * Returns the top-most thread container owned by the given thread.
      */
     private static ThreadContainer top(Thread thread) {
-        ThreadContainer container = JLA.headThreadContainer(thread);
-        while (container != null) {
-            ThreadContainer previous = container.previous();
-            if (previous == null)
-                return container;
-            container = previous;
+        StackableScope current = JLA.headStackableScope(thread);
+        ThreadContainer top = null;
+        while (current != null) {
+            if (current instanceof ThreadContainer tc) {
+                top = tc;
+            }
+            current = current.previous();
         }
-        return null;
+        return top;
     }
 
     /**
      * Returns the thread container that the given thread container encloses.
      */
     private static ThreadContainer next(ThreadContainer container) {
-        ThreadContainer head = JLA.headThreadContainer(container.owner());
-        if (head != null) {
-            ThreadContainer next = head;
-            ThreadContainer previous = next.previous();
-            while (previous != null) {
-                if (previous == container) {
+        StackableScope current = JLA.headStackableScope(container.owner());
+        if (current != null) {
+            ThreadContainer next = null;
+            while (current != null) {
+                if (current == container) {
                     return next;
+                } else if (current instanceof ThreadContainer tc) {
+                    next = tc;
                 }
-                next = previous;
-                previous = next.previous();
+                current = current.previous();
             }
         }
         return null;
@@ -182,9 +180,16 @@ public class ThreadContainers {
     /**
      * Root container.
      */
-    private static class RootContainer implements ThreadContainer {
+    private static class RootContainer extends ThreadContainer {
         static final RootContainer INSTANCE = new RootContainer();
         private static final LongAdder VTHREAD_COUNT = new LongAdder();
+        private RootContainer() {
+            super(true);
+        }
+        @Override
+        public ThreadContainer push() {
+            throw new UnsupportedOperationException();
+        }
         @Override
         public String name() {
             return "<root>";
@@ -213,10 +218,6 @@ public class ThreadContainers {
             return Stream.concat(s1, s2);
         }
         @Override
-        public void setPrevious(ThreadContainer container) {
-            throw new UnsupportedOperationException();
-        }
-        @Override
         public String toString() {
             return name();
         }
@@ -229,6 +230,10 @@ public class ThreadContainers {
         public void onExit(Thread thread) {
             assert thread.isVirtual();
             VTHREAD_COUNT.add(-11L);
+        }
+        @Override
+        public StackableScope previous() {
+            return null;
         }
     }
 }
