@@ -346,16 +346,70 @@ public final class ScopeLocal<T> {
         /*
          * Add a list of bindings to the current Thread's set of bound values.
          */
-        private final static Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
+        private static final Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
             Snapshot prev = getScopeLocalBindings();
             var b = new Snapshot(bindings, prev, primaryBits);
             ScopeLocal.setScopeLocalBindings(b);
             return prev;
         }
+
+        /*
+         * Ensure that none of these bindings is already bound.
+         */
+        void checkNotBound() {
+            for (Carrier c = this; c != null; c = c.prev) {
+                if (c.key.isBound()) {
+                    throw new RuntimeException("Scope Local already bound");
+                }
+            }
+        }
+
+        /**
+         * Create a try-with-resources ScopeLocal binding
+         * @return a Binder
+         */
+        public Binder bind() {
+            checkNotBound();
+            Cache.invalidate(primaryBits | secondaryBits);
+            Thread currentThread = Thread.currentThread();
+            var prev = TWRBindings();
+            var b = new Snapshot(this, prev, primaryBits);
+            setTWRBindings(b);
+            return new Binder(b, primaryBits | secondaryBits);
+        }
+
+        /**
+         * An @AutoCloseable that's used to bind a ScopeLocal in a try-with-resources construct.
+         */
+        static public class Binder implements AutoCloseable {
+            private final Snapshot bindings;
+            private final int bits;
+
+            Binder(Snapshot bindings, int bits) {
+                Objects.requireNonNull(bindings);
+                this.bindings = bindings;
+                this.bits = bits;
+            }
+
+            /**
+             * Close a scope local binding context.
+             * @throws StructureViolationException if @this isn't the current top binding
+             */
+            public void close() throws StructureViolationException {
+                Cache.invalidate(bits);
+                Thread currentThread = Thread.currentThread();
+                var top = TWRBindings();
+                setTWRBindings(bindings.prev);
+                if (top != bindings) {
+                    Cache.invalidate();
+                    throw new StructureViolationException();
+                }
+            }
+        }
     }
 
     /**
-     * Creates a binding for a ScopeLocal instance.
+     * Create a binding for a ScopeLocal instance.
      * That {@link Carrier} may be used later to invoke a {@link Callable} or
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier}
      * by the {@link Carrier#where(ScopeLocal, Object)} method.
@@ -437,8 +491,7 @@ public final class ScopeLocal<T> {
 
     @SuppressWarnings("unchecked")
     private T slowGet() {
-        var bindings = scopeLocalBindings();
-        var value =  bindings.find(this);
+        var value =  findBinding();
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();
         }
@@ -453,14 +506,18 @@ public final class ScopeLocal<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
-        return (scopeLocalBindings().find(this) != Snapshot.NIL);
+        return findBinding() != Snapshot.NIL;
     }
 
     /**
      * Return the value of the scope local or NIL if not bound.
      */
     private Object findBinding() {
-        return scopeLocalBindings().find(this);
+        Object value = scopeLocalBindings().find(this);
+        if (value != Snapshot.NIL) {
+            return value;
+        }
+        return TWRBindings().find(this);
     }
 
     /**
@@ -501,8 +558,7 @@ public final class ScopeLocal<T> {
     }
 
     private static Snapshot getScopeLocalBindings() {
-        Thread currentThread = Thread.currentThread();
-        return currentThread.scopeLocalBindings;
+        return Thread.currentThread().scopeLocalBindings;
     }
 
     private static void setScopeLocalBindings(Snapshot bindings) {
@@ -512,6 +568,19 @@ public final class ScopeLocal<T> {
 
     private Snapshot scopeLocalBindings() {
         return getScopeLocalBindings();
+    }
+
+    private static void setTWRBindings(Snapshot bindings) {
+        Objects.requireNonNull(bindings);
+        Thread.currentThread().TWRBindings = bindings;
+    }
+
+    private static Snapshot TWRBindings() {
+        var result = Thread.currentThread().TWRBindings;
+        if (result == null) {
+            setTWRBindings(result = new EmptySnapshot());
+        }
+        return result;
     }
 
     private static int nextKey = 0xf0f0_f0f0;
