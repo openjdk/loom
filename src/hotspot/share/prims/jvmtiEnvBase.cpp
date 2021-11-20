@@ -2037,7 +2037,7 @@ JvmtiModuleClosure::get_all_modules(JvmtiEnv* env, jint* module_count_ptr, jobje
     return JVMTI_ERROR_OUT_OF_MEMORY;
   }
   for (jint idx = 0; idx < len; idx++) {
-    array[idx] = JNIHandles::make_local(Thread::current(), _tbl->at(idx).resolve());
+    array[idx] = JNIHandles::make_local(_tbl->at(idx).resolve());
   }
   _tbl = NULL;
   *modules_ptr = array;
@@ -2317,8 +2317,10 @@ VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
 
 void
 VThreadGetThreadClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
+  JavaThread *jt = JavaThread::cast(target);
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(target, carrier_thread);
+  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(jt, carrier_thread);
 }
 
 void
