@@ -2229,6 +2229,7 @@ oop java_lang_Thread::park_blocker(oop java_thread) {
 }
 
 oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
+  ThreadsListHandle tlh(JavaThread::current());
   JavaThread* thread;
   bool is_virtual = java_lang_VirtualThread::is_instance(java_thread);
   if (is_virtual) {
@@ -2239,6 +2240,9 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     thread = java_lang_Thread::thread(carrier_thread);
   } else {
     thread = java_lang_Thread::thread(java_thread);
+  }
+  if (thread == NULL) {
+    return NULL;
   }
 
   class GetStackTraceClosure : public HandshakeClosure {
@@ -2309,7 +2313,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark   hm(THREAD);
   GetStackTraceClosure gstc(Handle(THREAD, java_thread));
-  Handshake::execute(&gstc, thread);
+  Handshake::execute(&gstc, &tlh, thread);
 
   // Stop if no stack trace is found.
   if (gstc._depth == 0) {
