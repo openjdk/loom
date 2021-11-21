@@ -251,7 +251,7 @@ public interface Future<V> {
          */
         FAILED,
         /**
-         * The task is cancelled.
+         * The task was cancelled.
          * @see #cancel(boolean)
          */
         CANCELLED
