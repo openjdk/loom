@@ -336,6 +336,8 @@ runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java
 runtime/cds/appcds/dynamicArchive/OldClassAndInf.java
 runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java
 runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java
+runtime/cds/appcds/dynamicArchive/OldClassInBaseArchive.java
+runtime/cds/appcds/dynamicArchive/RedefineCallerClassTest.java
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl
