@@ -165,6 +165,16 @@ public interface Future<V> {
     /**
      * Returns the computed result, without waiting.
      *
+     * <p> This method is for cases where the caller knows that the task has
+     * already completed successfully, for example a filter-map of a stream of
+     * Future objects where the filter matches tasks that completed successfully.
+     * <pre>{@code
+     *     results = futures.stream()
+     *                .filter(f -> f.state() == Future.State.SUCCESS)
+     *                .map(Future::resultNow)
+     *                .toList();
+     * }</pre>
+     *
      * @implSpec
      * The default implementation invokes {@code isDone()} to test if the task
      * has completed. If done, it invokes {@code get()} to obtain the result.
@@ -196,8 +206,10 @@ public interface Future<V> {
     }
 
     /**
-     * Returns the exception thrown by the task or a CancellationException
-     * if cancelled, without waiting.
+     * Returns the exception thrown by the task, without waiting.
+     *
+     * <p> This method is for cases where the caller knows that the task
+     * has already completed with an exception.
      *
      * @implSpec
      * The default implementation invokes {@code isDone()} to test if the task
@@ -205,15 +217,15 @@ public interface Future<V> {
      * catches the {@code ExecutionException} to obtain the exception.
      *
      * @return the exception thrown by the task
-     * @throws IllegalStateException if the task has not completed or the task
-     * completed normally
+     * @throws IllegalStateException if the task has not completed, the task
+     * completed normally, or the task was cancelled
      * @since 99
      */
     default Throwable exceptionNow() {
         if (!isDone())
             throw new IllegalStateException("Task has not completed");
         if (isCancelled())
-            return new CancellationException();
+            throw new IllegalStateException("Task was cancelled");
         boolean interrupted = false;
         try {
             while (true) {

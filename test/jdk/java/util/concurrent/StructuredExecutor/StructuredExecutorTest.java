@@ -451,7 +451,7 @@ public class StructuredExecutorTest {
             executor.join();
 
             // task should have completed abnormally
-            assertTrue(future.isDone() && future.exceptionNow() != null);
+            assertTrue(future.isDone() && future.state() != Future.State.SUCCESS);
         }
     }
 
@@ -474,10 +474,10 @@ public class StructuredExecutorTest {
             executor.join();
 
             // task1 should have completed abnormally
-            assertTrue(future1.isDone() && future1.exceptionNow() != null);
+            assertTrue(future1.isDone() && future1.state() != Future.State.SUCCESS);
 
             // task2 should have completed normally
-            assertTrue(future2.isDone() && future2.resultNow() == null);
+            assertTrue(future2.isDone() && future2.state() == Future.State.SUCCESS);
         }
     }
 
@@ -922,7 +922,6 @@ public class StructuredExecutorTest {
             future.cancel(true);
             expectThrows(CancellationException.class, future::get);
             assertTrue(future.state() == Future.State.CANCELLED);
-            assertTrue(future.exceptionNow() instanceof CancellationException);
 
             executor.join();
         }

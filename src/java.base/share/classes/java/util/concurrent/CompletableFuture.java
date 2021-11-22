@@ -2152,8 +2152,16 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     @Override
     public Throwable exceptionNow() {
         Object r = result;
-        if (r instanceof AltResult alt && alt.ex != null) {
-            return alt.ex;
+        Throwable x;
+        if (r instanceof AltResult alt
+                && ((x = alt.ex) != null)
+                && !(x instanceof CancellationException)) {
+            if (x instanceof CompletionException) {
+                Throwable cause = x.getCause();
+                if (cause != null)
+                    x = cause;
+            }
+            return x;
         }
         throw new IllegalStateException();
     }
