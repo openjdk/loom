@@ -33,10 +33,14 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
-import java.util.stream.*;
+import java.util.concurrent.StructuredExecutor.CompletionHandler;
+import java.util.concurrent.StructuredExecutor.ShutdownOnSuccess;
+import java.util.concurrent.StructuredExecutor.ShutdownOnFailure;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -193,13 +197,13 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * BiConsumer that captures all Future objects notified to the accept method.
+     * CompletionHandler that collects all Future objects notified to the accept method.
      */
-    private static class OnComplete<V> implements BiConsumer<StructuredExecutor, Future<V>> {
+    private static class CollectAll<V> implements CompletionHandler<V> {
         final StructuredExecutor executor;
         final List<Future<V>> futures = new CopyOnWriteArrayList<>();
 
-        OnComplete(StructuredExecutor executor) {
+        CollectAll(StructuredExecutor executor) {
             this.executor = executor;
         }
 
@@ -216,44 +220,44 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * Test fork with onComplete operation. It should be invoked for tasks that
+     * Test fork with handler operation. It should be invoked for tasks that
      * complete normally and abnormally.
      */
     @Test(dataProvider = "factories")
-    public void testForkOnCompleteOp1(ThreadFactory factory) throws Exception {
+    public void testForkWithCompletionHandler1(ThreadFactory factory) throws Exception {
         try (var executor = StructuredExecutor.open(null, factory)) {
-            var onComplete = new OnComplete<String>(executor);
+            var handler = new CollectAll<String>(executor);
 
             // completes normally
-            Future<String> future1 = executor.fork(() -> "foo", onComplete);
+            Future<String> future1 = executor.fork(() -> "foo", handler);
 
             // completes with exception
             Future<String> future2 = executor.fork(() -> {
                 throw new FooException();
-            }, onComplete);
+            }, handler);
 
             // cancelled
             Future<String> future3 = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
-            }, onComplete);
+            }, handler);
             future3.cancel(true);
 
             executor.join();
 
-            Set<Future<String>> futures = onComplete.futures().collect(Collectors.toSet());
+            Set<Future<String>> futures = handler.futures().collect(Collectors.toSet());
             assertEquals(futures, Set.of(future1, future2, future3));
         }
     }
 
     /**
-     * Test fork with onComplete operation. It should not be invoked for tasks that
+     * Test fork with handler operation. It should not be invoked for tasks that
      * complete after the executor has been shutdown
      */
     @Test(dataProvider = "factories")
-    public void testForkOnCompleteOp2(ThreadFactory factory) throws Exception {
+    public void testForkWithCompletionHandler2(ThreadFactory factory) throws Exception {
         try (var executor = StructuredExecutor.open(null, factory)) {
-            var onComplete = new OnComplete<String>(executor);
+            var handler = new CollectAll<String>(executor);
 
             var latch = new CountDownLatch(1);
 
@@ -267,7 +271,7 @@ public class StructuredExecutorTest {
                     } catch (InterruptedException e) { }
                 }
                 return null;
-            }, onComplete);
+            }, handler);
 
             // start a second task to shutdown the executor after 500ms
             Future<String> future2 = executor.fork(() -> {
@@ -281,9 +285,9 @@ public class StructuredExecutorTest {
             // let task finish
             latch.countDown();
 
-            // onComplete should not have been called
+            // handler should not have been called
             assertTrue(future1.isDone());
-            assertTrue(onComplete.futures().count() == 0L);
+            assertTrue(handler.futures().count() == 0L);
         }
     }
 
@@ -466,11 +470,11 @@ public class StructuredExecutorTest {
                 return "foo";
             });
 
-            BiConsumer<StructuredExecutor, Future<String>> onComplete = (s, f) -> s.shutdown();
+            CompletionHandler<String> handler = (e, f) -> e.shutdown();
             Future<String> future2 = executor.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return null;
-            }, onComplete);
+            }, handler);
             executor.join();
 
             // task1 should have completed abnormally
@@ -998,7 +1002,7 @@ public class StructuredExecutorTest {
         }
 
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<Object>();
+            var handler = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.complete(null);
             expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
@@ -1008,7 +1012,7 @@ public class StructuredExecutorTest {
         }
 
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<Object>();
+            var handler = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
             handler.accept(executor, future);
@@ -1017,7 +1021,7 @@ public class StructuredExecutorTest {
         }
 
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.complete(null);
             expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
@@ -1027,7 +1031,7 @@ public class StructuredExecutorTest {
         }
 
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
             handler.accept(executor, future);
@@ -1041,7 +1045,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnSuccess1() throws Exception {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
+            var handler = new ShutdownOnSuccess<String>();
 
             // invoke accept with task that has not completed
             var future = new CompletableFuture<String>();
@@ -1060,7 +1064,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnSuccess2() throws Exception {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
+            var handler = new ShutdownOnSuccess<String>();
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
@@ -1082,7 +1086,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnSuccess3() throws Exception {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
+            var handler = new ShutdownOnSuccess<String>();
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
@@ -1104,7 +1108,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnSuccess4() throws Exception {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
+            var handler = new ShutdownOnSuccess<String>();
 
             // failed task
             var future = new CompletableFuture<String>();
@@ -1126,7 +1130,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnSuccess5() throws Exception {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnSuccess<String>();
+            var handler = new ShutdownOnSuccess<String>();
 
             // cancelled task
             var future = new CompletableFuture<String>();
@@ -1147,7 +1151,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnFailure1() throws Throwable {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
 
             // invoke accept with task that has not completed
             var future = new CompletableFuture<Object>();
@@ -1167,7 +1171,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnFailure2() throws Throwable {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
 
             // tasks complete with result
             var future = new CompletableFuture<Object>();
@@ -1188,7 +1192,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnFailure3() throws Throwable {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
 
             // tasks complete with result
             var future1 = new CompletableFuture<Object>();
@@ -1217,7 +1221,7 @@ public class StructuredExecutorTest {
      */
     public void testShutdownOnFailure4() throws Throwable {
         try (var executor = StructuredExecutor.open()) {
-            var handler = new StructuredExecutor.ShutdownOnFailure();
+            var handler = new ShutdownOnFailure();
 
             // cancelled task
             var future = new CompletableFuture<Object>();
