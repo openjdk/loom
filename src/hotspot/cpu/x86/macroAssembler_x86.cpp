@@ -795,6 +795,8 @@ static void pass_arg3(MacroAssembler* masm, Register arg) {
 }
 
 void MacroAssembler::stop(const char* msg) {
+  if (! strcmp(msg, "null oop passed to encode_heap_oop_not_null2"))
+    __asm("nop");
   if (ShowMessageBoxOnError) {
     address rip = pc();
     pusha(); // get regs on stack
@@ -4773,6 +4775,7 @@ void MacroAssembler::store_klass_gap(Register dst, Register src) {
 
 #ifdef ASSERT
 void MacroAssembler::verify_heapbase(const char* msg) {
+  return;
   assert (UseCompressedOops, "should be compressed");
   assert (Universe::heap() != NULL, "java heap should be initialized");
   if (CheckCompressedOops) {
@@ -4852,9 +4855,6 @@ void MacroAssembler::encode_heap_oop_not_null(Register dst, Register src) {
 }
 
 void  MacroAssembler::decode_heap_oop(Register r) {
-#ifdef ASSERT
-  verify_heapbase("MacroAssembler::decode_heap_oop: heap base corrupted?");
-#endif
   if (CompressedOops::base() == NULL) {
     if (CompressedOops::shift() != 0) {
       assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
@@ -4867,7 +4867,6 @@ void  MacroAssembler::decode_heap_oop(Register r) {
     addq(r, r12_heapbase);
     bind(done);
   }
-  verify_oop_msg(r, "broken oop in decode_heap_oop");
 }
 
 void  MacroAssembler::decode_heap_oop_not_null(Register r) {
