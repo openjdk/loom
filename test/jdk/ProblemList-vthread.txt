@@ -47,6 +47,7 @@ java/lang/Thread/virtual/NioChannels.java#id0
 java/lang/Thread/virtual/NioChannels.java#id1
 java/lang/Thread/virtual/NetSockets.java#id0
 java/lang/Thread/virtual/NetSockets.java#id1
+java/lang/Thread/virtual/StackTraceWhenRunnable.java
 java/beans/PropertyEditor/Test6397609.java
 
 ####
