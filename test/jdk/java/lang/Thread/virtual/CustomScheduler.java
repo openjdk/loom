@@ -128,7 +128,6 @@ public class CustomScheduler {
         assertTrue(ref.get() == SCHEDULER_2);
     }
 
-
     /**
      * Test running task on a virtual thread, should thrown IllegalCallerException.
      */
@@ -152,24 +151,6 @@ public class CustomScheduler {
         };
 
         TestHelper.virtualThreadBuilder(scheduler).start(LockSupport::park);
-    }
-
-    /**
-     * Test running task on a virtual thread, should thrown IllegalStateException.
-     */
-    @Test
-    public void testBadState() {
-        Executor scheduler = (task) -> {
-            // run on current thread
-            task.run();
-
-            // run again, should throw IllegalStateException
-            try {
-                task.run();
-                assertTrue(false);
-            } catch (IllegalStateException expected) { }
-        };
-        TestHelper.virtualThreadBuilder(scheduler).start(() -> { });
     }
 
     /**

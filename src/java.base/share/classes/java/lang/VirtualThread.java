@@ -95,9 +95,10 @@ class VirtualThread extends Thread {
     private static final int YIELDING = 7;     // Thread.yield
     private static final int TERMINATED = 99;  // final state
 
-    // can be suspended from scheduling when parked
+    // can be suspended from scheduling when unmounted
     private static final int SUSPENDED = 1 << 8;
-    private static final int PARKED_SUSPENDED = (PARKED | SUSPENDED);
+    private static final int RUNNABLE_SUSPENDED = (RUNNABLE | SUSPENDED);
+    private static final int PARKED_SUSPENDED   = (PARKED | SUSPENDED);
 
     // parking permit, may eventually be merged into state
     private volatile boolean parkPermit;
@@ -182,7 +183,8 @@ class VirtualThread extends Thread {
             setParkPermit(false);
             firstRun = false;
         } else {
-            throw new IllegalStateException();
+            // not runnable
+            return;
         }
 
         // notify JVMTI before mount
@@ -756,6 +758,7 @@ class VirtualThread extends Thread {
                 return Thread.State.NEW;
             case STARTED:
             case RUNNABLE:
+            case RUNNABLE_SUSPENDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
             case RUNNING:
@@ -798,33 +801,40 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the stack trace for this virtual thread if it newly created,
-     * started, parked, or terminated. Returns null if the thread is in
-     * another state.
+     * Returns the stack trace for this virtual thread if it is unmounted.
+     * Returns null if the thread is in another state.
      */
     private StackTraceElement[] tryGetStackTrace() {
-        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
-            try {
-                return cont.getStackTrace();
-            } finally {
-                assert state() == PARKED_SUSPENDED;
-                setState(PARKED);
-
-                // may have been unparked while suspended
-                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+        int initialState = state();
+        return switch (initialState) {
+            case RUNNABLE, PARKED -> {
+                int suspendedState = initialState | SUSPENDED;
+                if (compareAndSetState(initialState, suspendedState)) {
                     try {
-                        submitRunContinuation();
-                    } catch (RejectedExecutionException ignore) { }
+                        yield cont.getStackTrace();
+                    } finally {
+                        assert state == suspendedState;
+                        setState(initialState);
+
+                        // re-submit if runnable
+                        // re-submit if unparked while suspended
+                        if (initialState == RUNNABLE
+                            || (parkPermit && compareAndSetState(PARKED, RUNNABLE))) {
+                            try {
+                                submitRunContinuation();
+                            } catch (RejectedExecutionException ignore) { }
+                        }
+                    }
                 }
+                yield null;
             }
-        } else {
-            int s = state();
-            if (s == NEW || s == STARTED || s == TERMINATED) {
-                return new StackTraceElement[0];   // empty stack
-            } else {
-                return null;
+            case NEW, STARTED, TERMINATED ->  {
+                yield new StackTraceElement[0];   // empty stack
             }
-        }
+            default -> {
+                yield null;
+            }
+        };
     }
 
     @Override

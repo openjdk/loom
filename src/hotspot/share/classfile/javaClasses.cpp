@@ -2492,6 +2492,7 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(jint state)
       break;
     case STARTED :
     case RUNNABLE :
+    case RUNNABLE_SUSPENDED :
     case RUNNING :
     case PARKING :
     case YIELDING :
