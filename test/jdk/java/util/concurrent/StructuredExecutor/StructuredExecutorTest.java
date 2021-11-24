@@ -197,7 +197,7 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * CompletionHandler that collects all Future objects notified to the accept method.
+     * CompletionHandler that collects all Future objects notified to the handle method.
      */
     private static class CollectAll<V> implements CompletionHandler<V> {
         final StructuredExecutor executor;
@@ -208,7 +208,7 @@ public class StructuredExecutorTest {
         }
 
         @Override
-        public void accept(StructuredExecutor executor, Future<V> future) {
+        public void handle(StructuredExecutor executor, Future<V> future) {
             assertTrue(executor == this.executor);
             assertTrue(future.isDone());
             futures.add(future);
@@ -1005,8 +1005,8 @@ public class StructuredExecutorTest {
             var handler = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.complete(null);
-            expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
-            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
+            expectThrows(NullPointerException.class, () -> handler.handle(executor, null));
+            expectThrows(NullPointerException.class, () -> handler.handle(null, future));
             expectThrows(NullPointerException.class, () -> handler.result(null));
             executor.join();
         }
@@ -1015,7 +1015,7 @@ public class StructuredExecutorTest {
             var handler = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
-            handler.accept(executor, future);
+            handler.handle(executor, future);
             expectThrows(NullPointerException.class, () -> handler.result(e -> null));
             executor.join();
         }
@@ -1024,8 +1024,8 @@ public class StructuredExecutorTest {
             var handler = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.complete(null);
-            expectThrows(NullPointerException.class, () -> handler.accept(executor, null));
-            expectThrows(NullPointerException.class, () -> handler.accept(null, future));
+            expectThrows(NullPointerException.class, () -> handler.handle(executor, null));
+            expectThrows(NullPointerException.class, () -> handler.handle(null, future));
             expectThrows(NullPointerException.class, () -> handler.throwIfFailed(null));
             executor.join();
         }
@@ -1034,10 +1034,15 @@ public class StructuredExecutorTest {
             var handler = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
-            handler.accept(executor, future);
+            handler.handle(executor, future);
             expectThrows(NullPointerException.class, () -> handler.throwIfFailed(e -> null));
             executor.join();
         }
+
+        var handler = new ShutdownOnSuccess<String>();
+        expectThrows(NullPointerException.class, () -> CompletionHandler.compose(handler, null));
+        expectThrows(NullPointerException.class, () -> CompletionHandler.compose(null, handler));
+        expectThrows(NullPointerException.class, () -> CompletionHandler.compose(null, null));
     }
 
     /**
@@ -1047,9 +1052,9 @@ public class StructuredExecutorTest {
         try (var executor = StructuredExecutor.open()) {
             var handler = new ShutdownOnSuccess<String>();
 
-            // invoke accept with task that has not completed
+            // invoke handle with task that has not completed
             var future = new CompletableFuture<String>();
-            expectThrows(IllegalArgumentException.class, () -> handler.accept(executor, future));
+            expectThrows(IllegalArgumentException.class, () -> handler.handle(executor, future));
 
             // no tasks completed
             expectThrows(IllegalStateException.class, () -> handler.result());
@@ -1071,8 +1076,8 @@ public class StructuredExecutorTest {
             var future2 = new CompletableFuture<String>();
             future1.complete("foo");
             future2.complete("bar");
-            handler.accept(executor, future1);   // first
-            handler.accept(executor, future2);
+            handler.handle(executor, future1);   // first
+            handler.handle(executor, future2);
 
             assertEquals(handler.result(), "foo");
             assertEquals(handler.result(e -> null), "foo");
@@ -1093,8 +1098,8 @@ public class StructuredExecutorTest {
             var future2 = new CompletableFuture<String>();
             future1.completeExceptionally(new ArithmeticException());
             future2.complete("foo");
-            handler.accept(executor, future1);   // first
-            handler.accept(executor, future2);
+            handler.handle(executor, future1);   // first
+            handler.handle(executor, future2);
 
             assertEquals(handler.result(), "foo");
             assertEquals(handler.result(e -> null), "foo");
@@ -1113,7 +1118,7 @@ public class StructuredExecutorTest {
             // failed task
             var future = new CompletableFuture<String>();
             future.completeExceptionally(new ArithmeticException());
-            handler.accept(executor, future);
+            handler.handle(executor, future);
 
             Throwable ex = expectThrows(ExecutionException.class, () -> handler.result());
             assertTrue(ex.getCause() instanceof  ArithmeticException);
@@ -1135,7 +1140,7 @@ public class StructuredExecutorTest {
             // cancelled task
             var future = new CompletableFuture<String>();
             future.cancel(false);
-            handler.accept(executor, future);
+            handler.handle(executor, future);
 
             expectThrows(CancellationException.class, () -> handler.result());
             Throwable ex = expectThrows(FooException.class,
@@ -1153,9 +1158,9 @@ public class StructuredExecutorTest {
         try (var executor = StructuredExecutor.open()) {
             var handler = new ShutdownOnFailure();
 
-            // invoke accept with task that has not completed
+            // invoke handle with task that has not completed
             var future = new CompletableFuture<Object>();
-            expectThrows(IllegalArgumentException.class, () -> handler.accept(executor, future));
+            expectThrows(IllegalArgumentException.class, () -> handler.handle(executor, future));
 
             // no exception
             assertTrue(handler.exception().isEmpty());
@@ -1176,7 +1181,7 @@ public class StructuredExecutorTest {
             // tasks complete with result
             var future = new CompletableFuture<Object>();
             future.complete("foo");
-            handler.accept(executor, future);
+            handler.handle(executor, future);
 
             // no exception
             assertTrue(handler.exception().isEmpty());
@@ -1199,8 +1204,8 @@ public class StructuredExecutorTest {
             var future2 = new CompletableFuture<Object>();
             future1.complete("foo");
             future2.completeExceptionally(new ArithmeticException());
-            handler.accept(executor, future1);
-            handler.accept(executor, future2);
+            handler.handle(executor, future1);
+            handler.handle(executor, future2);
 
             Throwable ex = handler.exception().orElse(null);
             assertTrue(ex instanceof ArithmeticException);
@@ -1226,7 +1231,7 @@ public class StructuredExecutorTest {
             // cancelled task
             var future = new CompletableFuture<Object>();
             future.cancel(false);
-            handler.accept(executor, future);
+            handler.handle(executor, future);
 
             Throwable ex = handler.exception().orElse(null);
             assertTrue(ex instanceof CancellationException);
@@ -1237,6 +1242,39 @@ public class StructuredExecutorTest {
                     () -> handler.throwIfFailed(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
 
+            executor.join();
+        }
+    }
+
+    /**
+     * Test CompletionHandler.compose.
+     */
+    public void testCompletionHandlerCompose() throws Throwable {
+        try (var executor = StructuredExecutor.open()) {
+
+            // completed future
+            var future = new CompletableFuture<String>();
+            future.complete("foo");
+
+            AtomicInteger counter = new AtomicInteger();
+
+            // handler1 should run first
+            CompletionHandler<String> handler1 = (e, f) -> {
+                assertTrue(e == executor);
+                assertTrue(f == future);
+                assertTrue(counter.incrementAndGet() == 1);
+            };
+
+            // handler1 should run second
+            CompletionHandler<String> handler2 = (e, f) -> {
+                assertTrue(e == executor);
+                assertTrue(f == future);
+                assertTrue(counter.incrementAndGet() == 2);
+            };
+
+            var handler = CompletionHandler.compose(handler1, handler2);
+            handler.handle(executor, future);
+            
             executor.join();
         }
     }

@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import jdk.internal.misc.ThreadFlock;
 import jdk.internal.javac.PreviewFeature;
@@ -79,7 +78,7 @@ import jdk.internal.javac.PreviewFeature;
  *
  * <p> StructuredExecutor defines the 2-arg {@link #fork(Callable, CompletionHandler) fork}
  * method that executes a {@link CompletionHandler CompletionHandler} after a task completes.
- * The completion handler can be used to implement policy, collects results and/or exceptions,
+ * The completion handler can be used to implement policy, collect results and/or exceptions,
  * and provide an API that makes available the outcome to the main task to process after the
  * {@code join} method.
  * <pre>{@code
@@ -140,7 +139,7 @@ import jdk.internal.javac.PreviewFeature;
  * either fails, or a deadline is reached. It invokes the handler's {@link
  * ShutdownOnFailure#throwIfFailed(Function) throwIfFailed(Function)} to throw an exception
  * when either task fails. This method is a no-op if no tasks fail. The main task uses
- * {@code Future}'s {@link Future#resultNow() resultNow()} method to obtain the results.
+ * {@code Future}'s {@link Future#resultNow() resultNow()} method to retrieve the results.
  *
  * <pre>{@code
  *        Instant deadline = ...
@@ -393,15 +392,15 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
      * bindings and must match the bindings captured when the executor was created.
      *
-     * <p> The completion handler's {@link CompletionHandler#accept(StructuredExecutor, Future)
-     * accept} method is invoked if the task completes before the executor is {@link
+     * <p> The completion handler's {@link CompletionHandler#handle(StructuredExecutor, Future)
+     * handle} method is invoked if the task completes before the executor is {@link
      * #shutdown() shutdown}. If the executor shuts down at or around the same time that
      * the task completes then the completion handler may or may not be invoked.
      * The {@link CompletionHandler#compose(CompletionHandler, CompletionHandler) comppose}
-     * method can be used to compose more than one handler where required. The {@code accept}
+     * method can be used to compose more than one handler where required. The {@code handle}
      * method is run by the thread when the task completes with a result or exception. If
      * the {@link Future#cancel(boolean) Future.cancel} is used to cancel a task, and before
-     * the executor is shutdown, then the {@code accept} method is run by the thread that
+     * the executor is shutdown, then the {@code handle} method is run by the thread that
      * invokes {@code cancel}.
      *
      * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
@@ -703,7 +702,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             if (handler != null && !executor.isShutdown()) {
                 var handler = (CompletionHandler<Object>) this.handler;
                 var future = (Future<Object>) this;
-                handler.accept(executor, future);
+                handler.handle(executor, future);
             }
         }
 
@@ -799,7 +798,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * or outcome to code that executes after the {@code join} method. A completion handler
      * that collects results and ignores tasks that fail may define a method that returns
      * a possibly empty collection of the results. A completion handler that implements
-     * a policy to cancel remaining tasks when a task fails may define a method to obtain
+     * a policy to shut down the executor when a task fails may define a method to retrieve
      * the exception of the first task to fail.
      *
      * <p> The {@link #compose(CompletionHandler, CompletionHandler) compose} method may be
@@ -812,7 +811,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * @since 99
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public interface CompletionHandler<V> extends BiConsumer<StructuredExecutor, Future<V>> {
+    public interface CompletionHandler<V> {
         /**
          * Performs an action on a completed task.
          *
@@ -820,8 +819,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @param future the Future for the completed task
          * @throws IllegalArgumentException if the task has not completed
          */
-        @Override
-        void accept(StructuredExecutor executor, Future<V> future);
+        void handle(StructuredExecutor executor, Future<V> future);
 
         /**
          * Returns a composed {@code CompletionHandler} that performs, in sequence, a
@@ -845,8 +843,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             @SuppressWarnings("unchecked")
             var handler2 = (CompletionHandler<V>) second;
             return (e, f) -> {
-                handler1.accept(e, f);
-                handler2.accept(e, f);
+                handler1.handle(e, f);
+                handler2.handle(e, f);
             };
         }
     }
@@ -899,7 +897,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @see Future.State#SUCCESS
          */
         @Override
-        public void accept(StructuredExecutor executor, Future<V> future) {
+        public void handle(StructuredExecutor executor, Future<V> future) {
             Objects.requireNonNull(executor);
             switch (future.state()) {
                 case RUNNING -> throw new IllegalArgumentException("Task is not completed");
@@ -931,12 +929,12 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * <p> When no task completed with a result but a task completed with an exception
          * then {@code ExecutionException} is thrown with the exception as the {@linkplain
          * Throwable#getCause() cause}. If only cancelled tasks were notified to the {@code
-         * accept} method then {@code CancellationException} is thrown.
+         * handle} method then {@code CancellationException} is thrown.
          *
          * @throws ExecutionException if no tasks completed with a result but a task
          * completed with an exception
          * @throws CancellationException if all tasks were cancelled
-         * @throws IllegalStateException if the accept method was not invoked with a
+         * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
          */
         public V result() throws ExecutionException {
@@ -956,7 +954,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          *
          * <p> When no task completed with a result but a task completed with an
          * exception then the exception supplying function is invoked with the
-         * exception. If only cancelled tasks were notified to the {@code accept}
+         * exception. If only cancelled tasks were notified to the {@code handle}
          * method then the exception supplying function is invoked with a
          * {@code CancellationException}.
          *
@@ -964,7 +962,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @param <X> type of the exception to be thrown
          * @return the result of the first task that completed with a result
          * @throws X if no task completed with a result
-         * @throws IllegalStateException if the accept method was not invoked with a
+         * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
          */
         public <X extends Throwable> V result(Function<Throwable, ? extends X> esf) throws X {
@@ -1032,7 +1030,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @see Future.State#CANCELLED
          */
         @Override
-        public void accept(StructuredExecutor executor, Future<Object> future) {
+        public void handle(StructuredExecutor executor, Future<Object> future) {
             Objects.requireNonNull(executor);
             switch (future.state()) {
                 case RUNNING -> throw new IllegalArgumentException("Task is not completed");
@@ -1055,11 +1053,11 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         /**
          * Returns the exception for the first task that completed with an exception.
          * If no task completed with an exception but cancelled tasks were notified
-         * to the {@code accept} method then a {@code CancellationException} is returned.
+         * to the {@code handle} method then a {@code CancellationException} is returned.
          * If no tasks completed abnormally then an empty {@code Optional} is returned.
          *
          * @return the exception for a task that completed abnormally or an empty
-         * optional if no tasks completed
+         * optional if no tasks completed abnormally
          */
         public Optional<Throwable> exception() {
             Future<Object> f = firstFailed;
@@ -1075,7 +1073,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * exception then {@code ExecutionException} is thrown with the exception of
          * the first task to fail as the {@linkplain Throwable#getCause() cause}.
          * If no task completed with an exception but cancelled tasks were notified
-         * to the {@code accept} method then {@code CancellationException} is thrown.
+         * to the {@code handle} method then {@code CancellationException} is thrown.
          * This method does nothing if no tasks completed abnormally.
          *
          * @throws ExecutionException if a task completed with an exception
@@ -1095,7 +1093,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * a task completed abnormally. If any task completed with an exception then
          * the function is invoked with the exception of the first task to fail.
          * If no task completed with an exception but cancelled tasks were notified to
-         * the {@code accept} method then the function is called with a {@code
+         * the {@code handle} method then the function is called with a {@code
          * CancellationException}. The exception returned by the function is thrown.
          * This method does nothing if no tasks completed abnormally.
          *
