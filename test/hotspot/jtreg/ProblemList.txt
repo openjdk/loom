@@ -208,3 +208,5 @@ vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            827
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
 gtest/GTestWrapper.java                                                       0000000 generic-all
+
+runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
