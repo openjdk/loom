@@ -244,7 +244,7 @@ public class Thread implements Runnable {
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
-    ScopeLocal.Snapshot TWRBindings;
+    ScopeLocal.Snapshot TWRBindings = ScopeLocal.EmptySnapshot.getInstance();
 
     static ScopeLocal.Snapshot scopeLocalBindings() {
         return currentThread().scopeLocalBindings;
@@ -3020,7 +3020,7 @@ public class Thread implements Runnable {
     }
 
     /** The top of this stack of stackable scopes owned by this thread */
-    private volatile StackableScope headStackableScopes;
+    private StackableScope headStackableScopes;
     StackableScope headStackableScopes() {
         return headStackableScopes;
     }

@@ -242,37 +242,12 @@ public final class ScopeLocal<T> {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
-            Throwable ex = null;
-            R result = null;
-            var scope = new StackableScope().push();
-            boolean atTop;
             try {
-                result = op.call();
-            } catch (Throwable e) {
-                ex = e;
+                return StackableScope.call(op);
             } finally {
-                atTop = scope.popForcefully();  // may block
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
-            // re-throw exception if op completed with exception
-            // throw exception if a structure mismatch was detected
-            if (ex != null || !atTop) {
-                if (!atTop) {
-                    var e = new StructureViolationException();
-                    if (ex == null) {
-                        ex = e;
-                    } else {
-                        ex.addSuppressed(e);
-                    }
-                }
-                if (ex instanceof Exception e)
-                    throw e;
-                if (ex instanceof Error e)
-                    throw e;
-                assert false;
-            }
-            return result;
         }
 
         /**
@@ -312,34 +287,11 @@ public final class ScopeLocal<T> {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
-            Throwable ex = null;
-            boolean atTop;
-            var scope = new StackableScope().push();
             try {
-                op.run();
+                StackableScope.run(op);
             } catch (Throwable e) {
-                ex = e;
-            } finally {
-                atTop = scope.popForcefully();  // may block
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
-            }
-            // re-throw exception if op completed with exception
-            // throw exception if a structure mismatch was detected
-            if (ex != null || !atTop) {
-                if (!atTop) {
-                    var e = new StructureViolationException();
-                    if (ex == null) {
-                        ex = e;
-                    } else {
-                        ex.addSuppressed(e);
-                    }
-                }
-                if (ex instanceof RuntimeException e)
-                    throw e;
-                if (ex instanceof Error e)
-                    throw e;
-                assert false;
             }
         }
 
@@ -370,39 +322,65 @@ public final class ScopeLocal<T> {
          */
         public Binder bind() {
             checkNotBound();
-            Cache.invalidate(primaryBits | secondaryBits);
-            Thread currentThread = Thread.currentThread();
-            var prev = TWRBindings();
-            var b = new Snapshot(this, prev, primaryBits);
-            setTWRBindings(b);
-            return new Binder(b, primaryBits | secondaryBits);
+            return new Binder().push(this);
         }
 
         /**
-         * An @AutoCloseable that's used to bind a ScopeLocal in a try-with-resources construct.
+         * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
          */
         static public class Binder implements AutoCloseable {
-            private final Snapshot bindings;
-            private final int bits;
+            private Snapshot bindings;
+            private int bits;
+            private StackableScope scope;
 
-            Binder(Snapshot bindings, int bits) {
-                Objects.requireNonNull(bindings);
-                this.bindings = bindings;
-                this.bits = bits;
+            Binder() {
+            }
+
+            Binder push(Carrier carrier) {
+                // Push a StackableScope first
+                scope = new StackableScope().push();
+
+                // Then push the ScopeLocal bindings
+                var prev = TWRBindings();
+                bits = carrier.primaryBits | carrier.secondaryBits;
+                bindings = new Snapshot(carrier, prev, carrier.primaryBits);
+                Cache.invalidate(bits);
+                setTWRBindings(bindings);
+                return this;
             }
 
             /**
              * Close a scope local binding context.
-             * @throws StructureViolationException if @this isn't the current top binding
+             *
+             * @throws StructureViolationException if {@code this} isn't the current top binding
              */
             public void close() throws StructureViolationException {
+                Throwable ex = null;
+
+                // First, remove the ScopeLocal bindings
                 Cache.invalidate(bits);
-                Thread currentThread = Thread.currentThread();
                 var top = TWRBindings();
                 setTWRBindings(bindings.prev);
                 if (top != bindings) {
+                    // It's all gone wrong
                     Cache.invalidate();
-                    throw new StructureViolationException();
+                    ex = new StructureViolationException();
+                }
+
+                // Second, remove the StackableScope
+                boolean atTop = scope.popForcefully();
+                if (ex != null || !atTop) {
+                    if (!atTop) {
+                        var e = new StructureViolationException();
+                        if (ex == null) {
+                            ex = e;
+                        } else {
+                            ex.addSuppressed(e);
+                        }
+                    }
+                    if (ex instanceof RuntimeException e)
+                        throw e;
+                    assert false;
                 }
             }
         }
@@ -576,11 +554,7 @@ public final class ScopeLocal<T> {
     }
 
     private static Snapshot TWRBindings() {
-        var result = Thread.currentThread().TWRBindings;
-        if (result == null) {
-            setTWRBindings(result = new EmptySnapshot());
-        }
-        return result;
+        return Thread.currentThread().TWRBindings;
     }
 
     private static int nextKey = 0xf0f0_f0f0;
