@@ -24,7 +24,7 @@
 /*
  * @test
  * @summary Test Future's default methods
- * @library ../ExecutorService
+ * @library ../lib
  * @run testng DefaultMethods
  */
 
