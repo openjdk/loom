@@ -812,6 +812,35 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * <p> The {@link #compose(CompletionHandler, CompletionHandler) compose} method may be
      * used to compose more than one completion handler if required.
      *
+     * <p> The following is an example of a completion handler that collects the results
+     * of tasks that complete successfully. It defines a {@code results()} method for the
+     * main task to invoke to retrieve the results.
+     *
+     * <pre>{@code
+     *     class MyHandler<V> implements CompletionHandler<V> {
+     *         private final Queue<V> results = new ConcurrentLinkedQueue<>();
+     *
+     *         @Override
+     *         public void handle(StructuredExecutor executor, Future<V> future) {
+     *             switch (future.state()) {
+     *                 case RUNNING -> throw new IllegalArgumentException();
+     *                 case SUCCESS -> {
+     *                     V result = future.resultNow();
+     *                     results.add(result);
+     *                 }
+     *                 case FAILED, CANCELLED -> {
+     *                     // ignore for now
+     *                 }
+     *             }
+     *         }
+     *
+     *         // Returns a stream of results from tasks that completed successfully.
+     *         public Stream<V> results() {
+     *             return results.stream();
+     *         }
+     *     }
+     * }</pre>
+     *
      * @param <V> the result type
      * @since 99
      */
