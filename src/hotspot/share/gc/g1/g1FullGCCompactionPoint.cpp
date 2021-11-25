@@ -105,22 +105,10 @@ void G1FullGCCompactionPoint::forward(oop object, size_t size) {
   // Store a forwarding pointer if the object should be moved or compacted in place.
   if (cast_from_oop<HeapWord*>(object) != _compaction_top || csize < size) {
     object->forward_to(cast_to_oop(_compaction_top));
+    assert(object->is_forwarded(), "must be forwarded");
     size = csize;
   } else {
-    if (object->forwardee() != NULL) {
-      // Object should not move but mark-word is used so it looks like the
-      // object is forwarded. Need to clear the mark and it's no problem
-      // since it will be restored by preserved marks.
-      object->init_mark();
-    } else {
-      // Make sure object has the correct mark-word set or that it will be
-      // fixed when restoring the preserved marks.
-      assert(object->mark() == markWord::prototype() || // Correct mark
-             object->mark_must_be_preserved(), // Will be restored by PreservedMarksSet
-             "should have correct prototype obj: " PTR_FORMAT " mark: " PTR_FORMAT " prototype: " PTR_FORMAT,
-             p2i(object), object->mark().value(), markWord::prototype().value());
-    }
-    assert(object->forwardee() == NULL, "should be forwarded to NULL");
+    assert(!object->is_forwarded(), "must not be forwarded");
   }
 
   // Update compaction values.
