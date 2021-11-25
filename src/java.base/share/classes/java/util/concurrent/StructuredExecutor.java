@@ -396,7 +396,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * handle} method is invoked if the task completes before the executor is {@link
      * #shutdown() shutdown}. If the executor shuts down at or around the same time that
      * the task completes then the completion handler may or may not be invoked.
-     * The {@link CompletionHandler#compose(CompletionHandler, CompletionHandler) comppose}
+     * The {@link CompletionHandler#compose(CompletionHandler, CompletionHandler) compose}
      * method can be used to compose more than one handler where required. The {@code handle}
      * method is run by the thread when the task completes with a result or exception. If
      * the {@link Future#cancel(boolean) Future.cancel} is used to cancel a task, and before
@@ -784,40 +784,47 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * An operation that is invoked after a task completes. A CompletionHandler is specified
-     * to the {@link #fork(Callable, CompletionHandler) fork} method to execute after a task
-     * completes.
+     * A handler that accepts a StructuredExecutor and a Future object for a completed
+     * task.
      *
-     * <p> A CompletionHandler implements a policy on how tasks that complete normally and
+     * A CompletionHandler is specified to the {@link #fork(Callable, CompletionHandler)
+     * fork} method to execute after the task completes. It defines the {@link
+     * #handle(StructuredExecutor, Future) handle} method to handle the completed task.
+     * The {@code handle} method does not return a result, it is expected to operate via
+     * side-effects.
+     *
+     * <p> A completion handler implements a policy on how tasks that complete normally and
      * abnormally are handled. It may, for example, collect the results of tasks that complete
      * with a result and ignore tasks that fail. It may collect exceptions when tasks fail. It
      * may invoke the {@link #shutdown() shutdown} method to shut down the executor and
      * cause {@link #join() join} to wakeup when some condition arises.
      *
-     * <p> A CompletionHandler will typically define methods to make available results, state
-     * or outcome to code that executes after the {@code join} method. A completion handler
-     * that collects results and ignores tasks that fail may define a method that returns
-     * a possibly empty collection of the results. A completion handler that implements
+     * <p> A completion handler will typically define methods to make available results, state,
+     * or other outcome to code that executes after the {@code join} method. A completion
+     * handler that collects results and ignores tasks that fail may define a method that
+     * returns a possibly-empty collection of results. A completion handler that implements
      * a policy to shut down the executor when a task fails may define a method to retrieve
      * the exception of the first task to fail.
+     *
+     * <p> A completion handler implementation is required to be thread safe. The {@code
+     * handle} method may be invoked by several threads at around the same time.
      *
      * <p> The {@link #compose(CompletionHandler, CompletionHandler) compose} method may be
      * used to compose more than one completion handler if required.
      *
-     * <p> Unless otherwise specified, passing a {@code null} argument a method
-     * in this class will cause a {@link NullPointerException} to be thrown.
-     *
      * @param <V> the result type
      * @since 99
      */
+    @FunctionalInterface
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public interface CompletionHandler<V> {
         /**
-         * Performs an action on a completed task.
+         * Handles a completed task.
          *
          * @param executor the executor
          * @param future the Future for the completed task
          * @throws IllegalArgumentException if the task has not completed
+         * @throws NullPointerException if executor or future is {@code null}
          */
         void handle(StructuredExecutor executor, Future<V> future);
 
