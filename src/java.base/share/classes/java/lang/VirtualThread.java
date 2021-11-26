@@ -39,6 +39,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -205,13 +206,13 @@ class VirtualThread extends Thread {
      * Submits the runContinuation task to the scheduler.
      * In the case of the default scheduler, and the current carrier thread is one
      * of FJP worker threads, then the task is queued to the current thread's queue.
-     * @param {@code signalOnEmpty} to signal when the worker's queue is empty
+     * @param {@code lazySubmit} to lazy submit (don't signal worker) if possible
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation(boolean signalOnEmpty) {
+    private void submitRunContinuation(boolean lazySubmit) {
         try {
-            if (scheduler == DEFAULT_SCHEDULER) {
-                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER, runContinuation, signalOnEmpty);
+            if (lazySubmit && scheduler instanceof ForkJoinPool pool) {
+                ForkJoinPools.externalLazySubmit(pool, ForkJoinTask.adapt(runContinuation));
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -232,7 +233,7 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        submitRunContinuation(true);
+        submitRunContinuation(false);
     }
 
     /**
@@ -240,7 +241,7 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException
      */
     private void lazySubmitRunContinuation() {
-        submitRunContinuation(false);
+        submitRunContinuation(true);
     }
 
     /**
@@ -983,26 +984,26 @@ class VirtualThread extends Thread {
      * Defines static methods to invoke non-public ForkJoinPool methods.
      */
     private static class ForkJoinPools {
-        static final MethodHandle externalExecuteTask;
+        static final MethodHandle externalLazySubmit;
         static {
             try {
                 PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
                     MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
                 @SuppressWarnings("removal")
                 MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                MethodType methodType = MethodType.methodType(void.class, Runnable.class, boolean.class);
-                externalExecuteTask = l.findVirtual(ForkJoinPool.class, "externalExecuteTask", methodType);
+                MethodType methodType = MethodType.methodType(void.class, ForkJoinTask.class);
+                externalLazySubmit = l.findVirtual(ForkJoinPool.class, "externalLazySubmit", methodType);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
         /**
-         * Invokes the non-public ForkJoinPool.externalExecuteTask method to
+         * Invokes the non-public ForkJoinPool.externalLazySubmit method to
          * submit the task to the current carrier thread's work queue.
          */
-        static void externalExecuteTask(ForkJoinPool pool, Runnable task, boolean signalOnEmpty) {
+        static void externalLazySubmit(ForkJoinPool pool, ForkJoinTask<?> task) {
             try {
-                externalExecuteTask.invoke(pool, task, signalOnEmpty);
+                externalLazySubmit.invoke(pool, task);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable e) {

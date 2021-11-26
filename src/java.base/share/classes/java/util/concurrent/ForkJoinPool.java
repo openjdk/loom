@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
-import jdk.internal.misc.VirtualThreads;
 import jdk.internal.vm.SharedThreadContainer;
 
 /**
@@ -2178,19 +2177,16 @@ public class ForkJoinPool extends AbstractExecutorService {
     }
 
     /**
-     * Pushes an external submission to the current carrier thread's work queue if
-     * possible. This method is invoked (reflectively) by the virtual thread
+     * Pushes a possibly-external submission without signalling when the queue
+     * is empty. This method is invoked (reflectively) by the virtual thread
      * implementation.
-     *
-     * @param signalOnEmpty true to signal a worker when the queue is empty
      */
-    private void externalExecuteTask(Runnable task, boolean signalOnEmpty) {
-        var forkJoinTask = new ForkJoinTask.RunnableExecuteAction(task);
-        Thread t = VirtualThreads.currentCarrierThread();
+    private void externalLazySubmit(ForkJoinTask<?> task) {
+        Thread t = Thread.currentThread();
         if (t instanceof ForkJoinWorkerThread wt && wt.pool == this) {
-            wt.workQueue.push(forkJoinTask, this, signalOnEmpty);
+            wt.workQueue.push(task, this, false);
         } else {
-            externalPush(forkJoinTask);
+            externalPush(task);
         }
     }
 
