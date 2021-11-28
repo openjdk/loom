@@ -63,7 +63,7 @@ import jdk.internal.javac.PreviewFeature;
  *
  *         ... process results/exceptions ...
  *
- *     }
+ *     } // close // @highlight substring="close"
  * }
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
  * by the <em>executor owner</em> (the thread that opened the executor), and the {@code close}
@@ -130,7 +130,6 @@ import jdk.internal.javac.PreviewFeature;
  *
  *         executor.join();
  *
- *         // @link substring=".result" target="ShutdownOnSuccess#result" :
  *         String result = handler.result(e -> new WebApplicationException(e));
  *
  *         :

@@ -130,7 +130,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * starting threads. The {@link #ofPlatform()} and {@link #ofVirtual()} methods are
  * used to create builders for platform and virtual threads respectively.
  * The following are examples that use the builder:
- * <pre>{@code
+ * {@snippet :
  *   Runnable runnable = ...
  *
  *   // Start a daemon thread to run a task
@@ -148,7 +148,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  *   // A ThreadFactory that creates virtual threads
  *   ThreadFactory factory = Thread.ofVirtual().factory();
- * }</pre>
+ * }
  *
  * <p> In addition to the builder, {@code Thread} defines (for historical and
  * customization reasons) public constructors for creating platform threads. Most
@@ -554,12 +554,12 @@ public class Thread implements Runnable {
      * As an example consider a method in a class that spins in a loop until
      * some flag is set outside of that method. A call to the {@code onSpinWait}
      * method should be placed inside the spin loop.
-     * <pre>{@code
+     * {@snippet :
      *     class EventHandler {
      *         volatile boolean eventNotificationNotReceived;
      *         void waitForEventAndHandleIt() {
      *             while ( eventNotificationNotReceived ) {
-     *                 java.lang.Thread.onSpinWait();
+     *                 Thread.onSpinWait();
      *             }
      *             readAndProcessEvent();
      *         }
@@ -569,7 +569,7 @@ public class Thread implements Runnable {
      *              . . .
      *         }
      *     }
-     * }</pre>
+     * }
      * <p>
      * The code above would remain correct even if the {@code onSpinWait}
      * method was not called at all. However on some architectures the Java
@@ -742,7 +742,7 @@ public class Thread implements Runnable {
      * that creates platform threads.
      *
      * @apiNote The following are examples using the builder:
-     * <pre>{@code
+     * {@snippet :
      *   // Start a daemon thread to run a task
      *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
      *
@@ -752,7 +752,7 @@ public class Thread implements Runnable {
      *
      *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
      *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
-     * }</pre>
+     * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
@@ -767,13 +767,13 @@ public class Thread implements Runnable {
      * that creates virtual threads.
      *
      * @apiNote The following are examples using the builder:
-     * <pre>{@code
+     * {@snippet :
      *   // Start a virtual thread to run a task.
      *   Thread thread = Thread.ofVirtual().start(runnable);
      *
      *   // A ThreadFactory that creates virtual threads
      *   ThreadFactory factory = Thread.ofVirtual().factory();
-     * }</pre>
+     * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
