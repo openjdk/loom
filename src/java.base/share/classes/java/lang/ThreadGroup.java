@@ -139,7 +139,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
-    @Deprecated(since = "99")
+    @Deprecated(since="99")
     public ThreadGroup(String name) {
         this(Thread.currentThread().getThreadGroup(), name);
     }
@@ -164,7 +164,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
-    @Deprecated(since = "99")
+    @Deprecated(since="99")
     public ThreadGroup(ThreadGroup parent, String name) {
         this(checkParentAccess(parent), parent, name);
     }
