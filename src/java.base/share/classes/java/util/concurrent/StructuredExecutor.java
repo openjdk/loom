@@ -650,7 +650,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * it also throws {@code StructureViolationException} after closing the executor.
      *
      * @throws IllegalStateException if invoked by a thread that is not the owner,
-     * or thrown after closing the executor if the owner did not join the executor
+     * or thrown after closing the executor if the owner did not invoke join after
+     * forking
      */
     @Override
     public void close() {
