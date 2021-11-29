@@ -130,6 +130,7 @@ import jdk.internal.javac.PreviewFeature;
  *
  *         executor.join();
  *
+ *         // @link regex="result(?=\()" target="ShutdownOnSuccess#result" :
  *         String result = handler.result(e -> new WebApplicationException(e));
  *
  *         :
