@@ -679,19 +679,38 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * Test close without join, no threads running.
+     * Test close without join, no threads forked.
      */
     public void testCloseWithoutJoin1() {
-        var executor = StructuredExecutor.open();
-        expectThrows(IllegalStateException.class, executor::close);
+        try (var executor = StructuredExecutor.open()) {
+            // do nothing
+        }
     }
 
     /**
-     * Test close without join, threads running.
+     * Test close without join, threads forked.
      */
     @Test(dataProvider = "factories")
     public void testCloseWithoutJoin2(ThreadFactory factory) {
         try (var executor = StructuredExecutor.open(null, factory)) {
+            Future<String> future = executor.fork(() -> {
+                Thread.sleep(Duration.ofDays(1));
+                return null;
+            });
+            expectThrows(IllegalStateException.class, executor::close);
+            assertTrue(future.isDone() && future.exceptionNow() != null);
+        }
+    }
+
+    /**
+     * Test close with threads forked after join.
+     */
+    @Test(dataProvider = "factories")
+    public void testCloseWithoutJoin3(ThreadFactory factory) throws Exception {
+        try (var executor = StructuredExecutor.open(null, factory)) {
+            executor.fork(() -> "foo");
+            executor.join();
+
             Future<String> future = executor.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;

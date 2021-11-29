@@ -202,8 +202,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     // the set of "tracked" Future objects, created lazily
     private volatile Set<Future<?>> futures;
 
-    // set to true when owner calls join
-    private boolean joinInvoked;
+    // set when owner calls fork, reset when owner calls join
+    private boolean needJoin;
 
     // states: OPEN -> SHUTDOWN -> CLOSED
     private static final int OPEN     = 0;
@@ -331,34 +331,39 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         // create future
         var future = new FutureImpl<V>(this, task, handler);
 
-        // check state before creating thread
-        int s = state;
-        if (s >= SHUTDOWN) {
-            // the executor is closed, shutdown, or in the process of shutting down
-            if (state == CLOSED)
-                throw new IllegalStateException("Executor is closed");
-            future.cancel(false);
-            return future;
+        boolean shutdown = (state >= SHUTDOWN);
+
+        if (!shutdown) {
+            // create thread
+            Thread thread = factory.newThread(future);
+            if (thread == null)
+                throw new RejectedExecutionException();
+
+            // attempt to start the thread
+            try {
+                flock.start(thread);
+            } catch (IllegalStateException e) {
+                // the executor is closed, shutdown, or in the process of shutting down
+                if (flock.isShutdown()) {
+                    shutdown = true;
+                } else {
+                    // scope-locals don't match
+                    throw e;
+                }
+            }
         }
 
-        // create thread
-        Thread thread = factory.newThread(future);
-        if (thread == null)
-            throw new RejectedExecutionException();
-
-        // attempt to start the thread
-        try {
-            flock.start(thread);
-        } catch (IllegalStateException e) {
-            if (flock.isShutdown()) {
-                // the executor is closed, shutdown, or in the process of shutting down
-                if (state == CLOSED)
-                    throw new IllegalStateException("Executor is closed");
-                future.cancel(false);
+        if (shutdown) {
+            if (state == CLOSED) {
+                throw new IllegalStateException("Executor is closed");
             } else {
-                // scope-locals don't match
-                throw e;
+                future.cancel(false);
             }
+        }
+
+        // if owner forks then it will need to join
+        if (Thread.currentThread() == flock.owner() && !needJoin) {
+            needJoin = true;
         }
 
         return future;
@@ -462,7 +467,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         throws InterruptedException, TimeoutException
     {
         ensureOwner();
-        joinInvoked = true;
+        needJoin = false;
         int s = state;
         if (s >= SHUTDOWN) {
             if (s == CLOSED)
@@ -659,8 +664,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             state = CLOSED;
         }
 
-        if (!joinInvoked) {
-            throw new IllegalStateException("Owner did not invoke join or joinUntil");
+        if (needJoin) {
+            throw new IllegalStateException("Owner did not invoke join or joinUntil after fork");
         }
     }
 
