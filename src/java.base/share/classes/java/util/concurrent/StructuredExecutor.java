@@ -68,7 +68,7 @@ import jdk.internal.javac.PreviewFeature;
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
  * by the <em>executor owner</em> (the thread that opened the executor), and the {@code close}
  * method throws an exception after closing if the owner did not invoke the {@code join}
- * method.
+ * method after forking.
  *
  * <p> StructuredExecutor defines the {@link #shutdown() shutdown} method to shut down an
  * executor without closing it. Shutdown is useful for cases where a task completes with
@@ -450,15 +450,20 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * in the executor.
      *
      * @param task the task to run
-     * @throws IllegalStateException if this executor is closed, the current
+     * @throws RejectedExecutionException if this executor is closed, the current
      * scope-local bindings are not the same as when the executor was created,
-     * or the caller thread is not the owner or a thread contained in the executor
-     * @throws RejectedExecutionException if the thread factory rejected creating a
-     * thread to run the task
+     * the caller thread is not the owner or a thread contained in the executor,
+     * or if the thread factory rejected creating a thread to run the task
      */
     @Override
     public void execute(Runnable task) {
-        spawn(Executors.callable(task), null);
+        try {
+            spawn(Executors.callable(task), null);
+        } catch (RejectedExecutionException e) {
+            throw e;
+        } catch (IllegalStateException e) {
+            throw new RejectedExecutionException(e);
+        }
     }
 
     /**

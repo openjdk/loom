@@ -339,6 +339,17 @@ public class StructuredExecutorTest {
     }
 
     /**
+     * Test execute throws when executor is closed.
+     */
+    public void testExecuteAfterClose() throws Exception {
+        try (var executor = StructuredExecutor.open()) {
+            executor.join();
+            executor.close();
+            expectThrows(RejectedExecutionException.class, () -> executor.execute(() -> { }));
+        }
+    }
+
+    /**
      * Test join with no threads.
      */
     public void testJoinWithNoThreads() throws Exception {
