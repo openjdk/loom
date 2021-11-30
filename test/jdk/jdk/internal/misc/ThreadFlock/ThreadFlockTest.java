@@ -356,6 +356,26 @@ public class ThreadFlockTest {
     }
 
     /**
+     * Test that start inherits scope-local bindings.
+     */
+    @Test(dataProvider = "factories")
+    public void testStartInheritsScopeLocals(ThreadFactory factory) throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+            var result = new AtomicReference<String>();
+            try (var flock = ThreadFlock.open(null)) {
+                Thread thread = factory.newThread(() -> {
+                    // child
+                    result.set(NAME.get());
+                });
+                flock.start(thread);
+            }
+            return result.get();
+        });
+        assertEquals(value, "fred");
+    }
+
+    /**
      * Test awaitAll with no threads.
      */
     public void testAwaitAllWithNoThreads() throws Exception {
@@ -1051,6 +1071,21 @@ public class ThreadFlockTest {
                         }
                     });
                 }
+            });
+        }
+    }
+
+    /**
+     * Test that start throws StructureViolationException if scope-local bindings
+     * have changed.
+     */
+    @Test(dataProvider = "factories")
+    public void testStructureViolation6(ThreadFactory factory) throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        try (var flock = ThreadFlock.open(null)) {
+            ScopeLocal.where(NAME, "fred").run(() -> {
+                Thread thread = factory.newThread(() -> { });
+                expectThrows(StructureViolationException.class, () -> flock.start(thread));
             });
         }
     }
