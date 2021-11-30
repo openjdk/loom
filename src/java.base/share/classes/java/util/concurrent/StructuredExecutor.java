@@ -886,6 +886,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @param <V> the result type
          * @return a composed CompletionHandler that performs in sequence the first
          * and second handlers
+         * @throws NullPointerException if first or second is {@code null}
          */
         static <V> CompletionHandler<V> compose(CompletionHandler<? extends V> first,
                                                 CompletionHandler<? extends V> second) {
@@ -909,7 +910,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * is intended for cases where the result of any task will do ("invoke any") and
      * where the results of other unfinished tasks are no longer needed.
      *
-     * <p> Unless otherwise specified, passing a {@code null} argument a method
+     * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @param <V> the result type
@@ -1045,7 +1046,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * intended for cases where the results for all tasks are required ("invoke all");
      * if any task fails then the results of other unfinished tasks are no longer needed.
      *
-     * <p> Unless otherwise specified, passing a {@code null} argument a method
+     * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @since 99
