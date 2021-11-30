@@ -218,21 +218,21 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Throws IllegalCallerThreadException if the current thread is not the owner.
+     * Throws WrongThreadException if the current thread is not the owner.
      */
     private void ensureOwner() {
         if (Thread.currentThread() != flock.owner())
-            throw new IllegalCallerThreadException("Current thread not owner");
+            throw new WrongThreadException("Current thread not owner");
     }
 
     /**
-     * Throws IllegalCallerThreadException if the current thread is not the owner
+     * Throws WrongThreadException if the current thread is not the owner
      * or a thread contained in the tree.
      */
     private void ensureOwnerOrContainsThread() {
         Thread currentThread = Thread.currentThread();
         if (currentThread != flock.owner() && !flock.containsThread(currentThread))
-            throw new IllegalCallerThreadException("Current thread not owner or thread in executor");
+            throw new WrongThreadException("Current thread not owner or thread in executor");
     }
 
     /**
@@ -325,7 +325,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * Starts a new thread to run the given task. If handler is non-null then it is
      * invoked if the task completes before the executor is shutdown.
      * @throws IllegalStateException
-     * @throws IllegalCallerThreadException
+     * @throws WrongThreadException
      * @throws StructureViolationException
      * @throws RejectedExecutionException
      */
@@ -386,8 +386,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * @param <V> the task return type
      * @return a future
      * @throws IllegalStateException if this executor is closed
-     * @throws IllegalCallerThreadException if the current thread is not the owner or a
-     * thread contained in the executor
+     * @throws WrongThreadException if the current thread is not the owner or a thread
+     * contained in the executor
      * @throws StructureViolationException if the current scope-local bindings are not
      * the same as when the executor was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
@@ -427,8 +427,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * @param <V> the task return type
      * @return a future
      * @throws IllegalStateException if this executor is closed
-     * @throws IllegalCallerThreadException if the caller thread is not the owner or a
-     * thread contained in the executor
+     * @throws WrongThreadException if the current thread is not the owner or a thread
+     * contained in the executor
      * @throws StructureViolationException if the current scope-local bindings are not
      * the same as when the executor was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
@@ -452,7 +452,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * in the executor.
      *
      * @param task the task to run
-     * @throws RejectedExecutionException if this executor is closed, the caller thread
+     * @throws RejectedExecutionException if this executor is closed, the current thread
      * is not the owner or a thread contained in the executor, the current scope-local
      * bindings are not the same as when the executor was created, or if the thread
      * factory rejected creating a thread to run the task
@@ -462,7 +462,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         try {
             spawn(Executors.callable(task), null);
         } catch (IllegalStateException |            // executor closed
-                IllegalCallerThreadException |      // called from wrong thread
+                WrongThreadException |              // called from wrong thread
                 StructureViolationException e) {    // scope-local bindings changed
             throw new RejectedExecutionException(e);
         }
@@ -501,7 +501,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * <p> This method may only be invoked by the executor owner.
      *
      * @throws IllegalStateException if this executor is closed
-     * @throws IllegalCallerThreadException if the caller thread is not the owner
+     * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      */
     public void join() throws InterruptedException {
@@ -523,7 +523,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      *
      * @param deadline the deadline
      * @throws IllegalStateException if this executor is closed
-     * @throws IllegalCallerThreadException if the caller thread is not the owner
+     * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      * @throws TimeoutException if the deadline is reached while waiting
      */
@@ -626,7 +626,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * in the executor.
      *
      * @throws IllegalStateException if this executor is closed
-     * @throws IllegalCallerThreadException if the caller thread is not the owner or
+     * @throws WrongThreadException if the current thread is not the owner or
      * a thread contained in the executor
      */
     public void shutdown() {
@@ -659,7 +659,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      *
      * @throws IllegalStateException thrown after closing the executor if the owner
      * did not invoke join after forking
-     * @throws IllegalCallerThreadException if the caller thread is not the owner
+     * @throws WrongThreadException if the current thread is not the owner
      * @throws StructureViolationException if a structure violation was detected
      */
     @Override

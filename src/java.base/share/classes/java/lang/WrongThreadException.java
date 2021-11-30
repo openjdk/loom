@@ -26,51 +26,48 @@
 package java.lang;
 
 /**
- * Thrown to indicate that a method has been called by an inappropriate caller
- * thread.
+ * Thrown to indicate that a method has been called on the wrong thread.
  *
  * @since 99
  */
-public class IllegalCallerThreadException extends RuntimeException {
+public class WrongThreadException extends RuntimeException {
     @java.io.Serial
     static final long serialVersionUID = 4676498871006316905L;
 
     /**
-     * Constructs an IllegalCallerException with no detail message.
+     * Constructs a WrongThreadException with no detail message.
      */
-    public IllegalCallerThreadException() {
+    public WrongThreadException() {
         super();
     }
 
     /**
-     * Constructs an IllegalCallerThreadException with the specified detail
-     * message.
+     * Constructs a WrongThreadException with the given detail message.
      *
      * @param s the String that contains a detailed message, can be null
      */
-    public IllegalCallerThreadException(String s) {
+    public WrongThreadException(String s) {
         super(s);
     }
 
     /**
-     * Constructs a new exception with the specified detail message and
-     * cause.
+     * Constructs a WrongThreadException with the given detail message and cause.
      *
      * @param  message the detail message, can be null
      * @param  cause the cause, can be null
      */
-    public IllegalCallerThreadException(String message, Throwable cause) {
+    public WrongThreadException(String message, Throwable cause) {
         super(message, cause);
     }
 
     /**
-     * Constructs a new exception with the specified cause and a detail
+     * Constructs a WrongThreadException with the given cause and a detail
      * message of {@code (cause==null ? null : cause.toString())} (which
      * typically contains the class and detail message of {@code cause}).
      *
      * @param  cause the cause, can be null
      */
-    public IllegalCallerThreadException(Throwable cause) {
+    public WrongThreadException(Throwable cause) {
         super(cause);
     }
 }

@@ -338,7 +338,7 @@ class ThreadPerTaskExecutor implements ExecutorService {
             if (Thread.currentThread() != thread) {
                 // should not happen except where something casts this object
                 // to a Runnable and invokes the run method.
-                throw new IllegalCallerThreadException();
+                throw new WrongThreadException();
             }
             try {
                 T result = task.call();

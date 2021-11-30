@@ -130,7 +130,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+            assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // thread in executor2 can fork thread in executor1
             Future<Void> future2 = executor2.fork(() -> {
@@ -147,7 +147,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future::get);
-                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+                assertTrue(ex.getCause() instanceof WrongThreadException);
             }
 
             executor2.join();
@@ -426,7 +426,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+            assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // random thread cannot join
             try (var pool = Executors.newCachedThreadPool()) {
@@ -435,7 +435,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+                assertTrue(ex.getCause() instanceof WrongThreadException);
             }
 
             executor.join();
@@ -745,7 +745,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 Throwable ex = expectThrows(ExecutionException.class, future::get);
-                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+                assertTrue(ex.getCause() instanceof WrongThreadException);
             }
 
             // thread in executor1 cannot shutdown executor2
@@ -754,7 +754,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+            assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // thread in executor2 can shutdown executor1
             Future<Void> future2 = executor2.fork(() -> {
@@ -822,7 +822,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+            assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // random thread cannot close executor
             try (var pool = Executors.newCachedThreadPool()) {
@@ -831,7 +831,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+                assertTrue(ex.getCause() instanceof WrongThreadException);
             }
 
             executor.join();

@@ -351,7 +351,7 @@ public class ThreadFlockTest {
         if (flock.containsThread(thread)) {
             assertTrue(cause == null);
         } else {
-            assertTrue(cause instanceof IllegalCallerThreadException);
+            assertTrue(cause instanceof WrongThreadException);
         }
     }
 
@@ -664,7 +664,7 @@ public class ThreadFlockTest {
         });
         thread.join();
         Throwable cause = exception.get();
-        assertTrue(cause instanceof IllegalCallerThreadException);
+        assertTrue(cause instanceof WrongThreadException);
     }
 
     /**
@@ -764,7 +764,7 @@ public class ThreadFlockTest {
         if (flock.containsThread(thread)) {
             assertTrue(cause == null);
         } else {
-            assertTrue(cause instanceof IllegalCallerThreadException);
+            assertTrue(cause instanceof WrongThreadException);
         }
     }
 
@@ -847,7 +847,7 @@ public class ThreadFlockTest {
         });
         thread.join();
         Throwable cause = exception.get();
-        assertTrue(cause instanceof IllegalCallerThreadException);
+        assertTrue(cause instanceof WrongThreadException);
     }
 
     /**
@@ -940,7 +940,7 @@ public class ThreadFlockTest {
         if (flock.containsThread(thread)) {
             assertTrue(cause == null);
         } else {
-            assertTrue(cause instanceof IllegalCallerThreadException);
+            assertTrue(cause instanceof WrongThreadException);
         }
     }
 
