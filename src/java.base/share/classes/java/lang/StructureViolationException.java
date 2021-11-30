@@ -26,15 +26,17 @@ package java.lang;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.StructuredExecutor;
+import jdk.internal.javac.PreviewFeature;
 
 /**
- * Thrown when a structural violation is detected.
+ * Thrown when a structure violation is detected.
  *
  * @see StructuredExecutor#close()
  * @see ScopeLocal.Carrier#run(Runnable) 
  * @see ScopeLocal.Carrier#call(Callable) 
  * @since 99
  */
+@PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public class StructureViolationException extends RuntimeException {
     @java.io.Serial
     private static final long serialVersionUID = -7705327650798235468L;
