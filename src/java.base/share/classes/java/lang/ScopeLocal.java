@@ -30,6 +30,9 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
@@ -87,6 +90,8 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 @jdk.internal.javac.PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
     private final @Stable int hash;
+
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     public final int hashCode() { return hash; }
 
@@ -320,7 +325,7 @@ public final class ScopeLocal<T> {
          * Create a try-with-resources ScopeLocal binding
          * @return a Binder
          */
-        public Binder bind() {
+        public ScopeLocalBinder bind() {
             checkNotBound();
             return new Binder().push(this);
         }
@@ -328,25 +333,31 @@ public final class ScopeLocal<T> {
         /**
          * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
          */
-        static public class Binder implements AutoCloseable {
-            private Snapshot bindings;
+        static class Binder extends StackableScope implements ScopeLocalBinder {
             private int bits;
-            private StackableScope scope;
+            private Snapshot snapshot;
 
             Binder() {
             }
 
-            Binder push(Carrier carrier) {
-                // Push a StackableScope first
-                scope = new StackableScope().push();
+            static Snapshot innermostSnapshot() {
+                StackableScope headScope = JLA.headStackableScope(Thread.currentThread());
+                if (headScope == null) {
+                    return EmptySnapshot.SINGLETON;
+                }
+                Binder head = headScope.innermostScope(Binder.class);
+                if (head == null) {
+                    return EmptySnapshot.SINGLETON;
+                }
+                return head.snapshot;
+            }
 
-                // Then push the ScopeLocal bindings
-                var prev = TWRBindings();
-                bits = carrier.primaryBits | carrier.secondaryBits;
-                bindings = new Snapshot(carrier, prev, carrier.primaryBits);
+            Binder push(Carrier carrier) {
+                Snapshot prev = innermostSnapshot();
+                Snapshot newSnapshot = new Snapshot(carrier, prev, carrier.primaryBits);
+                this.snapshot = newSnapshot;
                 Cache.invalidate(bits);
-                setTWRBindings(bindings);
-                return this;
+                return (Binder)super.push();
             }
 
             /**
@@ -354,34 +365,21 @@ public final class ScopeLocal<T> {
              *
              * @throws StructureViolationException if {@code this} isn't the current top binding
              */
-            public void close() throws StructureViolationException {
-                Throwable ex = null;
-
-                // First, remove the ScopeLocal bindings
+            public void close() throws RuntimeException {
                 Cache.invalidate(bits);
-                var top = TWRBindings();
-                setTWRBindings(bindings.prev);
-                if (top != bindings) {
-                    // It's all gone wrong
-                    Cache.invalidate();
-                    ex = new StructureViolationException();
+                if (! popForcefully()) {
+                    throw new StructureViolationException();
                 }
+            }
 
-                // Second, remove the StackableScope
-                boolean atTop = scope.popForcefully();
-                if (ex != null || !atTop) {
-                    if (!atTop) {
-                        var e = new StructureViolationException();
-                        if (ex == null) {
-                            ex = e;
-                        } else {
-                            ex.addSuppressed(e);
-                        }
-                    }
-                    if (ex instanceof RuntimeException e)
-                        throw e;
-                    assert false;
-                }
+            protected boolean tryClose() {
+                Cache.invalidate(bits);
+                snapshot = null;
+                return true;
+            }
+
+            static Object find(ScopeLocal<?> key) {
+                return innermostSnapshot().find(key);
             }
         }
     }
@@ -495,7 +493,7 @@ public final class ScopeLocal<T> {
         if (value != Snapshot.NIL) {
             return value;
         }
-        return TWRBindings().find(this);
+        return Carrier.Binder.find(this);
     }
 
     /**

@@ -267,7 +267,11 @@ public class StackableScope {
      * Returns the scope of the given type that encloses this scope.
      */
     public <T extends StackableScope> T enclosingScope(Class<T> type) {
-        StackableScope current = enclosingScope();
+        return enclosingScope().innermostScope(type);
+    }
+
+    public <T extends StackableScope> T innermostScope(Class<T> type) {
+        StackableScope current = this;
         while (current != null) {
             if (type.isInstance(current)) {
                 @SuppressWarnings("unchecked")
@@ -278,7 +282,6 @@ public class StackableScope {
         }
         return null;
     }
-
     /**
      * Returns the scope that directly encloses this scope, null if none.
      */
