@@ -209,6 +209,8 @@ vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java              
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
+vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_cl/TestDescription.java 8277989 generic-all
+
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
 runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
