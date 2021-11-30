@@ -129,7 +129,7 @@ public class CustomScheduler {
     }
 
     /**
-     * Test running task on a virtual thread, should thrown IllegalCallerException.
+     * Test running task on a virtual thread, should thrown IllegalCallerThreadException.
      */
     @Test
     public void testBadCarrier() {
@@ -147,7 +147,7 @@ public class CustomScheduler {
             } catch (InterruptedException e) {
                 assertTrue(false);
             }
-            assertTrue(exc.get() instanceof IllegalCallerException);
+            assertTrue(exc.get() instanceof IllegalCallerThreadException);
         };
 
         TestHelper.virtualThreadBuilder(scheduler).start(LockSupport::park);
