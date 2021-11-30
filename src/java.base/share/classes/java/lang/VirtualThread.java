@@ -170,7 +170,7 @@ class VirtualThread extends Thread {
     private void runContinuation() {
         // the carrier thread should be a platform thread
         if (Thread.currentThread().isVirtual()) {
-            throw new IllegalCallerException();
+            throw new IllegalCallerThreadException();
         }
 
         // set state to RUNNING

@@ -31,7 +31,7 @@ import jdk.internal.javac.PreviewFeature;
 /**
  * Thrown when a structure violation is detected.
  *
- * @see StructuredExecutor#close()
+ * @see StructuredExecutor
  * @see ScopeLocal.Carrier#run(Runnable) 
  * @see ScopeLocal.Carrier#call(Callable) 
  * @since 99

@@ -253,7 +253,7 @@ public class Thread implements Runnable {
         Object bindings = container.scopeLocalBindings();
         if (bindings != null) {
             if (Thread.currentThread().scopeLocalBindings != bindings) {
-                throw new IllegalStateException("Scope local bindings have changed");
+                throw new StructureViolationException("Scope local bindings have changed");
             }
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
         }

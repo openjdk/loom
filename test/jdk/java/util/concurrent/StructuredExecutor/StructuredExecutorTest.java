@@ -130,7 +130,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalStateException);
+            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
 
             // thread in executor2 can fork thread in executor1
             Future<Void> future2 = executor2.fork(() -> {
@@ -147,7 +147,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future::get);
-                assertTrue(ex.getCause() instanceof IllegalStateException);
+                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
             }
 
             executor2.join();
@@ -292,6 +292,48 @@ public class StructuredExecutorTest {
     }
 
     /**
+     * Test that fork inherits scope-local bindings.
+     */
+    public void testForkInheritsScopeLocals1() throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+            try (var executor = StructuredExecutor.open()) {
+                Future<String> future = executor.fork(() -> {
+                    // child
+                    return NAME.get();
+                });
+                executor.join();
+                return future.resultNow();
+            }
+        });
+        assertEquals(value, "fred");
+    }
+
+    /**
+     * Test that fork inherits scope-local bindings.
+     */
+    public void testForkInheritsScopeLocals2() throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+            try (var executor1 = StructuredExecutor.open()) {
+                Future<String> future1 = executor1.fork(() -> {
+                    try (var executor2 = StructuredExecutor.open()) {
+                        Future<String> future2 = executor2.fork(() -> {
+                            // grandchild
+                            return NAME.get();
+                        });
+                        executor2.join();
+                        return future2.resultNow();
+                    }
+                });
+                executor1.join();
+                return future1.resultNow();
+            }
+        });
+        assertEquals(value, "fred");
+    }
+
+    /**
      * Test that each execute creates a thread.
      */
     @Test(dataProvider = "factories")
@@ -384,7 +426,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalStateException);
+            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
 
             // random thread cannot join
             try (var pool = Executors.newCachedThreadPool()) {
@@ -393,7 +435,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof IllegalStateException);
+                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
             }
 
             executor.join();
@@ -690,6 +732,44 @@ public class StructuredExecutorTest {
     }
 
     /**
+     * Test shutdown is confined to threads in the executor "tree".
+     */
+    public void testShutdownConfined() throws Exception {
+        try (var executor1 = StructuredExecutor.open();
+             var executor2 = StructuredExecutor.open()) {
+
+            // random thread cannot shutdown
+            try (var pool = Executors.newCachedThreadPool()) {
+                Future<Void> future = pool.submit(() -> {
+                    executor1.shutdown();
+                    return null;
+                });
+                Throwable ex = expectThrows(ExecutionException.class, future::get);
+                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+            }
+
+            // thread in executor1 cannot shutdown executor2
+            Future<Void> future1 = executor1.fork(() -> {
+                executor2.shutdown();
+                return null;
+            });
+            Throwable ex = expectThrows(ExecutionException.class, future1::get);
+            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
+
+            // thread in executor2 can shutdown executor1
+            Future<Void> future2 = executor2.fork(() -> {
+                executor1.shutdown();
+                return null;
+            });
+            future2.get();
+            assertTrue(future2.resultNow() == null);
+
+            executor2.join();
+            executor1.join();
+        }
+    }
+
+    /**
      * Test close without join, no threads forked.
      */
     public void testCloseWithoutJoin1() {
@@ -742,7 +822,7 @@ public class StructuredExecutorTest {
                 return null;
             });
             Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof IllegalStateException);
+            assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
 
             // random thread cannot close executor
             try (var pool = Executors.newCachedThreadPool()) {
@@ -751,7 +831,7 @@ public class StructuredExecutorTest {
                     return null;
                 });
                 ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof IllegalStateException);
+                assertTrue(ex.getCause() instanceof IllegalCallerThreadException);
             }
 
             executor.join();
@@ -891,6 +971,20 @@ public class StructuredExecutorTest {
             if (executor != null) {
                 executor.close();
             }
+        }
+    }
+
+    /**
+     * Test that fork throws StructureViolationException if scope-local bindings
+     * have changed.
+     */
+    public void testStructureViolation3() throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        try (var executor = StructuredExecutor.open()) {
+            ScopeLocal.where(NAME, "fred").run(() -> {
+                expectThrows(StructureViolationException.class,
+                             () -> executor.fork(() -> "foo"));
+            });
         }
     }
 
