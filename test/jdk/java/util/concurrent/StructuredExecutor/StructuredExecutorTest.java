@@ -984,6 +984,8 @@ public class StructuredExecutorTest {
             ScopeLocal.where(NAME, "fred").run(() -> {
                 expectThrows(StructureViolationException.class,
                              () -> executor.fork(() -> "foo"));
+                expectThrows(RejectedExecutionException.class,
+                             () -> executor.execute(() -> { }));
             });
         }
     }
