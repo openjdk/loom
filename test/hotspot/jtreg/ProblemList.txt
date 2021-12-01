@@ -189,7 +189,7 @@ compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              82
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
-# Needs --enable-preview
+# This class should be shared but isn't: RedefineRunningMethods
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
 # SA needs update
