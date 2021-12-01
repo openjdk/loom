@@ -201,10 +201,6 @@ resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
 
-# Needs --enable-preview
-vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java 0000000 generic-all
-vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java                  0000000 generic-all
-
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
