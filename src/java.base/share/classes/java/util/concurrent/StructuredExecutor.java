@@ -406,14 +406,15 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      *
      * <p> The completion handler's {@link CompletionHandler#handle(StructuredExecutor, Future)
      * handle} method is invoked if the task completes before the executor is {@link
-     * #shutdown() shutdown}. If the executor shuts down at or around the same time that
-     * the task completes then the completion handler may or may not be invoked.
+     * #shutdown() shutdown}. The {@code handle} method is run by the thread when the task
+     * completes with a result or exception. If the {@link Future#cancel(boolean) Future.cancel}
+     * method is used to cancel a task, before the executor is shutdown, then the {@code handle}
+     * method is run by the thread that invokes {@code cancel}. If the executor shuts down at
+     * or around the same time that the task completes or is cancelled then the completion
+     * handler may or may not be invoked.
+     *
      * The {@link CompletionHandler#compose(CompletionHandler, CompletionHandler) compose}
-     * method can be used to compose more than one handler where required. The {@code handle}
-     * method is run by the thread when the task completes with a result or exception. If
-     * the {@link Future#cancel(boolean) Future.cancel} is used to cancel a task, and before
-     * the executor is shutdown, then the {@code handle} method is run by the thread that
-     * invokes {@code cancel}.
+     * method can be used to compose more than one handler where required.
      *
      * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
      * shutting down) then this method returns a Future representing a {@link
