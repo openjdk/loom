@@ -182,10 +182,12 @@ java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
 java/security/AccessController/DoPrivAccompliceTest.java
+java/security/AccessController/LimitedDoPrivileged.java
 java/security/Policy/SignedJar/SignedJarTest.java
 java/security/Provider/SecurityProviderModularTest.java
 javax/security/auth/login/modules/JaasModularClientTest.java
 javax/security/auth/login/modules/JaasModularDefaultHandlerTest.java
+sun/security/ssl/CertPathRestrictions/TLSRestrictions.java
 sun/security/tools/jarsigner/multiRelease/MVJarSigningTest.java
 java/io/FilePermission/ReadFileOnPath.java
 java/nio/file/spi/SetDefaultProvider.java
@@ -215,6 +217,7 @@ java/io/Serializable/class/NonSerializableTest.java
 java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
+
 ####
 # No expected StackOverflow
 
@@ -227,6 +230,21 @@ java/lang/invoke/condy/CondyNestedResolutionTest.java
 # Test memory consumption changed a little bit
 java/lang/RuntimeTests/exec/LotsOfOutput.java
 
+
+####
+# Not supported functionality
+# getCurrentThreadCpuTime()
+sun/security/provider/Signature/TestDSATimingAttack.java
+sun/security/ec/TestECDSATimingAttack.java
+
+####
+# Legacy socket I/O is interruptible in the context of virtual threads
+# TBD Might be tests can fixed
+
+java/net/DatagramSocket/InterruptibleDatagramSocket.java
+java/net/Socket/Timeouts.java
+java/nio/channels/DatagramChannel/InterruptibleOrNot.java
+java/nio/channels/SocketChannel/ShortWrite.java
 
 ####
 # JDI tests, should be re-reviewed when JVMTI is synced with JDI
