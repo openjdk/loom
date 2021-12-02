@@ -232,12 +232,6 @@ java/lang/RuntimeTests/exec/LotsOfOutput.java
 
 
 ####
-# Not supported functionality
-# getCurrentThreadCpuTime()
-sun/security/provider/Signature/TestDSATimingAttack.java
-sun/security/ec/TestECDSATimingAttack.java
-
-####
 # Legacy socket I/O is interruptible in the context of virtual threads
 # TBD Might be tests can fixed
 
