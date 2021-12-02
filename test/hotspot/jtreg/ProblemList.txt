@@ -211,3 +211,5 @@ vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
 runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
+
+gc/metaspace/TestPerfCountersAndMemoryPools.java                              8278109 generic-all
