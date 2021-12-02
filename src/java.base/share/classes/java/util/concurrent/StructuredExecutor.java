@@ -380,7 +380,10 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * Future.State#CANCELLED cancelled} task that was not run.
      *
      * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor.
+     * in the executor. The {@link Future#cancel(boolean) cancel} method of the returned
+     * {@code Future} object is also restricted to the executor owner or threads contained
+     * in the executor; {@link WrongThreadException} is thrown if {@code cancel} is invoked
+     * from another thread.
      *
      * @param task the task to run
      * @param <V> the task return type
@@ -421,7 +424,10 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * Future.State#CANCELLED cancelled} task that was not run.
      *
      * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor.
+     * in the executor. The {@link Future#cancel(boolean) cancel} method of the returned
+     * {@code Future} object is also restricted to the executor owner or threads contained
+     * in the executor; {@link WrongThreadException} is thrown if {@code cancel} is invoked
+     * from another thread.
      *
      * @param task the task to run
      * @param handler the completion handler to run when the task completes
@@ -705,7 +711,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * The blocking get methods register the Future with the executor so that they
      * are cancelled when the executor shuts down.
      */
-    private class FutureImpl<V> extends FutureTask<V> {
+    private static class FutureImpl<V> extends FutureTask<V> {
         private final StructuredExecutor executor;
         private final CompletionHandler<? super V> handler;
 
@@ -748,6 +754,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
+            executor.ensureOwnerOrContainsThread();
             cancelIfShutdown();
             return super.cancel(mayInterruptIfRunning);
         }

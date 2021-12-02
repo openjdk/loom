@@ -120,7 +120,8 @@ public class StructuredExecutorTest {
     /**
      * Test fork is confined to threads in the executor "tree".
      */
-    public void testForkConfined() throws Exception {
+    @Test(dataProvider = "factories")
+    public void testForkConfined(ThreadFactory factory) throws Exception {
         try (var executor1 = StructuredExecutor.open();
              var executor2 = StructuredExecutor.open()) {
 
@@ -141,7 +142,7 @@ public class StructuredExecutorTest {
             assertTrue(future2.resultNow() == null);
 
             // random thread cannot fork
-            try (var pool = Executors.newCachedThreadPool()) {
+            try (var pool = Executors.newCachedThreadPool(factory)) {
                 Future<Void> future = pool.submit(() -> {
                     executor1.fork(() -> null);
                     return null;
@@ -418,7 +419,8 @@ public class StructuredExecutorTest {
     /**
      * Test join is owner confined.
      */
-    public void testJoinConfined() throws Exception {
+    @Test(dataProvider = "factories")
+    public void testJoinConfined(ThreadFactory factory) throws Exception {
         try (var executor = StructuredExecutor.open()) {
             // attempt to join on thread in executor
             Future<Void> future1 = executor.fork(() -> {
@@ -429,7 +431,7 @@ public class StructuredExecutorTest {
             assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // random thread cannot join
-            try (var pool = Executors.newCachedThreadPool()) {
+            try (var pool = Executors.newCachedThreadPool(factory)) {
                 Future<Void> future2 = pool.submit(() -> {
                     executor.join();
                     return null;
@@ -734,12 +736,13 @@ public class StructuredExecutorTest {
     /**
      * Test shutdown is confined to threads in the executor "tree".
      */
-    public void testShutdownConfined() throws Exception {
+    @Test(dataProvider = "factories")
+    public void testShutdownConfined(ThreadFactory factory) throws Exception {
         try (var executor1 = StructuredExecutor.open();
              var executor2 = StructuredExecutor.open()) {
 
             // random thread cannot shutdown
-            try (var pool = Executors.newCachedThreadPool()) {
+            try (var pool = Executors.newCachedThreadPool(factory)) {
                 Future<Void> future = pool.submit(() -> {
                     executor1.shutdown();
                     return null;
@@ -814,7 +817,8 @@ public class StructuredExecutorTest {
     /**
      * Test close is owner confined.
      */
-    public void testCloseConfined() throws Exception {
+    @Test(dataProvider = "factories")
+    public void testCloseConfined(ThreadFactory factory) throws Exception {
         try (var executor = StructuredExecutor.open()) {
             // attempt to close on thread in executor
             Future<Void> future1 = executor.fork(() -> {
@@ -825,7 +829,7 @@ public class StructuredExecutorTest {
             assertTrue(ex.getCause() instanceof WrongThreadException);
 
             // random thread cannot close executor
-            try (var pool = Executors.newCachedThreadPool()) {
+            try (var pool = Executors.newCachedThreadPool(factory)) {
                 Future<Void> future2 = pool.submit(() -> {
                     executor.close();
                     return null;
@@ -1090,6 +1094,33 @@ public class StructuredExecutorTest {
             waiter.join();
             assertTrue(waitDone.get());
 
+            executor.join();
+        }
+    }
+
+    /**
+     * Test Future::cancel throws if invoked by a thread that is not in the tree.
+     * @throws Exception
+     */
+    @Test(dataProvider = "factories")
+    public void testFutureCancelConfined(ThreadFactory factory) throws Exception {
+        try (var executor = StructuredExecutor.open()) {
+            Future<String> future1 = executor.fork(() -> {
+                Thread.sleep(Duration.ofDays(1));
+                return "foo";
+            });
+
+            // random thread cannot cancel
+            try (var pool = Executors.newCachedThreadPool(factory)) {
+                Future<Void> future2 = pool.submit(() -> {
+                    future1.cancel(true);
+                    return null;
+                });
+                Throwable ex = expectThrows(ExecutionException.class, future2::get);
+                assertTrue(ex.getCause() instanceof WrongThreadException);
+            } finally {
+                future1.cancel(true);
+            }
             executor.join();
         }
     }
