@@ -181,15 +181,15 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 compiler/whitebox/ForceNMethodSweepTest.java                                  8265181 generic-all
 
-# Sets SegmentedCodeCache with -Xint
 compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      8276711 generic-all
 compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           8276711 generic-all
 compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              8276711 generic-all
+compiler/codecache/stress/UnexpectedDeoptimizationAllTest.java                8278093 generic-all
 
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
-# Needs --enable-preview
+# This class should be shared but isn't: RedefineRunningMethods
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java            0000000 generic-all
 
 # SA needs update
@@ -201,15 +201,12 @@ resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all
 
-# Needs --enable-preview
-vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq001/TestDescription.java 0000000 generic-all
-vmTestbase/nsk/jvmti/GetThreadInfo/thrinfo001/TestDescription.java                  0000000 generic-all
-
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
 vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_cl/TestDescription.java 8277989 generic-all
+vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_class/TestDescription.java 8277989 generic-all
 
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
