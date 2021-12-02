@@ -548,6 +548,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *             the thread group. It was inherently unsafe.
      */
     @Deprecated(since="1.2", forRemoval=true)
+    @SuppressWarnings("removal")
     public final void stop() {
         throw new UnsupportedOperationException();
     }
