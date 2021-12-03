@@ -168,12 +168,12 @@ public interface Future<V> {
      * <p> This method is for cases where the caller knows that the task has
      * already completed successfully, for example a filter-map of a stream of
      * Future objects where the filter matches tasks that completed successfully.
-     * <pre>{@code
+     * {@snippet lang=java :
      *     results = futures.stream()
      *                .filter(f -> f.state() == Future.State.SUCCESS)
      *                .map(Future::resultNow)
      *                .toList();
-     * }</pre>
+     * }
      *
      * @implSpec
      * The default implementation invokes {@code isDone()} to test if the task
