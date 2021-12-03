@@ -43,9 +43,9 @@ import jdk.internal.javac.PreviewFeature;
  * where a task splits into several concurrent sub-tasks to be executed in their own
  * threads and where the sub-tasks must complete before the main task can continue.
  *
- * <p> <b>StructuredExecutor is work-in-progress.</b>
+ * <h2>Basic usage</h2>
  *
- * <p> StructuredExecutor defines the {@link #open() open} method to open a new executor,
+ * StructuredExecutor defines the {@link #open() open} method to open a new executor,
  * the {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
  * #join() join} method to wait for all threads to finish, and the {@link #close() close}
  * method to close the executor. The API is intended to be used with the {@code
@@ -77,11 +77,16 @@ import jdk.internal.javac.PreviewFeature;
  * the {@code join} to wakeup. It also interrupts all unfinished threads and prevents new
  * threads from starting in the executor.
  *
- * <p> StructuredExecutor defines the 2-arg {@link #fork(Callable, CompletionHandler) fork}
+ * <h2><a id="CompletionHandler">Completion handlers</a></h2>
+ *
+ * StructuredExecutor defines the 2-arg {@link #fork(Callable, CompletionHandler) fork}
  * method that executes a {@link CompletionHandler CompletionHandler} after a task completes.
- * The completion handler can be used to implement policy, collect results and/or exceptions,
+ * A completion handler can be used to implement policy, collect results and/or exceptions,
  * and provide an API that makes available the outcome to the main task to process after the
- * {@code join} method.
+ * {@code join} method. A completion handler may, for example, collect the results of tasks
+ * that complete with a result and ignore tasks that fail. It may collect exceptions when
+ * tasks fail. It may invoke the {@link #shutdown() shutdown} method to shut down the executor
+ * and cause {@link #join() join} to wakeup when some condition arises.
  * {@snippet lang=java :
  *     try (var executor = StructuredExecutor.open()) {
  *
@@ -92,13 +97,17 @@ import jdk.internal.javac.PreviewFeature;
  *
  *         executor.join();
  *
- *         ... invoke handler methods to examine outcome, process results/exceptions, ...
+ *         // @highlight region
+ *         ... invoke handler methods to obtain outcome, process results/exceptions, ...
+ *         // @end
  *
  *     }
  * }
  *
- * <p> StructuredExecutor defines two completion handlers that implement policy for two
- * common cases:
+ *  <h2><a id="BuiltinCompletionHandlers">ShutdownOnSuccess and ShutdownOnFailure</a></h2>
+ *
+ * StructuredExecutor defines two completion handlers that implement policy for two common
+ * cases:
  * <ol>
  *   <li> {@link ShutdownOnSuccess ShutdownOnSuccess} captures the first result and shuts
  *   down the executor to interrupt unfinished threads and wakeup the owner. This handler
@@ -133,7 +142,6 @@ import jdk.internal.javac.PreviewFeature;
  *         // @link regex="result(?=\()" target="ShutdownOnSuccess#result" :
  *         String result = handler.result(e -> new WebApplicationException(e));
  *
- *         :
  *     }
  * }
  * The second example creates a ShutdownOnFailure operation to capture the exception of
@@ -165,11 +173,11 @@ import jdk.internal.javac.PreviewFeature;
  *                 .map(Future::resultNow)
  *                 .collect(Collectors.join(", ", "{ ", " }"));
  *
- *         :
  *     }
  * }
+ *  <h2>Tree structure</h2>
  *
- * <p> A StructuredExecutor is conceptually a node in a tree. A thread started in executor
+ * A StructuredExecutor is conceptually a node in a tree. A thread started in executor
  * "A" may itself open a new executor "B", implicitly forming a tree where executor "A" is
  * the parent of executor "B". When nested, say where thread opens executor "B" and then
  * invokes a method that opens executor "C", then the enclosing executor "B" is conceptually
