@@ -117,10 +117,6 @@ public final class ScopeLocal<T> {
             this.primaryBits = primaryBits;
         }
 
-        boolean equivalent(Object obj) {
-            return this == obj;
-        }
-
         Object find(ScopeLocal<?> key) {
             for (Snapshot b = this; b != null; b = b.prev) {
                 if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
@@ -150,30 +146,6 @@ public final class ScopeLocal<T> {
 
         static final Snapshot getInstance() {
             return SINGLETON;
-        }
-    }
-
-    static final class MergeSnapshot extends Snapshot {
-        final Snapshot left, right;
-
-        MergeSnapshot(Snapshot left, Snapshot right) {
-            super(null, null, (short)(left.primaryBits | right.primaryBits));
-            this.left = left;
-            this.right = right;
-        }
-
-        Object find(ScopeLocal<?> key) {
-            var maybe = left.find(key);
-            return maybe != Snapshot.NIL ? maybe : right.find(key);
-        }
-
-        @Override
-        boolean equivalent(Object obj) {
-            if (obj instanceof MergeSnapshot snap) {
-                return snap.left == this.left && snap.right == this.right;
-            } else {
-                return super.equivalent(obj);
-            }
         }
     }
 
@@ -280,6 +252,9 @@ public final class ScopeLocal<T> {
             var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
                 return StackableScope.call(op);
+            } catch (Throwable t) {
+                Cache.invalidate();
+                throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
@@ -325,6 +300,9 @@ public final class ScopeLocal<T> {
             var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
                 StackableScope.run(op);
+            } catch (Throwable t) {
+                Cache.invalidate();
+                throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
@@ -358,37 +336,33 @@ public final class ScopeLocal<T> {
          */
         public ScopeLocalBinder bind() {
             checkNotBound();
-            return new Binder().push(this);
+            return (ScopeLocalBinder)new Binder(this).push();
         }
 
         /**
          * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
          */
         static class Binder extends StackableScope implements ScopeLocalBinder {
-            private int bits;
-            private Snapshot snapshot;
+            final Carrier bindings;
+            final short primaryBits;
+            final Binder prevBinder;
 
-            Binder() {
+            Binder(Carrier bindings) {
+                this.bindings = bindings;
+                this.prevBinder = innermostBinder();
+                this.primaryBits = (short)(bindings.primaryBits
+                        | (prevBinder == null ? 0 : prevBinder.primaryBits));
             }
 
-            static Snapshot innermostSnapshot() {
-                StackableScope headScope = JLA.headStackableScope(Thread.currentThread());
+            static Binder innermostBinder() {
+                StackableScope headScope =  JLA.headStackableScope(Thread.currentThread());
                 if (headScope == null) {
-                    return EmptySnapshot.SINGLETON;
+                    headScope = JLA.threadContainer(Thread.currentThread());
                 }
-                Binder head = headScope.innermostScope(Binder.class);
-                if (head == null) {
-                    return EmptySnapshot.SINGLETON;
+                if (headScope == null) {
+                    return null;
                 }
-                return head.snapshot;
-            }
-
-            Binder push(Carrier carrier) {
-                Snapshot prev = innermostSnapshot();
-                Snapshot newSnapshot = new Snapshot(carrier, prev, carrier.primaryBits);
-                this.snapshot = newSnapshot;
-                Cache.invalidate(bits);
-                return (Binder)super.push();
+                return headScope.innermostScope(Binder.class);
             }
 
             /**
@@ -397,20 +371,32 @@ public final class ScopeLocal<T> {
              * @throws StructureViolationException if {@code this} isn't the current top binding
              */
             public void close() throws RuntimeException {
-                Cache.invalidate(bits);
+                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
                 if (! popForcefully()) {
+                    Cache.invalidate();
                     throw new StructureViolationException();
                 }
             }
 
             protected boolean tryClose() {
-                Cache.invalidate(bits);
-                snapshot = null;
+                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
                 return true;
             }
 
             static Object find(ScopeLocal<?> key) {
-                return innermostSnapshot().find(key);
+                for (Binder b = innermostBinder(); b != null; b = b.prevBinder) {
+                    if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
+                        for (Carrier binding = b.bindings;
+                             binding != null;
+                             binding = binding.prev) {
+                            if (binding.getKey() == key) {
+                                Object value = binding.get();
+                                return value;
+                            }
+                        }
+                    }
+                }
+                return Snapshot.NIL;
             }
         }
     }
@@ -575,38 +561,6 @@ public final class ScopeLocal<T> {
 
     private Snapshot scopeLocalBindings() {
         return getScopeLocalBindings();
-    }
-
-    /**
-     * Return the head of the current thread's scope stacks.
-     */
-    static Object getTopScopeLocalSnapshot() {
-        Snapshot snapshot1 = getScopeLocalBindings();
-        Snapshot snapshot2 = Carrier.Binder.innermostSnapshot();
-        if (snapshot1 == EmptySnapshot.getInstance()) {
-            return snapshot2;
-        }
-        if (snapshot2 == EmptySnapshot.getInstance()) {
-            return snapshot1;
-        }
-        return new MergeSnapshot(snapshot1, snapshot2);
-    }
-
-    static boolean stateEquals(Object snapshot) {
- /*
-        if (snapshot instanceof MergeSnapshot m) {
-
-            var innermostSnapshot = Carrier.Binder.innermostSnapshot();
-            var scopeLocalBindings = getScopeLocalBindings();
-             if (m.left == scopeLocalBindings && m.right == innermostSnapshot)
-                 return true;
-             return snapshot == scopeLocalBindings
-                     && EmptySnapshot.getInstance() == innermostSnapshot;
-        }
-        return snapshot == getScopeLocalBindings() || snapshot == Carrier.Binder.innermostSnapshot();
-        */
-        var ours = getTopScopeLocalSnapshot();
-        return ((Snapshot)ours).equivalent(snapshot);
     }
 
     private static int nextKey = 0xf0f0_f0f0;

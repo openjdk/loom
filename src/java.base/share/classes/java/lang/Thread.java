@@ -252,8 +252,7 @@ public class Thread implements Runnable {
     void inheritScopeLocalBindings(ThreadContainer container) {
         Object bindings = container.scopeLocalBindings();
         if (bindings != null) {
-            if (! ScopeLocal.stateEquals(bindings)) {
-                var x = ScopeLocal.stateEquals(bindings);
+            if (Thread.currentThread().scopeLocalBindings != bindings) {
                 throw new IllegalStateException("Scope local bindings have changed");
             }
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
@@ -3020,7 +3019,7 @@ public class Thread implements Runnable {
     }
 
     /** The top of this stack of stackable scopes owned by this thread */
-    private StackableScope headStackableScopes;
+    private volatile StackableScope headStackableScopes;
     StackableScope headStackableScopes() {
         return headStackableScopes;
     }

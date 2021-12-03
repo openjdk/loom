@@ -104,6 +104,7 @@ public class StackableScope {
      */
     public static <T> T call(Callable<T> op) throws Exception {
         if (head() != null) {
+            // Slow path
             return new StackableScope().doCall(op);
         } else {
             Throwable ex = null;
@@ -145,6 +146,7 @@ public class StackableScope {
      */
     public static void run(Runnable op) {
         if (head() != null) {
+            // Slow path
             new StackableScope().doRun(op);
         } else {
             Throwable ex = null;
@@ -267,7 +269,11 @@ public class StackableScope {
      * Returns the scope of the given type that encloses this scope.
      */
     public <T extends StackableScope> T enclosingScope(Class<T> type) {
-        return enclosingScope().innermostScope(type);
+        StackableScope enclosing = enclosingScope();
+        if (enclosing != null) {
+            return enclosing.innermostScope(type);
+        }
+        return null;
     }
 
     public <T extends StackableScope> T innermostScope(Class<T> type) {
@@ -282,6 +288,7 @@ public class StackableScope {
         }
         return null;
     }
+
     /**
      * Returns the scope that directly encloses this scope, null if none.
      */

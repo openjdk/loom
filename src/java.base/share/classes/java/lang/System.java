@@ -2526,7 +2526,7 @@ public final class System {
             }
 
             public Object scopeLocalBindings() {
-                return ScopeLocal.getTopScopeLocalSnapshot();
+                return Thread.scopeLocalBindings();
             }
 
             public Continuation getContinuation(Thread thread) {
