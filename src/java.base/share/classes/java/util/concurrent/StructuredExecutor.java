@@ -53,7 +53,7 @@ import jdk.internal.javac.PreviewFeature;
  * the {@code fork} method to fork threads to execute the sub-tasks, wait for the threads
  * to finish with the {@code join} method, and then <em>process the results</em>.
  * Processing of results may include handling or re-throwing of exceptions.
- * {@snippet :
+ * {@snippet lang=java :
  *     try (var executor = StructuredExecutor.open()) {      // @highlight substring="open"
  *
  *         Future<String> future1 = executor.fork(task1);    // @highlight substring="fork"
@@ -82,7 +82,7 @@ import jdk.internal.javac.PreviewFeature;
  * The completion handler can be used to implement policy, collect results and/or exceptions,
  * and provide an API that makes available the outcome to the main task to process after the
  * {@code join} method.
- * {@snippet :
+ * {@snippet lang=java :
  *     try (var executor = StructuredExecutor.open()) {
  *
  *         MyHandler<String> handler = ...
@@ -120,7 +120,7 @@ import jdk.internal.javac.PreviewFeature;
  * result(Function)} method to get the captured result. If both tasks fails then this
  * method throws WebApplicationException with the exception from one of the tasks as the
  * cause.
- * {@snippet :
+ * {@snippet lang=java :
  *     try (var executor = StructuredExecutor.open()) {
  *
  *         var handler = new ShutdownOnSuccess<String>();
@@ -144,7 +144,7 @@ import jdk.internal.javac.PreviewFeature;
  * when either task fails. This method is a no-op if no tasks fail. The main task uses
  * {@code Future}'s {@link Future#resultNow() resultNow()} method to retrieve the results.
  *
- * {@snippet :
+ * {@snippet lang=java :
  *    Instant deadline = ...
  *
  *    try (var executor = StructuredExecutor.open()) {
@@ -845,7 +845,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * of tasks that complete successfully. It defines a {@code results()} method for the
      * main task to invoke to retrieve the results.
      *
-     * {@snippet :
+     * {@snippet lang=java :
      *     class MyHandler<V> implements CompletionHandler<V> {
      *         private final Queue<V> results = new ConcurrentLinkedQueue<>();
      *
@@ -902,12 +902,10 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          */
         static <V> CompletionHandler<V> compose(CompletionHandler<? extends V> first,
                                                 CompletionHandler<? extends V> second) {
-            Objects.requireNonNull(first);
-            Objects.requireNonNull(second);
             @SuppressWarnings("unchecked")
-            var handler1 = (CompletionHandler<V>) first;
+            var handler1 = (CompletionHandler<V>) Objects.requireNonNull(first);
             @SuppressWarnings("unchecked")
-            var handler2 = (CompletionHandler<V>) second;
+            var handler2 = (CompletionHandler<V>) Objects.requireNonNull(second);
             return (e, f) -> {
                 handler1.handle(e, f);
                 handler2.handle(e, f);
