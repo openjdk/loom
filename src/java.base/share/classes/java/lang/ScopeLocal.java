@@ -338,66 +338,66 @@ public final class ScopeLocal<T> {
             checkNotBound();
             return (ScopeLocalBinder)new Binder(this).push();
         }
+    }
+
+    /**
+     * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
+     */
+    static class Binder extends StackableScope implements ScopeLocalBinder {
+        final Carrier bindings;
+        final short primaryBits;
+        final Binder prevBinder;
+
+        Binder(Carrier bindings) {
+            this.bindings = bindings;
+            this.prevBinder = innermostBinder();
+            this.primaryBits = (short)(bindings.primaryBits
+                    | (prevBinder == null ? 0 : prevBinder.primaryBits));
+        }
+
+        static Binder innermostBinder() {
+            StackableScope headScope =  JLA.headStackableScope(Thread.currentThread());
+            if (headScope == null) {
+                headScope = JLA.threadContainer(Thread.currentThread());
+            }
+            if (headScope == null) {
+                return null;
+            }
+            return headScope.innermostScope(Binder.class);
+        }
 
         /**
-         * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
+         * Close a scope local binding context.
+         *
+         * @throws StructureViolationException if {@code this} isn't the current top binding
          */
-        static class Binder extends StackableScope implements ScopeLocalBinder {
-            final Carrier bindings;
-            final short primaryBits;
-            final Binder prevBinder;
-
-            Binder(Carrier bindings) {
-                this.bindings = bindings;
-                this.prevBinder = innermostBinder();
-                this.primaryBits = (short)(bindings.primaryBits
-                        | (prevBinder == null ? 0 : prevBinder.primaryBits));
+        public void close() throws RuntimeException {
+            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+            if (! popForcefully()) {
+                Cache.invalidate();
+                throw new StructureViolationException();
             }
+        }
 
-            static Binder innermostBinder() {
-                StackableScope headScope =  JLA.headStackableScope(Thread.currentThread());
-                if (headScope == null) {
-                    headScope = JLA.threadContainer(Thread.currentThread());
-                }
-                if (headScope == null) {
-                    return null;
-                }
-                return headScope.innermostScope(Binder.class);
-            }
+        protected boolean tryClose() {
+            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+            return true;
+        }
 
-            /**
-             * Close a scope local binding context.
-             *
-             * @throws StructureViolationException if {@code this} isn't the current top binding
-             */
-            public void close() throws RuntimeException {
-                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
-                if (! popForcefully()) {
-                    Cache.invalidate();
-                    throw new StructureViolationException();
-                }
-            }
-
-            protected boolean tryClose() {
-                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
-                return true;
-            }
-
-            static Object find(ScopeLocal<?> key) {
-                for (Binder b = innermostBinder(); b != null; b = b.prevBinder) {
-                    if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
-                        for (Carrier binding = b.bindings;
-                             binding != null;
-                             binding = binding.prev) {
-                            if (binding.getKey() == key) {
-                                Object value = binding.get();
-                                return value;
-                            }
+        static Object find(ScopeLocal<?> key) {
+            for (Binder b = innermostBinder(); b != null; b = b.prevBinder) {
+                if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
+                    for (Carrier binding = b.bindings;
+                         binding != null;
+                         binding = binding.prev) {
+                        if (binding.getKey() == key) {
+                            Object value = binding.get();
+                            return value;
                         }
                     }
                 }
-                return Snapshot.NIL;
             }
+            return Snapshot.NIL;
         }
     }
 
@@ -510,7 +510,7 @@ public final class ScopeLocal<T> {
         if (value != Snapshot.NIL) {
             return value;
         }
-        return Carrier.Binder.find(this);
+        return Binder.find(this);
     }
 
     /**
