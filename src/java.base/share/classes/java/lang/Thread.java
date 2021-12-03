@@ -244,7 +244,6 @@ public class Thread implements Runnable {
     int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
     ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
-    ScopeLocal.Snapshot TWRBindings = ScopeLocal.EmptySnapshot.getInstance();
 
     static ScopeLocal.Snapshot scopeLocalBindings() {
         return currentThread().scopeLocalBindings;
@@ -253,7 +252,8 @@ public class Thread implements Runnable {
     void inheritScopeLocalBindings(ThreadContainer container) {
         Object bindings = container.scopeLocalBindings();
         if (bindings != null) {
-            if (Thread.currentThread().scopeLocalBindings != bindings) {
+            if (! ScopeLocal.stateEquals(bindings)) {
+                var x = ScopeLocal.stateEquals(bindings);
                 throw new IllegalStateException("Scope local bindings have changed");
             }
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
