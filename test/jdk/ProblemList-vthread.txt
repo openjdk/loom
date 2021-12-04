@@ -25,6 +25,7 @@ java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
+jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
 jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
 jdk/internal/vm/Continuation/Preempt.java

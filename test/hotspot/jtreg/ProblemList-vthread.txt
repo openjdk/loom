@@ -122,6 +122,10 @@ serviceability/jvmti/GetThreadListStackTraces/OneGetThreadListStackTraces.java
 serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java
 
 ####
+# JVMTI tests which generated unexpected events by virtual threads
+serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java
+
+####
 # OOME in unexpected thread
 gc/g1/ihop/TestIHOPStatic.java
 vmTestbase/gc/gctests/MemoryEater/TestDescription.java
