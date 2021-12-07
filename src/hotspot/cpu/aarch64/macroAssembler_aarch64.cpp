@@ -2070,6 +2070,25 @@ int MacroAssembler::pop_fp(unsigned int bitset, Register stack) {
 }
 
 #ifdef ASSERT
+void MacroAssembler::verify_heapbase(const char* msg) {
+#if 0
+  assert (UseCompressedOops || UseCompressedClassPointers, "should be compressed");
+  assert (Universe::heap() != NULL, "java heap should be initialized");
+  if (!UseCompressedOops || Universe::ptr_base() == NULL) {
+    // rheapbase is allocated as general register
+    return;
+  }
+  if (CheckCompressedOops) {
+    Label ok;
+    push(1 << rscratch1->encoding(), sp); // cmpptr trashes rscratch1
+    cmpptr(rheapbase, ExternalAddress((address)CompressedOops::ptrs_base_addr()));
+    br(Assembler::EQ, ok);
+    stop(msg);
+    bind(ok);
+    pop(1 << rscratch1->encoding(), sp);
+  }
+#endif
+}
 #endif
 
 void MacroAssembler::resolve_jobject(Register value, Register thread, Register tmp) {
@@ -3705,6 +3724,10 @@ void MacroAssembler::store_klass_gap(Register dst, Register src) {
 
 // Algorithm must match CompressedOops::encode.
 void MacroAssembler::encode_heap_oop(Register d, Register s) {
+#ifdef ASSERT
+  verify_heapbase("MacroAssembler::encode_heap_oop: heap base corrupted?");
+#endif
+  verify_oop(s, "broken oop in encode_heap_oop");
   if (CompressedOops::base() == NULL) {
     if (CompressedOops::shift() != 0) {
       assert (LogMinObjAlignmentInBytes == CompressedOops::shift(), "decode alg wrong");
@@ -3728,6 +3751,16 @@ void MacroAssembler::encode_heap_oop(Register d, Register s) {
 }
 
 void MacroAssembler::encode_heap_oop_not_null(Register r) {
+#ifdef ASSERT
+  verify_heapbase("MacroAssembler::encode_heap_oop_not_null: heap base corrupted?");
+  if (CheckCompressedOops) {
+    Label ok;
+    cbnz(r, ok);
+    stop("null oop passed to encode_heap_oop_not_null");
+    bind(ok);
+  }
+#endif
+  verify_oop(r, "broken oop in encode_heap_oop_not_null");
   if (CompressedOops::base() != NULL) {
     sub(r, r, rheapbase);
   }
@@ -3739,7 +3772,15 @@ void MacroAssembler::encode_heap_oop_not_null(Register r) {
 
 void MacroAssembler::encode_heap_oop_not_null(Register dst, Register src) {
 #ifdef ASSERT
+  verify_heapbase("MacroAssembler::encode_heap_oop_not_null2: heap base corrupted?");
+  if (CheckCompressedOops) {
+    Label ok;
+    cbnz(src, ok);
+    stop("null oop passed to encode_heap_oop_not_null2");
+    bind(ok);
+  }
 #endif
+  verify_oop(src, "broken oop in encode_heap_oop_not_null2");
 
   Register data = src;
   if (CompressedOops::base() != NULL) {
@@ -3756,6 +3797,9 @@ void MacroAssembler::encode_heap_oop_not_null(Register dst, Register src) {
 }
 
 void  MacroAssembler::decode_heap_oop(Register d, Register s) {
+#ifdef ASSERT
+  verify_heapbase("MacroAssembler::decode_heap_oop: heap base corrupted?");
+#endif
   if (CompressedOops::base() == NULL) {
     if (CompressedOops::shift() != 0 || d != s) {
       lsl(d, s, CompressedOops::shift());

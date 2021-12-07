@@ -865,6 +865,8 @@ public:
   // if heap base register is used - reinit it with the correct value
   void reinit_heapbase();
 
+  DEBUG_ONLY(void verify_heapbase(const char* msg);)
+
   void push_CPU_state(bool save_vectors = false, bool use_sve = false,
                       int sve_vector_size_in_bytes = 0);
   void pop_CPU_state(bool restore_vectors = false, bool use_sve = false,
