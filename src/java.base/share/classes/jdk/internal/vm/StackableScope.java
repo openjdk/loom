@@ -103,10 +103,7 @@ public class StackableScope {
      * @throws Exception
      */
     public static <T> T call(Callable<T> op) throws Exception {
-        if (head() != null) {
-            // Slow path
-            return new StackableScope().doCall(op);
-        } else {
+        if (head() == null) {
             Throwable ex = null;
             T result = null;
             try {
@@ -121,6 +118,9 @@ public class StackableScope {
                 handleThrows(ex, head == null);
             }
             return result;
+        } else {
+            // Slow path
+            return new StackableScope().doCall(op);
         }
     }
 
@@ -145,10 +145,7 @@ public class StackableScope {
      * @param op a Runnable
      */
     public static void run(Runnable op) {
-        if (head() != null) {
-            // Slow path
-            new StackableScope().doRun(op);
-        } else {
+        if (head() == null) {
             Throwable ex = null;
             try {
                 op.run();
@@ -161,6 +158,9 @@ public class StackableScope {
                 }
                 handleThrows(ex, head == null);
             }
+        } else {
+            // Slow path
+            new StackableScope().doRun(op);
         }
     }
 
