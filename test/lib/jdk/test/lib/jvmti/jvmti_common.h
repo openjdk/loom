@@ -183,6 +183,7 @@ get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
 
   strncpy(result, cname + 1, len); // skip leading 'L'
   result[len] = '\0';
+  deallocate(jvmti, jni, (void*)cname);
   return result;
 }
 
@@ -201,6 +202,9 @@ print_method(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method, jint depth) {
 
   LOG("%2d: %s: %s%s\n", depth, cname, mname, msign);
   fflush(0);
+  deallocate(jvmti, jni, (void*)cname);
+  deallocate(jvmti, jni, (void*)mname);
+  deallocate(jvmti, jni, (void*)msign);
 }
 
 void
