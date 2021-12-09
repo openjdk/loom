@@ -29,6 +29,13 @@ package java.lang;
 /**
  * The interface for a ScopeLocal try-with-resources binding.
  */
-public interface ScopeLocalBinder extends AutoCloseable {
-    public void close() throws RuntimeException;
+public sealed interface ScopeLocalBinder extends AutoCloseable permits ScopeLocal.Binder {
+
+    /**
+     * Closes this {@link ScopeLocal} binding. If this binding was not the most recent binding
+     * created by {@code Carrier.bind()}, throws a {@link StructureViolationException}.
+     * This method is invoked automatically on objects managed by the try-with-resources statement.
+     * @throws StructureViolationException if the bindings were not closed in the correct order.
+     */
+    public void close() throws StructureViolationException;
 }

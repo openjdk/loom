@@ -26,6 +26,7 @@
 
 package java.lang;
 
+import java.lang.invoke.MethodHandle;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -73,7 +74,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.newInstance();
  *
  *   Credentials creds = ...
- *   ScopeLocal.where(CREDENTIALS, creds).run(creds, () -> {
+ *   ScopeLocal.where(CREDENTIALS, creds).run(() -> {
  *       :
  *       Connection connection = connectDatabase();
  *       :
@@ -85,6 +86,21 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *   }
  * }</pre>
  *
+ * As an alternative to the lambda expression form used above, {@link ScopeLocal} also supports
+ * a <i>try-with-resources</i> form, which looks like this:
+ * <pre>{@code}
+ *   try (var unused = ScopeLocal.where(CREDENTIALS, creds).bind()) {
+ *       :
+ *       Connection connection = connectDatabase();
+ *       :
+ *    }
+ * }</pre>
+ *
+ * Note, however, that this version is <i>insecure</i>: it is up to the application programmer
+ * to make sure that bindings are closed at the right time. While a <i>try-with-resources</i>
+ * statement is enough to guarantee this, there is no way to enforce the requirement that this form
+ * is only used in a <i>try-with-resources</i> statement.
+ * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal} with this <i>try-with-resources</i> binding.</p>
  * @param <T> the scope local's type
  * @since 99
  */
@@ -189,7 +205,7 @@ public final class ScopeLocal<T> {
          * @param key   The ScopeLocal to bind a value to
          * @param value The new value
          * @param <T>   The type of the ScopeLocal
-         * @return TBD
+         * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
          */
         public final <T> Carrier where(ScopeLocal<T> key, T value) {
             return where(key, value, this, primaryBits, secondaryBits);
@@ -263,15 +279,16 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Runs a value-returning operation with this some ScopeLocals bound to values.
-         * If the operation terminates with an exception {@code e}, apply {@code handler}
-         * to {@code e} and return the result.
-         *
-         * @param op the operation to run
-         * @param handler a function to be applied if the operation completes with an exception
-         * @param <R> the type of the result of the function
-         * @return the result
-         */
+         * Runs a value-returning operation with this some ScopeLocals bound to values,
+         * in the same way as {@code call()}.<p>
+         *     If the operation throws an exception, pass it as a single argument to the {@link Function}
+         *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
+         * </p>
+         * @param op    the operation to run
+         * @param <R>   the type of the result of the function
+         * @param handler the handler to be applied if {code op} threw an exception
+         * @return the result.
+          */
         public final <R> R callOrElse(Callable<R> op,
                                       Function<? super Exception, ? extends R> handler) {
             try {
@@ -332,8 +349,11 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Create a try-with-resources ScopeLocal binding
-         * @return a Binder
+         * Create a try-with-resources ScopeLocal binding to be used within
+         * a try-with-resources block.
+         * <p>If any of the {@link ScopeLocal}s bound in this {@link Carrier} are already bound in an outer context,
+         * throw a {@link RuntimeException}.</p>
+         * @return a {@link ScopeLocalBinder}.
          */
         public ScopeLocalBinder bind() {
             checkNotBound();
@@ -344,7 +364,7 @@ public final class ScopeLocal<T> {
     /**
      * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
      */
-    static class Binder extends StackableScope implements ScopeLocalBinder {
+    static final class Binder extends StackableScope implements ScopeLocalBinder {
         final Carrier bindings;
         final short primaryBits;
         final Binder prevBinder;
