@@ -39,6 +39,8 @@ public class ScopeLocalsData {
     static final ScopeLocal<Integer> sl6 = ScopeLocal.newInstance();
     static final ScopeLocal<AtomicInteger> sl_atomicInt = ScopeLocal.newInstance();
 
+    static final ScopeLocal<Integer> unbound = ScopeLocal.newInstance();
+
     static final ScopeLocal<AtomicReference<Integer>> sl_atomicRef = ScopeLocal.newInstance();
 
     static final ThreadLocal<Integer> tl2 = new ThreadLocal<>();
