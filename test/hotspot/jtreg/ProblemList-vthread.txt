@@ -494,13 +494,17 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
 
 ####
-## The tests expect an NPE to be uncaught, but the nsk.share.MainWrapper
+## The tests expect an NPE to be uncaught, but nsk.share.MainWrapper
 ## introduces exception handlers.
 
 vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java 8278470 generic-all
 vmTestbase/nsk/jdb/where/where005/where005.java 8278470 generic-all
 
-# Test is expected to be in main while checking stack
+###
+# Test expects that the "up" command should print "End of stack" because there are
+# normally no frames above the test's main method. However, nsk.share.MainWrapper
+# introduces more frames above the test's main method, so the test fails.
+
 vmTestbase/nsk/jdb/list/list003/list003.java
 vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 
@@ -508,7 +512,7 @@ vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 ## NSK JDI tests failing with wrapper
 
 ####
-## The test expects an NPE to be uncaught, but the nsk.share.MainWrapper
+## The test expects an NPE to be uncaught, but nsk.share.MainWrapper
 ## introduces exception handlers.
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
