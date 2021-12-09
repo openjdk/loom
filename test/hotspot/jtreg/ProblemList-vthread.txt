@@ -494,15 +494,11 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
 
 ####
-## The test expects an NPE to be uncaught. For vthreads the code in
-## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
-## that has an exception handler. So when the test purposefully throws an NPE,
-## jdb detects that it will be caught, so does not generate the
-## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
-## expects. This might be fixed by JEP 416 when pushed.
+## The tests expect an NPE to be uncaught, but the nsk.share.MainWrapper
+## introduces exception handlers.
 
-vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
-vmTestbase/nsk/jdb/where/where005/where005.java
+vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java 8278470 generic-all
+vmTestbase/nsk/jdb/where/where005/where005.java 8278470 generic-all
 
 # Test is expected to be in main while checking stack
 vmTestbase/nsk/jdb/list/list003/list003.java
@@ -512,11 +508,10 @@ vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 ## NSK JDI tests failing with wrapper
 
 ####
-## The test expects an exception to be uncaught, but it seems to be caught by
-## the lambda expression in MainWrapper.main(), and by LambdaForm code generated
-## during the Method.invoke() call. This might be fixed by JEP 416 when pushed.
+## The test expects an NPE to be uncaught, but the nsk.share.MainWrapper
+## introduces exception handlers.
 
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
+vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
 
 ####
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
