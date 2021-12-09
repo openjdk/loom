@@ -701,6 +701,10 @@ JVM_ENTRY(void, JVM_ReportFinalizationComplete(JNIEnv * env, jobject finalizee))
   MANAGEMENT_ONLY(FinalizerService::on_complete(JNIHandles::resolve_non_null(finalizee), THREAD);)
 JVM_END
 
+JVM_ENTRY(jboolean, JVM_IsFinalizationEnabled(JNIEnv * env))
+  return InstanceKlass::is_finalization_enabled();
+JVM_END
+
 // jdk.internal.vm.Continuation /////////////////////////////////////////////////////
 
 JVM_ENTRY(void, JVM_RegisterContinuationMethods(JNIEnv *env, jclass cls))

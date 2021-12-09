@@ -828,7 +828,7 @@ public class Executors {
         FinalizableDelegatedExecutorService(ExecutorService executor) {
             super(executor);
         }
-        @SuppressWarnings("deprecation")
+        @SuppressWarnings("removal")
         protected void finalize() {
             super.shutdown();
         }
