@@ -26,7 +26,6 @@
 
 package java.lang;
 
-import java.lang.invoke.MethodHandle;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.Callable;

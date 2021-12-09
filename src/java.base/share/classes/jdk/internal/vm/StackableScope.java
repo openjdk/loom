@@ -36,7 +36,7 @@ public class StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     private final Thread owner;
-    private StackableScope previous;
+    private volatile StackableScope previous;
 
     /**
      * Creates a stackable scope.
