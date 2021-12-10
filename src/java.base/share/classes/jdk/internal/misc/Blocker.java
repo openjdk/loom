@@ -36,16 +36,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinPool.ManagedBlocker;
-import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
-
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
  * Defines static methods to execute blocking tasks on virtual threads.
- * If the carrier thread is a ForkJoinWorkerThread then the task runs in a
+ * If the carrier thread is a CarrierThread then the task runs in a
  * ForkJoinPool.ManagedBlocker to that its pool may be expanded to support
  * additional parallelism during the blocking operation.
  */
@@ -85,9 +83,7 @@ public class Blocker {
         void run() throws X;
     }
 
-    private static class CallableBlocker<V, X extends Throwable>
-            implements ManagedBlocker {
-
+    private static class CallableBlocker<V, X extends Throwable> implements ManagedBlocker {
         private final BlockingCallable<V, X> task;
         private boolean done;
         private V result;
@@ -118,8 +114,7 @@ public class Blocker {
         }
     }
 
-    private static class RunnableBlocker<X extends Throwable>
-            implements ManagedBlocker {
+    private static class RunnableBlocker<X extends Throwable> implements ManagedBlocker {
         private final BlockingRunnable<X> task;
         private boolean done;
 
@@ -147,21 +142,22 @@ public class Blocker {
 
     /**
      * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * virtual thread and the current carrier thread is in a CarrierThread then the
      * pool may be expanded to support additional parallelism during the call to
      * this method.
      */
     public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
-        Thread carrier = JLA.currentCarrierThread();
-        ForkJoinPool pool;
-        if (carrier instanceof ForkJoinWorkerThread
-            && (pool = ((ForkJoinWorkerThread) carrier).getPool()) != null) {
+        Thread t = JLA.currentCarrierThread();
+        if (t instanceof CarrierThread ct && !ct.blocked()) {
+            ct.blocked(true);
             try {
                 var blocker = new CallableBlocker<>(task);
-                compensatedBlock.invoke(pool, blocker);
+                compensatedBlock.invoke(ct.getPool(), blocker);
                 return blocker.result();
             } catch (Throwable e) {
                 U.throwException(e);
+            } finally {
+                ct.blocked(false);
             }
             assert false;  // should not get here
         }
@@ -177,20 +173,21 @@ public class Blocker {
 
     /**
      * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a ForkJoinPool then the
+     * virtual thread and the current carrier thread is in a CarrierThread then the
      * pool may be expanded to support additional parallelism during the call to
      * this method.
      */
     public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        Thread carrier = JLA.currentCarrierThread();
-        ForkJoinPool pool;
-        if (carrier instanceof ForkJoinWorkerThread
-                && (pool = ((ForkJoinWorkerThread) carrier).getPool()) != null) {
+        Thread t = JLA.currentCarrierThread();
+        if (t instanceof CarrierThread ct && !ct.blocked()) {
+            ct.blocked(true);
             try {
-                compensatedBlock.invoke(pool, new RunnableBlocker<>(task));
+                compensatedBlock.invoke(ct.getPool(), new RunnableBlocker<>(task));
                 return;
             } catch (Throwable e) {
                 U.throwException(e);
+            } finally {
+                ct.blocked(false);
             }
             assert false;  // should not get here
         }

@@ -27,11 +27,9 @@ package java.lang;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
-import java.security.ProtectionDomain;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -49,6 +47,7 @@ import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
+import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.Continuation;
@@ -1009,71 +1008,6 @@ class VirtualThread extends Thread {
             } catch (Throwable e) {
                 throw new InternalError(e);
             }
-        }
-    }
-
-    /**
-     * A thread in the ForkJoinPool created by the default scheduler.
-     */
-    private static class CarrierThread extends ForkJoinWorkerThread {
-        private static final ThreadGroup CARRIER_THREADGROUP = carrierThreadGroup();
-        @SuppressWarnings("removal")
-        private static final AccessControlContext INNOCUOUS_ACC = innocuousACC();
-
-        private static final long CONTEXTCLASSLOADER;
-        private static final long INHERITABLETHREADLOCALS;
-        private static final long INHERITEDACCESSCONTROLCONTEXT;
-
-        CarrierThread(ForkJoinPool pool) {
-            super(CARRIER_THREADGROUP, pool);
-            U.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
-            U.putReference(this, INHERITABLETHREADLOCALS, null);
-            U.putReferenceRelease(this, INHERITEDACCESSCONTROLCONTEXT, INNOCUOUS_ACC);
-        }
-
-        @Override
-        public void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) { }
-
-        @Override
-        public void setContextClassLoader(ClassLoader cl) {
-            throw new SecurityException("setContextClassLoader");
-        }
-
-        /**
-         * The thread group for the carrier threads.
-         */
-        @SuppressWarnings("removal")
-        private static final ThreadGroup carrierThreadGroup() {
-            return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
-                public ThreadGroup run() {
-                    @SuppressWarnings("deprecation")
-                    ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
-                    for (ThreadGroup p; (p = group.getParent()) != null; )
-                        group = p;
-                    @SuppressWarnings("deprecation")
-                    var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
-                    return carrierThreadsGroup;
-                }
-            });
-        }
-
-        /**
-         * Return an AccessControlContext that doesn't support any permissions.
-         */
-        @SuppressWarnings("removal")
-        private static AccessControlContext innocuousACC() {
-            return new AccessControlContext(new ProtectionDomain[] {
-                new ProtectionDomain(null, null)
-            });
-        }
-
-        static {
-            CONTEXTCLASSLOADER = U.objectFieldOffset(Thread.class,
-                    "contextClassLoader");
-            INHERITABLETHREADLOCALS = U.objectFieldOffset(Thread.class,
-                    "inheritableThreadLocals");
-            INHERITEDACCESSCONTROLCONTEXT = U.objectFieldOffset(Thread.class,
-                    "inheritedAccessControlContext");
         }
     }
 
