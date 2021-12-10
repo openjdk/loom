@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2021, Red Hat Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,6 +31,9 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
@@ -69,7 +73,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.newInstance();
  *
  *   Credentials creds = ...
- *   ScopeLocal.where(CREDENTIALS, creds).run(creds, () -> {
+ *   ScopeLocal.where(CREDENTIALS, creds).run(() -> {
  *       :
  *       Connection connection = connectDatabase();
  *       :
@@ -81,12 +85,29 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *   }
  * }</pre>
  *
+ * As an alternative to the lambda expression form used above, {@link ScopeLocal} also supports
+ * a <i>try-with-resources</i> form, which looks like this:
+ * <pre>{@code}
+ *   try (var unused = ScopeLocal.where(CREDENTIALS, creds).bind()) {
+ *       :
+ *       Connection connection = connectDatabase();
+ *       :
+ *    }
+ * }</pre>
+ *
+ * Note, however, that this version is <i>insecure</i>: it is up to the application programmer
+ * to make sure that bindings are closed at the right time. While a <i>try-with-resources</i>
+ * statement is enough to guarantee this, there is no way to enforce the requirement that this form
+ * is only used in a <i>try-with-resources</i> statement.
+ * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal} with this <i>try-with-resources</i> binding.</p>
  * @param <T> the scope local's type
  * @since 99
  */
 @jdk.internal.javac.PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
     private final @Stable int hash;
+
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     public final int hashCode() { return hash; }
 
@@ -115,6 +136,9 @@ public final class ScopeLocal<T> {
         Object find(ScopeLocal<?> key) {
             for (Snapshot b = this; b != null; b = b.prev) {
                 if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
+                    if (b.getClass() != Snapshot.class) {
+                        return b.find(key);
+                    }
                     for (Carrier binding = b.bindings;
                          binding != null;
                          binding = binding.prev) {
@@ -180,7 +204,7 @@ public final class ScopeLocal<T> {
          * @param key   The ScopeLocal to bind a value to
          * @param value The new value
          * @param <T>   The type of the ScopeLocal
-         * @return TBD
+         * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
          */
         public final <T> Carrier where(ScopeLocal<T> key, T value) {
             return where(key, value, this, primaryBits, secondaryBits);
@@ -242,49 +266,28 @@ public final class ScopeLocal<T> {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
-            Throwable ex = null;
-            R result = null;
-            var scope = new StackableScope().push();
-            boolean atTop;
             try {
-                result = op.call();
-            } catch (Throwable e) {
-                ex = e;
+                return StackableScope.call(op);
+            } catch (Throwable t) {
+                Cache.invalidate();
+                throw t;
             } finally {
-                atTop = scope.popForcefully();  // may block
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
             }
-            // re-throw exception if op completed with exception
-            // throw exception if a structure mismatch was detected
-            if (ex != null || !atTop) {
-                if (!atTop) {
-                    var e = new StructureViolationException();
-                    if (ex == null) {
-                        ex = e;
-                    } else {
-                        ex.addSuppressed(e);
-                    }
-                }
-                if (ex instanceof Exception e)
-                    throw e;
-                if (ex instanceof Error e)
-                    throw e;
-                assert false;
-            }
-            return result;
         }
 
         /**
-         * Runs a value-returning operation with this some ScopeLocals bound to values.
-         * If the operation terminates with an exception {@code e}, apply {@code handler}
-         * to {@code e} and return the result.
-         *
-         * @param op the operation to run
-         * @param handler a function to be applied if the operation completes with an exception
-         * @param <R> the type of the result of the function
-         * @return the result
-         */
+         * Runs a value-returning operation with this some ScopeLocals bound to values,
+         * in the same way as {@code call()}.<p>
+         *     If the operation throws an exception, pass it as a single argument to the {@link Function}
+         *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
+         * </p>
+         * @param op    the operation to run
+         * @param <R>   the type of the result of the function
+         * @param handler the handler to be applied if {code op} threw an exception
+         * @return the result.
+          */
         public final <R> R callOrElse(Callable<R> op,
                                       Function<? super Exception, ? extends R> handler) {
             try {
@@ -312,50 +315,114 @@ public final class ScopeLocal<T> {
             Objects.requireNonNull(op);
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
-            Throwable ex = null;
-            boolean atTop;
-            var scope = new StackableScope().push();
             try {
-                op.run();
-            } catch (Throwable e) {
-                ex = e;
+                StackableScope.run(op);
+            } catch (Throwable t) {
+                Cache.invalidate();
+                throw t;
             } finally {
-                atTop = scope.popForcefully();  // may block
                 Thread.currentThread().scopeLocalBindings = prevBindings;
                 Cache.invalidate(primaryBits | secondaryBits);
-            }
-            // re-throw exception if op completed with exception
-            // throw exception if a structure mismatch was detected
-            if (ex != null || !atTop) {
-                if (!atTop) {
-                    var e = new StructureViolationException();
-                    if (ex == null) {
-                        ex = e;
-                    } else {
-                        ex.addSuppressed(e);
-                    }
-                }
-                if (ex instanceof RuntimeException e)
-                    throw e;
-                if (ex instanceof Error e)
-                    throw e;
-                assert false;
             }
         }
 
         /*
          * Add a list of bindings to the current Thread's set of bound values.
          */
-        private final static Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
+        private static final Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
             Snapshot prev = getScopeLocalBindings();
             var b = new Snapshot(bindings, prev, primaryBits);
             ScopeLocal.setScopeLocalBindings(b);
             return prev;
         }
+
+        /*
+         * Ensure that none of these bindings is already bound.
+         */
+        void checkNotBound() {
+            for (Carrier c = this; c != null; c = c.prev) {
+                if (c.key.isBound()) {
+                    throw new RuntimeException("Scope Local already bound");
+                }
+            }
+        }
+
+        /**
+         * Create a try-with-resources ScopeLocal binding to be used within
+         * a try-with-resources block.
+         * <p>If any of the {@link ScopeLocal}s bound in this {@link Carrier} are already bound in an outer context,
+         * throw a {@link RuntimeException}.</p>
+         * @return a {@link ScopeLocalBinder}.
+         */
+        public ScopeLocalBinder bind() {
+            checkNotBound();
+            return (ScopeLocalBinder)new Binder(this).push();
+        }
     }
 
     /**
-     * Creates a binding for a ScopeLocal instance.
+     * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
+     */
+    static final class Binder extends StackableScope implements ScopeLocalBinder {
+        final Carrier bindings;
+        final short primaryBits;
+        final Binder prevBinder;
+
+        Binder(Carrier bindings) {
+            this.bindings = bindings;
+            this.prevBinder = innermostBinder();
+            this.primaryBits = (short)(bindings.primaryBits
+                    | (prevBinder == null ? 0 : prevBinder.primaryBits));
+        }
+
+        static Binder innermostBinder() {
+            StackableScope headScope =  JLA.headStackableScope(Thread.currentThread());
+            if (headScope == null) {
+                headScope = JLA.threadContainer(Thread.currentThread());
+            }
+            if (headScope == null) {
+                return null;
+            }
+            return headScope.innermostScope(Binder.class);
+        }
+
+        /**
+         * Close a scope local binding context.
+         *
+         * @throws StructureViolationException if {@code this} isn't the current top binding
+         */
+        public void close() throws RuntimeException {
+            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+            if (! popForcefully()) {
+                Cache.invalidate();
+                throw new StructureViolationException();
+            }
+        }
+
+        protected boolean tryClose() {
+            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+            return true;
+        }
+
+        static Object find(ScopeLocal<?> key) {
+            for (Binder b = innermostBinder(); b != null; b = b.prevBinder) {
+                if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
+                    for (Carrier binding = b.bindings;
+                         binding != null;
+                         binding = binding.prev) {
+                        if (binding.getKey() == key) {
+                            Object value = binding.get();
+                            return value;
+                        }
+                    }
+                }
+            }
+            return Snapshot.NIL;
+        }
+    }
+
+    /**
+     * Create a binding for a ScopeLocal instance.
      * That {@link Carrier} may be used later to invoke a {@link Callable} or
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier}
      * by the {@link Carrier#where(ScopeLocal, Object)} method.
@@ -437,8 +504,7 @@ public final class ScopeLocal<T> {
 
     @SuppressWarnings("unchecked")
     private T slowGet() {
-        var bindings = scopeLocalBindings();
-        var value =  bindings.find(this);
+        var value =  findBinding();
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();
         }
@@ -453,14 +519,18 @@ public final class ScopeLocal<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
-        return (scopeLocalBindings().find(this) != Snapshot.NIL);
+        return findBinding() != Snapshot.NIL;
     }
 
     /**
      * Return the value of the scope local or NIL if not bound.
      */
     private Object findBinding() {
-        return scopeLocalBindings().find(this);
+        Object value = scopeLocalBindings().find(this);
+        if (value != Snapshot.NIL) {
+            return value;
+        }
+        return Binder.find(this);
     }
 
     /**
@@ -501,8 +571,7 @@ public final class ScopeLocal<T> {
     }
 
     private static Snapshot getScopeLocalBindings() {
-        Thread currentThread = Thread.currentThread();
-        return currentThread.scopeLocalBindings;
+        return Thread.currentThread().scopeLocalBindings;
     }
 
     private static void setScopeLocalBindings(Snapshot bindings) {

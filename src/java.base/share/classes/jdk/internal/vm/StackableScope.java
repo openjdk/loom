@@ -27,6 +27,8 @@ package jdk.internal.vm;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
+import java.util.concurrent.Callable;
+
 /**
  * A stackable scope.
  */
@@ -71,6 +73,109 @@ public class StackableScope {
         previous = head();
         setHead(this);
         return this;
+    }
+
+    private static void handleThrows(Throwable ex, boolean atTop) {
+        // re-throw exception if op completed with exception
+        // throw exception if a structure mismatch was detected
+        if (ex != null || !atTop) {
+            if (!atTop) {
+                var e = new StructureViolationException();
+                if (ex == null) {
+                    ex = e;
+                } else {
+                    ex.addSuppressed(e);
+                }
+            }
+            if (ex instanceof RuntimeException e)
+                throw e;
+            if (ex instanceof Error e)
+                throw e;
+            assert false;
+        }
+    }
+
+    /**
+     * Call op, wrapped in a {@code StackableScope}
+     * @param op a Callable
+     * @param <T> a class
+     * @return a T
+     * @throws Exception
+     */
+    public static <T> T call(Callable<T> op) throws Exception {
+        if (head() == null) {
+            Throwable ex = null;
+            T result = null;
+            try {
+                result = op.call();
+            } catch (Throwable e) {
+                ex = e;
+            } finally {
+                StackableScope head = head();
+                if (head != null) {
+                    popAll();
+                }
+                handleThrows(ex, head == null);
+            }
+            return result;
+        } else {
+            // Slow path
+            return new StackableScope().doCall(op);
+        }
+    }
+
+    private <T> T doCall(Callable<T> op) throws Exception {
+        Throwable ex = null;
+        boolean atTop;
+        T result = null;
+        var scope = push();
+        try {
+            result = op.call();
+        } catch (Throwable e) {
+            ex = e;
+        } finally {
+            atTop = scope.popForcefully();  // may block
+        }
+        handleThrows(ex, atTop);
+        return result;
+    }
+
+    /**
+     * Run op, wrapped in a {@code StackableScope}
+     * @param op a Runnable
+     */
+    public static void run(Runnable op) {
+        if (head() == null) {
+            Throwable ex = null;
+            try {
+                op.run();
+            } catch (Throwable e) {
+                ex = e;
+            } finally {
+                StackableScope head = head();
+                if (head != null) {
+                    popAll();
+                }
+                handleThrows(ex, head == null);
+            }
+        } else {
+            // Slow path
+            new StackableScope().doRun(op);
+        }
+    }
+
+    private void doRun(Runnable op) {
+        Throwable ex = null;
+        boolean atTop;
+        var scope = push();
+        try {
+            op.run();
+        } catch (Throwable e) {
+            ex = e;
+        } finally {
+            atTop = scope.popForcefully();  // may block
+        }
+        handleThrows(ex, atTop);
     }
 
     /**
@@ -164,7 +269,15 @@ public class StackableScope {
      * Returns the scope of the given type that encloses this scope.
      */
     public <T extends StackableScope> T enclosingScope(Class<T> type) {
-        StackableScope current = enclosingScope();
+        StackableScope enclosing = enclosingScope();
+        if (enclosing != null) {
+            return enclosing.innermostScope(type);
+        }
+        return null;
+    }
+
+    public <T extends StackableScope> T innermostScope(Class<T> type) {
+        StackableScope current = this;
         while (current != null) {
             if (type.isInstance(current)) {
                 @SuppressWarnings("unchecked")
