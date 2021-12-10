@@ -75,6 +75,11 @@ java/lang/ref/OOMEInReferenceHandler.java
 
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 
+####
+# functionality not supported by virtual theads
+java/lang/management/ThreadMXBean/ThreadUserTime.java
+java/lang/management/ThreadMXBean/ThreadCpuTime.java
+
 
 ####
 # Tests failing while setting custom Permissions
@@ -218,6 +223,7 @@ java/io/Serializable/class/NonSerializableTest.java
 java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
+java/lang/instrument/PremainClass/PremainClassTest.java
 
 ####
 # No expected StackOverflow

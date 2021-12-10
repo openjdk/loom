@@ -17,6 +17,8 @@ runtime/Nestmates/membership/TestNestmateMembership.java                        
 
 # java/lang/ClassLoader/loadLibraryUnload/LoadLibraryUnload.java                                  8273780 generic-all
 
+vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
+
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
 
@@ -186,6 +188,7 @@ runtime/cds/appcds/HelloExtTest.java
 runtime/cds/appcds/IgnoreEmptyClassPaths.java
 runtime/cds/appcds/JvmtiAddPath.java
 runtime/cds/appcds/LambdaWithOldClass.java
+runtime/cds/appcds/LambdaWithJavaAgent.java
 runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java
 runtime/cds/appcds/MissingSuperTest.java
 runtime/cds/appcds/MultiProcessSharing.java
