@@ -741,7 +741,7 @@ java/awt/Robot/HiDPIScreenCapture/ScreenCaptureTest.java  8277816 macosx-aarch64
 java/awt/Robot/CheckCommonColors/CheckCommonColors.java 8277816 macosx-aarch64
 java/awt/ColorClass/AlphaColorTest.java 8277816 macosx-aarch64
 java/awt/AlphaComposite/WindowAlphaCompositeTest.java 8277816 macosx-aarch64
-	
+
 # macos12 failure
 javax/swing/JMenu/4515762/bug4515762.java 8276074 macosx-all
 
@@ -876,3 +876,5 @@ java/awt/Focus/FrameMinimizeTest/FrameMinimizeTest.java 8016266 linux-x64
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 jdk/jfr/event/runtime/TestClassLoaderStatsEvent.java            8247965 generic-all
+
+jdk/jfr/event/gc/detailed/TestZPageAllocationEvent.java	        8278537 generic-all
