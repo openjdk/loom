@@ -141,6 +141,7 @@ public class ScopeLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    @SuppressWarnings("try")
     public Object TWR_bind_ScopeLocal() throws Exception {
         try (var x = ScopeLocal.where(unbound, 42).bind()) {
             return getClass();
