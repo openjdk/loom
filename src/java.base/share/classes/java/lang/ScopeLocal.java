@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
@@ -103,7 +104,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * @param <T> the scope local's type
  * @since 99
  */
-@jdk.internal.javac.PreviewFeature(feature=SCOPE_LOCALS)
+@PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
     private final @Stable int hash;
 
@@ -171,6 +172,7 @@ public final class ScopeLocal<T> {
      * are bound, such that calling the get() method returns the associated
      * value.
      */
+    @PreviewFeature(feature=SCOPE_LOCALS)
     public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache

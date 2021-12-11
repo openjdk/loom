@@ -26,9 +26,13 @@
 
 package java.lang;
 
+import jdk.internal.javac.PreviewFeature;
+import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
+
 /**
  * The interface for a ScopeLocal try-with-resources binding.
  */
+@PreviewFeature(feature=SCOPE_LOCALS)
 public sealed interface ScopeLocalBinder extends AutoCloseable permits ScopeLocal.Binder {
 
     /**
@@ -37,5 +41,5 @@ public sealed interface ScopeLocalBinder extends AutoCloseable permits ScopeLoca
      * This method is invoked automatically on objects managed by the try-with-resources statement.
      * @throws StructureViolationException if the bindings were not closed in the correct order.
      */
-    public void close() throws StructureViolationException;
+    public void close();
 }
