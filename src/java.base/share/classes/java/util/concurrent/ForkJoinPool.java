@@ -1659,7 +1659,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         } while (prevCtl != (prevCtl = compareAndExchangeCtl(prevCtl, c)));
 
         Thread.interrupted();                // clear status
-        LockSupport.setCurrentBlocker(this); // prepare to block (exit also OK)
+        //LockSupport.setCurrentBlocker(this); // prepare to block (exit also OK)
         long deadline = 0L;                  // nonzero if possibly quiescent
         int ac = (int)(c >> RC_SHIFT), md;
         if ((md = mode) < 0)                 // pool is terminating
