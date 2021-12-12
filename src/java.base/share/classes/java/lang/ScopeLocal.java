@@ -385,7 +385,11 @@ public final class ScopeLocal<T> {
             if (headScope == null) {
                 return null;
             }
-            return headScope.innermostScope(Binder.class);
+            if (headScope instanceof Binder binder) {
+                return binder;
+            } else {
+                return headScope.enclosingScope(Binder.class);
+            }
         }
 
         /**
