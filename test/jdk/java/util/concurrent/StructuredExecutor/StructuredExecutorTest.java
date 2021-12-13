@@ -1001,12 +1001,13 @@ public class StructuredExecutorTest {
     public void testStructureViolation3() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         try (var executor = StructuredExecutor.open()) {
-            ScopeLocal.where(NAME, "fred").run(() -> {
+            ScopeLocal.where(NAME, "fred").call(() -> {
                 expectThrows(StructureViolationException.class,
                              () -> executor.fork(() -> "foo"));
                 expectThrows(RejectedExecutionException.class,
                              () -> executor.execute(() -> { }));
                 executor.join();
+                return null;
             });
         }
     }
