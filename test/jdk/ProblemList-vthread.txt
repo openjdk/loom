@@ -76,9 +76,10 @@ java/lang/ref/OOMEInReferenceHandler.java
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 
 ####
-# functionality not supported by virtual theads
+# Makes use of methods that are not supported on virtual threads
 java/lang/management/ThreadMXBean/ThreadUserTime.java
 java/lang/management/ThreadMXBean/ThreadCpuTime.java
+com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java
 
 
 ####
