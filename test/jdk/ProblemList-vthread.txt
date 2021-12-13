@@ -78,6 +78,7 @@ runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
 ####
 # Makes use of methods that are not supported on virtual threads
 java/lang/management/ManagementFactory/ProxyTypeMapping.java
+java/lang/management/ManagementFactory/ValidateOpenTypes.java
 java/lang/management/ThreadMXBean/ThreadUserTime.java
 java/lang/management/ThreadMXBean/ThreadCpuTime.java
 com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java
