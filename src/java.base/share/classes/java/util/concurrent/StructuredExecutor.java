@@ -43,6 +43,9 @@ import jdk.internal.javac.PreviewFeature;
  * where a task splits into several concurrent sub-tasks to be executed in their own
  * threads and where the sub-tasks must complete before the main task can continue.
  *
+ * <p> <b>This API is still work in progress. It will probably be renamed and changed
+ * to not implement Executor.</b>
+ *
  * <h2>Basic usage</h2>
  *
  * StructuredExecutor defines the {@link #open() open} method to open a new executor,
@@ -175,7 +178,8 @@ import jdk.internal.javac.PreviewFeature;
  *
  *     }
  * }
- *  <h2>Tree structure</h2>
+ *
+ * <h2>Tree structure</h2>
  *
  * A StructuredExecutor is conceptually a node in a tree. A thread started in executor
  * "A" may itself open a new executor "B", implicitly forming a tree where executor "A" is
@@ -186,6 +190,34 @@ import jdk.internal.javac.PreviewFeature;
  * The phrase "threads contained in the executor" in method descriptions means threads in
  * executors in the tree. StructuredExecutor does not define APIs that exposes the tree
  * structure at this time.
+ *
+ * <h2> Inheritance of scope-local bindings</h2>
+ *
+ * Creating a StructuredExecutor captures the {@linkplain ScopeLocal scope-local} bindings
+ * for inheritance by threads created in the executor.
+ *
+ * The following example performs an operation with a scope local {@code NAME} bound to the
+ * value "duke". The operation creates a {@code StructuredExecutor} that invokes {@code fork}
+ * to start a thread to execute {@code childTask}. The code in {@code childTask} uses the
+ * value of the scope-local and so reads the value "duke".
+ * {@snippet lang=java :
+ *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
+ *
+ *     // @link substring="where" target="ScopeLocal#where" :
+ *     String result = ScopeLocal.where(NAME, "duke").call(() -> {  // @highlight substring="call"
+ *         try (var executor = StructuredExecutor.open()) {
+ *             executor.fork(() -> childTask());    // @highlight substring="fork"
+ *             ...
+ *         }
+ *     });
+ *
+ *     ...
+ *
+ *     String childTask() {
+ *         String name = NAME.get();   // "duke"    // @highlight substring="get"
+ *         ...
+ *     }
+ * }
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
