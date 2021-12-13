@@ -1,6 +1,7 @@
 # Filed bugs
 
-java/foreign/channels/TestSocketChannels.java                                                   8272749 windows-all
+java/foreign/channels/TestSocketChannels.java                         8272749 windows-all
+java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
