@@ -47,8 +47,13 @@ public class DumpThreads {
         try {
             mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
             cat(file);
-            String expect = "#" + Thread.currentThread().getId();
-            assertTrue(count(file, expect) == 1L);
+
+            // if the main thread is a platform thread then it should be included
+            Thread current = Thread.currentThread();
+            if (!current.isVirtual()) {
+                String expect = "#" + Thread.currentThread().getId();
+                assertTrue(count(file, expect) == 1L);
+            }
         } finally {
             Files.deleteIfExists(file);
         }
@@ -64,8 +69,13 @@ public class DumpThreads {
             assertTrue(count(file, "threadDump") >= 1L);
             assertTrue(count(file, "threadContainers") >= 1L);
             assertTrue(count(file, "threads") >= 1L);
-            String expect = "\"tid\": " + Thread.currentThread().getId();
-            assertTrue(count(file, expect) >= 1L);
+
+            // if the main thread is a platform thread then it should be included
+            Thread current = Thread.currentThread();
+            if (!current.isVirtual()) {
+                String expect = "\"tid\": " + current.getId();
+                assertTrue(count(file, expect) >= 1L);
+            }
         } finally {
             Files.deleteIfExists(file);
         }
