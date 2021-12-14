@@ -2,6 +2,8 @@
 
 java/foreign/channels/TestSocketChannels.java                         8272749 windows-all
 java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
+jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
+jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
@@ -58,11 +60,14 @@ java/lang/Thread/MainThreadTest.java
 
 
 ####
-# JFR tests check events for test main thread only
+# JFR tests check events for test main thread only or expect to find MainThread
 
 jdk/jfr/event/io/TestFileStreamEvents.java
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java
+jdk/jfr/event/runtime/TestThreadStartEvent.java
 
+# the VirtualThreadStartEvent is loaded before main() in wrapper
+test/jdk/jdk/jfr/jvm/TestGetAllEventClasses.java
 
 ####
 # OOME in unexpected thread
@@ -156,6 +161,7 @@ java/lang/constant/methodTypeDesc/ResolveConstantDesc.java
 java/lang/ClassLoader/forNameLeak/ClassForNameLeak.java
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithRemoveAddProvider.java
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithProviderChange.java
+jdk/jfr/api/consumer/security/TestStreamingRemote.java
 jdk/jfr/startupargs/TestDumpOnExit.java
 java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
@@ -177,6 +183,7 @@ java/util/logging/modules/GetResourceBundleTest.java
 jdk/modules/etc/DefaultModules.java
 jdk/modules/incubator/ServiceBinding.java
 jdk/internal/misc/VM/RuntimeArguments.java
+jdk/jfr/jvm/TestJfrJavaBase.java
 java/lang/StackWalker/CallerFromMain.java
 java/lang/Package/PackageFromManifest.java
 java/lang/Package/IsCompatibleWithDriver.java
