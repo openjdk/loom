@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -160,6 +161,8 @@ public class CustomScheduler {
     @Test
     public void testParkWithInterruptSet() {
         Thread carrier = Thread.currentThread();
+        if (carrier.isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         try {
             Thread vthread = TestHelper.virtualThreadBuilder(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
@@ -179,6 +182,8 @@ public class CustomScheduler {
     @Test
     public void testTerminateWithInterruptSet() {
         Thread carrier = Thread.currentThread();
+        if (carrier.isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         try {
             Thread vthread = TestHelper.virtualThreadBuilder(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
@@ -195,6 +200,8 @@ public class CustomScheduler {
      */
     @Test
     public void testRunWithInterruptSet() throws Exception {
+        if (Thread.currentThread().isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         Executor scheduler = (task) -> {
             Thread.currentThread().interrupt();
             task.run();

@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
@@ -279,7 +280,11 @@ public class BuilderTest {
 
     @Test
     public void testPriority3() {
-        int maxPriority = Thread.currentThread().getThreadGroup().getMaxPriority();
+        Thread currentThread = Thread.currentThread();
+        if (currentThread.isVirtual())
+            throw new SkipException("Main test is a virtual thread");
+
+        int maxPriority = currentThread.getThreadGroup().getMaxPriority();
         int priority = Math.min(maxPriority + 1, Thread.MAX_PRIORITY);
 
         Thread.Builder builder = Thread.ofPlatform().priority(priority);

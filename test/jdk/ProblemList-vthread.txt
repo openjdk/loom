@@ -37,8 +37,6 @@ jdk/internal/vm/Continuation/Fuzz.java
 ####
 # Thread-sensitive threads
 
-java/lang/Thread/BuilderTest.java
-java/lang/Thread/virtual/CustomScheduler.java
 java/lang/Thread/UncaughtExceptionsTest.java
 jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
 com/sun/net/httpserver/bugs/B6431193.java
@@ -47,10 +45,6 @@ com/sun/net/httpserver/bugs/B6431193.java
 ####
 # Other virtual threads tests, failing with wrapper
 
-java/lang/Thread/virtual/NioChannels.java#id0
-java/lang/Thread/virtual/NioChannels.java#id1
-java/lang/Thread/virtual/NetSockets.java#id0
-java/lang/Thread/virtual/NetSockets.java#id1
 java/lang/Thread/virtual/StackTraceWhenRunnable.java
 
 ####
@@ -167,6 +161,7 @@ java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
 java/lang/annotation/ParameterAnnotations.java
 sun/security/util/Resources/early/EarlyResources.java
+javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java
 
 #####
 # Tests failing because of ProcessTools wrapper
@@ -234,6 +229,7 @@ java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
 java/lang/instrument/PremainClass/PremainClassTest.java
+java/lang/instrument/executableJAR/ExecJarWithAgent.java
 
 ####
 # No expected StackOverflow
@@ -250,12 +246,14 @@ java/lang/RuntimeTests/exec/LotsOfOutput.java
 
 ####
 # Legacy socket I/O is interruptible in the context of virtual threads
-# TBD Might be tests can fixed
-
 java/net/DatagramSocket/InterruptibleDatagramSocket.java
-java/net/Socket/Timeouts.java
 java/nio/channels/DatagramChannel/InterruptibleOrNot.java
+
+
+####
+# Tests behavior that differs when underlying socket is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java
+
 
 ####
 # JDI tests, should be re-reviewed when JVMTI is synced with JDI
