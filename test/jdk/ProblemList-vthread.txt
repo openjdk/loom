@@ -43,8 +43,8 @@ com/sun/net/httpserver/bugs/B6431193.java
 #B6431193.java: HttpServer inherit thread properies (daemon, but sure not virtuality)
 
 ####
-# Other virtual threads tests, failing with wrapper
 
+# Test limits default scheduler to 1 carrier thread, can't run with wrapper
 java/lang/Thread/virtual/StackTraceWhenRunnable.java
 
 ####
