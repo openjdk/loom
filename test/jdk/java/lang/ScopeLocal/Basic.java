@@ -256,4 +256,50 @@ public class Basic {
         });
         assertFalse(name.isBound());
     }
+
+    /**
+     * Test closing enclosing binder, should close nested binder.
+     */
+    public void testStructureViolation1() {
+        ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
+        ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
+        var binding1 = ScopeLocal.where(NAME1, "x").bind();
+        try {
+            var binding2 = ScopeLocal.where(NAME2, "y").bind();
+            try {
+                expectThrows(StructureViolationException.class, binding1::close);
+
+                // binding1 and binding2 should be removed
+                assertFalse(NAME1.isBound());
+                assertFalse(NAME2.isBound());
+            } finally {
+                closeQuietly(binding2);
+            }
+        } finally {
+            closeQuietly(binding1);
+        }
+    }
+
+    /**
+     * Test closing enclosing binder, should not disrupt nested binding
+     * when running an op.
+     */
+    public void testStructureViolation2() {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        var binding = ScopeLocal.where(NAME, "x").bind();
+        try {
+            ScopeLocal.where(NAME, "y").run(() -> {
+                expectThrows(StructureViolationException.class, binding::close);
+                assertEquals(NAME.get(), "y");
+            });
+            assertFalse(NAME.isBound());
+        } finally {
+            closeQuietly(binding);
+        }
+    }
+
+    // Binder::close isn't idempotent so ignore exception for now
+    private void closeQuietly(AutoCloseable c) {
+        try { c.close(); } catch (Exception ignore) { }
+    }
 }
