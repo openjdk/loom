@@ -61,7 +61,7 @@ jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 jdk/jfr/event/runtime/TestThreadStartEvent.java
 
 # the VirtualThreadStartEvent is loaded before main() in wrapper
-test/jdk/jdk/jfr/jvm/TestGetAllEventClasses.java
+jdk/jfr/jvm/TestGetAllEventClasses.java
 
 ####
 # OOME in unexpected thread
