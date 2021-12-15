@@ -231,6 +231,9 @@ java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 java/lang/instrument/PremainClass/PremainClassTest.java
 java/lang/instrument/executableJAR/ExecJarWithAgent.java
 
+sun/management/jmxremote/bootstrap/SSLConfigFilePermissionTest.java
+sun/management/jmxremote/bootstrap/PasswordFilePermissionTest.java
+
 ####
 # No expected StackOverflow
 
