@@ -30,9 +30,6 @@
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
@@ -69,9 +66,6 @@ public class Basic {
         });
     }
 
-    /**
-     * Test runWithBinding with non-inheritable scope variable.
-     */
     public void testRunWithBinding1() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -96,9 +90,6 @@ public class Basic {
         });
     }
 
-    /**
-     * Test runWithBinding with non-inheritable scope variable, null value.
-     */
     public void testRunWithBinding3() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, null, () -> {
@@ -123,22 +114,12 @@ public class Basic {
         });
     }
 
-    /**
-     * Test runWithBinding with inheritable scope variable.
-     */
-
-    /**
-     * Test runWithBinding with null operation
-     */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testRunWithBinding9() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Runnable)null);
     }
 
-    /**
-     * Test callWithBinding with non-inheritable scope variable.
-     */
     public void testCallWithBinding1() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, "fred", () -> {
@@ -170,9 +151,6 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
-    /**
-     * Test callWithBinding with non-inheritable scope variable, null value.
-     */
     public void testCallWithBinding3() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, null, () -> {
@@ -202,12 +180,80 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
-    /**
-     * Test callWithBinding with null operation
-     */
     @Test(expectedExceptions = { NullPointerException.class })
     public void testCallWithBinding9() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", (Callable)null);
+    }
+
+    /**
+     * Basic test of bind method.
+     */
+    public void testTryWithResources1() {
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        try (var binding = ScopeLocal.where(name, "x").bind()) {
+            assertEquals(name.get(), "x");
+
+            // re-bind should fail
+            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
+
+            assertEquals(name.get(), "x");
+        }
+        assertFalse(name.isBound());
+    }
+
+    /**
+     * Basic test of bind method with nested bindings.
+     */
+    public void testTryWithResources2() {
+        ScopeLocal<String> name1 = ScopeLocal.newInstance();
+        ScopeLocal<String> name2 = ScopeLocal.newInstance();
+        try (var binding1 = ScopeLocal.where(name1, "x").bind()) {
+            assertEquals(name1.get(), "x");
+            assertFalse(name2.isBound());
+
+            try (var binding2 = ScopeLocal.where(name2, "y").bind()) {
+                assertEquals(name1.get(), "x");
+                assertEquals(name2.get(), "y");
+            }
+
+            assertEquals(name1.get(), "x");
+            assertFalse(name2.isBound());
+        }
+        assertFalse(name1.isBound());
+    }
+
+    /**
+     * Basic test of re-binding after bind.
+     */
+    public void testTryWithResources3() {
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        try (var binding = ScopeLocal.where(name, "x").bind()) {
+            assertEquals(name.get(), "x");
+
+            // re-bind
+            ScopeLocal.where(name, "y").run(() -> {
+                assertEquals(name.get(), "y");
+            });
+
+            assertEquals(name.get(), "x");
+        }
+        assertFalse(name.isBound());
+    }
+
+    /**
+     * Basic test that bind cannot re-bind.
+     */
+    public void testTryWithResources4() {
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        ScopeLocal.where(name, "x").run(() -> {
+            assertEquals(name.get(), "x");
+
+            // re-bind should fail
+            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
+
+            assertEquals(name.get(), "x");
+        });
+        assertFalse(name.isBound());
     }
 }
