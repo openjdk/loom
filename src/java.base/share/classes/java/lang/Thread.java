@@ -50,6 +50,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -250,11 +251,21 @@ public class Thread implements Runnable {
     }
 
     void inheritScopeLocalBindings(ThreadContainer container) {
-        Object bindings = container.scopeLocalBindings();
-        if (bindings != null) {
-            if (Thread.currentThread().scopeLocalBindings != bindings) {
+        ScopeLocalContainer.BindingsSnapshot snapshot;
+        if (container.owner() != null
+                && (snapshot = container.scopeLocalBindings()) != null) {
+
+            // bindings established for running/calling an operation
+            Object bindings = snapshot.scopeLocalBindings();
+            if (currentThread().scopeLocalBindings != bindings) {
                 throw new StructureViolationException("Scope local bindings have changed");
             }
+
+            // bindings established by invoking bind
+            if (ScopeLocalContainer.latest() != snapshot.container()) {
+                throw new StructureViolationException("Scope local bindings have changed");
+            }
+
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
         }
     }

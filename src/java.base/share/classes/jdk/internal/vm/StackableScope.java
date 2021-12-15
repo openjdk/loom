@@ -26,9 +26,6 @@ package jdk.internal.vm;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Unsafe;
-
-import java.util.concurrent.Callable;
 
 /**
  * A stackable scope.
@@ -83,7 +80,7 @@ public class StackableScope {
      */
     public boolean tryPop() {
         if (Thread.currentThread() != owner)
-            throw new IllegalStateException("Not owner");
+            throw new WrongThreadException("Not owner");
         if (head() == this) {
             setHead(previous);
             previous = null;
@@ -111,7 +108,7 @@ public class StackableScope {
      */
     public boolean popForcefully() {
         if (Thread.currentThread() != owner)
-            throw new IllegalStateException("Not owner");
+            throw new WrongThreadException("Not owner");
         final StackableScope head = head();
         if (head == this) {
             setHead(previous);
@@ -148,127 +145,6 @@ public class StackableScope {
                 current = current.previous();
             }
             setHead(null);
-        }
-    }
-
-    /**
-     * For use by ScopeLocal to run an operation in a structured context.
-     */
-    public static void run(Runnable op) {
-        if (head() == null) {
-            // no need to push scope when stack is empty
-            runWithoutScope(op);
-        } else {
-            new StackableScope().doRun(op);
-        }
-    }
-
-    /**
-     * Run an operation without a scope on the stack.
-     */
-    private static void runWithoutScope(Runnable op) {
-        assert head() == null;
-        Throwable ex;
-        boolean atTop;
-        try {
-            op.run();
-            ex = null;
-        } catch (Throwable e) {
-            ex = e;
-        } finally {
-            atTop = (head() == null);
-            if (!atTop) popAll();   // may block
-        }
-        throwIfFailed(ex, atTop);
-    }
-
-    /**
-     * Run an operation with this scope on the stack.
-     */
-    private void doRun(Runnable op) {
-        Throwable ex;
-        boolean atTop;
-        push();
-        try {
-            op.run();
-            ex = null;
-        } catch (Throwable e) {
-            ex = e;
-        } finally {
-            atTop = popForcefully();  // may block
-        }
-        throwIfFailed(ex, atTop);
-    }
-
-    /**
-     * For use by ScopeLocal to call a value returning operation in a structured context.
-     */
-    public static <V> V call(Callable<V> op) throws Exception {
-        if (head() == null) {
-            // no need to push scope when stack is empty
-            return callWithoutScope(op);
-        } else {
-            return new StackableScope().doCall(op);
-        }
-    }
-
-    /**
-     * Call an operation without a scope on the stack.
-     */
-    private static <V> V callWithoutScope(Callable<V> op) {
-        assert head() == null;
-        Throwable ex;
-        boolean atTop;
-        V result;
-        try {
-            result = op.call();
-            ex = null;
-        } catch (Throwable e) {
-            result = null;
-            ex = e;
-        } finally {
-            atTop = (head() == null);
-            if (!atTop) popAll();  // may block
-        }
-        throwIfFailed(ex, atTop);
-        return result;
-    }
-
-    /**
-     * Call an operation with this scope on the stack.
-     */
-    private <V> V doCall(Callable<V> op) {
-        Throwable ex;
-        boolean atTop;
-        V result;
-        push();
-        try {
-            result = op.call();
-            ex = null;
-        } catch (Throwable e) {
-            result = null;
-            ex = e;
-        } finally {
-            atTop = popForcefully();  // may block
-        }
-        throwIfFailed(ex, atTop);
-        return result;
-    }
-
-    /**
-     * Throws {@code ex} if not null. Throws StructureViolationException
-     */
-    private static void throwIfFailed(Throwable ex, boolean atTop) {
-        if (ex != null || !atTop) {
-            if (!atTop) {
-                var e = new StructureViolationException();
-                if (ex == null) {
-                    ex = e;
-                } else {
-                    ex.addSuppressed(e);
-                }
-            }
-            Unsafe.getUnsafe().throwException(ex);
         }
     }
 
@@ -361,7 +237,7 @@ public class StackableScope {
     /**
      * Returns the head of the current thread's scope stack.
      */
-    private static StackableScope head() {
+    static StackableScope head() {
         return JLA.headStackableScope(Thread.currentThread());
     }
 

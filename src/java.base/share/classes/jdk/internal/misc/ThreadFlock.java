@@ -35,6 +35,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -97,7 +98,7 @@ public class ThreadFlock implements AutoCloseable {
     private volatile int threadCount;
 
     private final String name;
-    private final Object scopeLocalBindings;
+    private final ScopeLocalContainer.BindingsSnapshot scopeLocalBindings;
     private final ThreadContainerImpl container; // encapsulate for now
 
     // state
@@ -109,7 +110,7 @@ public class ThreadFlock implements AutoCloseable {
 
     ThreadFlock(String name) {
         this.name = name;
-        this.scopeLocalBindings = JLA.scopeLocalBindings();
+        this.scopeLocalBindings = ScopeLocalContainer.captureBindings();
         this.container = new ThreadContainerImpl(this);
     }
 
@@ -117,7 +118,7 @@ public class ThreadFlock implements AutoCloseable {
         return threadCount;
     }
 
-    private Object scopeLocalBindings() {
+    private ScopeLocalContainer.BindingsSnapshot scopeLocalBindings() {
         return scopeLocalBindings;
     }
 
@@ -583,8 +584,8 @@ public class ThreadFlock implements AutoCloseable {
             return flock.toString();
         }
         @Override
-        public Object scopeLocalBindings() {
-            return flock.scopeLocalBindings();
+        public ScopeLocalContainer.BindingsSnapshot scopeLocalBindings() {
+            return flock.scopeLocalBindings;
         }
     }
 }

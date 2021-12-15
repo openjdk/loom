@@ -32,10 +32,8 @@ import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
 import jdk.internal.javac.PreviewFeature;
-import jdk.internal.vm.StackableScope;
+import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
 
@@ -108,8 +106,6 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 public final class ScopeLocal<T> {
     private final @Stable int hash;
 
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
     public final int hashCode() { return hash; }
 
     /**
@@ -120,7 +116,6 @@ public final class ScopeLocal<T> {
      *
      * @since 99
      */
-
     static class Snapshot {
         final Snapshot prev;
         final Carrier bindings;
@@ -269,7 +264,7 @@ public final class ScopeLocal<T> {
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
-                return StackableScope.call(op);
+                return ScopeLocalContainer.call(op);
             } catch (Throwable t) {
                 Cache.invalidate();
                 throw t;
@@ -318,7 +313,7 @@ public final class ScopeLocal<T> {
             Cache.invalidate(primaryBits | secondaryBits);
             var prevBindings = addScopeLocalBindings(this, primaryBits);
             try {
-                StackableScope.run(op);
+                ScopeLocalContainer.run(op);
             } catch (Throwable t) {
                 Cache.invalidate();
                 throw t;
@@ -365,7 +360,8 @@ public final class ScopeLocal<T> {
     /**
      * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
      */
-    static final class Binder extends StackableScope implements ScopeLocalBinder {
+    static final class Binder
+            extends ScopeLocalContainer implements ScopeLocalBinder {
         final Carrier bindings;
         final short primaryBits;
         final Binder prevBinder;
@@ -378,17 +374,11 @@ public final class ScopeLocal<T> {
         }
 
         static Binder innermostBinder() {
-            StackableScope headScope =  JLA.headStackableScope(Thread.currentThread());
-            if (headScope == null) {
-                headScope = JLA.threadContainer(Thread.currentThread());
-            }
-            if (headScope == null) {
-                return null;
-            }
-            if (headScope instanceof Binder binder) {
+            var container = ScopeLocalContainer.latest();
+            if (container instanceof Binder binder) {
                 return binder;
             } else {
-                return headScope.enclosingScope(Binder.class);
+                return null;
             }
         }
 

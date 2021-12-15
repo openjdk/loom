@@ -293,11 +293,11 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * Test that fork inherits a scope-local binding created when calling an operation.
+     * Test that fork inherits a scope-local binding.
      */
     public void testForkInheritsScopeLocals1() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+        String value = ScopeLocal.where(NAME, "x").call(() -> {
             try (var executor = StructuredExecutor.open()) {
                 Future<String> future = executor.fork(() -> {
                     // child
@@ -307,31 +307,31 @@ public class StructuredExecutorTest {
                 return future.resultNow();
             }
         });
-        assertEquals(value, "fred");
+        assertEquals(value, "x");
     }
 
     /**
-     * Test that fork inherits scope-local bindings created with bind.
+     * Test that fork inherits a scope-local binding.
      */
     public void testForkInheritsScopeLocals2() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var ignore = ScopeLocal.where(NAME, "fred").bind();
+        try (var ignore = ScopeLocal.where(NAME, "x").bind();
              var executor = StructuredExecutor.open()) {
             Future<String> future = executor.fork(() -> {
                 // child
                 return NAME.get();
             });
             executor.join();
-            assertEquals(future.resultNow(), "fred");
+            assertEquals(future.resultNow(), "x");
         }
     }
 
     /**
-     * Test that fork inherits a scope-local binding created when calling an operation.
+     * Test that fork inherits a scope-local binding into a grandchild.
      */
     public void testForkInheritsScopeLocals3() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+        String value = ScopeLocal.where(NAME, "x").call(() -> {
             try (var executor1 = StructuredExecutor.open()) {
                 Future<String> future1 = executor1.fork(() -> {
                     try (var executor2 = StructuredExecutor.open()) {
@@ -347,7 +347,32 @@ public class StructuredExecutorTest {
                 return future1.resultNow();
             }
         });
-        assertEquals(value, "fred");
+        assertEquals(value, "x");
+    }
+
+    /**
+     * Test that fork inherits a scope-local binding into a grandchild.
+     */
+    public void testForkInheritsScopeLocals4() throws Exception {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+
+        try (var binding = ScopeLocal.where(NAME, "x").bind();
+             var executor1 = StructuredExecutor.open()) {
+
+            Future<String> future1 = executor1.fork(() -> {
+                try (var executor2 = StructuredExecutor.open()) {
+                    Future<String> future2 = executor2.fork(() -> {
+                        // grandchild
+                        return NAME.get();
+                    });
+                    executor2.join();
+                    return future2.resultNow();
+                }
+            });
+
+            executor1.join();
+            assertEquals(future1.resultNow(), "x");
+        }
     }
 
     /**
@@ -943,7 +968,6 @@ public class StructuredExecutorTest {
                     assertTrue(false);
                 } catch (StructureViolationException expected) { }
 
-
                 // underlying flock should be closed, fork should return a cancelled task
                 AtomicBoolean ran = new AtomicBoolean();
                 Future<String> future = executor2.fork(() -> {
@@ -958,8 +982,8 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * Test exiting a scope local operation should close the thread flock
-     * is a nested executor.
+     * Test exiting a scope local operation closes the thread flock of a
+     * nested executor.
      */
     public void testStructureViolation2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
@@ -969,7 +993,7 @@ public class StructuredExecutorTest {
         var box = new Box();
         try {
             try {
-                ScopeLocal.where(name, "x1").run(() -> {
+                ScopeLocal.where(name, "x").run(() -> {
                     box.executor = StructuredExecutor.open();
                 });
                 assertTrue(false);
@@ -995,20 +1019,31 @@ public class StructuredExecutorTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if scope-local bindings
-     * created after StructuredExecutor is created.
+     * Test closing a scope local binder will close the thread flock of a
+     * nested executor.
      */
     public void testStructureViolation3() throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var executor = StructuredExecutor.open()) {
-            ScopeLocal.where(NAME, "fred").call(() -> {
-                expectThrows(StructureViolationException.class,
-                             () -> executor.fork(() -> "foo"));
-                expectThrows(RejectedExecutionException.class,
-                             () -> executor.execute(() -> { }));
-                executor.join();
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        StructuredExecutor executor = null;
+        try {
+            try (var binding = ScopeLocal.where(name, "x").bind()) {
+                executor = StructuredExecutor.open();
+            } catch (StructureViolationException expected) { }
+
+            // underlying flock should be closed, fork should return a cancelled task
+            AtomicBoolean ran = new AtomicBoolean();
+            Future<String> future = executor.fork(() -> {
+                ran.set(true);
                 return null;
             });
+            assertTrue(future.isCancelled());
+            executor.join();
+            assertFalse(ran.get());
+
+        } finally {
+            if (executor != null) {
+                executor.close();
+            }
         }
     }
 
@@ -1016,17 +1051,74 @@ public class StructuredExecutorTest {
      * Test that fork throws StructureViolationException if scope-local bindings
      * created after StructuredExecutor is created.
      */
-    @Test(enabled=false)
     public void testStructureViolation4() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
+
+        try (var executor = StructuredExecutor.open()) {
+            ScopeLocal.where(NAME, "x").run(() -> {
+                expectThrows(StructureViolationException.class,
+                             () -> executor.fork(() -> "foo"));
+                expectThrows(RejectedExecutionException.class,
+                             () -> executor.execute(() -> { }));
+            });
+        }
+
         try (var executor = StructuredExecutor.open();
-             var ignore = ScopeLocal.where(NAME, "fred").bind()) {
+             var ignore = ScopeLocal.where(NAME, "x").bind()) {
             expectThrows(StructureViolationException.class,
                          () -> executor.fork(() -> "foo"));
-            executor.join();
+            expectThrows(RejectedExecutionException.class,
+                         () -> executor.execute(() -> { }));
         }
     }
-    
+
+    /**
+     * Test that fork throws StructureViolationException if scope-local bindings
+     * changed after StructuredExecutor is created.
+     */
+    public void testStructureViolation5() throws Exception {
+        ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
+        ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
+
+        // re-bind
+        ScopeLocal.where(NAME1, "x").run(() -> {
+            try (var executor = StructuredExecutor.open()) {
+                ScopeLocal.where(NAME1, "y").run(() -> {
+                    expectThrows(StructureViolationException.class,
+                                 () -> executor.fork(() -> "foo"));
+                });
+            }
+        });
+
+        // new binding
+        ScopeLocal.where(NAME1, "x").run(() -> {
+            try (var executor = StructuredExecutor.open()) {
+                ScopeLocal.where(NAME2, "y").run(() -> {
+                    expectThrows(StructureViolationException.class,
+                                 () -> executor.fork(() -> "foo"));
+                });
+            }
+        });
+
+        // re-bind
+        try (var binding = ScopeLocal.where(NAME1, "x").bind();
+             var executor = StructuredExecutor.open()) {
+            ScopeLocal.where(NAME1, "y").run(() -> {
+                expectThrows(StructureViolationException.class,
+                             () -> executor.fork(() -> "foo"));
+            });
+        }
+
+        // new binding
+        try (var binding = ScopeLocal.where(NAME1, "x").bind();
+             var executor = StructuredExecutor.open()) {
+            ScopeLocal.where(NAME2, "y").run(() -> {
+                expectThrows(StructureViolationException.class,
+                             () -> executor.fork(() -> "foo"));
+            });
+        }
+    }
+
     /**
      * Test Future::get, task completes normally.
      */
