@@ -37,19 +37,16 @@ jdk/internal/vm/Continuation/Fuzz.java
 ####
 # Thread-sensitive threads
 
+# Test assumes main thread is named "main"
 java/lang/Thread/UncaughtExceptionsTest.java
-jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
-com/sun/net/httpserver/bugs/B6431193.java
-#B6431193.java: HttpServer inherit thread properies (daemon, but sure not virtuality)
 
-####
+# Handler thread has daemon status set because it inherited from virtual thread
+com/sun/net/httpserver/bugs/B6431193.java
 
 # Test limits default scheduler to 1 carrier thread, can't run with wrapper
 java/lang/Thread/virtual/StackTraceWhenRunnable.java
 
-####
-# ThreadGroup owner is not main
-
+# Test requires the main thread to be in a thread group
 java/lang/Thread/MainThreadTest.java
 
 
