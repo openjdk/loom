@@ -2192,7 +2192,7 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
                                                                     jt,
                                                                     _owned_monitor_ptr,
-                                                                    false);
+                                                                    _is_virtual);
   }
 }
 
@@ -2306,18 +2306,6 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
                                                          java_thread,
                                                          jvf,
                                                          _owned_monitors_list);
-  }
-}
-
-void
-VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
-  JavaThread* java_thread = JavaThread::cast(target);
-
-  if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread*)target,
-                                                                    java_thread,
-                                                                    _owned_monitor_ptr,
-                                                                    true);
   }
 }
 

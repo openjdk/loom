@@ -1492,9 +1492,7 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // there is no monitor info to collect if target virtual thread is unmounted
     if (java_thread != NULL) {
-      VThreadGetCurrentContendedMonitorClosure op(this,
-                                                  Handle(calling_thread, thread_oop),
-                                                  monitor_ptr);
+      GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr, true); // is_virtual
       Handshake::execute(&op, java_thread);
       err = op.result();
     } else {
@@ -1511,7 +1509,7 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
     err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr, false);
   } else {
     // get contended monitor information with handshake
-    GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);
+    GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr, false); // !is_virtual
     Handshake::execute(&op, java_thread);
     err = op.result();
   }

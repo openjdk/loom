@@ -512,19 +512,21 @@ public:
 
 };
 
-// HandshakeClosure to get current contended monitor.
+// HandshakeClosure to get current contended monitor. It is used for both platform and virtual threads.
 class GetCurrentContendedMonitorClosure : public JvmtiHandshakeClosure {
 private:
   JavaThread *_calling_thread;
   JvmtiEnv *_env;
   jobject *_owned_monitor_ptr;
+  bool _is_virtual;
 
 public:
-  GetCurrentContendedMonitorClosure(JavaThread* calling_thread, JvmtiEnv *env, jobject *mon_ptr)
+  GetCurrentContendedMonitorClosure(JavaThread* calling_thread, JvmtiEnv *env, jobject *mon_ptr, bool is_virtual)
     : JvmtiHandshakeClosure("GetCurrentContendedMonitor"),
       _calling_thread(calling_thread),
       _env(env),
-      _owned_monitor_ptr(mon_ptr) {}
+      _owned_monitor_ptr(mon_ptr),
+      _is_virtual(is_virtual) {}
   void do_thread(Thread *target);
 };
 
@@ -758,25 +760,6 @@ public:
 
   void do_thread(Thread *target);
   jvmtiError result() { return _result; }
-};
-
-// HandshakeClosure to get virtual thread current contended monitor.
-class VThreadGetCurrentContendedMonitorClosure : public HandshakeClosure {
-private:
-  JvmtiEnv *_env;
-  Handle _vthread_h;
-  jobject *_owned_monitor_ptr;
-  jvmtiError _result;
-
-public:
-  VThreadGetCurrentContendedMonitorClosure(JvmtiEnv *env, Handle vthread_h, jobject *mon_ptr)
-    : HandshakeClosure("VThreadGetCurrentContendedMonitor"),
-      _env(env),
-      _vthread_h(vthread_h),
-      _owned_monitor_ptr(mon_ptr),
-      _result(JVMTI_ERROR_THREAD_NOT_ALIVE) {}
-  jvmtiError result() { return _result; }
-  void do_thread(Thread *target);
 };
 
 // HandshakeClosure to get virtual thread thread at safepoint.
