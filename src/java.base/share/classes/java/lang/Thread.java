@@ -2633,8 +2633,8 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public long getId() {
-        // The 16 most significant bits can be used for tracing
-        // so these bits are excluded using TID_MASK.
+        // The 16 most significant bits are reserved for exclusive use
+        // by the JVM so these bits are excluded using TID_MASK.
         return tid & ThreadIdentifiers.TID_MASK;
     }
 
