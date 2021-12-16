@@ -60,6 +60,9 @@ jdk/jfr/event/runtime/TestThreadStartEvent.java
 # the VirtualThreadStartEvent is loaded before main() in wrapper
 jdk/jfr/jvm/TestGetAllEventClasses.java
 
+# Virtual threads don't generate jdk.ThreadPark event when they park
+jdk/jfr/event/runtime/TestThreadParkEvent.java
+
 ####
 # OOME in unexpected thread
 
