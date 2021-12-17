@@ -27,6 +27,7 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.inline.hpp"
 #include "jfr/recorder/repository/jfrChunkWriter.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTrace.hpp"
+#include "jfr/recorder/storage/jfrBuffer.hpp"
 #include "jfr/support/jfrMethodLookup.hpp"
 
 #include "memory/allocation.inline.hpp"
@@ -261,20 +262,26 @@ inline bool is_virtual(JavaThread* jt) {
   return jt->vthread() != jt->threadObj();
 }
 
-bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool async_mode, bool* virtual_thread) {
+static const size_t min_valid_free_size_bytes = 16;
+
+static inline bool is_full(const JfrBuffer* enqueue_buffer) {
+  return enqueue_buffer->free_size() < min_valid_free_size_bytes;
+}
+
+bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtual_thread) {
   assert(jt != NULL, "invariant");
   Thread* current_thread = Thread::current();
+  assert(jt != current_thread, "invariant");
+  assert(virtual_thread != NULL, "invariant");
+  // Explicitly monitor the available space of the thread-local buffer used for enqueuing klasses as part of tagging methods.
+  // We do this because if space becomes sparse, we cannot rely on the implicit allocation of a new buffer as part of the
+  // regular tag mechanism. If the free list is empty, a malloc could result, and the problem with that is that the thread
+  // we have suspended could be the holder of the malloc lock. If there is no more available space, the attempt is aborted.
+  const JfrBuffer* const enqueue_buffer = JfrTraceIdLoadBarrier::get_enqueue_buffer(current_thread);
   HandleMark hm(current_thread); // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
-  JfrVframeStream vfs(jt, frame, async_mode);
+  JfrVframeStream vfs(jt, frame, true);
   u4 count = 0;
   _reached_root = true;
-  for (int i = 0; i < skip; ++i) {
-    if (vfs.at_end()) {
-      break;
-    }
-    vfs.next_vframe();
-  }
-
   _hash = 1;
   while (!vfs.at_end()) {
     if (count >= _max_frames) {
@@ -282,12 +289,10 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
       break;
     }
     const Method* method = vfs.method();
-    if (async_mode) {
-      if (!Method::is_valid_method(method)) {
-        // we throw away everything we've gathered
-        // in this sample since none of it is safe
-        return false;
-      }
+    if (!Method::is_valid_method(method) || is_full(enqueue_buffer)) {
+      // we throw away everything we've gathered in this sample since
+      // none of it is safe
+      return false;
     }
     const traceid mid = JfrTraceId::load(method);
     int type = vfs.is_interpreted_frame() ? JfrStackFrame::FRAME_INTERPRETER : JfrStackFrame::FRAME_JIT;
@@ -305,30 +310,63 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip, bool as
       // frame, so this frame is inlined into the caller.
       type = JfrStackFrame::FRAME_INLINE;
     }
-
-    const int lineno = async_mode ? method->line_number_from_bci(bci) : 0;
     _hash = (_hash * 31) + mid;
     _hash = (_hash * 31) + bci;
     _hash = (_hash * 31) + type;
-    _frames[count] = JfrStackFrame(mid, bci, type, lineno, method->method_holder());
+    _frames[count] = JfrStackFrame(mid, bci, type, method->line_number_from_bci(bci), method->method_holder());
     count++;
   }
-
-  if (async_mode) {
-    assert(virtual_thread != NULL, "invariant");
-    assert(_lineno, "invarinat");
-    *virtual_thread = _reached_root ? vfs.continuation_scope_end_condition() : is_virtual(jt);
-  }
+  *virtual_thread = _reached_root ? vfs.continuation_scope_end_condition() : is_virtual(jt);
+  _lineno = true;
   _nr_of_frames = count;
   return count > 0;
 }
 
-bool JfrStackTrace::record_async(JavaThread* other_thread, frame& frame, bool* virtual_thread) {
-  assert(other_thread != NULL, "invariant");
-  assert(other_thread != Thread::current(), "invariant");
-  assert(virtual_thread != NULL, "invariant");
-  _lineno = true;
-  return record(other_thread, frame, 0, true, virtual_thread);
+bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
+  assert(jt != NULL, "invariant");
+  assert(jt == Thread::current(), "invariant");
+  HandleMark hm(jt); // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
+  JfrVframeStream vfs(jt, frame, false);
+  u4 count = 0;
+  _reached_root = true;
+  for (int i = 0; i < skip; ++i) {
+    if (vfs.at_end()) {
+      break;
+    }
+    vfs.next_vframe();
+  }
+  _hash = 1;
+  while (!vfs.at_end()) {
+    if (count >= _max_frames) {
+      _reached_root = false;
+      break;
+    }
+    const Method* method = vfs.method();
+    const traceid mid = JfrTraceId::load(method);
+    int type = vfs.is_interpreted_frame() ? JfrStackFrame::FRAME_INTERPRETER : JfrStackFrame::FRAME_JIT;
+    int bci = 0;
+    if (method->is_native()) {
+      type = JfrStackFrame::FRAME_NATIVE;
+    } else {
+      bci = vfs.bci();
+    }
+
+    intptr_t* frame_id = vfs.frame_id();
+    vfs.next_vframe();
+    if (type == JfrStackFrame::FRAME_JIT && !vfs.at_end() && frame_id == vfs.frame_id()) {
+      // This frame and the caller frame are both the same physical
+      // frame, so this frame is inlined into the caller.
+      type = JfrStackFrame::FRAME_INLINE;
+    }
+    _hash = (_hash * 31) + mid;
+    _hash = (_hash * 31) + bci;
+    _hash = (_hash * 31) + type;
+    _frames[count] = JfrStackFrame(mid, bci, type, 0, method->method_holder());
+    count++;
+  }
+  _lineno = false;
+  _nr_of_frames = count;
+  return count > 0;
 }
 
 bool JfrStackTrace::record(JavaThread* current_thread, int skip) {
@@ -337,8 +375,7 @@ bool JfrStackTrace::record(JavaThread* current_thread, int skip) {
   if (!current_thread->has_last_Java_frame()) {
     return false;
   }
-  _lineno = false;
-  return record(current_thread, current_thread->last_frame(), skip, false, NULL);
+  return record(current_thread, current_thread->last_frame(), skip);
 }
 
 void JfrStackFrame::resolve_lineno() const {
