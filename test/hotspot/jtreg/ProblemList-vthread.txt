@@ -2,14 +2,6 @@
 
 # Issues caused a lot of test failures
 
-compiler/codegen/TestOopCmp.java                                                                8254187 generic-all
-compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
-gc/epsilon/TestByteArrays.java                                                                  8254187 generic-all
-gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
-gc/epsilon/TestObjects.java                                                                     8254187 generic-all
-gc/epsilon/TestRefArrays.java                                                                   8254187 generic-all
-gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
-
 compiler/codegen/Test6942326.java                                                               8253918 generic-all
 compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
 gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
