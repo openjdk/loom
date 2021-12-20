@@ -429,15 +429,6 @@ runtime/condy/BadBSMUseTest.java
 ####
 ## Classes not unloaded as expected (TODO, need to check if FJ keep link)
 
-runtime/ClassUnload/UnloadInterfaceTest.java
-runtime/ClassUnload/UnloadTest.java
-runtime/ClassUnload/SuperDependsTest.java
-runtime/ClassUnload/KeepAliveSoftReference.java
-runtime/ClassUnload/KeepAliveObject.java
-runtime/ClassUnload/KeepAliveClassLoader.java
-runtime/ClassUnload/DictionaryDependsTest.java
-runtime/ClassUnload/KeepAliveClass.java
-runtime/ClassUnload/ConstantPoolDependsTest.java
 vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
