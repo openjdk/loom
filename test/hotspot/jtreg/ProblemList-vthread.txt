@@ -7,8 +7,6 @@ compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                       
 gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
 runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
 
-# java/lang/ClassLoader/loadLibraryUnload/LoadLibraryUnload.java                                  8273780 generic-all
-
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
 
 ##########
@@ -419,8 +417,8 @@ gc/g1/TestStringDeduplicationFullGC.java
 gc/g1/TestStringDeduplicationAgeThreshold.java
 gc/g1/TestRemsetLoggingPerRegion.java
 gc/g1/TestRemsetLogging.java
-
 gc/g1/TestMixedGCLiveThreshold.java#25percent
+gc/g1/plab/TestPLABResize.java
 
 ####
 ## Expected exception is ignored
