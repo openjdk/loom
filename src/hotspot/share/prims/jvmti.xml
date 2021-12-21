@@ -1856,7 +1856,7 @@ jvmtiEnv *jvmti;
    <function id="ResumeAllVirtualThreads" num="119" since="16">
       <synopsis>Resume All Virtual Threads</synopsis>
       <description>
-        <b> SuspendAllVirtualThreads is a preview API of the Java platform. </b>
+        <b> ResumeAllVirtualThreads is a preview API of the Java platform. </b>
         <i>Preview features may be removed in a future release, or upgraded to
         permanent features of the Java platform.</i>.
         <p/>
