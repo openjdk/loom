@@ -9,6 +9,7 @@ java/foreign/StdLibTest.java                                          8278992 ge
 # JFR is not completely fixed to support vthreads
 jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
 jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
+jdk/jfr/api/consumer/streaming/TestFilledChunks.java
 jdk/jfr/jcmd/TestJcmdStartWithOptions.java
 jdk/jfr/event/runtime/TestDirectBufferStatisticsEvent.java
 jdk/jfr/threading/TestManyVirtualThreads.java
@@ -58,6 +59,8 @@ java/lang/Thread/virtual/StackTraceWhenRunnable.java
 # Test requires the main thread to be in a thread group
 java/lang/Thread/MainThreadTest.java
 
+# Test don't expect FJ pool creating thread on demand
+java/lang/management/ThreadMXBean/ThreadLists.java
 
 ####
 # JFR tests check events for test main thread only or expect to find MainThread
