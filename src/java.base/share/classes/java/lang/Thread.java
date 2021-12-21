@@ -626,37 +626,29 @@ public class Thread implements Runnable {
         }
 
         Thread parent = currentThread();
-        boolean attached = (parent == this);
+        boolean attached = (parent == this);   // primordial or JNI attached
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
-            /* Determine if it's an applet or not */
+            //assert !attached;
 
-            /* If there is a security manager, ask the security manager
-               what to do. */
+            // the security manager can choose the thread group
             if (security != null) {
                 g = security.getThreadGroup();
             }
 
-            /* If the security manager doesn't have a strong opinion
-               on the matter, use the parent thread group. */
+            // default to current thread's group
             if (g == null) {
                 // avoid parent.getThreadGroup() during early startup
                 g = getCurrentThreadGroup();
             }
         }
 
-        /*
-         * Do we have the required permissions?
-         */
-        if (security != null) {
-            /* checkAccess regardless of whether or not threadgroup is
-               explicitly passed in. */
+        // permission checks when creating a chld Thread
+        if (!attached && security != null) {
             security.checkAccess(g);
-
             if (isCCLOverridden(getClass())) {
-                security.checkPermission(
-                        SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
+                security.checkPermission(SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
             }
         }
 
