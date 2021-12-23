@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -162,7 +162,7 @@ class contmon01Task implements Runnable {
         while (flag) {
             if (n <= 0) {
                 n = 1000;
-                contmon01.doSleep();
+                // no contmon01.doSleep() is allowed here as it can grab a lock
             }
             if (i > n) {
                 i = 0;
