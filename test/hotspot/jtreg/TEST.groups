@@ -101,6 +101,9 @@ hotspot_vector_2 = \
   compiler/vectorapi/VectorRebracket128Test.java \
   -compiler/intrinsics/string/TestStringLatin1IndexOfChar.java
 
+hotspot_compiler_arraycopy = \
+  compiler/arraycopy/stress
+
 tier1_loom = \
   :tier1_loom_runtime \
   :tier1_loom_serviceability
@@ -138,7 +141,8 @@ hotspot_not_fast_compiler = \
 hotspot_slow_compiler = \
   compiler/codegen/aes \
   compiler/codecache/stress \
-  compiler/gcbarriers/PreserveFPRegistersTest.java
+  compiler/gcbarriers/PreserveFPRegistersTest.java \
+  :hotspot_compiler_arraycopy
 
 tier1_compiler_1 = \
   compiler/arraycopy/ \
@@ -155,6 +159,7 @@ tier1_compiler_1 = \
   -compiler/c2/Test6792161.java \
   -compiler/c2/Test6603011.java \
   -compiler/c2/Test6912517.java \
+  -:hotspot_slow_compiler
 
 tier1_compiler_2 = \
   compiler/classUnloading/ \
