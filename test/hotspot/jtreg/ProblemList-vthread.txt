@@ -1,12 +1,5 @@
 ### Filed bugs
 
-# Issues caused a lot of test failures
-
-compiler/codegen/Test6942326.java                                                               8253918 generic-all
-compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
-gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
-runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
-
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
 
 ##########
