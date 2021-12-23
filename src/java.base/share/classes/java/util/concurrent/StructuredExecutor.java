@@ -129,7 +129,7 @@ import jdk.internal.javac.PreviewFeature;
  * the first task to complete normally, cancelling the other by way of shutting down the
  * executor. The main task waits in {@code join} until either task completes with a result
  * or both tasks fail. It invokes the handler's {@link ShutdownOnSuccess#result(Function)
- * result(Function)} method to get the captured result. If both tasks fails then this
+ * result(Function)} method to get the captured result. If both tasks fail then this
  * method throws WebApplicationException with the exception from one of the tasks as the
  * cause.
  * {@snippet lang=java :
