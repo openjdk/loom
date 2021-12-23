@@ -364,7 +364,8 @@ runtime/cds/appcds/ClassLoaderTest.java
 runtime/cds/appcds/HelloTest.java
 runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
 runtime/cds/BootAppendTests.java
-runtime/BootstrapMethod/BSMCalledTwice.java
+runtime/BootstrapMethod/BSMCalledTwice.java#id0
+runtime/BootstrapMethod/BSMCalledTwice.java#id1
 
 
 ####
