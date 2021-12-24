@@ -46,7 +46,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err = jvmti_env->AddCapabilities(&caps);
   if (err != JVMTI_ERROR_NONE) {
    LOG("(AddCapabilities) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+           TranelateError(err), err);
     return JNI_ERR;
   }
 
@@ -67,6 +67,7 @@ JNIEXPORT jboolean JNICALL Java_framecnt01_checkFrames0(JNIEnv *jni, jclass cls,
   if (frame_count != expected_count) {
     LOG("Thread #%s: number of frames expected: %d, got: %d\n",
         get_thread_name(jvmti_env, jni, thread), expected_count, frame_count);
+    result = JNI_FALSE;
     print_stack_trace(jvmti_env, jni, thread); // DBG: print stack trace once more
   }
 
