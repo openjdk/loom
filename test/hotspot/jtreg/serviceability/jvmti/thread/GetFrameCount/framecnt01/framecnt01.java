@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -80,7 +80,7 @@ public class framecnt01 {
             Thread.sleep(1);
         }
         // Let vthread1 to park
-        Thread.sleep(10);
+        Thread.sleep(100); // 10 is not enough as it intermittently fails with smaller frames count
 
         checkFrames(vThread1, false, 14);
         LockSupport.unpark(vThread1);
