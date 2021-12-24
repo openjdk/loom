@@ -59,7 +59,8 @@ public class RedefineRunningMethods_Shared {
         OutputAnalyzer output;
         TestCommon.testDump(appJar, shared_classes,
                             // command-line arguments ...
-                            use_whitebox_jar);
+                            use_whitebox_jar,
+                            "--enable-preview");
 
         // RedefineRunningMethods.java contained this:
         // @run main/othervm -javaagent:redefineagent.jar -Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace RedefineRunningMethods
