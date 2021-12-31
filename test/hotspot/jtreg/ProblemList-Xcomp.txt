@@ -50,4 +50,6 @@ gc/stringdedup/TestStringDeduplicationInterned.java#Z           8278127 generic-
 gc/whitebox/TestWBGC.java                                       8278128 generic-all
 gc/z/TestGarbageCollectorMXBean.java                            8278129 generic-all
 
+serviceability/dcmd/vm/ClassLoaderStatsTest.java                8278123 generic-all
+
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all
