@@ -86,52 +86,50 @@ public class ThreadContainers {
     }
 
     /**
-     * Returns the "parent" of the given thread container.
+     * Returns the parent of the given thread container.
      *
-     * The parent of an owned container is the enclosing container when nested,
-     * otherwise the parent of an owned container is the owner's container.
+     * If the container has an owner then its parent is the enclosing container when
+     * nested, or the container that the owner is in, when not nested.
      *
-     * The root thread container is the parent of all registered containers.
-     * The parent of the root container is null.
+     * If the container does not have an owner then the root container is returned,
+     * or null if called with the root container.
      */
-    public static ThreadContainer parent(ThreadContainer container) {
-        ThreadContainer root = root();
-        if (container == root) {
-            return null;
-        } else {
+    static ThreadContainer parent(ThreadContainer container) {
+        Thread owner = container.owner();
+        if (owner != null) {
             ThreadContainer parent = container.enclosingScope(ThreadContainer.class);
-            return (parent != null) ? parent : root;
+            if (parent != null)
+                return parent;
+            if ((parent = ThreadContainers.container(owner)) != null)
+                return parent;
         }
+        ThreadContainer root = ThreadContainers.root();
+        return (container != root) ? root : null;
     }
 
     /**
-     * Returns a stream of the given thread container's "children".
-     *
-     * An owned thread container is the parent of the thread container that is
-     * encloses. The "top most" container owned by threads in the container are
-     * also children.
-     *
-     * Unowned thread containers in the registry are children of the root container.
+     * Returns given thread container's "children".
      */
-    public static Stream<ThreadContainer> children(ThreadContainer container) {
-        Stream<ThreadContainer> s1 = Stream.empty();
-        Thread owner = container.owner();
-        if (owner != null) {
-            // container may enclose another container
+    static Stream<ThreadContainer> children(ThreadContainer container) {
+        // children of registered containers
+        Stream<ThreadContainer> s1 = CONTAINER_REGISTRY.stream()
+                .map(WeakReference::get)
+                .filter(c -> c != null && c.parent() == container);
+
+        // container may enclose another container
+        Stream<ThreadContainer> s2 = Stream.empty();
+        if (container.owner() != null) {
             ThreadContainer next = next(container);
-            s1 = Stream.ofNullable(next);
-        } else if (container == root()) {
-            // the root container is the parent of registered containers
-            s1 = CONTAINER_REGISTRY.stream()
-                    .map(WeakReference::get)
-                    .filter(c -> c != null);
+            if (next != null)
+                s2 = Stream.of(next);
         }
 
         // the top-most container owned by the threads in the container
-        Stream<ThreadContainer> s2 = container.threads()
+        Stream<ThreadContainer> s3 = container.threads()
                 .map(t -> Optional.ofNullable(top(t)))
                 .flatMap(Optional::stream);
-        return Stream.concat(s1, s2);
+
+        return Stream.concat(s1, Stream.concat(s2, s3));
     }
 
     /**
@@ -187,15 +185,15 @@ public class ThreadContainers {
             super(true);
         }
         @Override
-        public ThreadContainer push() {
-            throw new UnsupportedOperationException();
-        }
-        @Override
         public String name() {
             return "<root>";
         }
         @Override
         public Thread owner() {
+            return null;
+        }
+        @Override
+        public ThreadContainer parent() {
             return null;
         }
         @Override

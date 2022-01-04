@@ -56,14 +56,14 @@ public abstract class ThreadContainer extends StackableScope {
     /**
      * Returns the parent of this container or null if this is the root container.
      */
-    public final ThreadContainer parent() {
+    public ThreadContainer parent() {
         return ThreadContainers.parent(this);
     }
 
     /**
      * Return the stream of children of this container.
      */
-     public final Stream<ThreadContainer> children() {
+    public final Stream<ThreadContainer> children() {
         return ThreadContainers.children(this);
     }
     
