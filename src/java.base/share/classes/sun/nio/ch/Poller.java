@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@ import jdk.internal.misc.InnocuousThread;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.VirtualThreads;
+import sun.security.action.GetPropertyAction;
 
 /**
  * A Poller of file descriptors. A virtual thread registers the file descriptor
@@ -41,18 +42,73 @@ import jdk.internal.misc.VirtualThreads;
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-    private static final Poller READ_POLLER;
-    private static final Poller WRITE_POLLER;
+    private static final Poller[] READ_POLLERS;
+    private static final Poller[] WRITE_POLLERS;
+    private static final int READ_MASK, WRITE_MASK;
+
     static {
         PollerProvider provider = PollerProvider.provider();
         try {
-            READ_POLLER = provider.readPoller();
-            WRITE_POLLER = provider.writePoller();
-            READ_POLLER.startPollerThread("Read-Poller");
-            WRITE_POLLER.startPollerThread("Write-Poller");
+            Poller[] readPollers = createReadPollers(provider);
+            READ_POLLERS = readPollers;
+            READ_MASK = readPollers.length - 1;
+            Poller[] writePollers = createWritePollers(provider);
+            WRITE_POLLERS = writePollers;
+            WRITE_MASK = writePollers.length - 1;
         } catch (IOException ioe) {
             throw new IOError(ioe);
         }
+    }
+
+    /**
+     * Create the read poller(s).
+     */
+    private static Poller[] createReadPollers(PollerProvider provider) throws IOException {
+        int readPollerCount = pollerCount("jdk.readPollers");
+        Poller[] readPollers = new Poller[readPollerCount];
+        for (int i = 0; i< readPollerCount; i++) {
+            var poller = provider.readPoller();
+            poller.startPollerThread("Read-Poller-" + i);
+            readPollers[i] = poller;
+        }
+        return readPollers;
+    }
+
+    /**
+     * Create the write poller(s).
+     */
+    private static Poller[] createWritePollers(PollerProvider provider) throws IOException {
+        int writePollerCount = pollerCount("jdk.writePollers");
+        Poller[] writePollers = new Poller[writePollerCount];
+        for (int i = 0; i< writePollerCount; i++) {
+            var poller = provider.writePoller();
+            poller.startPollerThread("Write-Poller-" + i);
+            writePollers[i] = poller;
+        }
+        return writePollers;
+    }
+
+    /**
+     * Reads the given property name to get the poller count. If the property is
+     * set then the value must be a power of 2. Returns 1 if the property is not
+     * set.
+     * @throws IllegalArgumentException if the property is set to a value that
+     * is not a power of 2.
+     */
+    private static int pollerCount(String propName) {
+        String s = GetPropertyAction.privilegedGetProperty(propName, "1");
+        int count = Integer.parseInt(s);
+
+        // check power of 2
+        if (count != (1 << log2(count))) {
+            String msg = propName + " is set to a vale that is not a power of 2";
+            throw new IllegalArgumentException(msg);
+        }
+        return count;
+    }
+
+    private static int log2(int n) {
+        return 31 - Integer.numberOfLeadingZeros(n);
     }
 
     /**
@@ -91,12 +147,26 @@ public abstract class Poller {
      */
     static void register(int fdVal, int event) throws IOException {
         if (event == Net.POLLIN) {
-            READ_POLLER.register(fdVal);
+            readPoller(fdVal).register(fdVal);
         } else if (event == Net.POLLOUT) {
-            WRITE_POLLER.register(fdVal);
+            writePoller(fdVal).register(fdVal);
         } else {
             throw new IllegalArgumentException("Unknown event " + event);
         }
+    }
+
+    /**
+     * Maps the file descriptor value to a read poller.
+     */
+    private static Poller readPoller(int fdVal) {
+        return READ_POLLERS[fdVal & READ_MASK];
+    }
+
+    /**
+     * Maps the file descriptor value to a write poller.
+     */
+    private static Poller writePoller(int fdVal) {
+        return WRITE_POLLERS[fdVal & WRITE_MASK];
     }
 
     /**
@@ -107,9 +177,9 @@ public abstract class Poller {
      */
     static void deregister(int fdVal, int event) {
         if (event == Net.POLLIN) {
-            READ_POLLER.deregister(fdVal);
+            readPoller(fdVal).deregister(fdVal);
         } else if (event == Net.POLLOUT) {
-            WRITE_POLLER.deregister(fdVal);
+            writePoller(fdVal).deregister(fdVal);
         } else {
             throw new IllegalArgumentException("Unknown event " + event);
         }
@@ -121,9 +191,9 @@ public abstract class Poller {
      */
     static void stopPoll(int fdVal, int event) {
         if (event == Net.POLLIN) {
-            READ_POLLER.wakeup(fdVal);
+            readPoller(fdVal).wakeup(fdVal);
         } else if (event == Net.POLLOUT) {
-            WRITE_POLLER.wakeup(fdVal);
+            writePoller(fdVal).wakeup(fdVal);
         } else {
             throw new IllegalArgumentException();
         }
@@ -220,7 +290,13 @@ public abstract class Poller {
      * Return a stream of all threads blocked waiting for I/O operations.
      */
     public static Stream<Thread> blockedThreads() {
-        return Stream.concat(READ_POLLER.registeredThreads(),
-                WRITE_POLLER.registeredThreads());
+        Stream<Thread> s = Stream.empty();
+        for (int i = 0; i < READ_POLLERS.length; i++) {
+            s = Stream.concat(s, READ_POLLERS[i].registeredThreads());
+        }
+        for (int i = 0; i < WRITE_POLLERS.length; i++) {
+            s = Stream.concat(s, WRITE_POLLERS[i].registeredThreads());
+        }
+        return s;
     }
 }

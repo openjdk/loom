@@ -497,6 +497,7 @@ public final class ProcessTools {
      *              the default charset.
      * @return The {@linkplain OutputAnalyzer} instance wrapping the process.
      */
+    @SuppressWarnings("removal")
     public static OutputAnalyzer executeProcess(ProcessBuilder pb, String input,
                                                 Charset cs) throws Exception {
         OutputAnalyzer output = null;
@@ -669,6 +670,7 @@ public final class ProcessTools {
         return pb;
     }
 
+    @SuppressWarnings("removal")
     private static Process privilegedStart(ProcessBuilder pb) throws IOException {
         try {
             return AccessController.doPrivileged(

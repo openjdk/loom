@@ -230,7 +230,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
                 Object x = outcome;
                 return (Throwable) x;
             case CANCELLED:
-                return new CancellationException();
+                throw new IllegalStateException("Task was cancelled");
             default:
                 throw new IllegalStateException("Task has not completed");
         }

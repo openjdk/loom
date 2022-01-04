@@ -136,7 +136,7 @@ public class LocalExecutionControl extends DirectExecutionControl {
                 throw new InternalException("Process-local code snippets thread group is null. Aborting stop.");
             }
 
-            execThreadGroup.stop();
+            execThreadGroup.stop();  // throw UOE
         }
     }
 

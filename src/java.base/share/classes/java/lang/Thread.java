@@ -50,6 +50,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
+import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -130,7 +131,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * starting threads. The {@link #ofPlatform()} and {@link #ofVirtual()} methods are
  * used to create builders for platform and virtual threads respectively.
  * The following are examples that use the builder:
- * <pre>{@code
+ * {@snippet :
  *   Runnable runnable = ...
  *
  *   // Start a daemon thread to run a task
@@ -148,7 +149,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  *   // A ThreadFactory that creates virtual threads
  *   ThreadFactory factory = Thread.ofVirtual().factory();
- * }</pre>
+ * }
  *
  * <p> In addition to the builder, {@code Thread} defines (for historical and
  * customization reasons) public constructors for creating platform threads. Most
@@ -250,11 +251,21 @@ public class Thread implements Runnable {
     }
 
     void inheritScopeLocalBindings(ThreadContainer container) {
-        Object bindings = container.scopeLocalBindings();
-        if (bindings != null) {
-            if (Thread.currentThread().scopeLocalBindings != bindings) {
-                throw new IllegalStateException("Scope local bindings have changed");
+        ScopeLocalContainer.BindingsSnapshot snapshot;
+        if (container.owner() != null
+                && (snapshot = container.scopeLocalBindings()) != null) {
+
+            // bindings established for running/calling an operation
+            Object bindings = snapshot.scopeLocalBindings();
+            if (currentThread().scopeLocalBindings != bindings) {
+                throw new StructureViolationException("Scope local bindings have changed");
             }
+
+            // bindings established by invoking bind
+            if (ScopeLocalContainer.latest() != snapshot.container()) {
+                throw new StructureViolationException("Scope local bindings have changed");
+            }
+
             this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
         }
     }
@@ -554,12 +565,12 @@ public class Thread implements Runnable {
      * As an example consider a method in a class that spins in a loop until
      * some flag is set outside of that method. A call to the {@code onSpinWait}
      * method should be placed inside the spin loop.
-     * <pre>{@code
+     * {@snippet :
      *     class EventHandler {
      *         volatile boolean eventNotificationNotReceived;
      *         void waitForEventAndHandleIt() {
      *             while ( eventNotificationNotReceived ) {
-     *                 java.lang.Thread.onSpinWait();
+     *                 Thread.onSpinWait();
      *             }
      *             readAndProcessEvent();
      *         }
@@ -569,7 +580,7 @@ public class Thread implements Runnable {
      *              . . .
      *         }
      *     }
-     * }</pre>
+     * }
      * <p>
      * The code above would remain correct even if the {@code onSpinWait}
      * method was not called at all. However on some architectures the Java
@@ -615,37 +626,29 @@ public class Thread implements Runnable {
         }
 
         Thread parent = currentThread();
-        boolean attached = (parent == this);
+        boolean attached = (parent == this);   // primordial or JNI attached
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
-            /* Determine if it's an applet or not */
+            //assert !attached;
 
-            /* If there is a security manager, ask the security manager
-               what to do. */
+            // the security manager can choose the thread group
             if (security != null) {
                 g = security.getThreadGroup();
             }
 
-            /* If the security manager doesn't have a strong opinion
-               on the matter, use the parent thread group. */
+            // default to current thread's group
             if (g == null) {
                 // avoid parent.getThreadGroup() during early startup
                 g = getCurrentThreadGroup();
             }
         }
 
-        /*
-         * Do we have the required permissions?
-         */
-        if (security != null) {
-            /* checkAccess regardless of whether or not threadgroup is
-               explicitly passed in. */
+        // permission checks when creating a chld Thread
+        if (!attached && security != null) {
             security.checkAccess(g);
-
             if (isCCLOverridden(getClass())) {
-                security.checkPermission(
-                        SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
+                security.checkPermission(SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
             }
         }
 
@@ -742,7 +745,7 @@ public class Thread implements Runnable {
      * that creates platform threads.
      *
      * @apiNote The following are examples using the builder:
-     * <pre>{@code
+     * {@snippet :
      *   // Start a daemon thread to run a task
      *   Thread thread = Thread.ofPlatform().daemon().start(runnable);
      *
@@ -752,7 +755,7 @@ public class Thread implements Runnable {
      *
      *   // A ThreadFactory that creates daemon threads named "worker-0", "worker-1", ...
      *   ThreadFactory factory = Thread.ofPlatform().daemon().name("worker-", 0).factory();
-     * }</pre>
+     * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
@@ -767,13 +770,13 @@ public class Thread implements Runnable {
      * that creates virtual threads.
      *
      * @apiNote The following are examples using the builder:
-     * <pre>{@code
+     * {@snippet :
      *   // Start a virtual thread to run a task.
      *   Thread thread = Thread.ofVirtual().start(runnable);
      *
      *   // A ThreadFactory that creates virtual threads
      *   ThreadFactory factory = Thread.ofVirtual().factory();
-     * }</pre>
+     * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
      * @since 99
@@ -1920,8 +1923,11 @@ public class Thread implements Runnable {
      * Returns the thread group to which this thread belongs.
      * This method returns null if the thread has terminated.
      *
+     * @deprecated ThreadGroup is obsolete.
+     *
      * @return  this thread's thread group.
      */
+    @Deprecated(since="99")
     public final ThreadGroup getThreadGroup() {
         if (getState() == State.TERMINATED) {
             return null;
@@ -1958,12 +1964,7 @@ public class Thread implements Runnable {
      * @return  an estimate of the number of active threads in the current
      *          thread's thread group and in any other thread group that
      *          has the current thread's thread group as an ancestor
-     *
-     * @deprecated This method is obsolete. Code that needs an estimate of the
-     *     number of active platform threads in a thread group can invoke the
-     *     thread group's {@link ThreadGroup#activeCount()} method.
      */
-    @Deprecated(since = "99")
     public static int activeCount() {
         return currentThread().getThreadGroup().activeCount();
     }
@@ -1995,12 +1996,7 @@ public class Thread implements Runnable {
      * @throws  SecurityException
      *          if {@link java.lang.ThreadGroup#checkAccess} determines that
      *          the current thread cannot access its thread group
-     *
-     * @deprecated This method is obsolete. Code that needs to enumerate the
-     *     active platform threads can invoke the thread group's {@link
-     *     ThreadGroup#enumerate(Thread[])} method.
      */
-    @Deprecated(since = "99")
     public static int enumerate(Thread[] tarray) {
         return currentThread().getThreadGroup().enumerate(tarray);
     }
@@ -2629,8 +2625,8 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public long getId() {
-        // The 16 most significant bits can be used for tracing
-        // so these bits are excluded using TID_MASK.
+        // The 16 most significant bits are reserved for exclusive use
+        // by the JVM so these bits are excluded using TID_MASK.
         return tid & ThreadIdentifiers.TID_MASK;
     }
 

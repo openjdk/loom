@@ -30,7 +30,8 @@
  * @requires vm.jvmti
  * @library /test/lib /test/hotspot/jtreg/serviceability/jvmti/RedefineClasses /test/hotspot/jtreg/runtime/cds/appcds
  * @run driver RedefineClassHelper
- * @build sun.hotspot.WhiteBox RedefineRunningMethods_SharedHelper
+ * @build sun.hotspot.WhiteBox
+ * @compile --enable-preview -source ${jdk.version} RedefineRunningMethods_SharedHelper.java
  * @run driver RedefineRunningMethods_Shared
  */
 
@@ -58,7 +59,8 @@ public class RedefineRunningMethods_Shared {
         OutputAnalyzer output;
         TestCommon.testDump(appJar, shared_classes,
                             // command-line arguments ...
-                            use_whitebox_jar);
+                            use_whitebox_jar,
+                            "--enable-preview");
 
         // RedefineRunningMethods.java contained this:
         // @run main/othervm -javaagent:redefineagent.jar -Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace RedefineRunningMethods
@@ -67,6 +69,7 @@ public class RedefineRunningMethods_Shared {
                                  use_whitebox_jar,
                                  "-XX:+UnlockDiagnosticVMOptions",
                                  "-XX:+WhiteBoxAPI",
+                                 "--enable-preview",
                                  // These arguments are expected by RedefineRunningMethods
                                  "-javaagent:redefineagent.jar",
                                  "-Xlog:redefine+class+iklass+add=trace,redefine+class+iklass+purge=trace",

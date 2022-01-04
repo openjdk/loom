@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -128,9 +129,8 @@ public class CustomScheduler {
         assertTrue(ref.get() == SCHEDULER_2);
     }
 
-
     /**
-     * Test running task on a virtual thread, should thrown IllegalCallerException.
+     * Test running task on a virtual thread, should thrown WrongThreadException.
      */
     @Test
     public void testBadCarrier() {
@@ -148,28 +148,10 @@ public class CustomScheduler {
             } catch (InterruptedException e) {
                 assertTrue(false);
             }
-            assertTrue(exc.get() instanceof IllegalCallerException);
+            assertTrue(exc.get() instanceof WrongThreadException);
         };
 
         TestHelper.virtualThreadBuilder(scheduler).start(LockSupport::park);
-    }
-
-    /**
-     * Test running task on a virtual thread, should thrown IllegalStateException.
-     */
-    @Test
-    public void testBadState() {
-        Executor scheduler = (task) -> {
-            // run on current thread
-            task.run();
-
-            // run again, should throw IllegalStateException
-            try {
-                task.run();
-                assertTrue(false);
-            } catch (IllegalStateException expected) { }
-        };
-        TestHelper.virtualThreadBuilder(scheduler).start(() -> { });
     }
 
     /**
@@ -179,6 +161,8 @@ public class CustomScheduler {
     @Test
     public void testParkWithInterruptSet() {
         Thread carrier = Thread.currentThread();
+        if (carrier.isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         try {
             Thread vthread = TestHelper.virtualThreadBuilder(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
@@ -198,6 +182,8 @@ public class CustomScheduler {
     @Test
     public void testTerminateWithInterruptSet() {
         Thread carrier = Thread.currentThread();
+        if (carrier.isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         try {
             Thread vthread = TestHelper.virtualThreadBuilder(Runnable::run).start(() -> {
                 Thread.currentThread().interrupt();
@@ -214,6 +200,8 @@ public class CustomScheduler {
      */
     @Test
     public void testRunWithInterruptSet() throws Exception {
+        if (Thread.currentThread().isVirtual())
+            throw new SkipException("Main test is a virtual thread");
         Executor scheduler = (task) -> {
             Thread.currentThread().interrupt();
             task.run();

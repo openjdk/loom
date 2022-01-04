@@ -123,15 +123,15 @@ class VThreadList : public GrowableArrayCHeap<OopHandle, mtServiceability> {
 class JvmtiVTSuspender : AllStatic {
  private:
   // Suspend modes for virtual threads
-  typedef enum VThreadSuspendMode {
-    vthread_suspend_none = 0,
-    vthread_suspend_ind  = 1,
-    vthread_suspend_all  = 2
-  } VThreadSuspendMode;
+  typedef enum SR_Mode {
+    SR_none = 0,
+    SR_ind  = 1,
+    SR_all  = 2
+  } SR_Mode;
 
-  static VThreadSuspendMode _vthread_suspend_mode;
-  static VThreadList* _vthread_suspend_list;
-  static VThreadList* _vthread_resume_list;
+  static SR_Mode _SR_mode;
+  static VThreadList* _suspended_list;
+  static VThreadList* _not_suspended_list;
 
  public:
   static void register_all_vthreads_suspend();

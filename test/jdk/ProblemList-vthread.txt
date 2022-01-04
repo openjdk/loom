@@ -1,6 +1,19 @@
 # Filed bugs
 
-java/foreign/channels/TestSocketChannels.java                                                   8272749 windows-all
+java/foreign/channels/TestSocketChannels.java                         8272749 windows-all
+java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
+java/foreign/StdLibTest.java                                          8278992 generic-all
+
+
+####
+# JFR is not completely fixed to support vthreads
+jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
+jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
+jdk/jfr/api/consumer/streaming/TestFilledChunks.java
+jdk/jfr/jcmd/TestJcmdStartWithOptions.java
+jdk/jfr/event/runtime/TestDirectBufferStatisticsEvent.java
+jdk/jfr/threading/TestManyVirtualThreads.java
+jdk/jfr/tool/TestPrintXML.java
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
@@ -25,6 +38,7 @@ java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
+jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
 jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
 jdk/internal/vm/Continuation/Preempt.java
@@ -33,34 +47,33 @@ jdk/internal/vm/Continuation/Fuzz.java
 ####
 # Thread-sensitive threads
 
-java/lang/Thread/BuilderTest.java
-java/lang/Thread/virtual/CustomScheduler.java
+# Test assumes main thread is named "main"
 java/lang/Thread/UncaughtExceptionsTest.java
-jdk/internal/misc/TerminatingThreadLocal/TestTerminatingThreadLocal.java
+
+# Handler thread has daemon status set because it inherited from virtual thread
 com/sun/net/httpserver/bugs/B6431193.java
-#B6431193.java: HttpServer inherit thread properies (daemon, but sure not virtuality)
 
-####
-# Other virtual threads tests, failing with wrapper
+# Test limits default scheduler to 1 carrier thread, can't run with wrapper
+java/lang/Thread/virtual/StackTraceWhenRunnable.java
 
-java/lang/Thread/virtual/NioChannels.java#id0
-java/lang/Thread/virtual/NioChannels.java#id1
-java/lang/Thread/virtual/NetSockets.java#id0
-java/lang/Thread/virtual/NetSockets.java#id1
-java/beans/PropertyEditor/Test6397609.java
-
-####
-# ThreadGroup owner is not main
-
+# Test requires the main thread to be in a thread group
 java/lang/Thread/MainThreadTest.java
 
+# Test don't expect FJ pool creating thread on demand
+java/lang/management/ThreadMXBean/ThreadLists.java
 
 ####
-# JFR tests check events for test main thread only
+# JFR tests check events for test main thread only or expect to find MainThread
 
 jdk/jfr/event/io/TestFileStreamEvents.java
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java
+jdk/jfr/event/runtime/TestThreadStartEvent.java
 
+# the VirtualThreadStartEvent is loaded before main() in wrapper
+jdk/jfr/jvm/TestGetAllEventClasses.java
+
+# Virtual threads don't generate jdk.ThreadPark event when they park
+jdk/jfr/event/runtime/TestThreadParkEvent.java
 
 ####
 # OOME in unexpected thread
@@ -72,6 +85,14 @@ java/lang/ref/OOMEInReferenceHandler.java
 # incorrect using of 'test.jdk' by wrapper
 
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
+
+####
+# Makes use of methods that are not supported on virtual threads
+java/lang/management/ManagementFactory/ProxyTypeMapping.java
+java/lang/management/ManagementFactory/ValidateOpenTypes.java
+java/lang/management/ThreadMXBean/ThreadUserTime.java
+java/lang/management/ThreadMXBean/ThreadCpuTime.java
+com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java
 
 
 ####
@@ -146,11 +167,13 @@ java/lang/constant/methodTypeDesc/ResolveConstantDesc.java
 java/lang/ClassLoader/forNameLeak/ClassForNameLeak.java
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithRemoveAddProvider.java
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithProviderChange.java
+jdk/jfr/api/consumer/security/TestStreamingRemote.java
 jdk/jfr/startupargs/TestDumpOnExit.java
 java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java
 java/lang/annotation/ParameterAnnotations.java
 sun/security/util/Resources/early/EarlyResources.java
+javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java
 
 #####
 # Tests failing because of ProcessTools wrapper
@@ -167,6 +190,7 @@ java/util/logging/modules/GetResourceBundleTest.java
 jdk/modules/etc/DefaultModules.java
 jdk/modules/incubator/ServiceBinding.java
 jdk/internal/misc/VM/RuntimeArguments.java
+jdk/jfr/jvm/TestJfrJavaBase.java
 java/lang/StackWalker/CallerFromMain.java
 java/lang/Package/PackageFromManifest.java
 java/lang/Package/IsCompatibleWithDriver.java
@@ -181,10 +205,12 @@ java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
 java/security/AccessController/DoPrivAccompliceTest.java
+java/security/AccessController/LimitedDoPrivileged.java
 java/security/Policy/SignedJar/SignedJarTest.java
 java/security/Provider/SecurityProviderModularTest.java
 javax/security/auth/login/modules/JaasModularClientTest.java
 javax/security/auth/login/modules/JaasModularDefaultHandlerTest.java
+sun/security/ssl/CertPathRestrictions/TLSRestrictions.java
 sun/security/tools/jarsigner/multiRelease/MVJarSigningTest.java
 java/io/FilePermission/ReadFileOnPath.java
 java/nio/file/spi/SetDefaultProvider.java
@@ -214,6 +240,16 @@ java/io/Serializable/class/NonSerializableTest.java
 java/io/Serializable/evolution/RenamePackage/RenamePackageTest.java
 java/io/Serializable/serialFilter/InvalidGlobalFilterTest.java
 
+java/lang/instrument/PremainClass/PremainClassTest.java
+java/lang/instrument/executableJAR/ExecJarWithAgent.java
+
+sun/management/jmxremote/bootstrap/SSLConfigFilePermissionTest.java
+sun/management/jmxremote/bootstrap/PasswordFilePermissionTest.java
+sun/management/jmxremote/bootstrap/JMXInterfaceBindingTest.java
+sun/management/jmxremote/startstop/JMXStartStopTest.java
+sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java
+sun/management/jmxremote/startstop/JMXStatusTest.java
+
 ####
 # No expected StackOverflow
 
@@ -228,36 +264,55 @@ java/lang/RuntimeTests/exec/LotsOfOutput.java
 
 
 ####
-# JDI tests, should be re-reviewed when JVMTI is synced with JDI
+# Legacy socket I/O is interruptible in the context of virtual threads
+java/net/DatagramSocket/InterruptibleDatagramSocket.java
+java/nio/channels/DatagramChannel/InterruptibleOrNot.java
 
-com/sun/jdi/AcceptTimeout.java
-com/sun/jdi/AccessSpecifierTest.java
-com/sun/jdi/AfterThreadDeathTest.java
-com/sun/jdi/ArrayRangeTest.java
-com/sun/jdi/ConstantPoolInfo.java
-com/sun/jdi/CountFilterTest.java
-com/sun/jdi/EarlyReturnNegativeTest.java
+
+####
+# Tests behavior that differs when underlying socket is non-blocking
+java/nio/channels/SocketChannel/ShortWrite.java
+
+
+####
+# JDI tests failing with wrapper
+# some failing to find main method
+# need to be re-reviewed later if want to support wrapper for jdi
+
+com/sun/jdi/DeferredStepTest.java
 com/sun/jdi/EarlyReturnTest.java
-com/sun/jdi/FieldWatchpoints.java
-com/sun/jdi/FramesTest.java
-com/sun/jdi/InstanceFilter.java
-com/sun/jdi/InterfaceMethodsTest.java
-com/sun/jdi/InvokeTest.java
-com/sun/jdi/LocalVariableEqual.java
-com/sun/jdi/LocationTest.java
-com/sun/jdi/ModificationWatchpoints.java
-com/sun/jdi/MonitorEventTest.java
-com/sun/jdi/MonitorFrameInfo.java
-com/sun/jdi/NullThreadGroupNameTest.java
+com/sun/jdi/ExceptionEvents.java
+com/sun/jdi/FetchLocals.java
+com/sun/jdi/Frames2Test.java
+com/sun/jdi/GetSetLocalTest.java
+com/sun/jdi/JdbMethodExitTest.java
+com/sun/jdi/JdbStepTest.java
+com/sun/jdi/JdbStopThreadTest.java
+com/sun/jdi/JdbStopThreadidTest.java
+com/sun/jdi/LaunchCommandLine.java
+com/sun/jdi/MethodEntryExitEvents.java
+com/sun/jdi/MultiBreakpointsTest.java
+com/sun/jdi/NativeInstanceFilter.java
 com/sun/jdi/PopAndStepTest.java
 com/sun/jdi/PopAsynchronousTest.java
+com/sun/jdi/PopSynchronousTest.java
+com/sun/jdi/RedefineCrossStart.java
+com/sun/jdi/RedefineG.java
+com/sun/jdi/RedefineNestmateAttr/TestNestmateAttr.java
+com/sun/jdi/RedefineTTYLineNumber.java
 com/sun/jdi/ReferrersTest.java
-com/sun/jdi/RequestReflectionTest.java
-com/sun/jdi/ResumeOneThreadTest.java
-com/sun/jdi/RunToExit.java
-com/sun/jdi/SourceNameFilterTest.java
-com/sun/jdi/VarargsTest.java
-com/sun/jdi/Vars.java
+com/sun/jdi/ResumeAfterThreadResumeCallTest.java
+com/sun/jdi/SetLocalWhileThreadInNative.java
+com/sun/jdi/StepTest.java
+com/sun/jdi/redefine/RedefineTest.java
 com/sun/jdi/redefineMethod/RedefineTest.java
+
+####
+# JDI SDE Tests
+# Use custom classpath
+
+com/sun/jdi/sde/FilterMangleTest.java
 com/sun/jdi/sde/MangleTest.java
+com/sun/jdi/sde/MangleStepTest.java
 com/sun/jdi/sde/TemperatureTableTest.java
+com/sun/jdi/sde/SourceDebugExtensionTest.java

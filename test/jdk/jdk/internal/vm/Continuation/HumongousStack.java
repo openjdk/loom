@@ -26,6 +26,7 @@
 * @summary Tests humongous stack-chunk handling
 * @modules java.base/jdk.internal.vm
 *
+* @requires vm.gc.G1
 * @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xint HumongousStack 5000
 * @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
 * @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
@@ -66,12 +67,12 @@ public class HumongousStack implements Runnable {
         String res = deep(DEPTH, new String("x"));
         System.out.println("done: " + res);
     }
-    
+
 
     static String deep(int depth, String x) {
         if (depth > 0) {
             assert x != null;
-            var r = deep(depth-1, x); // deep(depth-1, depth + "-" + x) + "-" + depth; // 
+            var r = deep(depth-1, x); // deep(depth-1, depth + "-" + x) + "-" + depth; //
             assert r != null;
             return r;
         }

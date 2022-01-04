@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -843,6 +843,7 @@ final class RealTimeSequencer extends AbstractMidiDevice
     private static EventDispatcher getEventDispatcher() {
         // create and start the global event thread
         //TODO  need a way to stop this thread when the engine is done
+        @SuppressWarnings("deprecation")
         final ThreadGroup tg = Thread.currentThread().getThreadGroup();
         synchronized (dispatchers) {
             EventDispatcher eventDispatcher = dispatchers.get(tg);
@@ -1024,7 +1025,7 @@ final class RealTimeSequencer extends AbstractMidiDevice
         }
     } // class Info
 
-    private class ControllerListElement {
+    private static class ControllerListElement {
 
         // $$jb: using an array for controllers b/c its
         //       easier to deal with than turning all the

@@ -27,11 +27,9 @@ package java.lang;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
-import java.security.ProtectionDomain;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -39,6 +37,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -48,6 +47,7 @@ import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
+import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.Continuation;
@@ -95,9 +95,10 @@ class VirtualThread extends Thread {
     private static final int YIELDING = 7;     // Thread.yield
     private static final int TERMINATED = 99;  // final state
 
-    // can be suspended from scheduling when parked
+    // can be suspended from scheduling when unmounted
     private static final int SUSPENDED = 1 << 8;
-    private static final int PARKED_SUSPENDED = (PARKED | SUSPENDED);
+    private static final int RUNNABLE_SUSPENDED = (RUNNABLE | SUSPENDED);
+    private static final int PARKED_SUSPENDED   = (PARKED | SUSPENDED);
 
     // parking permit, may eventually be merged into state
     private volatile boolean parkPermit;
@@ -168,7 +169,7 @@ class VirtualThread extends Thread {
     private void runContinuation() {
         // the carrier thread should be a platform thread
         if (Thread.currentThread().isVirtual()) {
-            throw new IllegalCallerException();
+            throw new WrongThreadException();
         }
 
         // set state to RUNNING
@@ -182,7 +183,8 @@ class VirtualThread extends Thread {
             setParkPermit(false);
             firstRun = false;
         } else {
-            throw new IllegalStateException();
+            // not runnable
+            return;
         }
 
         // notify JVMTI before mount
@@ -203,14 +205,13 @@ class VirtualThread extends Thread {
      * Submits the runContinuation task to the scheduler.
      * In the case of the default scheduler, and the current carrier thread is one
      * of FJP worker threads, then the task is queued to the current thread's queue.
-     * In that case, the parameter {@code signalOnEmpty} indicates if workers are
-     * signalled when its queue is empty.
+     * @param {@code lazySubmit} to lazy submit (don't signal worker) if possible
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuationAndSignal(boolean signalOnEmpty) {
+    private void submitRunContinuation(boolean lazySubmit) {
         try {
-            if (scheduler == DEFAULT_SCHEDULER) {
-                ForkJoinPools.externalExecuteTask(DEFAULT_SCHEDULER,runContinuation, signalOnEmpty);
+            if (lazySubmit && scheduler instanceof ForkJoinPool pool) {
+                ForkJoinPools.externalLazySubmit(pool, ForkJoinTask.adapt(runContinuation));
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -231,7 +232,15 @@ class VirtualThread extends Thread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        submitRunContinuationAndSignal(true);
+        submitRunContinuation(false);
+    }
+
+    /**
+     * Submits the runContinuation task to the scheduler without signalling.
+     * @throws RejectedExecutionException
+     */
+    private void lazySubmitRunContinuation() {
+        submitRunContinuation(true);
     }
 
     /**
@@ -364,8 +373,8 @@ class VirtualThread extends Thread {
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                // re-submit to continue on this carrier thread if possible
-                submitRunContinuationAndSignal(false);
+                // lazy submit to continue on this carrier thread if possible
+                lazySubmitRunContinuation();
             }
         } else if (s == YIELDING) {   // Thread.yield
             setState(RUNNABLE);
@@ -373,8 +382,8 @@ class VirtualThread extends Thread {
             // notify JVMTI that unmount has completed, thread is runnable
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
-            // re-submit to continue on this carrier thread if possible
-            submitRunContinuationAndSignal(false);
+            // lazy submit to continue on this carrier thread if possible
+            lazySubmitRunContinuation();
         }
     }
 
@@ -749,6 +758,7 @@ class VirtualThread extends Thread {
                 return Thread.State.NEW;
             case STARTED:
             case RUNNABLE:
+            case RUNNABLE_SUSPENDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
             case RUNNING:
@@ -791,33 +801,40 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Returns the stack trace for this virtual thread if it newly created,
-     * started, parked, or terminated. Returns null if the thread is in
-     * another state.
+     * Returns the stack trace for this virtual thread if it is unmounted.
+     * Returns null if the thread is in another state.
      */
     private StackTraceElement[] tryGetStackTrace() {
-        if (compareAndSetState(PARKED, PARKED_SUSPENDED)) {
-            try {
-                return cont.getStackTrace();
-            } finally {
-                assert state() == PARKED_SUSPENDED;
-                setState(PARKED);
-
-                // may have been unparked while suspended
-                if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+        int initialState = state();
+        return switch (initialState) {
+            case RUNNABLE, PARKED -> {
+                int suspendedState = initialState | SUSPENDED;
+                if (compareAndSetState(initialState, suspendedState)) {
                     try {
-                        submitRunContinuation();
-                    } catch (RejectedExecutionException ignore) { }
+                        yield cont.getStackTrace();
+                    } finally {
+                        assert state == suspendedState;
+                        setState(initialState);
+
+                        // re-submit if runnable
+                        // re-submit if unparked while suspended
+                        if (initialState == RUNNABLE
+                            || (parkPermit && compareAndSetState(PARKED, RUNNABLE))) {
+                            try {
+                                submitRunContinuation();
+                            } catch (RejectedExecutionException ignore) { }
+                        }
+                    }
                 }
+                yield null;
             }
-        } else {
-            int s = state();
-            if (s == NEW || s == STARTED || s == TERMINATED) {
-                return new StackTraceElement[0];   // empty stack
-            } else {
-                return null;
+            case NEW, STARTED, TERMINATED ->  {
+                yield new StackTraceElement[0];   // empty stack
             }
-        }
+            default -> {
+                yield null;
+            }
+        };
     }
 
     @Override
@@ -966,95 +983,31 @@ class VirtualThread extends Thread {
      * Defines static methods to invoke non-public ForkJoinPool methods.
      */
     private static class ForkJoinPools {
-        static final MethodHandle externalExecuteTask;
+        static final MethodHandle externalLazySubmit;
         static {
             try {
                 PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
                     MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
                 @SuppressWarnings("removal")
                 MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                MethodType methodType = MethodType.methodType(void.class, Runnable.class, boolean.class);
-                externalExecuteTask = l.findVirtual(ForkJoinPool.class, "externalExecuteTask", methodType);
+                MethodType methodType = MethodType.methodType(void.class, ForkJoinTask.class);
+                externalLazySubmit = l.findVirtual(ForkJoinPool.class, "externalLazySubmit", methodType);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
         /**
-         * Invokes the non-public ForkJoinPool.externalExecuteTask method to
+         * Invokes the non-public ForkJoinPool.externalLazySubmit method to
          * submit the task to the current carrier thread's work queue.
          */
-        static void externalExecuteTask(ForkJoinPool pool, Runnable task, boolean signalOnEmpty) {
+        static void externalLazySubmit(ForkJoinPool pool, ForkJoinTask<?> task) {
             try {
-                externalExecuteTask.invoke(pool, task, signalOnEmpty);
+                externalLazySubmit.invoke(pool, task);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable e) {
                 throw new InternalError(e);
             }
-        }
-    }
-
-    /**
-     * A thread in the ForkJoinPool created by the default scheduler.
-     */
-    private static class CarrierThread extends ForkJoinWorkerThread {
-        private static final ThreadGroup CARRIER_THREADGROUP = carrierThreadGroup();
-        @SuppressWarnings("removal")
-        private static final AccessControlContext INNOCUOUS_ACC = innocuousACC();
-
-        private static final long CONTEXTCLASSLOADER;
-        private static final long INHERITABLETHREADLOCALS;
-        private static final long INHERITEDACCESSCONTROLCONTEXT;
-
-        CarrierThread(ForkJoinPool pool) {
-            super(CARRIER_THREADGROUP, pool);
-            U.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
-            U.putReference(this, INHERITABLETHREADLOCALS, null);
-            U.putReferenceRelease(this, INHERITEDACCESSCONTROLCONTEXT, INNOCUOUS_ACC);
-        }
-
-        @Override
-        public void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) { }
-
-        @Override
-        public void setContextClassLoader(ClassLoader cl) {
-            throw new SecurityException("setContextClassLoader");
-        }
-
-        /**
-         * The thread group for the carrier threads.
-         */
-        @SuppressWarnings("removal")
-        private static final ThreadGroup carrierThreadGroup() {
-            return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
-                public ThreadGroup run() {
-                    ThreadGroup group = Thread.currentCarrierThread().getThreadGroup();
-                    for (ThreadGroup p; (p = group.getParent()) != null; )
-                        group = p;
-                    @SuppressWarnings("deprecation")
-                    var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
-                    return carrierThreadsGroup;
-                }
-            });
-        }
-
-        /**
-         * Return an AccessControlContext that doesn't support any permissions.
-         */
-        @SuppressWarnings("removal")
-        private static AccessControlContext innocuousACC() {
-            return new AccessControlContext(new ProtectionDomain[] {
-                new ProtectionDomain(null, null)
-            });
-        }
-
-        static {
-            CONTEXTCLASSLOADER = U.objectFieldOffset(Thread.class,
-                    "contextClassLoader");
-            INHERITABLETHREADLOCALS = U.objectFieldOffset(Thread.class,
-                    "inheritableThreadLocals");
-            INHERITEDACCESSCONTROLCONTEXT = U.objectFieldOffset(Thread.class,
-                    "inheritedAccessControlContext");
         }
     }
 

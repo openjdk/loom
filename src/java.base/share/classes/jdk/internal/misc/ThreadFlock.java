@@ -35,6 +35,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -97,7 +98,7 @@ public class ThreadFlock implements AutoCloseable {
     private volatile int threadCount;
 
     private final String name;
-    private final Object scopeLocalBindings;
+    private final ScopeLocalContainer.BindingsSnapshot scopeLocalBindings;
     private final ThreadContainerImpl container; // encapsulate for now
 
     // state
@@ -109,7 +110,7 @@ public class ThreadFlock implements AutoCloseable {
 
     ThreadFlock(String name) {
         this.name = name;
-        this.scopeLocalBindings = JLA.scopeLocalBindings();
+        this.scopeLocalBindings = ScopeLocalContainer.captureBindings();
         this.container = new ThreadContainerImpl(this);
     }
 
@@ -117,7 +118,7 @@ public class ThreadFlock implements AutoCloseable {
         return threadCount;
     }
 
-    private Object scopeLocalBindings() {
+    private ScopeLocalContainer.BindingsSnapshot scopeLocalBindings() {
         return scopeLocalBindings;
     }
 
@@ -187,21 +188,21 @@ public class ThreadFlock implements AutoCloseable {
     }
 
     /**
-     * Throws IllegalStateException if the current thread is not the owner.
+     * Throws WrongThreadException if the current thread is not the owner.
      */
     private void ensureOwner() {
         if (Thread.currentThread() != owner())
-            throw new IllegalStateException("Not owner");
+            throw new WrongThreadException("Current thread not owner");
     }
 
     /**
-     * Throws IllegalStateException if the current thread is not the owner
+     * Throws WrongThreadException if the current thread is not the owner
      * or a thread contained in the flock.
      */
     private void ensureOwnerOrContainsThread() {
         Thread currentThread = Thread.currentThread();
         if (currentThread != owner() && !containsThread(currentThread))
-            throw new IllegalStateException("Current thread not owner or thread in flock");
+            throw new WrongThreadException("Current thread not owner or thread in flock");
     }
 
     /**
@@ -257,11 +258,11 @@ public class ThreadFlock implements AutoCloseable {
      *
      * @param thread the unstarted thread
      * @return the thread, started
-     * @throws IllegalStateException if this flock is shutdown or closed,
-     * or the current scope-local bindings are not the same as when the flock
-     * was created
+     * @throws IllegalStateException if this flock is shutdown or closed
+     * @throws StructureViolationException if the current scope-local bindings are not
+     * the same as when the flock was created
      * @throws IllegalThreadStateException if the thread has already started,
-     * or the caller thread is not the owner or a thread contained in the flock
+     * or the current thread is not the owner or a thread contained in the flock
      */
     public Thread start(Thread thread) {
         ensureOwnerOrContainsThread();
@@ -277,8 +278,8 @@ public class ThreadFlock implements AutoCloseable {
      * <p> This method may only be invoked by the flock owner or threads {@linkplain
      * #containsThread(Thread) contained} in the flock.
      *
-     * @throws IllegalStateException if the caller thread is not the owner
-     * or a thread contained in the flock
+     * @throws WrongThreadException if the current thread is not the owner or a thread
+     * contained in the flock
      */
     public void shutdown() {
         ensureOwnerOrContainsThread();
@@ -301,7 +302,7 @@ public class ThreadFlock implements AutoCloseable {
      * @return true if there are no threads in the flock, false if wakeup was invoked
      * and there are unfinished threads
      * @throws InterruptedException if interrupted while waiting
-     * @throws IllegalStateException if invoked by a thread that is not the owner
+     * @throws WrongThreadException if invoked by a thread that is not the owner
      */
     public boolean awaitAll() throws InterruptedException {
         ensureOwner();
@@ -335,7 +336,7 @@ public class ThreadFlock implements AutoCloseable {
      * and there are unfinished threads
      * @throws InterruptedException if interrupted while waiting
      * @throws TimeoutException if the wait timed out
-     * @throws IllegalStateException if invoked by a thread that is not the owner
+     * @throws WrongThreadException if invoked by a thread that is not the owner
      */
     public boolean awaitAll(Duration timeout)
             throws InterruptedException, TimeoutException {
@@ -372,8 +373,8 @@ public class ThreadFlock implements AutoCloseable {
      * If the owner is not blocked in {@code awaitAll} then its next call to wait
      * will return immediately. The method does nothing when the flock is closed.
      *
-     * @throws IllegalStateException if the caller thread is not the owner
-     * or a thread contained in the flock
+     * @throws WrongThreadException if the current thread is not the owner or a thread
+     * contained in the flock
      */
     public void wakeup() {
         ensureOwnerOrContainsThread();
@@ -401,7 +402,8 @@ public class ThreadFlock implements AutoCloseable {
      * ScopeLocal.Carrier#run(Runnable) operations} with scope-local bindings then
      * it also throws {@code StructureViolationException} after closing the flock.
      *
-     * @throws IllegalStateException if invoked by a thread that is not the owner
+     * @throws WrongThreadException if invoked by a thread that is not the owner
+     * @throws StructureViolationException if a structure violation was detected
      */
     public void close() {
         ensureOwner();
@@ -582,8 +584,8 @@ public class ThreadFlock implements AutoCloseable {
             return flock.toString();
         }
         @Override
-        public Object scopeLocalBindings() {
-            return flock.scopeLocalBindings();
+        public ScopeLocalContainer.BindingsSnapshot scopeLocalBindings() {
+            return flock.scopeLocalBindings;
         }
     }
 }

@@ -24,7 +24,7 @@
 /*
  * @test
  * @summary Test Future's default methods
- * @library ../ExecutorService
+ * @library ../lib
  * @run testng DefaultMethods
  */
 
@@ -122,8 +122,7 @@ public class DefaultMethods {
             try {
                 assertTrue(future.state() == CANCELLED);
                 expectThrows(IllegalStateException.class, future::resultNow);
-                Throwable ex = future.exceptionNow();
-                assertTrue(ex instanceof CancellationException);
+                expectThrows(IllegalStateException.class, future::exceptionNow);
             } finally {
                 latch.countDown();
             }
@@ -142,8 +141,7 @@ public class DefaultMethods {
             try {
                 assertTrue(future.state() == CANCELLED);
                 expectThrows(IllegalStateException.class, future::resultNow);
-                Throwable ex = future.exceptionNow();
-                assertTrue(ex instanceof CancellationException);
+                expectThrows(IllegalStateException.class, future::exceptionNow);
             } finally {
                 latch.countDown();
             }
@@ -207,8 +205,7 @@ public class DefaultMethods {
         future.cancel(false);
         assertTrue(future.state() == CANCELLED);
         expectThrows(IllegalStateException.class, future::resultNow);
-        Throwable ex = future.exceptionNow();
-        assertTrue(ex instanceof CancellationException);
+        expectThrows(IllegalStateException.class, future::exceptionNow);
     }
 
     /**

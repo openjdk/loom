@@ -420,46 +420,46 @@ VThreadList::invalidate() {
 
 /* Virtual Threads Suspend/Resume management */
 
-JvmtiVTSuspender::VThreadSuspendMode
-JvmtiVTSuspender::_vthread_suspend_mode = vthread_suspend_none;
+JvmtiVTSuspender::SR_Mode
+JvmtiVTSuspender::_SR_mode = SR_none;
 
 VThreadList*
-JvmtiVTSuspender::_vthread_suspend_list = new VThreadList();
+JvmtiVTSuspender::_suspended_list = new VThreadList();
 
 VThreadList*
-JvmtiVTSuspender::_vthread_resume_list = new VThreadList();
+JvmtiVTSuspender::_not_suspended_list = new VThreadList();
 
 void
 JvmtiVTSuspender::register_all_vthreads_suspend() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  _vthread_suspend_mode = vthread_suspend_all;
-  _vthread_suspend_list->invalidate();
-  _vthread_resume_list->invalidate();
+  _SR_mode = SR_all;
+  _suspended_list->invalidate();
+  _not_suspended_list->invalidate();
 }
 
 void
 JvmtiVTSuspender::register_all_vthreads_resume() {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  _vthread_suspend_mode = vthread_suspend_none;
-  _vthread_suspend_list->invalidate();
-  _vthread_resume_list->invalidate();
+  _SR_mode = SR_none;
+  _suspended_list->invalidate();
+  _not_suspended_list->invalidate();
 }
 
 bool
 JvmtiVTSuspender::register_vthread_suspend(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  if (_vthread_suspend_mode == vthread_suspend_all) {
-    assert(_vthread_resume_list->contains(vt),
+  if (_SR_mode == SR_all) {
+    assert(_not_suspended_list->contains(vt),
            "register_vthread_suspend sanity check");
-    _vthread_resume_list->remove(vt);
+    _not_suspended_list->remove(vt);
   } else {
-    assert(!_vthread_suspend_list->contains(vt),
+    assert(!_suspended_list->contains(vt),
            "register_vthread_suspend sanity check");
-    _vthread_suspend_mode = vthread_suspend_ind;
-    _vthread_suspend_list->append(vt);
+    _SR_mode = SR_ind;
+    _suspended_list->append(vt);
   }
   return true;
 }
@@ -468,16 +468,16 @@ bool
 JvmtiVTSuspender::register_vthread_resume(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  if (_vthread_suspend_mode == vthread_suspend_all) {
-    assert(!_vthread_resume_list->contains(vt),
+  if (_SR_mode == SR_all) {
+    assert(!_not_suspended_list->contains(vt),
            "register_vthread_resume sanity check");
-    _vthread_resume_list->append(vt);
-  } else if (_vthread_suspend_mode == vthread_suspend_ind) {
-    assert(_vthread_suspend_list->contains(vt),
+    _not_suspended_list->append(vt);
+  } else if (_SR_mode == SR_ind) {
+    assert(_suspended_list->contains(vt),
            "register_vthread_resume check");
-    _vthread_suspend_list->remove(vt);
-    if (_vthread_suspend_list->length() == 0) {
-      _vthread_suspend_mode = vthread_suspend_none;
+    _suspended_list->remove(vt);
+    if (_suspended_list->length() == 0) {
+      _SR_mode = SR_none;
     }
   } else {
     assert(false, "register_vthread_resume: no suspend mode enabled");
@@ -488,8 +488,8 @@ JvmtiVTSuspender::register_vthread_resume(oop vt) {
 bool
 JvmtiVTSuspender::is_vthread_suspended(oop vt) {
   bool suspend_is_needed =
-   (_vthread_suspend_mode == vthread_suspend_all && !_vthread_resume_list->contains(vt)) ||
-   (_vthread_suspend_mode == vthread_suspend_ind && _vthread_suspend_list->contains(vt));
+   (_SR_mode == SR_all && !_not_suspended_list->contains(vt)) ||
+   (_SR_mode == SR_ind && _suspended_list->contains(vt));
 
   return suspend_is_needed;
 }

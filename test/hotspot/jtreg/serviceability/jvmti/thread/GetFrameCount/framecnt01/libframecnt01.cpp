@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -66,8 +66,9 @@ JNIEXPORT jboolean JNICALL Java_framecnt01_checkFrames0(JNIEnv *jni, jclass cls,
   jint frame_count = get_frame_count(jvmti_env, jni, thread);
   if (frame_count != expected_count) {
     LOG("Thread #%s: number of frames expected: %d, got: %d\n",
-           get_thread_name(jvmti_env, jni, thread), expected_count, frame_count);
+        get_thread_name(jvmti_env, jni, thread), expected_count, frame_count);
     result = JNI_FALSE;
+    print_stack_trace(jvmti_env, jni, thread); // DBG: print stack trace once more
   }
 
   if (suspend) {

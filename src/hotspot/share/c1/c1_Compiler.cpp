@@ -157,6 +157,7 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_scopeLocalCache:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_dsqrt:
+  case vmIntrinsics::_dsqrt_strict:
   case vmIntrinsics::_dsin:
   case vmIntrinsics::_dcos:
   case vmIntrinsics::_dtan:

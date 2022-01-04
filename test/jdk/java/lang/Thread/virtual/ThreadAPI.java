@@ -1753,7 +1753,7 @@ public class ThreadAPI {
         var thread = Thread.ofVirtual().start(() -> {
             try { sel.select(); } catch (Exception e) { }
         });
-        Thread.sleep(200);  // give him for thread to block
+        Thread.sleep(200);  // give time for thread to block
         try {
             assertTrue(thread.getState() == Thread.State.RUNNABLE);
             StackTraceElement[] stack = thread.getStackTrace();

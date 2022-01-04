@@ -1015,6 +1015,7 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
 jvmtiError
 JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list) {
   JavaThread* current = JavaThread::current();
+  ThreadsListHandle tlh(current);
   jvmtiError err = JvmtiEnvBase::check_thread_list(except_count, except_list);
   if (err != JVMTI_ERROR_NONE) {
     return err;
@@ -1491,9 +1492,7 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // there is no monitor info to collect if target virtual thread is unmounted
     if (java_thread != NULL) {
-      VThreadGetCurrentContendedMonitorClosure op(this,
-                                                  Handle(calling_thread, thread_oop),
-                                                  monitor_ptr);
+      GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr, true); // is_virtual
       Handshake::execute(&op, java_thread);
       err = op.result();
     } else {
@@ -1510,7 +1509,7 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
     err = get_current_contended_monitor(calling_thread, java_thread, monitor_ptr, false);
   } else {
     // get contended monitor information with handshake
-    GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr);
+    GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr, false); // !is_virtual
     Handshake::execute(&op, java_thread);
     err = op.result();
   }
@@ -1779,7 +1778,7 @@ JvmtiEnv::GetThreadListStackTraces(jint thread_count, const jthread* thread_list
     }
 
     GetSingleStackTraceClosure op(this, current_thread, thread, max_frame_count);
-    Handshake::execute(&op, java_thread);
+    Handshake::execute(&op, &tlh, java_thread);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
       *stack_info_ptr = op.stack_info();

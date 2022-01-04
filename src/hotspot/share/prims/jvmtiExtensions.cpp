@@ -133,16 +133,29 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
   ThreadInVMfromNative tiv(current_thread);
   JvmtiVTMTDisabler vtmt_disabler;
 
-  oop vthread_obj = JNIHandles::resolve_external_guard(vthread);
-
-  if (!java_lang_VirtualThread::is_instance(vthread_obj)) {
+  ThreadsListHandle tlh(current_thread);
+  JavaThread* java_thread;
+  oop vthread_oop;
+  jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), vthread, &java_thread, &vthread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    // We got an error code so we don't have a JavaThread *, but
+    // only return an error from here if we didn't get a valid
+    // thread_oop.
+    // In a vthread case the cv_external_thread_to_JavaThread is expected to correctly set
+    // the thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
+    if (vthread_oop == NULL) {
+      return err;
+    }
+  }
+ 
+  if (!java_lang_VirtualThread::is_instance(vthread_oop)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
   if (thread_ptr == NULL) {
       return JVMTI_ERROR_NULL_POINTER;
   }
-  VThreadGetThreadClosure op(Handle(current_thread, vthread_obj), thread_ptr);
-  Handshake::execute(&op, current_thread);
+  VThreadGetThreadClosure op(Handle(current_thread, vthread_oop), thread_ptr);
+  Handshake::execute(&op, &tlh, current_thread);
   return op.result();
 }
 

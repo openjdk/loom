@@ -1395,8 +1395,8 @@ class StubGenerator: public StubCodeGenerator {
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
-
-    bool use64byteVector = MaxVectorSize > 32 && AVX3Threshold == 0;
+    int avx3threshold = VM_Version::avx3_threshold();
+    bool use64byteVector = (MaxVectorSize > 32) && (avx3threshold == 0);
     Label L_main_loop, L_main_loop_64bytes, L_tail, L_tail64, L_exit, L_entry;
     Label L_repmovs, L_main_pre_loop, L_main_pre_loop_64bytes, L_pre_main_post_64;
     const Register from        = rdi;  // source array address
@@ -1459,7 +1459,7 @@ class StubGenerator: public StubCodeGenerator {
       // PRE-MAIN-POST loop for aligned copy.
       __ BIND(L_entry);
 
-      if (AVX3Threshold != 0) {
+      if (avx3threshold != 0) {
         __ cmpq(count, threshold[shift]);
         if (MaxVectorSize == 64) {
           // Copy using 64 byte vectors.
@@ -1471,7 +1471,7 @@ class StubGenerator: public StubCodeGenerator {
         }
       }
 
-      if (MaxVectorSize < 64  || AVX3Threshold != 0) {
+      if ((MaxVectorSize < 64)  || (avx3threshold != 0)) {
         // Partial copy to make dst address 32 byte aligned.
         __ movq(temp2, to);
         __ andq(temp2, 31);
@@ -1614,7 +1614,8 @@ class StubGenerator: public StubCodeGenerator {
     StubCodeMark mark(this, "StubRoutines", name);
     address start = __ pc();
 
-    bool use64byteVector = MaxVectorSize > 32 && AVX3Threshold == 0;
+    int avx3threshold = VM_Version::avx3_threshold();
+    bool use64byteVector = (MaxVectorSize > 32) && (avx3threshold == 0);
 
     Label L_main_pre_loop, L_main_pre_loop_64bytes, L_pre_main_post_64;
     Label L_main_loop, L_main_loop_64bytes, L_tail, L_tail64, L_exit, L_entry;
@@ -1679,12 +1680,12 @@ class StubGenerator: public StubCodeGenerator {
       // PRE-MAIN-POST loop for aligned copy.
       __ BIND(L_entry);
 
-      if (MaxVectorSize > 32 && AVX3Threshold != 0) {
+      if ((MaxVectorSize > 32) && (avx3threshold != 0)) {
         __ cmpq(temp1, threshold[shift]);
         __ jcc(Assembler::greaterEqual, L_pre_main_post_64);
       }
 
-      if (MaxVectorSize < 64  || AVX3Threshold != 0) {
+      if ((MaxVectorSize < 64)  || (avx3threshold != 0)) {
         // Partial copy to make dst address 32 byte aligned.
         __ leaq(temp2, Address(to, temp1, (Address::ScaleFactor)(shift), 0));
         __ andq(temp2, 31);
@@ -6710,6 +6711,9 @@ address generate_avx_ghash_processBlocks() {
       __ cmpl(length, 63);
       __ jcc(Assembler::lessEqual, L_finalBit);
 
+      __ mov64(rax, 0x0000ffffffffffff);
+      __ kmovql(k2, rax);
+
       __ align32();
       __ BIND(L_process64Loop);
 
@@ -6731,7 +6735,7 @@ address generate_avx_ghash_processBlocks() {
       __ vpmaddwd(merged0, merge_ab_bc0, pack32_op, Assembler::AVX_512bit);
       __ vpermb(merged0, pack24bits, merged0, Assembler::AVX_512bit);
 
-      __ evmovdquq(Address(dest, dp), merged0, Assembler::AVX_512bit);
+      __ evmovdqub(Address(dest, dp), k2, merged0, true, Assembler::AVX_512bit);
 
       __ subl(length, 64);
       __ addptr(source, 64);
@@ -6978,7 +6982,13 @@ address generate_avx_ghash_processBlocks() {
     if (VM_Version::supports_sse4_1() && VM_Version::supports_avx512_vpclmulqdq() &&
         VM_Version::supports_avx512bw() &&
         VM_Version::supports_avx512vl()) {
+        // The constants used in the CRC32 algorithm requires the 1's compliment of the initial crc value.
+        // However, the constant table for CRC32-C assumes the original crc value.  Account for this
+        // difference before calling and after returning.
+      __ lea(table, ExternalAddress(StubRoutines::x86::crc_table_avx512_addr()));
+      __ notl(crc);
       __ kernel_crc32_avx512(crc, buf, len, table, tmp1, tmp2);
+      __ notl(crc);
     } else {
       __ kernel_crc32(crc, buf, len, table, tmp1);
     }
@@ -7030,20 +7040,27 @@ address generate_avx_ghash_processBlocks() {
 
       BLOCK_COMMENT("Entry:");
       __ enter(); // required for proper stackwalking of RuntimeStub frame
+      if (VM_Version::supports_sse4_1() && VM_Version::supports_avx512_vpclmulqdq() &&
+          VM_Version::supports_avx512bw() &&
+          VM_Version::supports_avx512vl()) {
+        __ lea(j, ExternalAddress(StubRoutines::x86::crc32c_table_avx512_addr()));
+        __ kernel_crc32_avx512(crc, buf, len, j, l, k);
+      } else {
 #ifdef _WIN64
-      __ push(y);
-      __ push(z);
+        __ push(y);
+        __ push(z);
 #endif
-      __ crc32c_ipl_alg2_alt2(crc, buf, len,
-                              a, j, k,
-                              l, y, z,
-                              c_farg0, c_farg1, c_farg2,
-                              is_pclmulqdq_supported);
+        __ crc32c_ipl_alg2_alt2(crc, buf, len,
+                                a, j, k,
+                                l, y, z,
+                                c_farg0, c_farg1, c_farg2,
+                                is_pclmulqdq_supported);
+#ifdef _WIN64
+        __ pop(z);
+        __ pop(y);
+#endif
+      }
       __ movl(rax, crc);
-#ifdef _WIN64
-      __ pop(z);
-      __ pop(y);
-#endif
       __ vzeroupper();
       __ leave(); // required for proper stackwalking of RuntimeStub frame
       __ ret(0);
@@ -8413,6 +8430,7 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::x86::_vector_double_sign_mask = generate_vector_mask("vector_double_sign_mask", 0x7FFFFFFFFFFFFFFF);
     StubRoutines::x86::_vector_double_sign_flip = generate_vector_mask("vector_double_sign_flip", 0x8000000000000000);
     StubRoutines::x86::_vector_all_bits_set = generate_vector_mask("vector_all_bits_set", 0xFFFFFFFFFFFFFFFF);
+    StubRoutines::x86::_vector_int_mask_cmp_bits = generate_vector_mask("vector_int_mask_cmp_bits", 0x0000000100000001);
     StubRoutines::x86::_vector_short_to_byte_mask = generate_vector_mask("vector_short_to_byte_mask", 0x00ff00ff00ff00ff);
     StubRoutines::x86::_vector_byte_perm_mask = generate_vector_byte_perm_mask("vector_byte_perm_mask");
     StubRoutines::x86::_vector_int_to_byte_mask = generate_vector_mask("vector_int_to_byte_mask", 0x000000ff000000ff);
@@ -8570,15 +8588,15 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     // Get svml stub routine addresses
-    void *libsvml = NULL;
+    void *libjsvml = NULL;
     char ebuf[1024];
     char dll_name[JVM_MAXPATHLEN];
-    if (os::dll_locate_lib(dll_name, sizeof(dll_name), Arguments::get_dll_dir(), "svml")) {
-      libsvml = os::dll_load(dll_name, ebuf, sizeof ebuf);
+    if (os::dll_locate_lib(dll_name, sizeof(dll_name), Arguments::get_dll_dir(), "jsvml")) {
+      libjsvml = os::dll_load(dll_name, ebuf, sizeof ebuf);
     }
-    if (libsvml != NULL) {
+    if (libjsvml != NULL) {
       // SVML method naming convention
-      //   All the methods are named as __svml_op<T><N>_ha_<VV>
+      //   All the methods are named as __jsvml_op<T><N>_ha_<VV>
       //   Where:
       //      ha stands for high accuracy
       //      <T> is optional to indicate float/double
@@ -8589,10 +8607,10 @@ RuntimeStub* generate_cont_doYield() {
       //              e.g. 128 bit float vector has 4 float elements
       //      <VV> indicates the avx/sse level:
       //              z0 is AVX512, l9 is AVX2, e9 is AVX1 and ex is for SSE2
-      //      e.g. __svml_expf16_ha_z0 is the method for computing 16 element vector float exp using AVX 512 insns
-      //           __svml_exp8_ha_z0 is the method for computing 8 element vector double exp using AVX 512 insns
+      //      e.g. __jsvml_expf16_ha_z0 is the method for computing 16 element vector float exp using AVX 512 insns
+      //           __jsvml_exp8_ha_z0 is the method for computing 8 element vector double exp using AVX 512 insns
 
-      log_info(library)("Loaded library %s, handle " INTPTR_FORMAT, JNI_LIB_PREFIX "svml" JNI_LIB_SUFFIX, p2i(libsvml));
+      log_info(library)("Loaded library %s, handle " INTPTR_FORMAT, JNI_LIB_PREFIX "jsvml" JNI_LIB_SUFFIX, p2i(libjsvml));
       if (UseAVX > 2) {
         for (int op = 0; op < VectorSupport::NUM_SVML_OP; op++) {
           int vop = VectorSupport::VECTOR_OP_SVML_START + op;
@@ -8600,11 +8618,11 @@ RuntimeStub* generate_cont_doYield() {
               (vop == VectorSupport::VECTOR_OP_LOG || vop == VectorSupport::VECTOR_OP_LOG10 || vop == VectorSupport::VECTOR_OP_POW)) {
             continue;
           }
-          snprintf(ebuf, sizeof(ebuf), "__svml_%sf16_ha_z0", VectorSupport::svmlname[op]);
-          StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libsvml, ebuf);
+          snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf16_ha_z0", VectorSupport::svmlname[op]);
+          StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-          snprintf(ebuf, sizeof(ebuf), "__svml_%s8_ha_z0", VectorSupport::svmlname[op]);
-          StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libsvml, ebuf);
+          snprintf(ebuf, sizeof(ebuf), "__jsvml_%s8_ha_z0", VectorSupport::svmlname[op]);
+          StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libjsvml, ebuf);
         }
       }
       const char* avx_sse_str = (UseAVX >= 2) ? "l9" : ((UseAVX == 1) ? "e9" : "ex");
@@ -8613,23 +8631,23 @@ RuntimeStub* generate_cont_doYield() {
         if (vop == VectorSupport::VECTOR_OP_POW) {
           continue;
         }
-        snprintf(ebuf, sizeof(ebuf), "__svml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__svml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__svml_%sf8_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf8_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__svml_%s1_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%s1_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__svml_%s2_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%s2_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__svml_%s4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
-        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libsvml, ebuf);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%s4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+        StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libjsvml, ebuf);
       }
     }
 #endif // COMPILER2

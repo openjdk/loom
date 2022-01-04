@@ -303,6 +303,7 @@ public abstract class Reference<T> {
     }
 
     static {
+        @SuppressWarnings("deprecation")
         ThreadGroup tg = Thread.currentThread().getThreadGroup();
         for (ThreadGroup tgn = tg;
              tgn != null;

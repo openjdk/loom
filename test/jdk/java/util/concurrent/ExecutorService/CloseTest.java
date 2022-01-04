@@ -24,6 +24,7 @@
 /*
  * @test
  * @summary Test ExecutorService.close, including default implementation
+ * @library ../lib
  * @compile --enable-preview -source ${jdk.version} CloseTest.java
  * @run testng/othervm --enable-preview CloseTest
  */
@@ -56,6 +57,8 @@ public class CloseTest {
 
             // implementations that may override close
             { new ForkJoinPool(), },
+            { Executors.newFixedThreadPool(1), },
+            { Executors.newCachedThreadPool(), },
             { Executors.newThreadPerTaskExecutor(defaultThreadFactory), },
             { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
         };

@@ -59,8 +59,7 @@ package java.util.concurrent;
 public interface ThreadFactory {
 
     /**
-     * Constructs a new {@code Thread}.  Implementations may also initialize
-     * priority, name, daemon status, {@code ThreadGroup}, etc.
+     * Constructs a new unstarted {@code Thread} to run the given runnable.
      *
      * @param r a runnable to be executed by new thread instance
      * @return constructed thread, or {@code null} if the request to

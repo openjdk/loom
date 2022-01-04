@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
@@ -46,9 +45,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.net.URL;
-import java.nio.charset.CharacterCodingException;
 import java.nio.channels.Channel;
 import java.nio.channels.spi.SelectorProvider;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.security.AccessControlContext;
 import java.security.AccessController;
@@ -92,6 +91,7 @@ import sun.nio.ch.ConsoleStreams;
 import sun.nio.fs.DefaultFileSystemProvider;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
+import sun.nio.cs.UTF_8;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -195,6 +195,11 @@ public final class System {
     // current security manager
     @SuppressWarnings("removal")
     private static volatile SecurityManager security;   // read by VM
+
+    // `sun.jnu.encoding` if it is not supported. Otherwise null.
+    // It is initialized in `initPhase1()` before any charset providers
+    // are initialized.
+    private static String notSupportedJnuEncoding;
 
     // return true if a security manager is allowed
     private static boolean allowSecurityManager() {
@@ -339,7 +344,7 @@ public final class System {
     private static class CallersHolder {
         // Remember callers of setSecurityManager() here so that warning
         // is only printed once for each different caller
-        final static Map<Class<?>, Boolean> callers
+        static final Map<Class<?>, Boolean> callers
             = Collections.synchronizedMap(new WeakHashMap<>());
     }
 
@@ -1603,7 +1608,7 @@ public final class System {
      *
      * @since 9
      */
-    public static abstract class LoggerFinder {
+    public abstract static class LoggerFinder {
         /**
          * The {@code RuntimePermission("loggerFinder")} is
          * necessary to subclass and instantiate the {@code LoggerFinder} class,
@@ -1925,8 +1930,18 @@ public final class System {
      * Runtime.getRuntime().runFinalization()
      * </pre></blockquote>
      *
+     * @deprecated Finalization has been deprecated for removal.  See
+     * {@link java.lang.Object#finalize} for background information and details
+     * about migration options.
+     * <p>
+     * When running in a JVM in which finalization has been disabled or removed,
+     * no objects will be pending finalization, so this method does nothing.
+     *
      * @see     java.lang.Runtime#runFinalization()
+     * @jls 12.6 Finalization of Class Instances
      */
+    @Deprecated(since="18", forRemoval=true)
+    @SuppressWarnings("removal")
     public static void runFinalization() {
         Runtime.getRuntime().runFinalization();
     }
@@ -2025,10 +2040,9 @@ public final class System {
      * Create PrintStream for stdout/err based on encoding.
      */
     private static PrintStream newPrintStream(OutputStream out, String enc) {
-       if (enc != null) {
-            try {
-                return new PrintStream(new BufferedOutputStream(out, 128), true, enc);
-            } catch (UnsupportedEncodingException uee) {}
+        if (enc != null) {
+            return new PrintStream(new BufferedOutputStream(out, 128), true,
+                                   Charset.forName(enc, UTF_8.INSTANCE));
         }
         return new PrintStream(new BufferedOutputStream(out, 128), true);
     }
@@ -2120,6 +2134,13 @@ public final class System {
         // can only be accessed by the internal implementation.
         VM.saveProperties(tempProps);
         props = createProperties(tempProps);
+
+        // Check if sun.jnu.encoding is supported. If not, replace it with UTF-8.
+        var jnuEncoding = props.getProperty("sun.jnu.encoding");
+        if (jnuEncoding == null || !Charset.isSupported(jnuEncoding)) {
+            notSupportedJnuEncoding = jnuEncoding == null ? "null" : jnuEncoding;
+            props.setProperty("sun.jnu.encoding", "UTF-8");
+        }
 
         StaticProperty.javaHome();          // Load StaticProperty to cache the property values
 
@@ -2254,6 +2275,14 @@ public final class System {
                     WARNING: The Security Manager is deprecated and will be removed in a future release""");
         }
 
+        // Emit a warning if `sun.jnu.encoding` is not supported.
+        if (notSupportedJnuEncoding != null) {
+            System.err.println(
+                    "WARNING: The encoding of the underlying platform's" +
+                    " file system is not supported: " +
+                    notSupportedJnuEncoding);
+        }
+
         initialErrStream = System.err;
 
         // initializing the system class loader
@@ -2309,7 +2338,7 @@ public final class System {
             public Thread newThreadWithAcc(Runnable target, @SuppressWarnings("removal") AccessControlContext acc) {
                 return new Thread(target, acc);
             }
-            @SuppressWarnings("deprecation")
+            @SuppressWarnings("removal")
             public void invokeFinalize(Object o) throws Throwable {
                 o.finalize();
             }

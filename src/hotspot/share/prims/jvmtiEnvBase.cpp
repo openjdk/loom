@@ -1920,6 +1920,9 @@ SetForceEarlyReturn::doit(Thread *target, bool self) {
   Thread* current_thread = Thread::current();
   HandleMark   hm(current_thread);
 
+  if (java_thread->is_exiting()) {
+    return; /* JVMTI_ERROR_THREAD_NOT_ALIVE (default) */
+  }
   if (!self) {
     if (!java_thread->is_suspended()) {
       _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
@@ -2037,7 +2040,7 @@ JvmtiModuleClosure::get_all_modules(JvmtiEnv* env, jint* module_count_ptr, jobje
     return JVMTI_ERROR_OUT_OF_MEMORY;
   }
   for (jint idx = 0; idx < len; idx++) {
-    array[idx] = JNIHandles::make_local(Thread::current(), _tbl->at(idx).resolve());
+    array[idx] = JNIHandles::make_local(_tbl->at(idx).resolve());
   }
   _tbl = NULL;
   *modules_ptr = array;
@@ -2050,6 +2053,10 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
   Thread* current_thread  = Thread::current();
   HandleMark hm(current_thread);
   JavaThread* java_thread = JavaThread::cast(target);
+
+  if (java_thread->is_exiting()) {
+    return; /* JVMTI_ERROR_THREAD_NOT_ALIVE (default) */
+  }
   assert(java_thread == _state->get_thread(), "Must be");
 
   if (!self && !java_thread->is_suspended() && !java_thread->is_thread_suspended()) {
@@ -2126,20 +2133,22 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
   // It's fine to update the thread state here because no JVMTI events
   // shall be posted for this PopFrame.
 
-  if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
-    _state->update_for_pop_top_frame();
-    java_thread->set_popframe_condition(JavaThread::popframe_pending_bit);
-    // Set pending step flag for this popframe and it is cleared when next
-    // step event is posted.
-    _state->set_pending_step_for_popframe();
-    _result = JVMTI_ERROR_NONE;
-  }
+  _state->update_for_pop_top_frame();
+  java_thread->set_popframe_condition(JavaThread::popframe_pending_bit);
+  // Set pending step flag for this popframe and it is cleared when next
+  // step event is posted.
+  _state->set_pending_step_for_popframe();
+  _result = JVMTI_ERROR_NONE;
 }
 
 void
 SetFramePopClosure::doit(Thread *target, bool self) {
   ResourceMark rm;
   JavaThread* java_thread = JavaThread::cast(target);
+
+  if (java_thread->is_exiting()) {
+    return; /* JVMTI_ERROR_THREAD_NOT_ALIVE (default) */
+  }
 
   // TBD: This might need to be corrected for detached carrier and virtual threads.
   assert(_state->get_thread_or_saved() == java_thread, "Must be");
@@ -2161,9 +2170,6 @@ SetFramePopClosure::doit(Thread *target, bool self) {
   }
 
   assert(vf->frame_pointer() != NULL, "frame pointer mustn't be NULL");
-  if (java_thread->is_exiting() || java_thread->threadObj() == NULL) {
-    return; /* JVMTI_ERROR_THREAD_NOT_ALIVE (default) */
-  }
   int frame_number = _state->count_frames() - _depth;
   _state->env_thread_state((JvmtiEnvBase*)_env)->set_frame_pop(frame_number);
   _result = JVMTI_ERROR_NONE;
@@ -2186,7 +2192,7 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
     _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor(_calling_thread,
                                                                     jt,
                                                                     _owned_monitor_ptr,
-                                                                    false);
+                                                                    _is_virtual);
   }
 }
 
@@ -2304,21 +2310,11 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
 }
 
 void
-VThreadGetCurrentContendedMonitorClosure::do_thread(Thread *target) {
-  JavaThread* java_thread = JavaThread::cast(target);
-
-  if (!java_thread->is_exiting() && java_thread->threadObj() != NULL) {
-    _result = ((JvmtiEnvBase *)_env)->get_current_contended_monitor((JavaThread*)target,
-                                                                    java_thread,
-                                                                    _owned_monitor_ptr,
-                                                                    true);
-  }
-}
-
-void
 VThreadGetThreadClosure::do_thread(Thread *target) {
+  assert(target->is_Java_thread(), "just checking");
+  JavaThread *jt = JavaThread::cast(target);
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(target, carrier_thread);
+  *_carrier_thread_ptr = (jthread)JNIHandles::make_local(jt, carrier_thread);
 }
 
 void

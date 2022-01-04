@@ -924,9 +924,8 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
 
     @Override
     public Throwable exceptionNow() {
-        Throwable ex = getException(status);
-        if (ex != null) {
-            return ex;
+        if ((status & (ABNORMAL | THROWN)) == (ABNORMAL | THROWN)) {
+            return getThrowableException();
         } else {
             throw new IllegalStateException();
         }

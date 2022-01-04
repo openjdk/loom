@@ -80,7 +80,7 @@ public class StackableScope {
      */
     public boolean tryPop() {
         if (Thread.currentThread() != owner)
-            throw new IllegalStateException("Not owner");
+            throw new WrongThreadException("Not owner");
         if (head() == this) {
             setHead(previous);
             previous = null;
@@ -108,7 +108,7 @@ public class StackableScope {
      */
     public boolean popForcefully() {
         if (Thread.currentThread() != owner)
-            throw new IllegalStateException("Not owner");
+            throw new WrongThreadException("Not owner");
         final StackableScope head = head();
         if (head == this) {
             setHead(previous);
@@ -237,7 +237,7 @@ public class StackableScope {
     /**
      * Returns the head of the current thread's scope stack.
      */
-    private static StackableScope head() {
+    static StackableScope head() {
         return JLA.headStackableScope(Thread.currentThread());
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -61,7 +61,7 @@ Java_contmon01_checkMonitor(JNIEnv *jni, jclass cls, jint point, jthread thread,
   }
   check_jvmti_status(jni, err, "Error in GetCurrentContendedMonitor");
   if (jni->IsSameObject(lock, monitor) == JNI_FALSE) {
-    LOG("(IsSameObject#%d) unexpected monitor object: 0x%p\n", point, monitor);
+    LOG("(IsSameObject#%d) unexpected monitor object: %p\n", point, monitor);
     fatal(jni, "Unexpected monitor object.");
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,7 +39,7 @@ static frame_info expected_platform_frames[] = {
     {"Lgetstacktr08$TestThread;", "checkPoint", "()V"},
     {"Lgetstacktr08$TestThread;", "chain5", "()V"},
     {"Lgetstacktr08$TestThread;", "chain4", "()V"},
-    {"Lgetstacktr08;", "nativeChain", "()V"},
+    {"Lgetstacktr08;", "nativeChain", "(Ljava/lang/Class;)V"},
     {"Lgetstacktr08$TestThread;", "chain3", "()V"},
     {"Lgetstacktr08$TestThread;", "chain2", "()V"},
     {"Lgetstacktr08$TestThread;", "chain1", "()V"},
@@ -51,7 +51,7 @@ static frame_info expected_virtual_frames[] = {
     {"Lgetstacktr08$TestThread;", "checkPoint", "()V"},
     {"Lgetstacktr08$TestThread;", "chain5", "()V"},
     {"Lgetstacktr08$TestThread;", "chain4", "()V"},
-    {"Lgetstacktr08;", "nativeChain", "()V"},
+    {"Lgetstacktr08;", "nativeChain", "(Ljava/lang/Class;)V"},
     {"Lgetstacktr08$TestThread;", "chain3", "()V"},
     {"Lgetstacktr08$TestThread;", "chain2", "()V"},
     {"Lgetstacktr08$TestThread;", "chain1", "()V"},
@@ -177,9 +177,9 @@ Java_getstacktr08_getReady(JNIEnv *jni, jclass cls, jclass clazz, jbyteArray byt
 }
 
 JNIEXPORT void JNICALL
-Java_getstacktr08_nativeChain(JNIEnv *jni, jclass cls) {
+Java_getstacktr08_nativeChain(JNIEnv *jni, jclass cls, jclass clazz) {
   if (mid_chain4 != NULL) {
-    jni->CallStaticVoidMethod(cls, mid_chain4);
+    jni->CallStaticVoidMethod(clazz, mid_chain4);
   }
   if (!compare_stack_trace(jvmti, jni, get_current_thread(jvmti, jni), 3)) {
     jni->ThrowNew(jni->FindClass("java/lang/RuntimeException"), "Stacktrace differs from expected.");

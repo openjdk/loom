@@ -1,21 +1,6 @@
 ### Filed bugs
 
-# Issues caused a lot of test failures
-
-compiler/codegen/TestOopCmp.java                                                                8254187 generic-all
-compiler/memoryinitialization/ZeroTLABTest.java                                                 8254187 generic-all
-gc/epsilon/TestByteArrays.java                                                                  8254187 generic-all
-gc/epsilon/TestManyThreads.java                                                                 8254187 generic-all
-gc/epsilon/TestObjects.java                                                                     8254187 generic-all
-gc/epsilon/TestRefArrays.java                                                                   8254187 generic-all
-gc/survivorAlignment/TestAllocationInEden.java                                                  8254187 generic-all
-
-compiler/codegen/Test6942326.java                                                               8253918 generic-all
-compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java                                       8253918 generic-all
-gc/TestJNIWeak/TestJNIWeak.java                                                                 8253918 generic-all
-runtime/Nestmates/membership/TestNestmateMembership.java                                        8253918 generic-all
-
-# java/lang/ClassLoader/loadLibraryUnload/LoadLibraryUnload.java                                  8273780 generic-all
+vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
@@ -122,6 +107,10 @@ serviceability/jvmti/GetThreadListStackTraces/OneGetThreadListStackTraces.java
 serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java
 
 ####
+# JVMTI tests which generated unexpected events by virtual threads
+serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java
+
+####
 # OOME in unexpected thread
 gc/g1/ihop/TestIHOPStatic.java
 vmTestbase/gc/gctests/MemoryEater/TestDescription.java
@@ -182,6 +171,7 @@ runtime/cds/appcds/HelloExtTest.java
 runtime/cds/appcds/IgnoreEmptyClassPaths.java
 runtime/cds/appcds/JvmtiAddPath.java
 runtime/cds/appcds/LambdaWithOldClass.java
+runtime/cds/appcds/LambdaWithJavaAgent.java
 runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java
 runtime/cds/appcds/MissingSuperTest.java
 runtime/cds/appcds/MultiProcessSharing.java
@@ -333,9 +323,12 @@ runtime/cds/appcds/OldSuperInf.java
 runtime/cds/appcds/OldSuperInfIndirect.java
 runtime/cds/appcds/customLoader/OldClassAndInf.java
 runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java
+runtime/cds/appcds/dynamicArchive/LambdaForOldInfInBaseArchive.java
 runtime/cds/appcds/dynamicArchive/OldClassAndInf.java
 runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java
 runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java
+runtime/cds/appcds/dynamicArchive/OldClassInBaseArchive.java
+runtime/cds/appcds/dynamicArchive/RedefineCallerClassTest.java
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl
@@ -371,7 +364,8 @@ runtime/cds/appcds/ClassLoaderTest.java
 runtime/cds/appcds/HelloTest.java
 runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
 runtime/cds/BootAppendTests.java
-runtime/BootstrapMethod/BSMCalledTwice.java
+runtime/BootstrapMethod/BSMCalledTwice.java#id0
+runtime/BootstrapMethod/BSMCalledTwice.java#id1
 
 
 ####
@@ -417,8 +411,8 @@ gc/g1/TestStringDeduplicationFullGC.java
 gc/g1/TestStringDeduplicationAgeThreshold.java
 gc/g1/TestRemsetLoggingPerRegion.java
 gc/g1/TestRemsetLogging.java
-
 gc/g1/TestMixedGCLiveThreshold.java#25percent
+gc/g1/plab/TestPLABResize.java
 
 ####
 ## Expected exception is ignored
@@ -429,16 +423,6 @@ runtime/condy/BadBSMUseTest.java
 ####
 ## Classes not unloaded as expected (TODO, need to check if FJ keep link)
 
-gc/g1/humongousObjects/TestHumongousClassLoader.java
-runtime/ClassUnload/UnloadInterfaceTest.java
-runtime/ClassUnload/UnloadTest.java
-runtime/ClassUnload/SuperDependsTest.java
-runtime/ClassUnload/KeepAliveSoftReference.java
-runtime/ClassUnload/KeepAliveObject.java
-runtime/ClassUnload/KeepAliveClassLoader.java
-runtime/ClassUnload/DictionaryDependsTest.java
-runtime/ClassUnload/KeepAliveClass.java
-runtime/ClassUnload/ConstantPoolDependsTest.java
 vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
 
 
@@ -487,26 +471,28 @@ vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
 
 ####
-## The test expects an NPE to be uncaught. For vthreads the code in
-## jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance() generates a method
-## that has an exception handler. So when the test purposefully throws an NPE,
-## jdb detects that it will be caught, so does not generate the
-## "Exception occurred: java.lang.NullPointerException (uncaught)" message that the test
-## expects. This might be fixed by JEP 416 when pushed.
+## The tests expect an NPE to be uncaught, but nsk.share.MainWrapper
+## introduces exception handlers.
 
-vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java
-vmTestbase/nsk/jdb/where/where005/where005.java
+vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java 8278470 generic-all
+vmTestbase/nsk/jdb/where/where005/where005.java 8278470 generic-all
 
+###
+# Test expects that the "up" command should print "End of stack" because there are
+# normally no frames above the test's main method. However, nsk.share.MainWrapper
+# introduces more frames above the test's main method, so the test fails.
+
+vmTestbase/nsk/jdb/list/list003/list003.java
+vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 
 ####
 ## NSK JDI tests failing with wrapper
 
 ####
-## The test expects an exception to be uncaught, but it seems to be caught by
-## the lambda expression in MainWrapper.main(), and by LambdaForm code generated
-## during the Method.invoke() call. This might be fixed by JEP 416 when pushed.
+## The test expects an NPE to be uncaught, but nsk.share.MainWrapper
+## introduces exception handlers.
 
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
+vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
 
 ####
 ## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
@@ -543,13 +529,6 @@ vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn002/forceEar
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEarlyReturn014.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
-
-####
-## Extra references returned by ClassObjectReference.referringObjects(). The extra references
-## are all from java.lang.invoke.MethodType instances, and are due to some rework of Class::newInstance
-## for loom. This issue should go away once JEP 416 is pushed.
-
-vmTestbase/nsk/jdi/ObjectReference/referringObjects/referringObjects002/referringObjects002.java
 
 ###
 # These 2 tests try to create 10 vthreads and have them all block on a synchornized
