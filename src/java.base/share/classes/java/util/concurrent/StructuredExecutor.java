@@ -174,7 +174,7 @@ import jdk.internal.javac.PreviewFeature;
  *         String result = Stream.of(future1, future2)
  *                 // @link substring="Future::resultNow" target="Future#resultNow" :
  *                 .map(Future::resultNow)
- *                 .collect(Collectors.join(", ", "{ ", " }"));
+ *                 .collect(Collectors.joining(", ", "{ ", " }"));
  *
  *     }
  * }
@@ -1109,13 +1109,13 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
                 FIRST_FAILED = l.findVarHandle(ShutdownOnFailure.class, "firstFailed", Future.class);
-                FIRST_CANCELLED = l.findVarHandle(ShutdownOnFailure.class, "fistCancelled", Future.class);
+                FIRST_CANCELLED = l.findVarHandle(ShutdownOnFailure.class, "firstCancelled", Future.class);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
         private volatile Future<Object> firstFailed;
-        private volatile Future<Object> fistCancelled;
+        private volatile Future<Object> firstCancelled;
 
         /**
          * Creates a new ShutdownOnFailure object.
@@ -1146,7 +1146,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
                     }
                 }
                 case CANCELLED -> {
-                    if (firstFailed == null && fistCancelled == null
+                    if (firstFailed == null && firstCancelled == null
                             && FIRST_CANCELLED.compareAndSet(this, null, future)) {
                         executor.shutdown();
                     }
@@ -1167,7 +1167,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             Future<Object> f = firstFailed;
             if (f != null)
                 return Optional.of(f.exceptionNow());
-            if (fistCancelled != null)
+            if (firstCancelled != null)
                 return Optional.of(new CancellationException());
             return Optional.empty();
         }
@@ -1188,7 +1188,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             Future<Object> f = firstFailed;
             if (f != null)
                 throw new ExecutionException(f.exceptionNow());
-            if (fistCancelled != null)
+            if (firstCancelled != null)
                 throw new CancellationException();
         }
 
@@ -1212,7 +1212,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             Future<Object> f = firstFailed;
             if (f != null) {
                 throwable = f.exceptionNow();
-            } else if (fistCancelled != null) {
+            } else if (firstCancelled != null) {
                 throwable = new CancellationException();
             }
             if (throwable != null) {
