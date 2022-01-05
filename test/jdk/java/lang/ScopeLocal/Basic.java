@@ -30,6 +30,9 @@
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
@@ -263,20 +266,14 @@ public class Basic {
     public void testStructureViolation1() {
         ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
         ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
-        var binding1 = ScopeLocal.where(NAME1, "x").bind();
-        try {
-            var binding2 = ScopeLocal.where(NAME2, "y").bind();
-            try {
+        try (var binding1 = ScopeLocal.where(NAME1, "x").bind()) {
+            try (var binding2 = ScopeLocal.where(NAME2, "y").bind()) {
                 expectThrows(StructureViolationException.class, binding1::close);
 
                 // binding1 and binding2 should be removed
                 assertFalse(NAME1.isBound());
                 assertFalse(NAME2.isBound());
-            } finally {
-                closeQuietly(binding2);
             }
-        } finally {
-            closeQuietly(binding1);
         }
     }
 
@@ -286,20 +283,59 @@ public class Basic {
      */
     public void testStructureViolation2() {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        var binding = ScopeLocal.where(NAME, "x").bind();
-        try {
+        try (var binding = ScopeLocal.where(NAME, "x").bind()) {
             ScopeLocal.where(NAME, "y").run(() -> {
                 expectThrows(StructureViolationException.class, binding::close);
                 assertEquals(NAME.get(), "y");
             });
             assertFalse(NAME.isBound());
-        } finally {
-            closeQuietly(binding);
         }
     }
 
-    // Binder::close isn't idempotent so ignore exception for now
-    private void closeQuietly(AutoCloseable c) {
-        try { c.close(); } catch (Exception ignore) { }
+    /**
+     * Test that close is idempotent.
+     */
+    public void testCloseIsIdempotent() {
+        ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
+        ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
+        try (var binding1 = ScopeLocal.where(NAME1, "x").bind()) {
+            try (var binding2 = ScopeLocal.where(NAME2, "y").bind()) {
+
+                assertTrue(NAME1.isBound());
+                assertTrue(NAME2.isBound());
+
+                // call binding2::close several times.
+                for (int i = 0; i < 3; i++) {
+                    binding2.close();
+                    assertTrue(NAME1.isBound());
+                    assertFalse(NAME2.isBound());
+                }
+
+                // call binding1::close several times.
+                for (int i = 0; i < 3; i++) {
+                    binding1.close();
+                    assertFalse(NAME1.isBound());
+                    assertFalse(NAME2.isBound());
+                }
+
+                // call binding2::close again, should not throw
+                binding2.close();
+            }
+        }
+    }
+
+    /**
+     * Test that WrongThreadException if close is invoked by a thread other than the owner.
+     */
+    public void testCloseConfined() {
+        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        try (var binding = ScopeLocal.where(NAME, "x").bind();
+             var executor = Executors.newFixedThreadPool(1)) {
+
+            // attempt to close binding from wrong thread
+            Future<?> future = executor.submit(binding::close);
+            Throwable ex = expectThrows(ExecutionException.class, future::get);
+            assertTrue(ex.getCause() instanceof WrongThreadException);
+        }
     }
 }
