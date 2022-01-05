@@ -8105,8 +8105,7 @@ RuntimeStub* generate_cont_doYield() {
     __ movptr(last_java_pc, Address(rsp, 0));
     __ lea(last_java_sp, Address(rsp, wordSize));
     __ vzeroupper();
-    Address anchor_java_pc(r15_thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
-    __ movptr(anchor_java_pc, last_java_pc);
+    __ movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), last_java_pc);
     __ movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
   }
 
