@@ -1,7 +1,8 @@
 [general]
 project=loom
 repository=loom
-jbs=jdk
+jbs=JDK
+version=19
 
 [checks]
 error=author,committer,whitespace
