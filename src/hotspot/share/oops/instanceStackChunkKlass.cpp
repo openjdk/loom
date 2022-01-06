@@ -284,7 +284,7 @@ public:
 
       OrderAccess::loadload();
       intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
-      if (derived_int_val <= 0) {
+      if (derived_int_val <= 0) { // an offset of 0 was observed on AArch64
         return;
       }
 
@@ -317,7 +317,7 @@ public:
 
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      if (offset <= 0) {
+      if (offset <= 0) { // an offset of 0 was observed on AArch64
         offset = -offset;
         assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "");
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
@@ -838,12 +838,11 @@ public:
       ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
       OrderAccess::loadload();
       intptr_t offset = Atomic::load((intptr_t*)derived_loc);
-      offset = offset < 0
+      offset = offset <= 0 // an offset of 0 was observed on AArch64
                   ? -offset
                   : offset - cast_from_oop<intptr_t>(base);
 
-      // The following assert fails on AArch64 for some reason
-      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld base->size: %d relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc < 0);
+      assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
     }
