@@ -662,7 +662,7 @@ ThreadStackTrace::~ThreadStackTrace() {
   }
 }
 
-void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, bool full) {
+void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHashtable* table, bool full) {
   assert(SafepointSynchronize::is_at_safepoint(), "all threads are stopped");
 
   if (_thread->has_last_Java_frame()) {
@@ -689,9 +689,19 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, bool full) {
 
   if (_with_locked_monitors) {
     // Iterate inflated monitors and find monitors locked by this thread
-    // not found in the stack
+    // that are not found in the stack, e.g. JNI locked monitors:
     InflatedMonitorsClosure imc(this);
-    ObjectSynchronizer::monitors_iterate(&imc, _thread);
+    if (table != nullptr) {
+      // Get the ObjectMonitors locked by the target thread, if any,
+      // and does not include any where owner is set to a stack lock
+      // address in the target thread:
+      ObjectMonitorsHashtable::PtrList* list = table->get_entry(_thread);
+      if (list != nullptr) {
+        ObjectSynchronizer::monitors_iterate(&imc, list, _thread);
+      }
+    } else {
+      ObjectSynchronizer::monitors_iterate(&imc, _thread);
+    }
   }
 }
 
@@ -943,9 +953,10 @@ ThreadSnapshot::~ThreadSnapshot() {
   delete _concurrent_locks;
 }
 
-void ThreadSnapshot::dump_stack_at_safepoint(int max_depth, bool with_locked_monitors, bool full) {
+void ThreadSnapshot::dump_stack_at_safepoint(int max_depth, bool with_locked_monitors,
+                                             ObjectMonitorsHashtable* table, bool full) {
   _stack_trace = new ThreadStackTrace(_thread, with_locked_monitors);
-  _stack_trace->dump_stack_at_safepoint(max_depth, full);
+  _stack_trace->dump_stack_at_safepoint(max_depth, table, full);
 }
 
 

@@ -763,6 +763,10 @@ JvmtiExport::cv_external_thread_to_JavaThread(ThreadsList * t_list,
   assert(jt_pp != NULL, "must have a return JavaThread pointer");
   // thread_oop_p is optional so no assert()
 
+  if (thread_oop_p != NULL) {
+    *thread_oop_p = NULL;
+  }
+
   oop thread_oop = JNIHandles::resolve_external_guard(thread);
   if (thread_oop == NULL) {
     // NULL jthread, GC'ed jthread or a bad JNI handle.
@@ -772,9 +776,6 @@ JvmtiExport::cv_external_thread_to_JavaThread(ThreadsList * t_list,
 
   if (!thread_oop->is_a(vmClasses::Thread_klass())) {
     // The oop is not a java.lang.Thread.
-    if (thread_oop_p != NULL) {
-      *thread_oop_p = NULL;
-    }
     return JVMTI_ERROR_INVALID_THREAD;
   }
   // Looks like a java.lang.Thread oop at this point.

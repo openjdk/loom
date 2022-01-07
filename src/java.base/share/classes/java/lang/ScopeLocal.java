@@ -365,6 +365,7 @@ public final class ScopeLocal<T> {
         final Carrier bindings;
         final short primaryBits;
         final Binder prevBinder;
+        private boolean closed;
 
         Binder(Carrier bindings) {
             this.bindings = bindings;
@@ -386,18 +387,32 @@ public final class ScopeLocal<T> {
          * Close a scope local binding context.
          *
          * @throws StructureViolationException if {@code this} isn't the current top binding
+         * @throws WrongThreadException if the current thread is not the owner
          */
         public void close() throws RuntimeException {
-            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
-            if (! popForcefully()) {
-                Cache.invalidate();
-                throw new StructureViolationException();
+            if (Thread.currentThread() != owner())
+                throw new WrongThreadException();
+            if (!closed) {
+                closed = true;
+                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+                if (!popForcefully()) {
+                    Cache.invalidate();
+                    throw new StructureViolationException();
+                }
             }
         }
 
         protected boolean tryClose() {
-            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
-            return true;
+            assert Thread.currentThread() == owner();
+            if (!closed) {
+                closed = true;
+                Cache.invalidate(bindings.primaryBits | bindings.secondaryBits);
+                return true;
+            } else {
+                assert false : "Should not get there";
+                return false;
+            }
+
         }
 
         static Object find(ScopeLocal<?> key) {
