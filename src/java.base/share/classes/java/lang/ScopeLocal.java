@@ -36,6 +36,7 @@ import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Stable;
+import sun.security.action.GetPropertyAction;
 
 import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 
@@ -108,8 +109,12 @@ public final class ScopeLocal<T> {
 
     public final int hashCode() { return hash; }
 
-    static final boolean PRESERVE_SCOPE_LOCAL_CACHE
-            = ! "false".equalsIgnoreCase(System.getProperty("java.lang.ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE"));
+    static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
+    static {
+        // maybe rename to preserveScopeLocalCache to be consistent with other props
+        String value = GetPropertyAction.privilegedGetProperty("java.lang.ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE");
+        PRESERVE_SCOPE_LOCAL_CACHE = (value == null) || Boolean.parseBoolean(value);
+    }
 
     /**
      * The interface for a ScopeLocal try-with-resources binding.
