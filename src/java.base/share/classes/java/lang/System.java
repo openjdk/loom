@@ -2547,7 +2547,11 @@ public final class System {
             }
 
             public Object[] scopeLocalCache() {
-                return Thread.scopeLocalCache();
+                if (! ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE) {
+                    return Thread.scopeLocalCache();
+                } else {
+                    return null;
+                }
             }
 
             public void setScopeLocalCache(Object[] cache) {

@@ -108,6 +108,24 @@ public final class ScopeLocal<T> {
 
     public final int hashCode() { return hash; }
 
+    static final boolean PRESERVE_SCOPE_LOCAL_CACHE
+            = ! "false".equalsIgnoreCase(System.getProperty("java.lang.ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE"));
+
+    /**
+     * The interface for a ScopeLocal try-with-resources binding.
+     */
+    @PreviewFeature(feature = SCOPE_LOCALS)
+    public sealed interface Binder extends AutoCloseable permits BinderImpl {
+
+        /**
+         * Closes this {@link ScopeLocal} binding. If this binding was not the most recent binding
+         * created by {@code Carrier.bind()}, throws a {@link StructureViolationException}.
+         * This method is invoked automatically on objects managed by the try-with-resources statement.
+         *
+         * @throws StructureViolationException if the bindings were not closed in the correct order.
+         */
+        public void close();
+    }
     /**
      * An immutable map from {@code ScopeLocal} to values.
      *
@@ -149,7 +167,9 @@ public final class ScopeLocal<T> {
         }
     }
 
-     static final class EmptySnapshot extends Snapshot {
+
+
+    static final class EmptySnapshot extends Snapshot {
         private EmptySnapshot() {
             super(null, null, (short)0);
         }
@@ -349,34 +369,34 @@ public final class ScopeLocal<T> {
          * a try-with-resources block.
          * <p>If any of the {@link ScopeLocal}s bound in this {@link Carrier} are already bound in an outer context,
          * throw a {@link RuntimeException}.</p>
-         * @return a {@link ScopeLocalBinder}.
+         * @return a {@link ScopeLocal.Binder}.
          */
-        public ScopeLocalBinder bind() {
+        public ScopeLocal.Binder bind() {
             checkNotBound();
-            return (ScopeLocalBinder)new Binder(this).push();
+            return (Binder)new BinderImpl(this).push();
         }
     }
 
     /**
      * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
      */
-    static final class Binder
-            extends ScopeLocalContainer implements ScopeLocalBinder {
+    static final class BinderImpl
+            extends ScopeLocalContainer implements ScopeLocal.Binder {
         final Carrier bindings;
         final short primaryBits;
-        final Binder prevBinder;
+        final BinderImpl prevBinder;
         private boolean closed;
 
-        Binder(Carrier bindings) {
+        BinderImpl(Carrier bindings) {
             this.bindings = bindings;
             this.prevBinder = innermostBinder();
             this.primaryBits = (short)(bindings.primaryBits
                     | (prevBinder == null ? 0 : prevBinder.primaryBits));
         }
 
-        static Binder innermostBinder() {
+        static BinderImpl innermostBinder() {
             var container = ScopeLocalContainer.latest();
-            if (container instanceof Binder binder) {
+            if (container instanceof BinderImpl binder) {
                 return binder;
             } else {
                 return null;
@@ -394,7 +414,7 @@ public final class ScopeLocal<T> {
                 throw new WrongThreadException();
             if (!closed) {
                 closed = true;
-                Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
+                Cache.invalidate(bindings.primaryBits | bindings.secondaryBits);
                 if (!popForcefully()) {
                     Cache.invalidate();
                     throw new StructureViolationException();
@@ -412,11 +432,10 @@ public final class ScopeLocal<T> {
                 assert false : "Should not get there";
                 return false;
             }
-
         }
 
         static Object find(ScopeLocal<?> key) {
-            for (Binder b = innermostBinder(); b != null; b = b.prevBinder) {
+            for (BinderImpl b = innermostBinder(); b != null; b = b.prevBinder) {
                 if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
                     for (Carrier binding = b.bindings;
                          binding != null;
@@ -445,6 +464,19 @@ public final class ScopeLocal<T> {
      */
     public static <T> Carrier where(ScopeLocal<T> key, T value) {
         return Carrier.of(key, value);
+    }
+
+
+    /**
+     * Create a try-with-resources ScopeLocal binding to be used within
+     * a try-with-resources block.
+     * <p>If this {@link ScopeLocal} is already bound in an outer context,
+     * throw a {@link RuntimeException}.</p>
+     * @param t The value to bind this to
+     * @return a {@link ScopeLocal.Binder}.
+     */
+    public ScopeLocal.Binder bind(T t) {
+        return where(this, t).bind();
     }
 
     /**
@@ -541,7 +573,7 @@ public final class ScopeLocal<T> {
         if (value != Snapshot.NIL) {
             return value;
         }
-        return Binder.find(this);
+        return BinderImpl.find(this);
     }
 
     /**
