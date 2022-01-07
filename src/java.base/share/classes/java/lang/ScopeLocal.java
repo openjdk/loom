@@ -423,9 +423,15 @@ public final class ScopeLocal<T> {
         }
 
         protected boolean tryClose() {
-            closed = true;
-            Cache.invalidate(bindings.primaryBits|bindings.secondaryBits);
-            return true;
+            assert Thread.currentThread() == owner();
+            if (!closed) {
+                closed = true;
+                Cache.invalidate(bindings.primaryBits | bindings.secondaryBits);
+                return true;
+            } else {
+                assert false : "Should not get there";
+                return false;
+            }
         }
 
         static Object find(ScopeLocal<?> key) {

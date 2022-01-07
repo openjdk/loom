@@ -32,7 +32,7 @@ extern "C" {
 
 typedef struct Tinfo {
   jboolean just_scheduled;
-  const char* tname;
+  char* tname;
 } Tinfo;
 
 static const int MAX_EVENTS_TO_PROCESS = 20;
@@ -50,7 +50,8 @@ find_tinfo(JNIEnv* jni, const char* tname) {
   for (; idx < MAX_WORKER_THREADS; idx++) {
     inf = &tinfo[idx];
     if (inf->tname == NULL) {
-      inf->tname = tname;
+      inf->tname = (char*)malloc(strlen(tname) + 1); 
+      strcpy(inf->tname, tname);
       break;
     }
     if (strcmp(inf->tname, tname) == 0) {
@@ -108,7 +109,7 @@ print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread v
     }
     inf->just_scheduled = JNI_FALSE;
   }
-  //deallocate(jvmti, jni, (void*)tname);
+  deallocate(jvmti, jni, (void*)tname);
 }
 
 static void
@@ -116,7 +117,7 @@ test_GetVirtualThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
   jobject thread_vthread = NULL;
   jvmtiError err;
 
-  LOG("\n");
+  LOG("\ntest_GetVirtualThread: event: %s\n", event_name);
 
   // #1: Test JVMTI GetVirtualThread extension function NULL thread (current)
   err = GetVirtualThread(jvmti, jni, NULL, &thread_vthread);
@@ -148,7 +149,7 @@ test_GetCarrierThread(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthr
   jthread vthread_thread = NULL;
   jvmtiError err;
 
-  LOG("\n");
+  LOG("\ntest_GetCarrierThread: event: %s\n", event_name);
 
   // #1: Test JVMTI GetCarrierThread extension function with NULL vthread
   err = GetCarrierThread(jvmti, jni, NULL, &vthread_thread);

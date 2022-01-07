@@ -3101,8 +3101,7 @@ class StubGenerator: public StubCodeGenerator {
   // key = c_rarg4
   // state = c_rarg5 - GHASH.state
   // subkeyHtbl = c_rarg6 - powers of H
-  // subkeyHtbl_48_entries = c_rarg7 (not used)
-  // counter = [sp, #0] pointer to 16 bytes of CTR
+  // counter = c_rarg7 - 16 bytes of CTR
   // return - number of processed bytes
   address generate_galoisCounterMode_AESCrypt() {
     address ghash_polynomial = __ pc();
@@ -3128,10 +3127,7 @@ class StubGenerator: public StubCodeGenerator {
 
     const Register subkeyHtbl = c_rarg6;
 
-    // Pointer to CTR is passed on the stack before the (fp, lr) pair.
-    const Address counter_mem(sp, 2 * wordSize);
     const Register counter = c_rarg7;
-    __ ldr(counter, counter_mem);
 
     const Register keylen = r10;
     // Save state before entering routine
@@ -6852,14 +6848,14 @@ RuntimeStub* generate_cont_doYield() {
   static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
     Register last_java_pc = c_rarg0;
     Register last_java_sp = c_rarg2;
-    __ ldr(last_java_pc, Address(sp, 0));
-    __ lea(last_java_sp, Address(sp, wordSize));
     // __ vzeroupper();
-    Address anchor_java_pc(thread, JavaThread::frame_anchor_offset() + JavaFrameAnchor::last_Java_pc_offset());
-    __ str(last_java_pc, anchor_java_pc);
+    __ mov(last_java_pc, lr);
+    __ mov(last_java_sp, sp);
+    __ str(last_java_pc, Address(thread, JavaThread::last_Java_pc_offset()));
     __ str(last_java_sp, Address(thread, JavaThread::last_Java_sp_offset()));
   }
 
+  // Must be called before enter()
   static void jfr_prologue(MacroAssembler* _masm, Register thread) {
     jfr_set_last_java_frame(_masm, thread);
     __ mov(c_rarg0, rthread);
@@ -6883,8 +6879,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
     address start = __ pc();
 
-    __ enter();
     jfr_prologue(_masm, rthread);
+    __ enter();
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
     jfr_epilogue(_masm, rthread);
     __ leave();
@@ -6899,8 +6895,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
 
-    __ enter();
     jfr_prologue(_masm, rthread);
+    __ enter();
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
     jfr_epilogue(_masm, rthread);
     __ leave();

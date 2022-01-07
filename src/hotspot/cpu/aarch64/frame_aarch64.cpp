@@ -452,7 +452,7 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
 frame frame::sender(RegisterMap* map) const {
   frame result = sender_raw(map);
 
-  if (map->process_frames()) {
+  if (map->process_frames() && !map->in_cont()) {
     StackWatermarkSet::on_iteration(map->thread(), result);
   }
 
