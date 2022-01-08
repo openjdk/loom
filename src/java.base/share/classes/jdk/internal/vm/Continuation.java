@@ -25,13 +25,13 @@
 
 package jdk.internal.vm;
 
+import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.security.action.GetPropertyAction;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
@@ -45,13 +45,14 @@ import jdk.internal.access.SharedSecrets;
  * TBD
  */
 public class Continuation {
+    private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         StackChunk.init(); // ensure StackChunk class is initialized
+        U.ensureClassInitialized(ScopeLocal.class);
     }
 
     // private static final WhiteBox WB = sun.hotspot.WhiteBox.WhiteBox.getWhiteBox();
-    private static final jdk.internal.misc.Unsafe unsafe = jdk.internal.misc.Unsafe.getUnsafe();
 
     private static final boolean TRACE = isEmptyOrTrue("jdk.internal.vm.Continuation.trace");
     private static final boolean DEBUG = TRACE | isEmptyOrTrue("jdk.internal.vm.Continuation.debug");
@@ -415,7 +416,7 @@ public class Continuation {
         if (scope != this.scope)
             this.yieldInfo = scope;
         int res = doYield();
-        unsafe.storeFence(); // needed to prevent certain transformations by the compiler
+        U.storeFence(); // needed to prevent certain transformations by the compiler
 
         if (TRACE) System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
 
@@ -545,7 +546,7 @@ public class Continuation {
     }
 
     private boolean fence() {
-        unsafe.storeFence(); // needed to prevent certain transformations by the compiler
+        U.storeFence(); // needed to prevent certain transformations by the compiler
         return true;
     }
 
