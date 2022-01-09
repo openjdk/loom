@@ -41,6 +41,8 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 # Loom specific
 
+compiler/codecache/stress/OverloadCompileQueueTest.java         8279653 generic-all
+
 gc/g1/plab/TestPLABPromotion.java                               8278126 generic-all
 gc/g1/plab/TestPLABResize.java                                  8278126 generic-all
 gc/stringdedup/TestStringDeduplicationInterned.java#Parallel    8278127 generic-all
