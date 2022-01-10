@@ -1458,7 +1458,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         if (fst->is_stack()) {
           assert (((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
           int offset = fst->reg2stack() * VMRegImpl::stack_slot_size + stack_slot_offset;
-          intptr_t* stack_address = (intptr_t*)((address)sp() + offset);
+          intptr_t* stack_address = (intptr_t*)((address)unextended_sp() + offset);
           if (at_this)
             values.describe(frame_no, stack_address, err_msg("this for #%d", frame_no), 1);
           else
