@@ -844,7 +844,8 @@ public:
                   : offset - cast_from_oop<intptr_t>(base);
 
       // Has been seen to fail on AArch64 for some reason
-      // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);    } else {
+      // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
+    } else {
       assert (*derived_loc == derived_pointer(0), "");
     }
   }
