@@ -138,17 +138,6 @@ extern "C" void find(intptr_t x);
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
 
-// Freeze:
-// 5 - no call into C
-// 10 - immediate return from C
-// <100 - don't allocate
-// 100 - everything
-//
-// Thaw:
-// 105 - no call into C (prepare_thaw)
-// 110 - immediate return from C (prepare_thaw)
-// 130 - thaw oops
-
 // TODO: See AbstractAssembler::generate_stack_overflow_check (assembler.cpp), Compile::bang_size_in_bytes() (compile.cpp), m->as_SafePoint()->jvms()->interpreter_frame_size()
 // when we stack-bang, we need to update a thread field with the lowest (farthest) bang point.
 

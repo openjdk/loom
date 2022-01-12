@@ -7929,18 +7929,13 @@ RuntimeStub* generate_cont_doYield() {
 
     __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
-    if (ContPerfTest > 5) {
-      __ movptr(c_rarg0, r15_thread);
-      __ set_last_Java_frame(rsp, rbp, the_pc);
-
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
-      
-      __ reset_last_Java_frame(true);
-    }
+    __ movptr(c_rarg0, r15_thread);
+    __ set_last_Java_frame(rsp, rbp, the_pc);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+    __ reset_last_Java_frame(true);
 
     Label pinned;
 
-    if (ContPerfTest <= 5) { __ xorq(rax, rax); }
     __ testq(rax, rax);
     __ jcc(Assembler::notZero, pinned);
 
@@ -8003,12 +7998,9 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    if (ContPerfTest > 105) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
-      __ movptr(rbx, rax); // rax contains the size of the frames to thaw, 0 if overflow or no more frames
-    } else {
-      __ xorq(rbx, rbx);
-    }
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
+    __ movptr(rbx, rax); // rax contains the size of the frames to thaw, 0 if overflow or no more frames
+
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
@@ -8032,9 +8024,7 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    if (ContPerfTest > 112) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
-    }
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
     if (return_barrier) {

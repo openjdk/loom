@@ -6642,9 +6642,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ mov(c_rarg0, rthread);
     __ set_last_Java_frame(sp, rfp, the_pc, rscratch1);
-
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
-      
     __ reset_last_Java_frame(true);
 
     Label pinned;
