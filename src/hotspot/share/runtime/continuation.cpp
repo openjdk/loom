@@ -478,7 +478,6 @@ address Compiled::deopt_original_pc(intptr_t* sp, address pc, CodeBlob* cb) {
 
 template<typename RegisterMapT>
 bool Compiled::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
-  // if (!DetectLocksInCompiledFrames) return false;
   assert (!f.is_interpreted_frame() && Compiled::is_instance(f), "");
 
   CompiledMethod* cm = f.cb()->as_compiled_method();

@@ -806,9 +806,6 @@ const intx ObjectAlignmentInBytes = 8;
           "JVM aborts, producing an error log and core/mini dump, on the "  \
           "first occurrence of an out-of-memory error thrown from JVM")     \
                                                                             \
-  product(bool, DetectLocksInCompiledFrames, true,                          \
-          "Detect monitors in continuation compiled frames")                \
-                                                                            \
   /* tracing */                                                             \
                                                                             \
   develop(bool, StressRewriter, false,                                      \
