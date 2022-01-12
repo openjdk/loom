@@ -1997,22 +1997,16 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
-  product(bool, LoomGenCode, true,                                          \
-          "Generate oopmap code")                                           \
-                                                                            \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
                                                                             \
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, UseContinuationStrong, true,                                \
-          "The weak keepalive is considered strong on stack")               \
-                                                                            \
   product(bool, TrimContinuationChunksInGC, false,                          \
          "Trim stack chunks when copying objects in GC")                    \
                                                                             \
-  product(bool, UseChunkBitmaps, false,                                    \
+  product(bool, UseChunkBitmaps, false,                                     \
          "Generate oop bitmaps for continuation chunks")                    \
                                                                             \
   product(bool, UseContinuationFastPath, true,                              \
