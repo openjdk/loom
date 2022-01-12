@@ -67,10 +67,6 @@ public:
   inline void set_flags(uint8_t value);
   inline int max_size() const;
   inline void set_max_size(int value);
-  inline int numFrames() const;
-  inline void set_numFrames(int value);
-  inline int numOops() const;
-  inline void set_numOops(int value);
   inline int gc_sp() const;
   inline void set_gc_sp(int value);
   inline uint64_t mark_cycle() const;
@@ -105,7 +101,6 @@ public:
   template <typename OopT, bool concurrent_gc> inline bool should_fix() const;
   bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
-  inline void reset_counters();
 
   inline BitMapView bitmap() const;
   inline BitMap::idx_t bit_offset() const;

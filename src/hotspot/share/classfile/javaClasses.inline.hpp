@@ -335,18 +335,6 @@ inline jint jdk_internal_vm_StackChunk::maxSize(oop ref) {
 inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, jint value) {
   ref->int_field_put(_maxSize_offset, value);
 }
-inline jint jdk_internal_vm_StackChunk::numFrames(oop ref) {
-  return ref->int_field(_numFrames_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_numFrames(oop ref, jint value) {
-  ref->int_field_put(_numFrames_offset, value);
-}
-inline jint jdk_internal_vm_StackChunk::numOops(oop ref) {
-  return ref->int_field(_numOops_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_numOops(oop ref, jint value) {
-  ref->int_field_put(_numOops_offset, value);
-}
 
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {
   site->obj_field_put_volatile(_target_offset, target);

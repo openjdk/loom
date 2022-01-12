@@ -51,10 +51,6 @@ inline uint8_t stackChunkOopDesc::flags() const          { return (uint8_t)jdk_i
 inline void stackChunkOopDesc::set_flags(uint8_t value)  { jdk_internal_vm_StackChunk::set_flags(this, (jbyte)value); }
 inline int stackChunkOopDesc::max_size() const           { return (int)jdk_internal_vm_StackChunk::maxSize(as_oop()); }
 inline void stackChunkOopDesc::set_max_size(int value)   { jdk_internal_vm_StackChunk::set_maxSize(this, (jint)value); }
-inline int stackChunkOopDesc::numFrames() const          { return jdk_internal_vm_StackChunk::numFrames(as_oop()); }
-inline void stackChunkOopDesc::set_numFrames(int value)  { jdk_internal_vm_StackChunk::set_numFrames(this, value); }
-inline int stackChunkOopDesc::numOops() const            { return jdk_internal_vm_StackChunk::numOops(as_oop()); }
-inline void stackChunkOopDesc::set_numOops(int value)    { jdk_internal_vm_StackChunk::set_numOops(this, value); }
 inline int stackChunkOopDesc::gc_sp() const              { return jdk_internal_vm_StackChunk::gc_sp(as_oop()); }
 inline void stackChunkOopDesc::set_gc_sp(int value)      { jdk_internal_vm_StackChunk::set_gc_sp(this, value); }
 inline uint64_t stackChunkOopDesc::mark_cycle() const         { return (uint64_t)jdk_internal_vm_StackChunk::mark_cycle(as_oop()); }
@@ -153,11 +149,6 @@ inline bool stackChunkOopDesc::is_gc_mode() const               { return is_flag
 inline void stackChunkOopDesc::set_gc_mode(bool value)          { set_flag(FLAG_GC_MODE, value); }
 inline bool stackChunkOopDesc::has_bitmap() const               { return is_flag(FLAG_HAS_BITMAP); }
 inline void stackChunkOopDesc::set_has_bitmap(bool value)       { set_flag(FLAG_HAS_BITMAP, value); assert (!value || UseChunkBitmaps, ""); }
-
-inline void stackChunkOopDesc::reset_counters() {
-  set_numFrames(-1);
-  set_numOops(-1);
-}
 
 inline intptr_t* stackChunkOopDesc::relative_base() const {
   // we relativize with respect to end rather than start because GC might compact the chunk

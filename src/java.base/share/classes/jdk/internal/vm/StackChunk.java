@@ -42,8 +42,6 @@ public final class StackChunk {
     private long markCycle;
 
     private int maxSize; // size when fully thawed on stack
-    private int numFrames;
-    private int numOops;
    
    // the stack itself is appended here by the VM
 

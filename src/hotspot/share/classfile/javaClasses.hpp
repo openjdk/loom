@@ -1145,8 +1145,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _gcSP_offset;
   static int _markCycle_offset;
   static int _maxSize_offset;
-  static int _numFrames_offset;
-  static int _numOops_offset;
   static int _cont_offset;
 
   static void compute_offsets();
@@ -1179,10 +1177,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void set_mark_cycle(oop ref, jlong value);
   static inline jint maxSize(oop ref);
   static inline void set_maxSize(oop ref, jint value);
-  static inline jint numFrames(oop ref);
-  static inline void set_numFrames(oop ref, jint value);
-  static inline jint numOops(oop ref);
-  static inline void set_numOops(oop ref, jint value);
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
   template<typename P>

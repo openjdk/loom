@@ -1096,8 +1096,6 @@ public:
         chunk->set_max_size(size);
         chunk->set_argsize(argsize);
       }
-
-      // chunk->reset_counters(chunk);
     } else {
       assert (_thread->thread_state() == _thread_in_vm, "");
       assert (!is_chunk_available(top_sp), "");
@@ -1747,14 +1745,11 @@ public:
     chunk->set_gc_mode(false);
     chunk->set_max_size(0);
     chunk->set_mark_cycle(0);
-    chunk->reset_counters();
     // chunk->set_pc(nullptr); // TODO PERF: necessary?
 
     assert (chunk->flags() == 0, "");
     assert (chunk->is_gc_mode() == false, "");
     assert (chunk->mark_cycle() == 0, "");
-    assert (chunk->numFrames() <= 0, "");
-    assert (chunk->numOops() <= 0, "");
     assert (chunk->max_size() == 0, "");
 
     // fields are uninitialized
@@ -2334,7 +2329,6 @@ public:
       chunk->set_sp(chunk->stack_size());
       chunk->set_argsize(0);
       // chunk->clear_flags();
-      chunk->reset_counters();
       chunk->set_max_size(0);
       log_develop_trace(jvmcont)("set max_size: 0");
       // chunk->set_pc(nullptr);
@@ -2354,7 +2348,6 @@ public:
       if (empty) {
         chunk->set_sp(chunk->stack_size());
         chunk->set_argsize(0);
-        chunk->reset_counters();
         chunk->set_max_size(0);
         log_develop_trace(jvmcont)("set max_size: 0");
         // chunk->set_pc(nullptr);

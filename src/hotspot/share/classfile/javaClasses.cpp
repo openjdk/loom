@@ -5097,8 +5097,6 @@ int jdk_internal_vm_StackChunk::_flags_offset;
 int jdk_internal_vm_StackChunk::_gcSP_offset;
 int jdk_internal_vm_StackChunk::_markCycle_offset;
 int jdk_internal_vm_StackChunk::_maxSize_offset;
-int jdk_internal_vm_StackChunk::_numFrames_offset;
-int jdk_internal_vm_StackChunk::_numOops_offset;
 int jdk_internal_vm_StackChunk::_cont_offset;
 
 #define STACKCHUNK_FIELDS_DO(macro) \
@@ -5111,8 +5109,6 @@ int jdk_internal_vm_StackChunk::_cont_offset;
   macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
   macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
   macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,        false); \
-  macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
-  macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);
 
 void jdk_internal_vm_StackChunk::compute_offsets() {

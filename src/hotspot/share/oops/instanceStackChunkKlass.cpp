@@ -488,10 +488,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
 
   assert (frame_closure._num_frames >= 0, "");
   assert (frame_closure._num_oops >= 0, "");
-  if (do_destructive_processing || closure == nullptr) {
-    // chunk->set_numFrames(frame_closure._num_frames); -- TODO: remove those fields
-    // chunk->set_numOops(frame_closure._num_oops);
-  }
 
   if (closure != nullptr) {
     Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
@@ -881,12 +877,11 @@ public:
       _num_interpreted_frames++;
     }
 
-    // assert (!chunk->requires_barriers() || num_frames <= chunk->numFrames(), "");
     log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
     if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
     assert (f.pc() != nullptr,
-      "young: %d chunk->numFrames(): %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
-      !_chunk->requires_barriers(), _chunk->numFrames(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));
+      "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
+      !_chunk->requires_barriers(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));
 
     if (_num_frames == 0) {
       assert (f.pc() == _chunk->pc(), "");
@@ -938,8 +933,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   if (chunk->is_empty()) {
     assert (chunk->argsize() == 0, "");
     assert (chunk->max_size() == 0, "");
-    assert (chunk->numFrames() == -1, "");
-    assert (chunk->numOops() == -1, "");
   }
 
   if (!SafepointSynchronize::is_at_safepoint()) {
@@ -987,9 +980,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
     int max_size = closure._size + closure._num_i2c * align_wiggle();
     assert (chunk->max_size() == max_size, "max_size(): %d max_size: %d argsize: %d num_i2c: %d", chunk->max_size(), max_size, closure._argsize, closure._num_i2c);
-
-    assert (chunk->numFrames() == -1 || closure._num_frames == chunk->numFrames(), "barriers: %d num_frames: %d chunk->numFrames(): %d", chunk->requires_barriers(), closure._num_frames, chunk->numFrames());
-    assert (chunk->numOops()   == -1 || closure._num_oops   == chunk->numOops(),   "barriers: %d num_oops: %d chunk->numOops(): %d",     chunk->requires_barriers(), closure._num_oops,   chunk->numOops());
 
     if (out_size   != nullptr) *out_size   += size;
     if (out_oops   != nullptr) *out_oops   += closure._num_oops;
@@ -1092,7 +1082,7 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT, p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
   st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT, c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
-  st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT " num_frames: %d num_oops: %d", c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()), c->numFrames(), c->numOops());
+  st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT, c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
 
   if (verbose) {
     st->cr();
