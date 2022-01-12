@@ -143,8 +143,6 @@ public class Continuation {
 
     private short cs; // critical section semaphore
 
-    private boolean reset = false; // perftest only
-
     private Object[] scopeLocalCache;
 
     // private long[] nmethods = null; // grows up
@@ -550,37 +548,6 @@ public class Continuation {
         return true;
     }
 
-    // /**
-    //  * TBD
-    //  */
-    // public void doneX() {
-    //     // System.out.println("DONEX");
-    //     this.doneX = true;
-    // }
-
-
-    /**
-     * temporary testing
-     */
-    public void something_something_1() {
-        this.done = false;
-
-        setMounted(false);
-    }
-
-    /**
-     * temporary testing
-     */
-    public void something_something_2() {
-        reset = true;
-    }
-
-    /**
-     * temporary testing
-     */
-    public void something_something_3() {
-        this.done = false;
-    }
 
     // private void pushNmethod(long nmethod) {
     //     if (nmethods == null) {

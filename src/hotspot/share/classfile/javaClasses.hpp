@@ -1108,7 +1108,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static int _yieldInfo_offset;
   static int _tail_offset;
   static int _cs_offset;
-  static int _reset_offset;
   static int _mounted_offset;
   static int _done_offset;
   static int _preempted_offset;
@@ -1127,7 +1126,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static inline jshort critical_section(oop ref);
   static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
-  static inline bool is_reset(oop ref);
   static inline bool is_mounted(oop ref);
   static inline bool done(oop ref);
   static inline bool is_preempted(oop ref);

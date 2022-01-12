@@ -5044,7 +5044,6 @@ int jdk_internal_vm_Continuation::_tail_offset;
 int jdk_internal_vm_Continuation::_parent_offset;
 int jdk_internal_vm_Continuation::_yieldInfo_offset;
 int jdk_internal_vm_Continuation::_cs_offset;
-int jdk_internal_vm_Continuation::_reset_offset;
 int jdk_internal_vm_Continuation::_mounted_offset;
 int jdk_internal_vm_Continuation::_done_offset;
 int jdk_internal_vm_Continuation::_preempted_offset;
@@ -5072,7 +5071,6 @@ void jdk_internal_vm_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_yieldInfo_offset, k, vmSymbols::yieldInfo_name(), object_signature,            false); \
   macro(_tail_offset,      k, vmSymbols::tail_name(),      stackchunk_signature,        false); \
   macro(_cs_offset,        k, vmSymbols::cs_name(),        short_signature,             false); \
-  macro(_reset_offset,     k, vmSymbols::reset_name(),     bool_signature,              false); \
   macro(_mounted_offset,   k, vmSymbols::mounted_name(),   bool_signature,              false); \
   macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
   macro(_preempted_offset, k, "preempted",                 bool_signature,              false);

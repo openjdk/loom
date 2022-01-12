@@ -230,9 +230,6 @@ inline jshort jdk_internal_vm_Continuation::critical_section(oop ref) {
 inline void jdk_internal_vm_Continuation::set_critical_section(oop ref, jshort value) {
   ref->short_field_put(_cs_offset, value);
 }
-inline bool jdk_internal_vm_Continuation::is_reset(oop ref) {
-  return ref->bool_field(_reset_offset);
-}
 
 inline bool jdk_internal_vm_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
