@@ -477,7 +477,6 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
 
 inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_words) {
   static const size_t mask = BitsPerWord - 1;
-  // tty->print_cr(">>> BitsPerWord: %d MASK: %d stack_size_in_words: %d stack_size_in_words & mask: %d", BitsPerWord, mask, stack_size_in_words, stack_size_in_words & mask);
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
 
@@ -603,10 +602,6 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
   assert (!map->in_cont(), "");
 
   StackChunkFrameStream<mixed> f(obj);
-  // if (f.end() > h) {
-  //   // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " bounded", p2i(this));
-  //   f.set_end(h);
-  // }
   bool should_continue = true;
 
   if (f.is_stub()) {

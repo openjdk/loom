@@ -194,9 +194,7 @@ inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int u
   intptr_t* base = fr.real_fp(); // equal to the caller's sp
   intptr_t* loc = (intptr_t*)((address)fr.unextended_sp() + usp_offset_in_bytes);
   assert (base > loc, "");
-  int res = (int)(base - loc);
-  // tty->print_cr(">>> relativize_usp_offset: %d -> %d -- address %p", usp_offset_in_bytes, res, loc); fr.print_on<true>(tty);
-  return res;
+  return (int)(base - loc);
 }
 
 inline address stackChunkOopDesc::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) const {
@@ -206,33 +204,27 @@ inline address stackChunkOopDesc::reg_to_location(const frame& fr, const Registe
   // the offsets are saved in the map after going through relativize_usp_offset, so they are sp - loc, in words
   intptr_t offset = (intptr_t)map->location(reg, nullptr); // see usp_offset_to_index for the chunk case
   intptr_t* base = derelativize_address(fr.offset_sp());
-  // tty->print_cr(">>> reg_to_location: %s -> %ld -- address: %p", reg->name(), offset, base - offset); fr.print_on(tty);
   return (address)(base - offset);
 }
 
 inline address stackChunkOopDesc::usp_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const {
   assert (fr.is_compiled_frame(), "");
-  // tty->print_cr(">>> usp_offset_to_location"); fr.print_on<true>(tty);
   return (address)derelativize_address(fr.offset_unextended_sp()) + usp_offset_in_bytes;
 }
 
 inline Method* stackChunkOopDesc::interpreter_frame_method(const frame& fr) {
-  // tty->print_cr(">>> interpreter_frame_method"); fr.print_on<true>(tty);
   return derelativize(fr).interpreter_frame_method();
 }
 
 inline address stackChunkOopDesc::interpreter_frame_bcp(const frame& fr) {
-  // tty->print_cr(">>> interpreter_frame_bcp"); derelativize(fr).print_on<true>(tty);
   return derelativize(fr).interpreter_frame_bcp();
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_expression_stack_at(const frame& fr, int index) const {
-  // tty->print_cr(">>> interpreter_frame_expression_stack_at"); fr.print_on<true>(tty);
   return derelativize(fr).interpreter_frame_expression_stack_at<true>(index);
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_local_at(const frame& fr, int index) const {
-  // tty->print_cr(">>> interpreter_frame_local_at"); fr.print_on<true>(tty);
   return derelativize(fr).interpreter_frame_local_at<true>(index);
 }
 
