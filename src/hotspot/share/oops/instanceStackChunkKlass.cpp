@@ -67,11 +67,9 @@ MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
 
 void InstanceStackChunkKlass::resolve_memcpy_functions() {
   if (!StubRoutines::has_word_memcpy() || UseNewCode) {
-    // tty->print_cr(">> Config memcpy: default");
     memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
     memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
   } else {
-    // tty->print_cr(">> Config memcpy: %s", UseContinuationStreamingCopy ? "NT" : "T");
     memcpy_fn_from_stack_to_chunk = UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_up_nt()
                                                                  : (MemcpyFnT)StubRoutines::word_memcpy_up();
     memcpy_fn_from_chunk_to_stack = UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_down_nt()
@@ -104,9 +102,6 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
 
-  // pns2();
-  // tty->print_cr(">>> CPY %s %p-%p (%zu) -> %p-%p (%zu) -- %d", disjoint ? "DIS" : "CON", cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(obj) + word_size, word_size, to_addr, to_addr + word_size, word_size, chunk->is_gc_mode());
-
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
   assert (from_addr != to_addr, "");
   disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
@@ -125,7 +120,6 @@ template size_t InstanceStackChunkKlass::copy<false>(oop obj, HeapWord* to_addr,
 template size_t InstanceStackChunkKlass::copy<true>(oop obj, HeapWord* to_addr, size_t word_size);
 
 size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
-  // tty->print_cr(">>>> InstanceStackChunkKlass::compact_oop_size");
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
   // We don't trim chunks with ZGC. See copy_compact
@@ -140,7 +134,6 @@ template size_t InstanceStackChunkKlass::copy_compact<true>(oop obj, HeapWord* t
 
 template <bool disjoint>
 size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
-  // tty->print_cr(">>> InstanceStackChunkKlass::copy_compact from: %p to: %p", (oopDesc*)obj, to_addr);
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
 
@@ -175,7 +168,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   HeapWord* const start_of_bitmap0 = start_of_bitmap(obj);
 #endif
 
-  // pns2();
   // tty->print_cr(">>> CPY %s %p-%p (%d) -> %p-%p (%d) [%d] -- %d", disjoint ? "DIS" : "CON", cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(obj) + header + from_size, from_size, to_addr, to_addr + header + to_stack_size, to_stack_size, old_compact_size, chunk->is_gc_mode());
 
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
@@ -235,9 +227,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
 
   return align_object_size(header + to_stack_size + to_bitmap_size);
 }
-
-// template class StackChunkFrameStream<true>;
-// template class StackChunkFrameStream<false>;
 
 template <bool mixed>
 int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {
@@ -303,7 +292,6 @@ public:
 class DerelativizeDerivedPointers : public DerivedOopClosure {
 public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // tty->print_cr(">>> DerelativizeDerivedPointers::do_derived_oop base_loc: " INTPTR_FORMAT " derived_loc: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load(base_loc);
@@ -314,8 +302,6 @@ public:
       OrderAccess::loadload();
       intptr_t offset = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
 
-      // tty->print_cr(">>> DerelativizeDerivedPointers::do_derived_oop base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT " %ld", p2i(base), offset, offset);
-
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset <= 0) { // an offset of 0 was observed on AArch64
@@ -324,7 +310,7 @@ public:
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
   #ifdef ASSERT
-      else { // DEBUG ONLY
+      else {
         offset = offset - cast_from_oop<intptr_t>(base);
         assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "offset: " PTR_FORMAT " size: %zu", offset, (base->size() << LogHeapWordSize));
       }
@@ -347,9 +333,6 @@ public:
     if (store) HeapAccess<>::oop_store(p, value);
     log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
   }
-
-// virtual void do_oop(oop* p) override { *(oop*)p = (oop)NativeAccess<>::oop_load((oop*)p); }
-// virtual void do_oop(narrowOop* p) override { *(narrowOop*)p = CompressedOops::encode((oop)NativeAccess<>::oop_load((narrowOop*)p)); }
 };
 
 
@@ -416,12 +399,6 @@ public:
     assert (mixed || !f.is_deoptimized(), "");
     if (mixed && f.is_compiled()) f.handle_deopted();
 
-    // For unload method debugging
-    // tty->print_cr(">>>> OopOopIterateStackClosure::do_frame is_compiled: %d return_barrier: %d pc: %p", f.is_compiled(), Continuation::is_return_barrier_entry(f.pc()), f.pc()); f.print_on(tty);
-    // if (f.is_compiled()) tty->print_cr(">>>> OopOopIterateStackClosure::do_frame nmethod: %p method: %p", f.cb()->as_nmethod(), f.cb()->as_compiled_method()->method());
-
-    // if (log_develop_is_enabled(Trace, jvmcont)) cb->print_value_on(tty);
-
     if (Devirtualizer::do_metadata(_closure)) {
       if (f.is_interpreted()) {
         Method* im = f.to_frame().interpreter_frame_method();
@@ -460,7 +437,6 @@ public:
 
 template <bool concurrent_gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  // oop_oop_iterate_stack_bounded<concurrent_gc, OopClosureType>(chunk, closure, MemRegion(nullptr, SIZE_MAX));
   assert (Continuation::debug_is_stack_chunk(chunk), "");
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !chunk->requires_barriers());
 
@@ -477,7 +453,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
     assert (!SafepointSynchronize::is_at_safepoint() || chunk->is_gc_mode(), "gc_mode: %d is_at_safepoint: %d", chunk->is_gc_mode(), SafepointSynchronize::is_at_safepoint());
   }
 
-  // tty->print_cr(">>>> OopOopIterateStackClosure::oop_oop_iterate_stack");
   OopOopIterateStackClosure<concurrent_gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
@@ -494,7 +469,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   }
 
   log_develop_trace(jvmcont)("stack_chunk_iterate_stack ------- end -------");
-  // tty->print_cr("<<< stack_chunk_iterate_stack %p %p", (oopDesc*)chunk, Thread::current());
 }
 
 template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
@@ -952,7 +926,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
   // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset) for the top frame (below sp), and *not* for the bottom frame
   int size = chunk->stack_size() - chunk->argsize() - chunk->sp();
-  // tty->print_cr("size: %d chunk->stack_size(): %d chunk->sp(): %d chunk->argsize(): %d", size, chunk->stack_size(), chunk->sp(), chunk->argsize());
   assert (size >= 0, "");
   assert ((size == 0) == chunk->is_empty(), "");
 
@@ -969,9 +942,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
     assert (chunk->argsize() == (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord,
       "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(), (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
   } 
-  // else {
-  //   assert (chunk->argsize() == 0, "");
-  // }
+
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 
   if (!concurrent) {

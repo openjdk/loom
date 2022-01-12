@@ -52,10 +52,7 @@ public class Continuation {
         U.ensureClassInitialized(ScopeLocal.class);
     }
 
-    // private static final WhiteBox WB = sun.hotspot.WhiteBox.WhiteBox.getWhiteBox();
-
     private static final boolean TRACE = isEmptyOrTrue("jdk.internal.vm.Continuation.trace");
-    private static final boolean DEBUG = TRACE | isEmptyOrTrue("jdk.internal.vm.Continuation.debug");
 
     private static final VarHandle MOUNTED;
 
@@ -144,9 +141,6 @@ public class Continuation {
     private short cs; // critical section semaphore
 
     private Object[] scopeLocalCache;
-
-    // private long[] nmethods = null; // grows up
-    // private int numNmethods = 0;
 
     /**
      * TBD
@@ -347,8 +341,6 @@ public class Continuation {
 
     private void finish() {
         done = true;
-        // assert doneX;
-        // System.out.println("-- done!  " + id());
         if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
         assert isEmpty();
     }
@@ -466,8 +458,6 @@ public class Continuation {
      * @param reason TBD
      */
     protected void onPinned(Pinned reason) {
-        if (DEBUG)
-            System.out.println("PINNED! " + reason);
         throw new IllegalStateException("Pinned: " + reason);
     }
 
@@ -548,24 +538,6 @@ public class Continuation {
         return true;
     }
 
-
-    // private void pushNmethod(long nmethod) {
-    //     if (nmethods == null) {
-    //         nmethods = new long[8];
-    //     } else {
-    //         if (numNmethods == nmethods.length) {
-    //             long[] newNmethods = new long[nmethods.length * 2];
-    //             System.arraycopy(nmethods, 0, newNmethods, 0, numNmethods);
-    //             this.nmethods = newNmethods;
-    //         }
-    //     }
-    //     nmethods[numNmethods++] = nmethod;
-    // }
-
-    // private void popNmethod() {
-    //     numNmethods--;
-    // }
-
     private static Map<Long, Integer> liveNmethods = new ConcurrentHashMap<>();
 
     private void processNmethods(int before, int after) {
@@ -574,12 +546,10 @@ public class Continuation {
 
     private boolean compareAndSetMounted(boolean expectedValue, boolean newValue) {
        boolean res = MOUNTED.compareAndSet(this, expectedValue, newValue);
-    //    System.out.println("-- compareAndSetMounted:  ex: " + expectedValue + " -> " + newValue + " " + res + " " + id());
        return res;
      }
 
     private void setMounted(boolean newValue) {
-        // System.out.println("-- setMounted:  " + newValue + " " + id());
         mounted = newValue;
         // MOUNTED.setVolatile(this, newValue);
     }

@@ -110,19 +110,6 @@ static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one
   // static void callgrind() {}
 #endif
 
-// #undef log_develop_info
-// #undef log_develop_debug
-// #undef log_develop_trace
-// #undef log_develop_is_enabled
-// #define log_develop_info(...)  (!log_is_enabled(Info, __VA_ARGS__))   ? (void)0 : LogImpl<LOG_TAGS(__VA_ARGS__)>::write<LogLevel::Info>
-// #define log_develop_debug(...) (!log_is_enabled(Debug, __VA_ARGS__)) ? (void)0 : LogImpl<LOG_TAGS(__VA_ARGS__)>::write<LogLevel::Debug>
-// #define log_develop_trace(...) (!log_is_enabled(Trace, __VA_ARGS__))  ? (void)0 : LogImpl<LOG_TAGS(__VA_ARGS__)>::write<LogLevel::Trace>
-// #define log_develop_is_enabled(level, ...)  log_is_enabled(level, __VA_ARGS__)
-
-// #undef ASSERT
-// #undef assert
-// #define assert(p, ...)
-
 #ifdef ASSERT
 template<int x> NOINLINE static bool verify_continuation(oop cont) { return Continuation::debug_verify_continuation(cont); }
 template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
@@ -144,14 +131,7 @@ static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->kla
 
 // TODO
 //
-// Nested continuations: must restore fastpath, held_monitor_count, cont_frame->sp (entrySP of parent)
-// Add:
-//  - compress interpreted frames
-//  - compiled->intrepreted for serialization (look at scopeDesc)
-//  - caching h-stacks in thread stacks
-//
 // Things to compress in interpreted frames: return address, monitors, last_sp
-//
 
 //
 // The data structure invariants are defined by Continuation::debug_verify_continuation and Continuation::debug_verify_stack_chunk
@@ -174,12 +154,6 @@ void do_deopt_after_thaw(JavaThread* thread);
   static void print_frame_layout(const frame& f, outputStream* st = tty);
   static void print_frames(JavaThread* thread, outputStream* st = tty);
   static jlong java_tid(JavaThread* thread);
-
-  // static void print_blob(outputStream* st, address addr);
-  // template<int x> static void walk_frames(JavaThread* thread);
-  // void static stop();
-  // void static stop(const frame& f);
-  // static void print_JavaThread_offsets();
 #endif
 
 void continuations_init() {
@@ -517,7 +491,6 @@ private:
   JavaThread* const _thread;   // Thread being frozen/thawed
   ContinuationEntry* _entry;
   oop _cont;
-
   stackChunkOop _tail;
 
   // Profiling data for the JFR event
@@ -1214,7 +1187,7 @@ public:
   #ifdef ASSERT
     ResourceMark rm;
   #endif
-    // tty->print_cr("FREEZE SLOW");
+
     log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());
 
     assert (_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
@@ -3010,8 +2983,6 @@ static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
   if (st != nullptr && !log_is_enabled(Trace, jvmcont)) return;
   if (st == nullptr) st = tty;
 
-  st->print_cr("\tfp: " INTPTR_FORMAT " real_fp: " INTPTR_FORMAT ", sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " usp: " INTPTR_FORMAT, p2i(f.fp()), p2i(f.real_fp()), p2i(f.sp()), p2i(f.pc()), p2i(f.unextended_sp()));
-
   f.print_on(st);
 }
 
@@ -3033,19 +3004,11 @@ bool Continuation::is_continuation_enterSpecial(const frame& f) {
 }
 
 bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap *map) {
-  // frame f = map->in_cont() ? map->stack_chunk()->derelativize(fr) : fr;
-  // tty->print_cr(">>> is_continuation_entry_frame %d", map->in_cont()); map->in_cont() ? f.print_on<true>(tty) : f.print_on<false>(tty);
-  // Method* m = Frame::frame_method(f);
-
   // we can do this because the entry frame is never inlined
   Method* m = (map->in_cont() && f.is_interpreted_frame()) ? map->stack_chunk()->interpreter_frame_method(f)
                                                            : Frame::frame_method(f);
   return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
 }
-
-// bool Continuation::is_cont_post_barrier_entry_frame(const frame& f) {
-//   return is_return_barrier_entry(Frame::real_pc(f));
-// }
 
 // When walking the virtual stack, this method returns true
 // iff the frame is a thawed continuation frame whose
@@ -3061,7 +3024,6 @@ bool Continuation::is_return_barrier_entry(const address pc) {
 }
 
 static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
-  // tty->print_cr(">>>> is_sp_in_continuation cont: %p sp: %p entry: %p in: %d", (oopDesc*)cont, sp, jdk_internal_vm_Continuation::entrySP(cont), jdk_internal_vm_Continuation::entrySP(cont) > sp);
   return cont->entry_sp() > sp;
 }
 
@@ -3145,7 +3107,6 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
     log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
     log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
-    // log_develop_trace(jvmcont)("fix_continuation_bottom_sender callee:"); if (log_develop_is_enabled(Debug, jvmcont)) callee.print_value_on(tty, thread);
 
     *sender_pc = cont->entry_pc();
     *sender_sp = cont->entry_sp();
@@ -3406,9 +3367,6 @@ public:
   static const bool _compressed_oops = compressed_oops;
   static const bool _concurrent_gc = BarrierSetT::is_concurrent_gc();
   // static const bool _post_barrier = post_barrier;
-  // static const bool allow_stubs = gen_stubs && post_barrier && compressed_oops;
-  // static const bool has_young = use_chunks;
-  // static const bool full_stack = full;
 
   static int freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
     return freeze0<SelfT>(thread, sp, preempt);
@@ -3541,7 +3499,7 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   int num_frames = 0;
   int num_interpreted_frames = 0;
   int num_oops = 0;
-  // tty->print_cr(">>> debug_verify_continuation traversing chunks");
+
   for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
     log_develop_trace(jvmcont)("debug_verify_continuation chunk %d", num_chunks);
     chunk->verify(&max_size, &num_oops, &num_frames, &num_interpreted_frames);
@@ -3549,7 +3507,6 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
     num_chunks++;
   }
 
-  // assert (cont.max_size() >= 0, ""); // size_t can't be negative...
   const bool is_empty = cont.is_empty();
   assert (!nonempty_chunk || !is_empty, "");
   assert (is_empty == (!nonempty_chunk && cont.last_frame().is_empty()), "");
@@ -3569,8 +3526,6 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
     st->print("* ");
     chunk->print_on(true, tty);
   }
-
-  // st->print_cr("frames: %d interpreted frames: %d oops: %d", cont.num_frames(), cont.num_interpreted_frames(), cont.num_oops());
 }
 #endif // ASSERT
 
@@ -3613,11 +3568,8 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   int i = 0;
   for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
 #ifndef PRODUCT
-    // print_vframe(f, &map, st);
     f.describe(values, i, &map);
 #else
-    // f.print_on(st);
-    // tty->print_cr("===");
     print_vframe(f, &map, st);
 #endif
     i++;
@@ -3671,10 +3623,6 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
       if (Continuation::is_continuation_enterSpecial(f))
         break;
       interpreted_bottom = f.is_interpreted_frame();
-      if (!(f.sp() != nullptr && f.sp() <= cont->bottom_sender_sp())) {
-        tty->print_cr("oops");
-        f.print_on(tty);
-      }
     }
     assert (Continuation::is_continuation_enterSpecial(f), "");
     sp = interpreted_bottom ? f.sp() : cont->bottom_sender_sp();

@@ -109,10 +109,8 @@ public:
   template <typename OopT> inline BitMap::idx_t bit_index_for(OopT* p) const;
   template <typename OopT> inline OopT* address_for_bit(BitMap::idx_t index) const;
 
-  //
   bool verify(size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
-  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*);
   template <class StackChunkFrameClosureType> 
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 

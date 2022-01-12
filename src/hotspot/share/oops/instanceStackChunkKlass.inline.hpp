@@ -74,7 +74,7 @@ inline void InstanceStackChunkKlass::copy_from_stack_to_chunk(void* from, void* 
   memcpy(to, from, size << LogBytesPerWord);
 #if 0
   if (dword_aligned) {
-    assert (size >= 2, ""); // one word for return address, another for rbp spill
+    assert (size >= 2, ""); // one word for return address, another for fp spill
     assert(((intptr_t)from & TwoWordAlignmentMask) == 0, "");
     assert(((intptr_t)to   & WordAlignmentMask)    == 0, "");
 
@@ -90,7 +90,7 @@ inline void InstanceStackChunkKlass::copy_from_chunk_to_stack(void* from, void* 
   memcpy(to, from, size << LogBytesPerWord);
 #if 0
   if (dword_aligned) {
-    assert (size >= 2, ""); // one word for return address, another for rbp spill
+    assert (size >= 2, ""); // one word for return address, another for fp spill
     assert(((intptr_t)from & WordAlignmentMask)    == 0, "");
     assert(((intptr_t)to   & TwoWordAlignmentMask) == 0, "");
 
