@@ -479,11 +479,6 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   }
 
   intptr_t* unextended_sp = sender_sp;
-  CodeBlob* sender_cb = CodeCache::find_blob_fast(sender_pc);
-  if (sender_cb != NULL) {
-    return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc, sender_cb);
-  }
-  // tty->print_cr(">>>> NO CB sender_pc: %p", sender_pc); os::print_location(tty, (intptr_t)sender_pc); print_on(tty);
   return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
