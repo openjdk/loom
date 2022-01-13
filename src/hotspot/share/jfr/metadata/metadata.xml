@@ -119,7 +119,6 @@
     thread="true" stackTrace="true">
     <Field type="Thread" name="carrierThread" label="Carrier Thread" description="Thread enlisted as a carrier" />
     <Field type="Class" name="contClass" label="Continuation class" description="Class of the continuation" />
-    <Field type="ushort" name="numFrames" label="Number of frames" />
     <Field type="ushort" name="numIFrames" label="Number of interpreted frames" />
     <Field type="ushort" name="numRefs" label="Number of references" />
     <Field type="ushort" name="size" label="Stack size in bytes" />
@@ -129,7 +128,6 @@
     thread="true" stackTrace="true">
     <Field type="Thread" name="carrierThread" label="Carrier Thread" description="Thread enlisted as a carrier" />
     <Field type="Class" name="contClass" label="Continuation class" description="Class of the continuation" />
-    <Field type="ushort" name="numFrames" label="Number of frames" />
     <Field type="ushort" name="numIFrames" label="Number of interpreted frames" />
     <Field type="ushort" name="numRefs" label="Number of references" />
     <Field type="ushort" name="size" label="Stack size in bytes" />

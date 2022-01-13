@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,6 +75,11 @@
 #include "utilities/macros.hpp"
 
 #define CONT_JFR false
+#if CONT_JFR
+  #define CONT_JFR_ONLY(code) code
+#else
+  #define CONT_JFR_ONLY(code)
+#endif
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time from chunks for testing purposes
 
@@ -493,10 +498,11 @@ private:
   oop _cont;
   stackChunkOop _tail;
 
+#if CONT_JFR
   // Profiling data for the JFR event
   short _e_size;
   short _e_num_interpreted_frames;
-  short _e_num_frames;
+#endif
 
 public:
   inline void post_safepoint(Handle conth);
@@ -511,18 +517,9 @@ public:
   ContMirror(oop cont);
   ContMirror(const RegisterMap* map);
 
-  intptr_t hash() {
-    #ifndef PRODUCT
-      return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1;
-    #else
-      return 0;
-    #endif
-  }
+  DEBUG_ONLY(intptr_t hash() { return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1; })
 
-  void read();
-  inline void read_minimal();
-  void read_rest();
-
+  inline void read();
   inline void write();
 
   oop mirror() { return _cont; }
@@ -562,10 +559,12 @@ public:
   bool is_preempted() { return jdk_internal_vm_Continuation::is_preempted(_cont); }
   void set_preempted(bool value) { jdk_internal_vm_Continuation::set_preempted(_cont, value); }
 
+#if CONT_JFR
   inline void inc_num_interpreted_frames() { _e_num_interpreted_frames++; }
   inline void dec_num_interpreted_frames() { _e_num_interpreted_frames++; }
 
   template<typename Event> void post_jfr_event(Event *e, JavaThread* jt);
+#endif
 
 #ifdef ASSERT
   inline bool is_entry_frame(const frame& f);
@@ -651,64 +650,46 @@ oop ContinuationHelper::get_continuation(JavaThread* thread) {
 }
 
 ContMirror::ContMirror(JavaThread* thread, oop cont)
- : _thread(thread), _entry(thread->last_continuation()), _cont(cont),
-#ifndef PRODUCT
-  _tail(nullptr),
+ : _thread(thread), _entry(thread->last_continuation()), _cont(cont)
+#if CONT_JFR
+  , _e_size(0), _e_num_interpreted_frames(0)
 #endif
-  _e_size(0) {
-
+  {
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
   assert (_cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: "
           INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
+  read();
 }
 
 ContMirror::ContMirror(oop cont)
- : _thread(nullptr), _entry(nullptr), _cont(cont),
-#ifndef PRODUCT
-  _tail(nullptr),
+ : _thread(nullptr), _entry(nullptr), _cont(cont)
+#if CONT_JFR
+  , _e_size(0), _e_num_interpreted_frames(0)
 #endif
-  _e_size(0) {
+  {
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-
   read();
 }
 
 ContMirror::ContMirror(const RegisterMap* map)
  : _thread(map->thread()),
    _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->stack_chunk()->cont())),
-   _cont(map->stack_chunk()->cont()),
-#ifndef PRODUCT
-  _tail(nullptr),
+   _cont(map->stack_chunk()->cont())
+#if CONT_JFR
+  , _e_size(0), _e_num_interpreted_frames(0)
 #endif
-  _e_size(0) {
-
+  {
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-
-  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, p2i((oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
+  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, 
+    p2i( (oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
   read();
 }
 
-void ContMirror::read() {
-  read_minimal();
-  read_rest();
-}
-
-ALWAYSINLINE void ContMirror::read_minimal() {
+inline void ContMirror::read() {
   _tail  = (stackChunkOop)jdk_internal_vm_Continuation::tail(_cont);
 }
 
-void ContMirror::read_rest() {
-  _e_num_interpreted_frames = 0;
-  _e_num_frames = 0;
-}
-
 inline void ContMirror::write() {
-  if (log_develop_is_enabled(Trace, jvmcont)) {
-    log_develop_trace(jvmcont)("Writing continuation object:");
-    log_develop_trace(jvmcont)("\ttail: " INTPTR_FORMAT, p2i((oopDesc*)_tail));
-    if (_tail != nullptr) _tail->print_on(tty);
-  }
-
   jdk_internal_vm_Continuation::set_tail(_cont, _tail);
 }
 
@@ -733,24 +714,23 @@ stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
   return nullptr;
 }
 
+#if CONT_JFR
 template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* jt) {
-#if INCLUDE_JFR
   if (e->should_commit()) {
-    log_develop_trace(jvmcont)("JFR event: frames: %d iframes: %d size: %d", _e_num_frames, _e_num_interpreted_frames, _e_size);
+    log_develop_trace(jvmcont)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
     e->set_carrierThread(JFR_VM_THREAD_ID(jt));
     e->set_contClass(_cont->klass());
-    e->set_numFrames(_e_num_frames);
     e->set_numIFrames(_e_num_interpreted_frames);
     e->set_size(_e_size);
     e->commit();
   }
-#endif
 }
+#endif
 
 template <bool aligned>
 void ContMirror::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
   tail()->copy_from_stack_to_chunk<aligned>(from, to, size);
-  _e_size += size << LogBytesPerWord;
+  CONT_JFR_ONLY(_e_size += size << LogBytesPerWord;)
 }
 
 #ifdef ASSERT
@@ -877,9 +857,6 @@ public:
   Freeze(JavaThread* thread, ContMirror& mirror, bool preempt) :
     _thread(thread), _cont(mirror), _barriers(false), _preempt(preempt) {
 
-    // _cont.read_entry(); // even when retrying, because deopt can change entryPC; see Continuation::get_continuation_entry_pc_for_sender
-    _cont.read(); // read_minimal
-
     assert (thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
 
     int argsize = bottom_argsize();
@@ -1001,7 +978,6 @@ public:
     }
   #endif
 
-    log_develop_trace(jvmcont)("freeze_fast");
     assert (_thread != nullptr, "");
     assert(_cont.chunk_invariant(), "");
     assert (!Interpreter::contains(_cont.entryPC()), "");
@@ -1075,7 +1051,7 @@ public:
       // They'll then be stored twice: in the chunk and in the parent
 
       _cont.set_tail(chunk);
-      // jdk_internal_vm_Continuation::set_tail(_cont.mirror(), chunk);
+      // _cont.write();
 
       if (UNLIKELY(ConfigT::requires_barriers(chunk))) { // probably humongous
         log_develop_trace(jvmcont)("allocation requires barriers; retrying slow");
@@ -1134,23 +1110,9 @@ public:
 
     _cont.write();
 
-    // if (UNLIKELY(argsize != 0)) {
-    //   // we're patching the chunk itself rather than the stack before the copy becuase of concurrent stack scanning
-    //   intptr_t* const chunk_bottom_sp = to + size - argsize;
-    //   log_develop_trace(jvmcont)("patching chunk's bottom sp: " INTPTR_FORMAT, p2i(chunk_bottom_sp));
-    //   assert (*(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) == StubRoutines::cont_returnBarrier(), "");
-    //   *(address*)(chunk_bottom_sp - SENDER_SP_RET_ADDRESS_OFFSET) = chunk->pc();
-    // }
+    log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());
+    if (log_develop_is_enabled(Trace, jvmcont)) chunk->print_on(true, tty);
 
-    // // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
-    // chunk->set_sp(sp);
-    // chunk->set_pc(*(address*)(top - SENDER_SP_RET_ADDRESS_OFFSET));
-    // chunk->set_gc_sp(sp);
-
-    log_develop_trace(jvmcont)("Young chunk success");
-    if (log_develop_is_enabled(Debug, jvmcont)) chunk->print_on(true, tty);
-
-    log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT, _cont.hash());
     assert (_cont.chunk_invariant(), "");
     assert (verify_stack_chunk<1>(chunk), "");
 
@@ -1158,7 +1120,7 @@ public:
     EventContinuationFreezeYoung e;
     if (e.should_commit()) {
       e.set_id(cast_from_oop<u8>(chunk));
-      e.set_allocate(allocated);
+      DEBUG_ONLY(e.set_allocate(allocated);)
       e.set_size(size << LogBytesPerWord);
       e.commit();
     }
@@ -1177,7 +1139,6 @@ public:
     assert (_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
 
     init_rest();
-    // _cont.read_rest();
 
     HandleMark hm(Thread::current());
 
@@ -1232,9 +1193,6 @@ public:
     Unimplemented();
 #endif
     if (!Interpreter::contains(f.pc())) {
-  #ifdef ASSERT
-      if (!Frame::is_stub(f.cb())) { f.print_value_on(tty, JavaThread::current()); }
-  #endif
       assert (Frame::is_stub(f.cb()), "must be");
       assert (f.oop_map() != nullptr, "must be");
 
@@ -1541,7 +1499,7 @@ public:
 
     patch<Interpreted>(f, hf, caller, bottom);
 
-    _cont.inc_num_interpreted_frames();
+    CONT_JFR_ONLY(_cont.inc_num_interpreted_frames();)
     DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
     caller = hf;
 
@@ -1728,7 +1686,6 @@ static void JVMTI_yield_cleanup(JavaThread* thread, ContMirror& cont) {
   if (JvmtiExport::can_post_frame_pop()) {
     ContinuationHelper::set_anchor_to_entry(thread, cont.entry()); // ensure frozen frames are invisible
 
-    // cont.read_rest();
     int num_frames = num_java_frames(cont);
 
     // The call to JVMTI can safepoint, so we need to restore oops.
@@ -1816,9 +1773,7 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
     assert (verify_continuation<11>(cont.mirror()), "");
     return early_return(res, thread);
   }
-#if CONT_JFR
-  cont.post_jfr_event(&event, thread);
-#endif
+
   JVMTI_yield_cleanup(thread, cont); // can safepoint
   return freeze_epilog(thread, cont, preempt);
 }
@@ -1846,9 +1801,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   /* ContinuationHelper::set_anchor(current, fi); */ print_frames(current);
 #endif
 
-#if CONT_JFR
-  EventContinuationFreeze event;
-#endif
+  CONT_JFR_ONLY(EventContinuationFreeze event;)
 
   current->set_cont_yield(true);
 
@@ -1874,23 +1827,18 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   if (UNLIKELY(preempt)) {
     freeze_result res = fr.freeze_slow();
     cont.set_preempted(true);
+    CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     return freeze_epilog(current, cont, res, preempt);
   }
 
   if (fast && fr.is_chunk_available(sp)) {
-    log_develop_trace(jvmcont)("chunk available; no transition");
     freeze_result res = fr.try_freeze_fast(sp, true);
     assert (res == freeze_ok, "");
-  #if CONT_JFR
-    cont.post_jfr_event(&event, current);
-  #endif
-
-    // if (UNLIKELY(preempt)) cont.set_preempted(true);
+    CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     return freeze_epilog(current, cont, preempt);
   }
 
   // if (current->held_monitor_count() > 0) {
-  //    // tty->print_cr(">>> FAIL FAST");
   //    return freeze_pinned_monitor;
   // }
 
@@ -1898,6 +1846,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
     freeze_result res = fast ? fr.try_freeze_fast(sp, false) : fr.freeze_slow();
+    CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     return freeze_epilog(current, cont, res, preempt);
   JRT_BLOCK_END
 }
@@ -2385,7 +2334,6 @@ public:
     }
 
     DEBUG_ONLY(_mode = 3;)
-    // _cont.read_rest();
     _align_size = 0;
     int num_frames = (return_barrier ? 1 : 2);
     // _frames = 0;
@@ -2597,7 +2545,7 @@ public:
 
     assert(Interpreted::frame_bottom<false>(f) <= Frame::frame_top(caller), "Interpreted::frame_bottom<false>(f): %p Frame::frame_top(caller): %p", Interpreted::frame_bottom<false>(f), Frame::frame_top(caller));
 
-    _cont.dec_num_interpreted_frames();
+    CONT_JFR_ONLY(_cont.dec_num_interpreted_frames();)
 
     maybe_set_fastpath(f.sp());
 
@@ -2792,9 +2740,7 @@ template<typename ConfigT>
 static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   //callgrind();
   // NoSafepointVerifier nsv;
-#if CONT_JFR
-  EventContinuationThaw event;
-#endif
+  CONT_JFR_ONLY(EventContinuationThaw event;)
 
   if (kind != thaw_top) {
     log_develop_trace(jvmcont)("== RETURN BARRIER");
@@ -2815,8 +2761,6 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
-
-  cont.read(); // read_minimal
 
 #ifdef ASSERT
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
@@ -2852,9 +2796,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
     print_vframe(f, nullptr);
   }
 
-#if CONT_JFR
-  cont.post_jfr_event(&event, thread);
-#endif
+  CONT_JFR_ONLY(cont.post_jfr_event(&event, thread);)
 
   // assert (thread->last_continuation()->argsize() == 0 || Continuation::is_return_barrier_entry(*(address*)(thread->last_continuation()->bottom_sender_sp() - SENDER_SP_RET_ADDRESS_OFFSET)), "");
   assert (verify_continuation<3>(cont.mirror()), "");
@@ -3439,13 +3381,11 @@ bool Continuation::debug_is_continuation_run_frame(const frame& f) {
   return is_continuation_run;
 }
 
-
 NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
   assert (contOop != (oop)nullptr, "");
   assert (oopDesc::is_oop(contOop), "");
   ContMirror cont(contOop);
-  cont.read();
 
   assert (oopDesc::is_oop_or_null(cont.tail()), "");
   assert (cont.chunk_invariant(), "");
@@ -3467,7 +3407,6 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   const bool is_empty = cont.is_empty();
   assert (!nonempty_chunk || !is_empty, "");
   assert (is_empty == (!nonempty_chunk && cont.last_frame().is_empty()), "");
-  // assert (num_interpreted_frames == cont.num_interpreted_frames(), "interpreted_frames: %d cont.num_interpreted_frames(): %d", num_interpreted_frames, cont.num_interpreted_frames());
 
   return true;
 }
@@ -3525,23 +3464,16 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   int i = 0;
   for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
 #ifndef PRODUCT
-    f.describe(values, i, &map);
+    f.describe(values, i++, &map);
 #else
     print_vframe(f, &map, st);
 #endif
-    i++;
   }
 #ifndef PRODUCT
   values.print(thread);
 #endif
   st->print_cr("======= end frames =========");
 }
-
-// template<int x>
-// NOINLINE static void walk_frames(JavaThread* thread) {
-//   RegisterMap map(thread, false, false, false);
-//   for (frame f = thread->last_frame(); !f.is_first_frame(); f = f.sender(&map));
-// }
 
 #endif
 
