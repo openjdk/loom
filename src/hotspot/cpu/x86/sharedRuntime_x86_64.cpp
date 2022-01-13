@@ -3143,8 +3143,6 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   // No need to save vector registers since they are caller-saved anyway.
   map = RegisterSaver::save_live_registers(masm, 0, &frame_size_in_words, /*save_vectors*/ false);
 
-  // __ stop_if_in_cont(r10, "CONT 3");
-
   int frame_complete = __ offset();
 
   __ set_last_Java_frame(noreg, noreg, NULL);
