@@ -1160,6 +1160,8 @@ void nmethod::make_deoptimized() {
         break;
     }
   }
+  // Don't deopt this again.
+  mark_deoptimized();
 }
 
 void nmethod::verify_clean_inline_caches() {
