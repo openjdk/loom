@@ -32,35 +32,12 @@
 const int ContinuationHelper::frame_metadata = frame::sender_sp_offset;
 const int ContinuationHelper::align_wiggle = 1;
 
-#ifdef ASSERT
-bool Frame::assert_frame_laid_out(frame f) {
-  intptr_t* sp = f.sp();
-  address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
-  assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
-  return f.raw_pc() == pc && f.fp() == fp;
-}
-#endif
-
-inline intptr_t** Frame::callee_link_address(const frame& f) {
-  return (intptr_t**)(f.sp() - frame::sender_sp_offset);
-}
-
-template<typename FKind>
-static inline intptr_t* real_fp(const frame& f) {
-  assert (FKind::is_instance(f), "");
-  assert (FKind::interpreted || f.cb() != nullptr, "");
-
-  return FKind::interpreted ? f.fp() : f.unextended_sp() + f.cb()->frame_size();
-}
-
 template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
 static inline intptr_t** link_address(const frame& f) {
   assert (FKind::is_instance(f), "");
   return FKind::interpreted
             ? (intptr_t**)(f.fp() + frame::link_offset)
-            : (intptr_t**)(real_fp<FKind>(f) - frame::sender_sp_offset);
+            : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - frame::sender_sp_offset);
 }
 
 static void patch_callee_link(const frame& f, intptr_t* fp) {
@@ -73,61 +50,6 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   intptr_t new_value = fp - la;
   *la = new_value;
   log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), new_value);
-}
-
-inline address* Interpreted::return_pc_address(const frame& f) {
-  return (address*)(f.fp() + frame::return_addr_offset);
-}
-
-template <bool relative>
-void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
-  assert (f.is_interpreted_frame(), "");
-  intptr_t* la = f.addr_at(frame::interpreter_frame_sender_sp_offset);
-  *la = relative ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
-  log_trace(jvmcont)("patched sender_sp: " INTPTR_FORMAT, *la);
-}
-
-inline address* Frame::return_pc_address(const frame& f) {
-  return (address*)(f.real_fp() - 1);
-}
-
-// inline address* Frame::pc_address(const frame& f) {
-//   return (address*)(f.sp() - frame::return_addr_offset);
-// }
-
-inline address Frame::real_pc(const frame& f) {
-  address* pc_addr = &(((address*) f.sp())[-1]);
-  return *pc_addr;
-}
-
-inline void Frame::patch_pc(const frame& f, address pc) {
-  address* pc_addr = &(((address*) f.sp())[-1]);
-  *pc_addr = pc;
-  log_develop_trace(jvmcont)("patch_pc at " INTPTR_FORMAT ": " INTPTR_FORMAT, p2i(pc_addr), p2i(pc));
-}
-
-inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask) { // inclusive; this will be copied with the frame
-  // interpreter_frame_last_sp_offset, points to unextended_sp includes arguments in the frame
-  // interpreter_frame_initial_sp_offset excludes expression stack slots
-  int expression_stack_sz = expression_stack_size(f, mask);
-  intptr_t* res = *(intptr_t**)f.addr_at(frame::interpreter_frame_initial_sp_offset) - expression_stack_sz;
-  assert (res == (intptr_t*)f.interpreter_frame_monitor_end() - expression_stack_sz, "");
-  assert (res >= f.unextended_sp(),
-    "res: " INTPTR_FORMAT " initial_sp: " INTPTR_FORMAT " last_sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " expression_stack_size: %d", 
-    p2i(res), p2i(f.addr_at(frame::interpreter_frame_initial_sp_offset)), f.at(frame::interpreter_frame_last_sp_offset), p2i(f.unextended_sp()), expression_stack_sz);
-  return res;
-  // Not true, but using unextended_sp might work
-  // assert (res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
-}
-
-template <bool relative>
-inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
-  return (intptr_t*)f.at<relative>(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
-}
-
-inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
-  // tty->print_cr(">>> f.unextended_sp(): %p callee_argsize: %d callee_interpreted: %d", f.unextended_sp(), callee_argsize, callee_interpreted);
-  return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
 }
 
 template<typename FKind, typename RegisterMapT>
@@ -434,6 +356,5 @@ inline intptr_t* Thaw<ConfigT>::align_chunk(intptr_t* vsp) {
 #endif
   return vsp;
 }
-////////
 
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP
