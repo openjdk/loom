@@ -2863,8 +2863,8 @@ public class Thread implements Runnable {
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
         if (getState() == State.TERMINATED)
             return null;
-        return uncaughtExceptionHandler != null ?
-            uncaughtExceptionHandler : getThreadGroup();
+        UncaughtExceptionHandler uhe = uncaughtExceptionHandler;
+        return (uhe != null) ? uhe : getThreadGroup();
     }
 
     /**
