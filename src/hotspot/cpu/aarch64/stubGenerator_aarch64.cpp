@@ -6846,14 +6846,14 @@ RuntimeStub* generate_cont_doYield() {
   static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
     Register last_java_pc = c_rarg0;
     Register last_java_sp = c_rarg2;
+    __ ldr(last_java_pc, Address(sp, wordSize));
+    __ lea(last_java_sp, Address(sp, 2*wordSize));
     // __ vzeroupper();
-    __ mov(last_java_pc, lr);
-    __ mov(last_java_sp, sp);
+
     __ str(last_java_pc, Address(thread, JavaThread::last_Java_pc_offset()));
     __ str(last_java_sp, Address(thread, JavaThread::last_Java_sp_offset()));
   }
 
-  // Must be called before enter()
   static void jfr_prologue(MacroAssembler* _masm, Register thread) {
     jfr_set_last_java_frame(_masm, thread);
     __ mov(c_rarg0, rthread);
@@ -6877,8 +6877,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
     address start = __ pc();
 
-    jfr_prologue(_masm, rthread);
     __ enter();
+    jfr_prologue(_masm, rthread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
     jfr_epilogue(_masm, rthread);
     __ leave();
@@ -6893,8 +6893,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
 
-    jfr_prologue(_masm, rthread);
     __ enter();
+    jfr_prologue(_masm, rthread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
     jfr_epilogue(_masm, rthread);
     __ leave();
