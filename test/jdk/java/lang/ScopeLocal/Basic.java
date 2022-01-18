@@ -199,6 +199,7 @@ public class Basic {
 
             // re-bind should fail
             expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
+            expectThrows(RuntimeException.class, () -> name.bind("y"));
 
             assertEquals(name.get(), "x");
         }
@@ -254,9 +255,26 @@ public class Basic {
 
             // re-bind should fail
             expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
+            expectThrows(RuntimeException.class, () -> name.bind("y"));
 
             assertEquals(name.get(), "x");
         });
+        assertFalse(name.isBound());
+    }
+
+    /**
+     * Basic test that the shorthand form of bind works.
+     */
+    public void testTryWithResources5() {
+        ScopeLocal<String> name = ScopeLocal.newInstance();
+        try (var binding = name.bind("x")) {
+            assertEquals(name.get(), "x");
+
+            // re-bind should fail
+            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
+
+            assertEquals(name.get(), "x");
+        }
         assertFalse(name.isBound());
     }
 
