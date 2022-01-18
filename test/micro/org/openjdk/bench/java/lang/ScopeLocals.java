@@ -44,6 +44,8 @@ import static org.openjdk.bench.java.lang.ScopeLocalsData.*;
 @SuppressWarnings("preview")
 public class ScopeLocals {
 
+    private static final Integer THE_ANSWER = 42;
+
     // Test 1: make sure ScopeLocal.get() is hoisted out of loops.
 
     @Benchmark
@@ -99,7 +101,7 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int CreateBindThenGetThenRemove_ScopeLocal() throws Exception {
-        return ScopeLocal.where(sl1, 42).call(sl1::get);
+        return ScopeLocal.where(sl1, THE_ANSWER).call(sl1::get);
     }
 
 
@@ -115,7 +117,7 @@ public class ScopeLocals {
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int bindThenGetThenRemove_ThreadLocal() throws Exception {
         try {
-            tl1.set(42);
+            tl1.set(THE_ANSWER);
             return tl1.get();
         } finally {
             tl1.remove();
@@ -127,7 +129,7 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int bindThenGetNoRemove_ThreadLocal() throws Exception {
-        tl1.set(42);
+        tl1.set(THE_ANSWER);
         return tl1.get();
     }
 
@@ -136,13 +138,13 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bind_ScopeLocal() throws Exception {
-        return ScopeLocal.where(sl1, 42, this::getClass);
+        return HOLD_42.call(this::getClass);
     }
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object TWR_bind_ScopeLocal() throws Exception {
-        try (var x = ScopeLocal.where(unbound, 42).bind()) {
+        try (var x = ScopeLocal.where(unbound, THE_ANSWER).bind()) {
             return getClass();
         }
     }
@@ -151,7 +153,7 @@ public class ScopeLocals {
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bind_ThreadLocal() throws Exception {
         try {
-            tl1.set(42);
+            tl1.set(THE_ANSWER);
             return this.getClass();
         } finally {
             tl1.remove();
@@ -164,7 +166,7 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void setNoRemove_ThreadLocal() throws Exception {
-        tl1.set(42);
+        tl1.set(THE_ANSWER);
     }
 
     // This is the closest I can think of to setNoRemove_ThreadLocal in that it
@@ -173,7 +175,7 @@ public class ScopeLocals {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void setNoRemove_ScopeLocal() throws Exception {
-        sl_atomicRef.get().setPlain(42);
+        sl_atomicRef.get().setPlain(THE_ANSWER);
     }
 
     // Test 5: A simple counter
