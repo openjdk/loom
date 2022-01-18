@@ -112,7 +112,7 @@ public final class ScopeLocal<T> {
     static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
     static {
         // maybe rename to preserveScopeLocalCache to be consistent with other props
-        String value = GetPropertyAction.privilegedGetProperty("java.lang.ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE");
+        String value = GetPropertyAction.privilegedGetProperty("java.lang.ScopeLocal.preserveScopeLocalCache");
         PRESERVE_SCOPE_LOCAL_CACHE = (value == null) || Boolean.parseBoolean(value);
     }
 
@@ -139,32 +139,36 @@ public final class ScopeLocal<T> {
      *
      * @since 99
      */
-    static class Snapshot {
+    static sealed class Snapshot permits EmptySnapshot {
         final Snapshot prev;
         final Carrier bindings;
-        final short primaryBits;
+        final int bitmask;
 
         private static final Object NIL = new Object();
 
-        Snapshot(Carrier bindings, Snapshot prev, short primaryBits) {
+        Snapshot(Carrier bindings, Snapshot prev) {
             this.prev = prev;
             this.bindings = bindings;
-            this.primaryBits = primaryBits;
+            this.bitmask = bindings.bitmask | prev.bitmask;
+        }
+
+        protected Snapshot() {
+            this.prev = null;
+            this.bindings = null;
+            this.bitmask = 0;
         }
 
         Object find(ScopeLocal<?> key) {
-            for (Snapshot b = this; b != null; b = b.prev) {
-                if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
-                    if (b.getClass() != Snapshot.class) {
-                        return b.find(key);
-                    }
-                    for (Carrier binding = b.bindings;
-                         binding != null;
-                         binding = binding.prev) {
-                        if (binding.getKey() == key) {
-                            Object value = binding.get();
-                            return value;
-                        }
+            int bits = key.bitmask();
+            for (Snapshot snapshot = this;
+                 containsAll(snapshot.bitmask, bits);
+                 snapshot = snapshot.prev) {
+                for (Carrier carrier = snapshot.bindings;
+                     carrier != null && containsAll(carrier.bitmask, bits);
+                     carrier = carrier.prev) {
+                    if (carrier.getKey() == key) {
+                        Object value = carrier.get();
+                        return value;
                     }
                 }
             }
@@ -172,11 +176,10 @@ public final class ScopeLocal<T> {
         }
     }
 
-
-
     static final class EmptySnapshot extends Snapshot {
+
         private EmptySnapshot() {
-            super(null, null, (short)0);
+            super();
         }
 
         private static final Snapshot SINGLETON = new EmptySnapshot();
@@ -195,29 +198,29 @@ public final class ScopeLocal<T> {
     @PreviewFeature(feature=SCOPE_LOCALS)
     public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
-        // hits that slot in the cache
-        final short primaryBits, secondaryBits;
+        // hits that slot in the cache.
+        final int bitmask;
         final ScopeLocal<?> key;
         final Object value;
         final Carrier prev;
 
-        Carrier(ScopeLocal<?> key, Object value, Carrier prev, short primaryBits, short secondaryBits) {
+        Carrier(ScopeLocal<?> key, Object value, Carrier prev) {
             this.key = key;
             this.value = value;
             this.prev = prev;
-            this.primaryBits = primaryBits;
-            this.secondaryBits = secondaryBits;
+            int bits = key.bitmask();
+            if (prev != null) {
+                bits |= prev.bitmask;
+            }
+            this.bitmask = bits;
         }
 
         /**
          * Add a binding to this map, returning a new Carrier instance.
          */
         private static final <T> Carrier where(ScopeLocal<T> key, T value,
-                                               Carrier prev,
-                                               short primaryBits, short secondaryBits) {
-            primaryBits |= (short)(1 << Cache.primaryIndex(key));
-            secondaryBits |= (short)(1 << Cache.secondaryIndex(key));
-            return new Carrier(key, value, prev, primaryBits, secondaryBits);
+                                               Carrier prev) {
+            return new Carrier(key, value, prev);
         }
 
         /**
@@ -229,14 +232,14 @@ public final class ScopeLocal<T> {
          * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
          */
         public final <T> Carrier where(ScopeLocal<T> key, T value) {
-            return where(key, value, this, primaryBits, secondaryBits);
+            return where(key, value, this);
         }
 
         /*
          * Return a new set consisting of a single binding.
          */
         static final <T> Carrier of(ScopeLocal<T> key, T value) {
-            return where(key, value, null, (short)0, (short)0);
+            return where(key, value, null);
         }
 
         final Object get() {
@@ -257,10 +260,12 @@ public final class ScopeLocal<T> {
          */
         @SuppressWarnings("unchecked")
         public final <T> T get(ScopeLocal<T> key) {
-            for (Carrier b = this;
-                 b != null; b = b.prev) {
-                if (b.getKey() == key) {
-                    Object value = b.get();
+            var bits = key.bitmask();
+            for (Carrier carrier = this;
+                 carrier != null && containsAll(carrier.bitmask, bits);
+                 carrier = carrier.prev) {
+                if (carrier.getKey() == key) {
+                    Object value = carrier.get();
                     return (T)value;
                 }
             }
@@ -268,10 +273,10 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Runs a value-returning operation with this some ScopeLocals bound to values.
+         * Run a value-returning operation with this some ScopeLocals bound to values.
          * Code executed by the operation can use the {@link #get()} method to
          * get the value of the scope local. The scope locals revert to their previous values or
-         * becomes {@linkplain #isBound() unbound} when the operation completes.
+         * become {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
          * operation creates {@link java.util.concurrent.StructuredTaskScope StructuredTaskScope}s
@@ -286,8 +291,8 @@ public final class ScopeLocal<T> {
          */
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
-            Cache.invalidate(primaryBits | secondaryBits);
-            var prevBindings = addScopeLocalBindings(this, primaryBits);
+            Cache.invalidate(bitmask);
+            var prevBindings = addScopeLocalBindings(this);
             try {
                 return ScopeLocalContainer.call(op);
             } catch (Throwable t) {
@@ -295,12 +300,12 @@ public final class ScopeLocal<T> {
                 throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
-                Cache.invalidate(primaryBits | secondaryBits);
+                Cache.invalidate(bitmask);
             }
         }
 
         /**
-         * Runs a value-returning operation with this some ScopeLocals bound to values,
+         * Run a value-returning operation with this set of ScopeLocals bound to values,
          * in the same way as {@code call()}.<p>
          *     If the operation throws an exception, pass it as a single argument to the {@link Function}
          *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
@@ -335,8 +340,8 @@ public final class ScopeLocal<T> {
          */
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
-            Cache.invalidate(primaryBits | secondaryBits);
-            var prevBindings = addScopeLocalBindings(this, primaryBits);
+            Cache.invalidate(bitmask);
+            var prevBindings = addScopeLocalBindings(this);
             try {
                 ScopeLocalContainer.run(op);
             } catch (Throwable t) {
@@ -344,16 +349,16 @@ public final class ScopeLocal<T> {
                 throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
-                Cache.invalidate(primaryBits | secondaryBits);
+                Cache.invalidate(bitmask);
             }
         }
 
         /*
          * Add a list of bindings to the current Thread's set of bound values.
          */
-        private static final Snapshot addScopeLocalBindings(Carrier bindings, short primaryBits) {
+        private static final Snapshot addScopeLocalBindings(Carrier bindings) {
             Snapshot prev = getScopeLocalBindings();
-            var b = new Snapshot(bindings, prev, primaryBits);
+            var b = new Snapshot(bindings, prev);
             ScopeLocal.setScopeLocalBindings(b);
             return prev;
         }
@@ -388,19 +393,20 @@ public final class ScopeLocal<T> {
     static final class BinderImpl
             extends ScopeLocalContainer implements ScopeLocal.Binder {
         final Carrier bindings;
-        final short primaryBits;
+        final int bitmask;
         final BinderImpl prevBinder;
         private boolean closed;
 
         BinderImpl(Carrier bindings) {
+            super();
             this.bindings = bindings;
             this.prevBinder = innermostBinder();
-            this.primaryBits = (short)(bindings.primaryBits
-                    | (prevBinder == null ? 0 : prevBinder.primaryBits));
+            this.bitmask = bindings.bitmask
+                    | (prevBinder == null ? 0 : prevBinder.bitmask);
         }
 
         static BinderImpl innermostBinder() {
-            var container = ScopeLocalContainer.latest();
+            var container = ScopeLocalContainer.latest(BinderImpl.class);
             if (container instanceof BinderImpl binder) {
                 return binder;
             } else {
@@ -419,7 +425,7 @@ public final class ScopeLocal<T> {
                 throw new WrongThreadException();
             if (!closed) {
                 closed = true;
-                Cache.invalidate(bindings.primaryBits | bindings.secondaryBits);
+                Cache.invalidate(bindings.bitmask);
                 if (!popForcefully()) {
                     Cache.invalidate();
                     throw new StructureViolationException();
@@ -431,7 +437,7 @@ public final class ScopeLocal<T> {
             assert Thread.currentThread() == owner();
             if (!closed) {
                 closed = true;
-                Cache.invalidate(bindings.primaryBits | bindings.secondaryBits);
+                Cache.invalidate(bindings.bitmask);
                 return true;
             } else {
                 assert false : "Should not get there";
@@ -440,15 +446,16 @@ public final class ScopeLocal<T> {
         }
 
         static Object find(ScopeLocal<?> key) {
-            for (BinderImpl b = innermostBinder(); b != null; b = b.prevBinder) {
-                if (((1 << Cache.primaryIndex(key)) & b.primaryBits) != 0) {
-                    for (Carrier binding = b.bindings;
-                         binding != null;
-                         binding = binding.prev) {
-                        if (binding.getKey() == key) {
-                            Object value = binding.get();
-                            return value;
-                        }
+            int bits = key.bitmask();
+            for (BinderImpl b = innermostBinder();
+                 b != null && containsAll(b.bitmask, bits);
+                 b = b.prevBinder) {
+                for (Carrier carrier = b.bindings;
+                     carrier != null && containsAll(carrier.bitmask, bits);
+                     carrier = carrier.prev) {
+                    if (carrier.getKey() == key) {
+                        Object value = carrier.get();
+                        return value;
                     }
                 }
             }
@@ -552,7 +559,7 @@ public final class ScopeLocal<T> {
 
     @SuppressWarnings("unchecked")
     private T slowGet() {
-        var value =  findBinding();
+        var value = findBinding();
         if (value == Snapshot.NIL) {
             throw new NoSuchElementException();
         }
@@ -567,6 +574,14 @@ public final class ScopeLocal<T> {
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
+        // ??? Do we want to search cache for this? In most cases we don't expect
+        // this {@link ScopeLocal} to be bound, so it's not worth it. But I may
+        // be wrong about that.
+/*
+        if (Cache.find(this) != Snapshot.NIL) {
+            return true;
+        }
+ */
         return findBinding() != Snapshot.NIL;
     }
 
@@ -598,7 +613,7 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Return the value of the scope local if bound, otherwise throws an exception
+     * Return the value of the scope local if bound, otherwise throw an exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces an
@@ -648,6 +663,22 @@ public final class ScopeLocal<T> {
         return (nextKey = x);
     }
 
+    /**
+     * Return a bit mask that may be used to determine if this ScopeLocal is
+     * bound in the current context. Each Carrier holds a bit mask which is
+     * the OR of all the bit masks of the bound ScopeLocals.
+     * @return the bitmask
+     */
+    int bitmask() {
+        return (1 << Cache.primaryIndex(this)) | (1 << (Cache.secondaryIndex(this) + Cache.TABLE_SIZE));
+    }
+
+    // Return true iff bitmask, considered as a set of bits, contains all
+    // of the bits in targetBits.
+    static boolean containsAll(int bitmask, int targetBits) {
+        return (bitmask & targetBits) == targetBits;
+    }
+
     // A small fixed-size key-value cache. When a scope scope local's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
@@ -655,6 +686,7 @@ public final class ScopeLocal<T> {
         static final int INDEX_BITS = 4;  // Must be a power of 2
         static final int TABLE_SIZE = 1 << INDEX_BITS;
         static final int TABLE_MASK = TABLE_SIZE - 1;
+        static final int PRIMARY_MASK = (1 << TABLE_SIZE) - 1;
 
         static final int primaryIndex(ScopeLocal<?> key) {
             return key.hash & TABLE_MASK;
@@ -713,6 +745,28 @@ public final class ScopeLocal<T> {
             }
         }
 
+
+/*
+        static Object find(ScopeLocal<?> key) {
+            Object[] objects;
+            var hash = key.hashCode();
+            if ((objects = Thread.scopeLocalCache()) != null) {
+                // This code should perhaps be in class Cache. We do it
+                // here because the generated code is small and fast and
+                // we really want it to be inlined in the caller.
+                int n = (hash & Cache.TABLE_MASK) * 2;
+                if (objects[n] == key) {
+                    return objects[n + 1];
+                }
+                n = ((hash >>> Cache.INDEX_BITS) & Cache.TABLE_MASK) * 2;
+                if (objects[n] == key) {
+                    return objects[n + 1];
+                }
+            }
+            return Snapshot.NIL;
+        }
+*/
+
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
             Thread.scopeLocalCache()[n * 2] = key;
             Thread.scopeLocalCache()[n * 2 + 1] = value;
@@ -745,10 +799,10 @@ public final class ScopeLocal<T> {
 
         // Null a set of cache entries, indicated by the 1-bits given
         static void invalidate(int toClearBits) {
-            assert(toClearBits == (short)toClearBits);
+            toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
             if ((objects = Thread.scopeLocalCache()) != null) {
-                for (short bits = (short)toClearBits; bits != 0; ) {
+                for (int bits = toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
                     setKeyAndObjectAt(index, null, null);
                     bits &= ~1 << index;

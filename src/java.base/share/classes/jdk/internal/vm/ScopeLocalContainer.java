@@ -40,22 +40,31 @@ public class ScopeLocalContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     /**
-     * Returns the "latest" ScopeLocalContainer for the current Thread. This
-     * may be on the current thread's scope task or may require walking up the
-     * tree to find it.
+     * Returns the "latest" ScopeLocalContainer (or a named subclass of one) for
+     * the current Thread. This may be on the current thread's scope task or may
+     * require walking up the tree to find it.
      */
-    public static ScopeLocalContainer latest() {
+    public static ScopeLocalContainer latest(Class<? extends ScopeLocalContainer> containerClass) {
         StackableScope scope = head();
         if (scope == null) {
             scope = JLA.threadContainer(Thread.currentThread());
             if (scope == null || scope.owner() == null)
                 return null;
         }
-        if (scope instanceof ScopeLocalContainer container) {
-            return container;
+        if (containerClass.isInstance(scope)) {
+            return (ScopeLocalContainer)scope;
         } else {
-            return scope.enclosingScope(ScopeLocalContainer.class);
+            return scope.enclosingScope(containerClass);
         }
+    }
+
+    /**
+     * Returns the "latest" ScopeLocalContainer for the current Thread. This
+     * may be on the current thread's scope task or may require walking up the
+     * tree to find it.
+     */
+    public static ScopeLocalContainer latest() {
+        return latest(ScopeLocalContainer.class);
     }
 
     /**
