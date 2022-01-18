@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,13 +25,12 @@
 package java.lang;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.StructuredExecutor;
 import jdk.internal.javac.PreviewFeature;
 
 /**
  * Thrown when a structure violation is detected.
  *
- * @see StructuredExecutor
+ * @see java.util.concurrent.StructuredTaskScope
  * @see ScopeLocal.Carrier#run(Runnable) 
  * @see ScopeLocal.Carrier#call(Callable) 
  * @since 99

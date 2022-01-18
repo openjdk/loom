@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,118 +39,126 @@ import jdk.internal.misc.ThreadFlock;
 import jdk.internal.javac.PreviewFeature;
 
 /**
- * A basic API for <em>structured concurrency</em>. StructuredExecutor supports cases
- * where a task splits into several concurrent sub-tasks to be executed in their own
- * threads and where the sub-tasks must complete before the main task can continue.
- *
- * <p> <b>This API is still work in progress. It will probably be renamed and changed
- * to not implement Executor.</b>
+ * A basic API for <em>structured concurrency</em>. StructuredTaskScope supports cases
+ * where a task splits into several concurrent sub-tasks, to be executed in their own
+ * threads, and where the sub-tasks must complete before the main task continues. A
+ * StructuredTaskScope can be used to ensure that the lifetime of a concurrent operation
+ * is confined by a <em>syntax block</em>, just like that of a sequential operation in
+ * structured programming.
  *
  * <h2>Basic usage</h2>
  *
- * StructuredExecutor defines the {@link #open() open} method to open a new executor,
+ * StructuredTaskScope defines the {@link #open() open} method to open a new task scope,
  * the {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
  * #join() join} method to wait for all threads to finish, and the {@link #close() close}
- * method to close the executor. The API is intended to be used with the {@code
+ * method to close the task scope. The API is intended to be used with the {@code
  * try-with-resources} construct. The intention is that code in the <em>block</em> uses
  * the {@code fork} method to fork threads to execute the sub-tasks, wait for the threads
  * to finish with the {@code join} method, and then <em>process the results</em>.
  * Processing of results may include handling or re-throwing of exceptions.
  * {@snippet lang=java :
- *     try (var executor = StructuredExecutor.open()) {      // @highlight substring="open"
+ *     try (var scope = StructuredTaskScope.<String>open()) {  // @highlight substring="open"
  *
- *         Future<String> future1 = executor.fork(task1);    // @highlight substring="fork"
- *         Future<String> future2 = executor.fork(task2);    // @highlight substring="fork"
+ *         Future<String> future1 = scope.fork(task1);    // @highlight substring="fork"
+ *         Future<String> future2 = scope.fork(task2);    // @highlight substring="fork"
  *
- *         executor.join();    // @highlight substring="join"
+ *         scope.join();    // @highlight substring="join"
  *
  *         ... process results/exceptions ...
  *
  *     } // close // @highlight substring="close"
  * }
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
- * by the <em>executor owner</em> (the thread that opened the executor), and the {@code close}
- * method throws an exception after closing if the owner did not invoke the {@code join}
- * method after forking.
+ * by the <em>owner</em> (the thread that opened/created the StructuredTaskScope, and the
+ * {@code close} method throws an exception after closing if the owner did not invoke the
+ * {@code join} method after forking.
  *
- * <p> StructuredExecutor defines the {@link #shutdown() shutdown} method to shut down an
- * executor without closing it. Shutdown is useful for cases where a task completes with
+ * <p> StructuredTaskScope defines the {@link #shutdown() shutdown} method to shut down a
+ * task scope without closing it. Shutdown is useful for cases where a task completes with
  * a result (or exception) and the results of other unfinished tasks are no longer needed.
  * Invoking {@code shutdown} while the owner is waiting in the {@code join} method will cause
- * the {@code join} to wakeup. It also interrupts all unfinished threads and prevents new
- * threads from starting in the executor.
+ * {@code join} to wakeup. It also interrupts all unfinished threads and prevents new threads
+ * from starting in the task scope.
  *
- * <h2><a id="CompletionHandler">Completion handlers</a></h2>
+ * <h2><a id="CompletionPolicy">Completion policy</a></h2>
  *
- * StructuredExecutor defines the 2-arg {@link #fork(Callable, CompletionHandler) fork}
- * method that executes a {@link CompletionHandler CompletionHandler} after a task completes.
- * A completion handler can be used to implement policy, collect results and/or exceptions,
+ * StructuredTaskScope defines {@link #withPolicy(CompletionPolicy) withPolicy} method to set
+ * a {@link CompletionPolicy CompletionPolicy} that executes after each task completes.
+ * A completion policy can be used to implement policy, collect results and/or exceptions,
  * and provide an API that makes available the outcome to the main task to process after the
- * {@code join} method. A completion handler may, for example, collect the results of tasks
+ * {@code join} method. A completion policy may, for example, collect the results of tasks
  * that complete with a result and ignore tasks that fail. It may collect exceptions when
- * tasks fail. It may invoke the {@link #shutdown() shutdown} method to shut down the executor
- * and cause {@link #join() join} to wakeup when some condition arises.
+ * tasks fail. It may invoke the {@link #shutdown() shutdown} method to shut down the task
+ * task scope and cause {@link #join() join} to wakeup when some condition arises.
  * {@snippet lang=java :
- *     try (var executor = StructuredExecutor.open()) {
+ *     try (var scope = StructuredTaskScope.<String>open()) {
  *
- *         MyHandler<String> handler = ...
+ *         CompletionPolicy<String> policy = ...
  *
- *         Future<String> future1 = executor.fork(task1, handler);
- *         Future<String> future2 = executor.fork(task2, handler);
+ *         scope.withPolicy(policy);
  *
- *         executor.join();
+ *         Future<String> future1 = scope.fork(task1);
+ *         Future<String> future2 = scope.fork(task2);
+ *
+ *         scope.join();
  *
  *         // @highlight region
- *         ... invoke handler methods to obtain outcome, process results/exceptions, ...
+ *         ... invoke policy methods to obtain outcome, process results/exceptions, ...
  *         // @end
  *
  *     }
  * }
  *
- *  <h2><a id="BuiltinCompletionHandlers">ShutdownOnSuccess and ShutdownOnFailure</a></h2>
+ * StructuredTaskScope defines the 2-arg {@link #fork(Callable, CompletionPolicy) fork} method
+ * to specify a completion policy for a specific task rather than invoking the completion
+ * policy set by the {@code withPolicy} method.
  *
- * StructuredExecutor defines two completion handlers that implement policy for two common
+ * <h2><a id="BuiltinCompletionPolicies">ShutdownOnSuccess and ShutdownOnFailure</a></h2>
+ *
+ * StructuredTaskScope defines two completion policies that implement policy for two common
  * cases:
  * <ol>
  *   <li> {@link ShutdownOnSuccess ShutdownOnSuccess} captures the first result and shuts
- *   down the executor to interrupt unfinished threads and wakeup the owner. This handler
+ *   down the task scope to interrupt unfinished threads and wakeup the owner. This policy
  *   is intended for cases where the result of any task will do ("invoke any") and where the
  *   results of other unfinished tasks are no longer needed. It defines methods to get the
  *   first result or throw an exception if all tasks fail.
  *   <li> {@link ShutdownOnFailure ShutdownOnFailure} captures the first exception and shuts
- *   down the executor. This handler is intended for cases where the results of all tasks
+ *   down the task scope. This policy is intended for cases where the results of all tasks
  *   are required ("invoke all"); if any task fails then the results of other unfinished tasks
  *   are no longer needed. If defines methods to throw an exception if any of the tasks fail.
  * </ol>
  *
- * <p> The following are two examples that use the built-in completion handlers. In both
+ * <p> The following are two examples that use the built-in completion policies. In both
  * cases, a pair of tasks are forked to fetch resources from two URL locations "left" and
  * "right". The first example creates a ShutdownOnSuccess object to capture the result of
  * the first task to complete normally, cancelling the other by way of shutting down the
- * executor. The main task waits in {@code join} until either task completes with a result
- * or both tasks fail. It invokes the handler's {@link ShutdownOnSuccess#result(Function)
+ * task scope. The main task waits in {@code join} until either task completes with a result
+ * or both tasks fail. It invokes the policy's {@link ShutdownOnSuccess#result(Function)
  * result(Function)} method to get the captured result. If both tasks fail then this
  * method throws WebApplicationException with the exception from one of the tasks as the
  * cause.
  * {@snippet lang=java :
- *     try (var executor = StructuredExecutor.open()) {
+ *     try (var scope = StructuredTaskScope.<String>open()) {
  *
- *         var handler = new ShutdownOnSuccess<String>();
+ *         var policy = new ShutdownOnSuccess<String>();
  *
- *         executor.fork(() -> fetch(left), handler);
- *         executor.fork(() -> fetch(right), handler);
+ *         scope.withPolicy(policy);
  *
- *         executor.join();
+ *         scope.fork(() -> fetch(left));
+ *         scope.fork(() -> fetch(right));
+ *
+ *         scope.join();
  *
  *         // @link regex="result(?=\()" target="ShutdownOnSuccess#result" :
- *         String result = handler.result(e -> new WebApplicationException(e));
+ *         String result = policy.result(e -> new WebApplicationException(e));
  *
  *     }
  * }
  * The second example creates a ShutdownOnFailure operation to capture the exception of
- * the first task to fail, cancelling the other by way of shutting down the executor. The
+ * the first task to fail, cancelling the other by way of shutting down the task scope. The
  * main task waits in {@link #joinUntil(Instant)} until both tasks complete with a result,
- * either fails, or a deadline is reached. It invokes the handler's {@link
+ * either fails, or a deadline is reached. It invokes the policy's {@link
  * ShutdownOnFailure#throwIfFailed(Function) throwIfFailed(Function)} to throw an exception
  * when either task fails. This method is a no-op if no tasks fail. The main task uses
  * {@code Future}'s {@link Future#resultNow() resultNow()} method to retrieve the results.
@@ -158,17 +166,19 @@ import jdk.internal.javac.PreviewFeature;
  * {@snippet lang=java :
  *    Instant deadline = ...
  *
- *    try (var executor = StructuredExecutor.open()) {
+ *    try (var scope = StructuredTaskScope.<String>open()) {
  *
- *         var handler = new ShutdownOnFailure();
+ *         var policy = new ShutdownOnFailure();
  *
- *         Future<String> future1 = executor.fork(() -> query(left), handler);
- *         Future<String> future2 = executor.fork(() -> query(right), handler);
+ *         scope.withPolicy(policy);
  *
- *         executor.joinUntil(deadline);
+ *         Future<String> future1 = scope.fork(() -> query(left));
+ *         Future<String> future2 = scope.fork(() -> query(right));
+ *
+ *         scope.joinUntil(deadline);
  *
  *         // @link substring="throwIfFailed" target="ShutdownOnFailure#throwIfFailed" :
- *         handler.throwIfFailed(e -> new WebApplicationException(e));
+ *         policy.throwIfFailed(e -> new WebApplicationException(e));
  *
  *         // both tasks completed successfully
  *         String result = Stream.of(future1, future2)
@@ -181,35 +191,39 @@ import jdk.internal.javac.PreviewFeature;
  *
  * <h2>Tree structure</h2>
  *
- * A StructuredExecutor is conceptually a node in a tree. A thread started in executor
- * "A" may itself open a new executor "B", implicitly forming a tree where executor "A" is
- * the parent of executor "B". When nested, say where thread opens executor "B" and then
- * invokes a method that opens executor "C", then the enclosing executor "B" is conceptually
- * the parent of the nested executor "C". The tree structure supports the inheritance of
- * {@linkplain ScopeLocal scope-local} bindings. It also supports confinement checks.
- * The phrase "threads contained in the executor" in method descriptions means threads in
- * executors in the tree. StructuredExecutor does not define APIs that exposes the tree
- * structure at this time.
+ * StructuredTaskScopes form a tree where parent-child relations are established implicitly
+ * when opening a new task scope:
+ * <ul>
+ *   <li> A parent-child relation is established when a thread started in a task scope opens
+ *   its own task scope. A thread started in task scope "A" opens task scope "B" establishes
+ *   a parent-child relation where task scope "A" is the parent of task scope "B".
+ *   <li> A parent-child relation is established with nesting. If a thread opens task scope
+ *   "B", then open task scope "C" (before it closes "B"), then the enclosing task scope "B"
+ *   is the parent of the nested task scope "C".
+ * </ul>
  *
- * <h2> Inheritance of scope-local bindings</h2>
+ * <p> The tree structure supports:
+ * <ul>
+ *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
+ *   descriptions means threads started in the task scope or descendant scopes.
+ *   <li> Inheritance of {@linkplain ScopeLocal scope-local} bindings by threads.
+ * </ul>
  *
- * Creating a StructuredExecutor captures the {@linkplain ScopeLocal scope-local} bindings
- * for inheritance by threads created in the executor.
- *
- * The following example performs an operation with a scope local {@code NAME} bound to the
- * value "duke". The operation creates a {@code StructuredExecutor} that invokes {@code fork}
- * to start a thread to execute {@code childTask}. The code in {@code childTask} uses the
- * value of the scope-local and so reads the value "duke".
+ * <p> The following example demonstrates the inheritance of a scope-local binding. A scope
+ * local {@code NAME} is bound to the value "duke". A StructuredTaskScope is created and
+ * its {@code fork} method invoked to start a thread to execute {@code childTask}. The thread
+ * inherits the scope-local binding. The code in {@code childTask} uses the value of the
+ * scope-local and so reads the value "duke".
  * {@snippet lang=java :
  *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
  *
- *     // @link substring="where" target="ScopeLocal#where" :
- *     String result = ScopeLocal.where(NAME, "duke").call(() -> {  // @highlight substring="call"
- *         try (var executor = StructuredExecutor.open()) {
- *             executor.fork(() -> childTask());    // @highlight substring="fork"
- *             ...
- *         }
- *     });
+ *     // @link substring="where" target="ScopeLocal#bind" :
+ *     try (var binding = ScopeLocal.where(NAME, "duke").bind();
+ *          var scope = StructuredTaskScope.<String>open()) {
+ *
+ *         scope.fork(() -> childTask());    // @highlight substring="fork"
+ *         ...
+ *      }
  *
  *     ...
  *
@@ -219,18 +233,21 @@ import jdk.internal.javac.PreviewFeature;
  *     }
  * }
  *
+ * <p> StructuredTaskScope does not define APIs that exposes the tree structure at this time.
+ *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
+ * @param <T> the result type of tasks executed in the scope
  * @since 99
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-public class StructuredExecutor implements Executor, AutoCloseable {
+public class StructuredTaskScope<T> implements AutoCloseable {
     private static final VarHandle FUTURES;
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            FUTURES = l.findVarHandle(StructuredExecutor.class, "futures", Set.class);
+            FUTURES = l.findVarHandle(StructuredTaskScope.class, "futures", Set.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -239,6 +256,9 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     private final ThreadFactory factory;
     private final ThreadFlock flock;
     private final ReentrantLock shutdownLock = new ReentrantLock();
+
+    // the default completion policy, null if not set
+    private volatile CompletionPolicy<? super T> policy;
 
     // the set of "tracked" Future objects, created lazily
     private volatile Set<Future<?>> futures;
@@ -252,7 +272,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     private static final int CLOSED   = 2;
     private volatile int state;
 
-    StructuredExecutor(String name, ThreadFactory factory) {
+    StructuredTaskScope(String name, ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory);
         this.flock = ThreadFlock.open(name);
     }
@@ -272,11 +292,11 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     private void ensureOwnerOrContainsThread() {
         Thread currentThread = Thread.currentThread();
         if (currentThread != flock.owner() && !flock.containsThread(currentThread))
-            throw new WrongThreadException("Current thread not owner or thread in executor");
+            throw new WrongThreadException("Current thread not owner or thread in the tree");
     }
 
     /**
-     * Tests if the executor is shutdown.
+     * Tests if the task scope is shutdown.
      */
     private boolean isShutdown() {
         return state >= SHUTDOWN;
@@ -307,74 +327,81 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Opens a new StructuredExecutor that creates threads with given thread factory
-     * to run tasks. The executor is owned by the current thread. The executor is
+     * Opens a new StructuredTaskScope that creates threads with given thread factory
+     * to run tasks. The task scope is owned by the current thread. The task scope is
      * optionally named.
      *
      * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings for inheritance by threads created in the executor.
+     * bindings for inheritance by threads created in the task scope.
      *
      * <p> For the purposes of confinement and inheritance of scope-local bindings, the
-     * parent of the executor is determined as follows:
+     * parent of the task scope is determined as follows:
      * <ul>
-     * <li> If the current thread is the owner of open executors then the most recently
-     * created, and open, executor is the parent of the new executor. In other words, the
-     * <em>enclosing executor</em> is the parent.
-     * <li> If the current thread is not the owner of any open executors then the
-     * parent of the new executor is the current thread's executor. If the current thread
-     * was not started in an executor then the new executor does not have a parent.
+     * <li> If the current thread is the owner of open task scopes then the most recently
+     * created, and open, task scope is the parent of the new task scope. In other words,
+     * the <em>enclosing task scope</em> is the parent.
+     * <li> If the current thread is not the owner of any open task scopes then the
+     * parent of the new task scope is the current thread's task scope. If the current
+     * thread was not started in a task scope then the new task scope does not have a parent.
      * </ul>
      *
-     * @param name the name of the executor, can be null
+     * @param name the name of the task scope, can be null
      * @param factory the thread factory
-     * @return a new StructuredExecutor
+     * @param <T> type of tasks executed by the scope
+     * @return a new StructuredTaskScope
      */
-    public static StructuredExecutor open(String name, ThreadFactory factory) {
-        return new StructuredExecutor(name, factory);
+    public static <T> StructuredTaskScope<T> open(String name, ThreadFactory factory) {
+        return new StructuredTaskScope<>(name, factory);
     }
 
     /**
-     * Opens a new StructuredExecutor that creates virtual threads to run tasks.
+     * Opens a new StructuredTaskScope that creates virtual threads to run tasks.
      *
      * <p> This method is equivalent to invoking {@link #open(String, ThreadFactory)}
      * with the given name and a thread factory that creates virtual threads.
      *
-     * @param name the name of the executor
-     * @return a new StructuredExecutor
+     * @param name the name of the task scope
+     * @param <T> type of tasks executed by the scope
+     * @return a new StructuredTaskScope
      */
-    public static StructuredExecutor open(String name) {
+    public static <T> StructuredTaskScope<T> open(String name) {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new StructuredExecutor(Objects.requireNonNull(name), factory);
+        return new StructuredTaskScope<>(Objects.requireNonNull(name), factory);
     }
 
     /**
-     * Opens a new StructuredExecutor that creates virtual threads to run tasks.
-     * The executor is unnamed.
+     * Opens a new StructuredTaskScope that creates virtual threads to run tasks.
+     * The task scope is unnamed.
      *
      * <p> This method is equivalent to invoking {@link #open(String, ThreadFactory)}
      * with a name of {@code null} and a thread factory that creates virtual threads.
      *
-     * @return a new StructuredExecutor
+     * @param <T> the result type of tasks executed by the scope
+     * @return a new StructuredTaskScope
      */
-    public static StructuredExecutor open() {
+    public static <T> StructuredTaskScope<T> open() {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        return new StructuredExecutor(null, factory);
+        return new StructuredTaskScope<>(null, factory);
     }
 
     /**
-     * Starts a new thread to run the given task. If handler is non-null then it is
-     * invoked if the task completes before the executor is shutdown.
+     * Starts a new thread to run the given task. If policy is non-null then it is
+     * invoked if the task completes before the task scope is shutdown.
      * @throws IllegalStateException
      * @throws WrongThreadException
      * @throws StructureViolationException
      * @throws RejectedExecutionException
      */
-    private <V> Future<V> spawn(Callable<? extends V> task,
-                                CompletionHandler<? super V> handler) {
+    <U extends T> Future<U> spawn(Callable<? extends U> task,
+                                  CompletionPolicy<? super U> policy) {
         Objects.requireNonNull(task);
 
         // create future
-        var future = new FutureImpl<V>(this, task, handler);
+        @SuppressWarnings("unchecked")
+        Callable<T> t = (Callable<T>) task;
+        @SuppressWarnings("unchecked")
+        CompletionPolicy<? super T> p = (CompletionPolicy<? super T>) policy;
+        var future = new FutureImpl<T>(this, t, p);
 
         boolean shutdown = (state >= SHUTDOWN);
 
@@ -395,7 +422,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
 
         if (shutdown) {
             if (state == CLOSED) {
-                throw new IllegalStateException("Executor is closed");
+                throw new IllegalStateException("Task scope is closed");
             } else {
                 future.cancel(false);
             }
@@ -406,117 +433,127 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             needJoin = true;
         }
 
-        return future;
+        @SuppressWarnings("unchecked")
+        var f = (Future<U>) future;
+        return f;
+    }
+
+    /**
+     * Sets the completion policy to be invoked when tasks started with the 1-arg
+     * {@link #fork(Callable) fork} method complete.
+     *
+     * <p> This method may only be invoked by the task scope owner. It can be invoked
+     * before {@code fork} method is used to start the first thread. If required,
+     * it can also be invoked after {@link #join()} and before additional threads
+     * are started with the {@code fork} method. If set to {@code null} then no
+     * completion policy is invoked for tasks started with the 1-arg {@code fork}
+     * method.
+     *
+     * @param policy the completion policy or {@code null} for no policy
+     * @return this scope
+     * @throws IllegalStateException if this task scope is closed or the join
+     * method wasn't called after forking
+     * @throws WrongThreadException if the current thread is not the owner
+     */
+    public StructuredTaskScope<T> withPolicy(CompletionPolicy<? super T> policy) {
+        ensureOwner();
+        if (state == CLOSED)
+            throw new IllegalStateException("Task scope is closed");
+        if (needJoin)
+            throw new IllegalStateException();
+        this.policy = policy;
+        return this;
     }
 
     /**
      * Starts a new thread to run the given task.
      *
      * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings and must match the bindings captured when the executor was created.
+     * bindings and must match the bindings captured when the task scope was created.
      *
-     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
-     * shutting down) then this method returns a Future representing a {@link
+     * <p> If the {@link #withPolicy(CompletionPolicy) withPolicy} method has been used to
+     * set a completion policy then its {@link CompletionPolicy#handle(StructuredTaskScope, Future)
+     * handle} method is invoked if the task completes before the task scope is {@link
+     * #shutdown() shutdown}. The {@code handle} method is run by the thread when the task
+     * completes with a result or exception. If the {@link Future#cancel(boolean) Future.cancel}
+     * method is used to cancel a task, before the task scope is shutdown, then the {@code handle}
+     * method is run by the thread that invokes {@code cancel}. If the task scope shuts down at
+     * or around the same time that the task completes or is cancelled then the completion
+     * policy may or may not be invoked.
+     *
+     * <p> If this task scope is {@linkplain #shutdown() shutdown} (or in the process
+     * of shutting down) then this method returns a Future representing a {@link
      * Future.State#CANCELLED cancelled} task that was not run.
      *
-     * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor. The {@link Future#cancel(boolean) cancel} method of the returned
-     * {@code Future} object is also restricted to the executor owner or threads contained
-     * in the executor; {@link WrongThreadException} is thrown if {@code cancel} is invoked
+     * <p> This method may only be invoked by the task scope owner or threads contained
+     * in the task scope. The {@link Future#cancel(boolean) cancel} method of the returned
+     * {@code Future} object is also restricted to the task scope owner or threads contained
+     * in the task scope; {@link WrongThreadException} is thrown if {@code cancel} is invoked
      * from another thread.
      *
      * @param task the task to run
-     * @param <V> the task return type
+     * @param <U> the result type
      * @return a future
-     * @throws IllegalStateException if this executor is closed
+     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner or a thread
-     * contained in the executor
+     * contained in the task scope
      * @throws StructureViolationException if the current scope-local bindings are not
-     * the same as when the executor was created
+     * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the task
      */
-    public <V> Future<V> fork(Callable<? extends V> task) {
-        return spawn(task, null);
+    public <U extends T> Future<U> fork(Callable<? extends U> task) {
+        return spawn(task, policy);
     }
 
     /**
-     * Starts a new thread to run the given task and a completion handler when the task
+     * Starts a new thread to run the given task and a completion policy when the task
      * completes.
      *
      * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings and must match the bindings captured when the executor was created.
+     * bindings and must match the bindings captured when the task scope was created.
      *
-     * <p> The completion handler's {@link CompletionHandler#handle(StructuredExecutor, Future)
-     * handle} method is invoked if the task completes before the executor is {@link
+     * <p> The given completion policy's {@link CompletionPolicy#handle(StructuredTaskScope, Future)
+     * handle} method is invoked if the task completes before the task scope is {@link
      * #shutdown() shutdown}. The {@code handle} method is run by the thread when the task
      * completes with a result or exception. If the {@link Future#cancel(boolean) Future.cancel}
-     * method is used to cancel a task, before the executor is shutdown, then the {@code handle}
-     * method is run by the thread that invokes {@code cancel}. If the executor shuts down at
+     * method is used to cancel a task, before the task scope is shutdown, then the {@code handle}
+     * method is run by the thread that invokes {@code cancel}. If the task scope shuts down at
      * or around the same time that the task completes or is cancelled then the completion
-     * handler may or may not be invoked.
+     * policy may or may not be invoked.
      *
-     * The {@link CompletionHandler#compose(CompletionHandler, CompletionHandler) compose}
-     * method can be used to compose more than one handler where required.
+     * The {@link CompletionPolicy#compose(CompletionPolicy, CompletionPolicy) compose}
+     * method can be used to compose more than one policy where required.
      *
-     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
+     * <p> If this task scope is {@linkplain #shutdown() shutdown} (or in the process of
      * shutting down) then this method returns a Future representing a {@link
      * Future.State#CANCELLED cancelled} task that was not run.
      *
-     * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor. The {@link Future#cancel(boolean) cancel} method of the returned
-     * {@code Future} object is also restricted to the executor owner or threads contained
-     * in the executor; {@link WrongThreadException} is thrown if {@code cancel} is invoked
+     * <p> This method may only be invoked by the task scope owner or threads contained
+     * in the task scope. The {@link Future#cancel(boolean) cancel} method of the returned
+     * {@code Future} object is also restricted to the task scope owner or threads contained
+     * in the task scope; {@link WrongThreadException} is thrown if {@code cancel} is invoked
      * from another thread.
      *
      * @param task the task to run
-     * @param handler the completion handler to run when the task completes
-     * @param <V> the task return type
+     * @param <U> the result type
+     * @param policy the completion policy to run when the task completes
      * @return a future
-     * @throws IllegalStateException if this executor is closed
+     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner or a thread
-     * contained in the executor
+     * contained in the task scope
      * @throws StructureViolationException if the current scope-local bindings are not
-     * the same as when the executor was created
+     * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the task
      */
-    public <V> Future<V> fork(Callable<? extends V> task,
-                              CompletionHandler<? super V> handler) {
-        return spawn(task, Objects.requireNonNull(handler));
+    public <U extends T> Future<U> fork(Callable<? extends U> task,
+                                        CompletionPolicy<? super U> policy) {
+        return spawn(task, Objects.requireNonNull(policy));
     }
 
     /**
-     * Starts a new thread in this executor to run the given task.
-     *
-     * <p> The thread inherits the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings and must match the bindings captured when the executor was created.
-     *
-     * <p> If this executor is {@linkplain #shutdown() shutdown} (or in the process of
-     * shutting down) then the task does not run.
-     *
-     * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor.
-     *
-     * @param task the task to run
-     * @throws RejectedExecutionException if this executor is closed, the current thread
-     * is not the owner or a thread contained in the executor, the current scope-local
-     * bindings are not the same as when the executor was created, or if the thread
-     * factory rejected creating a thread to run the task
-     */
-    @Override
-    public void execute(Runnable task) {
-        try {
-            spawn(Executors.callable(task), null);
-        } catch (IllegalStateException |            // executor closed
-                WrongThreadException |              // called from wrong thread
-                StructureViolationException e) {    // scope-local bindings changed
-            throw new RejectedExecutionException(e);
-        }
-    }
-
-    /**
-     * Wait for all threads to finish or the executor to shutdown.
+     * Wait for all threads to finish or the task scope to shut down.
      */
     private void implJoin(Duration timeout)
         throws InterruptedException, TimeoutException
@@ -526,7 +563,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         int s = state;
         if (s >= SHUTDOWN) {
             if (s == CLOSED)
-                throw new IllegalStateException("Executor is closed");
+                throw new IllegalStateException("Task scope is closed");
             return;
         }
 
@@ -539,15 +576,15 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Wait for all unfinished threads or the executor to shutdown. This method waits
-     * until all threads in the executor finish their tasks (including {@linkplain
-     * #fork(Callable, CompletionHandler) completion handlers}), the {@link #shutdown()
-     * shutdown} method is invoked to shut down the executor, or the current thread is
+     * Wait for all threads to finish or the task scope to shutdown. This method waits
+     * until all threads in the task scope finish their tasks (including {@linkplain
+     * #fork(Callable, CompletionPolicy) completion policies}), the {@link #shutdown()
+     * shutdown} method is invoked to shut down the task scope, or the current thread is
      * interrupted.
      *
-     * <p> This method may only be invoked by the executor owner.
+     * <p> This method may only be invoked by the task scope owner.
      *
-     * @throws IllegalStateException if this executor is closed
+     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      */
@@ -560,16 +597,16 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Wait for all unfinished threads or the executor to shutdown, up to the given
-     * deadline. This method waits until all threads in the executor finish their
-     * tasks (including {@linkplain #fork(Callable, CompletionHandler) completion
-     * handlers}), the {@link #shutdown() shutdown} method is invoked to shut down
-     * the executor, the current thread is interrupted, or the deadline is reached.
+     * Wait for all threads to finish or the task scope to shutdown, up to the given
+     * deadline. This method waits until all threads in the task scope finish their
+     * tasks (including {@linkplain #fork(Callable, CompletionPolicy) completion
+     * policies}), the {@link #shutdown() shutdown} method is invoked to shut down
+     * the task scope, the current thread is interrupted, or the deadline is reached.
      *
-     * <p> This method may only be invoked by the executor owner.
+     * <p> This method may only be invoked by the task scope owner.
      *
      * @param deadline the deadline
-     * @throws IllegalStateException if this executor is closed
+     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      * @throws TimeoutException if the deadline is reached while waiting
@@ -616,8 +653,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Shutdown the executor if not already shutdown. Return true if this method
-     * shutdowns the executor, false if already shutdown.
+     * Shutdown the task scope if not already shutdown. Return true if this method
+     * shutdowns the task scope, false if already shutdown.
      */
     private boolean implShutdown() {
         if (state < SHUTDOWN) {
@@ -646,7 +683,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * Shutdown the executor without closing it. Shutting down an executor prevents new
+     * Shutdown the task scope without closing it. Shutting down a task scope prevents new
      * threads from starting, interrupts all unfinished threads, and causes the
      * {@link #join() join} method to wakeup. Shutdown is useful for cases where the
      * results of unfinished tasks are no longer needed.
@@ -656,7 +693,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * <li> {@linkplain Future#cancel(boolean) Cancels} the tasks that have threads
      * {@linkplain Future#get() waiting} on a result so that the waiting threads wakeup.
      * <li> {@linkplain Thread#interrupt() Interrupts} all unfinished threads in the
-     * executor (except the current thread).
+     * task scope (except the current thread).
      * <li> Wakes up the owner if it is waiting in {@link #join()} or {@link
      * #joinUntil(Instant)}. If the owner is not waiting then its next call to {@code
      * join} or {@code joinUntil} will return immediately.
@@ -667,44 +704,44 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * threads that have not finished because they are executing code that did not
      * respond (or respond promptly) to thread interrupt. This method does not wait
      * for these threads. When the owner invokes the {@link #close() close} method
-     * to close the executor then it will wait for the remaining threads to finish.
+     * to close the task scope then it will wait for the remaining threads to finish.
      *
-     * <p> This method may only be invoked by the executor owner or threads contained
-     * in the executor.
+     * <p> This method may only be invoked by the task scope owner or threads contained
+     * in the task scope.
      *
-     * @throws IllegalStateException if this executor is closed
+     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner or
-     * a thread contained in the executor
+     * a thread contained in the task scope
      */
     public void shutdown() {
         ensureOwnerOrContainsThread();
         if (state == CLOSED)
-            throw new IllegalStateException("Executor is closed");
+            throw new IllegalStateException("Task scope is closed");
         if (implShutdown())
             flock.wakeup();
     }
 
     /**
-     * Closes this executor.
+     * Closes this task scope.
      *
-     * <p> This method first shuts down the executor (as if by invoking the {@link
+     * <p> This method first shuts down the task scope (as if by invoking the {@link
      * #shutdown() shutdown} method). It then waits for the threads executing any
      * unfinished tasks to finish. If interrupted then this method will continue to
      * wait for the threads to finish before completing with the interrupt status set.
      *
-     * <p> This method may only be invoked by the executor owner.
+     * <p> This method may only be invoked by the task scope owner.
      *
-     * <p> A StructuredExecutor is intended to be used in a <em>structured manner</em>. If
-     * this method is called to close an executor before nested executors are closed then
-     * it closes the underlying construct of each nested executor (in the reverse order
-     * that they were created in), closes this executor, and then throws {@link
+     * <p> A StructuredTaskScope is intended to be used in a <em>structured manner</em>.
+     * If this method is called to close a task scope before nested task scopes are closed
+     * then it closes the underlying construct of each nested task scope (in the reverse
+     * order that they were created in), closes this task scope, and then throws {@link
      * StructureViolationException}.
      *
-     * Similarly, if called to close an executor that <em>encloses</em> {@linkplain
+     * Similarly, if called to close a task scope that <em>encloses</em> {@linkplain
      * ScopeLocal.Carrier#run(Runnable) operations} with scope-local bindings then
-     * it also throws {@code StructureViolationException} after closing the executor.
+     * it also throws {@code StructureViolationException} after closing the task scope.
      *
-     * @throws IllegalStateException thrown after closing the executor if the owner
+     * @throws IllegalStateException thrown after closing the task scope if the owner
      * did not invoke join after forking
      * @throws WrongThreadException if the current thread is not the owner
      * @throws StructureViolationException if a structure violation was detected
@@ -747,35 +784,35 @@ public class StructuredExecutor implements Executor, AutoCloseable {
 
     /**
      * The Future implementation returned by the fork methods. Most methods are
-     * overridden to support cancellation when the executor is shutdown.
-     * The blocking get methods register the Future with the executor so that they
-     * are cancelled when the executor shuts down.
+     * overridden to support cancellation when the task scope is shutdown.
+     * The blocking get methods register the Future with the task scope so that they
+     * are cancelled when the task scope shuts down.
      */
     private static class FutureImpl<V> extends FutureTask<V> {
-        private final StructuredExecutor executor;
-        private final CompletionHandler<? super V> handler;
+        private final StructuredTaskScope<V> scope;
+        private final CompletionPolicy<? super V> policy;
 
         @SuppressWarnings("unchecked")
-        FutureImpl(StructuredExecutor executor,
-                   Callable<? extends V> task,
-                   CompletionHandler<? super V> handler) {
-            super((Callable<V>) task);
-            this.executor = executor;
-            this.handler = handler;
+        FutureImpl(StructuredTaskScope<V> scope,
+                   Callable<V> task,
+                   CompletionPolicy<? super V> policy) {
+            super(task);
+            this.scope = scope;
+            this.policy = policy;
         }
 
         @Override
         @SuppressWarnings("unchecked")
         protected void done() {
-            if (handler != null && !executor.isShutdown()) {
-                var handler = (CompletionHandler<Object>) this.handler;
-                var future = (Future<Object>) this;
-                handler.handle(executor, future);
+            if (policy != null && !scope.isShutdown()) {
+                var policy = (CompletionPolicy<V>) this.policy;
+                var future = (Future<V>) this;
+                policy.handle(scope, future);
             }
         }
 
         private void cancelIfShutdown() {
-            if (executor.isShutdown() && !super.isDone()) {
+            if (scope.isShutdown() && !super.isDone()) {
                 super.cancel(false);
             }
         }
@@ -794,7 +831,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            executor.ensureOwnerOrContainsThread();
+            scope.ensureOwnerOrContainsThread();
             cancelIfShutdown();
             return super.cancel(mayInterruptIfRunning);
         }
@@ -803,12 +840,12 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         public V get() throws InterruptedException, ExecutionException {
             if (super.isDone())
                 return super.get();
-            executor.track(this);
+            scope.track(this);
             try {
                 cancelIfShutdown();
                 return super.get();
             } finally {
-                executor.untrack(this);
+                scope.untrack(this);
             }
         }
 
@@ -818,12 +855,12 @@ public class StructuredExecutor implements Executor, AutoCloseable {
             Objects.requireNonNull(unit);
             if (super.isDone())
                 return super.get();
-            executor.track(this);
+            scope.track(this);
             try {
                 cancelIfShutdown();
                 return super.get(timeout, unit);
             } finally {
-                executor.untrack(this);
+                scope.untrack(this);
             }
         }
 
@@ -853,44 +890,39 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * A handler that accepts a StructuredExecutor and a Future object for a completed
-     * task.
-     *
-     * A CompletionHandler is specified to the {@link #fork(Callable, CompletionHandler)
-     * fork} method to execute after the task completes. It defines the {@link
-     * #handle(StructuredExecutor, Future) handle} method to handle the completed task.
-     * The {@code handle} method does not return a result, it is expected to operate via
-     * side-effects.
-     *
-     * <p> A completion handler implements a policy on how tasks that complete normally and
+     * An operation that implements a <em>completion policy</em>. A CompletionPolicy is
+     * specified to {@link #withPolicy(CompletionPolicy) withPolicy} or the 2-arg {@link
+     * #fork(Callable, CompletionPolicy) fork} method to execute after a task completes.
+     * A CompletionPolicy implements policy on how tasks that complete normally and
      * abnormally are handled. It may, for example, collect the results of tasks that complete
      * with a result and ignore tasks that fail. It may collect exceptions when tasks fail. It
-     * may invoke the {@link #shutdown() shutdown} method to shut down the executor and
+     * may invoke the {@link #shutdown() shutdown} method to shut down the task scope and
      * cause {@link #join() join} to wakeup when some condition arises.
      *
-     * <p> A completion handler will typically define methods to make available results, state,
+     * <p> A completion policy will typically define methods to make available results, state,
      * or other outcome to code that executes after the {@code join} method. A completion
-     * handler that collects results and ignores tasks that fail may define a method that
-     * returns a possibly-empty collection of results. A completion handler that implements
-     * a policy to shut down the executor when a task fails may define a method to retrieve
+     * policy that collects results and ignores tasks that fail may define a method that
+     * returns a possibly-empty collection of results. A completion policy that implements
+     * a policy to shut down the task scope when a task fails may define a method to retrieve
      * the exception of the first task to fail.
      *
-     * <p> A completion handler implementation is required to be thread safe. The {@code
-     * handle} method may be invoked by several threads at around the same time.
+     * <p> A completion policy implementation is required to be thread safe. The {@code
+     * handle} method may be invoked by several threads at around the same time. The {@code
+     * handle} method does not return a result, it is expected to operate via side-effects.
      *
-     * <p> The {@link #compose(CompletionHandler, CompletionHandler) compose} method may be
-     * used to compose more than one completion handler if required.
+     * <p> The {@link #compose(CompletionPolicy, CompletionPolicy) compose} method may be
+     * used to compose more than one completion policy if required.
      *
-     * <p> The following is an example of a completion handler that collects the results
-     * of tasks that complete successfully. It defines a {@code results()} method for the
-     * main task to invoke to retrieve the results.
+     * <p> The following is an example of a completion policy that collects the results
+     * of tasks that complete successfully. It defines the method <b>{@code results()}</b>
+     * to be used by the main task to retrieve the results.
      *
      * {@snippet lang=java :
-     *     class MyHandler<V> implements CompletionHandler<V> {
+     *     class MyPolicy<V> implements CompletionPolicy<V> {
      *         private final Queue<V> results = new ConcurrentLinkedQueue<>();
      *
      *         @Override
-     *         public void handle(StructuredExecutor executor, Future<V> future) {
+     *         public void handle(StructuredTaskScope<V> task scope, Future<V> future) {
      *             switch (future.state()) {
      *                 case RUNNING -> throw new IllegalArgumentException();
      *                 case SUCCESS -> {
@@ -904,70 +936,70 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      *         }
      *
      *         // Returns a stream of results from tasks that completed successfully.
-     *         public Stream<V> results() {
+     *         public Stream<V> results() {     // @highlight substring="results"
      *             return results.stream();
      *         }
      *     }
      * }
      *
-     * @param <V> the result type
+     * @param <T> the result type
      * @since 99
      */
     @FunctionalInterface
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public interface CompletionHandler<V> {
+    public interface CompletionPolicy<T> {
         /**
          * Handles a completed task.
          *
-         * @param executor the executor
+         * @param scope scope the task scope
          * @param future the Future for the completed task
          * @throws IllegalArgumentException if the task has not completed
-         * @throws NullPointerException if executor or future is {@code null}
+         * @throws NullPointerException if task scope or future is {@code null}
          */
-        void handle(StructuredExecutor executor, Future<V> future);
+        void handle(StructuredTaskScope<T> scope, Future<T> future);
 
         /**
-         * Returns a composed {@code CompletionHandler} that performs, in sequence, a
-         * {@code first} handler followed by a {@code second} handler. If performing
-         * either handler throws an exception, it is relayed to the caller of the
-         * composed handler. If performing the first handler throws an exception,
-         * the {@code second} handler will not be performed.
+         * Returns a composed {@code CompletionPolicy} that performs, in sequence, a
+         * {@code first} policy followed by a {@code second} policy. If performing
+         * either policy throws an exception, it is relayed to the caller of the
+         * composed policy. If performing the first policy throws an exception,
+         * the {@code second} policy will not be performed.
          *
-         * @param first the first handler
-         * @param second the second handler
+         * @param first the first policy
+         * @param second the second policy
          * @param <V> the result type
-         * @return a composed CompletionHandler that performs in sequence the first
-         * and second handlers
+         * @return a composed CompletionPolicy that performs in sequence the first
+         * and second policies
          * @throws NullPointerException if first or second is {@code null}
          */
-        static <V> CompletionHandler<V> compose(CompletionHandler<? extends V> first,
-                                                CompletionHandler<? extends V> second) {
+        static <V> CompletionPolicy<V> compose(CompletionPolicy<? extends V> first,
+                                                CompletionPolicy<? extends V> second) {
             @SuppressWarnings("unchecked")
-            var handler1 = (CompletionHandler<V>) Objects.requireNonNull(first);
+            var policy1 = (CompletionPolicy<V>) Objects.requireNonNull(first);
             @SuppressWarnings("unchecked")
-            var handler2 = (CompletionHandler<V>) Objects.requireNonNull(second);
+            var policy2 = (CompletionPolicy<V>) Objects.requireNonNull(second);
             return (e, f) -> {
-                handler1.handle(e, f);
-                handler2.handle(e, f);
+                policy1.handle(e, f);
+                policy2.handle(e, f);
             };
         }
     }
 
     /**
-     * A CompletionHandler that captures the result of the first task to complete
-     * successfully. Once captured, the handler {@linkplain #shutdown() shuts down}
-     * the executor to interrupt unfinished threads and wakeup the owner. This handler
+     * A CompletionPolicy that captures the result of the first task to complete
+     * successfully. Once captured, the policy {@linkplain #shutdown() shuts down}
+     * the task scope to interrupt unfinished threads and wakeup the owner. This policy
      * is intended for cases where the result of any task will do ("invoke any") and
      * where the results of other unfinished tasks are no longer needed.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
-     * @param <V> the result type
+     * @param <T> the result type
      * @since 99
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static final class ShutdownOnSuccess<V> implements CompletionHandler<V> {
+    public static final class ShutdownOnSuccess<T> implements CompletionPolicy<T> {
         private static final VarHandle FIRST_SUCCESS;
         private static final VarHandle FIRST_FAILED;
         private static final VarHandle FIRST_CANCELLED;
@@ -981,9 +1013,9 @@ public class StructuredExecutor implements Executor, AutoCloseable {
                 throw new InternalError(e);
             }
         }
-        private volatile Future<V> firstSuccess;
-        private volatile Future<V> firstFailed;
-        private volatile Future<V> firstCancelled;
+        private volatile Future<T> firstSuccess;
+        private volatile Future<T> firstFailed;
+        private volatile Future<T> firstCancelled;
 
         /**
          * Creates a new ShutdownOnSuccess object.
@@ -991,25 +1023,25 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         public ShutdownOnSuccess() { }
 
         /**
-         * Shutdown the given executor when invoked for the first time with a task
+         * Shutdown the given task scope when invoked for the first time with a task
          * that completed with a result.
          *
-         * @param executor the executor
+         * @param scope the task scope
          * @param future the completed task
          * @throws IllegalArgumentException {@inheritDoc}
          * @see #shutdown()
          * @see Future.State#SUCCESS
          */
         @Override
-        public void handle(StructuredExecutor executor, Future<V> future) {
-            Objects.requireNonNull(executor);
+        public void handle(StructuredTaskScope<T> scope, Future<T> future) {
+            Objects.requireNonNull(scope);
             switch (future.state()) {
                 case RUNNING -> throw new IllegalArgumentException("Task is not completed");
                 case SUCCESS -> {
                     // capture first task to complete normally
                     if (firstSuccess == null
                             && FIRST_SUCCESS.compareAndSet(this, null, future)) {
-                        executor.shutdown();
+                        scope.shutdown();
                     }
                 }
                 case FAILED -> {
@@ -1041,8 +1073,8 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
          */
-        public V result() throws ExecutionException {
-            Future<V> f = firstSuccess;
+        public T result() throws ExecutionException {
+            Future<T> f = firstSuccess;
             if (f != null)
                 return f.resultNow();
             if ((f = firstFailed) != null)
@@ -1069,9 +1101,9 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
          */
-        public <X extends Throwable> V result(Function<Throwable, ? extends X> esf) throws X {
+        public <X extends Throwable> T result(Function<Throwable, ? extends X> esf) throws X {
             Objects.requireNonNull(esf);
-            Future<V> f = firstSuccess;
+            Future<T> f = firstSuccess;
             if (f != null)
                 return f.resultNow();
             Throwable throwable = null;
@@ -1090,9 +1122,9 @@ public class StructuredExecutor implements Executor, AutoCloseable {
     }
 
     /**
-     * A CompletionHandler that captures the exception of the first task to complete
-     * abnormally. Once captured, the handler {@linkplain #shutdown() shuts down} the
-     * executor to interrupt unfinished threads and wakeup the owner. This handler is
+     * A CompletionPolicy that captures the exception of the first task to complete
+     * abnormally. Once captured, the policy {@linkplain #shutdown() shuts down} the
+     * task scope to interrupt unfinished threads and wakeup the owner. This policy is
      * intended for cases where the results for all tasks are required ("invoke all");
      * if any task fails then the results of other unfinished tasks are no longer needed.
      *
@@ -1102,7 +1134,7 @@ public class StructuredExecutor implements Executor, AutoCloseable {
      * @since 99
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static final class ShutdownOnFailure implements CompletionHandler<Object> {
+    public static final class ShutdownOnFailure implements CompletionPolicy<Object> {
         private static final VarHandle FIRST_FAILED;
         private static final VarHandle FIRST_CANCELLED;
         static {
@@ -1123,10 +1155,10 @@ public class StructuredExecutor implements Executor, AutoCloseable {
         public ShutdownOnFailure() { }
 
         /**
-         * Shutdown the given executor when invoked for the first time with a task
+         * Shutdown the given task scope when invoked for the first time with a task
          * that completed abnormally (exception or cancelled).
          *
-         * @param executor the executor
+         * @param scope the task scope
          * @param future the completed task
          * @throws IllegalArgumentException {@inheritDoc}
          * @see #shutdown()
@@ -1134,21 +1166,21 @@ public class StructuredExecutor implements Executor, AutoCloseable {
          * @see Future.State#CANCELLED
          */
         @Override
-        public void handle(StructuredExecutor executor, Future<Object> future) {
-            Objects.requireNonNull(executor);
+        public void handle(StructuredTaskScope<Object> scope, Future<Object> future) {
+            Objects.requireNonNull(scope);
             switch (future.state()) {
                 case RUNNING -> throw new IllegalArgumentException("Task is not completed");
                 case SUCCESS -> { }
                 case FAILED -> {
                     if (firstFailed == null
                             && FIRST_FAILED.compareAndSet(this, null, future)) {
-                        executor.shutdown();
+                        scope.shutdown();
                     }
                 }
                 case CANCELLED -> {
                     if (firstFailed == null && firstCancelled == null
                             && FIRST_CANCELLED.compareAndSet(this, null, future)) {
-                        executor.shutdown();
+                        scope.shutdown();
                     }
                 }
             }
