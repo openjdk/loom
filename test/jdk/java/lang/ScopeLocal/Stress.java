@@ -28,7 +28,7 @@
  * @summary Stress test for java.lang.ScopeLocal
  */
 
-import java.util.concurrent.StructuredExecutor;
+import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.ThreadFactory;
 
 import org.testng.annotations.Test;
@@ -84,12 +84,12 @@ public class Stress {
     private int deepBindings2(int depth) throws Exception {
         if (depth > 0) {
             try (var unused = scopeLocals[depth].bind(depth)) {
-                try (var structuredExecutor = StructuredExecutor.open(null, factory.get())) {
-                    var future = structuredExecutor.fork(
+                try (var scope = StructuredTaskScope.open(null, factory.get())) {
+                    var future = scope.fork(
                             () -> ScopeLocal.where(sl1, sl1.get() + 1)
                                     .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
                                     .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
-                    structuredExecutor.join();
+                    scope.join();
                     return future.get();
                 }
             }
