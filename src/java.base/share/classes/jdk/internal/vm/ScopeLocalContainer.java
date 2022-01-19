@@ -44,7 +44,7 @@ public class ScopeLocalContainer extends StackableScope {
      * the current Thread. This may be on the current thread's scope task or may
      * require walking up the tree to find it.
      */
-    public static ScopeLocalContainer latest(Class<? extends ScopeLocalContainer> containerClass) {
+    public static <T extends ScopeLocalContainer> T latest(Class<T> containerClass) {
         StackableScope scope = head();
         if (scope == null) {
             scope = JLA.threadContainer(Thread.currentThread());
@@ -52,7 +52,9 @@ public class ScopeLocalContainer extends StackableScope {
                 return null;
         }
         if (containerClass.isInstance(scope)) {
-            return (ScopeLocalContainer)scope;
+            @SuppressWarnings("unchecked")
+            T tmp = (T) scope;
+            return tmp;
         } else {
             return scope.enclosingScope(containerClass);
         }

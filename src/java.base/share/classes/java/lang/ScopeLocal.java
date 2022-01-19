@@ -406,12 +406,7 @@ public final class ScopeLocal<T> {
         }
 
         static BinderImpl innermostBinder() {
-            var container = ScopeLocalContainer.latest(BinderImpl.class);
-            if (container instanceof BinderImpl binder) {
-                return binder;
-            } else {
-                return null;
-            }
+            return ScopeLocalContainer.latest(BinderImpl.class);
         }
 
         /**
