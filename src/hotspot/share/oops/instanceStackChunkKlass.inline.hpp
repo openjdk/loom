@@ -129,7 +129,7 @@ StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, bool gc
     // }
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
-
+  
   if (is_stub()) {
     get_oopmap(pc(), 0);
     DEBUG_ONLY(_has_stub = true);
@@ -142,7 +142,7 @@ StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, const f
   assert (mixed || !chunk->has_mixed_frames(), "");
 
   DEBUG_ONLY(_index = 0;)
-
+  
   _end = chunk->bottom_address();
 
   assert (chunk->is_in_chunk(f.sp()), "");
@@ -178,13 +178,13 @@ inline bool StackChunkFrameStream<mixed>::is_compiled() const {
 }
 
 template <bool mixed>
-inline bool StackChunkFrameStream<mixed>::is_interpreted() const {
-  return mixed ? (!is_done() && Interpreter::contains(pc())) : false;
+inline bool StackChunkFrameStream<mixed>::is_interpreted() const { 
+  return mixed ? (!is_done() && Interpreter::contains(pc())) : false; 
 }
 
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::frame_size() const {
-  return is_interpreted() ? interpreter_frame_size()
+  return is_interpreted() ? interpreter_frame_size() 
                           : cb()->frame_size() + stack_argsize();
 }
 
@@ -247,18 +247,18 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
     return;
   }
 
-  assert (pc() != nullptr && dbg_is_safe(pc(), -1),
-  "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d",
+  assert (pc() != nullptr && dbg_is_safe(pc(), -1), 
+  "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d", 
   _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp());
 
   _cb = CodeCache::find_blob_fast(pc());
 
   // if (_cb == nullptr) { tty->print_cr("OOPS"); os::print_location(tty, (intptr_t)pc()); }
-  assert (_cb != nullptr,
-    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d",
+  assert (_cb != nullptr, 
+    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d", 
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), _chunk->is_gc_mode());
-  assert (is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0),
-    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d",
+  assert (is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), 
+    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d", 
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), is_stub(), is_compiled(), _cb->frame_size(), mixed);
 }
 
@@ -266,7 +266,7 @@ template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_oopmap() const {
   if (is_interpreted()) return;
   assert (is_compiled(), "");
-  get_oopmap(pc(), CodeCache::find_oopmap_slot_fast(pc()));
+  get_oopmap(pc(), CodeCache::find_oopmap_slot_fast(pc())); 
 }
 
 template <bool mixed>
@@ -416,12 +416,12 @@ template<bool mixed>
 template <class DerivedOopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const {
   if (is_interpreted()) return;
-
+  
   for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {
     OopMapValue omv = oms.current();
     if (omv.type() != OopMapValue::derived_oop_value)
       continue;
-
+    
     intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), map);
     intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), map); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
 
@@ -430,7 +430,7 @@ inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClo
     assert (derived_loc != base_loc, "Base and derived in same location");
     assert (is_in_oops(base_loc, map), "not found: " INTPTR_FORMAT, p2i(base_loc));
     assert (!is_in_oops(derived_loc, map), "found: " INTPTR_FORMAT, p2i(derived_loc));
-
+    
     Devirtualizer::do_derived_oop(closure, (oop*)base_loc, (derived_pointer*)derived_loc);
   }
   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
@@ -610,7 +610,7 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
 
     RegisterMap full_map((JavaThread*)nullptr, true, false, true);
     full_map.set_include_argument_oops(false);
-
+    
     f.next(&full_map);
 
     // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " safepoint yield caller frame: %d", p2i(this), f.index());

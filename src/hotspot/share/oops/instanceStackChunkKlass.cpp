@@ -671,7 +671,6 @@ public:
     }
 
     if (UseChunkBitmaps) {
-      // ResourceMark rm;
       BuildBitmapOopClosure<compressedOops> oops_closure(_chunk->start_address(), _chunk->bit_offset(), _chunk->bitmap());
       f.iterate_oops(&oops_closure, map);
     }
@@ -727,7 +726,6 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
   if (chunk->has_bitmap() && UseCompressedOops) {
     FixCompressedOopClosure oop_closure;
     if (f.is_interpreted_frame()) {
-      ResourceMark rm;
       f.oops_interpreted_do(&oop_closure, nullptr);
     } else {
       OopMapDo<OopClosure, DerelativizeDerivedPointers, SkipNullValue> visitor(&oop_closure, nullptr);
@@ -757,7 +755,7 @@ public:
     _count++;
 
     log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap p: " INTPTR_FORMAT " i: " SIZE_FORMAT, p2i(p), index);
-
+    
     if (!SafepointSynchronize::is_at_safepoint()) {
       oop obj = safe_load(p);
       assert (obj == nullptr || is_good_oop(obj),
@@ -877,7 +875,6 @@ public:
     //   }
     // }
 
-    ResourceMark rm;
     StackChunkVerifyOopsClosure oops_closure(_chunk, f.sp());
     f.iterate_oops(&oops_closure, map);
     assert (oops_closure.count() == num_oops, "oops: %d oopmap->num_oops(): %d", oops_closure.count(), num_oops);
@@ -944,7 +941,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   if (closure._cb != nullptr && closure._cb->is_compiled()) {
     assert (chunk->argsize() == (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord,
       "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(), (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
-  }
+  } 
 
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 

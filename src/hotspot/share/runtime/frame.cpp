@@ -932,14 +932,6 @@ template void frame::oops_interpreted_do<true> (OopClosure* f, const RegisterMap
 template void frame::oops_interpreted_do<false>(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
 
 template <bool relative>
-void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const {
-  Thread *thread = Thread::current();
-  methodHandle m (thread, interpreter_frame_method());
-  jint bci = interpreter_frame_bci();
-  oops_interpreted_do0<relative>(f, map, m, bci, mask);
-}
-
-template <bool relative>
 void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   assert(!Universe::heap()->is_in(m()),
