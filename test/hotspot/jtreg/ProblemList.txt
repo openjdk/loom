@@ -195,6 +195,7 @@ serviceability/sa/ClhsdbScanOops.java#id0                                      8
 serviceability/sa/ClhsdbScanOops.java#id1                                      8279662 windows-all
 serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
 serviceability/sa/TestObjectMonitorIterate.java                                0000000 generic-all
+serviceability/sa/ClhsdbThreadContext.java                                     0000000 generic-all
 resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java	       0000000 generic-all
 resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0000000 generic-all
 
