@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,7 +54,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc); // not fast because this constructor can be used on native frames
-  
+
   setup(pc);
 
   _oop_map = NULL;
@@ -239,13 +239,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Method* m = interpreter_frame_method();
   int   bci = interpreter_frame_bci();
   m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
-}
-
-
-inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
-  return   mask->num_oops()
-        + 1 // for the mirror oop
-        + ((intptr_t*)interpreter_frame_monitor_begin() - (intptr_t*)interpreter_frame_monitor_end())/BasicObjectLock::size();
 }
 
 // helper to update a map with callee-saved RBP
@@ -453,7 +446,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     // outside of update_register_map.
     if (stub) { // compiled frames do not use callee-saved registers
       map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
-      if (oop_map() != NULL) { 
+      if (oop_map() != NULL) {
         _oop_map->update_register_map(this, map);
       }
     } else {
@@ -470,11 +463,11 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
 
   assert(sender_sp != sp(), "must have changed");
 
-  if (Continuation::is_return_barrier_entry(sender_pc)) {	
-    if (map->walk_cont()) { // about to walk into an h-stack 	
-      return Continuation::top_frame(*this, map);	
+  if (Continuation::is_return_barrier_entry(sender_pc)) {
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
-      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);	
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);
     }
   }
 

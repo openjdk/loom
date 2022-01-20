@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -199,9 +199,6 @@ class frame {
 
   inline void interpreted_frame_oop_map(InterpreterOopMap* mask) const;
 
-  // the number of oops in the frame
-  inline int interpreted_frame_num_oops(InterpreterOopMap* mask) const;
-
   // returns the sending frame
   frame sender(RegisterMap* map) const;
 
@@ -235,7 +232,7 @@ class frame {
   intptr_t  at(int index) const                  { return *addr_at(index); }
   // in interpreter frames in continuation stacks, internal addresses are relative to fp.
   intptr_t  at_relative(int index) const         { return (intptr_t)(fp() + fp()[index]); }
-  template <bool relative> 
+  template <bool relative>
   intptr_t at(int index) const                   { return relative ? at_relative(index) : at(index); }
 
   // accessors for locals
@@ -364,7 +361,7 @@ class frame {
   //                                 this value is >= BasicObjectLock::size(), and may be rounded up
 
   BasicObjectLock* interpreter_frame_monitor_begin() const;
-  template <bool relative = false> 
+  template <bool relative = false>
   BasicObjectLock* interpreter_frame_monitor_end()   const;
   template <bool relative = false>
   BasicObjectLock* next_monitor_in_interpreter_frame(BasicObjectLock* current) const;
@@ -441,8 +438,6 @@ class frame {
   void oops_compiled_arguments_do(Symbol* signature, bool has_receiver, bool has_appendix, const RegisterMap* reg_map, OopClosure* f) const;
   template <bool relative = false>
   void oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache = true) const;
-  template <bool relative = false>
-  void oops_interpreted_do(OopClosure* f, const RegisterMap* map, const InterpreterOopMap& mask) const;
 
  private:
   void oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const;
