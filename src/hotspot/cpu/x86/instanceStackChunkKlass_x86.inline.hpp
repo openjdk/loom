@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -110,9 +110,9 @@ inline int StackChunkFrameStream<mixed>::interpreter_frame_size() const {
   // InterpreterOopMap mask;
   // to_frame().interpreted_frame_oop_map(&mask);
   // intptr_t* top = derelativize(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
-  
+
   intptr_t* top = unextended_sp(); // later subtract argsize if callee is interpreted
-  intptr_t* bottom = derelativize(frame::interpreter_frame_locals_offset) + 1; // the sender's unextended sp: derelativize(frame::interpreter_frame_sender_sp_offset); 
+  intptr_t* bottom = derelativize(frame::interpreter_frame_locals_offset) + 1; // the sender's unextended sp: derelativize(frame::interpreter_frame_sender_sp_offset);
 
   // tty->print_cr(">>>> StackChunkFrameStream<mixed>::interpreter_frame_size bottom: %d top: %d size: %d", _chunk->to_offset(bottom - 1) + 1, _chunk->to_offset(top), (int)(bottom - top));
   return (int)(bottom - top);
@@ -129,6 +129,7 @@ inline int StackChunkFrameStream<mixed>::interpreter_frame_stack_argsize() const
 template <bool mixed>
 inline int StackChunkFrameStream<mixed>::interpreter_frame_num_oops() const {
   assert (mixed && is_interpreted(), "");
+  ResourceMark rm;
   InterpreterOopMap mask;
   frame f = to_frame();
   f.interpreted_frame_oop_map(&mask);
@@ -184,7 +185,7 @@ public:
     frame::update_map_with_saved_link(map, (intptr_t**)sp - frame::sender_sp_offset);
     return map;
   }
-  
+
   SmallRegisterMap() {}
 
   SmallRegisterMap(const RegisterMap* map) {
@@ -205,7 +206,7 @@ public:
 
   JavaThread* thread() const {
   #ifndef ASSERT
-    guarantee (false, ""); 
+    guarantee (false, "");
   #endif
     return nullptr;
   }

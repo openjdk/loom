@@ -361,7 +361,7 @@ ContMirror::ContMirror(const RegisterMap* map)
 #endif
   {
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, 
+  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT,
     p2i( (oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
   read();
 }
@@ -2194,6 +2194,7 @@ public:
   NOINLINE void recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
     assert (hf.is_interpreted_frame(), "");
 
+    ResourceMark rm; // oops_interpreted_do require ResourceMark
     const bool bottom = recurse_thaw_java_frame<Interpreted>(caller, num_frames);
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
@@ -2832,7 +2833,7 @@ bool Continuation::unpin(JavaThread* current) {
   oop cont = ce->cont_oop();
   assert (cont != nullptr, "");
   assert (cont == ContinuationHelper::get_continuation(current), "");
-  
+
   jshort value = jdk_internal_vm_Continuation::critical_section(cont);
   if (value > 0) {
     jdk_internal_vm_Continuation::set_critical_section(cont, value - 1);

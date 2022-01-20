@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2007, 2008, 2009, 2010 Red Hat, Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -181,11 +181,6 @@ inline int frame::compiled_frame_stack_argsize() const {
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
-}
-
-inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
-  Unimplemented();
-  return 0;
 }
 
 template <bool relative>

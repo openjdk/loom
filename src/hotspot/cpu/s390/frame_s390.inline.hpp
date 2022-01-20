@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 SAP SE. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -293,11 +293,6 @@ inline int frame::compiled_frame_stack_argsize() const {
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
-}
-
-inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
-  Unimplemented();
-  return 0;
 }
 
 template <bool relative>

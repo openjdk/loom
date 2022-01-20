@@ -88,7 +88,6 @@ public:
   template <bool relative>
   static void patch_sender_sp(frame& f, intptr_t* sp);
 
-  static int num_oops(const frame&f, InterpreterOopMap* mask);
   static int size(const frame& f, InterpreterOopMap* mask);
   static int size(const frame& f);
   static inline int expression_stack_size(const frame &f, InterpreterOopMap* mask);
@@ -173,6 +172,7 @@ address Frame::return_pc(const frame& f) {
 #ifdef ASSERT
 intptr_t* Frame::frame_top(const frame &f) {
   if (f.is_interpreted_frame()) {
+    ResourceMark rm;
     InterpreterOopMap mask;
     f.interpreted_frame_oop_map(&mask);
     return Interpreted::frame_top(f, &mask);
@@ -218,11 +218,6 @@ bool Frame::is_deopt_return(address pc, const frame& sender) {
 
 address Interpreted::return_pc(const frame& f) {
   return *return_pc_address(f);
-}
-
-int Interpreted::num_oops(const frame&f, InterpreterOopMap* mask) {
-  // all locks must be nullptr when freezing, but f.oops_do walks them, so we count them
-  return f.interpreted_frame_num_oops(mask);
 }
 
 int Interpreted::size(const frame&f) {

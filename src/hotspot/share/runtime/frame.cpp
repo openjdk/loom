@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -105,7 +105,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   DEBUG_ONLY(_skip_missing = map->_skip_missing;)
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
-  _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); // 
+  _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); //
 
   pd_initialize_from(map);
   if (update_map()) {
@@ -911,17 +911,18 @@ oop frame::interpreter_callee_receiver(Symbol* signature) {
 
 template <bool relative>
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const {
-  Thread *thread = Thread::current();
-  methodHandle m (thread, interpreter_frame_method());
+  Thread* current = Thread::current();
+  methodHandle m(current, interpreter_frame_method());
   jint bci = interpreter_frame_bci();
 
+  ResourceMark rm;
   InterpreterOopMap mask;
   if (query_oop_map_cache) {
     m->mask_for(bci, &mask);
   } else {
     OopMapCache::compute_one_oop_map(m, bci, &mask);
   }
-  
+
   oops_interpreted_do0<relative>(f, map, m, bci, mask);
 }
 
@@ -1178,8 +1179,8 @@ bool frame::is_deoptimized_frame() const {
   }
 
   /* This method only checks if the frame is deoptimized
-   * as in return address being patched. 
-   * It doesn't care if the OP that we return to is a 
+   * as in return address being patched.
+   * It doesn't care if the OP that we return to is a
    * deopt instruction */
   /*if (_cb != NULL && _cb->is_nmethod()) {
     return NativeDeoptInstruction::is_deopt_at(_pc);
@@ -1294,17 +1295,39 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 
 class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:
-  FrameValues& _values;
-  int _frame_no;
+  GrowableArray<oop*>* _oops;
+  GrowableArray<narrowOop*>* _narrow_oops;
+  NoSafepointVerifier nsv;
 public:
-  FrameValuesOopClosure(FrameValues& values, int frame_no) : _values(values), _frame_no(frame_no) {}
-  virtual void do_oop(oop* p) {
-    bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
-    _values.describe(_frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", _frame_no)); 
+  FrameValuesOopClosure() {
+    _oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<oop*>(100, mtThread);
+    _narrow_oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<narrowOop*>(100, mtThread);
   }
-  virtual void do_oop(narrowOop* p) { _values.describe(_frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", _frame_no)); }
-  virtual void do_derived_oop(oop* base, derived_pointer* derived) { 
+  ~FrameValuesOopClosure() {
+    delete _oops;
+    delete _narrow_oops;
+  }
+  void describe(FrameValues& values, int frame_no) {
+    for (int i = 0; i < _oops->length(); i++) {
+      oop* p = _oops->at(i);
+      bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
+      values.describe(frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", frame_no));
+    }
+    for (int i = 0; i < _narrow_oops->length(); i++) {
+      narrowOop* p = _narrow_oops->at(i);
+      values.describe(frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", frame_no));
+    }
+  }
+#if 0
+  virtual void do_derived_oop(oop* base, derived_pointer* derived) {
     _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
+  }
+#endif
+  virtual void do_oop(oop* p)       { _oops->push(p); }
+  virtual void do_oop(narrowOop* p) { _narrow_oops->push(p); }
+  virtual void do_derived_oop(oop* base, derived_pointer* derived) {
+    ShouldNotReachHere(); // ???
+    // _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
   }
 };
 
@@ -1369,7 +1392,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     values.describe(-1, info_address,
                     FormatBuffer<1024>("#%d method %s @ %d", frame_no, m->name_and_sig_as_C_string(), bci), 3);
     if (desc != NULL) {
-      values.describe(-1, info_address, err_msg("- %s codelet: %s", 
+      values.describe(-1, info_address, err_msg("- %s codelet: %s",
         desc->bytecode()    >= 0    ? Bytecodes::name(desc->bytecode()) : "",
         desc->description() != NULL ? desc->description()               : "?"), 2);
     }
@@ -1408,8 +1431,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
 
     if (reg_map != NULL) {
-      FrameValuesOopClosure oopsFn(values, frame_no);
+      FrameValuesOopClosure oopsFn;
       oops_do(&oopsFn, NULL, &oopsFn, reg_map);
+      oopsFn.describe(values, frame_no);
     }
   } else if (is_entry_frame()) {
     // For now just label the frame
@@ -1497,8 +1521,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         }
       }
 
-      FrameValuesOopClosure oopsFn(values, frame_no);
+      FrameValuesOopClosure oopsFn;
       oops_do(&oopsFn, NULL, &oopsFn, reg_map);
+      oopsFn.describe(values, frame_no);
 
       if (oop_map() != NULL) {
         FrameValuesOopMapClosure valuesFn(this, reg_map, values, frame_no);
@@ -1603,7 +1628,7 @@ void FrameValues::print_on(JavaThread* thread, outputStream* st) {
       while (!thread->is_in_full_stack((address)v1)) v1 = _values.at(--max_index).location;
     }
   }
-  
+
   print_on(st, min_index, max_index, v0, v1);
 }
 
@@ -1641,7 +1666,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       st->print_cr(" %s  %s %s", spacer, spacer, fv.description);
     } else {
       if (relative
-          && *fv.location != 0 && *fv.location > -100 && *fv.location < 100 
+          && *fv.location != 0 && *fv.location > -100 && *fv.location < 100
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
         st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);
       } else {
