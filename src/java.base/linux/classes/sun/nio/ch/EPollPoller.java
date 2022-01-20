@@ -40,6 +40,7 @@ class EPollPoller extends Poller {
     private final long address;
 
     EPollPoller(boolean read) throws IOException {
+        super(read, true);
         this.epfd = EPoll.create();
         this.event = (read) ? EPOLLIN : EPOLLOUT;
         this.address = EPoll.allocatePollArray(MAX_EVENTS_TO_POLL);

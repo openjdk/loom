@@ -71,7 +71,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import jdk.internal.misc.VirtualThreads;
 import jdk.internal.ref.CleanerFactory;
 import sun.net.ResourceManager;
 import sun.net.ext.ExtendedSocketOptions;
@@ -480,20 +479,10 @@ class DatagramChannelImpl
     public void park(int event, long nanos) throws IOException {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
-            Poller.register(getFDVal(), event);
-            try {
-                if (isOpen()) {
-                    if (nanos == 0) {
-                        VirtualThreads.park();
-                    } else {
-                        VirtualThreads.park(nanos);
-                    }
-                    if (!interruptible && thread.isInterrupted()) {
-                        throw new InterruptedIOException();
-                    }
-                }
-            } finally {
-                Poller.deregister(getFDVal(), event);
+            Poller.poll(getFDVal(), event, nanos, this::isOpen);
+            // DatagramSocket throws when virtual thread interrupted
+            if (!interruptible && thread.isInterrupted()) {
+                throw new InterruptedIOException();
             }
         } else {
             long millis;
@@ -1167,7 +1156,7 @@ class DatagramChannelImpl
     }
 
     /**
-     * Attempts to adjusts the blocking mode if the channel is open.
+     * Attempts to adjust the blocking mode if the channel is open.
      * @return {@code true} if the blocking mode was adjusted
      */
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
@@ -1434,7 +1423,7 @@ class DatagramChannelImpl
             }
 
             // copy the blocking mode
-            if (!isBlocking()) {
+            if (!isBlocking() || nonBlocking) {
                 IOUtil.configureBlocking(newfd, false);
             }
 

@@ -39,6 +39,7 @@ class WEPollPoller extends Poller {
     private final long address;
 
     WEPollPoller(boolean read) throws IOException {
+        super(read, true);
         this.handle = WEPoll.create();
         this.event = (read) ? EPOLLIN : EPOLLOUT;
         this.address = WEPoll.allocatePollArray(MAX_EVENTS_TO_POLL);

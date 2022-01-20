@@ -52,9 +52,6 @@ class WSAPollPoller extends Poller {
     // initial capacity of poll array
     private static final int INITIAL_CAPACITY = 16;
 
-    // true if this is a poller for reading (POLLIN), false for writing (POLLOUT)
-    private final boolean read;
-
     // poll array, grows as needed
     private long pollArrayAddress;
     private int pollArrayCapacity;  // allocated
@@ -90,7 +87,7 @@ class WSAPollPoller extends Poller {
      * operations.
      */
     WSAPollPoller(boolean read) throws IOException {
-        this.read = read;
+        super(read, false);
 
         this.pollArrayAddress = WSAPoll.allocatePollArray(INITIAL_CAPACITY);
         this.pollArrayCapacity = INITIAL_CAPACITY;
@@ -176,7 +173,7 @@ class WSAPollPoller extends Poller {
         assert Thread.holdsLock(updateLock);
         Integer fd;
         while ((fd = registerQueue.pollFirst()) != null) {
-            short events = (read) ? Net.POLLIN : Net.POLLOUT;
+            short events = (reading()) ? Net.POLLIN : Net.POLLOUT;
             int index = add(fd, events);
             fdToIndex.put(fd, index);
         }

@@ -53,12 +53,7 @@ public class ConsoleStreams {
     private static void park(FileDescriptor fd, int event) throws IOException {
         assert Thread.currentThread().isVirtual();
         int fdVal = SharedSecrets.getJavaIOFileDescriptorAccess().get(fd);
-        Poller.register(fdVal, event);
-        try {
-            VirtualThreads.park();
-        } finally {
-            Poller.deregister(fdVal, event);
-        }
+        Poller.poll(fdVal, event, 0, () -> true);
     }
 
     /**

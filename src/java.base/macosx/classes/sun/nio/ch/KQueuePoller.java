@@ -38,6 +38,7 @@ class KQueuePoller extends Poller {
     private final long address;
 
     KQueuePoller(boolean read) throws IOException {
+        super(read, true);
         this.kqfd = KQueue.create();
         this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.address = KQueue.allocatePollArray(MAX_EVENTS_TO_POLL);
