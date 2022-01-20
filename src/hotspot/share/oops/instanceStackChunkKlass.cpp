@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -755,7 +755,7 @@ public:
     _count++;
 
     log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap p: " INTPTR_FORMAT " i: " SIZE_FORMAT, p2i(p), index);
-    
+
     if (!SafepointSynchronize::is_at_safepoint()) {
       oop obj = safe_load(p);
       assert (obj == nullptr || is_good_oop(obj),
@@ -941,7 +941,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   if (closure._cb != nullptr && closure._cb->is_compiled()) {
     assert (chunk->argsize() == (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord,
       "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(), (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
-  } 
+  }
 
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 
