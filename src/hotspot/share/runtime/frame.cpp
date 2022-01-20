@@ -1289,15 +1289,21 @@ class FrameValuesOopClosure: public OopClosure, public DerivedOopClosure {
 private:
   GrowableArray<oop*>* _oops;
   GrowableArray<narrowOop*>* _narrow_oops;
+  GrowableArray<oop*>* _base;
+  GrowableArray<derived_pointer*>* _derived;
   NoSafepointVerifier nsv;
 public:
   FrameValuesOopClosure() {
     _oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<oop*>(100, mtThread);
     _narrow_oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<narrowOop*>(100, mtThread);
+    _base = new (ResourceObj::C_HEAP, mtThread) GrowableArray<oop*>(100, mtThread);
+    _derived = new (ResourceObj::C_HEAP, mtThread) GrowableArray<derived_pointer*>(100, mtThread);
   }
   ~FrameValuesOopClosure() {
     delete _oops;
     delete _narrow_oops;
+    delete _base;
+    delete _derived;
   }
   void describe(FrameValues& values, int frame_no) {
     for (int i = 0; i < _oops->length(); i++) {
@@ -1309,17 +1315,18 @@ public:
       narrowOop* p = _narrow_oops->at(i);
       values.describe(frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", frame_no));
     }
+    assert(_base->length() == _derived->length(), "should be the same");
+    for (int i = 0; i < _base->length(); i++) {
+      oop* base = _base->at(i);
+      derived_pointer* derived = _derived->at(i);
+      values.describe(frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), frame_no));
+    }
   }
-#if 0
-  virtual void do_derived_oop(oop* base, derived_pointer* derived) {
-    _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
-  }
-#endif
   virtual void do_oop(oop* p)       { _oops->push(p); }
   virtual void do_oop(narrowOop* p) { _narrow_oops->push(p); }
   virtual void do_derived_oop(oop* base, derived_pointer* derived) {
-    ShouldNotReachHere(); // ???
-    // _values.describe(_frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), _frame_no));
+    _base->push(base);
+    _derived->push(derived);
   }
 };
 
