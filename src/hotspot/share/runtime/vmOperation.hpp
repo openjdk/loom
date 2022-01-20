@@ -53,7 +53,6 @@
   template(CollectForCodeCacheAllocation)         \
   template(GC_HeapInspection)                     \
   template(GenCollectFull)                        \
-  template(GenCollectFullConcurrent)              \
   template(GenCollectForAllocation)               \
   template(ParallelGCFailedAllocation)            \
   template(ParallelGCSystemGC)                    \
