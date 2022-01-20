@@ -39,34 +39,18 @@ import jdk.internal.access.SharedSecrets;
 import sun.security.action.GetPropertyAction;
 
 /**
- * Polls file descriptors. Virtual threads invokes the poll method to park
- * the thread until a given file descriptor is ready for I/O.
+ * Polls file descriptors. Virtual threads invoke the poll method to park
+ * until a given file descriptor is ready for I/O.
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final Poller[] READ_POLLERS;
     private static final Poller[] WRITE_POLLERS;
     private static final int READ_MASK, WRITE_MASK;
-
-    static {
-        PollerProvider provider = PollerProvider.provider();
-        try {
-            Poller[] readPollers = createReadPollers(provider);
-            READ_POLLERS = readPollers;
-            READ_MASK = readPollers.length - 1;
-            Poller[] writePollers = createWritePollers(provider);
-            WRITE_POLLERS = writePollers;
-            WRITE_MASK = writePollers.length - 1;
-        } catch (IOException ioe) {
-            throw new IOError(ioe);
-        }
-    }
+    private static final boolean USE_DIRECT_REGISTER;
 
     // true if this is a poller for reading, false for writing
     private final boolean read;
-
-    // true if updates are queued to a updater thread
-    private final boolean asyncUpdate;
 
     // maps file descriptors to parked Thread
     private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
@@ -75,19 +59,180 @@ public abstract class Poller {
     private final BlockingQueue<Request> queue = new LinkedTransferQueue<>();
 
     /**
-     * Creates a Poller for reading or writing.
+     * Initialize a Poller for reading or writing.
      */
-    protected Poller(boolean read, boolean asyncUpdate) {
+    protected Poller(boolean read) {
         this.read = read;
-        this.asyncUpdate = asyncUpdate;
     }
 
     /**
      * Returns true if this poller is for read (POLLIN) events.
      */
-    protected final boolean reading() {
+    final boolean reading() {
         return read;
     }
+
+    /**
+     * Parks the current thread until a file descriptor is ready for the given op.
+     * @param fdVal the file descriptor
+     * @param event POLLIN or POLLOUT
+     * @param nanos the waiting time or 0 to wait indefinitely
+     * @param supplier supplies a boolean to indicate if the enclosing object is open
+     */
+    public static void poll(int fdVal, int event, long nanos, BooleanSupplier supplier)
+        throws IOException
+    {
+        assert nanos >= 0L;
+        if (event == Net.POLLIN) {
+            readPoller(fdVal).poll(fdVal, nanos, supplier);
+        } else if (event == Net.POLLOUT) {
+            writePoller(fdVal).poll(fdVal, nanos, supplier);
+        } else {
+            assert false;
+        }
+    }
+
+    /**
+     * Parks the current thread until a file descriptor is ready.
+     */
+    private void poll(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
+        if (USE_DIRECT_REGISTER) {
+            poll1(fdVal, nanos, supplier);
+        } else {
+            poll2(fdVal, nanos, supplier);
+        }
+    }
+
+    /**
+     * Parks the current thread until a file descriptor is ready. This implementation
+     * registers the file descriptor, then parks until the file descriptor is polled.
+     */
+    private void poll1(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
+        register(fdVal);
+        try {
+            boolean isOpen = supplier.getAsBoolean();
+            if (isOpen) {
+                if (nanos > 0) {
+                    LockSupport.parkNanos(nanos);
+                } else {
+                    LockSupport.park();
+                }
+            }
+        } finally {
+            deregister(fdVal);
+        }
+    }
+
+    /**
+     * Parks the current thread until a file descriptor is ready. This implementation
+     * queues the file descriptor to the update thread, then parks until the file
+     * descriptor is polled.
+     */
+    private void poll2(int fdVal, long nanos, BooleanSupplier supplier) {
+        Request request = registerAsync(fdVal);
+        try {
+            boolean isOpen = supplier.getAsBoolean();
+            if (isOpen) {
+                if (nanos > 0) {
+                    LockSupport.parkNanos(nanos);
+                } else {
+                    LockSupport.park();
+                }
+            }
+        } finally {
+            request.awaitFinish();
+            deregister(fdVal);
+        }
+    }
+
+    /**
+     * Registers the file descriptor.
+     */
+    private void register(int fdVal) throws IOException {
+        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        assert previous == null;
+        implRegister(fdVal);
+    }
+
+    /**
+     * Queues the file descriptor to be registered by the updater thread, returning
+     * a Request object to track the request.
+     */
+    private Request registerAsync(int fdVal) {
+        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        assert previous == null;
+        Request request = new Request(fdVal);
+        queue.add(request);
+        return request;
+    }
+
+    /**
+     * Deregister the file descriptor, a no-op if already polled.
+     */
+    private void deregister(int fdVal) {
+        Thread previous = map.remove(fdVal);
+        assert previous == null || previous == Thread.currentThread();
+        if (previous != null) {
+            implDeregister(fdVal);
+        }
+    }
+
+    /**
+     * A registration request queued to the updater thread.
+     */
+    private static class Request {
+        private final int fdVal;
+        private volatile boolean done;
+        private volatile Thread waiter;
+
+        Request(int fdVal) {
+            this.fdVal = fdVal;
+        }
+
+        private int fdVal() {
+            return fdVal;
+        }
+
+        /**
+         * Invoked by the updater when the request has been processed.
+         */
+        void finish() {
+            done = true;
+            Thread waiter = this.waiter;
+            if (waiter != null) {
+                LockSupport.unpark(waiter);
+            }
+        }
+
+        /**
+         * Waits for a request to be processed.
+         */
+        void awaitFinish() {
+            if (!done) {
+                waiter = Thread.currentThread();
+                boolean interrupted = false;
+                while (!done) {
+                    LockSupport.park();
+                    if (Thread.interrupted()) {
+                        interrupted = true;
+                    }
+                }
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+
+    /**
+     * Register the file descriptor.
+     */
+    abstract void implRegister(int fdVal) throws IOException;
+
+    /**
+     * Deregister the file descriptor.
+     */
+    abstract void implDeregister(int fdVal);
 
     /**
      * Starts the poller threads.
@@ -95,7 +240,7 @@ public abstract class Poller {
     private Poller start() {
         String prefix = (read) ? "Read" : "Write";
         startThread(prefix + "-Poller", this::pollLoop);
-        if (asyncUpdate) {
+        if (!USE_DIRECT_REGISTER) {
             startThread(prefix + "-Updater", this::updateLoop);
         }
         return this;
@@ -150,166 +295,6 @@ public abstract class Poller {
     }
 
     /**
-     * A registration request queued to the updater thread.
-     */
-    private static class Request {
-        private final int fdVal;
-        private volatile boolean done;
-        private volatile Thread waiter;
-
-        Request(int fdVal) {
-            this.fdVal = fdVal;
-        }
-
-        private int fdVal() {
-            return fdVal;
-        }
-
-        /**
-         * Invoked by the updater when the request has been processed.
-         */
-        void finish() {
-            done = true;
-            Thread waiter = this.waiter;
-            if (waiter != null) {
-                LockSupport.unpark(waiter);
-            }
-        }
-
-        /**
-         * Waits for a request to be processed.
-         */
-        void awaitFinish() {
-            if (!done) {
-                waiter = Thread.currentThread();
-                boolean interrupted = false;
-                while (!done) {
-                    LockSupport.park();
-                    if (Thread.interrupted()) {
-                        interrupted = true;
-                    }
-                }
-                if (interrupted) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        }
-    }
-
-    /**
-     * Register the file descriptor
-     */
-    abstract void implRegister(int fdVal) throws IOException;
-
-    /**
-     * Deregister the file descriptor
-     */
-    abstract void implDeregister(int fdVal);
-
-    /**
-     * Registers the file descriptor.
-     */
-    private void register(int fdVal) throws IOException {
-        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
-        assert previous == null;
-        implRegister(fdVal);
-    }
-
-    /**
-     * Queues the file register to be registered by the updater thread.
-     */
-    private Request registerAsync(int fdVal) {
-        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
-        assert previous == null;
-        Request request = new Request(fdVal);
-        queue.add(request);
-        return request;
-    }
-
-    /**
-     * Deregister the file descriptor, a no-op if already polled.
-     */
-    private void deregister(int fdVal) {
-        Thread previous = map.remove(fdVal);
-        assert previous == null || previous == Thread.currentThread();
-        if (previous != null) {
-            implDeregister(fdVal);
-        }
-    }
-
-    /**
-     * Parks the current thread until a file descriptor is ready for the given op.
-     * @param fdVal the file descriptor
-     * @param event POLLIN or POLLOUT
-     * @param nanos the waiting time or 0 to wait indefinitely
-     * @param supplier supplies a boolean to indicate if the enclosing object is open
-     */
-    public static void poll(int fdVal, int event, long nanos, BooleanSupplier supplier)
-        throws IOException
-    {
-        assert nanos >= 0L;
-        if (event == Net.POLLIN) {
-            readPoller(fdVal).poll(fdVal, nanos, supplier);
-        } else if (event == Net.POLLOUT) {
-            writePoller(fdVal).poll(fdVal, nanos, supplier);
-        } else {
-            assert false;
-        }
-    }
-
-    /**
-     * Parks the current thread until a file descriptor is ready.
-     */
-    private void poll(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
-        if (asyncUpdate) {
-            poll1(fdVal, nanos, supplier);
-        } else {
-            poll2(fdVal, nanos, supplier);
-        }
-    }
-
-    /**
-     * Parks the current thread until a file descriptor is ready. This implementation
-     * queues the file descriptor to the update thread, then parks.
-     */
-    private void poll1(int fdVal, long nanos, BooleanSupplier supplier) {
-        Request request = registerAsync(fdVal);
-        try {
-            boolean isOpen = supplier.getAsBoolean();
-            if (isOpen) {
-                if (nanos > 0) {
-                    LockSupport.parkNanos(nanos);
-                } else {
-                    LockSupport.park();
-                }
-            }
-        } finally {
-            request.awaitFinish();
-            deregister(fdVal);
-        }
-    }
-
-    /**
-     * Parks the current thread until a file descriptor is ready. This implementation
-     * registers the file descriptor to the update thread, then parks.
-     */
-    private void poll2(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
-        register(fdVal);
-        try {
-            boolean isOpen = supplier.getAsBoolean();
-            if (isOpen) {
-                if (nanos > 0) {
-                    LockSupport.parkNanos(nanos);
-                } else {
-                    LockSupport.park();
-                }
-            }
-        } finally {
-            deregister(fdVal);
-        }
-    }
-
-    /**
      * Maps the file descriptor value to a read poller.
      */
     private static Poller readPoller(int fdVal) {
@@ -324,7 +309,7 @@ public abstract class Poller {
     }
 
     /**
-     * Unparks any threads that are polling the given file descriptor for the
+     * Unparks any thread that is polling the given file descriptor for the
      * given event.
      */
     static void stopPoll(int fdVal, int event) {
@@ -390,6 +375,29 @@ public abstract class Poller {
      */
     int fdVal() {
         return -1;
+    }
+
+    /**
+     * Creates the read and writer pollers.
+     */
+    static {
+        PollerProvider provider = PollerProvider.provider();
+        String s = GetPropertyAction.privilegedGetProperty("jdk.useDirectRegister");
+        if (s == null) {
+            USE_DIRECT_REGISTER = provider.useDirectRegister();
+        } else {
+            USE_DIRECT_REGISTER = "".equals(s) || Boolean.parseBoolean(s);
+        }
+        try {
+            Poller[] readPollers = createReadPollers(provider);
+            READ_POLLERS = readPollers;
+            READ_MASK = readPollers.length - 1;
+            Poller[] writePollers = createWritePollers(provider);
+            WRITE_POLLERS = writePollers;
+            WRITE_MASK = writePollers.length - 1;
+        } catch (IOException ioe) {
+            throw new IOError(ioe);
+        }
     }
 
     /**

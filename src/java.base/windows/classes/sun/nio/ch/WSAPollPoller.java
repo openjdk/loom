@@ -87,7 +87,7 @@ class WSAPollPoller extends Poller {
      * operations.
      */
     WSAPollPoller(boolean read) throws IOException {
-        super(read, false);
+        super(read);
 
         this.pollArrayAddress = WSAPoll.allocatePollArray(INITIAL_CAPACITY);
         this.pollArrayCapacity = INITIAL_CAPACITY;
