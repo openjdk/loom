@@ -331,7 +331,7 @@ public:
   template <class T> inline void do_oop_work(T* p) {
     oop value = (oop)HeapAccess<>::oop_load(p);
     if (store) HeapAccess<>::oop_store(p, value);
-    log_develop_trace(jvmcont)("barriers_for_oops_in_frame narrow: %d p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
+    log_develop_trace(jvmcont)("BarrierClosure::do_oop narrow: %d p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
   }
 };
 
@@ -395,9 +395,6 @@ public:
 
     _num_frames++;
     assert (_closure != nullptr, "");
-
-    assert (mixed || !f.is_deoptimized(), "");
-    if (mixed && f.is_compiled()) f.handle_deopted();
 
     if (Devirtualizer::do_metadata(_closure)) {
       if (f.is_interpreted()) {
@@ -523,14 +520,10 @@ template void InstanceStackChunkKlass::relativize_derived_pointers<true> (const 
 
 
 template <bool store, bool mixed, typename RegisterMapT>
-void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) return;
-  log_develop_trace(jvmcont)("InstanceStackChunkKlass::invoke_barriers sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(f.sp()), p2i(f.pc()));
-
-  if (log_develop_is_enabled(Trace, jvmcont) && !mixed && f.is_interpreted()) f.cb()->print_value_on(tty);
-
-  if (mixed) f.handle_deopted(); // we could freeze deopted frames in slow mode.
+  log_develop_trace(jvmcont)("InstanceStackChunkKlass::do_barriers sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(f.sp()), p2i(f.pc()));
 
   if (f.is_interpreted()) {
     Method* m = f.to_frame().interpreter_frame_method();
@@ -559,22 +552,17 @@ void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkF
   }
   OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
 
-  // if (has_derived) { // we do this in fix_thawed_frame
-  //   derelativize_derived_pointers(f, map);
-  // }
+  // if (has_derived) derelativize_derived_pointers(f, map); // we do this in fix_thawed_frame
 }
 
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-
-template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
 
 template <bool store>
 class DoBarriersStackClosure {
@@ -584,19 +572,19 @@ public:
 
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-    InstanceStackChunkKlass::do_barriers<store>(_chunk, f, map);
+    InstanceStackChunkKlass::do_barriers0<store>(_chunk, f, map);
     return true;
   }
 };
-
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk);
-template void InstanceStackChunkKlass::do_barriers<true>(stackChunkOop chunk);
 
 template <bool store>
 void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
   DoBarriersStackClosure<store> closure(chunk);
   chunk->iterate_stack(&closure);
 }
+
+template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk);
+template void InstanceStackChunkKlass::do_barriers<true>(stackChunkOop chunk);
 
 #ifdef ASSERT
 template<class P>
@@ -698,22 +686,6 @@ void InstanceStackChunkKlass::build_bitmap(stackChunkOop chunk) {
   chunk->set_gc_mode(true); // must be set *after* the above closure
 }
 
-// template <bool store>
-// class BarriersIterateStackClosure {
-// public:
-//   template <bool mixed, typename RegisterMapT>
-//   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-//     InstanceStackChunkKlass::barriers_for_oops_in_frame<mixed, store>(f, map);
-//     return true;
-//   }
-// };
-
-// template <bool store>
-// void InstanceStackChunkKlass::barriers_for_oops_in_chunk(stackChunkOop chunk) {
-//   BarriersIterateStackClosure<store> frame_closure;
-//   chunk->iterate_stack(&frame_closure);
-// }
-
 // NOINLINE void InstanceStackChunkKlass::fix_chunk(stackChunkOop chunk) {
 //   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !chunk->requires_barriers());
 //   FixChunkIterateStackClosure frame_closure(chunk);
@@ -739,6 +711,9 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
     visitor.oops_do(&f, map, f.oop_map());
   }
 }
+
+template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const SmallRegisterMap* map);
 
 #ifdef ASSERT
 

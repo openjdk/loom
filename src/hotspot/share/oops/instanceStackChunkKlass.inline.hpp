@@ -114,19 +114,8 @@ StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, bool gc
   get_cb();
 
   if (mixed) {
-    if (!is_done() && is_interpreted()) {
-      _unextended_sp = unextended_sp_for_interpreter_frame();
-    } else {
-      _unextended_sp = _sp;
-    }
+    _unextended_sp = (!is_done() && is_interpreted()) ? unextended_sp_for_interpreter_frame() : _sp;
     assert (_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
-    // else if (is_compiled()) {
-    //   tty->print_cr(">>>>> XXXX"); os::print_location(tty, (intptr_t)nativeCall_before(pc())->destination());
-    //   assert (NativeCall::is_call_before(pc()) && nativeCall_before(pc()) != nullptr && nativeCall_before(pc())->destination() != nullptr, "");
-    //   if (Interpreter::contains(nativeCall_before(pc())->destination())) { // interpreted callee
-    //     _unextended_sp = unextended_sp_for_interpreter_frame_caller();
-    //   }
-    // }
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
 
@@ -480,6 +469,12 @@ inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_wo
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
 
+template <bool store, bool mixed, typename RegisterMapT>
+void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  if (mixed) f.handle_deopted(); // we could freeze deopted frames in slow mode.
+  do_barriers0<store>(chunk, f, map);
+}
+
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
   assert (obj->is_stackChunk(), "");
@@ -618,13 +613,9 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
     assert (!f.is_done(), "");
     assert (f.is_compiled(), "");
 
-    // if (f.sp() + f.frame_size() >= l) {
-      // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " stub-caller frame: %d", p2i(this), f.index());
-      // if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
-
-      should_continue = closure->template do_frame<mixed>((const StackChunkFrameStream<mixed>&)f, &full_map);
-    // }
+    should_continue = closure->template do_frame<mixed>((const StackChunkFrameStream<mixed>&)f, &full_map);
     f.next(map);
+    f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
   }
   assert (!f.is_stub(), "");
 

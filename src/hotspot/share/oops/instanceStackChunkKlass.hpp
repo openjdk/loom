@@ -60,6 +60,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class FixChunkIterateStackClosure;
   friend class MarkMethodsStackClosure;
   template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
+  template <bool store> friend class DoBarriersStackClosure;
 
 public:
   static const KlassID ID = InstanceStackChunkKlassID;
@@ -145,7 +146,7 @@ public:
   static void do_barriers(stackChunkOop chunk);
 
   template <bool store, bool mixed, typename RegisterMapT>
-  static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
+  inline static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
@@ -185,6 +186,9 @@ private:
 
   template <bool mixed, typename RegisterMapT>
   static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
+
+  template <bool store, bool mixed, typename RegisterMapT>
+  static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
 
   typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
   static void resolve_memcpy_functions();

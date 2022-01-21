@@ -130,7 +130,6 @@ public:
 
   template <typename RegisterMapT>
   static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
-  static address deopt_original_pc(intptr_t* sp, address pc, CodeBlob* cb);
 };
 
 DEBUG_ONLY(const char* Compiled::name = "Compiled";)
@@ -290,22 +289,6 @@ template<typename Self>
 inline int NonInterpreted<Self>::num_oops(const frame& f) {
   assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
   return f.num_oops() + Self::extra_oops;
-}
-
-
-address Compiled::deopt_original_pc(intptr_t* sp, address pc, CodeBlob* cb) {
-  // TODO DEOPT: unnecessary in the long term solution of unroll on freeze
-
-  assert (cb != nullptr && cb->is_compiled(), "");
-  CompiledMethod* cm = cb->as_compiled_method();
-  if (cm->is_deopt_pc(pc)) {
-    pc = *(address*)((address)sp + cm->orig_pc_offset());
-    assert(pc != nullptr, "");
-    assert(cm->insts_contains_inclusive(pc), "original PC must be in the main code section of the the compiled method (or must be immediately following it)");
-    assert(!cm->is_deopt_pc(pc), "");
-  }
-
-  return pc;
 }
 
 template<typename RegisterMapT>

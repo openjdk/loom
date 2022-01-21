@@ -54,7 +54,6 @@
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
-#include "runtime/continuation.inline.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
@@ -198,7 +197,7 @@ public:
   ContMirror(oop cont);
   ContMirror(const RegisterMap* map);
 
-  DEBUG_ONLY(intptr_t hash() { return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1; })
+  NOT_PRODUCT(intptr_t hash() { return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1; })
 
   inline void read();
   inline void write();
@@ -791,7 +790,7 @@ public:
 
     _cont.write();
 
-    DEBUG_ONLY(log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());)
+    log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());
     if (log_develop_is_enabled(Trace, jvmcont)) chunk->print_on(true, tty);
 
     assert (_cont.chunk_invariant(), "");
@@ -815,7 +814,7 @@ public:
     ResourceMark rm;
   #endif
 
-    DEBUG_ONLY(log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());)
+    log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());
 
     assert (_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
 
@@ -1247,7 +1246,7 @@ public:
     if (UNLIKELY(senderf.oop_map() == nullptr)) return freeze_pinned_native; // native frame
     if (UNLIKELY(Compiled::is_owning_locks(_cont.thread(), &map, senderf))) return freeze_pinned_monitor;
 
-    freeze_result result = recurse_freeze_compiled_frame(senderf, caller, 0, 0);
+    freeze_result result = recurse_freeze_compiled_frame(senderf, caller, 0, 0); // This might be deoptimized
     if (UNLIKELY(result > freeze_ok_bottom)) return result;
     assert (result != freeze_ok_bottom, "");
     assert (!caller.is_interpreted_frame(), "");
@@ -1444,7 +1443,7 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preem
 
   thread->set_cont_yield(false);
 
-  DEBUG_ONLY(log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());)
+  log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
   return 0;
 }
@@ -1492,7 +1491,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(current, oopCont);
-  DEBUG_ONLY(log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));)
+  log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
@@ -1816,8 +1815,6 @@ private:
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
 
-  bool should_deoptimize() { return true; /* _thread->is_interp_only_mode(); */ } // TODO PERF
-
 public:
   DEBUG_ONLY(int _mode;)
   DEBUG_ONLY(bool barriers() { return _barriers; })
@@ -2024,7 +2021,6 @@ public:
     bool last_interpreted = false;
     if (chunk->has_mixed_frames()) {
       last_interpreted = Interpreter::contains(chunk->pc());
-      log_develop_trace(jvmcont)("thaw: preempt; last_interpreted: %d", last_interpreted);
     }
 
     _stream = StackChunkFrameStream<true>(chunk);
@@ -2167,13 +2163,10 @@ public:
 
   template<typename FKind, bool bottom>
   inline void patch(frame& f, const frame& caller) {
-    // assert (_cont.is_empty0() == _cont.is_empty(), "is_empty0: %d is_empty: %d", _cont.is_empty0(), _cont.is_empty());
-    if (bottom && !_cont.is_empty()) {
-      log_develop_trace(jvmcont)("Setting return address to return barrier: " INTPTR_FORMAT, p2i(StubRoutines::cont_returnBarrier()));
-      FKind::patch_pc(caller, StubRoutines::cont_returnBarrier());
-    } else if (bottom || should_deoptimize()) {
-      FKind::patch_pc(caller, caller.raw_pc()); // this patches the return address to the deopt handler if necessary
+    if (bottom) {
+      FKind::patch_pc(caller, _cont.is_empty() ? caller.raw_pc() : StubRoutines::cont_returnBarrier());
     }
+
     patch_pd<FKind, bottom>(f, caller); // TODO R: reevaluate if and when this is necessary -- only bottom and interpreted caller?
 
     if (FKind::interpreted) {
@@ -2282,9 +2275,13 @@ public:
       f.cb()->as_nmethod()->run_nmethod_entry_barrier();
     }
 
-    if (f.is_deoptimized_frame()) { // TODO PERF
+    if (f.is_deoptimized_frame()) {
       maybe_set_fastpath(f.sp());
-    } else if (should_deoptimize() && (f.cb()->as_compiled_method()->is_marked_for_deoptimization() || _thread->is_interp_only_mode())) {
+    } else if (_thread->is_interp_only_mode() 
+                || (_cont.is_preempted() && f.cb()->as_compiled_method()->is_marked_for_deoptimization())) {
+      // The caller of the safepoint stub when the continuation is preempted is not at a call instruction, and so
+      // cannot rely on nmethod patching for deopt.
+
       log_develop_trace(jvmcont)("Deoptimizing thawed frame");
       DEBUG_ONLY(Frame::patch_pc(f, nullptr));
 
@@ -2298,8 +2295,8 @@ public:
     }
 
     if (!bottom) {
-      log_develop_trace(jvmcont)("fix thawed caller");
-      InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance); // can only fix caller once this frame is thawed (due to callee saved regs)
+      // can only fix caller once this frame is thawed (due to callee saved regs)
+      InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
     } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
       clear_bitmap_bits(hsp + Compiled::size(hf), added_argsize);
     }
@@ -2324,7 +2321,7 @@ public:
       assert (!_stream.is_done(), "");
     }
 
-    recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames);
+    recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames); // this could be deoptimized
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, false, num_frames);)
 
@@ -2441,7 +2438,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
-  DEBUG_ONLY(log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));)
+  log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
 #ifdef ASSERT
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
@@ -2481,7 +2478,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   // assert (thread->last_continuation()->argsize() == 0 || Continuation::is_return_barrier_entry(*(address*)(thread->last_continuation()->bottom_sender_sp() - SENDER_SP_RET_ADDRESS_OFFSET)), "");
   assert (verify_continuation<3>(cont.mirror()), "");
-  DEBUG_ONLY(log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());)
+  log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
 
   return sp;
 }
