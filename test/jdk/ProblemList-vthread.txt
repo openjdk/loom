@@ -211,6 +211,7 @@ java/security/AccessController/DoPrivAccompliceTest.java
 java/security/AccessController/LimitedDoPrivileged.java
 java/security/Policy/SignedJar/SignedJarTest.java
 java/security/Provider/SecurityProviderModularTest.java
+java/security/Security/signedfirst/DynStatic.java
 javax/security/auth/login/modules/JaasModularClientTest.java
 javax/security/auth/login/modules/JaasModularDefaultHandlerTest.java
 sun/security/ssl/CertPathRestrictions/TLSRestrictions.java
