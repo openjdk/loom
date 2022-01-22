@@ -64,7 +64,7 @@ public:
 
   virtual void    fill_frame(int index, objArrayHandle  frames_array,
                              const methodHandle& method, TRAPS)=0;
-  
+
   oop continuation() { return _continuation(); }
   void set_continuation(Handle cont);
 
@@ -175,7 +175,7 @@ public:
                              int frame_count, int start_index,
                              objArrayHandle frames_array, TRAPS);
 
-  static void setContinuation(Handle stackStream, jlong magic, objArrayHandle frames_array, 
+  static void setContinuation(Handle stackStream, jlong magic, objArrayHandle frames_array,
                               Handle cont, TRAPS);
 };
 #endif // SHARE_PRIMS_STACKWALK_HPP

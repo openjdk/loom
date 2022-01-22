@@ -226,7 +226,7 @@ StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(_chunk());
 
   StackValue* res = StackValue::create_stack_value(&_fr, register_map(), sv);
-  
+
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(c);
   return res;
 }

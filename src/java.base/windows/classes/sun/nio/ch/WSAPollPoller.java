@@ -249,7 +249,7 @@ class WSAPollPoller extends Poller {
 
     /**
      * Add a pollfd entry to the poll array.
-     * 
+     *
      * @return the index of the pollfd entry in the poll array
      */
     private int add(int fd, short events) {

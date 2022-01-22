@@ -960,7 +960,7 @@ JvmtiEnv::SuspendThread(jthread thread) {
     if (java_thread != current) {
       err = suspend_thread(thread_oop, java_thread, true, NULL); // single suspend
       return err;
-    } 
+    }
   }
   // Do self suspend for current JavaThread.
   err = suspend_thread(thread_oop, current, true, NULL); // single suspend

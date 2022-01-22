@@ -28,7 +28,7 @@
 extern "C" {
 
 #define MAX_FRAME_COUNT 20
-#define FRAMES_TO_NOTIFY_POP 7 
+#define FRAMES_TO_NOTIFY_POP 7
 
 static jvmtiEnv *jvmti = NULL;
 static jthread exp_thread = NULL;
@@ -83,7 +83,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
 
       err = jvmti->NotifyFramePop(thread, depth);
       check_jvmti_status(jni, err, "MethodEntry: error in JVMTI NotifyFramePop");
-      
+
       err = jvmti->GetFrameLocation(thread, depth, &frame_method, &location);
       check_jvmti_status(jni, err, "MethodEntry: error in JVMTI GetFrameLocation");
 

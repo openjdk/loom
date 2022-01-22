@@ -57,7 +57,7 @@ import static org.testng.Assert.*;
 public class NetSockets {
 
     private static final long DELAY = 2000;
-    
+
     /**
      * Socket read/write, no blocking.
      */

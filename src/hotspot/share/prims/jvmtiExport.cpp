@@ -1694,7 +1694,7 @@ void JvmtiExport::continuation_yield_cleanup(JavaThread* thread, jint continuati
           MutexLocker mu(JvmtiThreadState_lock);
           ets->clear_frame_pop(frame_num);
         }
-      } 
+      }
     }
   }
 }
@@ -2205,7 +2205,7 @@ void JvmtiExport::post_field_modification_by_jni(JavaThread *thread, oop obj,
 
   if (thread->is_in_VTMT()) {
     return; // no events should be posted if thread is in a VTMT transition
-  }                   
+  }
 
   ResourceMark rm;
   fieldDescriptor fd;

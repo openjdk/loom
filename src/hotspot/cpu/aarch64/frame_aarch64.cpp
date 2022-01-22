@@ -275,7 +275,7 @@ void frame::patch_pc(Thread* thread, address pc) {
   }
 
   assert(!Continuation::is_return_barrier_entry(*pc_addr), "return barrier");
-  
+
   // Only generated code frames should be patched, therefore the return address will not be signed.
   assert(pauth_ptr_is_raw(*pc_addr), "cannot be signed");
   // Either the return address is the original one or we are going to
@@ -438,9 +438,9 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   // Use the raw version of pc - the interpreter should not have signed it.
   address sender_pc = this->sender_pc_maybe_signed();
 
-  if (Continuation::is_return_barrier_entry(sender_pc)) {	
-    if (map->walk_cont()) { // about to walk into an h-stack	
-      return Continuation::top_frame(*this, map);	
+  if (Continuation::is_return_barrier_entry(sender_pc)) {
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }

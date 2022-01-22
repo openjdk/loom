@@ -248,7 +248,7 @@ public class NioChannels {
             }
         });
     }
-    
+
     /**
      * ServerSocketChannel accept, no blocking.
      */
@@ -636,7 +636,7 @@ public class NioChannels {
     }
 
     // -- supporting classes --
-    
+
     /**
      * Creates a loopback connection
      */

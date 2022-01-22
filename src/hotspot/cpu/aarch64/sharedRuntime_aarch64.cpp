@@ -1203,7 +1203,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
                                  int& frame_complete,
                                  int& stack_slots) {
   //verify_oop_args(masm, method, sig_bt, regs);
-  Address resolve(SharedRuntime::get_resolve_static_call_stub(), 
+  Address resolve(SharedRuntime::get_resolve_static_call_stub(),
                   relocInfo::static_call_type);
 
   stack_slots = 2; // will be overwritten
@@ -1224,11 +1224,11 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   __ cmp(c_rarg2, (u1)0);
   __ br(Assembler::NE, call_thaw);
-  
+
   address mark = __ pc();
 //  __ relocate(resolve.rspec());
   //if (!far_branches()) {
-//  __ bl(resolve.target()); 
+//  __ bl(resolve.target());
   __ trampoline_call1(resolve, NULL, false);
 
   oop_maps->add_gc_map(__ pc() - start, map);
@@ -1253,10 +1253,10 @@ static void gen_continuation_enter(MacroAssembler* masm,
   exception_offset = __ pc() - start;
   {
       __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
-  
+
       continuation_enter_cleanup(masm);
       // __ mov(sp, rfp);
-  
+
       __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);
 

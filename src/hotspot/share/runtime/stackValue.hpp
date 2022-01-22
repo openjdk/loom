@@ -122,7 +122,7 @@ class StackValue : public ResourceObj {
     Location loc = ((LocationValue *)sv)->location();
     if (loc.type() == Location::invalid)
       return NULL;
-    
+
     address value_addr;
     if (!reg_map->in_cont()) {
       value_addr = loc.is_register()
@@ -137,7 +137,7 @@ class StackValue : public ResourceObj {
       value_addr = loc.is_register()
           ? reg_map->as_RegisterMap()->stack_chunk()->reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()))
           : reg_map->as_RegisterMap()->stack_chunk()->usp_offset_to_location(*fr, loc.stack_offset());
-        
+
       assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || (reg_map->thread() != NULL && reg_map->thread()->is_in_usable_stack(value_addr)), INTPTR_FORMAT, p2i(value_addr));
     }
     return value_addr;

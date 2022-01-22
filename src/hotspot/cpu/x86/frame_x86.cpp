@@ -147,8 +147,8 @@ bool frame::safe_for_sender(JavaThread *thread) {
       saved_fp = (intptr_t*) *(sender_sp - frame::sender_sp_offset);
     }
 
-    if (Continuation::is_return_barrier_entry(sender_pc)) {	
-      Continuation::fix_continuation_bottom_sender(thread, *this, &sender_pc, &sender_sp);	
+    if (Continuation::is_return_barrier_entry(sender_pc)) {
+      Continuation::fix_continuation_bottom_sender(thread, *this, &sender_pc, &sender_sp);
     }
 
     // If the potential sender is the interpreter then we can do some more checking
@@ -292,9 +292,9 @@ void frame::patch_pc(Thread* thread, address pc) {
 #ifdef ASSERT
   {
     frame f(this->sp(), this->unextended_sp(), this->fp(), pc);
-    assert(f.is_deoptimized_frame() == this->is_deoptimized_frame() && f.pc() == this->pc() && f.raw_pc() == this->raw_pc(), 
+    assert(f.is_deoptimized_frame() == this->is_deoptimized_frame() && f.pc() == this->pc() && f.raw_pc() == this->raw_pc(),
       "must be (f.is_deoptimized_frame(): %d this->is_deoptimized_frame(): %d "
-      "f.pc(): " INTPTR_FORMAT " this->pc(): " INTPTR_FORMAT " f.raw_pc(): " INTPTR_FORMAT " this->raw_pc(): " INTPTR_FORMAT ")", 
+      "f.pc(): " INTPTR_FORMAT " this->pc(): " INTPTR_FORMAT " f.raw_pc(): " INTPTR_FORMAT " this->raw_pc(): " INTPTR_FORMAT ")",
       f.is_deoptimized_frame(), this->is_deoptimized_frame(), p2i(f.pc()), p2i(this->pc()), p2i(f.raw_pc()), p2i(this->raw_pc()));
   }
 #endif
@@ -465,8 +465,8 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   address sender_pc = this->sender_pc();
 
   if (Continuation::is_return_barrier_entry(sender_pc)) {
-    if (map->walk_cont()) { // about to walk into an h-stack	
-      return Continuation::top_frame(*this, map);	
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }

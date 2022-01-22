@@ -66,7 +66,7 @@ public abstract class ThreadContainer extends StackableScope {
     public final Stream<ThreadContainer> children() {
         return ThreadContainers.children(this);
     }
-    
+
     /**
      * Return a count of the number of threads in this container.
      */

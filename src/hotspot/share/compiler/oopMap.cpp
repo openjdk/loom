@@ -580,8 +580,8 @@ void ImmutableOopMap::update_register_map(const frame *fr, RegisterMap *reg_map)
 #endif // COMPILER2
 }
 
-const ImmutableOopMap* OopMapSet::find_map(const frame *fr) { 
-  return find_map(fr->cb(), fr->pc()); 
+const ImmutableOopMap* OopMapSet::find_map(const frame *fr) {
+  return find_map(fr->cb(), fr->pc());
 }
 
 const ImmutableOopMap* OopMapSet::find_map(const CodeBlob* cb, address pc) {
@@ -771,7 +771,7 @@ const ImmutableOopMap* ImmutableOopMapSet::find_map_at_offset(int pc_offset) con
   return last->get_from(this);
 }
 
-ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) 
+ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap)
   : _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
   _has_derived_oops = oopmap->has_derived_oops();

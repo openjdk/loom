@@ -87,7 +87,7 @@ public class BufferedReader extends Reader {
 
     private static int defaultCharBufferSize = 8192;
     private static int defaultExpectedLineLength = 80;
-    
+
     /**
      * Creates a buffering character-input stream that uses an input buffer of
      * the specified size.

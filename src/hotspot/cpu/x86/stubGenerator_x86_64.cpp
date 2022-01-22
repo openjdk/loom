@@ -7900,7 +7900,7 @@ RuntimeStub* generate_cont_doYield() {
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
-    
+
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -7960,7 +7960,7 @@ RuntimeStub* generate_cont_doYield() {
     __ get_thread(r15_thread);
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
-    
+
     __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     continuation_enter_cleanup(_masm);
     __ pop(rbp);
@@ -8008,7 +8008,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ subq(rsp, rbx);             // make room for the thawed frames
     __ andptr(rsp, -16);           // align
-    
+
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // save original return value -- again
     }
@@ -8693,7 +8693,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   return map;
 }
 
-// on entry c_rarg1 points to the continuation 
+// on entry c_rarg1 points to the continuation
 //          rsp points to ContinuationEntry
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
@@ -8707,7 +8707,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rax);
   __ movl(rax, Address(r15_thread, JavaThread::held_monitor_count_offset()));
   __ movl(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rax);
-  
+
   __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), 0);
   __ reset_held_monitor_count(r15_thread);
 }
@@ -8723,7 +8723,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
   __ stop("incorrect rsp1");
   __ bind(OK);
 #endif
-  
+
   __ movptr(rbx, Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), rbx);
   __ movl(rbx, Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()));

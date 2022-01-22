@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class Reflection {
-    
+
     // -- invoke static method --
 
     @Test

@@ -33,7 +33,7 @@ import jdk.internal.misc.Unsafe;
 class WSAPoll {
     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
     private static final int ADDRESS_SIZE = UNSAFE.addressSize();
-    
+
     private WSAPoll() { }
 
     /**

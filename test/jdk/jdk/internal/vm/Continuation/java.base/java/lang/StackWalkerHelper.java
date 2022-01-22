@@ -101,14 +101,14 @@ public final class StackWalkerHelper {
         // if (!Arrays.equals(la.getMonitors(), lb.getMonitors())) return false;
         // if (!slotsEqual(la.getLocals(), lb.getLocals())) return false;
         // if (!slotsEqual(la.getStack(),  lb.getStack()))  return false;
-        
+
         return true;
     }
 
     public static String frameToString(StackFrame sf) {
         if (!(sf instanceof LiveStackFrame))
             return sf.toString();
-        
+
         LiveStackFrame lsf = (LiveStackFrame) sf;
         var sb = new StringBuilder();
         sb.append(sf.toString()).append("\n");

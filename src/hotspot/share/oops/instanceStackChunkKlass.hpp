@@ -39,7 +39,7 @@ typedef VMRegImpl* VMReg;
 template <bool mixed = true> class StackChunkFrameStream;
 
 
-// An InstanceStackChunkKlass is a specialization of the InstanceKlass. 
+// An InstanceStackChunkKlass is a specialization of the InstanceKlass.
 // It has a header containing metadata, and a blob containing a stack segment
 // (some integral number of stack frames)
 //
@@ -56,7 +56,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class InstanceKlass;
   friend class stackChunkOopDesc;
   friend class Continuations;
-  template <bool mixed> friend class StackChunkFrameStream; 
+  template <bool mixed> friend class StackChunkFrameStream;
   friend class FixChunkIterateStackClosure;
   friend class MarkMethodsStackClosure;
   template <bool concurrent_gc, typename OopClosureType> friend class OopOopIterateStackClosure;
@@ -120,7 +120,7 @@ public:
 
   template<bool mixed = true>
   static int count_frames(stackChunkOop chunk);
-  
+
   // Oop fields (and metadata) iterators
   //
   // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
@@ -156,10 +156,10 @@ private:
 
   template<bool disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
   template<bool disjoint> size_t copy_compact(oop obj, HeapWord* to);
-  
+
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
-  
+
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
@@ -168,7 +168,7 @@ private:
 
   template <bool concurrent_gc, class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
-  
+
   template <class OopClosureType>
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
@@ -185,7 +185,7 @@ private:
 
   template <bool mixed, typename RegisterMapT>
   static void derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map);
-  
+
   typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
   static void resolve_memcpy_functions();
   static MemcpyFnT memcpy_fn_from_stack_to_chunk;
@@ -247,7 +247,7 @@ public:
   template <typename RegisterMapT> inline void next(RegisterMapT* map);
 
   template <typename RegisterMapT> inline void update_reg_map(RegisterMapT* map);
-  
+
   void handle_deopted() const;
 
   inline int to_offset(stackChunkOop chunk) const { assert (!is_done(), ""); return _sp - chunk->start_address(); }

@@ -139,7 +139,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStartLocalDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStopRemoteDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStatusDCmd>(jmx_agent_export_flags, true,false));
-    
+
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
 
   // Debug on cmd (only makes sense with JVMTI since the agentlib needs it).

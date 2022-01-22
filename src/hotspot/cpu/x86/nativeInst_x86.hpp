@@ -769,7 +769,7 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix && 
+    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix &&
       ((*(instr+1)) & 0xFF) == NativeDeoptInstruction::instruction_code;
   }
 

@@ -79,7 +79,7 @@ inline frame ContinuationHelper::last_frame(JavaThread* thread) {
   assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "must be");
 
   return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), nullptr, nullptr, true);
-  // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), 
+  // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(),
   //   StubRoutines::cont_doYield_stub(), StubRoutines::cont_doYield_stub()->oop_map_for_slot(0, anchor->last_Java_pc()), true);
 }
 
@@ -113,7 +113,7 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   *(hf.sp() - 1) = (intptr_t)hf.pc();
 
   intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
-  *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr) 
+  *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
                                        : (intptr_t)hf.fp();
 
   log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: %ld", p2i(hf.pc()), *fp_addr);
@@ -136,7 +136,7 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
   }
   intptr_t** link_addr = link_address<FKind>(f);
 
-  intptr_t* sender_sp = (intptr_t*)(link_addr + frame::sender_sp_offset); //  f.unextended_sp() + (fsize/wordSize); // 
+  intptr_t* sender_sp = (intptr_t*)(link_addr + frame::sender_sp_offset); //  f.unextended_sp() + (fsize/wordSize); //
   address sender_pc = (address) *(sender_sp-1);
   assert(sender_sp != f.sp(), "must have changed");
 
@@ -163,7 +163,7 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
     caller.set_sp(fp + frame::sender_sp_offset);
 
     assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
-    
+
     frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
@@ -178,7 +178,7 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
     caller.set_sp(sp + fsize);
 
     assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
-    
+
     return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
   }
 }
@@ -194,7 +194,7 @@ inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& 
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
-  
+
   relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
 
   assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
@@ -257,7 +257,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     if (bottom || caller.is_interpreted_frame()) {
       int argsize = hf.compiled_frame_stack_argsize();
       log_develop_trace(jvmcont)("thaw_compiled_frame add argsize: fsize: %d argsize: %d fsize: %d", fsize, argsize, fsize + argsize);
-      
+
       fsize += argsize;
       vsp   -= argsize;
       caller.set_sp(caller.sp() - argsize);
@@ -267,7 +267,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     }
 
     assert (hf.cb() != nullptr && hf.oop_map() != nullptr, "");
-    intptr_t* fp = FKind::stub 
+    intptr_t* fp = FKind::stub
       ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
       : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
@@ -290,13 +290,13 @@ inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& 
 template <typename ConfigT>
 inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
   // if (caller.is_interpreted_frame()) {
-  //   // Deoptimization likes ample room between interpreted frames and compiled frames. 
+  //   // Deoptimization likes ample room between interpreted frames and compiled frames.
   //   // This is due to caller_adjustment calculation in Deoptimization::fetch_unroll_info_helper.
   //   // An attempt to simplify that calculation and make more room during deopt has failed some tests.
 
   //   int addedWords = 0;
 
-  //   // SharedRuntime::gen_i2c_adapter makes room that's twice as big as required for the stack-passed arguments by counting slots but subtracting words from rsp 
+  //   // SharedRuntime::gen_i2c_adapter makes room that's twice as big as required for the stack-passed arguments by counting slots but subtracting words from rsp
   //   assert (VMRegImpl::stack_slot_size == 4, "");
   //   int argsize = hf.compiled_frame_stack_argsize();
   //   assert (argsize >= 0, "");

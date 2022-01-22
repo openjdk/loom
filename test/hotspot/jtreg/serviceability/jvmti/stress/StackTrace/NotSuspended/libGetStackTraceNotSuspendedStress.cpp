@@ -41,7 +41,7 @@ static void test_stack_trace(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
   if (err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
     LOG("Agent: No stacktrace for non-alive vthread\n");
     return;
-  } 
+  }
   check_jvmti_status(jni, err, "GetStackTrace returns error");
   if (count <= 0) {
     LOG("Agent: Stacktrace in virtual thread is incorrect: count: %d\n", count);

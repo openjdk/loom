@@ -416,20 +416,20 @@ bool oopDesc::mark_must_be_preserved(markWord m) const {
   return m.must_be_preserved(this);
 }
 
-size_t oopDesc::copy_disjoint(HeapWord* to) { 
-  return copy_disjoint(to, size()); 
+size_t oopDesc::copy_disjoint(HeapWord* to) {
+  return copy_disjoint(to, size());
 }
 
-size_t oopDesc::copy_conjoint(HeapWord* to) { 
-  return copy_conjoint(to, size()); 
+size_t oopDesc::copy_conjoint(HeapWord* to) {
+  return copy_conjoint(to, size());
 }
 
-size_t oopDesc::copy_disjoint_compact(HeapWord* to) { 
-  return copy_disjoint_compact(to, compact_size()); 
+size_t oopDesc::copy_disjoint_compact(HeapWord* to) {
+  return copy_disjoint_compact(to, compact_size());
 }
 
-size_t oopDesc::copy_conjoint_compact(HeapWord* to) { 
-  return copy_conjoint_compact(to, compact_size()); 
+size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
+  return copy_conjoint_compact(to, compact_size());
 }
 
 size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {

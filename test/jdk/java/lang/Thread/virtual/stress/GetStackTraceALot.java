@@ -76,7 +76,7 @@ public class GetStackTraceALot {
     }
 
     public static void main(String[] args) throws Exception {
-        int iterations = args.length > 0 ? Integer.parseInt(args[0]) 
+        int iterations = args.length > 0 ? Integer.parseInt(args[0])
                                          : 10_000;
 
         final int ITERATIONS = iterations;

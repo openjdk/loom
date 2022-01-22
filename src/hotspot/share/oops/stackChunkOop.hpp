@@ -48,7 +48,7 @@ private:
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
   static const uint8_t FLAG_GC_MODE = 1 << 2; // once this is true, it can never be false; also, once true, FLAG_HAS_INTERPRETED_FRAMES can't change
   static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
-  
+
 public:
   inline stackChunkOopDesc* parent() const;
   inline void set_parent(stackChunkOopDesc* value);
@@ -111,7 +111,7 @@ public:
 
   bool verify(size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
-  template <class StackChunkFrameClosureType> 
+  template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   MemRegion range();

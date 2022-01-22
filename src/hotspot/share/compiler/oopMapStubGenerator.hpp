@@ -48,7 +48,7 @@ public:
   address thaw_stub() { return _thaw_stub; }
   bool generate();
   void free();
-  
+
   static address thaw_stub(address freeze_stub_address);
   static CodeBlob* code_blob(address thaw_stub_address);
 };

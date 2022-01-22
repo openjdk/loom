@@ -59,7 +59,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
       OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::derived_oop_value)
         continue;
-        
+
   #ifndef COMPILER2
       COMPILER1_PRESENT(ShouldNotReachHere();)
   #if INCLUDE_JVMCI

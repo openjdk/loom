@@ -730,7 +730,7 @@ JRT_LEAF(BasicType, Deoptimization::unpack_frames(JavaThread* thread, int exec_m
   HandleMark hm(thread);
 
   frame stub_frame = thread->last_frame();
-  
+
   Continuation::notify_deopt(thread, stub_frame.sp());
 
   // Since the frame to unpack is the top frame of this thread, the vframe_array_head

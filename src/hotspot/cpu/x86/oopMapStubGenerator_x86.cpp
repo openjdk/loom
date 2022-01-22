@@ -1079,7 +1079,7 @@ public:
         OopMapValue omv = oms.current();
         if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
           continue;
-        
+
         VMReg reg = omv.reg();
 
         // read value from array
@@ -1297,7 +1297,7 @@ public:
         OopMapValue omv = oms.current();
         if (omv.type() != OopMapValue::derived_oop_value)
           continue;
-          
+
         if (!derived_init) {
           _masm->push(r11);
           derived_init = true;

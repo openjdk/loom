@@ -192,7 +192,7 @@ test_vthread_suspend_all(JNIEnv* jni, const jthread* thread_list, int suspend_ma
     } else {
       // thread is not in exclude list or was initially suspended: expected to be suspended
       check_suspended_state(jni, thread, idx, tname, "SuspendAllVirtualThreads");
-    } 
+    }
     deallocate(jvmti, jni, (void*)tname);
   }
   LOG("\n## Agent: test_vthread_suspend_all finished\n");
@@ -255,7 +255,7 @@ check_threads_resumed_state(JNIEnv* jni, const jthread* thread_list, int thread_
   for (int idx = 0; idx < thread_cnt; idx++) {
     jthread thread = thread_list[idx];
     char* tname = get_thread_name(jvmti, jni, thread);
-    
+
     check_resumed_state(jni, thread, idx, tname, "<Final-Sanity-Check>");
     deallocate(jvmti, jni, (void*)tname);
   }
@@ -263,7 +263,7 @@ check_threads_resumed_state(JNIEnv* jni, const jthread* thread_list, int thread_
 }
 
 JNIEXPORT void JNICALL
-Java_SuspendResumeAll_TestSuspendResume(JNIEnv* jni, jclass cls) { 
+Java_SuspendResumeAll_TestSuspendResume(JNIEnv* jni, jclass cls) {
   jthread* tested_cthreads = NULL;
   jint cthread_cnt = get_cthreads(jni, &tested_cthreads);
 

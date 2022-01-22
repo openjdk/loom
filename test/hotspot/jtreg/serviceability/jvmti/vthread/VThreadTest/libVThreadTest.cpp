@@ -50,7 +50,7 @@ find_tinfo(JNIEnv* jni, const char* tname) {
   for (; idx < MAX_WORKER_THREADS; idx++) {
     inf = &tinfo[idx];
     if (inf->tname == NULL) {
-      inf->tname = (char*)malloc(strlen(tname) + 1); 
+      inf->tname = (char*)malloc(strlen(tname) + 1);
       strcpy(inf->tname, tname);
       break;
     }

@@ -66,7 +66,7 @@ public:
 
   CLDClosure* weak_clds()             { return &_weak._clds; }
   CLDClosure* strong_clds()           { return &_strong._clds; }
-  
+
   CodeBlobClosure* strong_codeblobs()      { return &_strong._strong_codeblobs; }
   CodeBlobClosure* weak_codeblobs()        { return &_weak._weak_codeblobs; }
 };

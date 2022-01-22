@@ -31,8 +31,8 @@ import jdk.internal.javac.PreviewFeature;
  * Thrown when a structure violation is detected.
  *
  * @see java.util.concurrent.StructuredTaskScope
- * @see ScopeLocal.Carrier#run(Runnable) 
- * @see ScopeLocal.Carrier#call(Callable) 
+ * @see ScopeLocal.Carrier#run(Runnable)
+ * @see ScopeLocal.Carrier#call(Callable)
  * @since 99
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)

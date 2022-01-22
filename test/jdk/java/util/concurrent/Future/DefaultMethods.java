@@ -66,7 +66,7 @@ public class DefaultMethods {
             }
         }
     }
-    
+
     /**
      * Test methods when the task has already completed with a result.
      */

@@ -1550,7 +1550,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   // A case of non-virtual thread.
   if (!is_virtual) {
     // Thread.suspend() is used in some tests. It sets jt->is_suspended() only.
-    if (java_thread->is_thread_suspended() || 
+    if (java_thread->is_thread_suspended() ||
         (!is_passive_cthread && java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }

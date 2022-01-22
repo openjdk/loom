@@ -75,7 +75,7 @@ public class contmon01 {
     public static volatile boolean startingBarrier = true;
     public static volatile boolean waitingBarrier = true;
     static Object lockFld = new Object();
-    
+
     public static void doSleep() {
         try {
             Thread.sleep(10);

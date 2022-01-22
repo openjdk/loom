@@ -193,7 +193,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni,
                 jthread thread, jthread cthread,
                 jboolean is_virtual, char* mname) {
   jvmtiError err;
-    
+
   // Verify that we did not get a METHOD_EXIT events when enabled on the cthread.
   if (received_method_exit_event) {
     passed = JNI_FALSE;

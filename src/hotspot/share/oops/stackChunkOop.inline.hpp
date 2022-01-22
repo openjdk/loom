@@ -59,9 +59,9 @@ inline void stackChunkOopDesc::set_mark_cycle(uint64_t value) { jdk_internal_vm_
 inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_vm_StackChunk::set_cont(this, value); }
 template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_vm_StackChunk::set_cont_raw<P>(this, value); }
 inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
-template<typename P> inline oop stackChunkOopDesc::cont() const { 
+template<typename P> inline oop stackChunkOopDesc::cont() const {
   // this is a special field used to detect GC processing status (see should_fix) and so we don't want to invoke a barrier directly on it
-  oop obj = jdk_internal_vm_StackChunk::cont_raw<P>(as_oop()); 
+  oop obj = jdk_internal_vm_StackChunk::cont_raw<P>(as_oop());
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
 }
@@ -74,7 +74,7 @@ inline intptr_t* stackChunkOopDesc::bottom_address() const { return start_addres
 inline intptr_t* stackChunkOopDesc::sp_address()  const { return start_address() + sp(); }
 
 inline int stackChunkOopDesc::to_offset(intptr_t* p) const {
-  assert(is_in_chunk(p) || (p >= start_address() && (p - start_address()) <= stack_size() + InstanceStackChunkKlass::metadata_words()), 
+  assert(is_in_chunk(p) || (p >= start_address() && (p - start_address()) <= stack_size() + InstanceStackChunkKlass::metadata_words()),
     "p: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(p), p2i(start_address()), p2i(bottom_address()));
   return p - start_address();
 }
@@ -122,7 +122,7 @@ inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
 inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
-inline bool stackChunkOopDesc::requires_barriers() const { 
+inline bool stackChunkOopDesc::requires_barriers() const {
   return Universe::heap()->requires_barriers(as_oop());
 }
 

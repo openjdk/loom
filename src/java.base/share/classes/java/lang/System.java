@@ -2463,11 +2463,11 @@ public final class System {
             public void setCause(Throwable t, Throwable cause) {
                 t.setCause(cause);
             }
-            
+
             public ProtectionDomain protectionDomain(Class<?> c) {
                 return c.protectionDomain();
             }
-            
+
             public MethodHandle stringConcatHelper(String name, MethodType methodType) {
                 return StringConcatHelper.lookupStatic(name, methodType);
             }
@@ -2497,7 +2497,7 @@ public final class System {
             public void exit(int statusCode) {
                 Shutdown.exit(statusCode);
             }
-            
+
             public Thread[] getAllThreads() {
                 return Thread.getAllThreads();
             }

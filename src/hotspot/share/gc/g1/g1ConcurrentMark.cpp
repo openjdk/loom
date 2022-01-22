@@ -813,7 +813,7 @@ G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1Concu
 
 void G1ConcurrentMark::pre_concurrent_start(GCCause::Cause cause) {
   assert_at_safepoint_on_vm_thread();
-    
+
   CodeCache::increment_marking_cycle();
 
   G1PreConcurrentStartTask cl(cause, this);

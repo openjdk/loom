@@ -1640,7 +1640,7 @@ public class StructuredTaskScopeTest {
 
             var policy = CompletionPolicy.compose(policy1, policy2);
             policy.handle(scope, future);
-            
+
             scope.join();
         }
     }

@@ -36,7 +36,7 @@ inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(re
   _thread = _reg_map.thread();
 }
 
-inline oop vframeStreamCommon::continuation() const { 
+inline oop vframeStreamCommon::continuation() const {
   if (_reg_map.cont() != NULL) return _reg_map.cont();
   if (_cont != NULL)           return _cont->continuation();
   return NULL;
@@ -72,7 +72,7 @@ inline void vframeStreamCommon::next() {
       assert (_cont != NULL, "");
       assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
-      
+
       oop scope = jdk_internal_vm_Continuation::scope(_cont->cont_oop());
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
@@ -84,11 +84,11 @@ inline void vframeStreamCommon::next() {
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;
-      }      
+      }
     }
 
     _frame = _frame.sender(&_reg_map);
-    
+
     if (cont_entry) {
       _cont = _cont->parent();
     }

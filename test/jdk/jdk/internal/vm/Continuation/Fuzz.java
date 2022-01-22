@@ -91,8 +91,8 @@ public class Fuzz implements Runnable {
     ////////////////
 
     enum Op {
-        CALL_I_INT, CALL_I_DBL, CALL_I_MANY, 
-        CALL_C_INT, CALL_C_DBL, CALL_C_MANY, 
+        CALL_I_INT, CALL_I_DBL, CALL_I_MANY,
+        CALL_C_INT, CALL_C_DBL, CALL_C_MANY,
         CALL_I_CTCH, CALL_C_CTCH,
         CALL_I_PIN, CALL_C_PIN,
         MH_I_INT, MH_C_INT, MH_I_MANY, MH_C_MANY,
@@ -131,7 +131,7 @@ public class Fuzz implements Runnable {
             }
             Op[] highProb0 = highProb.toArray(Op[]::new);
             Op[] lowProb0  = lowProb.toArray(Op[]::new);
-            
+
             int loops = 7;
             Op[] trace = new Op[length];
             for (int i=0; i < trace.length; i++) {
@@ -149,23 +149,23 @@ public class Fuzz implements Runnable {
         private int plusOrMinus(int n) { return rnd.nextInt(2*n + 1) - n; }
     }
 
-    static Stream<Op[]> random(Random rnd) { 
-        var g = new Generator(rnd); 
-        return Stream.iterate(0, x->x+1).map(__ -> g.generate()); 
+    static Stream<Op[]> random(Random rnd) {
+        var g = new Generator(rnd);
+        return Stream.iterate(0, x->x+1).map(__ -> g.generate());
     }
 
-    static void testRandom(long seed, int number) { 
+    static void testRandom(long seed, int number) {
         System.out.println("-- RANDOM (seed: " + seed + ") --");
-        testStream(random(new Random(seed)).limit(number)); 
+        testStream(random(new Random(seed)).limit(number));
     }
 
-    static void testFile(String fileName) { 
+    static void testFile(String fileName) {
         System.out.println("-- FILE (" + fileName + ") --");
-        try { 
-            testStream(file(TEST_DIR.resolve(fileName))); 
-        } catch (java.io.IOException e) { throw new RuntimeException(e); } 
+        try {
+            testStream(file(TEST_DIR.resolve(fileName)));
+        } catch (java.io.IOException e) { throw new RuntimeException(e); }
     }
-    
+
     static Stream<Op[]> file(Path file) throws java.io.IOException {
         return Files.lines(file).map(String::trim).filter(s -> !s.isBlank() && !s.startsWith("#")).map(Fuzz::parse);
     }
@@ -196,7 +196,7 @@ public class Fuzz implements Runnable {
             int yields = fuzz.test();
             time(start, "Test (" + yields + " yields)");
 
-            if (fuzz.checkCompilation()) 
+            if (fuzz.checkCompilation())
                 break;
         }
     }
@@ -283,7 +283,7 @@ public class Fuzz implements Runnable {
         var compile = new HashSet<Method>();
         for (Method m : Continuation.class.getDeclaredMethods()) {
             if (!WB.isMethodCompiled(m)) {
-                if (!Modifier.isNative(m.getModifiers()) 
+                if (!Modifier.isNative(m.getModifiers())
                     && (m.getName().startsWith("enter")
                      || m.getName().startsWith("yield"))) {
                     WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
@@ -320,7 +320,7 @@ public class Fuzz implements Runnable {
     boolean checkContinuationCompilation() {
         for (Method m : Continuation.class.getDeclaredMethods()) {
             if (!WB.isMethodCompiled(m)) {
-                if (!Modifier.isNative(m.getModifiers()) 
+                if (!Modifier.isNative(m.getModifiers())
                     && (m.getName().startsWith("enter")
                      || m.getName().startsWith("yield"))) {
                     return false;
@@ -373,7 +373,7 @@ public class Fuzz implements Runnable {
 
     void logOp(int iter) {
         if (!verbose) return;
-        
+
         int depth = depth();
         System.out.print("> " + depth + " ");
         indent(depth);
@@ -382,7 +382,7 @@ public class Fuzz implements Runnable {
 
     <T> T log(T result) {
         if (!verbose) return result;
-        
+
         int depth = depth();
         System.out.print("> " + depth + " ");
         indent(depth);
@@ -412,7 +412,7 @@ public class Fuzz implements Runnable {
         // To compute the expected result, we remove all YIELDs from the trace and run it
         Op[] trace0 = Arrays.stream(trace).filter(op -> op != Op.YIELD)
             .collect(Collectors.toList()).toArray(Op[]::new);
-        
+
         Fuzz f0 = new Fuzz(trace0);
         f0.run();
         return f0.result;
@@ -471,7 +471,7 @@ public class Fuzz implements Runnable {
         verifyStack(backtrace);
         verifyStack(backtrace, StackWalkerHelper.toStackTraceElement(fbacktrace));
         verifyStack(fbacktrace, lfbacktrace);
-        
+
         verifyStack(backtrace, cont.getStackTrace());
         verifyStack(fbacktrace, StackWalkerHelper.getStackFrames(cont));
         verifyStack(lfbacktrace, StackWalkerHelper.getLiveStackFrames(cont));
@@ -479,7 +479,7 @@ public class Fuzz implements Runnable {
     }
 
     static boolean isStackCaptureMechanism(Object sf) {
-        return Fuzz.class.getName().equals(sfClassName(sf)) 
+        return Fuzz.class.getName().equals(sfClassName(sf))
             && ("captureStack".equals(sfMethodName(sf)) || "verifyStack".equals(sfMethodName(sf)));
     }
 
@@ -534,24 +534,24 @@ public class Fuzz implements Runnable {
     static String sfClassName(Object f)  {
         return f instanceof String ? Fuzz.class.getName() :
             (f instanceof StackTraceElement ? ((StackTraceElement)f).getClassName()  : ((StackFrame)f).getClassName()); }
-    static String sfMethodName(Object f) { 
+    static String sfMethodName(Object f) {
         return f instanceof String ? (String)f :
             (f instanceof StackTraceElement ? ((StackTraceElement)f).getMethodName() : ((StackFrame)f).getMethodName()); }
 
     static boolean sfEquals(Object a, Object b) {
         if (a instanceof String)
             return sfClassName(a).equals(sfClassName(b)) && sfMethodName(a).equals(sfMethodName(b));
-        
+
         return a instanceof StackTraceElement ? Objects.equals(a, b)
                                               : StackWalkerHelper.equals((StackFrame)a, (StackFrame)b);
     }
 
-    static String sfToString(Object f) { 
+    static String sfToString(Object f) {
         return f instanceof StackFrame ? StackWalkerHelper.frameToString((StackFrame)f) : Objects.toString(f);
     }
 
     //// Static Helpers
-    
+
     static void rethrow(Throwable t) {
         if (t instanceof Error) throw (Error)t;
         if (t instanceof RuntimeException) throw (RuntimeException)t;
@@ -561,12 +561,12 @@ public class Fuzz implements Runnable {
     static <T> T[] arrayType(T[] array) {
         return (T[])java.lang.reflect.Array.newInstance(array.getClass().componentType(), 0);
     }
-   
+
     static void printTrace(Op[] trace) { System.out.println(write(trace)); }
 
-    static String write(Op[] trace) { 
-        return Arrays.stream(trace).map(Object::toString).collect(Collectors.joining(", ")); 
-    }  
+    static String write(Op[] trace) {
+        return Arrays.stream(trace).map(Object::toString).collect(Collectors.joining(", "));
+    }
 
     static Method method(Op op)       { return method.get(op); }
     static MethodHandle handle(Op op) { return handle.get(op); }
@@ -577,7 +577,7 @@ public class Fuzz implements Runnable {
         if (duration > 500)
             System.out.println(message + " in " + duration + " ms");
     }
- 
+
     //////
 
     private static final WhiteBox WB = WhiteBox.getWhiteBox();
@@ -626,7 +626,7 @@ public class Fuzz implements Runnable {
             method.put(Op.REF_I_INT,  method(Op.CALL_I_INT));
             method.put(Op.REF_C_INT,  method(Op.CALL_C_INT));
             method.put(Op.REF_I_MANY, method(Op.CALL_I_MANY));
-            method.put(Op.REF_C_MANY, method(Op.CALL_C_MANY)); 
+            method.put(Op.REF_C_MANY, method(Op.CALL_C_MANY));
 
             MethodHandles.Lookup lookup = MethodHandles.lookup();
 
@@ -678,7 +678,7 @@ public class Fuzz implements Runnable {
             default -> throw new AssertionError("Unknown op: " + current());
             }
         }
-        
+
         this.result = log(res);
     }
 

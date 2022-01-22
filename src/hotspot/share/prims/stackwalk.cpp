@@ -46,7 +46,7 @@
 #include "utilities/globalDefinitions.hpp"
 
 // setup and cleanup actions
-BaseFrameStream::BaseFrameStream(JavaThread* thread, Handle continuation) 
+BaseFrameStream::BaseFrameStream(JavaThread* thread, Handle continuation)
   : _thread(thread), _continuation(continuation), _anchor(0L) {
     assert (thread != NULL, "");
 }
@@ -94,7 +94,7 @@ void BaseFrameStream::set_continuation(Handle cont) {
 // }
 
 JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope, Handle cont)
-  : BaseFrameStream(thread, cont), 
+  : BaseFrameStream(thread, cont),
    _vfst(cont.is_null()
       ? vframeStream(thread, cont_scope)
       : vframeStream(cont(), cont_scope)) {
@@ -103,7 +103,7 @@ JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope
 
 LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle cont_scope, Handle cont)
    : BaseFrameStream(thread, cont), _cont_scope(cont_scope) {
-     
+
     _map = rm;
     if (cont.is_null()) {
       _jvf  = thread->last_java_vframe(rm);
@@ -114,9 +114,9 @@ LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle con
     }
 }
 
-void JavaFrameStream::next() { 
-  _vfst.next(); 
-  if (_vfst.method()->is_continuation_enter_intrinsic()) 
+void JavaFrameStream::next() {
+  _vfst.next();
+  if (_vfst.method()->is_continuation_enter_intrinsic())
     _vfst.next();
 }
 
@@ -124,7 +124,7 @@ void LiveFrameStream::next() {
   assert (_cont_scope.is_null() || cont() != (oop)NULL, "must be");
 
   oop cont = this->cont();
-  if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {    
+  if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {
     oop scope = jdk_internal_vm_Continuation::scope(cont);
     if (_cont_scope.not_null() && scope == _cont_scope()) {
       _jvf = NULL;
@@ -133,7 +133,7 @@ void LiveFrameStream::next() {
     _cont = _cont->parent();
   }
   assert (!Continuation::is_scope_bottom(_cont_scope(), _jvf->fr(), _jvf->register_map()), "");
-  
+
   _jvf = _jvf->java_sender();
 }
 
@@ -417,7 +417,7 @@ void LiveFrameStream::fill_live_stackframe(Handle stackFrame,
 //
 // Returns Object returned from AbstractStackWalker::doStackWalk call.
 //
-oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont_scope, Handle cont, 
+oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont_scope, Handle cont,
                     int frame_count, int start_index, objArrayHandle frames_array,
                     TRAPS) {
   ResourceMark rm(THREAD);
@@ -548,7 +548,7 @@ oop StackWalk::fetchFirstBatch(BaseFrameStream& stream, Handle stackStream,
 // Returns the end index of frame filled in the buffer.
 //
 jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
-                               int frame_count, int start_index, 
+                               int frame_count, int start_index,
                                objArrayHandle frames_array,
                                TRAPS)
 {

@@ -34,7 +34,7 @@ public class InterruptThreadTest {
     private static final String AGENT_LIB = "InterruptThreadTest";
     final Object lock = new Object();
     final AtomicBoolean isJNITestingCompleted = new AtomicBoolean(false);
-    
+
     native boolean testJvmtiFunctionsInJNICall(Thread vthread);
 
     private boolean iterrupted = false;
@@ -42,7 +42,7 @@ public class InterruptThreadTest {
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
             do {
-                try { 
+                try {
                     lock.wait(1);
                 } catch (InterruptedException ie) {
                     System.err.println("Virtual thread was interrupted as expected");
@@ -52,7 +52,7 @@ public class InterruptThreadTest {
         }
     };
 
-    void runTest() throws Exception { 
+    void runTest() throws Exception {
         Thread vthread = Thread.ofVirtual().name("VThread").start(pinnedTask);
         testJvmtiFunctionsInJNICall(vthread);
         isJNITestingCompleted.set(true);
@@ -69,7 +69,7 @@ public class InterruptThreadTest {
             System.err.println("Failed to load " + AGENT_LIB + " lib");
             System.err.println("java.library.path: " + System.getProperty("java.library.path"));
             throw ex;
-        } 
+        }
         InterruptThreadTest t = new InterruptThreadTest();
         t.runTest();
     }

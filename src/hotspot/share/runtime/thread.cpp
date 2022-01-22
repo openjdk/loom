@@ -1788,7 +1788,7 @@ bool JavaThread::java_suspend() {
   assert(!is_in_VTMT(), "no suspend allowed in VTMT transition");
   assert(!is_VTMT_disabler(), "no suspend allowed for VTMT disablers");
 #endif
-    
+
   guarantee(Thread::is_JavaThread_protected_by_TLH(/* target */ this),
             "missing ThreadsListHandle in calling context.");
   return this->handshake_state()->suspend();

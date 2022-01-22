@@ -475,7 +475,7 @@ address SharedRuntime::raw_exception_handler_for_return_address(JavaThread* curr
   if (Continuation::is_return_barrier_entry(return_address)) {
     return StubRoutines::cont_returnBarrierExc();
   }
-  
+
   // The fastest case first
   CodeBlob* blob = CodeCache::find_blob(return_address);
   CompiledMethod* nm = (blob != NULL) ? blob->as_compiled_method_or_null() : NULL;
@@ -1166,7 +1166,7 @@ Handle SharedRuntime::find_callee_info_helper(vframeStream& vfst, Bytecodes::Cod
 
     // Retrieve from a compiled argument list
     receiver = Handle(current, callerFrame.retrieve_receiver(&reg_map2));
-    assert (oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); // 
+    assert (oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); //
 
     if (receiver.is_null()) {
       THROW_(vmSymbols::java_lang_NullPointerException(), nullHandle);

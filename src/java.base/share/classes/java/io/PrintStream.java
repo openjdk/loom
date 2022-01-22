@@ -457,7 +457,7 @@ public class PrintStream extends FilterOutputStream
             }
         }
     }
-    
+
     private void lockedFlush() {
         try {
             ensureOpen();
@@ -491,7 +491,7 @@ public class PrintStream extends FilterOutputStream
             }
         }
     }
-    
+
     private void lockedClose() {
         if (!closing) {
             closing = true;
@@ -602,7 +602,7 @@ public class PrintStream extends FilterOutputStream
             trouble = true;
         }
     }
-    
+
     private void lockedWrite(int b) throws IOException {
         ensureOpen();
         out.write(b);
@@ -654,7 +654,7 @@ public class PrintStream extends FilterOutputStream
         if (autoFlush)
             out.flush();
     }
-    
+
 
     /**
      * Writes all bytes from the specified byte array to this stream. If
@@ -1546,7 +1546,7 @@ public class PrintStream extends FilterOutputStream
     public Charset charset() {
         return charset;
     }
-    
+
     static {
         SharedSecrets.setJavaIOCPrintStreamAccess(new JavaIOPrintStreamAccess() {
             public Object lock(PrintStream ps) {

@@ -242,7 +242,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
-  
+
   /* register agent proc and arg */
   if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
     return JNI_ERR;

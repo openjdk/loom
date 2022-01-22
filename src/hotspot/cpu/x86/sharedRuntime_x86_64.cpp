@@ -1469,7 +1469,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
   // if isContinue == 0
   //   _enterSP = sp
   // end
- 
+
   fill_continuation_entry(masm); // kills rax
 
   __ cmpl(c_rarg2, 0);

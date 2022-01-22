@@ -6621,7 +6621,7 @@ RuntimeStub* generate_cont_doYield() {
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
-    
+
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -6654,7 +6654,7 @@ RuntimeStub* generate_cont_doYield() {
     continuation_enter_cleanup(masm);
 
     __ bind(pinned); // pinned -- return to caller
-    
+
     __ leave();
     __ ret(lr);
 
@@ -6690,7 +6690,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
-    
+
     __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
     __ mov(sp, rscratch1);
     continuation_enter_cleanup(_masm);
@@ -6735,12 +6735,12 @@ RuntimeStub* generate_cont_doYield() {
     __ lea(rscratch1, ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
     __ br(rscratch1);
     __ bind(thaw_success);
-    
+
     // make room for the thawed frames
     __ sub(rscratch1, sp, rscratch2);
     __ andr(rscratch1, rscratch1, -16); // align
     __ mov(sp, rscratch1);
-    
+
     if (return_barrier) {
       // save original return value -- again
       __ fmovd(rscratch1, v0);
@@ -8127,7 +8127,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   return map;
 }
 
-// on entry c_rarg1 points to the continuation 
+// on entry c_rarg1 points to the continuation
 //          sp points to ContinuationEntry
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
@@ -8143,7 +8143,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ ldr(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
-  
+
   __ str(zr, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ reset_held_monitor_count(rthread);
 }
@@ -8159,7 +8159,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
   __ stop("incorrect sp1");
   __ bind(OK);
 #endif
-  
+
   __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ str(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));

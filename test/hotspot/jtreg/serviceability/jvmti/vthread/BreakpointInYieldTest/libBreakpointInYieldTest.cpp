@@ -184,7 +184,7 @@ JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
-  jvmtiError err; 
+  jvmtiError err;
 
   LOG("Agent_OnLoad started\n");
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {
