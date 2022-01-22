@@ -2861,8 +2861,13 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
-        UncaughtExceptionHandler ueh = uncaughtExceptionHandler;
-        return (ueh != null) ? ueh : getThreadGroup();
+        if (getState() == State.TERMINATED) {
+            // uncaughtExceptionHandler may be set to null after thread terminates
+            return null;
+        } else {
+            UncaughtExceptionHandler ueh = uncaughtExceptionHandler;
+            return (ueh != null) ? ueh : getThreadGroup();
+        }
     }
 
     /**
