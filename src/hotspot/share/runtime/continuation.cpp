@@ -361,7 +361,7 @@ ContMirror::ContMirror(const RegisterMap* map)
 #endif
   {
   assert(_cont != nullptr && oopDesc::is_oop_or_null(_cont), "Invalid cont: " INTPTR_FORMAT, p2i((void*)_cont));
-  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT, 
+  assert (_entry == nullptr || _cont == _entry->cont_oop(), "mirror: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT,
     p2i( (oopDesc*)_cont), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
   read();
 }
@@ -791,7 +791,7 @@ public:
 
     _cont.write();
 
-    log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());
+    DEBUG_ONLY(log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());)
     if (log_develop_is_enabled(Trace, jvmcont)) chunk->print_on(true, tty);
 
     assert (_cont.chunk_invariant(), "");
@@ -815,7 +815,7 @@ public:
     ResourceMark rm;
   #endif
 
-    log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());
+    DEBUG_ONLY(log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());)
 
     assert (_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
 
@@ -1444,7 +1444,7 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preem
 
   thread->set_cont_yield(false);
 
-  log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
+  DEBUG_ONLY(log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());)
 
   return 0;
 }
@@ -1492,7 +1492,7 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(current, oopCont);
-  log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+  DEBUG_ONLY(log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));)
 
   if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
@@ -2441,7 +2441,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (verify_continuation<1>(oopCont), "");
   ContMirror cont(thread, oopCont);
-  log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+  DEBUG_ONLY(log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));)
 
 #ifdef ASSERT
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
@@ -2481,7 +2481,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   // assert (thread->last_continuation()->argsize() == 0 || Continuation::is_return_barrier_entry(*(address*)(thread->last_continuation()->bottom_sender_sp() - SENDER_SP_RET_ADDRESS_OFFSET)), "");
   assert (verify_continuation<3>(cont.mirror()), "");
-  log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
+  DEBUG_ONLY(log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());)
 
   return sp;
 }
@@ -2832,7 +2832,7 @@ bool Continuation::unpin(JavaThread* current) {
   oop cont = ce->cont_oop();
   assert (cont != nullptr, "");
   assert (cont == ContinuationHelper::get_continuation(current), "");
-  
+
   jshort value = jdk_internal_vm_Continuation::critical_section(cont);
   if (value > 0) {
     jdk_internal_vm_Continuation::set_critical_section(cont, value - 1);
