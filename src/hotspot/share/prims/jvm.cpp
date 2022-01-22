@@ -3925,12 +3925,16 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   if (first_mount) {
     // thread start
     if (JvmtiExport::can_support_virtual_threads()) {
+      JvmtiEventController::thread_started(thread);
       if (JvmtiExport::should_post_vthread_start()) {
         JvmtiExport::post_vthread_start(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_start
       if (JvmtiExport::should_post_thread_life()) {
+        // JvmtiEventController::thread_started is called here
         JvmtiExport::post_thread_start(thread);
+      } else {
+        JvmtiEventController::thread_started(thread);
       }
     }
   }

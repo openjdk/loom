@@ -84,7 +84,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
 
   // in a case of unmounted virtual thread the thread can be NULL
   JvmtiThreadState *state = thread == NULL ? NULL : thread->jvmti_thread_state();
-  const char* action = "FOUND";
 
   if (state == NULL && thread != NULL && thread->is_exiting()) {
     // don't add a JvmtiThreadState to a thread that is exiting
@@ -100,7 +99,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
       if (thread_oop != NULL) { // thread_oop can be NULL at early VMStart
         java_lang_Thread::set_jvmti_thread_state(thread_oop, state);
       }
-      action = "CREATED";
     }
   }
   return state;
@@ -149,9 +147,6 @@ inline void JvmtiThreadState::bind_to(JavaThread* thread) {
 
   // bind JavaThread to JvmtiThreadState
   thread->set_jvmti_thread_state(this);
-
-  // TBD: This is hacky and may need a better solution.
-  JvmtiEventController::thread_started(thread);
 
   if (this != NULL) {
     // bind to JavaThread
