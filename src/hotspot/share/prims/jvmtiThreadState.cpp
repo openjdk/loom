@@ -112,7 +112,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   }
 
   if (thread_oop != NULL) {
-    java_lang_Thread::set_jvmti_thread_state(thread_oop, (JvmtiThreadState*)this);
+    java_lang_Thread::set_jvmti_thread_state(thread_oop, this);
     _is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
   }
 

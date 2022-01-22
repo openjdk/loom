@@ -3964,6 +3964,9 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_thread_end(thread);
       }
     }
+    if (thread->jvmti_thread_state() != NULL) {
+      JvmtiExport::cleanup_thread(thread);
+    }
   }
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");

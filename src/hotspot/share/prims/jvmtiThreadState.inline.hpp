@@ -96,9 +96,6 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
     }
     if (state == NULL) { // need to create state
       state = new JvmtiThreadState(thread, thread_oop);
-      if (thread_oop != NULL) { // thread_oop can be NULL at early VMStart
-        java_lang_Thread::set_jvmti_thread_state(thread_oop, state);
-      }
     }
   }
   return state;
