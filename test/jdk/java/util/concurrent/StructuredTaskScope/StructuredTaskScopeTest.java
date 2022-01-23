@@ -39,6 +39,7 @@ import java.util.concurrent.StructuredTaskScope.ShutdownOnSuccess;
 import java.util.concurrent.StructuredTaskScope.ShutdownOnFailure;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -50,6 +51,7 @@ import static org.testng.Assert.*;
 
 @Test
 public class StructuredTaskScopeTest {
+    private final static CompletionPolicy<Object> NULL_POLICY = (s, f) -> { };
 
     private ScheduledExecutorService scheduler;
 
@@ -89,7 +91,7 @@ public class StructuredTaskScopeTest {
     @Test(dataProvider = "factories")
     public void testFork1(ThreadFactory factory) throws Exception {
         AtomicInteger count = new AtomicInteger();
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             for (int i = 0; i < 100; i++) {
                 scope.fork(() -> count.incrementAndGet());
             }
@@ -108,7 +110,7 @@ public class StructuredTaskScopeTest {
             count.incrementAndGet();
             return factory.newThread(task);
         };
-        try (var scope = StructuredTaskScope.<Object>open(null, countingFactory)) {
+        try (var scope = StructuredTaskScope.open(null, countingFactory, NULL_POLICY)) {
             for (int i = 0; i < 100; i++) {
                 scope.fork(() -> null);
             }
@@ -162,7 +164,7 @@ public class StructuredTaskScopeTest {
     @Test(dataProvider = "factories")
     public void testForkAfterShutdown(ThreadFactory factory) throws Exception {
         AtomicInteger count = new AtomicInteger();
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             scope.shutdown();
             Future<String> future = scope.fork(() -> {
                 count.incrementAndGet();
@@ -179,7 +181,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testForkAfterClose(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             scope.join();
             scope.close();
             expectThrows(IllegalStateException.class, () -> scope.fork(() -> null));
@@ -191,7 +193,7 @@ public class StructuredTaskScopeTest {
      */
     public void testForkReject() throws Exception {
         ThreadFactory factory = task -> null;
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             expectThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
             scope.join();
         }
@@ -201,16 +203,16 @@ public class StructuredTaskScopeTest {
      * CompletionPolicy that collects all Future objects notified to the handle method.
      */
     private static class CollectAll<V> implements CompletionPolicy<V> {
-        final StructuredTaskScope<V> scope;
-        final List<Future<V>> futures = new CopyOnWriteArrayList<>();
+        private final List<Future<V>> futures = new CopyOnWriteArrayList<>();
+        private volatile StructuredTaskScope<V> expectedScope;
 
-        CollectAll(StructuredTaskScope<V> scope) {
-            this.scope = scope;
+        void setExpectedScope(StructuredTaskScope<V> scope) {
+            expectedScope = scope;
         }
 
         @Override
         public void handle(StructuredTaskScope<V> scope, Future<V> future) {
-            assertTrue(scope == this.scope);
+            assertTrue(scope == expectedScope);
             assertTrue(future.isDone());
             futures.add(future);
         }
@@ -225,27 +227,27 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test fork with policy operation. It should be invoked for tasks that
-     * complete normally and abnormally.
+     * Test that the completion policy is invoked for tasks that complete normally and
+     * and abnormally.
      */
     @Test(dataProvider = "factories")
-    public void testForkWithCompletionPolicy1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<String>open(null, factory)) {
-            var policy = new CollectAll<String>(scope);
+    public void testCompletionPolicy1(ThreadFactory factory) throws Exception {
+        try (var policy = new CollectAll<String>();
+             var scope = StructuredTaskScope.<String>open(null, factory, policy)) {
+
+            policy.setExpectedScope(scope);
 
             // completes normally
-            Future<String> future1 = scope.fork(() -> "foo", policy);
+            Future<String> future1 = scope.fork(() -> "foo");
 
             // completes with exception
-            Future<String> future2 = scope.fork(() -> {
-                throw new FooException();
-            }, policy);
+            Future<String> future2 = scope.fork(() -> { throw new FooException(); });
 
             // cancelled
             Future<String> future3 = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
-            }, policy);
+            });
             future3.cancel(true);
 
             scope.join();
@@ -256,13 +258,14 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test fork with policy operation. It should not be invoked for tasks that
-     * complete after the scope has been shutdown
+     * Test that the completion policy is not invoked after the scope has been shutdown.
      */
     @Test(dataProvider = "factories")
-    public void testForkWithCompletionPolicy2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<String>open(null, factory)) {
-            var policy = new CollectAll<String>(scope);
+    public void testCompletionPolicy2(ThreadFactory factory) throws Exception {
+        try (var policy = new CollectAll<String>();
+             var scope = StructuredTaskScope.<String>open(null, factory, policy)) {
+
+            policy.setExpectedScope(scope);
 
             var latch = new CountDownLatch(1);
 
@@ -276,7 +279,7 @@ public class StructuredTaskScopeTest {
                     } catch (InterruptedException e) { }
                 }
                 return null;
-            }, policy);
+            });
 
             // start a second task to shutdown the scope after 500ms
             Future<String> future2 = scope.fork(() -> {
@@ -380,129 +383,6 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test setting completion policy. It should be invoked for tasks that
-     * complete normally and abnormally.
-     */
-    @Test(dataProvider = "factories")
-    public void testWithPolicy1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<String>open(null, factory)) {
-            var policy = new CollectAll<String>(scope);
-            scope.withPolicy(policy);
-
-            // completes normally
-            Future<String> future1 = scope.fork(() -> "foo");
-
-            // completes with exception
-            Future<String> future2 = scope.fork(() -> {
-                throw new FooException();
-            });
-
-            // cancelled
-            Future<String> future3 = scope.fork(() -> {
-                Thread.sleep(Duration.ofDays(1));
-                return null;
-            });
-            future3.cancel(true);
-
-            scope.join();
-
-            Set<Future<String>> futures = policy.futuresAsSet();
-            assertEquals(futures, Set.of(future1, future2, future3));
-        }
-    }
-
-    /**
-     * Test using withPolicy and the 2-arg fork method.
-     */
-    @Test(dataProvider = "factories")
-    public void testWithPolicy2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<String>open(null, factory)) {
-            var policy1 = new CollectAll<String>(scope);
-            var policy2 = new CollectAll<String>(scope);
-
-            scope.withPolicy(policy1);
-
-            Future<String> future1 = scope.fork(() -> "foo");
-            Future<String> future2 = scope.fork(() -> "bar", policy2);
-
-            scope.join();
-
-            assertEquals(policy1.futuresAsSet(), Set.of(future1));
-            assertEquals(policy2.futuresAsSet(), Set.of(future2));
-        }
-    }
-
-    /**
-     * Test setting completion policy to null. The completion policy that was
-     * set previously should not be invoked.
-     */
-    @Test(dataProvider = "factories")
-    public void testWithPolicy3(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<String>open(null, factory)) {
-            var policy = new CollectAll<String>(scope);
-
-            scope.withPolicy(policy);
-            Future<String> future1 = scope.fork(() -> "foo");
-            scope.join();
-            assertTrue(policy.futures().count() == 1);
-
-            scope.withPolicy(null);
-            Future<String> future2 = scope.fork(() -> "foo");
-            scope.join();
-            assertTrue(policy.futures().count() == 1);
-        }
-    }
-
-    /**
-     * Test withPolicy is owner confined.
-     */
-    @Test(dataProvider = "factories")
-    public void testWithPolicyConfined(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            // attempt to call withPolicy on thread in scope
-            Future<Void> future1 = scope.fork(() -> {
-                scope.withPolicy((s, f) -> { });
-                return null;
-            });
-            Throwable ex = expectThrows(ExecutionException.class, future1::get);
-            assertTrue(ex.getCause() instanceof WrongThreadException);
-
-            // random thread cannot call withPolicy
-            try (var pool = Executors.newCachedThreadPool(factory)) {
-                Future<Void> future2 = pool.submit(() -> {
-                    scope.withPolicy((s, f) -> { });
-                    return null;
-                });
-                ex = expectThrows(ExecutionException.class, future2::get);
-                assertTrue(ex.getCause() instanceof WrongThreadException);
-            }
-
-            scope.join();
-        }
-    }
-
-    /**
-     * Test withPolicy after fork.
-     */
-    public void testWithPolicyAfterFork() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            scope.fork(() -> "foo");
-            expectThrows(IllegalStateException.class, () -> scope.withPolicy((s, f) -> { }));
-            scope.join();
-        }
-    }
-
-    /**
-     * Test withPolicy after scope is closed.
-     */
-    public void testWithPolicyAfterClose() {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.withPolicy((s, f) -> { }));
-        }
-    }
-
-    /**
      * Test join with no threads.
      */
     public void testJoinWithNoThreads() throws Exception {
@@ -516,7 +396,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinWithThreads(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return "foo";
@@ -559,7 +439,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoin1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
@@ -585,7 +465,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoin2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
@@ -611,7 +491,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinWithShutdown1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
@@ -629,17 +509,16 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinWithShutdown2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (CompletionPolicy<String> policy = (s, f) -> s.shutdown();
+             var scope = StructuredTaskScope.open(null, factory, policy)) {
             Future<String> future1 = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
             });
-
-            CompletionPolicy<String> policy = (s, f) -> s.shutdown();
             Future<String> future2 = scope.fork(() -> {
                 Thread.sleep(Duration.ofMillis(500));
                 return null;
-            }, policy);
+            });
             scope.join();
 
             // task1 should have completed abnormally
@@ -677,7 +556,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(2));
@@ -697,7 +576,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
@@ -720,7 +599,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil3(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
@@ -748,7 +627,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinUntil4(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 try {
                     Thread.sleep(Duration.ofSeconds(30));
@@ -785,7 +664,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoinUntil1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
@@ -811,7 +690,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptJoinUntil2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofSeconds(3));
                 return "foo";
@@ -896,7 +775,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testCloseWithoutJoin2(ThreadFactory factory) {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
@@ -911,7 +790,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testCloseWithoutJoin3(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             scope.fork(() -> "foo");
             scope.join();
 
@@ -957,7 +836,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptClose1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             var latch = new CountDownLatch(1);
 
             // start task that does not respond to interrupt
@@ -993,7 +872,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testInterruptClose2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
             var latch = new CountDownLatch(1);
 
             // start task that does not respond to interrupt
@@ -1189,7 +1068,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture1(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
 
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofMillis(100));
@@ -1209,7 +1088,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture2(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
 
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofMillis(100));
@@ -1230,7 +1109,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testFuture3(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
 
             Future<String> future = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
@@ -1256,7 +1135,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testFutureWithShutdown(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open(null, factory)) {
+        try (var scope = StructuredTaskScope.open(null, factory, NULL_POLICY)) {
 
             // long running task
             Future<String> future = scope.fork(() -> {
@@ -1319,7 +1198,8 @@ public class StructuredTaskScopeTest {
      * Test toString includes the scope name.
      */
     public void testToString() throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open("xxx")) {
+        ThreadFactory factory = Thread.ofVirtual().factory();
+        try (var scope = StructuredTaskScope.open("xxx", factory, NULL_POLICY)) {
             // open
             assertTrue(scope.toString().contains("xxx"));
 
@@ -1338,31 +1218,20 @@ public class StructuredTaskScopeTest {
      * Test generics. This is a compile-time test.
      */
     public void testGenerics() throws Exception {
-        try (var scope = StructuredTaskScope.<Number>open()) {
-            CompletionPolicy<Object> policy1 = (s, f) -> { };
-            scope.withPolicy(policy1);
-
-            CompletionPolicy<Number> policy2 = (s, f) -> { };
-            scope.withPolicy(policy1);
-
-            Future<Number> future1 = scope.fork(() -> (Number) 99);
-            Future<Number> future2 = scope.fork(() -> (Integer) 99);
-            Future<Integer> future3 = scope.fork(() -> (Integer) 99);
-
-            scope.join();
-        }
     }
 
     /**
      * Test for NullPointerException.
      */
     public void testNulls() throws Exception {
-        expectThrows(NullPointerException.class, () -> StructuredTaskScope.<Object>open(null));
-        expectThrows(NullPointerException.class, () -> StructuredTaskScope.<Object>open("", null));
+        expectThrows(NullPointerException.class, () -> StructuredTaskScope.open(null));
+        expectThrows(NullPointerException.class,
+                     () -> StructuredTaskScope.open("", Thread.ofVirtual().factory(), null));
+        expectThrows(NullPointerException.class,
+                     () -> StructuredTaskScope.open("", null, NULL_POLICY));
 
         try (var scope = StructuredTaskScope.<Object>open()) {
             expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.fork(() -> null, null));
             expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
             scope.join();
         }
@@ -1415,8 +1284,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnSuccess with no completed tasks.
      */
     public void testShutdownOnSuccess1() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            var policy = new ShutdownOnSuccess<String>();
+        try (var policy = new ShutdownOnSuccess<String>();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // invoke handle with task that has not completed
             var future = new CompletableFuture<String>();
@@ -1434,8 +1303,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnSuccess with tasks that completed normally.
      */
     public void testShutdownOnSuccess2() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            var policy = new ShutdownOnSuccess<String>();
+        try (var policy = new ShutdownOnSuccess<String>();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
@@ -1456,8 +1325,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnSuccess with tasks that completed normally and abnormally.
      */
     public void testShutdownOnSuccess3() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            var policy = new ShutdownOnSuccess<String>();
+        try (var policy = new ShutdownOnSuccess<String>();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // tasks complete with result
             var future1 = new CompletableFuture<String>();
@@ -1478,8 +1347,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnSuccess with a task that completed with an exception.
      */
     public void testShutdownOnSuccess4() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            var policy = new ShutdownOnSuccess<String>();
+        try (var policy = new ShutdownOnSuccess<String>();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // failed task
             var future = new CompletableFuture<String>();
@@ -1500,8 +1369,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnSuccess with a cancelled task.
      */
     public void testShutdownOnSuccess5() throws Exception {
-        try (var scope = StructuredTaskScope.<String>open()) {
-            var policy = new ShutdownOnSuccess<String>();
+        try (var policy = new ShutdownOnSuccess<String>();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // cancelled task
             var future = new CompletableFuture<String>();
@@ -1521,8 +1390,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnFailure with no completed tasks.
      */
     public void testShutdownOnFailure1() throws Throwable {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            var policy = new ShutdownOnFailure();
+        try (var policy = new ShutdownOnFailure();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // invoke handle with task that has not completed
             var future = new CompletableFuture<Object>();
@@ -1541,8 +1410,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnFailure with tasks that completed normally.
      */
     public void testShutdownOnFailure2() throws Throwable {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            var policy = new ShutdownOnFailure();
+        try (var policy = new ShutdownOnFailure();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // tasks complete with result
             var future = new CompletableFuture<Object>();
@@ -1562,8 +1431,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnFailure with tasks that completed normally and abnormally.
      */
     public void testShutdownOnFailure3() throws Throwable {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            var policy = new ShutdownOnFailure();
+        try (var policy = new ShutdownOnFailure();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // tasks complete with result
             var future1 = new CompletableFuture<Object>();
@@ -1591,8 +1460,8 @@ public class StructuredTaskScopeTest {
      * Test ShutdownOnFailure with a cancelled task.
      */
     public void testShutdownOnFailure4() throws Throwable {
-        try (var scope = StructuredTaskScope.<Object>open()) {
-            var policy = new ShutdownOnFailure();
+        try (var policy = new ShutdownOnFailure();
+             var scope = StructuredTaskScope.open(policy)) {
 
             // cancelled task
             var future = new CompletableFuture<Object>();
@@ -1616,32 +1485,33 @@ public class StructuredTaskScopeTest {
      * Test CompletionPolicy.compose.
      */
     public void testCompletionPolicyCompose() throws Throwable {
-        try (var scope = StructuredTaskScope.<String>open()) {
+        // completed future
+        var future = new CompletableFuture<String>();
+        future.complete("foo");
 
-            // completed future
-            var future = new CompletableFuture<String>();
-            future.complete("foo");
+        var expectedScope = new AtomicReference<StructuredTaskScope<String>>();
+        var counter = new AtomicInteger();
 
-            AtomicInteger counter = new AtomicInteger();
 
-            // policy1 should run first
-            CompletionPolicy<String> policy1 = (s, f) -> {
-                assertTrue(s == scope);
-                assertTrue(f == future);
-                assertTrue(counter.incrementAndGet() == 1);
-            };
+        // policy1 should run first
+        CompletionPolicy<String> policy1 = (s, f) -> {
+            assertTrue(s == expectedScope.get());
+            assertTrue(f == future);
+            assertTrue(counter.incrementAndGet() == 1);
+        };
 
-            // policy1 should run second
-            CompletionPolicy<String> policy2 = (s, f) -> {
-                assertTrue(s == scope);
-                assertTrue(f == future);
-                assertTrue(counter.incrementAndGet() == 2);
-            };
+        // policy1 should run second
+        CompletionPolicy<String> policy2 = (s, f) -> {
+            assertTrue(s == expectedScope.get());
+            assertTrue(f == future);
+            assertTrue(counter.incrementAndGet() == 2);
+        };
 
-            var policy = CompletionPolicy.compose(policy1, policy2);
+        var policy = CompletionPolicy.compose(policy1, policy2);
+
+        try (var scope = StructuredTaskScope.open(policy)) {
+            expectedScope.set(scope);
             policy.handle(scope, future);
-
-            scope.join();
         }
     }
 

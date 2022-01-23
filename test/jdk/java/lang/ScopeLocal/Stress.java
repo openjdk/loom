@@ -83,15 +83,14 @@ public class Stress {
 
     private int deepBindings2(int depth) throws Exception {
         if (depth > 0) {
-            try (var unused = scopeLocals[depth].bind(depth)) {
-                try (var scope = StructuredTaskScope.open(null, factory.get())) {
-                    var future = scope.fork(
-                            () -> ScopeLocal.where(sl1, sl1.get() + 1)
-                                    .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
-                                    .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
-                    scope.join();
-                    return future.get();
-                }
+            try (var unused = scopeLocals[depth].bind(depth);
+                 var scope = StructuredTaskScope.<Object>open(null, factory.get(), (sc, f) -> { })) {
+                var future = scope.fork(
+                    () -> ScopeLocal.where(sl1, sl1.get() + 1)
+                            .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
+                            .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
+                scope.join();
+                return future.get();
             }
         } else {
             return sl2.get();
