@@ -179,7 +179,7 @@ import jdk.internal.javac.PreviewFeature;
  *     }
  * }
  *
- * <h2>Tree structure</h2>
+ * <h2><a id="TreeStructure">Tree structure</a></h2>
  *
  * StructuredTaskScopes form a tree where parent-child relations are established implicitly
  * when opening a new task scope:
@@ -194,9 +194,9 @@ import jdk.internal.javac.PreviewFeature;
  *
  * <p> The tree structure supports:
  * <ul>
+ *   <li> Inheritance of {@linkplain ScopeLocal scope-local} bindings by threads.
  *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
  *   descriptions means threads started in the task scope or descendant scopes.
- *   <li> Inheritance of {@linkplain ScopeLocal scope-local} bindings by threads.
  * </ul>
  *
  * <p> The following example demonstrates the inheritance of a scope-local binding. A scope
@@ -207,9 +207,8 @@ import jdk.internal.javac.PreviewFeature;
  * {@snippet lang=java :
  *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
  *
- *     // @link substring="where" target="ScopeLocal#bind" :
- *     try (var binding = ScopeLocal.where(NAME, "duke").bind();
- *          var scope = StructuredTaskScope.open(policy)) {
+ *     try (var binding = ScopeLocal.where(NAME, "duke").bind();  // @highlight regex="bind(?=\()"
+ *          var scope = StructuredTaskScope.open()) {
  *
  *         scope.fork(() -> childTask());    // @highlight substring="fork"
  *         ...
@@ -331,18 +330,10 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * and management. The task scope is owned by the current thread.
      *
      * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
-     * bindings for inheritance by threads created in the task scope.
-     *
-     * <p> For the purposes of confinement and inheritance of scope-local bindings, the
-     * parent of the task scope is determined as follows:
-     * <ul>
-     * <li> If the current thread is the owner of open task scopes then the most recently
-     * created, and open, task scope is the parent of the new task scope. In other words,
-     * the <em>enclosing task scope</em> is the parent.
-     * <li> If the current thread is not the owner of any open task scopes then the
-     * parent of the new task scope is the current thread's task scope. If the current
-     * thread was not started in a task scope then the new task scope does not have a parent.
-     * </ul>
+     * bindings for inheritance by threads created in the task scope. The
+     * <a href="#TreeStructure">Tree Structure</a> section in the class description
+     * details how parent-child relations are established implicitly for the purpose of
+     * inheritance of scope-local bindings.
      *
      * @param name the name of the task scope, can be null
      * @param factory the thread factory
