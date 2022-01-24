@@ -519,8 +519,6 @@ public class Thread implements Runnable {
      *          if the current thread is interrupted while sleeping. The
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
-     * @throws  NullPointerException
-     *          if duration is null
      *
      * @since 99
      */
@@ -2391,7 +2389,6 @@ public class Thread implements Runnable {
      * </pre>
      *
      * @param  obj the object on which to test lock ownership
-     * @throws NullPointerException if obj is {@code null}
      * @return {@code true} if the current thread holds the monitor lock on
      *         the specified object.
      * @since 1.4
