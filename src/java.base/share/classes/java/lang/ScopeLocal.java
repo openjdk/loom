@@ -118,6 +118,7 @@ public final class ScopeLocal<T> {
 
     /**
      * The interface for a ScopeLocal try-with-resources binding.
+     * @since 99
      */
     @PreviewFeature(feature = SCOPE_LOCALS)
     public sealed interface Binder extends AutoCloseable permits BinderImpl {
@@ -136,8 +137,6 @@ public final class ScopeLocal<T> {
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
      * or method in this class will cause a {@link NullPointerException} to be thrown.
-     *
-     * @since 99
      */
     static sealed class Snapshot permits EmptySnapshot {
         final Snapshot prev;
@@ -194,6 +193,7 @@ public final class ScopeLocal<T> {
      * When map() or call() is invoked, the ScopeLocals bound in this set
      * are bound, such that calling the get() method returns the associated
      * value.
+     * @since 99
      */
     @PreviewFeature(feature=SCOPE_LOCALS)
     public static final class Carrier {
