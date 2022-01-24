@@ -71,7 +71,7 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
 
       address loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
 
-      DEBUG_ONLY(if (reg_map->should_skip_missing()) continue;)
+      DEBUG_ONLY(if (loc == NULL && reg_map->should_skip_missing()) continue;)
       guarantee(loc != NULL, "missing saved register");
       derived_pointer* derived_loc = (derived_pointer*)loc;
       oop* base_loc = fr->oopmapreg_to_oop_location(omv.content_reg(), reg_map);

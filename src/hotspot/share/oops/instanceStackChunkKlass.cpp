@@ -273,14 +273,14 @@ public:
 
       OrderAccess::loadload();
       intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
-      if (derived_int_val <= 0) { // an offset of 0 was observed on AArch64
+      if (derived_int_val <= 0) {
         return;
       }
 
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      assert (offset >= 0, "Derived pointer offset is %ld", offset); // an offset of 0 was observed on AArch64
+      assert (offset >= 0, "Derived pointer offset is %ld", offset);
       // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
       Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
     } else {
@@ -304,17 +304,11 @@ public:
 
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      if (offset <= 0) { // an offset of 0 was observed on AArch64
+      if (offset <= 0) {
         offset = -offset;
         assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "");
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
-  #ifdef ASSERT
-      else {
-        offset = offset - cast_from_oop<intptr_t>(base);
-        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "offset: " PTR_FORMAT " size: %zu", offset, (base->size() << LogHeapWordSize));
-      }
-  #endif
     }
   }
 };
@@ -744,10 +738,10 @@ public:
 
 class StackChunkVerifyOopsClosure : public OopClosure {
   stackChunkOop _chunk;
-  intptr_t* _sp;
+  intptr_t* _unextended_sp;
   int _count;
 public:
-  StackChunkVerifyOopsClosure(stackChunkOop chunk, intptr_t* sp) : _chunk(chunk), _sp(sp), _count(0) {}
+  StackChunkVerifyOopsClosure(stackChunkOop chunk, intptr_t* unextended_sp) : _chunk(chunk), _unextended_sp(unextended_sp), _count(0) {}
   int count() { return _count; }
   void do_oop(oop* p) override { (_chunk->has_bitmap() && UseCompressedOops) ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   void do_oop(narrowOop* p) override { do_oop_work(p); }
@@ -768,8 +762,10 @@ public:
 
 class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
   stackChunkOop _chunk;
+  intptr_t* _unextended_sp;
 public:
-  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk) : _chunk(chunk) {}
+
+  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk, intptr_t* unextended_sp) : _chunk(chunk), _unextended_sp(unextended_sp) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
@@ -784,11 +780,12 @@ public:
       ZGC_ONLY(assert (!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
       OrderAccess::loadload();
       intptr_t offset = Atomic::load((intptr_t*)derived_loc);
-      offset = offset <= 0 // an offset of 0 was observed on AArch64
+      offset = offset <= 0
                   ? -offset
                   : offset - cast_from_oop<intptr_t>(base);
 
       // Has been seen to fail on AArch64 for some reason
+      // It looks as if a derived pointer appears live in the oopMap but isn't used.
       // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
@@ -850,11 +847,11 @@ public:
     //   }
     // }
 
-    StackChunkVerifyOopsClosure oops_closure(_chunk, f.sp());
+    StackChunkVerifyOopsClosure oops_closure(_chunk, f.unextended_sp());
     f.iterate_oops(&oops_closure, map);
     assert (oops_closure.count() == num_oops, "oops: %d oopmap->num_oops(): %d", oops_closure.count(), num_oops);
 
-    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk);
+    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk, f.unextended_sp());
     f.iterate_derived_pointers(&derived_oops_closure, map);
 
     _callee_interpreted = f.is_interpreted();

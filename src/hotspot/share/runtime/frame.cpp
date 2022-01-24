@@ -1317,11 +1317,15 @@ public:
       values.describe(frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), frame_no));
     }
   }
-  virtual void do_oop(oop* p)       { _oops->push(p); }
-  virtual void do_oop(narrowOop* p) { _narrow_oops->push(p); }
-  virtual void do_derived_oop(oop* base, derived_pointer* derived) {
-    _base->push(base);
-    _derived->push(derived);
+  virtual void do_oop(oop* p) override { _oops->push(p); }
+  virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+    // oop base = *base_loc;
+    // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
+    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
+
+    _base->push(base_loc);
+    _derived->push(derived_loc);
   }
 };
 
@@ -1335,7 +1339,7 @@ public:
   FrameValuesOopMapClosure(const frame* fr, const RegisterMap* reg_map, FrameValues& values, int frame_no)
    : _fr(fr), _reg_map(reg_map), _values(values), _frame_no(frame_no) {}
 
-  virtual void do_value(VMReg reg, OopMapValue::oop_types type) {
+  virtual void do_value(VMReg reg, OopMapValue::oop_types type) override {
     intptr_t* p = (intptr_t*)_fr->oopmapreg_to_location(reg, _reg_map);
     if (p != NULL && (((intptr_t)p & WordAlignmentMask) == 0)) {
       const char* type_name = NULL;

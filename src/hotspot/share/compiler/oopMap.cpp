@@ -498,6 +498,7 @@ void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
     derived_cl = &process_cl;
     break;
   case DerivedPointerIterationMode::_with_table:
+    // if (has_derived_oops()) { tty->print_cr(">>> ImmutableOopMap::oops_do derived table"); fr->print_on(tty); }
     derived_cl = &add_cl;
     break;
   case DerivedPointerIterationMode::_ignore:
@@ -1010,6 +1011,8 @@ void DerivedPointerTable::update_pointers() {
     derived_pointer derived_base = to_derived_pointer(base);
     *derived_loc = derived_base + offset;
     assert(*derived_loc - derived_base == offset, "sanity check");
+
+    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
 
     if (TraceDerivedPointers) {
       tty->print_cr("Updating derived pointer@" INTPTR_FORMAT
