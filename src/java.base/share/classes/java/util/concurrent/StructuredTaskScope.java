@@ -207,10 +207,11 @@ import jdk.internal.javac.PreviewFeature;
  * {@snippet lang=java :
  *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
  *
- *     try (var binding = ScopeLocal.where(NAME, "duke").bind();  // @highlight regex="bind(?=\()"
+ *     // @link regex="bind(?=\()" target="ScopeLocal#bind" :
+ *     try (var binding = NAME.bind("duke"));
  *          var scope = StructuredTaskScope.open()) {
  *
- *         scope.fork(() -> childTask());    // @highlight substring="fork"
+ *         scope.fork(() -> childTask());           // @highlight substring="fork"
  *         ...
  *      }
  *
