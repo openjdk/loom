@@ -35,6 +35,7 @@ import java.util.function.Supplier;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.ForceInline;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 import jdk.internal.vm.annotation.Stable;
 import sun.security.action.GetPropertyAction;
 
@@ -57,7 +58,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
- * <p> Scope locals  support nested bindings. If a scope local has a value
+ * <p> Scope locals support nested bindings. If a scope local has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
  * another operation with a new value. Code executed by this methods "sees" the new
  * value of the scope local. The scope local reverts to its previous value when the
@@ -95,11 +96,31 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  *    }
  * }</pre>
  *
- * Note, however, that this version is <i>insecure</i>: it is up to the application programmer
- * to make sure that bindings are closed at the right time. While a <i>try-with-resources</i>
- * statement is enough to guarantee this, there is no way to enforce the requirement that this form
- * is only used in a <i>try-with-resources</i> statement.
- * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal} with this <i>try-with-resources</i> binding.</p>
+ * This try-with-resources version of {@code bind()} is <i>insecure</i>: it is up
+ * to the application programmer to make sure that bindings are closed at the
+ * right time, in the right order. While a <i>try-with-resources</i> statement is
+ * enough to guarantee this, there is no way to enforce the requirement that
+ * {@link Carrier#bind} is only used in a <i>try-with-resources</i> statement.
+ * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal}
+ * with this <i>try-with-resources</i> binding.</p>
+ *
+ * @implNote Scope locals are designed to be used in fairly small numbers. {@link
+ * #get} initially performs a linear search through enclosing scopes to find a
+ * scope local's innermost binding. It then caches the result of the search in a
+ * small thread-local cache. Subsequent invocations of {@link #get} for that
+ * scope local will almost always be very fast. However, if a program has many
+ * scope locals that it uses cyclically, the cache hit rate will be low and
+ * performance will be poor. On the other hand, this design allows scope-local
+ * inheritance by {@link java.util.concurrent.StructuredTaskScope} threads to be
+ * very fast: in essence, no more than copying a pointer, and leaving a
+ * scope-local binding also requires little more than updating a pointer.
+ *
+ * Because the scope-local per-thread cache is small, you should try to minimize
+ * the number of bound scope locals in use. For example, if you need to pass a
+ * number of values as scope locals, it makes sense to create a record class to
+ * hold those values, and then bind a single scope local to an instance of that
+ * record.
+ *
  * @param <T> the scope local's type
  * @since 99
  */
@@ -125,13 +146,14 @@ public final class ScopeLocal<T> {
 
         /**
          * Closes this {@link ScopeLocal} binding. If this binding was not the most recent binding
-         * created by {@code Carrier.bind()}, throws a {@link StructureViolationException}.
+         * created by {@code #Carrier.bind}, throws a {@link StructureViolationException}.
          * This method is invoked automatically on objects managed by the try-with-resources statement.
          *
          * @throws StructureViolationException if the bindings were not closed in the correct order.
          */
         public void close();
     }
+
     /**
      * An immutable map from {@code ScopeLocal} to values.
      *
@@ -380,6 +402,15 @@ public final class ScopeLocal<T> {
          * <p>If any of the {@link ScopeLocal}s bound in this {@link Carrier} are already bound in an outer context,
          * throw a {@link RuntimeException}.</p>
          * @return a {@link ScopeLocal.Binder}.
+         *
+         * @implNote Using try-with-resources in this way is more expensive than
+         * using, for example, {@link Carrier#run} (or {@link Carrier#call})
+         * because it has to do consistency checking at runtime in order to
+         * ensure that scope locals are used in a correctly-nested way. Also,
+         * it's necessary to search for existing bindings, so it can fail at
+         * runtime. For those reasons, if your application can use {@link
+         * Carrier#run}, it will probably perform better as well as being more
+         * secure.
          */
         public ScopeLocal.Binder bind() {
             checkNotBound();
@@ -481,6 +512,15 @@ public final class ScopeLocal<T> {
      * throw a {@link RuntimeException}.</p>
      * @param t The value to bind this to
      * @return a {@link ScopeLocal.Binder}.
+     *
+     * @implNote Using try-with-resources in this way is more expensive than
+     * using, for example, {@link Carrier#run} (or {@link Carrier#call})
+     * because it has to do consistency checking at runtime in order to
+     * ensure that scope locals are used in a correctly-nested way. Also,
+     * it's necessary to search for existing bindings, so it can fail at
+     * runtime. For those reasons, if your application can use {@link
+     * Carrier#run}, it will probably perform better as well as being more
+     * secure.
      */
     public ScopeLocal.Binder bind(T t) {
         return where(this, t).bind();
@@ -740,28 +780,6 @@ public final class ScopeLocal<T> {
             }
         }
 
-
-/*
-        static Object find(ScopeLocal<?> key) {
-            Object[] objects;
-            var hash = key.hashCode();
-            if ((objects = Thread.scopeLocalCache()) != null) {
-                // This code should perhaps be in class Cache. We do it
-                // here because the generated code is small and fast and
-                // we really want it to be inlined in the caller.
-                int n = (hash & Cache.TABLE_MASK) * 2;
-                if (objects[n] == key) {
-                    return objects[n + 1];
-                }
-                n = ((hash >>> Cache.INDEX_BITS) & Cache.TABLE_MASK) * 2;
-                if (objects[n] == key) {
-                    return objects[n + 1];
-                }
-            }
-            return Snapshot.NIL;
-        }
-*/
-
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
             Thread.scopeLocalCache()[n * 2] = key;
             Thread.scopeLocalCache()[n * 2 + 1] = value;
@@ -788,11 +806,13 @@ public final class ScopeLocal<T> {
             return (tmp & 15) >= 5;
         }
 
+        @ReservedStackAccess
         public static void invalidate() {
             Thread.setScopeLocalCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
+        @ReservedStackAccess
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
