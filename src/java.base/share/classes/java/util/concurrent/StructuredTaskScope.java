@@ -57,16 +57,16 @@ import jdk.internal.javac.PreviewFeature;
  * to finish with the {@code join} method, and then <em>process the results</em>.
  * Processing of results may include handling or re-throwing of exceptions.
  * {@snippet lang=java :
- *     try (var scope = StructuredTaskScope.<String>open()) {  // @highlight substring="open"
+ *     try (var scope = StructuredTaskScope.open()) {     // @highlight substring="open"
  *
  *         Future<String> future1 = scope.fork(task1);    // @highlight substring="fork"
  *         Future<String> future2 = scope.fork(task2);    // @highlight substring="fork"
  *
- *         scope.join();    // @highlight substring="join"
+ *         scope.join();                                  // @highlight substring="join"
  *
  *         ... process results/exceptions ...
  *
- *     } // close // @highlight substring="close"
+ *     } // close                                         // @highlight substring="close"
  * }
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
  * by the <em>owner</em> (the thread that opened/created the StructuredTaskScope, and the
@@ -244,7 +244,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     private final ThreadFactory factory;
-    private final CompletionPolicy<? super T> policy;
+    private final CompletionPolicy<T> policy;
     private final ThreadFlock flock;
     private final ReentrantLock shutdownLock = new ReentrantLock();
 
@@ -260,7 +260,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     private static final int CLOSED   = 2;
     private volatile int state;
 
-    StructuredTaskScope(String name, ThreadFactory factory, CompletionPolicy<? super T> policy) {
+    StructuredTaskScope(String name, ThreadFactory factory, CompletionPolicy<T> policy) {
         this.factory = Objects.requireNonNull(factory, "'factory' is null");
         this.policy = Objects.requireNonNull(policy, "'policy' is null");
         this.flock = ThreadFlock.open(name);
@@ -287,7 +287,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     /**
      * Return the completion policy.
      */
-    private CompletionPolicy<? super T> policy() {
+    private CompletionPolicy<T> policy() {
         return policy;
     }
 
@@ -344,7 +344,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      */
     public static <T> StructuredTaskScope<T> open(String name,
                                                   ThreadFactory factory,
-                                                  CompletionPolicy<? super T> policy) {
+                                                  CompletionPolicy<T> policy) {
         return new StructuredTaskScope<>(name, factory, policy);
     }
 
@@ -363,7 +363,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @param <T> the result type of tasks executed in the scope
      * @return a new StructuredTaskScope
      */
-    public static <T> StructuredTaskScope<T> open(CompletionPolicy<? super T> policy) {
+    public static <T> StructuredTaskScope<T> open(CompletionPolicy<T> policy) {
         ThreadFactory factory = Thread.ofVirtual().factory();
         return new StructuredTaskScope<>(null, factory, policy);
     }
@@ -377,10 +377,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * with a name of {@code null}, a thread factory that creates virtual threads, and a
      * completion policy that does nothing.
      *
-     * @param <T> the result type of tasks executed in the scope
      * @return a new StructuredTaskScope
      */
-    public static <T> StructuredTaskScope<T> open() {
+    public static StructuredTaskScope<Object> open() {
         ThreadFactory factory = Thread.ofVirtual().factory();
         return new StructuredTaskScope<>(null, factory, (s, f) -> { });
     }
@@ -709,13 +708,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         protected void done() {
             if (!scope.isShutdown()) {
-                var policy = (CompletionPolicy<Object>) scope.policy();
-                var s = (StructuredTaskScope<Object>) this.scope;
-                var f = (Future<Object>) this;
-                policy.handle(s, f);
+                scope.policy().handle(scope, this);
             }
         }
 
