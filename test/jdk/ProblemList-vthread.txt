@@ -267,6 +267,10 @@ java/lang/invoke/condy/CondyNestedResolutionTest.java
 # Test memory consumption changed a little bit
 java/lang/RuntimeTests/exec/LotsOfOutput.java
 
+###
+# transform invoked during parking, attempts recursive park that deadlocks
+java/lang/instrument/NativeMethodPrefixAgent.java
+
 
 ####
 # Legacy socket I/O is interruptible in the context of virtual threads
