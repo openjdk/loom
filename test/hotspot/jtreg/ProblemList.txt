@@ -191,13 +191,8 @@ runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         82
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
 # SA needs update
-serviceability/sa/ClhsdbScanOops.java#id0                                      8279662 windows-all
-serviceability/sa/ClhsdbScanOops.java#id1                                      8279662 windows-all
-serviceability/sa/JhsdbThreadInfoTest.java                                     8243016 generic-all
-serviceability/sa/TestObjectMonitorIterate.java                                0000000 generic-all
-serviceability/sa/ClhsdbThreadContext.java                                     0000000 generic-all
-resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java	       0000000 generic-all
-resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                  0000000 generic-all
+serviceability/sa/ClhsdbThreadContext.java                                    8243016 generic-all
+serviceability/sa/JhsdbThreadInfoTest.java                                    8243016 generic-all
 
 vmTestbase/nsk/stress/strace/strace001.java                                   8254188 generic-all
 vmTestbase/nsk/stress/strace/strace002.java                                   8254188 generic-all

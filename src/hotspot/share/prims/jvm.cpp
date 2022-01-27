@@ -3964,13 +3964,17 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_thread_end(thread);
       }
     }
-    if (thread->jvmti_thread_state() != NULL) {
-      JvmtiExport::cleanup_thread(thread);
-    }
   }
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+
+  if (last_unmount && thread->jvmti_thread_state() != NULL) {
+    JvmtiExport::cleanup_thread(thread);
+    thread->set_jvmti_thread_state(NULL);
+    oop vt = JNIHandles::resolve(vthread);
+    java_lang_Thread::set_jvmti_thread_state(vt, NULL);
+  }
   thread->rebind_to_jvmti_thread_state_of(ct());
 #else
   fatal("Should only be called with JVMTI enabled");
