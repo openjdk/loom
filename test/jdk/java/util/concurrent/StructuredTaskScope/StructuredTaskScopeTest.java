@@ -124,8 +124,8 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testForkConfined(ThreadFactory factory) throws Exception {
-        try (var scope1 = StructuredTaskScope.<Object>open();
-             var scope2 = StructuredTaskScope.<Object>open()) {
+        try (var scope1 = StructuredTaskScope.open();
+             var scope2 = StructuredTaskScope.open()) {
 
             // thread in scope1 cannot fork thread in scope2
             Future<Void> future1 = scope1.fork(() -> {
@@ -233,7 +233,7 @@ public class StructuredTaskScopeTest {
     @Test(dataProvider = "factories")
     public void testCompletionPolicy1(ThreadFactory factory) throws Exception {
         try (var policy = new CollectAll<String>();
-             var scope = StructuredTaskScope.<String>open(null, factory, policy)) {
+             var scope = StructuredTaskScope.open(null, factory, policy)) {
 
             policy.setExpectedScope(scope);
 
@@ -263,7 +263,7 @@ public class StructuredTaskScopeTest {
     @Test(dataProvider = "factories")
     public void testCompletionPolicy2(ThreadFactory factory) throws Exception {
         try (var policy = new CollectAll<String>();
-             var scope = StructuredTaskScope.<String>open(null, factory, policy)) {
+             var scope = StructuredTaskScope.open(null, factory, policy)) {
 
             policy.setExpectedScope(scope);
 
@@ -305,7 +305,7 @@ public class StructuredTaskScopeTest {
     public void testForkInheritsScopeLocals1() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         String value = ScopeLocal.where(NAME, "x").call(() -> {
-            try (var scope = StructuredTaskScope.<Object>open()) {
+            try (var scope = StructuredTaskScope.open()) {
                 Future<String> future = scope.fork(() -> {
                     // child
                     return NAME.get();
@@ -323,7 +323,7 @@ public class StructuredTaskScopeTest {
     public void testForkInheritsScopeLocals2() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         try (var ignore = ScopeLocal.where(NAME, "x").bind();
-             var scope = StructuredTaskScope.<Object>open()) {
+             var scope = StructuredTaskScope.open()) {
             Future<String> future = scope.fork(() -> {
                 // child
                 return NAME.get();
@@ -339,9 +339,9 @@ public class StructuredTaskScopeTest {
     public void testForkInheritsScopeLocals3() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         String value = ScopeLocal.where(NAME, "x").call(() -> {
-            try (var scope1 = StructuredTaskScope.<Object>open()) {
+            try (var scope1 = StructuredTaskScope.open()) {
                 Future<String> future1 = scope1.fork(() -> {
-                    try (var scope2 = StructuredTaskScope.<Object>open()) {
+                    try (var scope2 = StructuredTaskScope.open()) {
                         Future<String> future2 = scope2.fork(() -> {
                             // grandchild
                             return NAME.get();
@@ -364,10 +364,10 @@ public class StructuredTaskScopeTest {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
 
         try (var binding = ScopeLocal.where(NAME, "x").bind();
-             var scope1 = StructuredTaskScope.<Object>open()) {
+             var scope1 = StructuredTaskScope.open()) {
 
             Future<String> future1 = scope1.fork(() -> {
-                try (var scope2 = StructuredTaskScope.<Object>open()) {
+                try (var scope2 = StructuredTaskScope.open()) {
                     Future<String> future2 = scope2.fork(() -> {
                         // grandchild
                         return NAME.get();
@@ -386,7 +386,7 @@ public class StructuredTaskScopeTest {
      * Test join with no threads.
      */
     public void testJoinWithNoThreads() throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             scope.join();
         }
     }
@@ -411,7 +411,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testJoinConfined(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             // attempt to join on thread in scope
             Future<Void> future1 = scope.fork(() -> {
                 scope.join();
@@ -533,7 +533,7 @@ public class StructuredTaskScopeTest {
      * Test join after scope is shutdown.
      */
     public void testJoinAfterShutdown() throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             scope.shutdown();
             scope.join();
         }
@@ -543,7 +543,7 @@ public class StructuredTaskScopeTest {
      * Test join after scope is closed.
      */
     public void testJoinAfterClose() throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             scope.join();
             scope.close();
             expectThrows(IllegalStateException.class, () -> scope.join());
@@ -715,7 +715,7 @@ public class StructuredTaskScopeTest {
      * Test shutdown after scope is closed.
      */
     public void testShutdownAfterClose() throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             scope.join();
             scope.close();
             expectThrows(IllegalStateException.class, () -> scope.shutdown());
@@ -727,8 +727,8 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testShutdownConfined(ThreadFactory factory) throws Exception {
-        try (var scope1 = StructuredTaskScope.<Object>open();
-             var scope2 = StructuredTaskScope.<Object>open()) {
+        try (var scope1 = StructuredTaskScope.open();
+             var scope2 = StructuredTaskScope.open()) {
 
             // random thread cannot shutdown
             try (var pool = Executors.newCachedThreadPool(factory)) {
@@ -765,7 +765,7 @@ public class StructuredTaskScopeTest {
      * Test close without join, no threads forked.
      */
     public void testCloseWithoutJoin1() {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             // do nothing
         }
     }
@@ -808,7 +808,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testCloseConfined(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             // attempt to close on thread in scope
             Future<Void> future1 = scope.fork(() -> {
                 scope.close();
@@ -906,8 +906,8 @@ public class StructuredTaskScopeTest {
      * nested scope.
      */
     public void testStructureViolation1() throws Exception {
-        try (var scope1 = StructuredTaskScope.<Object>open()) {
-            try (var scope2 = StructuredTaskScope.<Object>open()) {
+        try (var scope1 = StructuredTaskScope.open()) {
+            try (var scope2 = StructuredTaskScope.open()) {
 
                 // join + close enclosing scope
                 scope1.join();
@@ -936,19 +936,19 @@ public class StructuredTaskScopeTest {
     public void testStructureViolation2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         class Box {
-            StructuredTaskScope<String> scope;
+            StructuredTaskScope<Object> scope;
         }
         var box = new Box();
         try {
             try {
                 ScopeLocal.where(name, "x").run(() -> {
-                    box.scope = StructuredTaskScope.<String>open();
+                    box.scope = StructuredTaskScope.open();
                 });
                 assertTrue(false);
             } catch (StructureViolationException expected) { }
 
             // underlying flock should be closed, fork should return a cancelled task
-            StructuredTaskScope<String> scope = box.scope;
+            StructuredTaskScope<Object> scope = box.scope;
             AtomicBoolean ran = new AtomicBoolean();
             Future<String> future = scope.fork(() -> {
                 ran.set(true);
@@ -959,7 +959,7 @@ public class StructuredTaskScopeTest {
             assertFalse(ran.get());
 
         } finally {
-            StructuredTaskScope<String> scope = box.scope;
+            StructuredTaskScope<Object> scope = box.scope;
             if (scope != null) {
                 scope.close();
             }
@@ -972,10 +972,10 @@ public class StructuredTaskScopeTest {
      */
     public void testStructureViolation3() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
-        StructuredTaskScope<String> scope = null;
+        StructuredTaskScope<Object> scope = null;
         try {
             try (var binding = ScopeLocal.where(name, "x").bind()) {
-                scope = StructuredTaskScope.<String>open();
+                scope = StructuredTaskScope.open();
             } catch (StructureViolationException expected) { }
 
             // underlying flock should be closed, fork should return a cancelled task
@@ -1002,14 +1002,14 @@ public class StructuredTaskScopeTest {
     public void testStructureViolation4() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             ScopeLocal.where(NAME, "x").run(() -> {
                 expectThrows(StructureViolationException.class,
                              () -> scope.fork(() -> "foo"));
             });
         }
 
-        try (var scope = StructuredTaskScope.<Object>open();
+        try (var scope = StructuredTaskScope.open();
              var ignore = ScopeLocal.where(NAME, "x").bind()) {
             expectThrows(StructureViolationException.class,
                          () -> scope.fork(() -> "foo"));
@@ -1026,7 +1026,7 @@ public class StructuredTaskScopeTest {
 
         // re-bind
         ScopeLocal.where(NAME1, "x").run(() -> {
-            try (var scope = StructuredTaskScope.<Object>open()) {
+            try (var scope = StructuredTaskScope.open()) {
                 ScopeLocal.where(NAME1, "y").run(() -> {
                     expectThrows(StructureViolationException.class,
                                  () -> scope.fork(() -> "foo"));
@@ -1036,7 +1036,7 @@ public class StructuredTaskScopeTest {
 
         // new binding
         ScopeLocal.where(NAME1, "x").run(() -> {
-            try (var scope = StructuredTaskScope.<Object>open()) {
+            try (var scope = StructuredTaskScope.open()) {
                 ScopeLocal.where(NAME2, "y").run(() -> {
                     expectThrows(StructureViolationException.class,
                                  () -> scope.fork(() -> "foo"));
@@ -1046,7 +1046,7 @@ public class StructuredTaskScopeTest {
 
         // re-bind
         try (var binding = ScopeLocal.where(NAME1, "x").bind();
-             var scope = StructuredTaskScope.<Object>open()) {
+             var scope = StructuredTaskScope.open()) {
             ScopeLocal.where(NAME1, "y").run(() -> {
                 expectThrows(StructureViolationException.class,
                              () -> scope.fork(() -> "foo"));
@@ -1055,7 +1055,7 @@ public class StructuredTaskScopeTest {
 
         // new binding
         try (var binding = ScopeLocal.where(NAME1, "x").bind();
-             var scope = StructuredTaskScope.<Object>open()) {
+             var scope = StructuredTaskScope.open()) {
             ScopeLocal.where(NAME2, "y").run(() -> {
                 expectThrows(StructureViolationException.class,
                              () -> scope.fork(() -> "foo"));
@@ -1173,7 +1173,7 @@ public class StructuredTaskScopeTest {
      */
     @Test(dataProvider = "factories")
     public void testFutureCancelConfined(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             Future<String> future1 = scope.fork(() -> {
                 Thread.sleep(Duration.ofDays(1));
                 return "foo";
@@ -1230,13 +1230,13 @@ public class StructuredTaskScopeTest {
         expectThrows(NullPointerException.class,
                      () -> StructuredTaskScope.open("", null, NULL_POLICY));
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             expectThrows(NullPointerException.class, () -> scope.fork(null));
             expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
             scope.join();
         }
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             var policy = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.complete(null);
@@ -1246,7 +1246,7 @@ public class StructuredTaskScopeTest {
             scope.join();
         }
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             var policy = new ShutdownOnSuccess<Object>();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
@@ -1255,7 +1255,7 @@ public class StructuredTaskScopeTest {
             scope.join();
         }
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             var policy = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.complete(null);
@@ -1265,7 +1265,7 @@ public class StructuredTaskScopeTest {
             scope.join();
         }
 
-        try (var scope = StructuredTaskScope.<Object>open()) {
+        try (var scope = StructuredTaskScope.open()) {
             var policy = new ShutdownOnFailure();
             var future = new CompletableFuture<Object>();
             future.completeExceptionally(new FooException());
