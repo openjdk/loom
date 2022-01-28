@@ -279,7 +279,7 @@ public:
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      assert (offset >= 0, "Derived pointer offset is %ld", offset);
+      assert (offset >= 0, "Derived pointer offset is " INTPTR_FORMAT, offset);
       // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
       Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
     } else {
