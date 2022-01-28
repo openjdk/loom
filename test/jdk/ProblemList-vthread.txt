@@ -22,6 +22,7 @@ jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  827
 ## Tests failing because of issues with testng import in jtreg with wrapper.
 java/foreign/handles/Driver.java
 java/lang/ModuleTests/addXXX/Driver.java
+java/lang/invoke/MethodHandleProxies/Driver.java
 java/lang/invoke/MethodHandles/privateLookupIn/Driver.java
 java/lang/invoke/modules/Driver.java
 java/lang/invoke/modules/Driver1.java
@@ -265,6 +266,10 @@ java/lang/invoke/condy/CondyNestedResolutionTest.java
 
 # Test memory consumption changed a little bit
 java/lang/RuntimeTests/exec/LotsOfOutput.java
+
+###
+# transform invoked during parking, attempts recursive park that deadlocks
+java/lang/instrument/NativeMethodPrefixAgent.java
 
 
 ####

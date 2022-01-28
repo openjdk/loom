@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,9 +23,9 @@
  */
 
 #include "precompiled.hpp"
+#include "compiler/compiler_globals.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "oops/instanceStackChunkKlass.hpp"
-#include "gc/shared/gc_globals.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/stackChunkOop.hpp"
@@ -36,7 +36,6 @@
 #include "jfr/jfrEvents.hpp"
 #include "memory/iterator.inline.hpp"
 #include "memory/oopFactory.hpp"
-#include "memory/universe.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/instanceOop.hpp"

@@ -193,6 +193,7 @@ runtime/cds/appcds/SignedJar.java
 runtime/cds/appcds/SpecifySysLoaderProp.java
 runtime/cds/appcds/StaticArchiveWithLambda.java
 runtime/cds/appcds/TestCombinedCompressedFlags.java
+runtime/cds/appcds/TestDumpClassListSource.java
 runtime/cds/appcds/TestWithProfiler.java
 runtime/cds/appcds/TestEpsilonGCWithCDS.java
 runtime/cds/appcds/TestSerialGCWithCDS.java
@@ -263,6 +264,7 @@ runtime/cds/appcds/dynamicArchive/RelativePath.java
 runtime/cds/appcds/dynamicArchive/SharedArchiveFileOption.java
 runtime/cds/appcds/dynamicArchive/SharedBaseAddressOption.java
 runtime/cds/appcds/dynamicArchive/StaticInnerTest.java
+runtime/cds/appcds/dynamicArchive/TestAutoCreateSharedArchive.java
 runtime/cds/appcds/dynamicArchive/UnsafeAndLambda.java
 runtime/cds/appcds/dynamicArchive/UnsafeAnonymous.java
 runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java
