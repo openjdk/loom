@@ -1136,7 +1136,7 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   jvmtiError err = JVMTI_ERROR_NONE;
 
   if (java_thread->has_last_Java_frame()) {
-    RegisterMap reg_map(java_thread, true, true);
+    RegisterMap reg_map(java_thread, true, false); // don't process frames
     ResourceMark rm(current_thread);
     javaVFrame *jvf = get_last_java_vframe(java_thread, &reg_map);
 

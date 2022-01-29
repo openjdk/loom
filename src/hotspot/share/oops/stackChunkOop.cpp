@@ -50,6 +50,7 @@ bool stackChunkOopDesc::should_fix() const {
 
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   // tty->print_cr(">>> stackChunkOopDesc::top_frame this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()());
+  assert (!is_empty(), "");
   StackChunkFrameStream<true> fs(this);
 
   map->set_stack_chunk(this);

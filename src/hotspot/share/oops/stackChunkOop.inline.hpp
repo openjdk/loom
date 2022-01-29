@@ -86,7 +86,6 @@ inline intptr_t* stackChunkOopDesc::from_offset(int offset) const {
 
 inline bool stackChunkOopDesc::is_empty() const {
   assert (is_stackChunk(), "");
-  // assert ((sp() < end()) || (sp() >= stack_size()), "");
   return sp() >= stack_size() - argsize();
 }
 

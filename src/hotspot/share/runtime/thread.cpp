@@ -2484,11 +2484,13 @@ void JavaThread::trace_stack() {
 
 #endif // PRODUCT
 
-
 frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
   ContinuationEntry* cont = last_continuation(java_lang_VirtualThread::vthread_scope());
   guarantee (cont != NULL, "Not a carrier thread");
   frame f = cont->to_frame();
+  if (reg_map->process_frames()) {
+    cont->flush_stack_processing(this);
+  }
   cont->update_register_map(reg_map);
   return f.sender(reg_map);
 }

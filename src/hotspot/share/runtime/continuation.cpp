@@ -126,10 +126,6 @@ extern "C" void pfl();
 extern "C" void find(intptr_t x);
 #endif
 
-// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
-
 // TODO: See AbstractAssembler::generate_stack_overflow_check (assembler.cpp), Compile::bang_size_in_bytes() (compile.cpp), m->as_SafePoint()->jvms()->interpreter_frame_size()
 // when we stack-bang, we need to update a thread field with the lowest (farthest) bang point.
 
@@ -149,10 +145,27 @@ static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->kla
 #define RUN_SIG    "jdk.internal.vm.Continuation.run()V"
 
 // debugging functions
+extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
+static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
 bool do_verify_after_thaw(JavaThread* thread);
 template<int x> NOINLINE static bool do_verify_after_thaw1(JavaThread* thread) { return do_verify_after_thaw(thread); }
 static void print_vframe(frame f, const RegisterMap* map = nullptr, outputStream* st = tty);
 void do_deopt_after_thaw(JavaThread* thread);
+
+#ifdef ASSERT
+template <class P>
+static void verify_oop_at(P* p) {
+  oop obj = (oop)NativeAccess<>::oop_load(p);
+  assert(oopDesc::is_oop_or_null(obj), "");
+}
+#endif
+
+template<class P>
+static inline oop safe_load(P *addr) {
+  oop obj = (oop)RawAccess<>::oop_load(addr);
+  obj = (oop)NativeAccess<>::oop_load(&obj);
+  return obj;
+}
 
 #ifndef PRODUCT
   template <bool relative>
@@ -161,98 +174,146 @@ void do_deopt_after_thaw(JavaThread* thread);
   static jlong java_tid(JavaThread* thread);
 #endif
 
+// should match Continuation.preemptStatus() in Continuation.java
+enum freeze_result {
+  freeze_ok = 0,
+  freeze_ok_bottom = 1,
+  freeze_pinned_cs = 2,
+  freeze_pinned_native = 3,
+  freeze_pinned_monitor = 4,
+  freeze_exception = 5
+};
+
+const char* freeze_result_names[6] = {
+  "freeze_ok",
+  "freeze_ok_bottom",
+  "freeze_pinned_cs",
+  "freeze_pinned_native",
+  "freeze_pinned_monitor",
+  "freeze_exception"
+};
+
+static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
+static bool is_safe_to_preempt(JavaThread* thread);
+template<typename ConfigT> static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt);
+
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
+static FreezeContFnT cont_freeze = nullptr;
+
+enum thaw_kind {
+  thaw_top = 0,
+  thaw_return_barrier = 1,
+  thaw_exception = 2,
+};
+
+static inline int prepare_thaw0(JavaThread* thread, bool return_barrier);
+template<typename ConfigT> static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind);
+
+typedef intptr_t* (*ThawContFnT)(JavaThread*, thaw_kind);
+static ThawContFnT cont_thaw = nullptr;
+
+extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
+extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
+
+
+template <bool compressed_oops, typename BarrierSetT>
+class Config {
+public:
+  typedef Config<compressed_oops, BarrierSetT> SelfT;
+  typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
+
+  static const bool _compressed_oops = compressed_oops;
+  static const bool _concurrent_gc = BarrierSetT::is_concurrent_gc();
+  // static const bool _post_barrier = post_barrier;
+
+  static int freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
+    return freeze0<SelfT>(thread, sp, preempt);
+  }
+
+  static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
+    return thaw0<SelfT>(thread, kind);
+  }
+
+  static bool requires_barriers(oop obj) {
+    return BarrierSetT::requires_barriers(obj);
+  }
+
+  static void print() {
+    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, _concurrent_gc);
+    // tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
+    // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
+  }
+};
+
+class ConfigResolve {
+public:
+  static void resolve() { resolve_compressed(); }
+
+  static void resolve_compressed() {
+    UseCompressedOops ? resolve_gc<true>()
+                      : resolve_gc<false>();
+  }
+
+  template <bool use_compressed>
+  static void resolve_gc() {
+    BarrierSet* bs = BarrierSet::barrier_set();
+    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
+    switch (bs->kind()) {
+#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
+      case BarrierSet::bs_name: {                                       \
+        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
+      }                                                                 \
+        break;
+      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
+#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
+
+    default:
+      fatal("BarrierSet resolving not implemented");
+    };
+  }
+
+  template <bool use_compressed, typename BarrierSetT>
+  static void resolve() {
+    typedef Config<use_compressed, BarrierSetT> SelectedConfigT;
+    // SelectedConfigT::print();
+
+    cont_freeze = SelectedConfigT::freeze;
+    cont_thaw   = SelectedConfigT::thaw;
+  }
+};
+
 void continuations_init() {
   Continuations::init();
 }
 
-class SmallRegisterMap;
+void Continuations::init() {
+  ConfigResolve::resolve();
+  InstanceStackChunkKlass::resolve_memcpy_functions();
+  Continuation::init();
+}
 
+void Continuations::print_statistics() {
+  //tty->print_cr("Continuations hit/miss %ld / %ld", _exploded_hit, _exploded_miss);
+  //tty->print_cr("Continuations nmethod hit/miss %ld / %ld", _nmethod_hit, _nmethod_miss);
+}
 
-// Mirrors the Java continuation objects.
-// This object is created when we begin a freeze/thaw operation for a continuation, and is destroyed when the operation completes.
-// Contents are read from the Java object at the entry points of this module, and written at exists or intermediate calls into Java
-class ContMirror {
-private:
-  JavaThread* const _thread;   // Thread being frozen/thawed
-  ContinuationEntry* _entry;
-  oop _cont;
-  stackChunkOop _tail;
+#define CC (char*)  /*cast a literal from (const char*)*/
+#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
 
-#if CONT_JFR
-  // Profiling data for the JFR event
-  short _e_size;
-  short _e_num_interpreted_frames;
-#endif
-
-public:
-  inline void post_safepoint(Handle conth);
-  stackChunkOop allocate_stack_chunk(size_t stack_size, bool is_preempt);
-
-private:
-  ContMirror(const ContMirror& cont); // no copy constructor
-
-public:
-  // does not automatically read the continuation object
-  ContMirror(JavaThread* thread, oop cont);
-  ContMirror(oop cont);
-  ContMirror(const RegisterMap* map);
-
-  NOT_PRODUCT(intptr_t hash() { return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1; })
-
-  inline void read();
-  inline void write();
-
-  oop mirror() { return _cont; }
-  oop parent() { return jdk_internal_vm_Continuation::parent(_cont); }
-
-  ContinuationEntry* entry() const { return _entry; }
-  intptr_t* entrySP() const { return _entry->entry_sp(); }
-  intptr_t* entryFP() const { return _entry->entry_fp(); }
-  address   entryPC() const { return _entry->entry_pc(); }
-
-  int argsize() const { return _entry->argsize(); }
-  void set_argsize(int value) { _entry->set_argsize(value); }
-
-  bool is_mounted() { return _entry != nullptr; }
-
-  stackChunkOop tail() const         { return _tail; }
-  void set_tail(stackChunkOop chunk) { _tail = chunk; }
-
-  JavaThread* thread() const { return _thread; }
-
-  bool is_empty() const { return !has_nonempty_chunk(); }
-  bool has_nonempty_chunk() const { return last_nonempty_chunk() != nullptr; };
-  stackChunkOop last_nonempty_chunk() const { return nonempty_chunk(_tail); }
-  stackChunkOop prev_nonempty_chunk(stackChunkOop chunk) const { return nonempty_chunk(chunk->parent()); }
-  inline stackChunkOop nonempty_chunk(stackChunkOop chunk) const;
-
-  template <bool aligned = true>
-  void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
-
-  address last_pc() { return last_nonempty_chunk()->pc(); }
-
-  stackChunkOop find_chunk_by_address(void* p) const;
-
-  const frame last_frame();
-  inline void set_empty() { _tail = nullptr; }
-
-  bool is_preempted() { return jdk_internal_vm_Continuation::is_preempted(_cont); }
-  void set_preempted(bool value) { jdk_internal_vm_Continuation::set_preempted(_cont, value); }
-
-#if CONT_JFR
-  inline void inc_num_interpreted_frames() { _e_num_interpreted_frames++; }
-  inline void dec_num_interpreted_frames() { _e_num_interpreted_frames++; }
-
-  template<typename Event> void post_jfr_event(Event *e, JavaThread* jt);
-#endif
-
-#ifdef ASSERT
-  inline bool is_entry_frame(const frame& f);
-  bool has_mixed_frames();
-  bool chunk_invariant();
-#endif
+static JNINativeMethod CONT_methods[] = {
+    {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_TryForceYield0)},
+    {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
 };
 
+void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
+    Thread* thread = Thread::current();
+    assert(thread->is_Java_thread(), "");
+    ThreadToNativeFromVM trans((JavaThread*)thread);
+    int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
+    guarantee(status == JNI_OK && !env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
+}
+
+class SmallRegisterMap;
 
 class ContinuationHelper {
 public:
@@ -261,13 +322,13 @@ public:
 
   static oop get_continuation(JavaThread* thread);
 
-  static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
-  static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont);
+  static bool stack_overflow_check(JavaThread* thread, int size, address sp);
   static void set_anchor(JavaThread* thread, intptr_t* sp);
   static void set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp);
   static inline void clear_anchor(JavaThread* thread);
+  static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont);
+  static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont);
 
-  static void update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map);
   static void update_map_for_chunk_frame(RegisterMap* map);
   template<typename FKind, typename RegisterMapT> static void update_register_map(RegisterMapT* map, const frame& f); // TODO invert parameter order
   template<typename RegisterMapT> static void update_register_map_with_callee(RegisterMapT* map, const frame& f); // TODO invert parameter order
@@ -275,22 +336,30 @@ public:
   static inline frame last_frame(JavaThread* thread);
   static inline void push_pd(const frame& f);
 
+  static inline void maybe_flush_stack_processing(JavaThread* thread, ContinuationEntry* entry);
+  static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
+  static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
+
   template <bool dword_aligned = true>
   static inline void copy_from_stack(void* from, void* to, size_t size);
   template <bool dword_aligned = true>
   static inline void copy_to_stack(void* from, void* to, size_t size);
 };
 
-void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  anchor->set_last_Java_sp(cont->entry_sp());
-  anchor->set_last_Java_pc(cont->entry_pc());
-  set_anchor_to_entry_pd(anchor, cont);
+oop ContinuationHelper::get_continuation(JavaThread* thread) {
+  assert (thread != nullptr, "");
+  assert (thread->threadObj() != nullptr, "");
+  return java_lang_Thread::continuation(thread->threadObj());
+}
 
-  assert (thread->has_last_Java_frame(), "");
-  assert(thread->last_frame().cb() != nullptr, "");
-  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
-  print_vframe(thread->last_frame());
+bool ContinuationHelper::stack_overflow_check(JavaThread* thread, int size, address sp) {
+  const int page_size = os::vm_page_size();
+  if (size > page_size) {
+    if (sp - size < thread->stack_overflow_state()->stack_overflow_limit()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
@@ -312,22 +381,109 @@ inline void ContinuationHelper::clear_anchor(JavaThread* thread) {
   thread->frame_anchor()->clear();
 }
 
-void ContinuationHelper::update_register_map_for_entry_frame(const ContMirror& cont, RegisterMap* map) { // TODO NOT PD
-  // we need to register the link address for the entry frame
-  if (cont.entry() != nullptr) {
-    cont.entry()->update_register_map(map);
-    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame");
-  } else {
-    log_develop_trace(jvmcont)("ContinuationHelper::update_register_map_for_entry_frame: clearing register map.");
-    map->clear();
+void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEntry* cont) {
+  JavaFrameAnchor* anchor = thread->frame_anchor();
+  anchor->set_last_Java_sp(cont->entry_sp());
+  anchor->set_last_Java_pc(cont->entry_pc());
+  set_anchor_to_entry_pd(anchor, cont);
+
+  assert (thread->has_last_Java_frame(), "");
+  assert(thread->last_frame().cb() != nullptr, "");
+  log_develop_trace(jvmcont)("set_anchor: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
+  print_vframe(thread->last_frame());
+}
+
+inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, ContinuationEntry* entry) {
+  maybe_flush_stack_processing(thread, (intptr_t*)((uintptr_t)entry->entry_sp() + ContinuationEntry::size()));
+}
+
+inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp) {
+  StackWatermark* sw;
+  uintptr_t watermark;
+  if ((sw = StackWatermarkSet::get(thread, StackWatermarkKind::gc)) != nullptr
+        && (watermark = sw->watermark()) != 0
+        && watermark <= (uintptr_t)sp) {
+    flush_stack_processing(thread, sp);
   }
 }
 
-oop ContinuationHelper::get_continuation(JavaThread* thread) {
-  assert (thread != nullptr, "");
-  assert (thread->threadObj() != nullptr, "");
-  return java_lang_Thread::continuation(thread->threadObj());
+NOINLINE void ContinuationHelper::flush_stack_processing(JavaThread* thread, intptr_t* sp) {
+  log_develop_trace(jvmcont)("flush_stack_processing");
+  for (StackFrameStream fst(thread, true, true); fst.current()->sp() <= sp; fst.next())
+    ;
 }
+
+/////////////////////////////////////////////////////////////////////
+
+// Mirrors the Java continuation objects.
+// This object is created when we begin a freeze/thaw operation for a continuation, and is destroyed when the operation completes.
+// Contents are read from the Java object at the entry points of this module, and written at exists or intermediate calls into Java
+class ContMirror {
+private:
+  JavaThread* const _thread;   // Thread being frozen/thawed
+  ContinuationEntry* _entry;
+  oop _cont;
+  stackChunkOop _tail;
+
+#if CONT_JFR
+  // Profiling data for the JFR event
+  short _e_size;
+  short _e_num_interpreted_frames;
+#endif
+
+private:
+  ContMirror(const ContMirror& cont); // no copy constructor
+
+public:
+  ContMirror(JavaThread* thread, oop cont);
+  ContMirror(oop cont);
+  ContMirror(const RegisterMap* map);
+
+  inline void read();
+  inline void write();
+  inline void post_safepoint(Handle conth);
+
+  JavaThread* thread() const         { return _thread; }
+  oop mirror()                       { return _cont; }
+  stackChunkOop tail() const         { return _tail; }
+  void set_tail(stackChunkOop chunk) { _tail = chunk; }  
+  inline void set_empty() { _tail = nullptr; }
+
+  oop parent() { return jdk_internal_vm_Continuation::parent(_cont); }
+  bool is_preempted() { return jdk_internal_vm_Continuation::is_preempted(_cont); }
+  void set_preempted(bool value) { jdk_internal_vm_Continuation::set_preempted(_cont, value); }
+  NOT_PRODUCT(intptr_t hash() { return Thread::current()->is_Java_thread() ? _cont->identity_hash() : -1; })
+
+  ContinuationEntry* entry() const { return _entry; }
+  bool is_mounted()   const { return _entry != nullptr; }
+  intptr_t* entrySP() const { return _entry->entry_sp(); }
+  intptr_t* entryFP() const { return _entry->entry_fp(); }
+  address   entryPC() const { return _entry->entry_pc(); }
+  int argsize()       const { return _entry->argsize(); }
+  void set_argsize(int value) { _entry->set_argsize(value); }
+
+  bool is_empty() const { return last_nonempty_chunk() == nullptr; }
+  const frame last_frame();
+
+  stackChunkOop last_nonempty_chunk() const { return nonempty_chunk(_tail); }
+  stackChunkOop prev_nonempty_chunk(stackChunkOop chunk) const { return nonempty_chunk(chunk->parent()); }
+  inline stackChunkOop nonempty_chunk(stackChunkOop chunk) const;
+  stackChunkOop find_chunk_by_address(void* p) const;
+
+  stackChunkOop allocate_stack_chunk(size_t stack_size, bool is_preempt);
+
+#if CONT_JFR
+  inline void record_interpreted_frame() { _e_num_interpreted_frames++; }
+  inline void record_size_copied(int size) { _e_size += size << LogBytesPerWord; }
+  template<typename Event> void post_jfr_event(Event *e, JavaThread* jt);
+#endif
+
+#ifdef ASSERT
+  inline bool is_entry_frame(const frame& f);
+  bool has_mixed_frames();
+  bool chunk_invariant();
+#endif
+};
 
 ContMirror::ContMirror(JavaThread* thread, oop cont)
  : _thread(thread), _entry(thread->last_continuation()), _cont(cont)
@@ -373,15 +529,22 @@ inline void ContMirror::write() {
   jdk_internal_vm_Continuation::set_tail(_cont, _tail);
 }
 
-inline stackChunkOop ContMirror::nonempty_chunk(stackChunkOop chunk) const {
-  while (chunk != nullptr && chunk->is_empty()) chunk = chunk->parent();
-  return chunk;
+inline void ContMirror::post_safepoint(Handle conth) {
+  _cont = conth(); // reload oop
+  if (_tail != (oop)nullptr) {
+    _tail = (stackChunkOop)jdk_internal_vm_Continuation::tail(_cont);
+  }
 }
 
 const frame ContMirror::last_frame() {
   stackChunkOop chunk = last_nonempty_chunk();
   if (chunk == nullptr) return frame();
   return StackChunkFrameStream<true>(chunk).to_frame();
+}
+
+inline stackChunkOop ContMirror::nonempty_chunk(stackChunkOop chunk) const {
+  while (chunk != nullptr && chunk->is_empty()) chunk = chunk->parent();
+  return chunk;
 }
 
 stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
@@ -392,6 +555,28 @@ stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
     }
   }
   return nullptr;
+}
+
+/* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
+ * method. In the later case we might have done a safepoint and need to reload our oops */
+stackChunkOop ContMirror::allocate_stack_chunk(size_t stack_size, bool is_preempt) {
+  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
+  size_t size_in_words = klass->instance_size(stack_size);
+
+  assert(is_preempt || _thread == JavaThread::current(), "should be current");
+  JavaThread* current = is_preempt ? JavaThread::current() : _thread;
+
+  StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
+  HeapWord* start = current->tlab().allocate(size_in_words);
+  if (start != nullptr) {
+    return (stackChunkOop)allocator.initialize(start);
+  }
+
+  //HandleMark hm(current);
+  Handle conth(current, _cont);
+  stackChunkOop result = (stackChunkOop)allocator.allocate();
+  post_safepoint(conth);
+  return result;
 }
 
 #if CONT_JFR
@@ -407,15 +592,14 @@ template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* j
 }
 #endif
 
-template <bool aligned>
-void ContMirror::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
-  tail()->copy_from_stack_to_chunk<aligned>(from, to, size);
-  CONT_JFR_ONLY(_e_size += size << LogBytesPerWord;)
-}
-
 #ifdef ASSERT
 inline bool ContMirror::is_entry_frame(const frame& f) {
   return f.sp() == entrySP();
+}
+
+bool ContMirror::has_mixed_frames() {
+  for (stackChunkOop c = tail(); c != nullptr; c = c->parent()) if (c->has_mixed_frames()) return true;
+  return false;
 }
 
 bool ContMirror::chunk_invariant() {
@@ -435,11 +619,6 @@ bool ContMirror::chunk_invariant() {
   }
   return true;
 }
-
-bool ContMirror::has_mixed_frames() {
-  for (stackChunkOop c = tail(); c != nullptr; c = c->parent()) if (c->has_mixed_frames()) return true;
-  return false;
-}
 #endif
 
 #if INCLUDE_JVMTI
@@ -453,57 +632,505 @@ static int num_java_frames(ContMirror& cont) {
 }
 #endif // INCLUDE_JVMTI
 
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
+/////////////////////////////////////////////////////////////////
 
-static FreezeContFnT cont_freeze = nullptr;
-
-
-class CachedCompiledMetadata; // defined in PD
-template<class P>
-static inline oop safe_load(P *addr) {
-  oop obj = (oop)RawAccess<>::oop_load(addr);
-  obj = (oop)NativeAccess<>::oop_load(&obj);
-  return obj;
+void Continuation::init() {
 }
 
-#ifdef ASSERT
-template <class P>
-static void verify_oop_at(P* p) {
-  oop obj = (oop)NativeAccess<>::oop_load(p);
-  assert(oopDesc::is_oop_or_null(obj), "");
+
+// Entry point to freeze. Transitions are handled manually
+JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* current, intptr_t* sp))
+  // current->frame_anchor()->set_last_Java_sp(sp);
+  // current->frame_anchor()->make_walkable(current);
+
+  assert (sp == current->frame_anchor()->last_Java_sp(), "");
+
+  if (current->raw_cont_fastpath() > current->last_continuation()->entry_sp() || current->raw_cont_fastpath() < sp) {
+    current->set_cont_fastpath(nullptr);
+  }
+
+  return cont_freeze(current, sp, false);
+JRT_END
+
+// Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
+// May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
+// the only frames we're looking at are Java frames.
+int Continuation::try_force_yield(JavaThread* target, const oop cont) {
+  log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
+
+  ContinuationEntry* ce = target->last_continuation();
+  oop innermost = ce->continuation();
+  while (ce != nullptr && ce->continuation() != cont) {
+    ce = ce->parent();
+  }
+  if (ce == nullptr) {
+    return -1; // no continuation
+  }
+  if (target->_cont_yield) {
+    return -2; // during yield
+  }
+  if (!is_safe_to_preempt(target)) {
+    return freeze_pinned_native;
+  }
+
+  assert (target->has_last_Java_frame(), "");
+  // if (Interpreter::contains(thread->last_Java_pc())) { thread->push_cont_fastpath(thread->last_Java_sp()); }
+  assert (!Interpreter::contains(target->last_Java_pc()) || !target->cont_fastpath(),
+          "fast_path at codelet %s",
+          Interpreter::codelet_containing(target->last_Java_pc())->description());
+
+  const oop scope = jdk_internal_vm_Continuation::scope(cont);
+  if (innermost != cont) { // we have nested continuations
+    // make sure none of the continuations in the hierarchy are pinned
+    freeze_result res_pinned = is_pinned0(target, scope, true);
+    if (res_pinned != freeze_ok) {
+      log_trace(jvmcont, preempt)("try_force_yield: res_pinned");
+      return res_pinned;
+    }
+    jdk_internal_vm_Continuation::set_yieldInfo(cont, scope);
+  }
+
+  assert (target->has_last_Java_frame(), "need to test again?");
+  int res = cont_freeze(target, target->last_Java_sp(), true);
+  log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
+  if (res == 0) { // success
+    target->set_cont_preempt(true);
+
+    // The target thread calls
+    // Continuation::jump_from_safepoint from JavaThread::handle_special_runtime_exit_condition
+    // to yield on return from suspension/blocking handshake.
+  }
+  return res;
+}
+
+JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier))
+  return prepare_thaw0(thread, return_barrier);
+JRT_END
+
+JRT_LEAF(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
+  // TODO: JRT_LEAF and NoHandleMark is problematic for JFR events.
+  // vFrameStreamCommon allocates Handles in RegisterMap for continuations.
+  // JRT_ENTRY instead?
+  ResetNoHandleMark rnhm;
+
+  intptr_t* sp = cont_thaw(thread, (thaw_kind)kind);
+  // ContinuationHelper::clear_anchor(thread);
+  return sp;
+JRT_END
+
+typedef void (*cont_jump_from_sp_t)();
+
+void Continuation::jump_from_safepoint(JavaThread* thread) {
+  assert (thread == JavaThread::current(), "");
+  assert (thread->is_cont_force_yield(), "");
+  log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
+  thread->set_cont_preempt(false);
+  if (thread->thread_state() == _thread_in_vm) {
+    thread->set_thread_state(_thread_in_Java);
+  }
+  StackWatermarkSet::after_unwind(thread);
+  MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
+  CAST_TO_FN_PTR(cont_jump_from_sp_t, StubRoutines::cont_jump_from_sp())(); // does not return
+  ShouldNotReachHere();
+}
+
+JVM_ENTRY(jint, CONT_isPinned0(JNIEnv* env, jobject cont_scope)) {
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  return is_pinned0(thread, JNIHandles::resolve(cont_scope), false);
+}
+JVM_END
+
+JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
+  JavaThread* current = JavaThread::thread_from_jni_environment(env);
+  assert(current == JavaThread::current(), "should be");
+  jint result = -1; // no continuation (should have enum)
+
+  oop thread_oop = JNIHandles::resolve(jthread);
+  if (thread_oop != nullptr) {
+    JavaThread* target = java_lang_Thread::thread(thread_oop);
+    assert(target != current, "should be different threads");
+    // Suspend the target thread and freeze it.
+    if (target->block_suspend(current)) {
+      oop oopCont = JNIHandles::resolve_non_null(jcont);
+      result = Continuation::try_force_yield(target, oopCont);
+      target->continue_resume(current);
+    }
+  }
+  return result;
+}
+JVM_END
+
+ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
+  guarantee (thread->has_last_Java_frame(), "");
+  for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
+    if (cont_scope == jdk_internal_vm_Continuation::scope(entry->continuation()))
+      return entry;
+  }
+  return nullptr;
+}
+
+ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
+  if (thread == nullptr || cont == (oop)nullptr) return nullptr;
+
+  for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
+    if (cont == entry->continuation()) return entry;
+  }
+  return nullptr;
+}
+
+// When walking the virtual stack, this method returns true
+// iff the frame is a thawed continuation frame whose
+// caller is still frozen on the h-stack.
+// The continuation object can be extracted from the thread.
+bool Continuation::is_cont_barrier_frame(const frame& f) {
+  assert (f.is_interpreted_frame() || f.cb() != nullptr, "");
+  return is_return_barrier_entry(f.is_interpreted_frame() ? Interpreted::return_pc(f) : Compiled::return_pc(f));
+}
+
+bool Continuation::is_return_barrier_entry(const address pc) {
+  return pc == StubRoutines::cont_returnBarrier();
+}
+
+bool Continuation::is_continuation_enterSpecial(const frame& f) {
+  if (f.cb() == nullptr || !f.cb()->is_compiled()) return false;
+  Method* m = f.cb()->as_compiled_method()->method();
+  return (m != nullptr && m->is_continuation_enter_intrinsic());
+}
+
+bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap *map) {
+  // we can do this because the entry frame is never inlined
+  Method* m = (map->in_cont() && f.is_interpreted_frame()) ? map->stack_chunk()->interpreter_frame_method(f)
+                                                           : Frame::frame_method(f);
+  return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
+}
+
+bool Continuation::is_mounted(JavaThread* thread, oop cont_scope) {
+  return last_continuation(thread, cont_scope) != nullptr;
+}
+
+static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
+  return cont->entry_sp() > sp;
+}
+
+bool Continuation::is_frame_in_continuation(ContinuationEntry* cont, const frame& f) {
+  return is_sp_in_continuation(cont, f.unextended_sp());
+}
+
+static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, intptr_t* const sp) {
+  assert (thread != nullptr, "");
+  ContinuationEntry* cont = thread->last_continuation();
+  while (cont != nullptr && !is_sp_in_continuation(cont, sp)) {
+    cont = cont->parent();
+  }
+  return cont;
+}
+
+static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
+  assert (thread != nullptr, "");
+  ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
+  return cont != nullptr ? cont->continuation() : (oop)nullptr;
+}
+
+oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
+  return get_continuation_for_sp(thread, f.unextended_sp());
+}
+
+bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
+  return get_continuation_entry_for_frame(thread, f.unextended_sp()) != nullptr;
+}
+
+bool Continuation::has_last_Java_frame(oop continuation) {
+  return !ContMirror(continuation).is_empty();
+}
+
+static frame continuation_top_frame(oop contOop, RegisterMap* map) {
+  stackChunkOop chunk = ContMirror(contOop).last_nonempty_chunk();
+  map->set_stack_chunk(chunk);
+  return chunk != nullptr ? chunk->top_frame(map) : frame();
+}
+
+frame Continuation::last_frame(oop continuation, RegisterMap *map) {
+  assert(map != nullptr, "a map must be given");
+  return continuation_top_frame(continuation, map);
+}
+
+frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
+  assert (map != nullptr, "");
+  return continuation_top_frame(get_continuation_for_sp(map->thread(), callee.sp()), map);
+}
+
+javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map) {
+  assert(map != nullptr, "a map must be given");
+  if (!ContMirror(continuation()).is_empty()) {
+    frame f = last_frame(continuation(), map);
+    for (vframe* vf = vframe::new_vframe(&f, map, nullptr); vf; vf = vf->sender()) {
+      if (vf->is_java_frame()) return javaVFrame::cast(vf);
+    }
+  }
+  return nullptr;
+}
+
+frame Continuation::continuation_parent_frame(RegisterMap* map) {
+  assert (map->in_cont(), "");
+  ContMirror cont(map);
+  assert (map->thread() != nullptr || !cont.is_mounted(), "map->thread() == nullptr: %d cont.is_mounted(): %d", map->thread() == nullptr, cont.is_mounted());
+
+  log_develop_trace(jvmcont)("continuation_parent_frame");
+  if (map->update_map()) {
+    // we need to register the link address for the entry frame
+    if (cont.entry() != nullptr) {
+      cont.entry()->update_register_map(map);
+    } else {
+      map->clear();
+    }
+  }
+
+  if (!cont.is_mounted()) { // When we're walking an unmounted continuation and reached the end
+    oop parent = jdk_internal_vm_Continuation::parent(cont.mirror());
+    stackChunkOop chunk = parent != nullptr ? ContMirror(parent).last_nonempty_chunk() : nullptr;
+    if (chunk != nullptr) {
+      return chunk->top_frame(map);
+    }
+
+    map->set_stack_chunk(nullptr);
+    return frame();
+  }
+
+  map->set_stack_chunk(nullptr);
+
+#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
+  frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
+#else
+  frame sender = frame();
+  Unimplemented();
+#endif
+
+  return sender;
+}
+
+oop Continuation::continuation_scope(oop cont) {
+  return cont != nullptr ? jdk_internal_vm_Continuation::scope(cont) : nullptr;
+}
+
+bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const RegisterMap* map) {
+  if (cont_scope == nullptr || !is_continuation_entry_frame(f, map))
+    return false;
+
+  oop cont = get_continuation_for_sp(map->thread(), f.sp());
+  if (cont == nullptr)
+    return false;
+
+  oop sc = continuation_scope(cont);
+  assert(sc != nullptr, "");
+  return sc == cont_scope;
+}
+
+stackChunkOop Continuation::last_nonempty_chunk(oop continuation) {
+  return ContMirror(continuation).last_nonempty_chunk();
+}
+
+stackChunkOop Continuation::continuation_parent_chunk(stackChunkOop chunk) {
+  assert(chunk->cont() != nullptr, "");
+  oop cont_parent = jdk_internal_vm_Continuation::parent(chunk->cont());
+  return cont_parent != nullptr ? Continuation::last_nonempty_chunk(cont_parent) : nullptr;
+}
+
+bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
+  ContMirror cont(map);
+  stackChunkOop chunk = cont.find_chunk_by_address(addr);
+  return chunk != nullptr ? chunk->is_usable_in_chunk(addr) : false;
+}
+
+bool Continuation::pin(JavaThread* current) {
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce == nullptr)
+    return true;
+
+  oop cont = ce->cont_oop();
+  assert (cont != nullptr, "");
+  assert (cont == ContinuationHelper::get_continuation(current), "");
+
+  jshort value = jdk_internal_vm_Continuation::critical_section(cont);
+  if (value < max_jshort) {
+    jdk_internal_vm_Continuation::set_critical_section(cont, value + 1);
+    return true;
+  }
+  return false;
+}
+
+bool Continuation::unpin(JavaThread* current) {
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce == nullptr)
+    return true;
+
+  oop cont = ce->cont_oop();
+  assert (cont != nullptr, "");
+  assert (cont == ContinuationHelper::get_continuation(current), "");
+
+  jshort value = jdk_internal_vm_Continuation::critical_section(cont);
+  if (value > 0) {
+    jdk_internal_vm_Continuation::set_critical_section(cont, value - 1);
+    return true;
+  }
+  return false;
+}
+
+bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
+  if (thread != nullptr && is_return_barrier_entry(*sender_pc)) {
+    ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
+    assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
+
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
+    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
+
+    *sender_pc = cont->entry_pc();
+    *sender_sp = cont->entry_sp();
+    // We DO NOT want to fix FP. It could contain an oop that has changed on the stack, and its location should be OK anyway
+
+    return true;
+  }
+  return false;
+}
+
+address Continuation::get_top_return_pc_post_barrier(JavaThread* thread, address pc) {
+  ContinuationEntry* cont;
+  if (thread != nullptr && is_return_barrier_entry(pc) && (cont = thread->last_continuation()) != nullptr) {
+    pc = cont->entry_pc();
+  }
+  return pc;
+}
+
+void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
+  assert (thread != nullptr, "");
+  bool fast = !thread->is_interp_only_mode();
+  thread->set_cont_fastpath_thread_state(fast);
+}
+
+void Continuation::notify_deopt(JavaThread* thread, intptr_t* sp) {
+  ContinuationEntry* cont = thread->last_continuation();
+
+  if (cont == nullptr) return;
+
+  if (is_sp_in_continuation(cont, sp)) {
+    thread->push_cont_fastpath(sp);
+    return;
+  }
+
+  ContinuationEntry* prev;
+  do {
+    prev = cont;
+    cont = cont->parent();
+  } while (cont != nullptr && !is_sp_in_continuation(cont, sp));
+
+  if (cont == nullptr) return;
+  assert (is_sp_in_continuation(cont, sp), "");
+  if (sp > prev->parent_cont_fastpath())
+      prev->set_parent_cont_fastpath(sp);
+}
+
+#ifndef PRODUCT
+void Continuation::describe(FrameValues &values) {
+  JavaThread* thread = JavaThread::active();
+  if (thread != nullptr) {
+    for (ContinuationEntry* cont = thread->last_continuation(); cont != nullptr; cont = cont->parent()) {
+      intptr_t* bottom = cont->entry_sp();
+      if (bottom != nullptr)
+        values.describe(-1, bottom, "continuation entry");
+    }
+  }
 }
 #endif
 
-class CountOops : public OopClosure {
-private:
-  int _nr_oops;
-public:
-  CountOops() : _nr_oops(0) {}
-  int nr_oops() const { return _nr_oops; }
+void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
+  EventContinuationIterateOops e;
+  if (e.should_commit()) {
+    e.set_id(cast_from_oop<u8>(chunk));
+    e.set_safepoint(SafepointSynchronize::is_at_safepoint());
+    e.set_numFrames((u2)num_frames);
+    e.set_numOops((u2)num_oops);
+    e.commit();
+  }
+}
 
+#ifdef ASSERT
+bool Continuation::debug_is_stack_chunk(Klass* k) {
+  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
+}
 
-  virtual void do_oop(oop* o) { _nr_oops++; }
-  virtual void do_oop(narrowOop* o) { _nr_oops++; }
-};
+bool Continuation::debug_is_stack_chunk(oop obj) {
+  return obj != (oop)nullptr && obj->is_stackChunk();
+}
 
-// should match Continuation.preemptStatus() in Continuation.java
-enum freeze_result {
-  freeze_ok = 0,
-  freeze_ok_bottom = 1,
-  freeze_pinned_cs = 2,
-  freeze_pinned_native = 3,
-  freeze_pinned_monitor = 4,
-  freeze_exception = 5
-};
+bool Continuation::debug_is_continuation(Klass* klass) {
+  return klass->is_subtype_of(vmClasses::Continuation_klass());
+}
 
-const char* freeze_result_names[6] = {
-  "freeze_ok",
-  "freeze_ok_bottom",
-  "freeze_pinned_cs",
-  "freeze_pinned_native",
-  "freeze_pinned_monitor",
-  "freeze_exception"
-};
+bool Continuation::debug_is_continuation(oop obj) {
+  return obj->is_a(vmClasses::Continuation_klass());
+}
+
+bool Continuation::debug_is_continuation_run_frame(const frame& f) {
+  bool is_continuation_run = false;
+  if (f.is_compiled_frame()) {
+    HandleMark hm(Thread::current());
+    ResourceMark rm;
+    Method* m = f.cb()->as_compiled_method()->scope_desc_at(f.pc())->method();
+    if (m != nullptr) {
+      char buf[50];
+      if (0 == strcmp(ENTER_SPECIAL_SIG, m->name_and_sig_as_C_string(buf, 50))) {
+        is_continuation_run = true;
+      }
+    }
+  }
+  return is_continuation_run;
+}
+
+NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
+  DEBUG_ONLY(if (!VerifyContinuations) return true;)
+  assert (contOop != (oop)nullptr, "");
+  assert (oopDesc::is_oop(contOop), "");
+  ContMirror cont(contOop);
+
+  assert (oopDesc::is_oop_or_null(cont.tail()), "");
+  assert (cont.chunk_invariant(), "");
+
+  bool nonempty_chunk = false;
+  size_t max_size = 0;
+  int num_chunks = 0;
+  int num_frames = 0;
+  int num_interpreted_frames = 0;
+  int num_oops = 0;
+
+  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
+    log_develop_trace(jvmcont)("debug_verify_continuation chunk %d", num_chunks);
+    chunk->verify(&max_size, &num_oops, &num_frames, &num_interpreted_frames);
+    if (!chunk->is_empty()) nonempty_chunk = true;
+    num_chunks++;
+  }
+
+  const bool is_empty = cont.is_empty();
+  assert (!nonempty_chunk || !is_empty, "");
+  assert (is_empty == (!nonempty_chunk && cont.last_frame().is_empty()), "");
+
+  return true;
+}
+
+void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
+  if (st == nullptr) st = tty;
+
+  ContMirror cont(contOop);
+
+  st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
+  st->print_cr("CHUNKS:");
+  for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
+    st->print("* ");
+    chunk->print_on(true, tty);
+  }
+}
+#endif // ASSERT
+
+/////////////// FREEZE ////
 
 template <typename ConfigT>
 class Freeze {
@@ -554,6 +1181,7 @@ public:
 
     log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT, p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
     assert (_bottom_address != nullptr && _bottom_address <= _cont.entrySP(), "");
+    DEBUG_ONLY(_last_write = nullptr;)
   }
 
   void init_rest() { // we want to postpone some initialization after chunk handling
@@ -565,28 +1193,18 @@ public:
   int nr_bytes() const  { return _size << LogBytesPerWord; }
   int nr_frames() const { return _frames; }
 
-  inline bool should_flush_stack_processing() {
-    StackWatermark* sw;
-    uintptr_t watermark;
-    return ((sw = StackWatermarkSet::get(_thread, StackWatermarkKind::gc)) != nullptr
-      && (watermark = sw->watermark()) != 0
-      && watermark <= ((uintptr_t)_cont.entrySP() + ContinuationEntry::size()));
-  }
-
-  NOINLINE void flush_stack_processing() {
-    log_develop_trace(jvmcont)("flush_stack_processing");
-    for (StackFrameStream fst(_thread, true, true); !Continuation::is_continuation_enterSpecial(*fst.current()); fst.next())
-      ;
-  }
-
   template <bool aligned = true>
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
-    _cont.copy_to_chunk<aligned>(from, to, size);
-  #ifdef ASSERT
     stackChunkOop chunk = _cont.tail();
-    assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: " PTR_FORMAT " to+size: " PTR_FORMAT,
-      p2i(_last_write), p2i(to + size), chunk->stack_size(), _last_write - chunk->start_address(), to + size - chunk->start_address());
-    _last_write = to;
+    chunk->copy_from_stack_to_chunk<aligned>(from, to, size);
+    CONT_JFR_ONLY(_cont.record_size_copied(size);)
+
+  #ifdef ASSERT
+    if (_last_write != nullptr) {
+      assert (_last_write == to + size, "Missed a spot: _last_write: " INTPTR_FORMAT " to+size: " INTPTR_FORMAT " stack_size: %d _last_write offset: " PTR_FORMAT " to+size: " PTR_FORMAT,
+        p2i(_last_write), p2i(to + size), chunk->stack_size(), _last_write - chunk->start_address(), to + size - chunk->start_address());
+      _last_write = to;
+    }
   #endif
   }
 
@@ -751,8 +1369,7 @@ public:
     assert (!chunk->is_gc_mode(), "");
     assert (!chunk->has_bitmap(), "");
 
-    if (should_flush_stack_processing())
-      flush_stack_processing();
+    ContinuationHelper::maybe_flush_stack_processing(_thread, _cont.entry());
 
     NoSafepointVerifier nsv;
     assert (chunk->is_stackChunk(), "");
@@ -773,7 +1390,7 @@ public:
     log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT, p2i(chunk->start_address()), sp, p2i(chunk_top));
     intptr_t* from = top       - ContinuationHelper::frame_metadata;
     intptr_t* to   = chunk_top - ContinuationHelper::frame_metadata;
-    _cont.copy_to_chunk(from, to, size + ContinuationHelper::frame_metadata);
+    copy_to_chunk(from, to, size + ContinuationHelper::frame_metadata);
 
     // patch pc
     intptr_t* chunk_bottom_sp = chunk_top + size - argsize;
@@ -1054,8 +1671,7 @@ public:
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).is_done(), "");
     assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).to_frame().is_empty(), "");
 
-    if (should_flush_stack_processing())
-      flush_stack_processing();
+    ContinuationHelper::maybe_flush_stack_processing(_thread, _cont.entry());
 
     log_develop_trace(jvmcont)("add max_size: %d -- %d", _size - ContinuationHelper::frame_metadata, chunk->max_size() + _size - ContinuationHelper::frame_metadata);
     chunk->set_max_size(chunk->max_size() + _size - ContinuationHelper::frame_metadata);
@@ -1179,7 +1795,7 @@ public:
 
     patch<Interpreted>(f, hf, caller, bottom);
 
-    CONT_JFR_ONLY(_cont.inc_num_interpreted_frames();)
+    CONT_JFR_ONLY(_cont.record_interpreted_frame();)
     DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
     caller = hf;
 
@@ -1463,7 +2079,7 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
 // it must set Continuation.stackSize
 // sets Continuation.fp/sp to relative indices
 template<typename ConfigT>
-int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
+static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   //callgrind();
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
@@ -1530,20 +2146,6 @@ int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
     return freeze_epilog(current, cont, res, preempt);
   JRT_BLOCK_END
 }
-
-// Entry point to freeze. Transitions are handled manually
-JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* current, intptr_t* sp))
-  // current->frame_anchor()->set_last_Java_sp(sp);
-  // current->frame_anchor()->make_walkable(current);
-
-  assert (sp == current->frame_anchor()->last_Java_sp(), "");
-
-  if (current->raw_cont_fastpath() > current->last_continuation()->entry_sp() || current->raw_cont_fastpath() < sp) {
-    current->set_cont_fastpath(nullptr);
-  }
-
-  return cont_freeze(current, sp, false);
-JRT_END
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint) {
   ContinuationEntry* cont = thread->last_continuation();
@@ -1659,98 +2261,11 @@ static bool is_safe_to_preempt(JavaThread* thread) {
   }
 }
 
-// Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
-// May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
-// the only frames we're looking at are Java frames.
-int Continuation::try_force_yield(JavaThread* target, const oop cont) {
-  log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
-
-  ContinuationEntry* ce = target->last_continuation();
-  oop innermost = ce->continuation();
-  while (ce != nullptr && ce->continuation() != cont) {
-    ce = ce->parent();
-  }
-  if (ce == nullptr) {
-    return -1; // no continuation
-  }
-  if (target->_cont_yield) {
-    return -2; // during yield
-  }
-  if (!is_safe_to_preempt(target)) {
-    return freeze_pinned_native;
-  }
-
-  assert (target->has_last_Java_frame(), "");
-  // if (Interpreter::contains(thread->last_Java_pc())) { thread->push_cont_fastpath(thread->last_Java_sp()); }
-  assert (!Interpreter::contains(target->last_Java_pc()) || !target->cont_fastpath(),
-          "fast_path at codelet %s",
-          Interpreter::codelet_containing(target->last_Java_pc())->description());
-
-  const oop scope = jdk_internal_vm_Continuation::scope(cont);
-  if (innermost != cont) { // we have nested continuations
-    // make sure none of the continuations in the hierarchy are pinned
-    freeze_result res_pinned = is_pinned0(target, scope, true);
-    if (res_pinned != freeze_ok) {
-      log_trace(jvmcont, preempt)("try_force_yield: res_pinned");
-      return res_pinned;
-    }
-    jdk_internal_vm_Continuation::set_yieldInfo(cont, scope);
-  }
-
-  assert (target->has_last_Java_frame(), "need to test again?");
-  int res = cont_freeze(target, target->last_Java_sp(), true);
-  log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
-  if (res == 0) { // success
-    target->set_cont_preempt(true);
-
-    // The target thread calls
-    // Continuation::jump_from_safepoint from JavaThread::handle_special_runtime_exit_condition
-    // to yield on return from suspension/blocking handshake.
-  }
-  return res;
-}
-
-typedef void (*cont_jump_from_sp_t)();
-
-void Continuation::jump_from_safepoint(JavaThread* thread) {
-  assert (thread == JavaThread::current(), "");
-  assert (thread->is_cont_force_yield(), "");
-  log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
-  thread->set_cont_preempt(false);
-  if (thread->thread_state() == _thread_in_vm) {
-    thread->set_thread_state(_thread_in_Java);
-  }
-  StackWatermarkSet::after_unwind(thread);
-  MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
-  CAST_TO_FN_PTR(cont_jump_from_sp_t, StubRoutines::cont_jump_from_sp())(); // does not return
-  ShouldNotReachHere();
-}
-
 /////////////// THAW ////
-
-enum thaw_kind {
-  thaw_top = 0,
-  thaw_return_barrier = 1,
-  thaw_exception = 2,
-};
-
-typedef intptr_t* (*ThawContFnT)(JavaThread*, thaw_kind);
-
-static ThawContFnT cont_thaw = nullptr;
-
-static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
-  const int page_size = os::vm_page_size();
-  if (size > page_size) {
-    if (sp - size < thread->stack_overflow_state()->stack_overflow_limit()) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // make room on the stack for thaw
 // returns the size in bytes, or 0 on failure
-JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier))
+static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
 
   assert (thread == JavaThread::current(), "");
@@ -1777,14 +2292,14 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   size <<= LogBytesPerWord;
 
   const address bottom = (address)thread->last_continuation()->entry_sp(); // os::current_stack_pointer(); points to the entry frame
-  if (!stack_overflow_check(thread, size + 300, bottom)) {
+  if (!ContinuationHelper::stack_overflow_check(thread, size + 300, bottom)) {
     return 0;
   }
 
   log_develop_trace(jvmcont)("prepare_thaw bottom: " INTPTR_FORMAT " top: " INTPTR_FORMAT " size: %d", p2i(bottom), p2i(bottom - size), size);
 
   return size;
-JRT_END
+}
 
 template <typename ConfigT>
 class Thaw {
@@ -1985,6 +2500,7 @@ public:
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
     assert (to + size <= _cont.entrySP(), "");
     _cont.tail()->template copy_from_chunk_to_stack<aligned>(from, to, size);
+    CONT_JFR_ONLY(_cont.record_size_copied(size);)
   }
 
   void patch_chunk(intptr_t* sp, bool is_last) {
@@ -2219,7 +2735,7 @@ public:
 
     assert(Interpreted::frame_bottom<false>(f) <= Frame::frame_top(caller), "Interpreted::frame_bottom<false>(f): %p Frame::frame_top(caller): %p", Interpreted::frame_bottom<false>(f), Frame::frame_top(caller));
 
-    CONT_JFR_ONLY(_cont.dec_num_interpreted_frames();)
+    CONT_JFR_ONLY(_cont.record_interpreted_frame();)
 
     maybe_set_fastpath(f.sp());
 
@@ -2519,7 +3035,6 @@ void do_deopt_after_thaw(JavaThread* thread) {
   }
 }
 
-
 bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk) {
   assert(thread->has_last_Java_frame(), "");
 
@@ -2562,598 +3077,10 @@ bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChun
   return true;
 }
 
-static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
-  if (st != nullptr && !log_is_enabled(Trace, jvmcont)) return;
-  if (st == nullptr) st = tty;
-
-  f.print_on(st);
-}
-
-JRT_LEAF(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
-  // TODO: JRT_LEAF and NoHandleMark is problematic for JFR events.
-  // vFrameStreamCommon allocates Handles in RegisterMap for continuations.
-  // JRT_ENTRY instead?
-  ResetNoHandleMark rnhm;
-
-  intptr_t* sp = cont_thaw(thread, (thaw_kind)kind);
-  // ContinuationHelper::clear_anchor(thread);
-  return sp;
-JRT_END
-
-bool Continuation::is_continuation_enterSpecial(const frame& f) {
-  if (f.cb() == nullptr || !f.cb()->is_compiled()) return false;
-  Method* m = f.cb()->as_compiled_method()->method();
-  return (m != nullptr && m->is_continuation_enter_intrinsic());
-}
-
-bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap *map) {
-  // we can do this because the entry frame is never inlined
-  Method* m = (map->in_cont() && f.is_interpreted_frame()) ? map->stack_chunk()->interpreter_frame_method(f)
-                                                           : Frame::frame_method(f);
-  return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
-}
-
-// When walking the virtual stack, this method returns true
-// iff the frame is a thawed continuation frame whose
-// caller is still frozen on the h-stack.
-// The continuation object can be extracted from the thread.
-bool Continuation::is_cont_barrier_frame(const frame& f) {
-  assert (f.is_interpreted_frame() || f.cb() != nullptr, "");
-  return is_return_barrier_entry(f.is_interpreted_frame() ? Interpreted::return_pc(f) : Compiled::return_pc(f));
-}
-
-bool Continuation::is_return_barrier_entry(const address pc) {
-  return pc == StubRoutines::cont_returnBarrier();
-}
-
-static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
-  return cont->entry_sp() > sp;
-}
-
-bool Continuation::is_frame_in_continuation(ContinuationEntry* cont, const frame& f) {
-  return is_sp_in_continuation(cont, f.unextended_sp());
-}
-
-static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, intptr_t* const sp) {
-  assert (thread != nullptr, "");
-  ContinuationEntry* cont = thread->last_continuation();
-  while (cont != nullptr && !is_sp_in_continuation(cont, sp)) {
-    cont = cont->parent();
-  }
-  return cont;
-}
-
-static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
-  assert (thread != nullptr, "");
-  ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
-  return cont != nullptr ? cont->continuation() : (oop)nullptr;
-}
-
-oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
-  return get_continuation_for_sp(thread, f.unextended_sp());
-}
-
-ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
-  if (thread == nullptr || cont == (oop)nullptr) return nullptr;
-
-  for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
-    if (cont == entry->continuation()) return entry;
-  }
-  return nullptr;
-}
-
-bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
-  return get_continuation_entry_for_frame(thread, f.unextended_sp()) != nullptr;
-}
-
-bool Continuation::is_mounted(JavaThread* thread, oop cont_scope) {
-  return last_continuation(thread, cont_scope) != nullptr;
-}
-
-ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
-  guarantee (thread->has_last_Java_frame(), "");
-  for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
-    if (cont_scope == jdk_internal_vm_Continuation::scope(entry->continuation()))
-      return entry;
-  }
-  return nullptr;
-}
-
-void Continuation::notify_deopt(JavaThread* thread, intptr_t* sp) {
-  ContinuationEntry* cont = thread->last_continuation();
-
-  if (cont == nullptr) return;
-
-  if (is_sp_in_continuation(cont, sp)) {
-    thread->push_cont_fastpath(sp);
-    return;
-  }
-
-  ContinuationEntry* prev;
-  do {
-    prev = cont;
-    cont = cont->parent();
-  } while (cont != nullptr && !is_sp_in_continuation(cont, sp));
-
-  if (cont == nullptr) return;
-  assert (is_sp_in_continuation(cont, sp), "");
-  if (sp > prev->parent_cont_fastpath())
-      prev->set_parent_cont_fastpath(sp);
-}
-
-bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp) {
-  if (thread != nullptr && is_return_barrier_entry(*sender_pc)) {
-    ContinuationEntry* cont = get_continuation_entry_for_frame(thread, callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
-    assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
-
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
-    log_develop_trace(jvmcont)("fix_continuation_bottom_sender: sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
-
-    *sender_pc = cont->entry_pc();
-    *sender_sp = cont->entry_sp();
-    // We DO NOT want to fix FP. It could contain an oop that has changed on the stack, and its location should be OK anyway
-
-    return true;
-  }
-  return false;
-}
-
-address Continuation::get_top_return_pc_post_barrier(JavaThread* thread, address pc) {
-  ContinuationEntry* cont;
-  if (thread != nullptr && is_return_barrier_entry(pc) && (cont = thread->last_continuation()) != nullptr) {
-    pc = cont->entry_pc();
-  }
-  return pc;
-}
-
-bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const RegisterMap* map) {
-  if (cont_scope == nullptr || !is_continuation_entry_frame(f, map))
-    return false;
-
-  oop cont = get_continuation_for_sp(map->thread(), f.sp());
-  if (cont == nullptr)
-    return false;
-
-  oop sc = continuation_scope(cont);
-  assert(sc != nullptr, "");
-  return sc == cont_scope;
-}
-
-frame Continuation::continuation_parent_frame(RegisterMap* map) {
-  assert (map->in_cont(), "");
-  ContMirror cont(map);
-  assert (map->thread() != nullptr || !cont.is_mounted(), "map->thread() == nullptr: %d cont.is_mounted(): %d", map->thread() == nullptr, cont.is_mounted());
-
-  log_develop_trace(jvmcont)("continuation_parent_frame");
-  if (map->update_map()) {
-    ContinuationHelper::update_register_map_for_entry_frame(cont, map);
-  }
-
-  if (!cont.is_mounted()) { // When we're walking an unmounted continuation and reached the end
-    oop parent = jdk_internal_vm_Continuation::parent(cont.mirror());
-    stackChunkOop chunk = parent != nullptr ? ContMirror(parent).last_nonempty_chunk() : nullptr;
-    if (chunk != nullptr) {
-      return chunk->top_frame(map);
-    }
-
-    map->set_stack_chunk(nullptr);
-    return frame();
-  }
-
-  map->set_stack_chunk(nullptr);
-
-#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
-  frame sender(cont.entrySP(), cont.entryFP(), cont.entryPC());
-#else
-  frame sender = frame();
-  Unimplemented();
-#endif
-
-  return sender;
-}
-
-static frame continuation_top_frame(oop contOop, RegisterMap* map) {
-  stackChunkOop chunk = ContMirror(contOop).last_nonempty_chunk();
-  map->set_stack_chunk(chunk);
-  return chunk != nullptr ? chunk->top_frame(map) : frame();
-}
-
-frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
-  assert (map != nullptr, "");
-  return continuation_top_frame(get_continuation_for_sp(map->thread(), callee.sp()), map);
-}
-
-frame Continuation::last_frame(oop continuation, RegisterMap *map) {
-  assert(map != nullptr, "a map must be given");
-  return continuation_top_frame(continuation, map);
-}
-
-bool Continuation::has_last_Java_frame(oop continuation) {
-  return !ContMirror(continuation).is_empty();
-}
-
-stackChunkOop Continuation::last_nonempty_chunk(oop continuation) {
-  return ContMirror(continuation).last_nonempty_chunk();
-}
-
-javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map) {
-  assert(map != nullptr, "a map must be given");
-  if (!ContMirror(continuation()).is_empty()) {
-    frame f = last_frame(continuation(), map);
-    for (vframe* vf = vframe::new_vframe(&f, map, nullptr); vf; vf = vf->sender()) {
-      if (vf->is_java_frame()) return javaVFrame::cast(vf);
-    }
-  }
-  return nullptr;
-}
-
-bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
-  ContMirror cont(map);
-  stackChunkOop chunk = cont.find_chunk_by_address(addr);
-  return chunk != nullptr ? chunk->is_usable_in_chunk(addr) : false;
-}
-
-stackChunkOop Continuation::continuation_parent_chunk(stackChunkOop chunk) {
-  assert(chunk->cont() != nullptr, "");
-  oop cont_parent = jdk_internal_vm_Continuation::parent(chunk->cont());
-  return cont_parent != nullptr ? Continuation::last_nonempty_chunk(cont_parent) : nullptr;
-}
-
-oop Continuation::continuation_scope(oop cont) {
-  return cont != nullptr ? jdk_internal_vm_Continuation::scope(cont) : nullptr;
-}
-
-bool Continuation::pin(JavaThread* current) {
-  ContinuationEntry* ce = current->last_continuation();
-  if (ce == nullptr)
-    return true;
-
-  oop cont = ce->cont_oop();
-  assert (cont != nullptr, "");
-  assert (cont == ContinuationHelper::get_continuation(current), "");
-
-  jshort value = jdk_internal_vm_Continuation::critical_section(cont);
-  if (value < max_jshort) {
-    jdk_internal_vm_Continuation::set_critical_section(cont, value + 1);
-    return true;
-  }
-  return false;
-}
-
-bool Continuation::unpin(JavaThread* current) {
-  ContinuationEntry* ce = current->last_continuation();
-  if (ce == nullptr)
-    return true;
-
-  oop cont = ce->cont_oop();
-  assert (cont != nullptr, "");
-  assert (cont == ContinuationHelper::get_continuation(current), "");
-
-  jshort value = jdk_internal_vm_Continuation::critical_section(cont);
-  if (value > 0) {
-    jdk_internal_vm_Continuation::set_critical_section(cont, value - 1);
-    return true;
-  }
-  return false;
-}
-
-///// Allocation
-
-inline void ContMirror::post_safepoint(Handle conth) {
-  _cont = conth(); // reload oop
-  if (_tail != (oop)nullptr) {
-    _tail = (stackChunkOop)jdk_internal_vm_Continuation::tail(_cont);
-  }
-}
-
-
-/* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
- * method. In the later case we might have done a safepoint and need to reload our oops */
-stackChunkOop ContMirror::allocate_stack_chunk(size_t stack_size, bool is_preempt) {
-  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
-  size_t size_in_words = klass->instance_size(stack_size);
-
-  assert(is_preempt || _thread == JavaThread::current(), "should be current");
-  JavaThread* current = is_preempt ? JavaThread::current() : _thread;
-
-  StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
-  HeapWord* start = current->tlab().allocate(size_in_words);
-  if (start != nullptr) {
-    return (stackChunkOop)allocator.initialize(start);
-  }
-
-  //HandleMark hm(current);
-  Handle conth(current, _cont);
-  stackChunkOop result = (stackChunkOop)allocator.allocate();
-  post_safepoint(conth);
-  return result;
-}
-
-void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
-  EventContinuationIterateOops e;
-  if (e.should_commit()) {
-    e.set_id(cast_from_oop<u8>(chunk));
-    e.set_safepoint(SafepointSynchronize::is_at_safepoint());
-    e.set_numFrames((u2)num_frames);
-    e.set_numOops((u2)num_oops);
-    e.commit();
-  }
-}
-
-JVM_ENTRY(jint, CONT_isPinned0(JNIEnv* env, jobject cont_scope)) {
-  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-  return is_pinned0(thread, JNIHandles::resolve(cont_scope), false);
-}
-JVM_END
-
-JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
-  JavaThread* current = JavaThread::thread_from_jni_environment(env);
-  assert(current == JavaThread::current(), "should be");
-  jint result = -1; // no continuation (should have enum)
-
-  oop thread_oop = JNIHandles::resolve(jthread);
-  if (thread_oop != nullptr) {
-    JavaThread* target = java_lang_Thread::thread(thread_oop);
-    assert(target != current, "should be different threads");
-    // Suspend the target thread and freeze it.
-    if (target->block_suspend(current)) {
-      oop oopCont = JNIHandles::resolve_non_null(jcont);
-      result = Continuation::try_force_yield(target, oopCont);
-      target->continue_resume(current);
-    }
-  }
-  return result;
-}
-JVM_END
-
-
-void Continuation::init() {
-}
-
-void Continuation::set_cont_fastpath_thread_state(JavaThread* thread) {
-  assert (thread != nullptr, "");
-  bool fast = !thread->is_interp_only_mode();
-  thread->set_cont_fastpath_thread_state(fast);
-}
-
-#define CC (char*)  /*cast a literal from (const char*)*/
-#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
-
-static JNINativeMethod CONT_methods[] = {
-    {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",            FN_PTR(CONT_TryForceYield0)},
-    {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
-};
-
-void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
-    Thread* thread = Thread::current();
-    assert(thread->is_Java_thread(), "");
-    ThreadToNativeFromVM trans((JavaThread*)thread);
-    int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
-    guarantee(status == JNI_OK && !env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
-}
 
 #include CPU_HEADER_INLINE(continuation)
 
-template <bool compressed_oops, typename BarrierSetT>
-class Config {
-public:
-  typedef Config<compressed_oops, BarrierSetT> SelfT;
-  typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
-
-  static const bool _compressed_oops = compressed_oops;
-  static const bool _concurrent_gc = BarrierSetT::is_concurrent_gc();
-  // static const bool _post_barrier = post_barrier;
-
-  static int freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
-    return freeze0<SelfT>(thread, sp, preempt);
-  }
-
-  static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
-    return thaw0<SelfT>(thread, kind);
-  }
-
-  static bool requires_barriers(oop obj) {
-    return BarrierSetT::requires_barriers(obj);
-  }
-
-  static void print() {
-    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, _concurrent_gc);
-    // tty->print_cr(">>> Config UseAVX: %ld UseUnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
-    // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
-  }
-};
-
-class ConfigResolve {
-public:
-  static void resolve() { resolve_compressed(); }
-
-  static void resolve_compressed() {
-    UseCompressedOops ? resolve_gc<true>()
-                      : resolve_gc<false>();
-  }
-
-  template <bool use_compressed>
-  static void resolve_gc() {
-    BarrierSet* bs = BarrierSet::barrier_set();
-    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
-    switch (bs->kind()) {
-#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
-      case BarrierSet::bs_name: {                                       \
-        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
-      }                                                                 \
-        break;
-      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
-#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
-
-    default:
-      fatal("BarrierSet resolving not implemented");
-    };
-  }
-
-  template <bool use_compressed, typename BarrierSetT>
-  static void resolve() {
-    typedef Config<use_compressed, BarrierSetT> SelectedConfigT;
-    // SelectedConfigT::print();
-
-    cont_freeze = SelectedConfigT::freeze;
-    cont_thaw   = SelectedConfigT::thaw;
-  }
-};
-
-void Continuations::init() {
-  ConfigResolve::resolve();
-  InstanceStackChunkKlass::resolve_memcpy_functions();
-  Continuation::init();
-}
-
-void Continuations::print_statistics() {
-  //tty->print_cr("Continuations hit/miss %ld / %ld", _exploded_hit, _exploded_miss);
-  //tty->print_cr("Continuations nmethod hit/miss %ld / %ld", _nmethod_hit, _nmethod_miss);
-}
-
-///// DEBUGGING
-
-#ifndef PRODUCT
-void Continuation::describe(FrameValues &values) {
-  JavaThread* thread = JavaThread::active();
-  if (thread != nullptr) {
-    for (ContinuationEntry* cont = thread->last_continuation(); cont != nullptr; cont = cont->parent()) {
-      intptr_t* bottom = cont->entry_sp();
-      if (bottom != nullptr)
-        values.describe(-1, bottom, "continuation entry");
-    }
-  }
-}
-
-#ifdef ASSERT
-bool Continuation::debug_is_stack_chunk(Klass* k) {
-  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
-}
-
-bool Continuation::debug_is_stack_chunk(oop obj) {
-  return obj != (oop)nullptr && obj->is_stackChunk();
-}
-
-bool Continuation::debug_is_continuation(Klass* klass) {
-  return klass->is_subtype_of(vmClasses::Continuation_klass());
-}
-
-bool Continuation::debug_is_continuation(oop obj) {
-  return obj->is_a(vmClasses::Continuation_klass());
-}
-
-bool Continuation::debug_is_continuation_run_frame(const frame& f) {
-  bool is_continuation_run = false;
-  if (f.is_compiled_frame()) {
-    HandleMark hm(Thread::current());
-    ResourceMark rm;
-    Method* m = f.cb()->as_compiled_method()->scope_desc_at(f.pc())->method();
-    if (m != nullptr) {
-      char buf[50];
-      if (0 == strcmp(ENTER_SPECIAL_SIG, m->name_and_sig_as_C_string(buf, 50))) {
-        is_continuation_run = true;
-      }
-    }
-  }
-  return is_continuation_run;
-}
-
-NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
-  DEBUG_ONLY(if (!VerifyContinuations) return true;)
-  assert (contOop != (oop)nullptr, "");
-  assert (oopDesc::is_oop(contOop), "");
-  ContMirror cont(contOop);
-
-  assert (oopDesc::is_oop_or_null(cont.tail()), "");
-  assert (cont.chunk_invariant(), "");
-
-  bool nonempty_chunk = false;
-  size_t max_size = 0;
-  int num_chunks = 0;
-  int num_frames = 0;
-  int num_interpreted_frames = 0;
-  int num_oops = 0;
-
-  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
-    log_develop_trace(jvmcont)("debug_verify_continuation chunk %d", num_chunks);
-    chunk->verify(&max_size, &num_oops, &num_frames, &num_interpreted_frames);
-    if (!chunk->is_empty()) nonempty_chunk = true;
-    num_chunks++;
-  }
-
-  const bool is_empty = cont.is_empty();
-  assert (!nonempty_chunk || !is_empty, "");
-  assert (is_empty == (!nonempty_chunk && cont.last_frame().is_empty()), "");
-
-  return true;
-}
-
-void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
-  if (st == nullptr) st = tty;
-
-  ContMirror cont(contOop);
-
-  st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d", contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
-  st->print_cr("CHUNKS:");
-  for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
-    st->print("* ");
-    chunk->print_on(true, tty);
-  }
-}
-#endif // ASSERT
-
-static jlong java_tid(JavaThread* thread) {
-  return java_lang_Thread::thread_id(thread->threadObj());
-}
-
-#ifndef PRODUCT
-template <bool relative>
-static void print_frame_layout(const frame& f, outputStream* st) {
-  ResourceMark rm;
-  FrameValues values;
-  assert (f.get_cb() != nullptr, "");
-  RegisterMap map(relative ? (JavaThread*)nullptr : JavaThread::current(), true, false, false);
-  map.set_include_argument_oops(false);
-  map.set_skip_missing(true);
-  frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
-  const_cast<frame&>(f).describe<relative>(values, 0, &map);
-  values.print_on((JavaThread*)nullptr, st);
-}
-#endif
-
-static void print_frames(JavaThread* thread, outputStream* st) {
-  if (st != nullptr && !log_develop_is_enabled(Trace, jvmcont)) return;
-  if (st == nullptr) st = tty;
-
-  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
-
-  st->print_cr("------- frames ---------");
-  RegisterMap map(thread, true, true, false);
-  map.set_include_argument_oops(false);
-#ifndef PRODUCT
-  map.set_skip_missing(true);
-  ResetNoHandleMark rnhm;
-  ResourceMark rm;
-  HandleMark hm(Thread::current());
-  FrameValues values;
-#endif
-
-  int i = 0;
-  for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
-#ifndef PRODUCT
-    f.describe(values, i++, &map);
-#else
-    print_vframe(f, &map, st);
-#endif
-  }
-#ifndef PRODUCT
-  values.print(thread);
-#endif
-  st->print_cr("======= end frames =========");
-}
-
-#endif
+/////////////////////////////////////////////
 
 int ContinuationEntry::return_pc_offset = 0;
 nmethod* ContinuationEntry::continuation_enter = nullptr;
@@ -3168,6 +3095,10 @@ void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
 ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
   assert (Continuation::is_continuation_enterSpecial(f), "");
   return (ContinuationEntry*)f.unextended_sp();
+}
+
+void ContinuationEntry::flush_stack_processing(JavaThread* thread) {
+  ContinuationHelper::maybe_flush_stack_processing(thread, this);
 }
 
 #ifdef ASSERT
@@ -3218,3 +3149,61 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
   return true;
 }
 #endif
+
+///// DEBUGGING
+
+#ifndef PRODUCT
+static jlong java_tid(JavaThread* thread) {
+  return java_lang_Thread::thread_id(thread->threadObj());
+}
+
+template <bool relative>
+static void print_frame_layout(const frame& f, outputStream* st) {
+  ResourceMark rm;
+  FrameValues values;
+  assert (f.get_cb() != nullptr, "");
+  RegisterMap map(relative ? (JavaThread*)nullptr : JavaThread::current(), true, false, false);
+  map.set_include_argument_oops(false);
+  map.set_skip_missing(true);
+  frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
+  const_cast<frame&>(f).describe<relative>(values, 0, &map);
+  values.print_on((JavaThread*)nullptr, st);
+}
+
+static void print_frames(JavaThread* thread, outputStream* st) {
+  if (st != nullptr && !log_develop_is_enabled(Trace, jvmcont)) return;
+  if (st == nullptr) st = tty;
+
+  st->print_cr("------- frames ---------");
+  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
+
+  RegisterMap map(thread, true, true, false);
+  map.set_include_argument_oops(false);
+
+  if (false) {
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
+      print_vframe(f, &map, st);
+    }
+  } else {
+    map.set_skip_missing(true);
+    ResetNoHandleMark rnhm;
+    ResourceMark rm;
+    HandleMark hm(Thread::current());
+    FrameValues values;
+
+    int i = 0;
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
+      f.describe(values, i++, &map);
+    }
+    values.print(thread);
+  }
+  st->print_cr("======= end frames =========");
+}
+#endif
+
+static void print_vframe(frame f, const RegisterMap* map, outputStream* st) {
+  if (st != nullptr && !log_is_enabled(Trace, jvmcont)) return;
+  if (st == nullptr) st = tty;
+
+  f.print_on(st);
+}

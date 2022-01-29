@@ -58,51 +58,48 @@ public:
   static int try_force_yield(JavaThread* thread, oop cont);
   static void jump_from_safepoint(JavaThread* thread);
 
-  static void notify_deopt(JavaThread* thread, intptr_t* sp);
-
-  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
   static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
-  static bool is_mounted(JavaThread* thread, oop cont_scope);
-  static bool is_continuation_enterSpecial(const frame& f);
-  static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
+  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
+  static bool is_continuation_enterSpecial(const frame& f);
+  static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
+
+  static bool is_mounted(JavaThread* thread, oop cont_scope);
+  
+  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
+
   static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
-  static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
-  static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
-
-  static frame top_frame(const frame& callee, RegisterMap* map);
-  static frame continuation_parent_frame(RegisterMap* map);
 
   static bool has_last_Java_frame(oop continuation);
-  static stackChunkOop last_nonempty_chunk(oop continuation);
   static frame last_frame(oop continuation, RegisterMap *map);
+  static frame top_frame(const frame& callee, RegisterMap* map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
+  static frame continuation_parent_frame(RegisterMap* map);
+
+  static oop continuation_scope(oop cont);
+  static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
+
+  static stackChunkOop last_nonempty_chunk(oop continuation);
+  static stackChunkOop continuation_parent_chunk(stackChunkOop chunk);
+  static bool is_in_usable_stack(address addr, const RegisterMap* map);
 
   // pins/unpins the innermost mounted continuation; returns true on success or false if there's no continuation or the operation failed
   static bool pin(JavaThread* current);
   static bool unpin(JavaThread* current);
 
-  // access frame data
-  static bool is_in_usable_stack(address addr, const RegisterMap* map);
-
-  static stackChunkOop continuation_parent_chunk(stackChunkOop chunk);
-  static oop continuation_scope(oop cont);
-  static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
-
+  static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
+  static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
   static void set_cont_fastpath_thread_state(JavaThread* thread);
+  static void notify_deopt(JavaThread* thread, intptr_t* sp); 
 
-  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+  // access frame data
 
 #ifndef PRODUCT
   static void describe(FrameValues &values);
 #endif
-
-private:
-  // declared here as it's used in friend declarations
-  static address oop_address(objArrayOop ref_stack, int ref_sp, int index);
-  static address oop_address(objArrayOop ref_stack, int ref_sp, address stack_address);
 
 private:
   friend class InstanceStackChunkKlass;
@@ -114,9 +111,9 @@ public:
   static bool debug_is_stack_chunk(oop obj);
   static bool debug_is_continuation(Klass* klass);
   static bool debug_is_continuation(oop obj);
+  static bool debug_is_continuation_run_frame(const frame& f);
   static bool debug_verify_continuation(oop cont);
   static void debug_print_continuation(oop cont, outputStream* st = NULL);
-  static bool debug_is_continuation_run_frame(const frame& f);
 #endif
 };
 
@@ -177,6 +174,7 @@ public:
   static ContinuationEntry* from_frame(const frame& f);
   frame to_frame();
   void update_register_map(RegisterMap* map);
+  void flush_stack_processing(JavaThread* thread);
 
   intptr_t* bottom_sender_sp() {
     intptr_t* sp = entry_sp() - argsize();

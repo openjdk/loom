@@ -105,6 +105,7 @@ template <bool mixed>
 StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, bool gc) DEBUG_ONLY(: _chunk(chunk)) {
   assert (chunk->is_stackChunk(), "");
   assert (mixed || !chunk->has_mixed_frames(), "");
+  // assert (!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
   _end = chunk->bottom_address();
@@ -129,6 +130,7 @@ template <bool mixed>
 StackChunkFrameStream<mixed>::StackChunkFrameStream(stackChunkOop chunk, const frame& f) DEBUG_ONLY(: _chunk(chunk)) {
   assert (chunk->is_stackChunk(), "");
   assert (mixed || !chunk->has_mixed_frames(), "");
+  // assert (!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
 
