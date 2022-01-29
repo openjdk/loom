@@ -656,11 +656,15 @@ CodeBlob* CodeCache::find_blob_unsafe(void* start) {
 
 CodeBlob* CodeCache::patch_nop(NativePostCallNop* nop, void* pc, int& slot) {
   CodeBlob* cb = CodeCache::find_blob(pc);
-  int oopmap_slot = cb->oop_maps()->find_slot_for_offset((intptr_t) pc - (intptr_t) cb->code_begin());
   intptr_t cbaddr = (intptr_t) cb;
   intptr_t offset = ((intptr_t) pc) - cbaddr;
 
-  if (((oopmap_slot & 0xff) == oopmap_slot) && ((offset & 0xffffff) == offset)) {
+  int oopmap_slot = cb->oop_maps()->find_slot_for_offset((intptr_t) pc - (intptr_t) cb->code_begin());
+  if (oopmap_slot < 0) { // this can happen at asynchronous (non-safepoint) stackwalks
+    slot = -1;
+    log_debug(codecache)("failed to find oopmap for cb: " INTPTR_FORMAT " offset: %d", cbaddr, (int) offset);
+    // tty->print_cr("deopt: %d", cb->as_compiled_method()->is_deopt_pc((address)pc)); os::print_location(tty, (intptr_t)pc);
+  } else if (((oopmap_slot & 0xff) == oopmap_slot) && ((offset & 0xffffff) == offset)) {
     jint value = (oopmap_slot << 24) | (jint) offset;
     nop->patch(value);
     slot = oopmap_slot;

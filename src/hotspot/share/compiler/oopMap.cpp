@@ -746,8 +746,8 @@ int ImmutableOopMapSet::find_slot_for_offset(int pc_offset) const {
   for (int i = 0; i < _count; ++i) {
     if (pairs[i].pc_offset() >= pc_offset) {
       ImmutableOopMapPair* last = &pairs[i];
-      assert(last->pc_offset() == pc_offset, "oopmap not found");
-      return i;
+      return last->pc_offset() == pc_offset ? i
+                                            : -1; // this can happen at asynchronous (non-safepoint) stackwalks
     }
   }
 

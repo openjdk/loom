@@ -54,18 +54,16 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
 }
 
 template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
 }
 
 template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(RegisterMapT* map, const frame& f) {
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMapT* map) {
   frame::update_map_with_saved_link(map, Frame::callee_link_address(f));
 }
 
 inline void ContinuationHelper::push_pd(const frame& f) {
-  log_develop_trace(jvmcont)("ContinuationHelper::push_pd: " INTPTR_FORMAT, p2i(f.fp()));
-  // os::print_location(tty, (intptr_t)f.fp());
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 

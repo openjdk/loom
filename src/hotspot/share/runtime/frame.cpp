@@ -62,11 +62,12 @@
 RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frames, bool walk_cont) {
   _thread         = thread;
   _update_map     = update_map;
-  _walk_cont      = walk_cont;
-  DEBUG_ONLY(_skip_missing = false;)
   _process_frames = process_frames;
+  _walk_cont      = walk_cont;
   clear();
-  debug_only(_update_for_id = NULL;)
+  DEBUG_ONLY (_update_for_id = NULL;)
+  NOT_PRODUCT(_skip_missing = false;)
+  NOT_PRODUCT(_async = false;)
 
   if (walk_cont && thread != NULL && thread->last_continuation() != NULL) {
     _chunk = stackChunkHandle(Thread::current(), NULL, true);
@@ -80,11 +81,12 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frame
 RegisterMap::RegisterMap(oop continuation, bool update_map) {
   _thread         = NULL;
   _update_map     = update_map;
-  _walk_cont      = true;
-  DEBUG_ONLY(_skip_missing = false;)
   _process_frames = false;
+  _walk_cont      = true;
   clear();
-  debug_only(_update_for_id = NULL;)
+  DEBUG_ONLY (_update_for_id = NULL;)
+  NOT_PRODUCT(_skip_missing = false;)
+  NOT_PRODUCT(_async = false;)
 
   _chunk = stackChunkHandle(Thread::current(), NULL, true);
 
@@ -99,10 +101,11 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   _thread                = map->thread();
   _update_map            = map->update_map();
   _process_frames        = map->process_frames();
+  _walk_cont             = map->_walk_cont;
   _include_argument_oops = map->include_argument_oops();
-  debug_only(_update_for_id = map->_update_for_id;)
-  _walk_cont     = map->_walk_cont;
-  DEBUG_ONLY(_skip_missing = map->_skip_missing;)
+  DEBUG_ONLY (_update_for_id = map->_update_for_id;)
+  NOT_PRODUCT(_skip_missing = map->_skip_missing;)
+  NOT_PRODUCT(_async = map->_async;)
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
   _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); //
