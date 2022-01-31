@@ -498,7 +498,6 @@ void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
     derived_cl = &process_cl;
     break;
   case DerivedPointerIterationMode::_with_table:
-    // if (has_derived_oops()) { tty->print_cr(">>> ImmutableOopMap::oops_do derived table"); fr->print_on(tty); }
     derived_cl = &add_cl;
     break;
   case DerivedPointerIterationMode::_ignore:
