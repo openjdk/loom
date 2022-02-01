@@ -188,6 +188,8 @@ compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              82
 runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
 runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
 
+serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	          8264699 generic-all
+
 # SA needs update
 serviceability/sa/ClhsdbThreadContext.java                                    8243016 generic-all
 serviceability/sa/JhsdbThreadInfoTest.java                                    8243016 generic-all
