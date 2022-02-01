@@ -774,12 +774,12 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * A StructuredTaskScope that overrides the {@link #handleComplete(Future) handle}
-     * method to capture the result of the first task to complete successfully. Once
-     * captured, it invokes the {@linkplain #shutdown() shutdown} method to interrupt
-     * unfinished threads and wakeup the owner. The policy implemented by this class
-     * is intended for cases where the result of any task will do ("invoke any") and
-     * where the results of other unfinished tasks are no longer needed.
+     * A StructuredTaskScope that captures the result of the first task to complete
+     * successfully. Once captured, it invokes the {@linkplain #shutdown() shutdown}
+     * method to interrupt unfinished threads and wakeup the owner. The policy
+     * implemented by this class is intended for cases where the result of any task will
+     * do ("invoke any") and where the results of other unfinished tasks are no longer
+     * needed.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
@@ -811,6 +811,17 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         /**
          * Constructs a new WithShutdownOnSuccess with the given name and thread factory.
+         * The task scope is optionally named for the purposes of monitoring and management.
+         * The thread factory is used to {@link ThreadFactory#newThread(Runnable) create}
+         * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
+         * owned by the current thread.
+         *
+         * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
+         * bindings for inheritance by threads created in the task scope. The
+         * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
+         * the class description details how parent-child relations are established implicitly
+         * for the purpose of inheritance of scope-local bindings.
+         *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
          */
@@ -820,6 +831,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         /**
          * Constructs a new unnamed WithShutdownOnSuccess that creates virtual threads.
+         *
+         * <p> This method is equivalent to invoking the 2-arg constructor with a name of
+         * {@code null} and a thread factory that creates virtual threads.
          */
         public WithShutdownOnSuccess() {
             super(null, Thread.ofVirtual().factory());
@@ -922,11 +936,10 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * A StructuredTaskScope that overrides the {@link #handleComplete(Future) handle}
-     * method to capture the exception of the first task to complete abnormally. Once
-     * captured, it invokes the {@linkplain #shutdown() shutdown} method to interrupt
-     * unfinished threads and wakeup the owner. The policy implemented by this class
-     * is intended for cases where the results for all tasks are required ("invoke all");
+     * A StructuredTaskScope that captures the exception of the first task to complete
+     * abnormally. Once captured, it invokes the {@linkplain #shutdown() shutdown} method
+     * to interrupt unfinished threads and wakeup the owner. The policy implemented by this
+     * class is intended for cases where the results for all tasks are required ("invoke all");
      * if any task fails then the results of other unfinished tasks are no longer needed.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
@@ -954,6 +967,17 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         /**
          * Constructs a new WithShutdownOnSuccess with the given name and thread factory.
+         * The task scope is optionally named for the purposes of monitoring and management.
+         * The thread factory is used to {@link ThreadFactory#newThread(Runnable) create}
+         * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
+         * owned by the current thread.
+         *
+         * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
+         * bindings for inheritance by threads created in the task scope. The
+         * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
+         * the class description details how parent-child relations are established implicitly
+         * for the purpose of inheritance of scope-local bindings.
+         *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
          */
@@ -963,6 +987,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         /**
          * Constructs a new unnamed WithShutdownOnFailure that creates virtual threads.
+         *
+         * <p> This method is equivalent to invoking the 2-arg constructor with a name of
+         * {@code null} and a thread factory that creates virtual threads.
          */
         public WithShutdownOnFailure() {
             super(null, Thread.ofVirtual().factory());
