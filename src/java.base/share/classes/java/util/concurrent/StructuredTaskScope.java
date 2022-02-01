@@ -470,8 +470,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     /**
      * Wait for all threads to finish or the task scope to shutdown. This method waits
      * until all threads started in the task scope finish execution (of both task and
-     * {@link #handleComplete(Future) handle} method), the {@link #shutdown() shutdown} method
-     * is invoked to shut down the task scope, or the current thread is interrupted.
+     * {@link #handleComplete(Future) handleComplete} method), the {@link #shutdown()
+     * shutdown} method is invoked to shut down the task scope, or the current thread
+     * is interrupted.
      *
      * <p> This method may only be invoked by the task scope owner.
      *
@@ -490,9 +491,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     /**
      * Wait for all threads to finish or the task scope to shutdown, up to the given
      * deadline. This method waits until all threads started in the task scope finish
-     * execution (of both task and {@link #handleComplete(Future) handle} method), the
-     * {@link #shutdown() shutdown} method is invoked to shut down the task scope, the
-     * current thread is interrupted, or the deadline is reached.
+     * execution (of both task and {@link #handleComplete(Future) handleComplete} method),
+     * the {@link #shutdown() shutdown} method is invoked to shut down the task scope,
+     * the current thread is interrupted, or the deadline is reached.
      *
      * <p> This method may only be invoked by the task scope owner.
      *
