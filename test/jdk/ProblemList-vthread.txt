@@ -260,7 +260,6 @@ sun/management/jmxremote/startstop/JMXStatusTest.java
 
 java/lang/invoke/condy/CondyNestedResolutionTest.java
 
-
 ####
 # Other incorrect test expectations (test bugs)
 
@@ -325,3 +324,6 @@ com/sun/jdi/sde/MangleTest.java
 com/sun/jdi/sde/MangleStepTest.java
 com/sun/jdi/sde/TemperatureTableTest.java
 com/sun/jdi/sde/SourceDebugExtensionTest.java
+
+# Tests using Thread.stop(), not supported on virtual threads
+jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all

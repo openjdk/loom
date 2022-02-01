@@ -881,6 +881,3 @@ jdk/jfr/event/gc/detailed/TestZPageAllocationEvent.java         8278537 generic-
 jdk/jfr/jcmd/TestJcmdStartWithOptions.java                      8278257 generic-all
 jdk/jfr/tool/TestPrintXML.java                                  8278262 generic-all
 
-
-# Tests using Thread.stop()
-jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all
