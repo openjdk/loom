@@ -899,8 +899,6 @@ public class Thread implements Runnable {
          * method must be invoked to schedule the thread to execute.
          * @param task the object to run when the thread executes
          * @return a new unstarted Thread
-         * @throws SecurityException if a thread group has been set and the current thread
-         *         cannot create a thread in that thread group
          * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
         Thread unstarted(Runnable task);
@@ -940,6 +938,12 @@ public class Thread implements Runnable {
             @Override OfPlatform allowSetThreadLocals(boolean allow);
             @Override OfPlatform inheritInheritableThreadLocals(boolean inherit);
             @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * @throws SecurityException if a thread group has been set and the current
+             *         thread cannot create a thread in that thread group
+             */
+            @Override Thread unstarted(Runnable task);
 
             /**
              * @throws SecurityException if a thread group has been set and the current
