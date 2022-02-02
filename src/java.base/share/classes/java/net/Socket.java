@@ -571,10 +571,19 @@ public class Socket implements java.io.Closeable {
     /**
      * Connects this socket to the server.
      *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
+     * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
+     * following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread establishing a connection will
+     *        will close the underlying channel and cause this method to throw an
+     *        {@code IOException} with the interrupt status set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
+     *        connection. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. This method will then throw
+     *        {@code IOException} with the interrupt status set.
+     * </ol>
      *
      * @param   endpoint the {@code SocketAddress}
      * @throws  IOException if an error occurs during the connection
@@ -594,10 +603,19 @@ public class Socket implements java.io.Closeable {
      * A timeout of zero is interpreted as an infinite timeout. The connection
      * will then block until established or an error occurs.
      *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
+     * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
+     * following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread establishing a connection will
+     *        will close the underlying channel and cause this method to throw an
+     *        {@code IOException} with the interrupt status set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
+     *        connection. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. This method will then throw
+     *        {@code IOException} with the interrupt status set.
+     * </ol>
      *
      * @param   endpoint the {@code SocketAddress}
      * @param   timeout  the timeout value to be used in milliseconds.
