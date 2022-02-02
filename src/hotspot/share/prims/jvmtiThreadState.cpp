@@ -308,30 +308,44 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
-  ThreadBlockInVM tbivm(thread);
+  int attempts = 10 * 100;
+
+  // Avoid using MonitorLocker on performance critical path, use
+  // two-level synchronization with lock-free operations on counters.
+  Atomic::inc(&_VTMT_count); // try to enter VTMT section optmistically
 
   // Do not allow suspends inside VTMT transitions.
   // Block while transitions are disabled or there are suspend requests.
-  int attempts = 10 * 100;
-  while (true) {
-    Atomic::inc(&_VTMT_count);
+  if (_VTMT_disable_count > 0 ||
+      thread->is_suspended() ||
+      JvmtiVTSuspender::is_vthread_suspended(vth())
+  ) {
+    // Slow path: undo unsuccessful optimistic counter incrementation.
+    // It can cause an extra waiting cycle for VTMT disablers.
+    Atomic::dec(&_VTMT_count);
 
-    // block while transitions are disabled or there are suspend requests
-    if (_VTMT_disable_count > 0 ||
-        thread->is_suspended() ||
-        JvmtiVTSuspender::is_vthread_suspended(vth())
-    ) {
-      Atomic::dec(&_VTMT_count);
+    while (true) {
+      ThreadBlockInVM tbivm(thread);
       MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-      if (ml.wait(10)) {
-        attempts--;
+      // Do not allow suspends inside VTMT transitions.
+      // Block while transitions are disabled or there are suspend requests.
+      if (_VTMT_disable_count > 0 ||
+           thread->is_suspended() ||
+           JvmtiVTSuspender::is_vthread_suspended(vth())
+      ) {
+        // block while transitions are disabled or there are suspend requests
+        if (ml.wait(10)) {
+          attempts--;
+        }
+        DEBUG_ONLY(if (attempts == 0) break;)
+        continue; // ~ThreadBlockInVM has handshake-based suspend point
       }
-      DEBUG_ONLY(if (attempts == 0) break;)
-      continue; // ~ThreadBlockInVM has handshake-based suspend point
+      Atomic::inc(&_VTMT_count);
+      break;
     }
-    break;
   }
+  // enter VTMT section
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   thread->set_is_in_VTMT(true);
   JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
