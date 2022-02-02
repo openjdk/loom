@@ -840,11 +840,11 @@ public class Thread implements Runnable {
          * {@code Thread}.
          *
          * @apiNote
-         * <pre>{@code
+         * {@snippet :
          *   Thread.Builder builder = Thread.ofPlatform().name("worker-", 0);
          *   Thread t1 = builder.start(task1);   // name "worker-0"
          *   Thread t2 = builder.start(task2);   // name "worker-1"
-         * }</pre>
+         * }
          *
          * @param prefix thread name prefix
          * @param start the starting value of the counter
