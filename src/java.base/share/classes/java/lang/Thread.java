@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
@@ -914,8 +915,6 @@ public class Thread implements Runnable {
          *
          * @param task the object to run when the thread executes
          * @return a new started Thread
-         * @throws SecurityException if a thread group has been set and the current thread
-         *         cannot create a thread in that thread group
          * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
         default Thread start(Runnable task) {
@@ -950,6 +949,12 @@ public class Thread implements Runnable {
             @Override OfPlatform allowSetThreadLocals(boolean allow);
             @Override OfPlatform inheritInheritableThreadLocals(boolean inherit);
             @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * @throws SecurityException if a thread group has been set and the current
+             *         thread cannot create a thread in that thread group
+             */
+            @Override Thread start(Runnable task);
 
             /**
              * Sets the thread group.
@@ -1022,6 +1027,8 @@ public class Thread implements Runnable {
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+            /** @throws RejectedExecutionException if the scheduler cannot accept a task */
+            @Override Thread start(Runnable task);
         }
     }
 
@@ -1429,9 +1436,9 @@ public class Thread implements Runnable {
      * In particular, a thread may not be restarted once it has completed
      * execution.
      *
-     * @throws     IllegalThreadStateException  if the thread was already started.
-     * @throws     java.util.concurrent.RejectedExecutionException if the thread
-     *             is virtual and the scheduler cannot accept a task
+     * @throws IllegalThreadStateException if the thread was already started
+     * @throws RejectedExecutionException if the thread is virtual and the
+     *         scheduler cannot accept a task
      */
     public void start() {
         synchronized (this) {
