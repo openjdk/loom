@@ -1751,7 +1751,7 @@ public class Thread implements Runnable {
      */
     public final boolean isAlive() {
         if (isVirtual()) {
-            State state = getState();
+            State state = threadState();
             return (state != State.NEW && state != State.TERMINATED);
         } else {
             return isAlive0();
@@ -1927,7 +1927,7 @@ public class Thread implements Runnable {
      */
     @Deprecated(since="99")
     public final ThreadGroup getThreadGroup() {
-        if (getState() == State.TERMINATED) {
+        if (threadState() == State.TERMINATED) {
             return null;
         } else {
             return isVirtual() ? VirtualThreads.THREAD_GROUP : holder.group;
@@ -2159,7 +2159,7 @@ public class Thread implements Runnable {
     public final boolean join(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration); // MAX_VALUE if > 292 years
 
-        Thread.State state = getState();
+        Thread.State state = threadState();
         if (state == State.NEW)
             throw new IllegalThreadStateException("Thread not started");
         if (state == State.TERMINATED)
@@ -2176,7 +2176,7 @@ public class Thread implements Runnable {
                 millis += 1L;
             }
             join(millis);
-            return getState() == State.TERMINATED;
+            return threadState() == State.TERMINATED;
         }
     }
 
@@ -2858,7 +2858,7 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
-        if (getState() == State.TERMINATED) {
+        if (threadState() == State.TERMINATED) {
             // uncaughtExceptionHandler may be set to null after thread terminates
             return null;
         } else {

@@ -752,7 +752,7 @@ class VirtualThread extends Thread {
     }
 
     @Override
-    public Thread.State getState() {
+    Thread.State threadState() {
         switch (state()) {
             case NEW:
                 return Thread.State.NEW;
@@ -862,7 +862,7 @@ class VirtualThread extends Thread {
         }
         // include virtual thread state when not mounted
         if (carrier == null) {
-            String stateAsString = getState().toString();
+            String stateAsString = threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
         }
         return sb.toString();
