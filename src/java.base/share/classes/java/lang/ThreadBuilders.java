@@ -184,6 +184,13 @@ class ThreadBuilders {
         }
 
         @Override
+        public Thread start(Runnable task) {
+            Thread thread = unstarted(task);
+            thread.start();
+            return thread;
+        }
+
+        @Override
         public ThreadFactory factory() {
             return new PlatformThreadFactory(group, name(), counter(), characteristics(),
                     daemonChanged, daemon, priority, stackSize, uncaughtExceptionHandler());
@@ -205,6 +212,13 @@ class ThreadBuilders {
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
+            return thread;
+        }
+
+        @Override
+        public Thread start(Runnable task) {
+            Thread thread = unstarted(task);
+            thread.start();
             return thread;
         }
 

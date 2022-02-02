@@ -908,20 +908,11 @@ public class Thread implements Runnable {
         /**
          * Creates a new {@code Thread} from the current state of the builder and
          * schedules it to execute.
-         *
-         * @implSpec The default implementation invokes {@linkplain #unstarted(Runnable)
-         * unstarted} to create a {@code Thread} and then invokes its {@linkplain
-         * Thread#start() start} method to schedule it to execute.
-         *
          * @param task the object to run when the thread executes
          * @return a new started Thread
          * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
-        default Thread start(Runnable task) {
-            Thread thread = unstarted(task);
-            thread.start();
-            return thread;
-        }
+        Thread start(Runnable task);
 
         /**
          * Returns a {@code ThreadFactory} to create threads from the current
