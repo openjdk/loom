@@ -154,6 +154,8 @@ private:
 
   inline void relativize_frame_pd(frame& fr) const;
   inline void derelativize_frame_pd(frame& fr) const;
+
+  bool maybe_fix_async_walk(frame& f, RegisterMap* map) const;
 };
 
 #ifndef CHECK_UNHANDLED_OOPS

@@ -67,7 +67,7 @@ public:
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
 
   static bool is_mounted(JavaThread* thread, oop cont_scope);
-  
+
   static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
 
   static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
@@ -93,7 +93,7 @@ public:
   static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
   static void set_cont_fastpath_thread_state(JavaThread* thread);
-  static void notify_deopt(JavaThread* thread, intptr_t* sp); 
+  static void notify_deopt(JavaThread* thread, intptr_t* sp);
 
   // access frame data
 
@@ -111,7 +111,6 @@ public:
   static bool debug_is_stack_chunk(oop obj);
   static bool debug_is_continuation(Klass* klass);
   static bool debug_is_continuation(oop obj);
-  static bool debug_is_continuation_run_frame(const frame& f);
   static bool debug_verify_continuation(oop cont);
   static void debug_print_continuation(oop cont, outputStream* st = NULL);
 #endif

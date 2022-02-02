@@ -740,17 +740,14 @@ bool OopMap::equals(const OopMap* other) const {
 }
 
 int ImmutableOopMapSet::find_slot_for_offset(int pc_offset) const {
+  // we might not have an oopmap at asynchronous (non-safepoint) stackwalks
   ImmutableOopMapPair* pairs = get_pairs();
-
   for (int i = 0; i < _count; ++i) {
     if (pairs[i].pc_offset() >= pc_offset) {
       ImmutableOopMapPair* last = &pairs[i];
-      return last->pc_offset() == pc_offset ? i
-                                            : -1; // this can happen at asynchronous (non-safepoint) stackwalks
+      return last->pc_offset() == pc_offset ? i : -1;
     }
   }
-
-  guarantee(false, "failed to find oopmap for pc");
   return -1;
 }
 

@@ -49,7 +49,6 @@ bool stackChunkOopDesc::should_fix() const {
 }
 
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
-  // tty->print_cr(">>> stackChunkOopDesc::top_frame this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()());
   assert (!is_empty(), "");
   StackChunkFrameStream<true> fs(this);
 
@@ -58,6 +57,9 @@ frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
 
   frame f = fs.to_frame();
+  // if (!maybe_fix_async_walk(f, map)) return frame();
+
+  assert (to_offset(f.sp()) == sp(), "f.offset_sp(): %d sp(): %d async: %d", f.offset_sp(), sp(), map->is_async());
   relativize_frame(f);
   f.set_frame_index(0);
   return f;
@@ -92,6 +94,25 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
 
   return Continuation::continuation_parent_frame(map);
 }
+
+// bool stackChunkOopDesc::maybe_fix_async_walk(frame& f, RegisterMap* map) const {
+//   if (!Continuation::is_return_barrier_entry(f.pc()))
+//     return true;
+
+//   // Can happen during async stack walks, where the continuation is in the midst of a freeze/thaw
+//   assert (map->is_async(), "");
+//   address pc0 = pc();
+
+//   // we write sp first, then pc; here we read in the opposite order, so if sp is right, so is pc.
+//   OrderAccess::loadload();
+//   if (sp() == to_offset(f.sp())) {
+//     f.set_pc(pc0);
+//     return true;
+//   }
+//   assert (false, "");
+//   log_debug(jvmcont)("failed to fix frame during async stackwalk");
+//   return false;
+// }
 
 static int num_java_frames(CompiledMethod* cm, address pc) {
   int count = 0;

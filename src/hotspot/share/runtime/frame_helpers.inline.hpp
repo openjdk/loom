@@ -48,12 +48,9 @@ public:
   static inline bool is_deopt_return(address pc, const frame& sender);
   static bool assert_frame_laid_out(frame f);
 
-  static char* method_name(Method* m);
+  static char* method_name(Method* m) { return m != nullptr ? m->name_and_sig_as_C_string() : nullptr; }
   static Method* top_java_frame_method(const frame& f);
   static Method* bottom_java_frame_method(const frame& f)  { return Frame::frame_method(f); }
-  static char* top_java_frame_name(const frame& f) { return method_name(top_java_frame_method(f)); }
-  static char* bottom_java_frame_name(const frame& f) { return method_name(bottom_java_frame_method(f)); }
-  static bool assert_bottom_java_frame_name(const frame& f, const char* name);
 #endif
 };
 
@@ -180,10 +177,6 @@ intptr_t* Frame::frame_top(const frame &f) {
   }
 }
 
-char* Frame::method_name(Method* m) {
-  return m != nullptr ? m->name_and_sig_as_C_string() : nullptr;
-}
-
 Method* Frame::top_java_frame_method(const frame& f) {
   Method* m = nullptr;
   if (f.is_interpreted_frame()) {
@@ -197,13 +190,6 @@ Method* Frame::top_java_frame_method(const frame& f) {
   }
 
   return m;
-}
-
-bool Frame::assert_bottom_java_frame_name(const frame& f, const char* name) {
-  ResourceMark rm;
-  bool res = (strcmp(bottom_java_frame_name(f), name) == 0);
-  assert (res, "name: %s", bottom_java_frame_name(f));
-  return res;
 }
 
 bool Frame::is_deopt_return(address pc, const frame& sender) {

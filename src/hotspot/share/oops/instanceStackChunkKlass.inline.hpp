@@ -249,18 +249,18 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
     "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d",
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), _chunk->is_gc_mode());
 
-#ifdef ASSERT
-  if (!(is_interpreted() || is_compiled() || is_stub())) {
-    tty->print_cr(">>> oops get_cb1 pc: %p", pc()); os::print_location(tty, (intptr_t)pc());
-    tty->print_cr(">>> Stream:"); print_on(tty);
-    tty->print_cr(">>> Chunk:"); _chunk->print_on(false, tty);
-  }
-  if (_cb != nullptr && _cb->frame_size() <= 0) { tty->print_cr(">>> oops get_cb2 cb: %p size: %d", _cb, _cb->frame_size()); _cb->print_value_on(tty); }
-  if (!(is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0))) { tty->print_cr(">>> oops get_cb3 cb: %p", _cb); os::print_location(tty, (intptr_t)pc()); tty->print_cr("----"); _cb->print_value_on(tty); }
-  assert (is_interpreted() || is_compiled() || is_stub(), "");
-#endif
+// #ifdef ASSERT
+//   if (!(is_interpreted() || is_compiled() || is_stub())) {
+//     tty->print_cr(">>> oops get_cb1 pc: %p", pc()); os::print_location(tty, (intptr_t)pc());
+//     tty->print_cr(">>> Stream:"); print_on(tty);
+//     tty->print_cr(">>> Chunk:"); _chunk->print_on(false, tty);
+//   }
+//   if (_cb != nullptr && _cb->frame_size() <= 0) { tty->print_cr(">>> oops get_cb2 cb: %p size: %d", _cb, _cb->frame_size()); _cb->print_value_on(tty); }
+//   if (!(is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0))) { tty->print_cr(">>> oops get_cb3 cb: %p", _cb); os::print_location(tty, (intptr_t)pc()); tty->print_cr("----"); _cb->print_value_on(tty); }
+//   assert (is_interpreted() || is_compiled() || is_stub(), "");
+// #endif
 
-  assert (is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0),
+  assert (is_interpreted() || Continuation::is_return_barrier_entry(pc()) || ((is_stub() || is_compiled()) && _cb->frame_size() > 0),
     "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d",
     _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), is_stub(), is_compiled(), _cb->frame_size(), mixed);
 }
