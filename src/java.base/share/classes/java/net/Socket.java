@@ -576,7 +576,7 @@ public class Socket implements java.io.Closeable {
      * <ol>
      *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread establishing a connection will
-     *        will close the underlying channel and cause this method to throw an
+     *        close the underlying channel and cause this method to throw an
      *        {@code IOException} with the interrupt status set.
      *   <li> The socket uses the system-default socket implementation and a
      *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
@@ -608,7 +608,7 @@ public class Socket implements java.io.Closeable {
      * <ol>
      *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread establishing a connection will
-     *        will close the underlying channel and cause this method to throw an
+     *        close the underlying channel and cause this method to throw an
      *        {@code IOException} with the interrupt status set.
      *   <li> The socket uses the system-default socket implementation and a
      *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
