@@ -68,7 +68,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <p> {@code Thread} provides a {@link Builder} and other APIs to create and
  * start threads that execute {@link Runnable} tasks. Starting a thread schedules
- * it to execute concurrently with the thread that caused it start. The newly
+ * it to execute concurrently with the thread that caused it to start. The newly
  * started thread invokes the task's {@link Runnable#run() run} method. Thread
  * defines the {@link #join() join} method to wait for a thread to terminate.
  *
@@ -81,8 +81,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * local to a thread, meaning a thread can have a copy of a variable that is set to
  * a value that is independent of the value set by other threads. Thread also supports
  * {@link InheritableThreadLocal} variables that are thread local variables that are
- * inherited from the parent thread. Thread supports a special inheritable thread
- * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
+ * inherited at Thread creation time from the parent Thread. Thread supports a special
+ * inheritable thread local for the thread {@linkplain #getContextClassLoader()
+ * context-class-loader}.
  *
  * <h2><a id="platform-threads">Platform threads</a></h2>
  * <p> {@code Thread} supports the creation of <i>platform threads</i> that are
