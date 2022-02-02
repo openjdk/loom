@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -77,11 +77,11 @@ class JvmtiEnvThreadStateIterator : public StackObj {
 //
 class JvmtiVTMTDisabler {
  private:
-  static volatile bool _SR_mode;                      // there is an active suspender or resumer
-  static volatile unsigned short _VTMT_count;
-  static volatile unsigned short _VTMT_disable_count; // VTMT is disabled while it is non-zero
+  static volatile bool _SR_mode;             // there is an active suspender or resumer
+  static volatile int _VTMT_count;           // current number of VTMT transitions
+  static volatile int _VTMT_disable_count;   // VTMT is disabled while it is non-zero
 
-  bool _is_SR;                // is suspender or resumer
+  bool _is_SR;                               // is suspender or resumer
 
   void disable_VTMT();
   void enable_VTMT();

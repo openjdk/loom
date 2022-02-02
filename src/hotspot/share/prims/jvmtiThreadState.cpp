@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -212,10 +212,10 @@ JvmtiThreadState::periodic_clean_up() {
 /* Virtual Threads Mount Transition (VTMT) mechanism */
 
 // VTMT can not be disabled while this counter is positive
-volatile unsigned short JvmtiVTMTDisabler::_VTMT_count = 0;
+volatile int JvmtiVTMTDisabler::_VTMT_count = 0;
 
 // VTMT is disabled while this counter is positive
-volatile unsigned short JvmtiVTMTDisabler::_VTMT_disable_count = 0;
+volatile int JvmtiVTMTDisabler::_VTMT_disable_count = 0;
 
 // there is an active suspender or resumer
 volatile bool JvmtiVTMTDisabler::_SR_mode = false;
@@ -262,7 +262,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
         ml.wait(1000); // wait while there is any active jvmtiVTMTDisabler
       }
     }
-    _VTMT_disable_count++;
+    Atomic::inc(&_VTMT_disable_count);
 
     // Block while some mount/unmount transitions are in progress.
     // Debug version fails and print diagnostic information
@@ -290,12 +290,13 @@ JvmtiVTMTDisabler::enable_VTMT() {
   JavaThread* current = JavaThread::current();
   {
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
-    assert(_VTMT_count == 0 && _VTMT_disable_count > 0, "VTMT sanity check");
+    assert(_VTMT_disable_count > 0, "VTMT sanity check");
 
     if (_is_SR) { // disabler is suspender or resumer
       _SR_mode = false;
     }
-    if (--_VTMT_disable_count == 0 || _is_SR) {
+    Atomic::dec(&_VTMT_disable_count);
+    if (_VTMT_disable_count == 0 || _is_SR) {
       ml.notify_all();
     }
     current->set_is_VTMT_disabler(false);
@@ -307,33 +308,35 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
+  ThreadBlockInVM tbivm(thread);
 
   // Do not allow suspends inside VTMT transitions.
   // Block while transitions are disabled or there are suspend requests.
   int attempts = 10 * 100;
   while (true) {
-    ThreadBlockInVM tbivm(thread);
-    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+    Atomic::inc(&_VTMT_count);
 
     // block while transitions are disabled or there are suspend requests
     if (_VTMT_disable_count > 0 ||
         thread->is_suspended() ||
         JvmtiVTSuspender::is_vthread_suspended(vth())
     ) {
+      Atomic::dec(&_VTMT_count);
+      MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
       if (ml.wait(10)) {
         attempts--;
       }
       DEBUG_ONLY(if (attempts == 0) break;)
       continue; // ~ThreadBlockInVM has handshake-based suspend point
     }
-    assert(!thread->is_in_VTMT(), "VTMT sanity check");
-    thread->set_is_in_VTMT(true);
-    JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
-    if (vstate != NULL) {
-      vstate->set_is_in_VTMT(true);
-    }
-    _VTMT_count++;
     break;
+  }
+  assert(!thread->is_in_VTMT(), "VTMT sanity check");
+  thread->set_is_in_VTMT(true);
+  JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
+  if (vstate != NULL) {
+    vstate->set_is_in_VTMT(true);
   }
 #ifdef ASSERT
   if (attempts == 0) {
@@ -348,20 +351,21 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 void
 JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
-  MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-  _VTMT_count--;
-
-  // unblock waiting VTMT disablers
-  if (_VTMT_disable_count > 0) {
-    ml.notify_all();
-  }
   assert(thread->is_in_VTMT(), "sanity check");
   thread->set_is_in_VTMT(false);
   oop vt = JNIHandles::resolve_external_guard(vthread);
   JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt);
   if (vstate != NULL) {
     vstate->set_is_in_VTMT(false);
+  }
+
+  Atomic::dec(&_VTMT_count);
+
+  // unblock waiting VTMT disablers
+  if (_VTMT_disable_count > 0) {
+    MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+    ml.notify_all();
   }
 }
 

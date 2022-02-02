@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -77,10 +77,12 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   }
   LOG("Agent: started\n");
 
-  while(true) {
+  while (true) {
     jthread *threads = NULL;
     jint count = 0;
     jvmtiError err;
+
+    millisleep(100);
 
     err = jvmti->GetAllThreads(&count, &threads);
     if (err == JVMTI_ERROR_WRONG_PHASE) {

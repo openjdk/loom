@@ -1765,14 +1765,10 @@ void JavaThread::send_thread_stop(oop java_throwable)  {
 #if INCLUDE_JVMTI
 void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
-  if (val) {
-    assert(JvmtiVTMTDisabler::VTMT_disable_count() == 0, "must be 0");
-  }
 }
 
 void JavaThread::set_is_VTMT_disabler(bool val) {
   _is_VTMT_disabler = val;
-  assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
 }
 #endif
 

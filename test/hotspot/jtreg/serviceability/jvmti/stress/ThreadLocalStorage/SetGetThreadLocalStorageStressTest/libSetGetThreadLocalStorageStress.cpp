@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -124,9 +124,12 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     return;
   LOG("Started.....\n");
 
-  while(true) {
+  while (true) {
     jthread *threads = NULL;
     jint count = 0;
+
+    millisleep(10);
+
     RawMonitorLocker rml(jvmti, jni, monitor);
     if (!is_vm_running) {
       return;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1556,7 +1556,6 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     }
     java_thread->set_thread_suspended();
   }
-  assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
   assert(!single_suspend || (!is_virtual && java_thread->is_thread_suspended()) ||
