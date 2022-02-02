@@ -83,38 +83,6 @@
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing purposes
 
-#ifdef __has_include
-#  if __has_include(<valgrind/callgrind.h>)
-#    include <valgrind/callgrind.h>
-#  endif
-#endif
-#ifndef VG
-#define VG(X)
-#endif
-#ifdef __has_include
-#  if __has_include(<valgrind/memcheck.h>)
-#    include <valgrind/memcheck.h>
-#    undef VG
-#    define VG(x) x
-#  endif
-#endif
-
-#ifdef CALLGRIND_START_INSTRUMENTATION
-  static int callgrind_counter = 1;
-  // static void callgrind() {
-  //   if (callgrind_counter != 0) {
-  //     if (callgrind_counter > 20000) {
-  //       tty->print_cr("Starting callgrind instrumentation");
-  //       CALLGRIND_START_INSTRUMENTATION;
-  //       callgrind_counter = 0;
-  //     } else
-  //       callgrind_counter++;
-  //   }
-  // }
-#else
-  // static void callgrind() {}
-#endif
-
 #ifdef ASSERT
 template<int x> NOINLINE static bool verify_continuation(oop cont) { return Continuation::debug_verify_continuation(cont); }
 template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
@@ -1249,14 +1217,6 @@ public:
   }
 
   bool freeze_fast(intptr_t* top_sp, bool chunk_available) {
-  #ifdef CALLGRIND_START_INSTRUMENTATION
-    if (_frames > 0 && callgrind_counter == 1) {
-      callgrind_counter = 2;
-      tty->print_cr("Starting callgrind instrumentation");
-      CALLGRIND_START_INSTRUMENTATION;
-    }
-  #endif
-
     assert (_thread != nullptr, "");
     assert(_cont.chunk_invariant(), "");
     assert (!Interpreter::contains(_cont.entryPC()), "");
@@ -1528,14 +1488,6 @@ public:
 
   template<typename FKind> // the callee's type
   freeze_result finalize_freeze(const frame& callee, frame& caller, int argsize) {
-  #ifdef CALLGRIND_START_INSTRUMENTATION
-    if (_frames > 0 && _cgrind_interpreted_frames == 0 && callgrind_counter == 1) {
-      callgrind_counter = 2;
-      tty->print_cr("Starting callgrind instrumentation");
-      CALLGRIND_START_INSTRUMENTATION;
-    }
-  #endif
-
     assert (FKind::interpreted || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
     log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
       p2i(_bottom_address), _frames, _size << LogBytesPerWord, argsize);
@@ -2032,7 +1984,6 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
 
 template<typename ConfigT>
 static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
-  //callgrind();
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
   assert (current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
@@ -2851,7 +2802,6 @@ public:
 // called after preparations (stack overflow check and making room)
 template<typename ConfigT>
 static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
-  //callgrind();
   // NoSafepointVerifier nsv;
   CONT_JFR_ONLY(EventContinuationThaw event;)
 
