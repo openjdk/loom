@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -24,7 +24,7 @@
 /*
  * @test
  * @summary Fuzz tests for jdk.internal.vm.Continuation
-* @modules java.base/jdk.internal.vm
+ * @modules java.base/jdk.internal.vm
  *
  * @requires vm.flavor == "server" & (vm.opt.TieredStopAtLevel == null | vm.opt.TieredStopAtLevel == 4)
  * @requires vm.opt.TieredCompilation == null | vm.opt.TieredCompilation == true
@@ -68,6 +68,8 @@ public class Fuzz implements Runnable {
     static final boolean FILE    = true;
     static final boolean RANDOM  = false;
     static final boolean VERBOSE = false;
+
+    static final int COMPILATION_TIMEOUT = 5_000; // ms
 
     static final Path TEST_DIR = Path.of(System.getProperty("test.src", "."));
 
@@ -279,6 +281,27 @@ public class Fuzz implements Runnable {
         }
     }
 
+    static void enqueueForCompilation(Method m) {
+        if (WB.isMethodCompiled(m)) return;
+        // WB compilation tasks do not expire while others do,
+        // so we wait for an existing task to finish before enqueuing.
+        // Alternatively run with -XX:TieredCompileTaskTimeout=5000
+        Utils.waitForCondition(() -> WB.isMethodQueuedForCompilation(m), 1000);
+        if (WB.isMethodCompiled(m)) return;
+        WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+    }
+
+    static void waitForCompilation(Method m) {
+        if (!Utils.waitForCondition(() -> WB.isMethodCompiled(m), COMPILATION_TIMEOUT)) {
+            System.out.println(">>> Compilation status for: " + m);
+            System.out.println("isMethodCompiled: " + WB.isMethodCompiled(m) + " " +
+                                "isMethodCompilable: " + WB.isMethodCompilable(m) + " " +
+                                "isMethodQueuedForCompilation: " + WB.isMethodQueuedForCompilation(m) + " " +
+                                "getMethodCompilationLevel: " + WB.getMethodCompilationLevel(m));
+            throw new AssertionError("Failed to compile " + m + " in " + COMPILATION_TIMEOUT + "ms");
+        }
+    }
+
     static void compileContinuation() {
         var compile = new HashSet<Method>();
         for (Method m : Continuation.class.getDeclaredMethods()) {
@@ -286,13 +309,13 @@ public class Fuzz implements Runnable {
                 if (!Modifier.isNative(m.getModifiers())
                     && (m.getName().startsWith("enter")
                      || m.getName().startsWith("yield"))) {
-                    WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
+                    enqueueForCompilation(m);
                     compile.add(m);
                 }
             }
         }
 
-        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
+        for (Method m : compile) waitForCompilation(m);
     }
 
     static void compile() {
@@ -308,9 +331,8 @@ public class Fuzz implements Runnable {
 
         for (Method m : interpret) WB.makeMethodNotCompilable(m);
 
-        for (Method m : compile) if (!WB.isMethodCompiled(m)) WB.enqueueMethodForCompilation(m, COMPILE_LEVEL);
-        for (Method m : compile) Utils.waitForCondition(() -> WB.isMethodCompiled(m));
-
+        for (Method m : compile)   enqueueForCompilation(m);
+        for (Method m : compile)   waitForCompilation(m);
         for (Method m : compile)   assert  WB.isMethodCompiled(m) : "method: " + m;
         for (Method m : interpret) assert !WB.isMethodCompiled(m) : "method: " + m;
 
