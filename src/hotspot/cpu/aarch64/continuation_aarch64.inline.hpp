@@ -43,14 +43,12 @@ static inline intptr_t** link_address(const frame& f) {
 static void patch_callee_link(const frame& f, intptr_t* fp) {
   DEBUG_ONLY(intptr_t* orig = *Frame::callee_link_address(f));
   *Frame::callee_link_address(f) = fp;
-  DEBUG_ONLY(log_develop_trace(jvmcont)("patched link at " INTPTR_FORMAT ": " INTPTR_FORMAT " orig: " INTPTR_FORMAT, p2i(Frame::callee_link_address(f)), p2i(fp), p2i(orig));)
 }
 
 static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   intptr_t* la = (intptr_t*)Frame::callee_link_address(f);
   intptr_t new_value = fp - la;
   *la = new_value;
-  log_trace(jvmcont)("patched link at " INTPTR_FORMAT ": to relative %ld", p2i(Frame::callee_link_address(f)), new_value);
 }
 
 template<typename FKind, typename RegisterMapT>
@@ -73,8 +71,8 @@ inline frame ContinuationHelper::last_frame(JavaThread* thread) {
   assert (anchor->last_Java_sp() != nullptr, "");
   assert (anchor->last_Java_pc() != nullptr, "");
 
-  assert (StubRoutines::cont_doYield_stub()->contains(anchor->last_Java_pc()), "must be");
-  assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "must be");
+  assert (StubRoutines::cont_doYield_stub()->contains(anchor->last_Java_pc()), "");
+  assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "");
 
   return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), nullptr, nullptr, true);
   // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(),
@@ -113,8 +111,6 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
   *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
                                        : (intptr_t)hf.fp();
-
-  log_develop_trace(jvmcont)("set_top_frame_metadata_pd pc: " INTPTR_FORMAT " fp: %ld", p2i(hf.pc()), *fp_addr);
 }
 
 template <typename ConfigT>
@@ -160,7 +156,7 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
     assert (sp <= fp && fp <= caller.unextended_sp(), "");
     caller.set_sp(fp + frame::sender_sp_offset);
 
-    assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
+    assert (_cont.tail()->is_in_chunk(sp), "");
 
     frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
@@ -175,7 +171,7 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
     }
     caller.set_sp(sp + fsize);
 
-    assert (_cont.tail()->is_in_chunk(sp), "sp: " INTPTR_FORMAT " caller.sp(): " INTPTR_FORMAT " start_address: " INTPTR_FORMAT, p2i(sp), p2i(caller.sp()), p2i(_cont.tail()->start_address()));
+    assert (_cont.tail()->is_in_chunk(sp), "");
 
     return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
   }
@@ -220,7 +216,6 @@ inline void Freeze<ConfigT>::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
 
 template <typename ConfigT>
 inline frame Thaw<ConfigT>::new_entry_frame() {
-  // if (Interpreter::contains(_cont.entryPC())) _cont.set_entrySP(_cont.entrySP() - 1);
   intptr_t* sp = _cont.entrySP();
   return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
 }
@@ -240,7 +235,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
       vsp--;
     }
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
-    assert (vsp == unextended_sp, "vsp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(vsp), p2i(unextended_sp));
+    assert (vsp == unextended_sp, "");
     caller.set_sp(fp + frame::sender_sp_offset);
     frame f(vsp, vsp, fp, hf.pc());
     // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
@@ -254,7 +249,6 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     intptr_t* vsp = caller.unextended_sp() - fsize;
     if (bottom || caller.is_interpreted_frame()) {
       int argsize = hf.compiled_frame_stack_argsize();
-      log_develop_trace(jvmcont)("thaw_compiled_frame add argsize: fsize: %d argsize: %d fsize: %d", fsize, argsize, fsize + argsize);
 
       fsize += argsize;
       vsp   -= argsize;
@@ -307,11 +301,8 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
   // }
 #ifdef _LP64
   if (((intptr_t)vsp & 0xf) != 0) {
-    log_develop_trace(jvmcont)("Aligning compiled frame 1: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - 1));
     assert(caller.is_interpreted_frame() || (bottom && hf.compiled_frame_stack_argsize() % 2 != 0), "");
     vsp--;
-
-    log_develop_trace(jvmcont)("Aligning sender sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(caller.sp()), p2i(caller.sp() - 1));
     caller.set_sp(caller.sp() - 1);
   }
   assert((intptr_t)vsp % 16 == 0, "");
@@ -323,7 +314,7 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
 template <typename ConfigT>
 template<typename FKind, bool bottom>
 inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
-  assert (!bottom || caller.fp() == _cont.entryFP(), "caller.fp: " INTPTR_FORMAT " entryFP: " INTPTR_FORMAT, p2i(caller.fp()), p2i(_cont.entryFP()));
+  assert (!bottom || caller.fp() == _cont.entryFP(), "");
   patch_callee_link(caller, caller.fp());
 }
 
@@ -332,7 +323,8 @@ intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
   address pc = StubRoutines::cont_interpreter_forced_preempt_return();
   intptr_t* fp = sp - frame::sender_sp_offset;
 
-  log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
+  log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
+    p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
 
   sp = align_down(sp, 16);
   assert((intptr_t)sp % 16 == 0, "");
@@ -347,7 +339,6 @@ template <typename ConfigT>
 void Thaw<ConfigT>::patch_chunk_pd(intptr_t* sp) {
   intptr_t* fp = _cont.entryFP();
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
-  log_develop_trace(jvmcont)("thaw_chunk patching fp at " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(sp - frame::sender_sp_offset), p2i(fp));
 }
 
 template <typename ConfigT>
