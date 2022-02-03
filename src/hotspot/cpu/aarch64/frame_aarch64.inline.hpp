@@ -44,6 +44,7 @@ inline frame::frame() {
   _fp = NULL;
   _cb = NULL;
   _deopt_state = unknown;
+  _sp_is_trusted = false;
 }
 
 static int spin;
@@ -80,6 +81,7 @@ inline void frame::setup(address pc) {
       _deopt_state = not_deoptimized;
     }
   }
+  _sp_is_trusted = false;
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -123,6 +125,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
+  _sp_is_trusted = false;
 #ifdef ASSERT
   // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
   // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
@@ -178,6 +181,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   } else {
     _deopt_state = not_deoptimized;
   }
+  _sp_is_trusted = false;
 }
 
 // Accessors

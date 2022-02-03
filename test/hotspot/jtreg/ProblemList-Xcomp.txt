@@ -51,9 +51,6 @@ gc/z/TestGarbageCollectorMXBean.java                            8278129 generic-
 # -Xcomp causes SA failures due to full GC during codecache sweeping
 serviceability/sa/ClhsdbScanOops.java#id0                                    8279662 generic-all
 serviceability/sa/ClhsdbScanOops.java#id1                                    8279662 generic-all
-serviceability/sa/TestObjectMonitorIterate.java                              8280555 generic-all
-resourcehogs/serviceability/sa/ClhsdbRegionDetailsScanOopsForG1.java         8280554 generic-all
-resourcehogs/serviceability/sa/TestHeapDumpForLargeArray.java                8280553 generic-all
 
 serviceability/dcmd/vm/ClassLoaderStatsTest.java                8278123 generic-all
 

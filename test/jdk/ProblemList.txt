@@ -874,6 +874,9 @@ java/awt/Focus/FrameMinimizeTest/FrameMinimizeTest.java 8016266 linux-x64
 
 # Loom specific
 
+# JDK-8280842 may need further work
+java/foreign/TestSegmentCopy.java                               0000000 generic-all
+
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 jdk/jfr/event/runtime/TestClassLoaderStatsEvent.java            8247965 generic-all
