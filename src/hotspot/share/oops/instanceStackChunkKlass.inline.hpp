@@ -1,4 +1,4 @@
-/* Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -217,7 +217,7 @@ inline void StackChunkFrameStream<mixed>::next(RegisterMapT* map) {
   } else {
     _sp += cb()->frame_size();
   }
-  assert (!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "_unextended_sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(_unextended_sp), p2i(unextended_sp_for_interpreter_frame()));
+  assert (!is_interpreted() || _unextended_sp == unextended_sp_for_interpreter_frame(), "");
 
   get_cb();
   update_reg_map_pd(map);
@@ -238,31 +238,12 @@ inline void StackChunkFrameStream<mixed>::get_cb() {
     return;
   }
 
-  assert (pc() != nullptr && dbg_is_safe(pc(), -1),
-  "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d",
-  _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp());
+  assert (pc() != nullptr && dbg_is_safe(pc(), -1), "");
 
   _cb = CodeCache::find_blob_fast(pc());
 
-  // if (_cb == nullptr) { tty->print_cr("OOPS"); os::print_location(tty, (intptr_t)pc()); }
-  assert (_cb != nullptr,
-    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d gc_flag: %d",
-    _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), _chunk->is_gc_mode());
-
-// #ifdef ASSERT
-//   if (!(is_interpreted() || is_compiled() || is_stub())) {
-//     tty->print_cr(">>> oops get_cb1 pc: %p", pc()); os::print_location(tty, (intptr_t)pc());
-//     tty->print_cr(">>> Stream:"); print_on(tty);
-//     tty->print_cr(">>> Chunk:"); _chunk->print_on(false, tty);
-//   }
-//   if (_cb != nullptr && _cb->frame_size() <= 0) { tty->print_cr(">>> oops get_cb2 cb: %p size: %d", _cb, _cb->frame_size()); _cb->print_value_on(tty); }
-//   if (!(is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0))) { tty->print_cr(">>> oops get_cb3 cb: %p", _cb); os::print_location(tty, (intptr_t)pc()); tty->print_cr("----"); _cb->print_value_on(tty); }
-//   assert (is_interpreted() || is_compiled() || is_stub(), "");
-// #endif
-
-  assert (is_interpreted() || Continuation::is_return_barrier_entry(pc()) || ((is_stub() || is_compiled()) && _cb->frame_size() > 0),
-    "index: %d sp: " INTPTR_FORMAT " sp offset: %d end offset: %d size: %d chunk sp: %d is_stub: %d is_compiled: %d frame_size: %d mixed: %d",
-    _index, p2i(sp()), _chunk->to_offset(sp()), _chunk->to_offset(_chunk->bottom_address()), _chunk->stack_size(), _chunk->sp(), is_stub(), is_compiled(), _cb->frame_size(), mixed);
+  assert (_cb != nullptr, "");
+  assert (is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), "");
 }
 
 template <bool mixed>
@@ -275,7 +256,7 @@ inline void StackChunkFrameStream<mixed>::get_oopmap() const {
 template <bool mixed>
 inline void StackChunkFrameStream<mixed>::get_oopmap(address pc, int oopmap_slot) const {
   assert (cb() != nullptr, "");
-  assert (!is_compiled() || !cb()->as_compiled_method()->is_deopt_pc(pc), "oopmap_slot: %d", oopmap_slot);
+  assert (!is_compiled() || !cb()->as_compiled_method()->is_deopt_pc(pc), "");
   if (oopmap_slot >= 0) {
     assert (oopmap_slot >= 0, "");
     assert (cb()->oop_map_for_slot(oopmap_slot, pc) != nullptr, "");
@@ -348,9 +329,7 @@ inline address  StackChunkFrameStream<mixed>::orig_pc() const {
     pc1 = *(address*)((address)unextended_sp() + cm->orig_pc_offset());
   }
 
-  assert (pc1 != nullptr && !cm->is_deopt_pc(pc1),
-          "index: %d sp - start: " INTPTR_FORMAT " end - sp: " INTPTR_FORMAT " size: %d sp: %d",
-          _index, sp() - _chunk->sp_address(), end() - sp(), _chunk->stack_size(), _chunk->sp());
+  assert (pc1 != nullptr && !cm->is_deopt_pc(pc1), "");
   assert (_cb == CodeCache::find_blob_fast(pc1), "");
 
   return pc1;
@@ -393,7 +372,7 @@ inline void StackChunkFrameStream<mixed>::iterate_oops(OopClosureType* closure, 
     f.oops_interpreted_do<true>(closure, nullptr, true);
   } else {
     DEBUG_ONLY(int oops = 0;)
-    for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) { // see void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do
+    for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {
       OopMapValue omv = oms.current();
       if (omv.type() != OopMapValue::oop_value && omv.type() != OopMapValue::narrowoop_value)
         continue;
@@ -408,8 +387,9 @@ inline void StackChunkFrameStream<mixed>::iterate_oops(OopClosureType* closure, 
       // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
 
       // if (!SkipNullValue::should_skip(*p))
-      log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
-      omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
+      log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT,
+        omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
+        omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
     }
     assert (oops == oopmap()->num_oops(), "oops: %d oopmap->num_oops(): %d", oops, oopmap()->num_oops());
   }
@@ -425,8 +405,9 @@ inline void StackChunkFrameStream<mixed>::iterate_derived_pointers(DerivedOopClo
     if (omv.type() != OopMapValue::derived_oop_value)
       continue;
 
+    // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
     intptr_t* derived_loc = (intptr_t*)reg_to_loc(omv.reg(), map);
-    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), map); // see OopMapDo<OopMapFnT, DerivedOopFnT, ValueFilterT>::walk_derived_pointers1
+    intptr_t* base_loc    = (intptr_t*)reg_to_loc(omv.content_reg(), map);
 
     assert ((_has_stub && _index == 1) || is_in_frame(base_loc), "");
     assert ((_has_stub && _index == 1) || is_in_frame(derived_loc), "");
@@ -474,7 +455,7 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   static const size_t mask = BitsPerWord - 1;
   int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
   size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "size_in_bits: %zu bit_offset: %d res << LogBitsPerWord: %zu", size_in_bits, (int)bit_offset(stack_size_in_words), (res << LogBitsPerWord));
+  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "");
   return res;
 }
 
@@ -484,7 +465,8 @@ inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_wo
 }
 
 template <bool store, bool mixed, typename RegisterMapT>
-void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f,
+                                          const RegisterMapT* map) {
   if (mixed) f.handle_deopted(); // we could freeze deopted frames in slow mode.
   do_barriers0<store>(chunk, f, map);
 }
@@ -587,7 +569,8 @@ public:
 };
 
 template <class OopClosureType>
-void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end) {
+void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure,
+                                                           intptr_t* start, intptr_t* end) {
   if (Devirtualizer::do_metadata(closure)) {
     mark_methods(chunk, closure);
   }

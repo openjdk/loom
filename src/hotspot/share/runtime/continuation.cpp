@@ -909,7 +909,8 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
           callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: [" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
+    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: "
+                                  "[" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
     log_develop_trace(jvmcont)("sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(cont->entry_pc()));
     log_develop_trace(jvmcont)("sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(cont->entry_sp()));
 
@@ -1500,7 +1501,8 @@ public:
     _size -= overlap;
     assert (_size >= 0, "");
 
-    assert (chunk == nullptr || chunk->is_empty() || unextended_sp == chunk->to_offset(StackChunkFrameStream<true>(chunk).unextended_sp()), "");
+    assert (chunk == nullptr || chunk->is_empty()
+              || unextended_sp == chunk->to_offset(StackChunkFrameStream<true>(chunk).unextended_sp()), "");
     assert (chunk != nullptr || unextended_sp < _size, "");
 
      // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
@@ -1644,7 +1646,7 @@ public:
     assert (vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
       p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
     // Seen to fail on serviceability/jvmti/vthread/SuspendResume[1/2] on AArch64
-    // assert (fsize+1 >= Interpreted::size(f, &mask), "fsize: %d Interpreted::size: %d", fsize, Interpreted::size(f, &mask)); // +1 for possible alignment padding
+    // assert (fsize+1 >= Interpreted::size(f, &mask), ""); // +1 for possible alignment padding
   }
 #endif
 
@@ -1911,17 +1913,15 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
 static inline bool can_freeze_fast(JavaThread* thread) {
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
-
-  #ifdef ASSERT
-    if (!(!thread->cont_fastpath() || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)))) { pns2(); pfl(); }
-  #endif
-  assert (!thread->cont_fastpath() || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "thread->raw_cont_fastpath(): " INTPTR_FORMAT " thread->cont_fastpath_thread_state(): %d", p2i(thread->raw_cont_fastpath()), thread->cont_fastpath_thread_state());
+  assert (!thread->cont_fastpath()
+              || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "");
 
   // We also clear thread->cont_fastpath on deoptimization (notify_deopt) and when we thaw interpreted frames
   bool fast = UseContinuationFastPath && thread->cont_fastpath();
-  assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "monitors_on_stack: %d held_monitor_count: %d", monitors_on_stack(thread), thread->held_monitor_count());
+  assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "");
   fast = fast && thread->held_monitor_count() == 0;
-  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d", fast, thread->cont_fastpath(), thread->held_monitor_count());
+  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d",
+  //                                  fast, thread->cont_fastpath(), thread->held_monitor_count());
   return fast;
 }
 
@@ -1964,7 +1964,7 @@ static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
           "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
 #ifdef ASSERT
-  log_develop_trace(jvmcont)("~~~~~~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
+  log_develop_trace(jvmcont)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
   print_frames(current);
 #endif
 
@@ -2082,7 +2082,7 @@ static bool is_safe_to_preempt(JavaThread* thread) {
 
   address pc = thread->last_Java_pc();
   if (Interpreter::contains(pc)) {
-    // Generally, we don't want to preempt when returning from some useful VM function, and certainly not when inside one.
+    // We don't want to preempt when returning from some useful VM function, and certainly not when inside one.
     InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
     if (codelet != nullptr) {
       // We allow preemption only when at a safepoint codelet or a return byteocde
@@ -2119,7 +2119,7 @@ static bool is_safe_to_preempt(JavaThread* thread) {
 // make room on the stack for thaw
 // returns the size in bytes, or 0 on failure
 static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
-  log_develop_trace(jvmcont)("~~~~~~~~~ prepare_thaw return_barrier: %d", return_barrier);
+  log_develop_trace(jvmcont)("~~~~ prepare_thaw return_barrier: %d", return_barrier);
 
   assert (thread == JavaThread::current(), "");
 
@@ -2208,7 +2208,8 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-    _barriers = (chunk->should_fix<typename ConfigT::OopT, ConfigT::_concurrent_gc>() || ConfigT::requires_barriers(chunk));
+    _barriers = (chunk->should_fix<typename ConfigT::OopT, ConfigT::_concurrent_gc>()
+                  || ConfigT::requires_barriers(chunk));
     return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                           : thaw_slow(chunk, kind != thaw_top);
   }
@@ -2298,7 +2299,8 @@ public:
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
     intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
     copy_from_chunk(from, to, size + ContinuationHelper::frame_metadata);
-    assert (_cont.entrySP() - 1 <= to + size + ContinuationHelper::frame_metadata && to + size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
+    assert (_cont.entrySP() - 1 <= to + size + ContinuationHelper::frame_metadata
+              && to + size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
     assert (argsize != 0 || to + size + ContinuationHelper::frame_metadata == _cont.entrySP(), "");
 
     assert (!is_last || argsize == 0, "");
@@ -2745,7 +2747,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   CONT_JFR_ONLY(EventContinuationThaw event;)
 
   if (kind != thaw_top) { log_develop_trace(jvmcont)("== RETURN BARRIER"); }
-  log_develop_trace(jvmcont)("~~~~~~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
+  log_develop_trace(jvmcont)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
 
   assert (thread == JavaThread::current(), "");
 

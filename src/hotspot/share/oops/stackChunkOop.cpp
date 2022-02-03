@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -66,7 +66,6 @@ frame stackChunkOopDesc::top_frame(RegisterMap* map) {
 }
 
 frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
-  // tty->print_cr(">>> stackChunkOopDesc::sender this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()()); derelativize(f).print_on<true>(tty);
   assert (map->in_cont(), "");
   assert (!map->include_argument_oops(), "");
   assert (!f.is_empty(), "");
@@ -122,13 +121,15 @@ static int num_java_frames(CompiledMethod* cm, address pc) {
 }
 
 static int num_java_frames(const StackChunkFrameStream<true>& f) {
-  assert (f.is_interpreted() || (f.cb() != nullptr && f.cb()->is_compiled() && f.cb()->as_compiled_method()->is_java_method()), "");
+  assert (f.is_interpreted()
+          || (f.cb() != nullptr && f.cb()->is_compiled() && f.cb()->as_compiled_method()->is_java_method()), "");
   return f.is_interpreted() ? 1 : num_java_frames(f.cb()->as_compiled_method(), f.orig_pc());
 }
 
 int stackChunkOopDesc::num_java_frames() const {
   int n = 0;
-  for (StackChunkFrameStream<true> f(const_cast<stackChunkOopDesc*>(this)); !f.is_done(); f.next(SmallRegisterMap::instance)) {
+  for (StackChunkFrameStream<true> f(const_cast<stackChunkOopDesc*>(this)); !f.is_done();
+       f.next(SmallRegisterMap::instance)) {
     if (!f.is_stub()) n += ::num_java_frames(f);
   }
   return n;

@@ -69,8 +69,8 @@ private:
   static int _offset_of_stack;
 
   InstanceStackChunkKlass(const ClassFileParser& parser);
-  static inline int metadata_words(); // size, in words, of frame metadata (e.g. pc and link); same as ContinuationHelper::frame_metadata
-  static inline int align_wiggle();   // size, in words, of maximum shift in frame position due to alignment; same as ContinuationHelper::align_wiggle
+  static inline int metadata_words(); // size, in words, of frame metadata (e.g. pc and link)
+  static inline int align_wiggle();   // size, in words, of maximum shift in frame position due to alignment
 
 public:
   InstanceStackChunkKlass() { assert(DumpSharedSpaces || UseSharedSpaces, "only for CDS"); }
@@ -105,7 +105,8 @@ public:
   void oop_print_on(oop obj, outputStream* st) override;
 #endif
 
-  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
+  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL,
+                     int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
   // Stack offset is an offset into the Heap
   static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
@@ -288,8 +289,10 @@ public:
   inline void* reg_to_loc(VMReg reg, const RegisterMapT* map) const;
 
 public:
-  template <class OopClosureType, class RegisterMapT> inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;
-  template <class DerivedOopClosureType, class RegisterMapT> inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const;
+  template <class OopClosureType, class RegisterMapT>
+  inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;
+  template <class DerivedOopClosureType, class RegisterMapT>
+  inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const;
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

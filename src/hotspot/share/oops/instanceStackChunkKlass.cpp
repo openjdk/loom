@@ -222,7 +222,8 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (from_sp <= metadata_words() ?  (to_chunk->size() == old_size) : (to_chunk->size() < old_size), "");
   assert (to_chunk->verify(), "");
 
-  // assert (to_chunk->requires_barriers(), ""); // G1 sometimes compacts a young region and *then* turns it old ((G1CollectedHeap*)Universe::heap())->heap_region_containing(oop(to_addr))->print();
+  // assert (to_chunk->requires_barriers(), ""); // G1 sometimes compacts a young region and *then* turns it old
+  // ((G1CollectedHeap*)Universe::heap())->heap_region_containing(oop(to_addr))->print();
 
   return align_object_size(header + to_stack_size + to_bitmap_size);
 }
@@ -279,9 +280,10 @@ public:
       // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      assert (offset >= 0, "Derived pointer offset is " INTPTR_FORMAT, offset);
-      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), "offset: %ld size: %d", offset, (base->size() << LogHeapWordSize)); -- base might be invalid at this point
-      Atomic::store((intptr_t*)derived_loc, -offset); // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
+      assert (offset >= 0, "");
+      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), ""); -- base might be invalid at this point
+      // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
+      Atomic::store((intptr_t*)derived_loc, -offset);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
     }
@@ -324,7 +326,6 @@ public:
   template <class T> inline void do_oop_work(T* p) {
     oop value = (oop)HeapAccess<>::oop_load(p);
     if (store) HeapAccess<>::oop_store(p, value);
-    log_develop_trace(jvmcont)("BarrierClosure::do_oop narrow: %d p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p), (intptr_t*)p - _sp);
   }
 };
 
@@ -380,7 +381,8 @@ public:
 
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-    log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
+    // log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
+
     // if (Continuation::is_return_barrier_entry(f.pc())) {
     //   assert ((int)(f.sp() - chunk->start_address(chunk)) < chunk->sp(), ""); // only happens when starting from gcSP
     //   return;
@@ -418,7 +420,8 @@ public:
     bool mutated_oops = cl._mutated;
     _num_oops += cl._num_oops;// f.oopmap()->num_oops();
 
-    // if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && _chunk->is_gc_mode()) { // TODO: this is a ZGC-specific optimization that depends on the one in iterate_derived_pointers
+    // TODO: A ZGC-specific optimization that depends on the one in iterate_derived_pointers
+    // if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && _chunk->is_gc_mode()) {
     //   InstanceStackChunkKlass::derelativize_derived_pointers(f, map);
     // }
     return true;
@@ -428,7 +431,6 @@ public:
 template <bool concurrent_gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   assert (Continuation::debug_is_stack_chunk(chunk), "");
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack requires_barriers: %d", !chunk->requires_barriers());
 
   bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
   if (concurrent_gc) {
@@ -440,7 +442,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
     } else {
       do_destructive_processing = false;
     }
-    assert (!SafepointSynchronize::is_at_safepoint() || chunk->is_gc_mode(), "gc_mode: %d is_at_safepoint: %d", chunk->is_gc_mode(), SafepointSynchronize::is_at_safepoint());
+    assert (!SafepointSynchronize::is_at_safepoint() || chunk->is_gc_mode(), "");
   }
 
   OopOopIterateStackClosure<concurrent_gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
@@ -457,8 +459,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   if (closure != nullptr) {
     Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
   }
-
-  log_develop_trace(jvmcont)("stack_chunk_iterate_stack ------- end -------");
 }
 
 template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
@@ -516,7 +516,6 @@ template <bool store, bool mixed, typename RegisterMapT>
 void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) return;
-  log_develop_trace(jvmcont)("InstanceStackChunkKlass::do_barriers sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, p2i(f.sp()), p2i(f.pc()));
 
   if (f.is_interpreted()) {
     Method* m = f.to_frame().interpreter_frame_method();
@@ -589,7 +588,10 @@ static inline oop safe_load(P *addr) {
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-static bool is_good_oop(oop o) { return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass(); }
+static bool is_good_oop(oop o) { return    dbg_is_safe(o, -1)
+                                        && dbg_is_safe(o->klass(), -1)
+                                        && oopDesc::is_oop(o)
+                                        && o->klass()->is_klass(); }
 #endif
 
 class FixCompressedOopClosure : public OopClosure {
@@ -609,7 +611,8 @@ class BuildBitmapOopClosure : public OopClosure {
   const BitMap::idx_t _bit_offset;
   BitMapView _bm;
 public:
-  BuildBitmapOopClosure(intptr_t* stack_start, BitMap::idx_t bit_offset, BitMapView bm) : _stack_start(stack_start), _bit_offset(bit_offset), _bm(bm) {}
+  BuildBitmapOopClosure(intptr_t* stack_start, BitMap::idx_t bit_offset, BitMapView bm)
+    : _stack_start(stack_start), _bit_offset(bit_offset), _bm(bm) {}
 
   virtual void do_oop(oop* p) override {
     assert (p >= (oop*)_stack_start, "");
@@ -622,7 +625,6 @@ public:
       do_oop((narrowOop*)p);
     } else {
       BitMap::idx_t index = _bit_offset + (p - (oop*)_stack_start);
-      log_develop_trace(jvmcont)("Build bitmap wide oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT, p2i(p), index, _bit_offset);
       assert (!_bm.at(index), "");
       _bm.set_bit(index);
     }
@@ -631,7 +633,6 @@ public:
   virtual void do_oop(narrowOop* p) override {
     assert (p >= (narrowOop*)_stack_start, "");
     BitMap::idx_t index = _bit_offset + (p - (narrowOop*)_stack_start);
-    log_develop_trace(jvmcont)("Build bitmap narrow oop p: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT, p2i(p), index, _bit_offset);
     assert (!_bm.at(index), "");
     _bm.set_bit(index);
   }
@@ -722,8 +723,6 @@ public:
     OopT* p = _chunk->address_for_bit<OopT>(index);
     _count++;
 
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk bitmap p: " INTPTR_FORMAT " i: " SIZE_FORMAT, p2i(p), index);
-
     if (!SafepointSynchronize::is_at_safepoint()) {
       oop obj = safe_load(p);
       assert (obj == nullptr || is_good_oop(obj),
@@ -740,13 +739,13 @@ class StackChunkVerifyOopsClosure : public OopClosure {
   intptr_t* _unextended_sp;
   int _count;
 public:
-  StackChunkVerifyOopsClosure(stackChunkOop chunk, intptr_t* unextended_sp) : _chunk(chunk), _unextended_sp(unextended_sp), _count(0) {}
+  StackChunkVerifyOopsClosure(stackChunkOop chunk, intptr_t* unextended_sp)
+    : _chunk(chunk), _unextended_sp(unextended_sp), _count(0) {}
   int count() { return _count; }
   void do_oop(oop* p) override { (_chunk->has_bitmap() && UseCompressedOops) ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   void do_oop(narrowOop* p) override { do_oop_work(p); }
 
   template <class T> inline void do_oop_work(T* p) {
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk oop narrow: %d p: " INTPTR_FORMAT, sizeof(T) < sizeof(intptr_t), p2i(p));
      _count++;
     if (SafepointSynchronize::is_at_safepoint()) return;
 
@@ -764,14 +763,16 @@ class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
   intptr_t* _unextended_sp;
 public:
 
-  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk, intptr_t* unextended_sp) : _chunk(chunk), _unextended_sp(unextended_sp) {}
+  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk, intptr_t* unextended_sp)
+    : _chunk(chunk), _unextended_sp(unextended_sp) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk base: " INTPTR_FORMAT " derived: " INTPTR_FORMAT, p2i(base_loc), p2i(derived_loc));
     if (SafepointSynchronize::is_at_safepoint()) return;
 
-    oop base = (_chunk->has_bitmap() && UseCompressedOops) ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc)) : Atomic::load((oop*)base_loc);
-    // (oop)NativeAccess<>::oop_load((oop*)base_loc); //
+    oop base = (_chunk->has_bitmap() && UseCompressedOops)
+                  ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
+                  : Atomic::load((oop*)base_loc);
+    // (oop)NativeAccess<>::oop_load((oop*)base_loc);
     if (base != nullptr) {
       ZGC_ONLY(if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) return;)
       assert (!CompressedOops::is_base(base), "");
@@ -786,7 +787,7 @@ public:
       // Has been seen to fail on AArch64, where we have lots of derived pointers, with +any derived pointers into arrays.
       // It looks as if a derived pointer appears live in the oopMap but isn't pointing into the object.
       // This might be the result of address computation floating above corresponding range check for array access.
-      // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
+      // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu", offset, base->size() << LogHeapWordSize);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
     }
@@ -861,15 +862,14 @@ public:
 };
 
 // verifies the consistency of the chunk's data
-bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {
+bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
+                                     int* out_frames, int* out_interpreted_frames) {
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
 
   assert (oopDesc::is_oop(obj), "");
   assert (obj->is_stackChunk(), "");
-  stackChunkOop chunk = (stackChunkOop)obj;
 
-  log_develop_trace(jvmcont)("debug_verify_stack_chunk barriers: %d", chunk->requires_barriers());
-  // chunk->print_on(true, tty);
+  stackChunkOop chunk = (stackChunkOop)obj;
 
   assert (chunk->is_stackChunk(), "");
   assert (chunk->stack_size() >= 0, "");
@@ -896,7 +896,8 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
   const bool is_last = chunk->parent() == nullptr;
   const bool mixed = chunk->has_mixed_frames();
 
-  // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset) for the top frame (below sp), and *not* for the bottom frame
+  // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset)
+  // for the top frame (below sp), and *not* for the bottom frame
   int size = chunk->stack_size() - chunk->argsize() - chunk->sp();
   assert (size >= 0, "");
   assert ((size == 0) == chunk->is_empty(), "");
@@ -911,38 +912,55 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops, i
 
   assert (!chunk->is_empty() || closure._cb == nullptr, "");
   if (closure._cb != nullptr && closure._cb->is_compiled()) {
-    assert (chunk->argsize() == (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord,
-      "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(), (closure._cb->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord);
+    assert (chunk->argsize() ==
+      (closure._cb->as_compiled_method()->method()->num_stack_arg_slots()*VMRegImpl::stack_slot_size) >>LogBytesPerWord,
+      "chunk argsize: %d bottom frame argsize: %d", chunk->argsize(),
+      (closure._cb->as_compiled_method()->method()->num_stack_arg_slots()*VMRegImpl::stack_slot_size) >>LogBytesPerWord);
   }
 
   assert (closure._num_interpreted_frames == 0 || chunk->has_mixed_frames(), "");
 
   if (!concurrent) {
-    assert (closure._size <= size + chunk->argsize() + metadata_words(), "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d", size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
-    assert (chunk->argsize() == closure._argsize, "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d", chunk->argsize(), closure._argsize, closure._callee_interpreted);
+    assert (closure._size <= size + chunk->argsize() + metadata_words(),
+      "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d",
+      size, chunk->argsize(), closure._size, closure._sp - chunk->start_address(), chunk->sp(), chunk->stack_size());
+    assert (chunk->argsize() == closure._argsize,
+      "chunk->argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
+      chunk->argsize(), closure._argsize, closure._callee_interpreted);
 
     int max_size = closure._size + closure._num_i2c * align_wiggle();
-    assert (chunk->max_size() == max_size, "max_size(): %d max_size: %d argsize: %d num_i2c: %d", chunk->max_size(), max_size, closure._argsize, closure._num_i2c);
+    assert (chunk->max_size() == max_size,
+      "max_size(): %d max_size: %d argsize: %d num_i2c: %d",
+      chunk->max_size(), max_size, closure._argsize, closure._num_i2c);
 
     if (out_size   != nullptr) *out_size   += size;
     if (out_oops   != nullptr) *out_oops   += closure._num_oops;
     if (out_frames != nullptr) *out_frames += closure._num_frames;
     if (out_interpreted_frames != nullptr) *out_interpreted_frames += closure._num_interpreted_frames;
-  } else assert (out_size == nullptr && out_oops == nullptr && out_frames == nullptr && out_interpreted_frames == nullptr, "");
+  } else {
+    assert (out_size == nullptr && out_oops == nullptr && out_frames == nullptr && out_interpreted_frames == nullptr, "");
+  }
 
   if (chunk->has_bitmap()) {
-    assert (chunk->bitmap().size() == chunk->bit_offset() + (size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)), "bitmap().size(): %zu bit_offset: %zu stack_size: %d", chunk->bitmap().size(), chunk->bit_offset(), chunk->stack_size());
+    assert (chunk->bitmap().size() == chunk->bit_offset() + (size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)),
+      "bitmap().size(): %zu bit_offset: %zu stack_size: %d",
+      chunk->bitmap().size(), chunk->bit_offset(), chunk->stack_size());
     int oop_count;
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(chunk);
-      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((narrowOop*)chunk->end_address()));
+      chunk->bitmap().iterate(&bitmap_closure,
+        chunk->bit_index_for((narrowOop*)(chunk->sp_address() - metadata_words())),
+        chunk->bit_index_for((narrowOop*)chunk->end_address()));
       oop_count = bitmap_closure._count;
     } else {
       StackChunkVerifyBitmapClosure<oop> bitmap_closure(chunk);
-      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)(chunk->sp_address() - metadata_words())), chunk->bit_index_for((oop*)chunk->end_address()));
+      chunk->bitmap().iterate(&bitmap_closure,
+        chunk->bit_index_for((oop*)(chunk->sp_address() - metadata_words())),
+        chunk->bit_index_for((oop*)chunk->end_address()));
       oop_count = bitmap_closure._count;
     }
-    assert (oop_count == closure._num_oops, "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
+    assert (oop_count == closure._num_oops,
+      "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
   }
 
   return true;
@@ -955,7 +973,8 @@ class DescribeStackChunkClosure {
   RegisterMap _map;
   int _frame_no;
 public:
-  DescribeStackChunkClosure(stackChunkOop chunk) : _chunk(chunk), _map((JavaThread*)nullptr, true, false, true), _frame_no(0) {
+  DescribeStackChunkClosure(stackChunkOop chunk)
+    : _chunk(chunk), _map((JavaThread*)nullptr, true, false, true), _frame_no(0) {
     _map.set_include_argument_oops(false);
   }
 
@@ -975,9 +994,9 @@ public:
 
   void describe_chunk() {
     // _values.describe(-1, _chunk->start_address(), "CHUNK START");
-    _values.describe(-1, _chunk->sp_address(),      "CHUNK SP");
+    _values.describe(-1, _chunk->sp_address(),         "CHUNK SP");
     _values.describe(-1, _chunk->bottom_address() - 1, "CHUNK ARGS");
-    _values.describe(-1, _chunk->end_address() - 1, "CHUNK END");
+    _values.describe(-1, _chunk->end_address() - 1,    "CHUNK END");
   }
 
   void print_on(outputStream* out) {
@@ -1002,7 +1021,8 @@ public:
   template <bool mixed, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<mixed>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
-    _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d", p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
+    _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",
+      p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
     f.print_on<true>(_st);
     const ImmutableOopMap* oopmap = fs.oopmap();
     if (oopmap != nullptr) {
@@ -1022,10 +1042,13 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   assert(c->is_stackChunk(), "");
 
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
-  st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT, p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
-  st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT, c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
+  st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
+    p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
+  st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT,
+    c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
-  st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT, c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
+  st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT,
+    c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
 
   if (verbose) {
     st->cr();
@@ -1050,7 +1073,8 @@ template void StackChunkFrameStream<false>::print_on(outputStream* st) const;
 
 template <bool mixed>
 void StackChunkFrameStream<mixed>::print_on(outputStream* st) const {
-  st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d", p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
+  st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d",
+    p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
   to_frame().template print_on<true>(st);
 }
 #endif
