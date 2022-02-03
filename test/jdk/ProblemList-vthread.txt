@@ -4,6 +4,9 @@ java/foreign/channels/TestSocketChannels.java                         8272749 wi
 java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
 java/foreign/StdLibTest.java                                          8278992 generic-all
 
+java/foreign/TestSegmentCopy.java                                     8281222 generic-all
+java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 generic-all
+
 
 ####
 # JFR is not completely fixed to support vthreads

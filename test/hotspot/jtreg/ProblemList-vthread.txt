@@ -163,6 +163,7 @@ runtime/cds/appcds/CDSandJFR.java
 runtime/cds/appcds/ClassPathAttr.java
 runtime/cds/appcds/CommandLineFlagCombo.java
 runtime/cds/appcds/DumpClassList.java
+runtime/cds/appcds/DumpingWithNoCoops.java
 runtime/cds/appcds/ExtraSymbols.java
 runtime/cds/appcds/FieldAnnotationsTest.java
 runtime/cds/appcds/FieldLayoutFlags.java
