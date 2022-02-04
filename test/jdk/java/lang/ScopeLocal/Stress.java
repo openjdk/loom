@@ -24,28 +24,94 @@
 /**
  * @test
  * @compile --enable-preview -source ${jdk.version} Stress.java
+ * @run testng/othervm -XX:-TieredCompilation --enable-preview Stress
  * @run testng/othervm --enable-preview Stress
  * @summary Stress test for java.lang.ScopeLocal
  */
 
+import org.testng.annotations.Test;
+
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.ThreadFactory;
 
-import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class Stress {
 
-    private ScopeLocal<Integer> sl1 = ScopeLocal.newInstance();
-    private ScopeLocal<Integer> sl2 = ScopeLocal.newInstance();
+    ScopeLocal<Integer> sl1 = ScopeLocal.newInstance();
+    ScopeLocal<Integer> sl2 = ScopeLocal.newInstance();
 
-    private final ScopeLocal<Integer>[] scopeLocals;
+    static final ScopeLocal<ThreadFactory> factory = ScopeLocal.newInstance();
+    static final ScopeLocal.Carrier platformFactoryCarrier = ScopeLocal.where(factory, Thread.ofPlatform().factory());
+    static final ScopeLocal.Carrier virtualFactoryCarrier = ScopeLocal.where(factory, Thread.ofVirtual().factory());
+
+    final ScopeLocal<Integer>[] scopeLocals;
 
     Stress() {
         scopeLocals = new ScopeLocal[500];
         for (int i = 0; i < scopeLocals.length; i++) {
             scopeLocals[i] = ScopeLocal.newInstance();
+        }
+    }
+
+    private class MyBanger implements Runnable {
+        final ScopeLocal.Binder binder;
+        boolean shouldRunOutOfMemory;
+        boolean failed = false;
+
+        MyBanger(ScopeLocal.Binder binder, boolean shouldRunOutOfMemory) {
+            this.binder = binder;
+            this.shouldRunOutOfMemory = shouldRunOutOfMemory;
+        }
+
+        volatile int a[][] = new int[10000][];
+
+        public void runOutOfMemory(int base, int size) {
+            for (int i = base; i < a.length; i++) {
+                try {
+                    a[i] = new int[size];
+                } catch (OutOfMemoryError e) {
+                    size /= 2;
+                    if (size == 0) {
+                        return;
+                    }
+                }
+            }
+        }
+
+        public void run() {
+            int n = sl1.get();
+            try {
+                ScopeLocal.where(sl1, n + 1).run(this);
+            } catch (StackOverflowError e) {
+                if (sl1.get() != n) {
+                    failed = true;
+                }
+            }
+            if (shouldRunOutOfMemory) {
+                runOutOfMemory(0, 0x1000_0000);
+            }
+
+            // Trigger a StructureViolationException
+            binder.close();
+        }
+
+    }
+
+    public void stackOverflow() {
+        ScopeLocal.Binder binder = sl2.bind(99);
+        try {
+            var myBanger = new MyBanger(binder, false);
+            try {
+                ScopeLocal.where(sl1, 0, myBanger);
+            } catch (RuntimeException e) {
+                assertFalse(sl1.isBound());
+            } finally {
+                binder.close();
+            }
+            assertFalse(myBanger.failed);
+        } finally {
+            binder.close();
         }
     }
 
@@ -66,7 +132,7 @@ public class Stress {
         }
     }
 
-    public void deepBindings() {
+    private void deepBindings() {
         int result;
         try {
             result = ScopeLocal.where(sl2, 42).where(sl1, 99).call(() ->
@@ -77,26 +143,26 @@ public class Stress {
         assertEquals(result, 423693);
     }
 
-    private static final ScopeLocal<ThreadFactory> factory = ScopeLocal.newInstance();
-    private static final ScopeLocal.Carrier platformFactoryCarrier = ScopeLocal.where(factory, Thread.ofPlatform().factory());
-    private static final ScopeLocal.Carrier virtualFactoryCarrier = ScopeLocal.where(factory, Thread.ofVirtual().factory());
-
     private int deepBindings2(int depth) throws Exception {
         if (depth > 0) {
-            try (var unused = scopeLocals[depth].bind(depth);
-                 var scope = new StructuredTaskScope<Integer>(null, factory.get())) {
-                var future = scope.fork(
-                    () -> ScopeLocal.where(sl1, sl1.get() + 1)
-                            .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
-                            .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
-                scope.join();
-                return future.get();
+            try (var unused = scopeLocals[depth].bind(depth)) {
+                try (var structuredTaskScope = new StructuredTaskScope<Integer>(null, factory.get())) {
+                    var future = structuredTaskScope.fork(
+                            () -> ScopeLocal.where(sl1, sl1.get() + 1)
+                                    .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
+                                    .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
+                    structuredTaskScope.join();
+                    return future.get();
+                }
             }
         } else {
             return sl2.get();
         }
     }
 
+    // Serious abuse of ScopeLocals. Make sure everything still works,
+    // even with a ridiculous number of bindings.
+    @Test
     public void manyScopeLocals() {
         ScopeLocal<Object>[] scopeLocals = new ScopeLocal[10_000];
         ScopeLocal.Binder[] binders = new ScopeLocal.Binder[scopeLocals.length];
@@ -109,14 +175,15 @@ public class Stress {
         for (var sl : scopeLocals) {
             n += (Integer)sl.get();
         }
-        assertEquals(n, 49995000);
         for (int i = scopeLocals.length - 1; i >= 0; --i) {
             binders[i].close();
         }
+        assertEquals(n, 49995000);
         for (int i = 0; i < scopeLocals.length; i++) {
             binders[i] = scopeLocals[i].bind(i);
         }
         int caught = 0;
+        // Trigger StructureViolationExceptions
         for (int i = scopeLocals.length - 2; i >= 0; i -= 2) {
             try {
                 binders[i].close();
@@ -124,7 +191,7 @@ public class Stress {
                 caught++;
             }
         }
-        System.out.println(caught);
+
         assertEquals(caught, 5000);
 
         // They should all be closed now
@@ -140,7 +207,7 @@ public class Stress {
         assertEquals(caught, 0);
     }
 
-    private void test(ScopeLocal.Carrier factoryCarrier) {
+    private void testDeepBindings(ScopeLocal.Carrier factoryCarrier) {
         int val = 0;
         try (var unused = factoryCarrier.where(sl2, 42).where(sl1, 99).bind()) {
             val = deepBindings2(scopeLocals.length - 1);
@@ -150,8 +217,39 @@ public class Stress {
         assertEquals(val, 423693);
     }
 
-    public void run() {
-        test(platformFactoryCarrier);
-        test(virtualFactoryCarrier);
+    // Make sure that stack overflows are handled correctly.
+    // Run for a while to trigger JIT compilation.
+    @Test
+    public void stackOverflowTest() {
+        assertFalse(sl2.isBound());
+        for (int i = 0; i < 200; i++) {
+            try {
+                stackOverflow();
+            } catch (Throwable t) {
+                ;
+            }
+            assertFalse(sl2.isBound());
+        }
+    }
+
+    @Test
+    public void platformFactorydeepBindings() {
+        testDeepBindings(platformFactoryCarrier);
+    }
+
+    @Test
+    public void virtualFactorydeepBindings() {
+        testDeepBindings(virtualFactoryCarrier);
+    }
+
+    void run() {
+        manyScopeLocals();
+        platformFactorydeepBindings();
+        stackOverflowTest();
+        virtualFactorydeepBindings();
+    }
+
+    public static void main(String[] args) {
+        new Stress().run();
     }
 }
