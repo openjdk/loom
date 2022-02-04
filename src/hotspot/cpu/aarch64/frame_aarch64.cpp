@@ -450,18 +450,6 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
 }
 
-//------------------------------------------------------------------------------
-// frame::sender
-frame frame::sender(RegisterMap* map) const {
-  frame result = sender_raw(map);
-
-  if (map->process_frames() && !map->in_cont()) {
-    StackWatermarkSet::on_iteration(map->thread(), result);
-  }
-
-  return result;
-}
-
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   // These are reasonable sanity checks

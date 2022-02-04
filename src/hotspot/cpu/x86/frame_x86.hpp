@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -162,11 +162,8 @@
   template <bool relative = false>
   intptr_t* interpreter_frame_last_sp() const;
 
-  // helper to update a map with callee-saved RBP
   template <typename RegisterMapT>
   static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
-  template <typename RegisterMapT>
-  static intptr_t** saved_link_address(const RegisterMapT* map);
 
   // deoptimization support
   void interpreter_frame_set_last_sp(intptr_t* sp);

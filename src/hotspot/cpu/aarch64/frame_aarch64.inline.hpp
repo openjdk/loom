@@ -254,33 +254,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
 }
 
-// helper to update a map with callee-saved RBP
-
-template <typename RegisterMapT>
-void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
-  // The interpreter and compiler(s) always save EBP/RBP in a known
-  // location on entry. We must record where that location is
-  // so this if EBP/RBP was live on callout from c2 we can find
-  // the saved copy no matter what it called.
-
-  // Since the interpreter always saves EBP/RBP if we record where it is then
-  // we don't have to always save EBP/RBP on entry and exit to c2 compiled
-  // code, on entry will be enough.
-  map->set_location(rfp->as_VMReg(), (address) link_addr);
-  // this is weird "H" ought to be at a higher address however the
-  // oopMaps seems to have the "H" regs at the same address and the
-  // vanilla register.
-  // XXXX make this go away
-  if (true) {
-    map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
-  }
-}
-
-template <typename RegisterMapT>
-intptr_t** frame::saved_link_address(const RegisterMapT* map) {
-  return (intptr_t**)map->location(rfp->as_VMReg());
-}
-
 // Return address:
 
 inline address* frame::sender_pc_addr()         const { return (address*) addr_at( return_addr_offset); }
@@ -414,6 +387,18 @@ inline const ImmutableOopMap* frame::get_oop_map() const {
   return NULL;
 }
 
+//------------------------------------------------------------------------------
+// frame::sender
+inline frame frame::sender(RegisterMap* map) const {
+  frame result = sender_raw(map);
+
+  if (map->process_frames() && !map->in_cont()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+
+  return result;
+}
+
 inline frame frame::sender_raw(RegisterMap* map) const {
   // Default is we done have to follow them. The sender_for_xxx will
   // update it accordingly
@@ -428,17 +413,14 @@ inline frame frame::sender_raw(RegisterMap* map) const {
   if (is_interpreted_frame())     return sender_for_interpreter_frame(map);
 
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
+  if (_cb != NULL) return sender_for_compiled_frame(map);
 
-  if (_cb != NULL) {
-    return _cb->is_compiled() ? sender_for_compiled_frame<false>(map) : sender_for_compiled_frame<true>(map);
-  }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());
 }
 
-template <bool stub>
-frame frame::sender_for_compiled_frame(RegisterMap* map) const {
+inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // we cannot rely upon the last fp having been saved to the thread
   // in C2 code but it will have been pushed onto the stack. so we
   // have to find it relative to the unextended sp
@@ -456,7 +438,7 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     // Tell GC to use argument oopmaps for some runtime stubs that need it.
     // For C1, the runtime stub might not have oop maps, so set this flag
     // outside of update_register_map.
-    if (stub) { // compiled frames do not use callee-saved registers
+    if (!_cb->is_compiled()) { // compiled frames do not use callee-saved registers
       map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
       if (oop_map() != NULL) {
         _oop_map->update_register_map(this, map);
@@ -485,4 +467,23 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  // The interpreter and compiler(s) always save EBP/RBP in a known
+  // location on entry. We must record where that location is
+  // so this if EBP/RBP was live on callout from c2 we can find
+  // the saved copy no matter what it called.
+
+  // Since the interpreter always saves EBP/RBP if we record where it is then
+  // we don't have to always save EBP/RBP on entry and exit to c2 compiled
+  // code, on entry will be enough.
+  map->set_location(rfp->as_VMReg(), (address) link_addr);
+  // this is weird "H" ought to be at a higher address however the
+  // oopMaps seems to have the "H" regs at the same address and the
+  // vanilla register.
+  // XXXX make this go away
+  if (true) {
+    map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
+  }
+}
 #endif // CPU_AARCH64_FRAME_AARCH64_INLINE_HPP
