@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.ScopeLocalContainer;
+import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 import jdk.internal.vm.annotation.Stable;
@@ -295,7 +296,7 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with this some ScopeLocals bound to values.
+         * Run a value-returning operation with some ScopeLocals bound to values.
          * Code executed by the operation can use the {@link #get()} method to
          * get the value of the scope local. The scope locals revert to their previous values or
          * become {@linkplain #isBound() unbound} when the operation completes.
@@ -318,7 +319,7 @@ public final class ScopeLocal<T> {
             try {
                 return ScopeLocalContainer.call(op);
             } catch (Throwable t) {
-                Cache.invalidate();
+                Thread.setScopeLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
@@ -367,7 +368,7 @@ public final class ScopeLocal<T> {
             try {
                 ScopeLocalContainer.run(op);
             } catch (Throwable t) {
-                Cache.invalidate();
+                Thread.setScopeLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
                 Thread.currentThread().scopeLocalBindings = prevBindings;
@@ -450,12 +451,13 @@ public final class ScopeLocal<T> {
             if (Thread.currentThread() != owner())
                 throw new WrongThreadException();
             if (!closed) {
-                closed = true;
                 Cache.invalidate(bindings.bitmask);
                 if (!popForcefully()) {
-                    Cache.invalidate();
+                    Thread.setScopeLocalCache(null); // Cache.invalidate();
+                    closed = true;
                     throw new StructureViolationException();
                 }
+                closed = true;
             }
         }
 

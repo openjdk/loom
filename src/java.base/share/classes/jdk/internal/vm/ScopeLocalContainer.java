@@ -28,6 +28,8 @@ import java.util.concurrent.Callable;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.DontInline;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
  * A StackableScope to represent scope-local bindings.
@@ -192,6 +194,7 @@ public class ScopeLocalContainer extends StackableScope {
     /**
      * Throws {@code ex} if not null. Throws StructureViolationException
      */
+    @DontInline @ReservedStackAccess
     private static void throwIfFailed(Throwable ex, boolean atTop) {
         if (ex != null || !atTop) {
             if (!atTop) {
