@@ -275,7 +275,7 @@ void frame::patch_pc(Thread* thread, address pc) {
 
   assert(!Continuation::is_return_barrier_entry(*pc_addr), "return barrier");
 
-  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "must be (pc: " INTPTR_FORMAT " _pc: " INTPTR_FORMAT " pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT  " sp: " INTPTR_FORMAT ")", p2i(pc), p2i(_pc), p2i(pc_addr), p2i(*pc_addr), p2i(sp()));
+  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "");
   DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
   _pc = pc; // must be set before call to get_deopt_original_pc
