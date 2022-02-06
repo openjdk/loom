@@ -1611,16 +1611,19 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
+  bool is_passive_cthread = is_passive_carrier_thread(java_thread, thread_h());
+
   // A case of a non-virtual thread.
   if (!is_virtual) {
     if (!java_thread->is_thread_suspended() &&
-        (thread_h() == java_thread->vthread() && !java_thread->is_suspended())) {
+        (is_passive_cthread || !java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     }
     java_thread->clear_thread_suspended();
   }
   assert(!java_thread->is_in_VTMT(), "sanity check");
-  if (is_virtual || thread_h() == java_thread->vthread()) {
+
+  if (!is_passive_cthread) {
     assert(single_suspend || is_virtual, "ResumeAllVirtualThreads should never resume non-virtual threads");
     if (java_thread->is_suspended()) {
       if (!JvmtiSuspendControl::resume(java_thread)) {
