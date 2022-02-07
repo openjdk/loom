@@ -22,10 +22,11 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package java.util.concurrent;
+package jdk.incubator.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Method;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Duration;
@@ -33,10 +34,19 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import jdk.internal.misc.ThreadFlock;
-import jdk.internal.javac.PreviewFeature;
 
 /**
  * A basic API for <em>structured concurrency</em>. StructuredTaskScope supports cases
@@ -220,13 +230,14 @@ import jdk.internal.javac.PreviewFeature;
  * {@snippet lang=java :
  *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
  *
- *     // @link regex="bind(?=\()" target="ScopeLocal#bind" :
- *     try (var binding = NAME.bind("duke"));
- *          var scope = new StructuredTaskScope<String>()) {
+ *     // @link substring="where" target="ScopeLocal#where" :
+ *     ScopeLocal.where(NAME, "duke").run(() -> {
+ *         try (var scope = new StructuredTaskScope<String>()) {
  *
- *         scope.fork(() -> childTask());           // @highlight substring="fork"
- *         ...
- *      }
+ *             scope.fork(() -> childTask());           // @highlight substring="fork"
+ *             ...
+ *          }
+ *     });
  *
  *     ...
  *
@@ -242,9 +253,8 @@ import jdk.internal.javac.PreviewFeature;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @param <T> the result type of tasks executed in the scope
- * @since 99
+ * @since 19
  */
-@PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public class StructuredTaskScope<T> implements AutoCloseable {
     private static final VarHandle FUTURES;
     static {
@@ -300,7 +310,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * null} and a thread factory that creates virtual threads.
      */
     public StructuredTaskScope() {
-        this(null, Thread.ofVirtual().factory());
+        this(null, FactoryHolder.VIRTUAL_THREAD_FACTORY);
     }
 
     /**
@@ -785,9 +795,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @param <T> the result type
-     * @since 99
+     * @since 19
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class WithShutdownOnSuccess<T> extends StructuredTaskScope<T> {
         private static final VarHandle FIRST_SUCCESS;
         private static final VarHandle FIRST_FAILED;
@@ -836,7 +845,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * {@code null} and a thread factory that creates virtual threads.
          */
         public WithShutdownOnSuccess() {
-            super(null, Thread.ofVirtual().factory());
+            super(null, FactoryHolder.VIRTUAL_THREAD_FACTORY);
         }
 
         /**
@@ -945,9 +954,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
-     * @since 99
+     * @since 19
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class WithShutdownOnFailure extends StructuredTaskScope<Object> {
         private static final VarHandle FIRST_FAILED;
         private static final VarHandle FIRST_CANCELLED;
@@ -992,7 +1000,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * {@code null} and a thread factory that creates virtual threads.
          */
         public WithShutdownOnFailure() {
-            super(null, Thread.ofVirtual().factory());
+            super(null, FactoryHolder.VIRTUAL_THREAD_FACTORY);
         }
 
         /**
@@ -1091,6 +1099,31 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 Objects.requireNonNull(ex, "esf returned null");
                 throw ex;
             }
+        }
+    }
+
+    /**
+     * Holder class for the virtual thread factory. It uses reflection to allow
+     * this class be compiled in an incubator module without also enabling preview
+     * features.
+     */
+    private static class FactoryHolder {
+        static final ThreadFactory VIRTUAL_THREAD_FACTORY = virtualThreadFactory();
+
+        @SuppressWarnings("removal")
+        private static ThreadFactory virtualThreadFactory() {
+            PrivilegedAction<ThreadFactory> pa = () -> {
+                try {
+                    Method ofVirtualMethod = Thread.class.getDeclaredMethod("ofVirtual");
+                    Object virtualThreadBuilder = ofVirtualMethod.invoke(null);
+                    Class<?> ofVirtualClass = Class.forName("java.lang.Thread$Builder$OfVirtual");
+                    Method factoryMethod = ofVirtualClass.getMethod("factory");
+                    return (ThreadFactory) factoryMethod.invoke(virtualThreadBuilder);
+                } catch (Exception e) {
+                    throw new InternalError(e);
+                }
+            };
+            return AccessController.doPrivileged(pa);
         }
     }
 }

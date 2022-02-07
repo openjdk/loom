@@ -21,8 +21,9 @@
  * questions.
  */
 
-package org.openjdk.bench.java.lang;
+package org.openjdk.bench.jdk.incubator.concurrent;
 
+import jdk.incubator.concurrent.ScopeLocal;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 

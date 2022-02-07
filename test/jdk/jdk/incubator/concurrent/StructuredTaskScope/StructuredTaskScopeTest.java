@@ -24,24 +24,39 @@
 /*
  * @test
  * @summary Basic tests for StructuredTaskScope
+ * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} StructuredTaskScopeTest.java
  * @run testng/othervm --enable-preview StructuredTaskScopeTest
  */
 
+import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.StructuredTaskScope;
+import jdk.incubator.concurrent.StructuredTaskScope.WithShutdownOnSuccess;
+import jdk.incubator.concurrent.StructuredTaskScope.WithShutdownOnFailure;
+import jdk.incubator.concurrent.StructureViolationException;
 import java.time.Duration;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.NoSuchElementException;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.StructuredTaskScope.WithShutdownOnSuccess;
-import java.util.concurrent.StructuredTaskScope.WithShutdownOnFailure;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -308,25 +323,9 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork inherits a scope-local binding.
-     */
-    public void testForkInheritsScopeLocals2() throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var ignore = ScopeLocal.where(NAME, "x").bind();
-             var scope = new StructuredTaskScope()) {
-            Future<String> future = scope.fork(() -> {
-                // child
-                return NAME.get();
-            });
-            scope.join();
-            assertEquals(future.resultNow(), "x");
-        }
-    }
-
-    /**
      * Test that fork inherits a scope-local binding into a grandchild.
      */
-    public void testForkInheritsScopeLocals3() throws Exception {
+    public void testForkInheritsScopeLocals2() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         String value = ScopeLocal.where(NAME, "x").call(() -> {
             try (var scope1 = new StructuredTaskScope()) {
@@ -345,31 +344,6 @@ public class StructuredTaskScopeTest {
             }
         });
         assertEquals(value, "x");
-    }
-
-    /**
-     * Test that fork inherits a scope-local binding into a grandchild.
-     */
-    public void testForkInheritsScopeLocals4() throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-
-        try (var binding = ScopeLocal.where(NAME, "x").bind();
-             var scope1 = new StructuredTaskScope()) {
-
-            Future<String> future1 = scope1.fork(() -> {
-                try (var scope2 = new StructuredTaskScope()) {
-                    Future<String> future2 = scope2.fork(() -> {
-                        // grandchild
-                        return NAME.get();
-                    });
-                    scope2.join();
-                    return future2.resultNow();
-                }
-            });
-
-            scope1.join();
-            assertEquals(future1.resultNow(), "x");
-        }
     }
 
     /**
@@ -966,39 +940,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test closing a scope local binder will close the thread flock of a
-     * nested scope.
-     */
-    public void testStructureViolation3() throws Exception {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        StructuredTaskScope<Object> scope = null;
-        try {
-            try (var binding = ScopeLocal.where(name, "x").bind()) {
-                scope = new StructuredTaskScope();
-            } catch (StructureViolationException expected) { }
-
-            // underlying flock should be closed, fork should return a cancelled task
-            AtomicBoolean ran = new AtomicBoolean();
-            Future<String> future = scope.fork(() -> {
-                ran.set(true);
-                return null;
-            });
-            assertTrue(future.isCancelled());
-            scope.join();
-            assertFalse(ran.get());
-
-        } finally {
-            if (scope != null) {
-                scope.close();
-            }
-        }
-    }
-
-    /**
      * Test that fork throws StructureViolationException if scope-local bindings
      * created after StructuredTaskScope is created.
      */
-    public void testStructureViolation4() throws Exception {
+    public void testStructureViolation3() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
 
         try (var scope = new StructuredTaskScope()) {
@@ -1007,19 +952,13 @@ public class StructuredTaskScopeTest {
                              () -> scope.fork(() -> "foo"));
             });
         }
-
-        try (var scope = new StructuredTaskScope();
-             var ignore = ScopeLocal.where(NAME, "x").bind()) {
-            expectThrows(StructureViolationException.class,
-                         () -> scope.fork(() -> "foo"));
-        }
     }
 
     /**
      * Test that fork throws StructureViolationException if scope-local bindings
      * changed after StructuredTaskScope is created.
      */
-    public void testStructureViolation5() throws Exception {
+    public void testStructureViolation4() throws Exception {
         ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
         ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
 
@@ -1042,24 +981,6 @@ public class StructuredTaskScopeTest {
                 });
             }
         });
-
-        // re-bind
-        try (var binding = ScopeLocal.where(NAME1, "x").bind();
-             var scope = new StructuredTaskScope()) {
-            ScopeLocal.where(NAME1, "y").run(() -> {
-                expectThrows(StructureViolationException.class,
-                             () -> scope.fork(() -> "foo"));
-            });
-        }
-
-        // new binding
-        try (var binding = ScopeLocal.where(NAME1, "x").bind();
-             var scope = new StructuredTaskScope()) {
-            ScopeLocal.where(NAME2, "y").run(() -> {
-                expectThrows(StructureViolationException.class,
-                             () -> scope.fork(() -> "foo"));
-            });
-        }
     }
 
     /**

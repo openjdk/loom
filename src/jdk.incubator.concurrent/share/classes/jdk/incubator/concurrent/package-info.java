@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,38 +22,9 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package java.lang;
-
-import java.util.concurrent.Callable;
-import jdk.internal.javac.PreviewFeature;
 
 /**
- * Thrown when a structure violation is detected.
- *
- * @see java.util.concurrent.StructuredTaskScope
- * @see ScopeLocal.Carrier#run(Runnable)
- * @see ScopeLocal.Carrier#call(Callable)
- * @since 99
+ * Defines APIs for structured concurrent and scope locals.
+ * {@Incubating}
  */
-@PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-public class StructureViolationException extends RuntimeException {
-    @java.io.Serial
-    private static final long serialVersionUID = -7705327650798235468L;
-
-    /**
-     * Constructs an {@code StructureViolationException} with no detail message.
-     */
-    public StructureViolationException() {
-        super();
-    }
-
-    /**
-     * Constructs an {@code StructureViolationException} with the specified
-     * detail message.
-     *
-     * @param  message the detail message, can be null
-     */
-    public StructureViolationException(String message) {
-        super(message);
-    }
-}
+package jdk.incubator.concurrent;

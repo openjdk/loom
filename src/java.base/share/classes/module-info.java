@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -158,6 +158,7 @@ module java.base {
         jdk.jartool,
         jdk.jlink,
         jdk.net,
+        jdk.incubator.concurrent,
         jdk.incubator.foreign;
     exports jdk.internal.access.foreign to
         jdk.incubator.foreign;
@@ -210,6 +211,7 @@ module java.base {
         jdk.nio.mapmode,
         jdk.unsupported,
         jdk.internal.vm.ci,
+        jdk.incubator.concurrent,
         jdk.incubator.foreign;
     exports jdk.internal.module to
         java.instrument,
@@ -239,12 +241,14 @@ module java.base {
         jdk.incubator.foreign;
     exports jdk.internal.vm to
         java.management,
+        jdk.incubator.concurrent,
         jdk.internal.jvmstat,
         jdk.management,
         jdk.management.agent;
     exports jdk.internal.vm.annotation to
         java.instrument,
         jdk.internal.vm.ci,
+        jdk.incubator.concurrent,
         jdk.incubator.vector,
         jdk.incubator.foreign,
         jdk.jfr,
@@ -304,6 +308,7 @@ module java.base {
         java.desktop,
         java.security.jgss,
         jdk.crypto.ec,
+        jdk.incubator.concurrent,
         jdk.incubator.foreign;
     exports sun.security.internal.interfaces to
         jdk.crypto.cryptoki;

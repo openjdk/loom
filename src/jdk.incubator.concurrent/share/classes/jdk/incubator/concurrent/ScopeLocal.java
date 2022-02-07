@@ -24,7 +24,7 @@
  * questions.
  */
 
-package java.lang;
+package jdk.incubator.concurrent;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -32,15 +32,13 @@ import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import jdk.internal.javac.PreviewFeature;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 import jdk.internal.vm.annotation.Stable;
-import sun.security.action.GetPropertyAction;
-
-import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
 
 /**
  * Represents a scoped value.
@@ -112,7 +110,7 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * scope local will almost always be very fast. However, if a program has many
  * scope locals that it uses cyclically, the cache hit rate will be low and
  * performance will be poor. On the other hand, this design allows scope-local
- * inheritance by {@link java.util.concurrent.StructuredTaskScope} threads to be
+ * inheritance by {@link StructuredTaskScope} threads to be
  * very fast: in essence, no more than copying a pointer, and leaving a
  * scope-local binding also requires little more than updating a pointer.
  *
@@ -123,26 +121,19 @@ import static jdk.internal.javac.PreviewFeature.Feature.SCOPE_LOCALS;
  * record.
  *
  * @param <T> the scope local's type
- * @since 99
+ * @since 19
  */
-@PreviewFeature(feature=SCOPE_LOCALS)
 public final class ScopeLocal<T> {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     private final @Stable int hash;
 
     public final int hashCode() { return hash; }
 
-    static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
-    static {
-        // maybe rename to preserveScopeLocalCache to be consistent with other props
-        String value = GetPropertyAction.privilegedGetProperty("java.lang.ScopeLocal.preserveScopeLocalCache");
-        PRESERVE_SCOPE_LOCAL_CACHE = (value == null) || Boolean.parseBoolean(value);
-    }
-
     /**
      * The interface for a ScopeLocal try-with-resources binding.
-     * @since 99
+     * @since 19
      */
-    @PreviewFeature(feature = SCOPE_LOCALS)
     public sealed interface Binder extends AutoCloseable permits BinderImpl {
 
         /**
@@ -216,9 +207,8 @@ public final class ScopeLocal<T> {
      * When map() or call() is invoked, the ScopeLocals bound in this set
      * are bound, such that calling the get() method returns the associated
      * value.
-     * @since 99
+     * @since 19
      */
-    @PreviewFeature(feature=SCOPE_LOCALS)
     public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache.
@@ -302,7 +292,7 @@ public final class ScopeLocal<T> {
          * become {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link java.util.concurrent.StructuredTaskScope StructuredTaskScope}s
+         * operation creates {@link StructuredTaskScope}
          * but does not close them, then exiting the operation causes the underlying construct
          * of each executor to be closed (in the reverse order that they were created in), and
          * {@link StructureViolationException} to be thrown.
@@ -319,10 +309,10 @@ public final class ScopeLocal<T> {
             try {
                 return ScopeLocalContainer.call(op);
             } catch (Throwable t) {
-                Thread.setScopeLocalCache(null); // Cache.invalidate();
+                setScopeLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
-                Thread.currentThread().scopeLocalBindings = prevBindings;
+                setScopeLocalBindings(prevBindings);
                 Cache.invalidate(bitmask);
             }
         }
@@ -354,7 +344,7 @@ public final class ScopeLocal<T> {
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link java.util.concurrent.StructuredTaskScope StructuredTaskScope}s
+         * operation creates {@link StructuredTaskScope}s
          * but does not close them, then exiting the operation causes the underlying construct
          * of each executor to be closed (in the reverse order that they were created in), and
          * {@link StructureViolationException} to be thrown.
@@ -368,10 +358,10 @@ public final class ScopeLocal<T> {
             try {
                 ScopeLocalContainer.run(op);
             } catch (Throwable t) {
-                Thread.setScopeLocalCache(null); // Cache.invalidate();
+                setScopeLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
-                Thread.currentThread().scopeLocalBindings = prevBindings;
+                setScopeLocalBindings(prevBindings);
                 Cache.invalidate(bitmask);
             }
         }
@@ -380,7 +370,7 @@ public final class ScopeLocal<T> {
          * Add a list of bindings to the current Thread's set of bound values.
          */
         private static final Snapshot addScopeLocalBindings(Carrier bindings) {
-            Snapshot prev = getScopeLocalBindings();
+            Snapshot prev = scopeLocalBindings();
             var b = new Snapshot(bindings, prev);
             ScopeLocal.setScopeLocalBindings(b);
             return prev;
@@ -453,7 +443,7 @@ public final class ScopeLocal<T> {
             if (!closed) {
                 Cache.invalidate(bindings.bitmask);
                 if (!popForcefully()) {
-                    Thread.setScopeLocalCache(null); // Cache.invalidate();
+                    setScopeLocalCache(null); // Cache.invalidate();
                     closed = true;
                     throw new StructureViolationException();
                 }
@@ -578,7 +568,7 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     public T get() {
         Object[] objects;
-        if ((objects = Thread.scopeLocalCache()) != null) {
+        if ((objects = scopeLocalCache()) != null) {
             // This code should perhaps be in class Cache. We do it
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
@@ -670,17 +660,25 @@ public final class ScopeLocal<T> {
         }
     }
 
-    private static Snapshot getScopeLocalBindings() {
-        return Thread.currentThread().scopeLocalBindings;
+    private static Object[] scopeLocalCache() {
+        return JLA.scopeLocalCache();
+    }
+
+    private static void setScopeLocalCache(Object[] cache) {
+        JLA.setScopeLocalCache(cache);
+    }
+
+    private static Snapshot scopeLocalBindings() {
+        Object bindings = JLA.scopeLocalBindings();
+        if (bindings != null) {
+            return (Snapshot) bindings;
+        } else {
+            return EmptySnapshot.getInstance();
+        }
     }
 
     private static void setScopeLocalBindings(Snapshot bindings) {
-        Thread currentThread = Thread.currentThread();
-        currentThread.scopeLocalBindings = bindings;
-    }
-
-    private Snapshot scopeLocalBindings() {
-        return getScopeLocalBindings();
+        JLA.setScopeLocalBindings(bindings);
     }
 
     private static int nextKey = 0xf0f0_f0f0;
@@ -734,18 +732,17 @@ public final class ScopeLocal<T> {
         }
 
         static void put(ScopeLocal<?> key, Object value) {
-            Object[] theCache = Thread.scopeLocalCache();
+            Object[] theCache = scopeLocalCache();
             if (theCache == null) {
                 theCache = new Object[TABLE_SIZE * 2];
-                Thread.setScopeLocalCache(theCache);
+                setScopeLocalCache(theCache);
             }
             // Update the cache to replace one entry with the value we just looked up.
             // Each value can be in one of two possible places in the cache.
             // Pick a victim at (pseudo-)random.
-            Thread thread = Thread.currentThread();
             int k1 = primaryIndex(key);
             int k2 = secondaryIndex(key);
-            var usePrimaryIndex = chooseVictim(thread);
+            var usePrimaryIndex = chooseVictim();
             int victim = usePrimaryIndex ? k1 : k2;
             int other = usePrimaryIndex ? k2 : k1;
             setKeyAndObjectAt(victim, key, value);
@@ -756,7 +753,7 @@ public final class ScopeLocal<T> {
 
         private static final void update(Object key, Object value) {
             Object[] objects;
-            if ((objects = Thread.scopeLocalCache()) != null) {
+            if ((objects = scopeLocalCache()) != null) {
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, key, value);
@@ -770,7 +767,7 @@ public final class ScopeLocal<T> {
 
         private static final void remove(Object key) {
             Object[] objects;
-            if ((objects = Thread.scopeLocalCache()) != null) {
+            if ((objects = scopeLocalCache()) != null) {
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, null, null);
@@ -783,8 +780,8 @@ public final class ScopeLocal<T> {
         }
 
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
-            Thread.scopeLocalCache()[n * 2] = key;
-            Thread.scopeLocalCache()[n * 2 + 1] = value;
+            scopeLocalCache()[n * 2] = key;
+            scopeLocalCache()[n * 2 + 1] = value;
         }
 
         private static Object getKey(Object[] objs, int n) {
@@ -799,18 +796,18 @@ public final class ScopeLocal<T> {
         // This chooses either the primary or secondary cache slot, but the
         // primary slot is approximately twice as likely to be chosen as the
         // secondary one.
-        private static boolean chooseVictim(Thread thread) {
-            int tmp = thread.victims;
+        private static boolean chooseVictim() {
+            int tmp = JLA.scopeLocalCacheVictims();
             tmp ^= tmp << 13;
             tmp ^= tmp >>> 17;
             tmp ^= tmp << 5;
-            thread.victims = tmp;
+            JLA.setScopeLocalCacheVictims(tmp);
             return (tmp & 15) >= 5;
         }
 
         @ReservedStackAccess
         public static void invalidate() {
-            Thread.setScopeLocalCache(null);
+            setScopeLocalCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
@@ -818,7 +815,7 @@ public final class ScopeLocal<T> {
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
-            if ((objects = Thread.scopeLocalCache()) != null) {
+            if ((objects = scopeLocalCache()) != null) {
                 for (int bits = toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
                     setKeyAndObjectAt(index, null, null);

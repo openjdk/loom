@@ -45,6 +45,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.PreviewFeature;
+import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -244,14 +245,30 @@ public class Thread implements Runnable {
 
     // A simple (not very) random string of bits to use when evicting
     // cache entries from the scoped variable cache.
-    int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+    private int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
+    static int scopeLocalCacheVictims() {
+        return currentThread().victims;
+    }
 
-    static ScopeLocal.Snapshot scopeLocalBindings() {
+    static void setScopeLocalCacheVictims(int value) {
+        currentThread().victims = value;
+    }
+
+    // scope-local bindings
+    private Object scopeLocalBindings;
+
+    static Object scopeLocalBindings() {
         return currentThread().scopeLocalBindings;
     }
 
+    static void setScopeLocalBindings(Object bindings) {
+        currentThread().scopeLocalBindings = bindings;
+    }
+
+    /**
+     * Inherit the scope-local bindings from the given container.
+     */
     void inheritScopeLocalBindings(ThreadContainer container) {
         ScopeLocalContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
@@ -260,15 +277,15 @@ public class Thread implements Runnable {
             // bindings established for running/calling an operation
             Object bindings = snapshot.scopeLocalBindings();
             if (currentThread().scopeLocalBindings != bindings) {
-                throw new StructureViolationException("Scope local bindings have changed");
+                StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
             // bindings established by invoking bind
             if (ScopeLocalContainer.latest() != snapshot.container()) {
-                throw new StructureViolationException("Scope local bindings have changed");
+                StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
-            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+            this.scopeLocalBindings = bindings;
         }
     }
 
@@ -387,10 +404,6 @@ public class Thread implements Runnable {
 
     // ScopeLocal support:
 
-    /**
-     * TBD
-     * @return TBD
-     */
     @IntrinsicCandidate
     static native Object[] scopeLocalCache();
 

@@ -22,7 +22,7 @@
  */
 
 
-package org.openjdk.bench.java.lang;
+package org.openjdk.bench.jdk.incubator.concurrent;
 
 import java.util.concurrent.*;
 

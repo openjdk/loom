@@ -22,16 +22,17 @@
  */
 
 
-package org.openjdk.bench.java.lang;
+package org.openjdk.bench.jdk.incubator.concurrent;
 
+import jdk.incubator.concurrent.ScopeLocal;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
-import static org.openjdk.bench.java.lang.ScopeLocalsData.*;
+import static org.openjdk.bench.jdk.incubator.concurrent.ScopeLocalsData.*;
 
 /**
- * Tests java.lang.ScopeLocal
+ * Tests ScopeLocal
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -39,7 +40,11 @@ import static org.openjdk.bench.java.lang.ScopeLocalsData.*;
 @Measurement(iterations=10, time=1)
 @Threads(1)
 @Fork(value = 1,
-      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.java.lang.ScopeLocalsExecutorService", "-Djmh.executor=CUSTOM", "-Djmh.blackhole.mode=COMPILER", "--enable-preview"})
+      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.java.lang.ScopeLocalsExecutorService",
+                        "-Djmh.executor=CUSTOM",
+                        "-Djmh.blackhole.mode=COMPILER",
+                        "--add-modules=jdk.incubator.concurrent",
+                        "--enable-preview"})
 @State(Scope.Thread)
 @SuppressWarnings("preview")
 public class ScopeLocals {
@@ -143,6 +148,7 @@ public class ScopeLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    @SuppressWarnings("try")
     public Object TWR_bind_ScopeLocal() throws Exception {
         try (var x = ScopeLocal.where(unbound, THE_ANSWER).bind()) {
             return getClass();

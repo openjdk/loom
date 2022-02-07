@@ -23,17 +23,18 @@
 
 /**
  * @test
+ * @summary Stress test for ScopeLocal
+ * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} Stress.java
- * @run testng/othervm -XX:-TieredCompilation --enable-preview Stress
- * @run testng/othervm --enable-preview Stress
- * @summary Stress test for java.lang.ScopeLocal
+ * @run testng/othervm/timeout=300 -XX:-TieredCompilation --enable-preview Stress
+ * @run testng/othervm/timeout=300 --enable-preview Stress
  */
 
-import org.testng.annotations.Test;
-
-import java.util.concurrent.StructuredTaskScope;
+import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.StructuredTaskScope;
+import jdk.incubator.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
-
+import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class Stress {

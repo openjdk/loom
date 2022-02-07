@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -87,6 +87,7 @@ public class ThreadFlock implements AutoCloseable {
             MethodHandles.Lookup l = MethodHandles.lookup();
             THREAD_COUNT = l.findVarHandle(ThreadFlock.class, "threadCount", int.class);
             PERMIT = l.findVarHandle(ThreadFlock.class, "permit", boolean.class);
+            Unsafe.getUnsafe().ensureClassInitialized(StructureViolationExceptions.class);
         } catch (Exception e) {
             throw new InternalError(e);
         }
@@ -534,7 +535,7 @@ public class ThreadFlock implements AutoCloseable {
                 if (key != null)
                     ThreadContainers.deregisterContainer(key);
                 if (!atTop)
-                    throw new StructureViolationException();
+                    StructureViolationExceptions.throwException();
             }
         }
 

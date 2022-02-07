@@ -23,17 +23,18 @@
 
 /**
  * @test
- * @compile --enable-preview -source ${jdk.version} Basic.java
- * @run testng/othervm --enable-preview Basic
- * @summary Basic test for java.lang.ScopeLocal
+ * @summary Basic test for ScopeLocal
+ * @modules jdk.incubator.concurrent
+ * @run testng Basic
  */
 
+import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.StructureViolationException;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 

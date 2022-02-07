@@ -2549,11 +2549,7 @@ public final class System {
             }
 
             public Object[] scopeLocalCache() {
-                if (! ScopeLocal.PRESERVE_SCOPE_LOCAL_CACHE) {
-                    return Thread.scopeLocalCache();
-                } else {
-                    return null;
-                }
+                return Thread.scopeLocalCache();
             }
 
             public void setScopeLocalCache(Object[] cache) {
@@ -2562,6 +2558,18 @@ public final class System {
 
             public Object scopeLocalBindings() {
                 return Thread.scopeLocalBindings();
+            }
+
+            public void setScopeLocalBindings(Object bindings) {
+                Thread.setScopeLocalBindings(bindings);
+            }
+
+            public int scopeLocalCacheVictims() {
+                return Thread.scopeLocalCacheVictims();
+            }
+
+            public void setScopeLocalCacheVictims(int victims) {
+                Thread.setScopeLocalCacheVictims(victims);
             }
 
             public Continuation getContinuation(Thread thread) {

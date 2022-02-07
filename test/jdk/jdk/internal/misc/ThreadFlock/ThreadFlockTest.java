@@ -25,6 +25,7 @@
  * @test
  * @summary Basic tests for ThreadFlock
  * @modules java.base/jdk.internal.misc
+ * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} ThreadFlockTest.java
  * @run testng/othervm --enable-preview ThreadFlockTest
  */
@@ -37,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import jdk.internal.misc.ThreadFlock;
+import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.StructureViolationException;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

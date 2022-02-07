@@ -34,7 +34,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.EnumSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -46,10 +45,13 @@ import jdk.internal.access.SharedSecrets;
  */
 public class Continuation {
     private static final Unsafe U = Unsafe.getUnsafe();
+    private static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         StackChunk.init(); // ensure StackChunk class is initialized
-        U.ensureClassInitialized(ScopeLocal.class);
+
+        String value = GetPropertyAction.privilegedGetProperty("jdk.preserveScopeLocalCache");
+        PRESERVE_SCOPE_LOCAL_CACHE = (value == null) || Boolean.parseBoolean(value);
     }
 
     private static final VarHandle MOUNTED;
@@ -255,7 +257,11 @@ public class Continuation {
     }
 
     private void unmount() {
-        scopeLocalCache = JLA.scopeLocalCache();
+        if (PRESERVE_SCOPE_LOCAL_CACHE) {
+            scopeLocalCache = JLA.scopeLocalCache();
+        } else {
+            scopeLocalCache = null;
+        }
         JLA.setScopeLocalCache(null);
         setMounted(false);
     }

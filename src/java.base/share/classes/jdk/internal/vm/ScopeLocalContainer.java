@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,6 +27,7 @@ package jdk.internal.vm;
 import java.util.concurrent.Callable;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
@@ -40,6 +41,9 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
  */
 public class ScopeLocalContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+    static {
+        Unsafe.getUnsafe().ensureClassInitialized(StructureViolationExceptions.class);
+    }
 
     /**
      * Returns the "latest" ScopeLocalContainer (or a named subclass of one) for
@@ -170,8 +174,6 @@ public class ScopeLocalContainer extends StackableScope {
 
     /**
      * Call an operation with this scope on the stack.
-     *
-     * Move to this ScopeLocalNode !!!
      */
     private <V> V doCall(Callable<V> op) {
         Throwable ex;
@@ -192,17 +194,18 @@ public class ScopeLocalContainer extends StackableScope {
     }
 
     /**
-     * Throws {@code ex} if not null. Throws StructureViolationException
+     * Throws {@code ex} if not null. StructureViolationException is thrown or added
+     * as a suppressed exception when {@code atTop} is false.
      */
     @DontInline @ReservedStackAccess
     private static void throwIfFailed(Throwable ex, boolean atTop) {
         if (ex != null || !atTop) {
             if (!atTop) {
-                var e = new StructureViolationException();
+                var sve = StructureViolationExceptions.newException();
                 if (ex == null) {
-                    ex = e;
+                    ex = sve;
                 } else {
-                    ex.addSuppressed(e);
+                    ex.addSuppressed(sve);
                 }
             }
             Unsafe.getUnsafe().throwException(ex);
