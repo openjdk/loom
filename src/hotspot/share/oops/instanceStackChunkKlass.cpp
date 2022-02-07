@@ -65,7 +65,7 @@ MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_stack_to_chunk = nullptr;
 MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
 
 void InstanceStackChunkKlass::resolve_memcpy_functions() {
-  if (!StubRoutines::has_word_memcpy() || UseNewCode) {
+  if (!StubRoutines::has_word_memcpy() || UseNewCode) { // TODO LOOM
     memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
     memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
   } else {
@@ -96,15 +96,15 @@ size_t InstanceStackChunkKlass::oop_size(oop obj) const {
 
 template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
 
-template <bool disjoint>
+template <InstanceStackChunkKlass::copy_type overlap>
 size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_size) {
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
 
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
   assert (from_addr != to_addr, "");
-  disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
-           : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
+  overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
+                                 : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
 
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
   assert (!to_chunk->has_bitmap()|| to_chunk->is_gc_mode(), "");
@@ -115,8 +115,8 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
   return word_size;
 }
 
-template size_t InstanceStackChunkKlass::copy<false>(oop obj, HeapWord* to_addr, size_t word_size);
-template size_t InstanceStackChunkKlass::copy<true>(oop obj, HeapWord* to_addr, size_t word_size);
+template size_t InstanceStackChunkKlass::copy<InstanceStackChunkKlass::copy_type::CONJOINT>(oop obj, HeapWord* to_addr, size_t word_size);
+template size_t InstanceStackChunkKlass::copy<InstanceStackChunkKlass::copy_type::DISJOINT>(oop obj, HeapWord* to_addr, size_t word_size);
 
 size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   assert (obj->is_stackChunk(), "");
@@ -128,10 +128,10 @@ size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   return align_object_size(size_helper() + used_stack_in_words + bitmap_size(used_stack_in_words));
 }
 
-template size_t InstanceStackChunkKlass::copy_compact<false>(oop obj, HeapWord* to_addr);
-template size_t InstanceStackChunkKlass::copy_compact<true>(oop obj, HeapWord* to_addr);
+template size_t InstanceStackChunkKlass::copy_compact<InstanceStackChunkKlass::copy_type::CONJOINT>(oop obj, HeapWord* to_addr);
+template size_t InstanceStackChunkKlass::copy_compact<InstanceStackChunkKlass::copy_type::DISJOINT>(oop obj, HeapWord* to_addr);
 
-template <bool disjoint>
+template <InstanceStackChunkKlass::copy_type overlap>
 size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
@@ -150,7 +150,7 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   // ZGC usually relocates objects into allocating regions that don't require barriers, which keeps/makes the chunk mutable.
   if (from_sp <= metadata_words() /*|| UseZGC*/) {
     assert (oop_size(obj) == compact_oop_size(obj), "");
-    return copy<disjoint>(obj, to_addr, oop_size(obj));
+    return copy<overlap>(obj, to_addr, oop_size(obj));
   }
 
   const int header = size_helper();
@@ -173,15 +173,15 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
 
   // copy header and stack in the appropriate order if conjoint; must not touch old chunk after we start b/c this can be a conjoint copy
-  const int first  = (disjoint || to_addr <= from_addr) ? 0 : 2;
+  const int first  = (overlap == copy_type::DISJOINT || to_addr <= from_addr) ? 0 : 2;
   const int stride = 1 - first;
   for (int i = first; 0 <= i && i <= 2; i += stride) {
     switch(i) { // copy header and update it
     case 0:
       // tty->print_cr(">>> CPY header %p-%p -> %p-%p (%d)", from_addr, from_addr + header , to_addr, to_addr + header, header);
       if (to_addr != from_addr) {
-        disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, header)
-                 : Copy::aligned_conjoint_words(from_addr, to_addr, header);
+        overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_addr, to_addr, header)
+                                       : Copy::aligned_conjoint_words(from_addr, to_addr, header);
       }
 
       jdk_internal_vm_StackChunk::set_size(to_addr, to_stack_size);
@@ -193,8 +193,8 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
         HeapWord* from_start = from_addr + header + from_sp - metadata_words();
         HeapWord* to_start = to_addr + header;
         // tty->print_cr(">>> CPY stack  %p-%p -> %p-%p (%d)", from_start, from_start + to_stack_size , to_start, to_start + to_stack_size, to_stack_size);
-        disjoint ? Copy::aligned_disjoint_words(from_start, to_start, to_stack_size)
-                 : Copy::aligned_conjoint_words(from_start, to_start, to_stack_size);
+        overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_start, to_start, to_stack_size)
+                                       : Copy::aligned_conjoint_words(from_start, to_start, to_stack_size);
       }
       break;
     case 2: // copy bitmap
@@ -204,8 +204,8 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
         HeapWord* from_start = from_addr + header + from_stack_size + (from_bitmap_size - to_bitmap_size);
         HeapWord* to_start = to_addr + header + to_stack_size;
         // tty->print_cr(">>> CPY bitmap  %p-%p -> %p-%p (%d)", from_start, from_start + to_bitmap_size , to_start, to_start + to_bitmap_size, to_bitmap_size);
-        disjoint ? Copy::aligned_disjoint_words(from_start, to_start, to_bitmap_size)
-                 : Copy::aligned_conjoint_words(from_start, to_start, to_bitmap_size);
+        overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_start, to_start, to_bitmap_size)
+                                       : Copy::aligned_conjoint_words(from_start, to_start, to_bitmap_size);
       }
       break;
     }
@@ -228,10 +228,10 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   return align_object_size(header + to_stack_size + to_bitmap_size);
 }
 
-template <bool mixed>
+template <chunk_frames frame_kind>
 int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {
   int frames = 0;
-  for (StackChunkFrameStream<mixed> f(chunk); !f.is_done(); f.next(SmallRegisterMap::instance)) frames++;
+  for (StackChunkFrameStream<frame_kind> f(chunk); !f.is_done(); f.next(SmallRegisterMap::instance)) frames++;
   return frames;
 }
 
@@ -244,7 +244,7 @@ void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
 
 
 // We replace derived pointers with offsets; the converse is done in DerelativizeDerivedPointers
-template <bool concurrent_gc>
+template <gc_type gc>
 class RelativizeDerivedPointers : public DerivedOopClosure {
 public:
   RelativizeDerivedPointers() {}
@@ -258,13 +258,13 @@ public:
       assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-      if (concurrent_gc && UseZGC) {
+      if (gc == gc_type::CONCURRENT && UseZGC) {
         if (ZAddress::is_good(cast_from_oop<uintptr_t>(base)))
           return;
       }
 #endif
 #if INCLUDE_SHENANDOAHGC
-      if (concurrent_gc && UseShenandoahGC) {
+      if (gc == gc_type::CONCURRENT && UseShenandoahGC) {
         if (!ShenandoahHeap::heap()->in_collection_set(base)) {
           return;
         }
@@ -314,7 +314,7 @@ public:
   }
 };
 
-template <bool store, bool compressedOopsWithBitmap>
+template <InstanceStackChunkKlass::barrier_type barrier, bool compressedOopsWithBitmap>
 class BarrierClosure: public OopClosure {
   NOT_PRODUCT(intptr_t* _sp;)
 public:
@@ -325,7 +325,7 @@ public:
 
   template <class T> inline void do_oop_work(T* p) {
     oop value = (oop)HeapAccess<>::oop_load(p);
-    if (store) HeapAccess<>::oop_store(p, value);
+    if (barrier == InstanceStackChunkKlass::barrier_type::STORE) HeapAccess<>::oop_store(p, value);
   }
 };
 
@@ -362,7 +362,7 @@ public:
   }
 };
 
-template <bool concurrent_gc, typename OopClosureType>
+template <gc_type gc, typename OopClosureType>
 class OopOopIterateStackClosure {
   stackChunkOop _chunk;
   const bool _do_destructive_processing;
@@ -379,8 +379,8 @@ public:
       _num_frames(0),
       _num_oops(0) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     // log_develop_trace(jvmcont)("stack_chunk_iterate_stack sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT, f.sp() - _chunk->start_address(), p2i(f.pc()));
 
     // if (Continuation::is_return_barrier_entry(f.pc())) {
@@ -406,11 +406,11 @@ public:
     if (_do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
       assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
       if (f.is_compiled() && f.oopmap()->has_derived_oops()) {
-        if (concurrent_gc) {
+        if (gc == gc_type::CONCURRENT) {
           _chunk->set_gc_mode(true);
           OrderAccess::storestore();
         }
-        InstanceStackChunkKlass::relativize_derived_pointers<concurrent_gc>(f, map);
+        InstanceStackChunkKlass::relativize_derived_pointers<gc>(f, map);
         // OrderAccess::storestore();
       }
     }
@@ -428,12 +428,12 @@ public:
   }
 };
 
-template <bool concurrent_gc>
+template <gc_type gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   assert (Continuation::debug_is_stack_chunk(chunk), "");
 
   bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
-  if (concurrent_gc) {
+  if (gc == gc_type::CONCURRENT) {
     do_destructive_processing = true;
   } else {
     if (SafepointSynchronize::is_at_safepoint() /*&& !chunk->is_gc_mode()*/) {
@@ -445,10 +445,10 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
     assert (!SafepointSynchronize::is_at_safepoint() || chunk->is_gc_mode(), "");
   }
 
-  OopOopIterateStackClosure<concurrent_gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
+  OopOopIterateStackClosure<gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
-  // if (FIX_DERIVED_POINTERS && concurrent_gc) {
+  // if (FIX_DERIVED_POINTERS && gc == gc_type::CONCURRENT) {
   //   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
   //   chunk->set_gc_mode(false);
   // }
@@ -461,8 +461,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   }
 }
 
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<false>(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<true> (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
+template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<gc_type::STW>        (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
+template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<gc_type::CONCURRENT> (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
 class MarkMethodsStackClosure {
   OopIterateClosure* _closure;
@@ -470,8 +470,8 @@ class MarkMethodsStackClosure {
 public:
   MarkMethodsStackClosure(OopIterateClosure* cl) : _closure(cl) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (f.is_interpreted()) {
       Method* im = f.to_frame().interpreter_frame_method();
       _closure->do_method(im);
@@ -490,30 +490,30 @@ void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosur
   chunk->iterate_stack(&closure);
 }
 
-template <bool concurrent_gc, bool mixed, typename RegisterMapT>
-void InstanceStackChunkKlass::relativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-  RelativizeDerivedPointers<concurrent_gc> derived_closure;
+template <gc_type gc, chunk_frames frame_kind, typename RegisterMapT>
+void InstanceStackChunkKlass::relativize_derived_pointers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+  RelativizeDerivedPointers<gc> derived_closure;
   f.iterate_derived_pointers(&derived_closure, map);
 }
 
-template <bool mixed, typename RegisterMapT>
-void InstanceStackChunkKlass::derelativize_derived_pointers(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+template <chunk_frames frame_kind, typename RegisterMapT>
+void InstanceStackChunkKlass::derelativize_derived_pointers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   DerelativizeDerivedPointers derived_closure;
   f.iterate_derived_pointers(&derived_closure, map);
 }
 
-template void InstanceStackChunkKlass::relativize_derived_pointers<false>(const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<true> (const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<false>(const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<true> (const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<false>(const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<true> (const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<false>(const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<true> (const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
 
-template <bool store, bool mixed, typename RegisterMapT>
-void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
+void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) return;
 
@@ -531,15 +531,15 @@ void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunk
   bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
   if (has_derived) {
     if (UseZGC || UseShenandoahGC) {
-      relativize_derived_pointers<true>(f, map);
+      relativize_derived_pointers<gc_type::CONCURRENT>(f, map);
     }
   }
 
   if (chunk->has_bitmap() && UseCompressedOops) {
-    BarrierClosure<store, true> oops_closure(f.sp());
+    BarrierClosure<barrier, true> oops_closure(f.sp());
     f.iterate_oops(&oops_closure, map);
   } else {
-    BarrierClosure<store, false> oops_closure(f.sp());
+    BarrierClosure<barrier, false> oops_closure(f.sp());
     f.iterate_oops(&oops_closure, map);
   }
   OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
@@ -547,36 +547,36 @@ void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunk
   // if (has_derived) derelativize_derived_pointers(f, map); // we do this in fix_thawed_frame
 }
 
-template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<true >& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<false>(stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::do_barriers0<true> (stackChunkOop chunk, const StackChunkFrameStream<false>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::STORE>(stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::STORE>(stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::STORE>(stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::STORE>(stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
-template <bool store>
+template <InstanceStackChunkKlass::barrier_type barrier>
 class DoBarriersStackClosure {
   const stackChunkOop _chunk;
 public:
   DoBarriersStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
-    InstanceStackChunkKlass::do_barriers0<store>(_chunk, f, map);
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+    InstanceStackChunkKlass::do_barriers0<barrier>(_chunk, f, map);
     return true;
   }
 };
 
-template <bool store>
+template <InstanceStackChunkKlass::barrier_type barrier>
 void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
-  DoBarriersStackClosure<store> closure(chunk);
+  DoBarriersStackClosure<barrier> closure(chunk);
   chunk->iterate_stack(&closure);
 }
 
-template void InstanceStackChunkKlass::do_barriers<false>(stackChunkOop chunk);
-template void InstanceStackChunkKlass::do_barriers<true>(stackChunkOop chunk);
+template void InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk);
+template void InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(stackChunkOop chunk);
 
 #ifdef ASSERT
 template<class P>
@@ -605,7 +605,9 @@ class FixCompressedOopClosure : public OopClosure {
   void do_oop(narrowOop* p) override {}
 };
 
-template <bool compressedOops>
+enum class oop_kind { NARROW, WIDE };
+
+template <oop_kind oops>
 class BuildBitmapOopClosure : public OopClosure {
   intptr_t* const _stack_start;
   const BitMap::idx_t _bit_offset;
@@ -616,7 +618,7 @@ public:
 
   virtual void do_oop(oop* p) override {
     assert (p >= (oop*)_stack_start, "");
-    if (compressedOops) {
+    if (oops == oop_kind::NARROW) {
       // Convert all oops to narrow before marking bit
       oop obj = *p;
       *p = nullptr;
@@ -638,22 +640,22 @@ public:
   }
 };
 
-template <bool compressedOops>
+template <oop_kind oops>
 class BuildBitmapStackClosure {
   stackChunkOop _chunk;
   const BitMap::idx_t _bit_offset;
 public:
   BuildBitmapStackClosure(stackChunkOop chunk) : _chunk(chunk), _bit_offset(chunk->bit_offset()) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (!_chunk->is_gc_mode() && f.is_compiled() && f.oopmap()->has_derived_oops()) {
-      RelativizeDerivedPointers<false> derived_oops_closure;
+      RelativizeDerivedPointers<gc_type::STW> derived_oops_closure;
       f.iterate_derived_pointers(&derived_oops_closure, map);
     }
 
     if (UseChunkBitmaps) {
-      BuildBitmapOopClosure<compressedOops> oops_closure(_chunk->start_address(), _chunk->bit_offset(), _chunk->bitmap());
+      BuildBitmapOopClosure<oops> oops_closure(_chunk->start_address(), _chunk->bit_offset(), _chunk->bitmap());
       f.iterate_oops(&oops_closure, map);
     }
 
@@ -670,10 +672,10 @@ void InstanceStackChunkKlass::build_bitmap(stackChunkOop chunk) {
   }
 
   if (UseCompressedOops) {
-    BuildBitmapStackClosure<true> closure(chunk);
+    BuildBitmapStackClosure<oop_kind::NARROW> closure(chunk);
     chunk->iterate_stack(&closure);
   } else {
-    BuildBitmapStackClosure<false> closure(chunk);
+    BuildBitmapStackClosure<oop_kind::WIDE> closure(chunk);
     chunk->iterate_stack(&closure);
   }
 
@@ -807,8 +809,8 @@ public:
     : _chunk(chunk), _sp(nullptr), _cb(nullptr), _callee_interpreted(false),
       _size(size), _argsize(0), _num_oops(0), _num_frames(num_frames), _num_interpreted_frames(0), _num_i2c(0) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     _sp = f.sp();
     _cb = f.cb();
 
@@ -902,7 +904,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   assert (size >= 0, "");
   assert ((size == 0) == chunk->is_empty(), "");
 
-  const StackChunkFrameStream<true> first(chunk);
+  const StackChunkFrameStream<chunk_frames::MIXED> first(chunk);
   const bool has_safepoint_stub_frame = first.is_stub();
 
   VerifyStackClosure closure(chunk,
@@ -981,14 +983,14 @@ public:
   const RegisterMap* get_map(const RegisterMap* map,      intptr_t* sp) { return map; }
   const RegisterMap* get_map(const SmallRegisterMap* map, intptr_t* sp) { return map->copy_to_RegisterMap(&_map, sp); }
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& f, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     ResetNoHandleMark rnhm;
     HandleMark hm(Thread::current());
 
     frame fr = f.to_frame();
     if (_frame_no == 0) fr.describe_top(_values);
-    fr.template describe<true>(_values, _frame_no++, get_map(map, f.sp()));
+    fr.template describe<frame::addressing::RELATIVE>(_values, _frame_no++, get_map(map, f.sp()));
     return true;
   }
 
@@ -1018,12 +1020,12 @@ class PrintStackChunkClosure {
 public:
   PrintStackChunkClosure(stackChunkOop chunk, outputStream* st) : _chunk(chunk), _st(st) {}
 
-  template <bool mixed, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<mixed>& fs, const RegisterMapT* map) {
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",
       p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
-    f.print_on<true>(_st);
+    f.print_on<frame::addressing::RELATIVE>(_st);
     const ImmutableOopMap* oopmap = fs.oopmap();
     if (oopmap != nullptr) {
       oopmap->print_on(_st);
@@ -1068,13 +1070,13 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
 }
 
 #ifndef PRODUCT
-template void StackChunkFrameStream<true >::print_on(outputStream* st) const;
-template void StackChunkFrameStream<false>::print_on(outputStream* st) const;
+template void StackChunkFrameStream<chunk_frames::MIXED>::print_on(outputStream* st) const;
+template void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::print_on(outputStream* st) const;
 
-template <bool mixed>
-void StackChunkFrameStream<mixed>::print_on(outputStream* st) const {
+template <chunk_frames frames>
+void StackChunkFrameStream<frames>::print_on(outputStream* st) const {
   st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d",
     p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
-  to_frame().template print_on<true>(st);
+  to_frame().template print_on<frame::addressing::RELATIVE>(st);
 }
 #endif

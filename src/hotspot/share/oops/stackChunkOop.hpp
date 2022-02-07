@@ -37,6 +37,11 @@ class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
+
+enum chunk_frames { COMPILED_ONLY, MIXED };
+enum gc_type { STW, CONCURRENT }; // GC moving
+enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
+
 // A continuation stack-chunk oop.
 // See InstanceStackChunkKlass for a description of continuation stack-chunks.
 //
@@ -98,7 +103,7 @@ public:
   inline void set_gc_mode(bool value);
   inline bool has_bitmap() const;
   inline void set_has_bitmap(bool value);
-  template <typename OopT, bool concurrent_gc> inline bool should_fix() const;
+  template <typename OopT, gc_type gc> inline bool should_fix() const;
   bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
 
@@ -135,8 +140,8 @@ public:
 
   int num_java_frames() const;
 
-  template <bool dword_aligned> inline void copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size);
-  template <bool dword_aligned> inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
+  template <copy_alignment alignment> inline void copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size);
+  template <copy_alignment alignment> inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
 
   using oopDesc::print_on;
   void print_on(bool verbose, outputStream* st) const;
@@ -145,7 +150,8 @@ public:
   inline frame derelativize(frame fr) const;
 
 private:
-  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure);
+  template <chunk_frames frames, class StackChunkFrameClosureType>
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
   inline intptr_t* relative_base() const;
 
   inline void relativize_frame(frame& fr) const;

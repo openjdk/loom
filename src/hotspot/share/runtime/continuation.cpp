@@ -104,7 +104,7 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
 #endif
 
 #ifndef PRODUCT
-template <bool relative>
+template <frame::addressing pointers>
 static void print_frame_layout(const frame& f, outputStream* st = tty);
 static void print_frames(JavaThread* thread, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
@@ -151,13 +151,15 @@ static ThawContFnT cont_thaw = nullptr;
 extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
 extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
 
-template <bool compressed_oops, typename BarrierSetT>
+enum class oop_kind { NARROW, WIDE };
+template <oop_kind oops, typename BarrierSetT>
 class Config {
 public:
-  typedef Config<compressed_oops, BarrierSetT> SelfT;
-  typedef typename Conditional<compressed_oops, narrowOop, oop>::type OopT;
-  static const bool _compressed_oops = compressed_oops;
-  static const bool _concurrent_gc = BarrierSetT::is_concurrent_gc();
+
+  typedef Config<oops, BarrierSetT> SelfT;
+  typedef typename Conditional<oops == oop_kind::NARROW, narrowOop, oop>::type OopT;
+  static const oop_kind _oops = oops;
+  static const gc_type _gc = BarrierSetT::is_concurrent_gc() ? gc_type::CONCURRENT : gc_type::STW;
   // static const bool _post_barrier = post_barrier;
 
   static int freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
@@ -173,7 +175,7 @@ public:
   }
 
   static void print() {
-    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _compressed_oops, _concurrent_gc);
+    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _oops, _gc);
     // tty->print_cr(">>> Config UseAVX: %ld UnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d",
     //    UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
     // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
@@ -209,7 +211,7 @@ public:
 
   template <bool use_compressed, typename BarrierSetT>
   static void resolve() {
-    typedef Config<use_compressed, BarrierSetT> SelectedConfigT;
+    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
     cont_freeze = SelectedConfigT::freeze;
     cont_thaw   = SelectedConfigT::thaw;
     // SelectedConfigT::print();
@@ -271,9 +273,9 @@ public:
   static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
   static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
 
-  template <bool dword_aligned = true>
+  template <copy_alignment = copy_alignment::DWORD_ALIGNED>
   static inline void copy_from_stack(void* from, void* to, size_t size);
-  template <bool dword_aligned = true>
+  template <copy_alignment = copy_alignment::DWORD_ALIGNED>
   static inline void copy_to_stack(void* from, void* to, size_t size);
 };
 
@@ -466,7 +468,7 @@ inline void ContMirror::post_safepoint(Handle conth) {
 const frame ContMirror::last_frame() {
   stackChunkOop chunk = last_nonempty_chunk();
   if (chunk == nullptr) return frame();
-  return StackChunkFrameStream<true>(chunk).to_frame();
+  return StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
 }
 
 inline stackChunkOop ContMirror::nonempty_chunk(stackChunkOop chunk) const {
@@ -1105,7 +1107,7 @@ public:
     NOT_PRODUCT(_frames = 0;)
   }
 
-  template <bool aligned = true>
+  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
     stackChunkOop chunk = _cont.tail();
     chunk->copy_from_stack_to_chunk<aligned>(from, to, size);
@@ -1452,10 +1454,10 @@ public:
 
   inline void after_freeze_java_frame(const frame& hf, bool bottom) {
     DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) hf.print_value_on(tty, nullptr);)
-    DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) print_frame_layout<true>(hf);)
+    DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) print_frame_layout<frame::addressing::RELATIVE>(hf);)
     if (bottom && log_develop_is_enabled(Trace, jvmcont)) {
       log_develop_trace(jvmcont)("bottom h-frame:");
-      hf.print_on<true>(tty);
+      hf.print_on<frame::addressing::RELATIVE>(tty);
     }
   }
 
@@ -1484,7 +1486,7 @@ public:
         bool top_interpreted = Interpreter::contains(chunk->pc());
         unextended_sp = chunk->sp();
         if (top_interpreted) {
-          StackChunkFrameStream<true> last(chunk);
+          StackChunkFrameStream<chunk_frames::MIXED> last(chunk);
           unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
         }
         if (FKind::interpreted == top_interpreted) {
@@ -1502,7 +1504,7 @@ public:
     assert (_size >= 0, "");
 
     assert (chunk == nullptr || chunk->is_empty()
-              || unextended_sp == chunk->to_offset(StackChunkFrameStream<true>(chunk).unextended_sp()), "");
+            || unextended_sp == chunk->to_offset(StackChunkFrameStream<chunk_frames::MIXED>(chunk).unextended_sp()), "");
     assert (chunk != nullptr || unextended_sp < _size, "");
 
      // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
@@ -1558,8 +1560,8 @@ public:
     assert (!_barriers || chunk->is_empty(), "");
 
     assert (!chunk->has_bitmap(), "");
-    assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).is_done(), "");
-    assert (!chunk->is_empty() || StackChunkFrameStream<true>(chunk).to_frame().is_empty(), "");
+    assert (!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).is_done(), "");
+    assert (!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame().is_empty(), "");
 
     // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
     // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
@@ -1572,14 +1574,14 @@ public:
     log_develop_trace(jvmcont)("top chunk:");
     if (log_develop_is_enabled(Trace, jvmcont)) chunk->print_on(tty);
 
-    caller = StackChunkFrameStream<true>(chunk).to_frame();
+    caller = StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
 
     DEBUG_ONLY(_last_write = caller.unextended_sp() + (empty_chunk ? argsize : overlap);)
     assert(chunk->is_in_chunk(_last_write - _size),
       "last_write-size: " INTPTR_FORMAT " start: " INTPTR_FORMAT, p2i(_last_write-_size), p2i(chunk->start_address()));
   #ifdef ASSERT
     log_develop_trace(jvmcont)("top hframe before (freeze):");
-    if (log_develop_is_enabled(Trace, jvmcont)) caller.print_on<true>(tty);
+    if (log_develop_is_enabled(Trace, jvmcont)) caller.print_on<frame::addressing::RELATIVE>(tty);
 
     assert (!empty || Continuation::is_continuation_entry_frame(callee, nullptr), "");
 
@@ -1606,7 +1608,7 @@ public:
       patch_pd<FKind, false>(hf, caller);
     }
     if (FKind::interpreted) {
-      Interpreted::patch_sender_sp<true>(hf, caller.unextended_sp());
+      Interpreted::patch_sender_sp<frame::addressing::RELATIVE>(hf, caller.unextended_sp());
     }
 
 #ifdef ASSERT
@@ -1624,8 +1626,8 @@ public:
   freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
 #if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     { // TODO PD
-      assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-      intptr_t* real_unextended_sp = (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset);
+      assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+      intptr_t* real_unextended_sp = (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset);
       if (real_unextended_sp != nullptr) f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
     }
 #else
@@ -1635,7 +1637,7 @@ public:
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
     const int argsize = Interpreted::stack_argsize(f);
     const int locals = f.interpreter_frame_method()->max_locals();
-    assert (Interpreted::frame_bottom<false>(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
+    assert (Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
     const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
 
 #ifdef ASSERT
@@ -1664,12 +1666,12 @@ public:
     frame hf = new_hframe<Interpreted>(f, caller);
 
     intptr_t* hsp = Interpreted::frame_top(hf, callee_argsize, callee_interpreted);
-    assert (Interpreted::frame_bottom<true>(hf) == hsp + fsize, "");
+    assert (Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) == hsp + fsize, "");
 
     // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-    copy_to_chunk<false>(Interpreted::frame_bottom<false>(f) - locals,
-                         Interpreted::frame_bottom<true>(hf) - locals, locals); // copy locals
-    copy_to_chunk<false>(vsp, hsp, fsize - locals); // copy rest
+    copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) - locals,
+                                             Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals, locals); // copy locals
+    copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
     assert (!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
     relativize_interpreted_frame_metadata(f, hf);
@@ -1704,7 +1706,7 @@ public:
 
     intptr_t* hsp = Compiled::frame_top(hf, callee_argsize, callee_interpreted);
 
-    copy_to_chunk<false>(vsp, hsp, fsize);
+    copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
     assert (!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
     if (caller.is_interpreted_frame()) {
@@ -1750,7 +1752,7 @@ public:
     DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
     frame hf = new_hframe<StubF>(f, caller);
     intptr_t* hsp = StubF::frame_top(hf, 0, 0);
-    copy_to_chunk<false>(vsp, hsp, fsize);
+    copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
     DEBUG_ONLY(after_freeze_java_frame(hf, false);)
 
     caller = hf;
@@ -1761,7 +1763,7 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk->to_offset(top.sp()) <= chunk->sp(), "");
 
-    if (log_develop_is_enabled(Trace, jvmcont)) top.print_on<true>(tty);
+    if (log_develop_is_enabled(Trace, jvmcont)) top.print_on<frame::addressing::RELATIVE>(tty);
 
     set_top_frame_metadata_pd(top);
     assert (top.pc() == Frame::real_pc(top), "");
@@ -1774,14 +1776,14 @@ public:
 
     if (UNLIKELY(_barriers)) {
       log_develop_trace(jvmcont)("do barriers on humongous chunk");
-      InstanceStackChunkKlass::do_barriers<true>(_cont.tail());
+      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail());
     }
 
     log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
 
     if (log_develop_is_enabled(Trace, jvmcont)) {
       log_develop_trace(jvmcont)("top hframe after (freeze):");
-      _cont.last_frame().template print_on<true>(tty);
+      _cont.last_frame().template print_on<frame::addressing::RELATIVE>(tty);
     }
 
     assert(_cont.chunk_invariant(), "");
@@ -2165,7 +2167,7 @@ private:
   intptr_t* _top_unextended_sp;
   int _align_size;
 
-  StackChunkFrameStream<true> _stream;
+  StackChunkFrameStream<chunk_frames::MIXED> _stream;
 
   NOT_PRODUCT(int _frames;)
 
@@ -2208,8 +2210,8 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-    _barriers = (chunk->should_fix<typename ConfigT::OopT, ConfigT::_concurrent_gc>()
-                  || ConfigT::requires_barriers(chunk));
+    _barriers =   (chunk->should_fix<typename ConfigT::OopT, ConfigT::_gc>()
+               || ConfigT::requires_barriers(chunk));
     return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                           : thaw_slow(chunk, kind != thaw_top);
   }
@@ -2260,7 +2262,7 @@ public:
       partial = true;
       DEBUG_ONLY(_mode = 2;)
 
-      StackChunkFrameStream<false> f(chunk);
+      StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
       assert (hsp == f.sp() && hsp == f.unextended_sp(), "");
       size = f.cb()->frame_size();
       argsize = f.stack_argsize();
@@ -2337,7 +2339,7 @@ public:
     return vsp;
   }
 
-  template <bool aligned = true>
+  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
     assert (to + size <= _cont.entrySP(), "");
     _cont.tail()->template copy_from_chunk_to_stack<aligned>(from, to, size);
@@ -2373,12 +2375,12 @@ public:
     int num_frames = (return_barrier ? 1 : 2);
     bool last_interpreted = chunk->has_mixed_frames() && Interpreter::contains(chunk->pc());
 
-    _stream = StackChunkFrameStream<true>(chunk);
+    _stream = StackChunkFrameStream<chunk_frames::MIXED>(chunk);
     _top_unextended_sp = _stream.unextended_sp();
 
     frame hf = _stream.to_frame();
     log_develop_trace(jvmcont)("top hframe before (thaw):");
-    if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on<true>(tty);
+    if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on<frame::addressing::RELATIVE>(tty);
 
     frame f;
     thaw(hf, f, num_frames, true);
@@ -2435,7 +2437,7 @@ public:
     DEBUG_ONLY(_frames++;)
 
     if (UNLIKELY(_barriers)) {
-      InstanceStackChunkKlass::do_barriers<true>(_cont.tail(), _stream, SmallRegisterMap::instance);
+      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
     }
 
     int argsize = _stream.stack_argsize();
@@ -2488,7 +2490,7 @@ public:
 
   inline void before_thaw_java_frame(const frame& hf, const frame& caller, bool bottom, int num_frame) {
     log_develop_trace(jvmcont)("======== THAWING FRAME: %d", num_frame);
-    if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on<true>(tty);
+    if (log_develop_is_enabled(Trace, jvmcont)) hf.print_on<frame::addressing::RELATIVE>(tty);
     assert (bottom == _cont.is_entry_frame(caller), "bottom: %d is_entry_frame: %d", bottom, _cont.is_entry_frame(hf));
 }
 
@@ -2506,7 +2508,7 @@ public:
     patch_pd<FKind, bottom>(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
 
     if (FKind::interpreted) {
-      Interpreted::patch_sender_sp<false>(f, caller.unextended_sp());
+      Interpreted::patch_sender_sp<frame::addressing::ABSOLUTE>(f, caller.unextended_sp());
     }
 
     assert (!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");
@@ -2531,29 +2533,29 @@ public:
     frame f = new_frame<Interpreted>(hf, caller, bottom);
     intptr_t* const vsp = f.sp();
     intptr_t* const hsp = hf.unextended_sp();
-    intptr_t* const frame_bottom = Interpreted::frame_bottom<false>(f);
+    intptr_t* const frame_bottom = Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f);
 
-    const int fsize = Interpreted::frame_bottom<true>(hf) - hsp;
+    const int fsize = Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - hsp;
 
     assert (!bottom || vsp + fsize >= _cont.entrySP() - 2, "");
     assert (!bottom || vsp + fsize <= _cont.entrySP(), "");
 
-    assert (Interpreted::frame_bottom<false>(f) == vsp + fsize, "");
+    assert (Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) == vsp + fsize, "");
 
     // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
     const int locals = hf.interpreter_frame_method()->max_locals();
-    copy_from_chunk<false>(Interpreted::frame_bottom<true>(hf) - locals,
-                           Interpreted::frame_bottom<false>(f) - locals, locals); // copy locals
-    copy_from_chunk<false>(hsp, vsp, fsize - locals); // copy rest
+    copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals,
+                                          Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) - locals, locals); // copy locals
+    copy_from_chunk<copy_alignment::WORD_ALIGNED>(hsp, vsp, fsize - locals); // copy rest
 
     set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
     derelativize_interpreted_frame_metadata(hf, f);
     bottom ? patch<Interpreted, true>(f, caller) : patch<Interpreted, false>(f, caller);
 
-    DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) print_frame_layout<false>(f);)
+    DEBUG_ONLY(if (log_develop_is_enabled(Trace, jvmcont)) print_frame_layout<frame::addressing::ABSOLUTE>(f);)
 
     assert(f.is_interpreted_frame_valid(_cont.thread()), "invalid thawed frame");
-    assert(Interpreted::frame_bottom<false>(f) <= Frame::frame_top(caller), "");
+    assert(Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) <= Frame::frame_top(caller), "");
 
     CONT_JFR_ONLY(_cont.record_interpreted_frame();)
 
@@ -2563,7 +2565,7 @@ public:
       // can only fix caller once this frame is thawed (due to callee saved regs)
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
     } else if (_cont.tail()->has_bitmap() && locals > 0) {
-      clear_bitmap_bits(Interpreted::frame_bottom<true>(hf) - locals, locals);
+      clear_bitmap_bits(Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals, locals);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2646,7 +2648,7 @@ public:
       _stream.next(&map);
       assert (!_stream.is_done(), "");
       if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
-        InstanceStackChunkKlass::do_barriers<true>(_cont.tail(), _stream, &map);
+        InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, &map);
       }
       assert (!_stream.is_done(), "");
     }
@@ -2708,7 +2710,7 @@ public:
     log_develop_trace(jvmcont)("thawed %d frames", _frames);
 
     log_develop_trace(jvmcont)("top hframe after (thaw):");
-    if (log_develop_is_enabled(Trace, jvmcont)) _cont.last_frame().template print_on<true>(tty);
+    if (log_develop_is_enabled(Trace, jvmcont)) _cont.last_frame().template print_on<frame::addressing::RELATIVE>(tty);
   }
 
   void push_return_frame(frame& f) { // see generate_cont_thaw
@@ -2952,16 +2954,16 @@ static jlong java_tid(JavaThread* thread) {
   return java_lang_Thread::thread_id(thread->threadObj());
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 static void print_frame_layout(const frame& f, outputStream* st) {
   ResourceMark rm;
   FrameValues values;
   assert (f.get_cb() != nullptr, "");
-  RegisterMap map(relative ? (JavaThread*)nullptr : JavaThread::current(), true, false, false);
+  RegisterMap map(pointers == frame::addressing::RELATIVE ? (JavaThread*)nullptr : JavaThread::current(), true, false, false);
   map.set_include_argument_oops(false);
   map.set_skip_missing(true);
   frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
-  const_cast<frame&>(f).describe<relative>(values, 0, &map);
+  const_cast<frame&>(f).describe<pointers>(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
 }
 
