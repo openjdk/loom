@@ -307,7 +307,7 @@ public:
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset <= 0) {
         offset = -offset;
-        assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), "");
+        // assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), ""); -- see StackChunkVerifyDerivedPointersClosure
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
     }
