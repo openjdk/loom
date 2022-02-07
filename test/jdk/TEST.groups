@@ -98,7 +98,6 @@ jdk_loom = \
     com/sun/management/HotSpotDiagnosticMXBean/ \
     java/lang/Thread \
     java/lang/ThreadGroup \
-    java/lang/ScopeLocal \
     java/lang/management/ThreadMXBean \
     java/util/concurrent \
     jdk/incubator/concurrent \
