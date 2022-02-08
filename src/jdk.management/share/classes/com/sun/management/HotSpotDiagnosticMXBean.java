@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -120,8 +120,8 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
     public void setVMOption(String name, String value);
 
     /**
-     * Generate a thread dump to the given file and format. The {@code outputFile}
-     * parameter must be an absolute path.
+     * Generate a thread dump to the given file in the given format. The
+     * {@code outputFile} parameter must be an absolute path.
      *
      * <p> The thread dump will include output for all platform threads. It may
      * include output for some or all virtual threads.

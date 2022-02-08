@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,10 +37,9 @@ import java.util.stream.Stream;
 import jdk.internal.misc.VM;
 
 /**
- * A thread group represents a set of <a href="Thread.html#platform-threads">
- * platform threads</a>. In addition, a thread group can also include other
- * thread groups. The thread groups form a tree in which every thread group
- * except the initial thread group has a parent.
+ * A thread group represents a set of threads. In addition, a thread group can
+ * also include other thread groups. The thread groups form a tree in which
+ * every thread group except the initial thread group has a parent.
  *
  * <p> A thread group has a name and maximum priority. The name is specified
  * when creating the group and cannot be changed. The group's maximum priority
