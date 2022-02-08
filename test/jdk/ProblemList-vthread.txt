@@ -88,11 +88,6 @@ jdk/jfr/event/runtime/TestThreadParkEvent.java
 java/lang/ref/OOMEInReferenceHandler.java
 
 ####
-# Not ready to run with the wrapper
-java/lang/ScopeLocal/Stress.java
-
-
-####
 # incorrect using of 'test.jdk' by wrapper
 
 runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
