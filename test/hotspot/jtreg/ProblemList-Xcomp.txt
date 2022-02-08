@@ -43,6 +43,7 @@ compiler/codecache/stress/OverloadCompileQueueTest.java         8279653 generic-
 
 gc/g1/plab/TestPLABPromotion.java                               8278126 generic-all
 gc/g1/plab/TestPLABResize.java                                  8278126 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#G1          8278127 generic-all
 gc/stringdedup/TestStringDeduplicationInterned.java#Parallel    8278127 generic-all
 gc/stringdedup/TestStringDeduplicationInterned.java#Z           8278127 generic-all
 gc/whitebox/TestWBGC.java                                       8278128 generic-all
