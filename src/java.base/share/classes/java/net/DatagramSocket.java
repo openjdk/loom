@@ -679,12 +679,13 @@ public class DatagramSocket implements java.io.Closeable {
      *   <li> The socket is associated with a {@link DatagramChannel
      *        DatagramChannel}. In that case, interrupting a thread receiving a
      *        datagram packet will close the underlying channel and cause this
-     *        method to throw an {@code IOException} with the interrupt status set.
+     *        method to throw {@link java.nio.channels.ClosedByInterruptException}
+     *        with the interrupt status set.
      *   <li> The socket uses the system-default socket implementation and a
      *        {@linkplain Thread#isVirtual() virtual thread} is receiving a
      *        datagram packet. In that case, interrupting the virtual thread will
      *        cause it to wakeup and close the socket. This method will then throw
-     *        {@code IOException} with the interrupt status set.
+     *        {@code SocketException} with the interrupt status set.
      * </ol>
      *
      * <p> If there is a security manager, and the socket is not currently
