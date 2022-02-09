@@ -206,7 +206,7 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
 
     @Override
     public String toString() {
-        String id = getClass().getName() + "@" + System.identityHashCode(this);
+        String id = Objects.toIdentityString(this);
         String name = name();
         if (name != null) {
             return name + "/" + id;

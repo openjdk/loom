@@ -68,7 +68,7 @@ class ThreadPerTaskExecutor implements ExecutorService {
 
     private ThreadPerTaskExecutor(ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory);
-        String name = getClass().getName() + "@" + System.identityHashCode(this);
+        String name = Objects.toIdentityString(this);
         this.container = SharedThreadContainer.create(name, /*trackThreads*/ false);
     }
 
