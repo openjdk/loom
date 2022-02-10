@@ -881,4 +881,4 @@ jdk/jfr/event/runtime/TestClassLoaderStatsEvent.java            8247965 generic-
 jdk/jfr/event/gc/detailed/TestZPageAllocationEvent.java         8278537 generic-all
 jdk/jfr/jcmd/TestJcmdStartWithOptions.java                      8278257 generic-all
 jdk/jfr/tool/TestPrintXML.java                                  8278262 generic-all
-
+java/lang/Thread/virtual/Monitors.java                          8278603 generic-all
