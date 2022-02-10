@@ -71,29 +71,17 @@ public class Monitors {
         stop(carrier);
     }
 
+    static Executor executor(BlockingQueue<Runnable> q) {
+        return r -> {
+            if (!q.offer(r)) throw new RejectedExecutionException();
+        };
+    }
+
     static void eventLoop(BlockingQueue<Runnable> q) {
         try {
             while (!Thread.interrupted())
                 q.take().run();
         } catch (InterruptedException e) {}
-    }
-
-    static void stop(Thread t) throws InterruptedException {
-        t.interrupt();
-        t.join();
-    }
-
-    static void join(Thread t, AtomicReference<Throwable> ex) throws Exception {
-        t.join();
-        var ex0 = ex.get();
-        if (ex0 != null)
-            throw new ExecutionException("Thread " + t + " threw an uncaught exception.", ex0);
-    }
-
-    static Executor executor(BlockingQueue<Runnable> q) {
-        return r -> {
-            if (!q.offer(r)) throw new RejectedExecutionException();
-        };
     }
 
     static Thread spawnVirtual(AtomicReference<Throwable> ex, Executor scheduler, Runnable task) {
@@ -106,6 +94,18 @@ public class Monitors {
         });
         t.start();
         return t;
+    }
+
+    static void stop(Thread t) throws InterruptedException {
+        t.interrupt();
+        t.join();
+    }
+
+    static void join(Thread t, AtomicReference<Throwable> ex) throws Exception {
+        t.join();
+        var ex0 = ex.get();
+        if (ex0 != null)
+            throw new ExecutionException("Thread " + t + " threw an uncaught exception.", ex0);
     }
 
     private static final java.lang.reflect.Constructor<?> VTHREAD_CONSTRUCTOR;
