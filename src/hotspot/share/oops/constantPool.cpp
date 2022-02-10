@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2219,10 +2219,9 @@ int ConstantPool::copy_cpool_bytes(int cpool_size,
 // recorded in their constant pool cache. The on_stack-ness of the constant pool controls whether
 // memory for the method is reclaimed.
 bool ConstantPool::on_stack() const {
-  if (_cache == NULL || _pool_holder == NULL) return false; // removed in loading
-
   // See nmethod::is_not_on_continuation_stack for explanation of what this means.
-  bool not_on_vthread_stack = CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
+  bool not_on_vthread_stack = _cache == nullptr ||
+          CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
   return (_flags &_on_stack) != 0 || !not_on_vthread_stack;
 }
 
