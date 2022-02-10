@@ -23,9 +23,10 @@
 
 /**
  * @test
- * @summary Test virtual threads with native monitors
- * @compile --enable-preview -source ${jdk.version} Monitors.java
- * @run testng/othervm --enable-preview --add-opens java.base/java.lang=ALL-UNNAMED Monitors
+ * @summary Test Thread.holdsLock when lock held by carrier thread
+ * @modules java.base/java.lang:+open
+ * @compile --enable-preview -source ${jdk.version} HoldsLock.java TestHelper.java
+ * @run testng/othervm --enable-preview HoldsLock
  */
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -33,17 +34,18 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class Monitors {
+public class HoldsLock {
     static final Object lock1 = new Object();
     static final Object lock2 = new Object();
 
     @Test
-    public void testOwner() throws Exception {
+    public void testHoldsLock() throws Exception {
         var q = new ArrayBlockingQueue<Runnable>(5);
 
         Thread carrier = Thread.ofPlatform().start(() -> {
@@ -53,21 +55,20 @@ public class Monitors {
         });
 
         var ex = new AtomicReference<Throwable>();
-        Thread vt = spawnVirtual(ex, executor(q), () -> {
-            Thread virtual = Thread.currentThread();
-            assert virtual.isVirtual();
-            assert !carrier.isVirtual();
+        Thread vthread = spawnVirtual(ex, executor(q), () -> {
+            assertTrue(Thread.currentThread().isVirtual());
+            assertFalse(carrier.isVirtual());
 
             synchronized (lock2) {
-                assert carrier.holdsLock(lock1);
-                assert !carrier.holdsLock(lock2);
+                // carrier thread holds lock1
+                assertFalse(Thread.holdsLock(lock2));
 
-                assert virtual.holdsLock(lock2);
-                assert !virtual.holdsLock(lock1);
+                // virtual thread holds lock2
+                assertTrue(virtual.holdsLock(lock2));
             }
         });
 
-        join(vt, ex);
+        join(vthread, ex);
         stop(carrier);
     }
 
@@ -85,7 +86,7 @@ public class Monitors {
     }
 
     static Thread spawnVirtual(AtomicReference<Throwable> ex, Executor scheduler, Runnable task) {
-        var t = newThread(scheduler, null, 0, () -> {
+       var t = newThread(scheduler, () -> {
             try {
                 task.run();
             } catch (Throwable x) {
@@ -108,22 +109,8 @@ public class Monitors {
             throw new ExecutionException("Thread " + t + " threw an uncaught exception.", ex0);
     }
 
-    private static final java.lang.reflect.Constructor<?> VTHREAD_CONSTRUCTOR;
-    static {
-        try {
-            VTHREAD_CONSTRUCTOR = Class.forName("java.lang.VirtualThread")
-                .getDeclaredConstructor(Executor.class, String.class, int.class, Runnable.class);
-            VTHREAD_CONSTRUCTOR.setAccessible(true);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError(ex);
-        }
-    }
-
-    static Thread newThread(Executor scheduler, String name, int characteristics, Runnable task) {
-        try {
-            return (Thread)VTHREAD_CONSTRUCTOR.newInstance(scheduler, name, characteristics, task);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError(ex);
-        }
+    static Thread newThread(Executor scheduler, Runnable task) {
+        ThreadFactory factory = TestHelper.virtualThreadBuilder(scheduler).factory();
+        return factory.newThread(task);
     }
 }

@@ -38,14 +38,16 @@ java/lang/invoke/modules/Driver1.java
 
 ####
 # Incorrect stackwalking expectations for main thread stack trace
-
 java/lang/StackWalker/StackWalkTest.java
 java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
-java/lang/Thread/virtual/Monitors.java
+
+# Uses custom scheduler
+java/lang/Thread/virtual/HoldsLock.java
+
 jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
 jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
