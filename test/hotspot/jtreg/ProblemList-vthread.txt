@@ -2,6 +2,7 @@
 
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
 
+
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
 
