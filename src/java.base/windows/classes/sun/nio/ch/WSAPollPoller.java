@@ -302,7 +302,7 @@ class WSAPollPoller extends Poller {
      */
     private static PipeImpl makePipe() throws IOException {
         try {
-            return JLA.executeOnCarrierThread(() -> new PipeImpl(null, false));
+            return JLA.executeOnCarrierThread(() -> new PipeImpl(null, true, false));
         } catch (IOException ioe) {
             throw ioe;
         } catch (Throwable e) {
