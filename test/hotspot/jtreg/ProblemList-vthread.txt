@@ -280,6 +280,7 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesInvokersTest.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
+runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
 runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
 runtime/cds/appcds/javaldr/ArrayTest.java
 runtime/cds/appcds/javaldr/GCDuringDump.java
