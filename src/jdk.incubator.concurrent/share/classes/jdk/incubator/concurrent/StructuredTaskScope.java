@@ -79,7 +79,7 @@ import jdk.internal.misc.ThreadFlock;
  *     } // close                                         // @highlight substring="close"
  * }
  * To ensure correct usage, the {@code join} and {@code close} methods may only be invoked
- * by the <em>owner</em> (the thread that opened/created the StructuredTaskScope, and the
+ * by the <em>owner</em> (the thread that opened/created the StructuredTaskScope), and the
  * {@code close} method throws an exception after closing if the owner did not invoke the
  * {@code join} method after forking.
  *
