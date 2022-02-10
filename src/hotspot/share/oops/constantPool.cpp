@@ -2220,6 +2220,8 @@ int ConstantPool::copy_cpool_bytes(int cpool_size,
 // memory for the method is reclaimed.
 bool ConstantPool::on_stack() const {
   // See nmethod::is_not_on_continuation_stack for explanation of what this means.
+  // cpCache is null when doing default method processing during class loading, so
+  // won't be on a continuation stack.
   bool not_on_vthread_stack = _cache == nullptr ||
           CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
   return (_flags &_on_stack) != 0 || !not_on_vthread_stack;
