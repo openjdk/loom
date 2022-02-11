@@ -2158,10 +2158,6 @@ public final class System {
         setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding", StaticProperty.nativeEncoding())));
         setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding", StaticProperty.nativeEncoding())));
 
-//        setIn0(new BufferedInputStream(ConsoleStreams.in));
-//        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
-//        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
-
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();
 
