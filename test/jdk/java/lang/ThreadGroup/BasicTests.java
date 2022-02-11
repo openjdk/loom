@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -387,7 +387,9 @@ public class BasicTests {
         assertTrue(group3.enumerate(threads, false) == 0);
     }
 
-    // test enumerate(Thread[]) with an array of insufficient size
+    /**
+     * Test enumerate(Thread[]) with an array of insufficient size
+     */
     @Test
     public void enumerateThreads4() {
         ThreadGroup group = new ThreadGroup("group");
@@ -540,7 +542,9 @@ public class BasicTests {
         assertTrue(groups[1] == null);
     }
 
-    // test enumerate(ThreadGroup[]) with an array of insufficient size
+    /**
+     * Test enumerate(ThreadGroup[]) with an array of insufficient size
+     */
     @Test
     public void testEnumerateGroups2() throws Exception {
         ThreadGroup group = new ThreadGroup("group");
@@ -700,7 +704,7 @@ public class BasicTests {
     public void testDestroy() {
         ThreadGroup group = new ThreadGroup("group");
         assertFalse(group.isDestroyed());
-        group.destroy();
+        group.destroy();  // does nothing
         assertFalse(group.isDestroyed());
     }
 
@@ -708,7 +712,7 @@ public class BasicTests {
     public void testDaemon() {
         ThreadGroup group = new ThreadGroup("group");
         assertFalse(group.isDaemon());
-        group.setDaemon(true);
+        group.setDaemon(true);  // does nothing
         assertFalse(group.isDaemon());
     }
 
