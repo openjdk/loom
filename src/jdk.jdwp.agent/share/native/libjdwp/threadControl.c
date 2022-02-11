@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2548,9 +2548,6 @@ threadControl_interrupt(jthread thread)
 {
     ThreadNode *node;
     jvmtiError  error;
-
-    // vthread fixme: should this work for vthreads?
-    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 
