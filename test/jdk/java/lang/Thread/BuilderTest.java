@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,9 +39,8 @@ import static org.testng.Assert.*;
 
 public class BuilderTest {
 
-    // platform thread
     @Test
-    public void testPlatformThread1() throws Exception {
+    public void testPlatformThread() throws Exception {
         Thread parent = Thread.currentThread();
         Thread.Builder.OfPlatform builder = Thread.ofPlatform();
 
@@ -88,9 +87,8 @@ public class BuilderTest {
         assertTrue(done3.get());
     }
 
-    // virtual thread
     @Test
-    public void testVirtualThread1() throws Exception {
+    public void testVirtualThread() throws Exception {
         Thread parent = Thread.currentThread();
         Thread.Builder.OfVirtual builder = Thread.ofVirtual();
 
