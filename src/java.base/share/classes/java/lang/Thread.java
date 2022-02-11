@@ -530,7 +530,7 @@ public class Thread implements Runnable {
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
      *
-     * @since 99
+     * @since 19
      */
     public static void sleep(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration);  // MAX_VALUE if > 292 years
@@ -766,7 +766,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
@@ -787,7 +787,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
@@ -820,7 +820,7 @@ public class Thread implements Runnable {
      *
      * @see Thread#ofPlatform()
      * @see Thread#ofVirtual()
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public sealed interface Builder
@@ -934,7 +934,7 @@ public class Thread implements Runnable {
          * that creates platform threads.
          *
          * @see Thread#ofPlatform()
-         * @since 99
+         * @since 19
          */
         @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfPlatform extends Builder
@@ -1018,7 +1018,7 @@ public class Thread implements Runnable {
          * created from a builder, have no {@link Permission permissions}.
          *
          * @see Thread#ofVirtual()
-         * @since 99
+         * @since 19
          */
         @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfVirtual extends Builder
@@ -1409,7 +1409,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
      * @see <a href="#inheritance">Inheritance</a>
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
@@ -1424,7 +1424,7 @@ public class Thread implements Runnable {
      *
      * @return {@code true} if this thread is a virtual thread
      *
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
@@ -2165,7 +2165,7 @@ public class Thread implements Runnable {
      * @throws  IllegalThreadStateException
      *          if this thread has not been started.
      *
-     * @since 99
+     * @since 19
      */
     public final boolean join(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration); // MAX_VALUE if > 292 years

@@ -250,7 +250,7 @@ public class Executors {
      * @param threadFactory the factory to use when creating new threads
      * @return a new executor that creates a new Thread for each task
      * @throws NullPointerException if threadFactory is null
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
@@ -266,7 +266,7 @@ public class Executors {
      * that creates virtual threads.
      *
      * @return a new executor that creates a new virtual Thread for each task
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static ExecutorService newVirtualThreadPerTaskExecutor() {
