@@ -144,7 +144,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *         SecurityManager#checkWrite(java.lang.String)} method denies write
      *         access to the file or {@link java.lang.management.ManagementPermission
      *         ManagementPermission("control")} is denied.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
@@ -153,7 +153,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
 
     /**
      * Thread dump format.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static enum ThreadDumpFormat {
