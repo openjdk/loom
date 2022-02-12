@@ -55,7 +55,6 @@ public final class NewThreadAction implements PrivilegedAction<Thread> {
     static final ThreadGroup systemThreadGroup =
         AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
             public ThreadGroup run() {
-                @SuppressWarnings("deprecation")
                 ThreadGroup group = Thread.currentThread().getThreadGroup();
                 ThreadGroup parent;
                 while ((parent = group.getParent()) != null) {
@@ -70,7 +69,7 @@ public final class NewThreadAction implements PrivilegedAction<Thread> {
      * may execute user code, so that the security policy for threads in
      * the system thread group will not apply
      */
-    @SuppressWarnings({"deprecation", "removal"})
+    @SuppressWarnings("removal")
     static final ThreadGroup userThreadGroup =
         AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
             public ThreadGroup run() {
