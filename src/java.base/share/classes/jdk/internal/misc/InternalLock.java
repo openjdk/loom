@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,7 +37,24 @@ import java.util.concurrent.locks.ReentrantLock;
 public class InternalLock {
     private final ReentrantLock lock = new ReentrantLock();
 
-    public InternalLock() { }
+    // may have this configurable via system property
+    private static final boolean CAN_USE_INTERNAL_LOCK = true;
+
+    private InternalLock() { }
+
+    /**
+     * Returns a new InternalLock or null.
+     */
+    public static InternalLock newLockOrNull() {
+        return (CAN_USE_INTERNAL_LOCK) ? new InternalLock() : null;
+    }
+
+    /**
+     * Returns a new InternalLock or the given object.
+     */
+    public static Object newLockOr(Object obj) {
+        return (CAN_USE_INTERNAL_LOCK) ? new InternalLock() : obj;
+    }
 
     public boolean tryLock() {
         return lock.tryLock();

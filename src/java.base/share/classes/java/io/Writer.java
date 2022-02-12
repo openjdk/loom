@@ -158,7 +158,7 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
                 || clazz == FileWriter.class
                 || clazz == PrintWriter.class
                 || clazz == sun.nio.cs.StreamEncoder.class) {
-            this.lock = new InternalLock();
+            this.lock = InternalLock.newLockOr(this);
         } else {
             this.lock = this;
         }

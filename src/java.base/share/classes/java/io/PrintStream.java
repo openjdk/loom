@@ -120,7 +120,7 @@ public class PrintStream extends FilterOutputStream
 
         // use monitors when PrintStream is sub-classed
         if (getClass() == PrintStream.class) {
-            lock = new InternalLock();
+            lock = InternalLock.newLockOrNull();
         } else {
             lock = null;
         }
@@ -221,7 +221,7 @@ public class PrintStream extends FilterOutputStream
 
         // use monitors when PrintStream is sub-classed
         if (getClass() == PrintStream.class) {
-            lock = new InternalLock();
+            lock = InternalLock.newLockOrNull();
         } else {
             lock = null;
         }

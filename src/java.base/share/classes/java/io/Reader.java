@@ -160,7 +160,7 @@ public abstract class Reader implements Readable, Closeable {
             || clazz == BufferedReader.class
             || clazz == FileReader.class
             || clazz == sun.nio.cs.StreamDecoder.class) {
-            this.lock = new InternalLock();
+            this.lock = InternalLock.newLockOr(this);
         } else {
             this.lock = this;
         }
