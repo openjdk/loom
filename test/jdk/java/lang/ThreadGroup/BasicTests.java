@@ -710,10 +710,20 @@ public class BasicTests {
 
     @Test
     public void testDaemon() {
-        ThreadGroup group = new ThreadGroup("group");
-        assertFalse(group.isDaemon());
-        group.setDaemon(true);  // does nothing
-        assertFalse(group.isDaemon());
+        boolean d = Thread.currentThread().getThreadGroup().isDaemon();
+
+        ThreadGroup group1 = new ThreadGroup("group1");
+        assertTrue(group1.isDaemon() == d);  // inherit
+
+        group1.setDaemon(true);
+        assertTrue(group1.isDaemon());
+        ThreadGroup group2 = new ThreadGroup(group1, "group2");
+        assertTrue(group2.isDaemon());   // inherit
+
+        group1.setDaemon(false);
+        assertFalse(group1.isDaemon());
+        ThreadGroup group3 = new ThreadGroup(group1, "group2");
+        assertFalse(group3.isDaemon());  // inherit
     }
 
     @Test

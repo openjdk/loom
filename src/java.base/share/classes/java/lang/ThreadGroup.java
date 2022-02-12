@@ -73,6 +73,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
     private final String name;
     private volatile int maxPriority;
+    private volatile boolean daemon;
 
     // strongly reachable from this group
     private int ngroups;
@@ -96,10 +97,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Creates a ThreadGroup without any permission or other checks.
      */
-    ThreadGroup(ThreadGroup parent, String name, int maxPriority) {
+    ThreadGroup(ThreadGroup parent, String name, int maxPriority, boolean daemon) {
         this.parent = parent;
         this.name = name;
         this.maxPriority = maxPriority;
+        if (daemon)
+            this.daemon = true;
         if (VM.isBooted()) {
             parent.synchronizedAddWeak(this);
         } else {
@@ -111,7 +114,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
-        this(parent, name, parent.getMaxPriority());
+        this(parent, name, parent.maxPriority, parent.daemon);
     }
 
     private static Void checkParentAccess(ThreadGroup parent) {
@@ -194,9 +197,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns false.
-     *
-     * @return false
+     * {@return the daemon status of this thread group}
+     * The daemon status is not used for anything.
      *
      * @deprecated This method originally indicated if the thread group is a
      *             <i>daemon thread group</i> that is automatically destroyed
@@ -205,7 +207,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     @Deprecated(since="16", forRemoval=true)
     public final boolean isDaemon() {
-        return false;
+        return daemon;
     }
 
     /**
@@ -225,18 +227,27 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Does nothing.
+     * Sets the daemon status of this thread group.
+     * The daemon status is not used for anything.
+     * <p>
+     * First, the {@code checkAccess} method of this thread group is
+     * called with no arguments; this may result in a security exception.
      *
-     * @param daemon  ignored
+     * @param      daemon the daemon status
+     * @throws     SecurityException  if the current thread cannot modify
+     *               this thread group.
+     * @see        java.lang.SecurityException
+     * @see        java.lang.ThreadGroup#checkAccess()
      *
-     * @deprecated This method originally changed the <i>daemon status</i> of
-     *             the thread group. A daemon thread group was automatically
-     *             destroyed when its last thread terminated. The concept of
-     *             daemon thread group and the concept of a destroyed thread
+     * @deprecated This method originally configured whether the thread group is
+     *             a <i>daemon thread group</i> that is automatically destroyed
+     *             when its last thread terminates. The concept of daemon thread
      *             group no longer exists.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
+        checkAccess();
+        this.daemon = daemon;
     }
 
     /**

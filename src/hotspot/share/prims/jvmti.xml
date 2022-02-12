@@ -2408,8 +2408,7 @@ jvmtiEnv *jvmti;
         <field id="is_daemon">
           <jboolean/>
           <description>
-            <code>JNI_FALSE</code>.
-            The concept of daemon thread group no longer exists.
+            Is this a daemon thread group?
           </description>
         </field>
       </typedef>

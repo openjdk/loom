@@ -2919,7 +2919,7 @@ public class Thread implements Runnable {
             };
             @SuppressWarnings("removal")
             ThreadGroup root = AccessController.doPrivileged(pa);
-            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
+            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY, false);
 
             ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)
