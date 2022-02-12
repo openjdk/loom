@@ -69,7 +69,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * started thread invokes the task's {@link Runnable#run() run} method. Thread
  * defines the {@link #join() join} method to wait for a thread to terminate.
  *
- * <p> Threads have a unique {@linkplain #getId() identifier} and a {@linkplain
+ * <p> Threads have a unique {@linkplain #threadId() identifier} and a {@linkplain
  * #getName() name}. The identifier is generated when a {@code Thread} is created
  * and cannot be changed. The thread name can be specified when creating a thread
  * or can be {@linkplain #setName(String) changed} at a later time.
@@ -2277,15 +2277,15 @@ public class Thread implements Runnable {
 
     /**
      * Returns a string representation of this thread. The string representation
-     * will usually include the thread's {@linkplain #getId() identifier} and name.
-     * The default implementation for platform threads includes the thread's
+     * will usually include the thread's {@linkplain #threadId() identifier} and
+     * name. The default implementation for platform threads includes the thread's
      * identifier, name, priority, and the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
     public String toString() {
         StringBuilder sb = new StringBuilder("Thread[#");
-        sb.append(getId());
+        sb.append(threadId());
         sb.append(",");
         sb.append(getName());
         sb.append(",");
@@ -2615,15 +2615,30 @@ public class Thread implements Runnable {
      * Returns the identifier of this Thread.  The thread ID is a positive
      * {@code long} number generated when this thread was created.
      * The thread ID is unique and remains unchanged during its lifetime.
-     * When a thread is terminated, this thread ID may be reused.
+     * When this thread terminates, the thread ID may be reused.
      *
-     * @return this thread's ID.
-     * @since 1.5
+     * @return this thread's ID
+     * @since 19
      */
-    public final long getId() {
+    public final long threadId() {
         // The 16 most significant bits are reserved for exclusive use
         // by the JVM so these bits are excluded using TID_MASK.
         return tid & ThreadIdentifiers.TID_MASK;
+    }
+
+    /**
+     * Returns the identifier of this Thread obtained by invoking {@link #threadId()}.
+     *
+     * @return this thread's ID
+     *
+     * @deprecated This method is not final and may be overridden to return a
+     * value that is not the thread ID. Use {@link #threadId()} instead.
+     *
+     * @since 1.5
+     */
+    @Deprecated
+    public long getId() {
+        return threadId();
     }
 
     /**

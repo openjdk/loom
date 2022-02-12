@@ -57,10 +57,10 @@ import java.util.Map;
  * {@link PlatformManagedObject#getObjectName} method.
  *
  * <h2>Thread ID</h2>
- * Thread ID is a positive long value returned by calling the
- * {@link java.lang.Thread#getId} method for a thread.
- * The thread ID is unique during its lifetime.  When a thread
- * is terminated, this thread ID may be reused.
+ * Thread ID is a positive long value returned by calling the thread's
+ * {@link Thread#threadId() threadId()} method.
+ * The thread ID is unique during its lifetime.  When the thread terminates,
+ * its thread ID may be reused.
  *
  * <p> Some methods in this interface take a thread ID or an array
  * of thread IDs as the input parameter and return per-thread information.
@@ -409,7 +409,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * This is a convenience method for local management use and is
      * equivalent to calling:
      * <blockquote><pre>
-     *   {@link #getThreadCpuTime getThreadCpuTime}(Thread.currentThread().getId());
+     *   {@link #getThreadCpuTime getThreadCpuTime}(Thread.currentThread().threadId());
      * </pre></blockquote>
      *
      * @return the total CPU time for the current thread if CPU time
@@ -436,7 +436,7 @@ public interface ThreadMXBean extends PlatformManagedObject {
      * This is a convenience method for local management use and is
      * equivalent to calling:
      * <blockquote><pre>
-     *   {@link #getThreadUserTime getThreadUserTime}(Thread.currentThread().getId());
+     *   {@link #getThreadUserTime getThreadUserTime}(Thread.currentThread().threadId());
      * </pre></blockquote>
      *
      * @return the user-level CPU time for the current thread if CPU time

@@ -102,7 +102,7 @@ public class ThreadDumper {
 
     private static void dumpThread(Thread thread, PrintStream ps) {
         String suffix = thread.isVirtual() ? " virtual" : "";
-        ps.format("\"%s\" #%d%s%n", thread.getName(), thread.getId(), suffix);
+        ps.format("\"%s\" #%d%s%n", thread.getName(), thread.threadId(), suffix);
         for (StackTraceElement ste : thread.getStackTrace()) {
             ps.format("      %s%n", ste);
         }
@@ -159,7 +159,7 @@ public class ThreadDumper {
         if (owner == null) {
             out.format("        \"owner\": null,%n");
         } else {
-            out.format("        \"owner\": %d,%n", owner.getId());
+            out.format("        \"owner\": %d,%n", owner.threadId());
         }
 
         long threadCount = 0;
@@ -189,7 +189,7 @@ public class ThreadDumper {
     private static void dumpThreadToJson(Thread thread, PrintStream out, boolean more) {
         out.println("         {");
         out.format("           \"name\": \"%s\",%n", escape(thread.getName()));
-        out.format("           \"tid\": %d,%n", thread.getId());
+        out.format("           \"tid\": %d,%n", thread.threadId());
         out.format("           \"stack\": [%n");
         int i = 0;
         StackTraceElement[] stackTrace = thread.getStackTrace();

@@ -1522,20 +1522,53 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::getId.
+     * Test Thread::threadId and getId.
      */
     @Test
-    public void testGetId() throws Exception {
-        var ref1 = new AtomicReference<Long>();
-        var ref2 = new AtomicReference<Long>();
-        TestHelper.runInVirtualThread(() -> ref1.set(Thread.currentThread().getId()));
-        TestHelper.runInVirtualThread(() -> ref2.set(Thread.currentThread().getId()));
-        long id1 = ref1.get();
-        long id2 = ref2.get();
-        long id3 = Thread.currentThread().getId();
-        assertTrue(id1 != id2);
-        assertTrue(id1 != id3);
-        assertTrue(id2 != id3);
+    public void testThreadId1() throws Exception {
+        record ThreadIds(long threadId, long id) { }
+        var ref = new AtomicReference<ThreadIds>();
+
+        Thread vthread = Thread.ofVirtual().unstarted(() -> {
+            Thread thread = Thread.currentThread();
+            ref.set(new ThreadIds(thread.threadId(), thread.getId()));
+            LockSupport.park();
+        });
+
+        // unstarted
+        long tid = vthread.threadId();
+
+        // running
+        ThreadIds tids;
+        vthread.start();
+        try {
+            while ((tids = ref.get()) == null) {
+                Thread.sleep(10);
+            }
+            assertTrue(tids.threadId() == tid);
+            assertTrue(tids.id() == tid);
+        } finally {
+            LockSupport.unpark(vthread);
+            vthread.join();
+        }
+
+        // terminated
+        assertTrue(vthread.threadId() == tid);
+        assertTrue(vthread.getId() == tid);
+    }
+
+    /**
+     * Test that each Thread has a unique ID
+     */
+    @Test
+    public void testThreadId2() throws Exception {
+        // thread ID should be unique
+        long tid1 = Thread.ofVirtual().unstarted(() -> { }).threadId();
+        long tid2 = Thread.ofVirtual().unstarted(() -> { }).threadId();
+        long tid3 = Thread.currentThread().threadId();
+        assertFalse(tid1 == tid2);
+        assertFalse(tid1 == tid3);
+        assertFalse(tid2 == tid3);
     }
 
     /**
