@@ -256,8 +256,8 @@ JNIEXPORT void JNICALL
 JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
 
 JNIEXPORT jint JNICALL
-JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor, 
-                  jint frame_count, jint start_index, 
+JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor,
+                  jint frame_count, jint start_index,
                   jobjectArray frames);
 
 JNIEXPORT void JNICALL
@@ -1134,7 +1134,7 @@ JVM_GetTemporaryDirectory(JNIEnv *env);
  */
 JNIEXPORT jobjectArray JNICALL
 JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
-    
+
 /* Virtual thread support.
  */
 JNIEXPORT void JNICALL

@@ -92,7 +92,7 @@ public class FreezeAndThaw {
             if (depth > 0) {
                 run3(depth - 1, arg2, arg3);
             } if (depth == 0) {
-                if (yieldAtLimit) { 
+                if (yieldAtLimit) {
                     Continuation.yield(SCOPE);
                 }
             } else {

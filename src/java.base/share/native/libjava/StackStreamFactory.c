@@ -69,10 +69,10 @@ JNIEXPORT jobject JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWa
  */
 JNIEXPORT jint JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalker_fetchStackFrames
   (JNIEnv *env, jobject stackstream, jlong mode, jlong anchor,
-   jint batchSize, jint startIndex, 
+   jint batchSize, jint startIndex,
    jobjectArray frames)
 {
-    return JVM_MoreStackWalk(env, stackstream, mode, anchor, batchSize, 
+    return JVM_MoreStackWalk(env, stackstream, mode, anchor, batchSize,
                              startIndex, frames);
 }
 
