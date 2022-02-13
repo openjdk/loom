@@ -689,7 +689,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
 JVM_END
 
 ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
-  guarantee (thread->has_last_Java_frame(), "");
+  // guarantee (thread->has_last_Java_frame(), "");
   for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
     if (cont_scope == jdk_internal_vm_Continuation::scope(entry->continuation()))
       return entry;

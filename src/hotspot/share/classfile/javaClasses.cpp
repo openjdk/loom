@@ -2274,15 +2274,14 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       }
 
       bool carrier = false;
-      oop vthread_scope = java_lang_VirtualThread::vthread_scope();
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->last_continuation(vthread_scope)->cont_oop() !=
+        if (thread->vthread_continuation()->cont_oop() !=
               java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
-        carrier = (thread->last_continuation(vthread_scope) != NULL);
+        carrier = (thread->vthread_continuation() != NULL);
       }
 
       const int max_depth = MaxJavaStackTraceDepth;

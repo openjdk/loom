@@ -1278,7 +1278,7 @@ bool
 JvmtiEnvBase::cthread_with_continuation(JavaThread* jt) {
   ContinuationEntry* cont = NULL;
   if (jt->has_last_Java_frame()) {
-    cont = jt->last_continuation(java_lang_VirtualThread::vthread_scope());
+    cont = jt->vthread_continuation();
   }
   return (cont != NULL && cthread_with_mounted_vthread(jt));
 }

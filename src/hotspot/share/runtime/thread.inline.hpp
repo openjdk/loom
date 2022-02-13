@@ -28,6 +28,7 @@
 
 #include "runtime/thread.hpp"
 
+#include "classfile/javaClasses.hpp"
 #include "gc/shared/tlab_globals.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/nonJavaThread.hpp"
@@ -182,6 +183,26 @@ void JavaThread::set_safepoint_state(ThreadSafepointState *state) {
 
 bool JavaThread::is_at_poll_safepoint() {
   return _safepoint_state->is_at_poll_safepoint();
+}
+
+bool JavaThread::is_vthread_mounted() const {
+  return vthread_continuation() != nullptr;
+}
+
+ContinuationEntry* JavaThread::vthread_continuation() const {
+  return last_continuation(java_lang_VirtualThread::vthread_scope());
+};
+
+JavaThread::CarrierOrVirtual JavaThread::which_stack(address adr) const {
+  address stack_end = _stack_base - _stack_size;
+  if (adr >= stack_end) {
+    ContinuationEntry* cont = vthread_continuation();
+    if (cont != nullptr && (address)cont->entry_sp() > adr)
+      return CarrierOrVirtual::VIRTUAL;
+    if (_stack_base > adr)
+      return CarrierOrVirtual::CARRIER;
+  }
+  return CarrierOrVirtual::NONE;
 }
 
 void JavaThread::enter_critical() {

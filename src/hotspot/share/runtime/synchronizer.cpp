@@ -977,7 +977,7 @@ bool ObjectSynchronizer::current_thread_holds_lock(JavaThread* current,
 
   // Uncontended case, header points to stack
   if (mark.has_locker()) {
-    return current->is_lock_owned((address)mark.locker());
+    return current->is_lock_owned((address)mark.locker()); // is_lock_owned_current((address)mark.locker()); see JDK-8281642
   }
   // Contended case, header points to ObjectMonitor (tagged pointer)
   if (mark.has_monitor()) {

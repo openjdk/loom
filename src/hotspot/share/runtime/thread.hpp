@@ -699,7 +699,7 @@ class JavaThread: public Thread {
  private:
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
-  OopHandle      _vthread;
+  OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
   OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
@@ -1199,6 +1199,12 @@ private:
   void inc_held_monitor_count() { _held_monitor_count++; }
   void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
 
+  inline bool is_vthread_mounted() const;
+  inline ContinuationEntry* vthread_continuation() const;
+
+  enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
+  inline CarrierOrVirtual which_stack(address adr) const;
+
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -1260,6 +1266,8 @@ private:
 
   // Fast-locking support
   bool is_lock_owned(address adr) const;
+  bool is_lock_owned_current(address adr) const; // virtual if mounted, otherwise whole thread
+  bool is_lock_owned_carrier(address adr) const;
 
   // Accessors for vframe array top
   // The linked list of vframe arrays are sorted on sp. This means when we

@@ -668,7 +668,7 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHasht
   if (_thread->has_last_Java_frame()) {
     RegisterMap reg_map(_thread, true, false);
 
-    vframe* start_vf = !full && _thread->last_continuation(java_lang_VirtualThread::vthread_scope()) != NULL
+    vframe* start_vf = !full && _thread->is_vthread_mounted()
       ? _thread->vthread_carrier_last_java_vframe(&reg_map)
       : _thread->last_java_vframe(&reg_map);
     int count = 0;
@@ -899,7 +899,13 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   oop blocker_object = NULL;
   oop blocker_object_owner = NULL;
 
-  if (_thread_status == JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER ||
+  if (thread->is_vthread_mounted() && thread->vthread() != threadObj) { // ThreadSnapshot only captures platform threads
+    _thread_status = JavaThreadStatus::IN_OBJECT_WAIT;
+    oop vthread = thread->vthread();
+    assert (vthread != NULL, "");
+    blocker_object = vthread;
+    blocker_object_owner = vthread;
+  } else if (_thread_status == JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER ||
       _thread_status == JavaThreadStatus::IN_OBJECT_WAIT ||
       _thread_status == JavaThreadStatus::IN_OBJECT_WAIT_TIMED) {
 
@@ -923,10 +929,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
         blocker_object_owner = owner->threadObj();
       }
     }
-  }
-
-  // Support for JSR-166 locks
-  if (_thread_status == JavaThreadStatus::PARKED || _thread_status == JavaThreadStatus::PARKED_TIMED) {
+  } else if (_thread_status == JavaThreadStatus::PARKED || _thread_status == JavaThreadStatus::PARKED_TIMED) {
     blocker_object = thread->current_park_blocker();
     if (blocker_object != NULL && blocker_object->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
       blocker_object_owner = java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(blocker_object);
