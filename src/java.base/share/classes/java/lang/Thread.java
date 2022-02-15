@@ -63,11 +63,11 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * virtual machine allows an application to have multiple threads of
  * execution running concurrently.
  *
- * <p> {@code Thread} provides a {@link Builder} and other APIs to create and
- * start threads that execute {@link Runnable} tasks. Starting a thread schedules
- * it to execute concurrently with the thread that caused it to start. The newly
- * started thread invokes the task's {@link Runnable#run() run} method. Thread
- * defines the {@link #join() join} method to wait for a thread to terminate.
+ * <p> {@code Thread} defines constructors and a {@link Builder} to create threads
+ * that execute {@link Runnable} tasks. {@linkplain  #start() Starting} a thread
+ * schedules it to execute concurrently with the thread that caused it to start.
+ * The newly started thread invokes the task's {@link Runnable#run() run} method.
+ * Thread defines the {@link #join() join} method to wait for a thread to terminate.
  *
  * <p> Threads have a unique {@linkplain #threadId() identifier} and a {@linkplain
  * #getName() name}. The identifier is generated when a {@code Thread} is created
@@ -125,10 +125,13 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2>Creating and starting threads</h2>
  *
- * <p> As noted above, {@code Thread} defines a {@link Builder} API for creating and
- * starting threads. The {@link #ofPlatform()} and {@link #ofVirtual()} methods are
- * used to create builders for platform and virtual threads respectively.
- * The following are examples that use the builder:
+ * <p> {@code Thread} defines public constructors for creating platform threads and
+ * the {@link #start() start} method to schedule threads to execute. {@code Thread}
+ * may be extended for customization and other advanced reasons although most
+ * applications should have little need to do this.
+ *
+ * <p> {@code Thread} defines a {@link Builder} API for creating and starting both
+ * platform and virtual threads. The following are examples that use the builder:
  * {@snippet :
  *   Runnable runnable = ...
  *
@@ -148,11 +151,6 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *   // A ThreadFactory that creates virtual threads
  *   ThreadFactory factory = Thread.ofVirtual().factory();
  * }
- *
- * <p> In addition to the builder, {@code Thread} defines (for historical and
- * customization reasons) public constructors for creating platform threads. Most
- * applications should have little need to use these constructors directly or
- * extend {@code Thread}. The constructors cannot be used to create virtual threads.
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of
