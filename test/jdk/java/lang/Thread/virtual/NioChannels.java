@@ -641,14 +641,24 @@ public class NioChannels {
      * Creates a loopback connection
      */
     static class Connection implements Closeable {
-        private final ServerSocketChannel ssc;
         private final SocketChannel sc1;
         private final SocketChannel sc2;
         Connection() throws IOException {
             var lh = InetAddress.getLoopbackAddress();
-            this.ssc = ServerSocketChannel.open().bind(new InetSocketAddress(lh, 0));
-            this.sc1 = SocketChannel.open(ssc.getLocalAddress());
-            this.sc2 = ssc.accept();
+            try (var listener = ServerSocketChannel.open()) {
+                listener.bind(new InetSocketAddress(lh, 0));
+                SocketChannel sc1 = SocketChannel.open();
+                SocketChannel sc2 = null;
+                try {
+                    sc1.socket().connect(listener.getLocalAddress(), 10_000);
+                    sc2 = listener.accept();
+                } catch (IOException ioe) {
+                    sc1.close();
+                    throw ioe;
+                }
+                this.sc1 = sc1;
+                this.sc2 = sc2;
+            }
         }
         SocketChannel channel1() {
             return sc1;
@@ -658,9 +668,8 @@ public class NioChannels {
         }
         @Override
         public void close() throws IOException {
-            if (ssc != null) ssc.close();
-            if (sc1 != null) sc1.close();
-            if (sc2 != null) sc2.close();
+            sc1.close();
+            sc2.close();
         }
     }
 
