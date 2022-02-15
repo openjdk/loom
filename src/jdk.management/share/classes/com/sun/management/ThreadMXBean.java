@@ -119,7 +119,7 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      * This is a convenience method for local management use and is
      * equivalent to calling:
      * <blockquote><pre>
-     *   {@link #getThreadAllocatedBytes getThreadAllocatedBytes}(Thread.currentThread().getId());
+     *   {@link #getThreadAllocatedBytes getThreadAllocatedBytes}(Thread.currentThread().threadId());
      * </pre></blockquote>
      *
      * @return an approximation of the total memory allocated, in bytes, in
@@ -138,7 +138,7 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
      * @since 14
      */
     public default long getCurrentThreadAllocatedBytes() {
-        return getThreadAllocatedBytes(Thread.currentThread().getId());
+        return getThreadAllocatedBytes(Thread.currentThread().threadId());
     }
 
     /**

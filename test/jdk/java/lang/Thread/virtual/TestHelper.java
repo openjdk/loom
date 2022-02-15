@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
  */
 
 import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -60,7 +61,15 @@ class TestHelper {
         boolean inherit = ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0);
         builder.inheritInheritableThreadLocals(inherit);
         Thread thread = builder.start(target);
-        thread.join();
+
+        // wait for thread to terminate
+        while (thread.join(Duration.ofSeconds(10)) == false) {
+            System.out.println("-- " + thread + " --");
+            for (StackTraceElement e : thread.getStackTrace()) {
+                System.out.println("  " + e);
+            }
+        }
+
         Exception e = exc.get();
         if (e != null) {
             throw e;

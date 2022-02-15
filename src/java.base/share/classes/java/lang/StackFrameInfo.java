@@ -72,7 +72,7 @@ class StackFrameInfo implements StackFrame {
     void setContinuationScope(ContinuationScope contScope) {
         this.contScope = contScope;
     }
-    
+
     protected void clear() {
     }
 

@@ -64,7 +64,7 @@ public class ContFramePopTest {
 
     public void runTest() {
         log("\n####  runTest: started  ####\n");
-        Continuation cont = new Continuation(FOO, ()-> { 
+        Continuation cont = new Continuation(FOO, ()-> {
             double dval = 0;
 
             log("\n##    cont: started     ##\n");
@@ -74,9 +74,9 @@ public class ContFramePopTest {
 
                 log("\n cont: iteration #" + (k - 1));
 
-                log("\n<<<< runTest: before foo(): " + ival + ", " + str + ", " + dval + " <<<<"); 
+                log("\n<<<< runTest: before foo(): " + ival + ", " + str + ", " + dval + " <<<<");
                 dval += foo(k);
-	        log(  ">>>> runTest:  after foo(): " + ival + ", " + str + ", " + dval + " >>>>"); 
+	        log(  ">>>> runTest:  after foo(): " + ival + ", " + str + ", " + dval + " >>>>");
             }
             log("\n##    cont: finished    ##\n");
         });
@@ -96,7 +96,7 @@ public class ContFramePopTest {
         log("\n####   foo: started  ####\n");
         log("foo: before bar(): " + lval + ", " + str1 + ", " + iarg);
         String str2 = bar(iarg + 1);
-	log("foo:  after bar(): " + lval + ", " + str1 + ", " + str2); 
+	log("foo:  after bar(): " + lval + ", " + str1 + ", " + str2);
 
         log("\n####   foo: finished ####\n");
         return Integer.parseInt(str2) + 1;
@@ -107,11 +107,11 @@ public class ContFramePopTest {
         String str = zzz();
 
         log("\n####   bar: started  ####\n");
-        log("bar: before yield(): " + dval + ", " + str + ", " + larg); 
+        log("bar: before yield(): " + dval + ", " + str + ", " + larg);
         Continuation.yield(FOO);
 
         long lval = larg + 1;
-        log("bar:  after yield(): " + dval + ", " + str + ", " + lval); 
+        log("bar:  after yield(): " + dval + ", " + str + ", " + lval);
 
         str = zzz();
 

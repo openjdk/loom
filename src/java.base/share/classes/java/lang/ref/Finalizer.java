@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -121,7 +121,6 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
         AccessController.doPrivileged(
             new PrivilegedAction<>() {
                 public Void run() {
-                    @SuppressWarnings("deprecation")
                     ThreadGroup tg = Thread.currentThread().getThreadGroup();
                     for (ThreadGroup tgn = tg;
                          tgn != null;
@@ -192,7 +191,6 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
 
     static {
         if (ENABLED) {
-            @SuppressWarnings("deprecation")
             ThreadGroup tg = Thread.currentThread().getThreadGroup();
             for (ThreadGroup tgn = tg;
                  tgn != null;

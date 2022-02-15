@@ -87,7 +87,7 @@ public class ThreadPerTaskExecutorTest {
             { Executors.newThreadPerTaskExecutor(virtualThreadFactory), },
         };
     }
-    
+
     /**
      * Schedules a thread to be interrupted after the given delay.
      */
@@ -126,7 +126,7 @@ public class ThreadPerTaskExecutorTest {
             assertEquals((int) future.get(), i);
         }
     }
-    
+
     /**
      * Test that newThreadPerTaskExecutor uses the specified thread factory.
      */

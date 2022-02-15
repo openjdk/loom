@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,6 +38,7 @@ class KQueuePoller extends Poller {
     private final long address;
 
     KQueuePoller(boolean read) throws IOException {
+        super(read);
         this.kqfd = KQueue.create();
         this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.address = KQueue.allocatePollArray(MAX_EVENTS_TO_POLL);

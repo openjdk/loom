@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2021, Azul Systems, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -568,8 +568,8 @@ protected:
   void    set_stack_size(size_t size)  { _stack_size = size; }
   address stack_end()  const           { return stack_base() - stack_size(); }
   void    record_stack_base_and_size();
-  void    register_thread_stack_with_NMT() NOT_NMT_RETURN;
-  void    unregister_thread_stack_with_NMT() NOT_NMT_RETURN;
+  void    register_thread_stack_with_NMT();
+  void    unregister_thread_stack_with_NMT();
 
   int     lgrp_id() const        { return _lgrp_id; }
   void    set_lgrp_id(int value) { _lgrp_id = value; }
@@ -699,7 +699,7 @@ class JavaThread: public Thread {
  private:
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
-  OopHandle      _vthread;
+  OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
   OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
@@ -1199,6 +1199,12 @@ private:
   void inc_held_monitor_count() { _held_monitor_count++; }
   void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
 
+  inline bool is_vthread_mounted() const;
+  inline ContinuationEntry* vthread_continuation() const;
+
+  enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
+  inline CarrierOrVirtual which_stack(address adr) const;
+
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -1260,6 +1266,8 @@ private:
 
   // Fast-locking support
   bool is_lock_owned(address adr) const;
+  bool is_lock_owned_current(address adr) const; // virtual if mounted, otherwise whole thread
+  bool is_lock_owned_carrier(address adr) const;
 
   // Accessors for vframe array top
   // The linked list of vframe arrays are sorted on sp. This means when we
@@ -1412,16 +1420,21 @@ private:
   // Returns the jni environment for this thread
   JNIEnv* jni_environment()                      { return &_jni_environment; }
 
+  // Returns the current thread as indicated by the given JNIEnv.
+  // We don't assert it is Thread::current here as that is done at the
+  // external JNI entry points where the JNIEnv is passed into the VM.
   static JavaThread* thread_from_jni_environment(JNIEnv* env) {
-    JavaThread *thread_from_jni_env = (JavaThread*)((intptr_t)env - in_bytes(jni_environment_offset()));
-    // Only return NULL if thread is off the thread list; starting to
-    // exit should not return NULL.
-    if (thread_from_jni_env->is_terminated()) {
-      thread_from_jni_env->block_if_vm_exited();
-      return NULL;
-    } else {
-      return thread_from_jni_env;
+    JavaThread* current = (JavaThread*)((intptr_t)env - in_bytes(jni_environment_offset()));
+    // We can't get here in a thread that has completed its execution and so
+    // "is_terminated", but a thread is also considered terminated if the VM
+    // has exited, so we have to check this and block in case this is a daemon
+    // thread returning to the VM (the JNI DirectBuffer entry points rely on
+    // this).
+    if (current->is_terminated()) {
+      current->block_if_vm_exited();
+      ShouldNotReachHere();
     }
+    return current;
   }
 
   // JNI critical regions. These can nest.

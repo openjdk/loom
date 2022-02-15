@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,7 +27,7 @@
  * @library /test/lib
  * @build jdk.test.lib.Utils
  * @compile --enable-preview -source ${jdk.version} Timeouts.java
- * @run testng/othervm/timeout=180  --enable-preview Timeouts
+ * @run testng/othervm/timeout=180 --enable-preview Timeouts
  * @summary Test Socket timeouts
  */
 

@@ -54,7 +54,7 @@ public class resumethrd02 extends DebugeeClass {
     }
 
     /* =================================================================== */
-    
+
     long timeout = 0;
     int status = DebugeeClass.TEST_PASSED;
 

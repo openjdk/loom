@@ -451,22 +451,15 @@ public class LockSupport {
     }
 
     /**
-     * Returns the thread id for the given thread.  We must access
-     * this directly rather than via method Thread.getId() because
-     * getId() has been known to be overridden in ways that do not
-     * preserve unique mappings.
+     * Returns the thread id for the given thread.
      */
     static final long getThreadId(Thread thread) {
-        // need to keep in sync with Thread::getId
-        return U.getLong(thread, TID) & TID_MASK;
+        return thread.threadId();
     }
 
     // Hotspot implementation via intrinsics API
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final long PARKBLOCKER
         = U.objectFieldOffset(Thread.class, "parkBlocker");
-    private static final long TID
-        = U.objectFieldOffset(Thread.class, "tid");
-    private static final long TID_MASK = (1L << 48) - 1;
 
 }

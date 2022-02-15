@@ -26,7 +26,7 @@
  * @summary Functional test for continuations that are preempted and walked with StackWalker's LiveStackFrames
  * @build java.base/java.lang.PreemptLiveFrames
  * @modules java.base/jdk.internal.vm
- * 
+ *
  * @run main/othervm -Xint PreemptLiveFramesDriver
  * @run main/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
  * @run main/othervm -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver

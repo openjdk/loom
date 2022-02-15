@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -543,7 +543,7 @@ const intx ObjectAlignmentInBytes = 8;
           "compression. Otherwise the level must be between 1 and 9.")      \
           range(0, 9)                                                       \
                                                                             \
-  product(ccstr, NativeMemoryTracking, "off",                               \
+  product(ccstr, NativeMemoryTracking, DEBUG_ONLY("summary") NOT_DEBUG("off"), \
           "Native memory tracking options")                                 \
                                                                             \
   product(bool, PrintNMTStatistics, false, DIAGNOSTIC,                      \
@@ -805,9 +805,6 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, CrashOnOutOfMemoryError, false,                             \
           "JVM aborts, producing an error log and core/mini dump, on the "  \
           "first occurrence of an out-of-memory error thrown from JVM")     \
-                                                                            \
-  product(bool, DetectLocksInCompiledFrames, true,                          \
-          "Detect monitors in continuation compiled frames")                \
                                                                             \
   /* tracing */                                                             \
                                                                             \
@@ -1194,10 +1191,6 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, VerifyJNIFields, trueInDebug,                               \
           "Verify jfieldIDs for instance fields")                           \
                                                                             \
-  notproduct(bool, VerifyJNIEnvThread, false,                               \
-          "Verify JNIEnv.thread == Thread::current() when entering VM "     \
-          "from JNI")                                                       \
-                                                                            \
   develop(bool, VerifyFPU, false,                                           \
           "Verify FPU state (check for NaN's, etc.)")                       \
                                                                             \
@@ -1347,11 +1340,6 @@ const intx ObjectAlignmentInBytes = 8;
   develop(intx, MaxForceInlineLevel, 100,                                   \
           "maximum number of nested calls that are forced for inlining "    \
           "(using CompileCommand or marked w/ @ForceInline)")               \
-          range(0, max_jint)                                                \
-                                                                            \
-  product(intx, MinInliningThreshold, 0,                                    \
-          "(Deprecated) The minimum invocation count a method needs to"     \
-          "have to be inlined")                                             \
           range(0, max_jint)                                                \
                                                                             \
   develop(intx, MethodHistogramCutoff, 100,                                 \
@@ -1729,9 +1717,6 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, UseNewCode3, false, DIAGNOSTIC,                             \
           "Testing Only: Use the new version while testing")                \
                                                                             \
-  product(intx, ContPerfTest, 1000, DIAGNOSTIC,                             \
-          "Testing Only: Use the new version while testing")                \
-                                                                            \
   notproduct(bool, UseDebuggerErgo, false,                                  \
           "Debugging Only: Adjust the VM to be more debugger-friendly. "    \
           "Turns on the other UseDebuggerErgo* flags")                      \
@@ -1812,6 +1797,9 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   product(bool, RecordDynamicDumpInfo, false,                               \
           "Record class info for jcmd VM.cds dynamic_dump")                 \
+                                                                            \
+  product(bool, AutoCreateSharedArchive, false,                             \
+          "Create shared archive at exit if cds mapping failed")            \
                                                                             \
   product(bool, PrintSharedArchiveAndExit, false,                           \
           "Print shared archive file contents")                             \
@@ -2003,22 +1991,16 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
-  product(bool, LoomGenCode, true,                                          \
-          "Generate oopmap code")                                           \
-                                                                            \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
                                                                             \
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, UseContinuationStrong, true,                                \
-          "The weak keepalive is considered strong on stack")               \
-                                                                            \
   product(bool, TrimContinuationChunksInGC, false,                          \
          "Trim stack chunks when copying objects in GC")                    \
                                                                             \
-  product(bool, UseChunkBitmaps, false,                                    \
+  product(bool, UseChunkBitmaps, false,                                     \
          "Generate oop bitmaps for continuation chunks")                    \
                                                                             \
   product(bool, UseContinuationFastPath, true,                              \

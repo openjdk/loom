@@ -33,7 +33,7 @@ public class NullAsCurrentThreadTest {
     private static void log (String msg) { System.out.println(msg); }
     private static Object lock = new Object();
 
-    native static boolean failedStatus(); 
+    native static boolean failedStatus();
     native static void testJvmtiFunctions();
 
     static int factorial(int num) {
@@ -53,7 +53,7 @@ public class NullAsCurrentThreadTest {
         }
     };
 
-    void runTest() throws Exception { 
+    void runTest() throws Exception {
         Thread vthread = Thread.ofVirtual().name("TestedVThread").start(pinnedTask);
         vthread.join();
     }
@@ -65,7 +65,7 @@ public class NullAsCurrentThreadTest {
             log("Java App: Failed to load " + AGENT_LIB + " lib");
             log("Java App: java.library.path: " + System.getProperty("java.library.path"));
             throw ex;
-        } 
+        }
         NullAsCurrentThreadTest tst = new NullAsCurrentThreadTest();
         tst.runTest();
         boolean failed = failedStatus();

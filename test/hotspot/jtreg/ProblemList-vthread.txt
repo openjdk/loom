@@ -2,6 +2,7 @@
 
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
 
+
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
 
@@ -163,6 +164,7 @@ runtime/cds/appcds/CDSandJFR.java
 runtime/cds/appcds/ClassPathAttr.java
 runtime/cds/appcds/CommandLineFlagCombo.java
 runtime/cds/appcds/DumpClassList.java
+runtime/cds/appcds/DumpingWithNoCoops.java
 runtime/cds/appcds/ExtraSymbols.java
 runtime/cds/appcds/FieldAnnotationsTest.java
 runtime/cds/appcds/FieldLayoutFlags.java
@@ -193,6 +195,7 @@ runtime/cds/appcds/SignedJar.java
 runtime/cds/appcds/SpecifySysLoaderProp.java
 runtime/cds/appcds/StaticArchiveWithLambda.java
 runtime/cds/appcds/TestCombinedCompressedFlags.java
+runtime/cds/appcds/TestDumpClassListSource.java
 runtime/cds/appcds/TestWithProfiler.java
 runtime/cds/appcds/TestEpsilonGCWithCDS.java
 runtime/cds/appcds/TestSerialGCWithCDS.java
@@ -263,6 +266,7 @@ runtime/cds/appcds/dynamicArchive/RelativePath.java
 runtime/cds/appcds/dynamicArchive/SharedArchiveFileOption.java
 runtime/cds/appcds/dynamicArchive/SharedBaseAddressOption.java
 runtime/cds/appcds/dynamicArchive/StaticInnerTest.java
+runtime/cds/appcds/dynamicArchive/TestAutoCreateSharedArchive.java
 runtime/cds/appcds/dynamicArchive/UnsafeAndLambda.java
 runtime/cds/appcds/dynamicArchive/UnsafeAnonymous.java
 runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java
@@ -277,6 +281,7 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesInvokersTest.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
+runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
 runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
 runtime/cds/appcds/javaldr/ArrayTest.java
 runtime/cds/appcds/javaldr/GCDuringDump.java

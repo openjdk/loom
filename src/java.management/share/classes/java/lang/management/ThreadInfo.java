@@ -224,7 +224,7 @@ public class ThreadInfo {
                             StackTraceElement[] stackTrace,
                             MonitorInfo[] lockedMonitors,
                             LockInfo[] lockedSynchronizers) {
-        this.threadId = t.getId();
+        this.threadId = t.threadId();
         this.threadName = t.getName();
         this.threadState = ManagementFactoryHelper.toThreadState(state);
         this.suspended = ManagementFactoryHelper.isThreadSuspended(state);
@@ -249,7 +249,7 @@ public class ThreadInfo {
             this.lockOwnerId = -1;
             this.lockOwnerName = null;
         } else {
-            this.lockOwnerId = lockOwner.getId();
+            this.lockOwnerId = lockOwner.threadId();
             this.lockOwnerName = lockOwner.getName();
         }
         if (stackTrace == null) {

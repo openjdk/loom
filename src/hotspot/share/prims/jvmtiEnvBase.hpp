@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -90,9 +90,9 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
 
   // check if thread_oop represents a passive carrier thread
   static bool is_passive_carrier_thread(JavaThread* java_thread, oop thread_oop) {
-     return java_thread != NULL && java_thread->mounted_vthread() != NULL
-                                && java_thread->threadObj() == thread_oop
-                                && java_thread->vthread() != thread_oop;
+    return java_thread != NULL && java_thread->mounted_vthread() != NULL
+                               && java_thread->mounted_vthread() != thread_oop
+                               && java_thread->threadObj() == thread_oop;
   }
 
  private:

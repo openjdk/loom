@@ -42,8 +42,8 @@ import jdk.internal.misc.VM;
 public class ReferenceQueue<T> {
     private static class Null extends ReferenceQueue<Object> {
         public Null() { super(0); }
-        
-        @Override 
+
+        @Override
         boolean enqueue(Reference<?> r) {
             return false;
         }
@@ -60,7 +60,7 @@ public class ReferenceQueue<T> {
 
     void signal() { notEmpty.signalAll(); }
     void await() throws InterruptedException { notEmpty.await(); }
-    void await(long timeoutMillis) throws InterruptedException { 
+    void await(long timeoutMillis) throws InterruptedException {
         notEmpty.await(timeoutMillis, TimeUnit.MILLISECONDS);
     }
 
@@ -103,7 +103,7 @@ public class ReferenceQueue<T> {
     final boolean headIsNull() {
         return head == null;
     }
-    
+
     final Reference<? extends T> poll0() { // must hold lock
         Reference<? extends T> r = head;
         if (r != null) {
@@ -127,7 +127,7 @@ public class ReferenceQueue<T> {
         return null;
     }
 
-    final Reference<? extends T> remove0(long timeout) 
+    final Reference<? extends T> remove0(long timeout)
             throws IllegalArgumentException, InterruptedException { // must hold lock
         Reference<? extends T> r = poll0();
         if (r != null) return r;
@@ -200,7 +200,7 @@ public class ReferenceQueue<T> {
      * @throws  InterruptedException
      *          If the timeout wait is interrupted
      */
-    public Reference<? extends T> remove(long timeout) 
+    public Reference<? extends T> remove(long timeout)
         throws IllegalArgumentException, InterruptedException {
         if (timeout < 0) throw new IllegalArgumentException("Negative timeout value");
         if (timeout == 0) return remove();

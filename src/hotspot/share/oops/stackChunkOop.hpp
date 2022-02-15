@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +37,11 @@ class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
+
+enum chunk_frames { COMPILED_ONLY, MIXED };
+enum gc_type { STW, CONCURRENT }; // GC moving
+enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
+
 // A continuation stack-chunk oop.
 // See InstanceStackChunkKlass for a description of continuation stack-chunks.
 //
@@ -46,9 +51,9 @@ class stackChunkOopDesc : public instanceOopDesc {
 private:
   // Chunk flags.
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
-  static const uint8_t FLAG_GC_MODE = 1 << 2; // once this is true, it can never be false; also, once true, FLAG_HAS_INTERPRETED_FRAMES can't change
+  static const uint8_t FLAG_GC_MODE = 1 << 2; // once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
   static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
-  
+
 public:
   inline stackChunkOopDesc* parent() const;
   inline void set_parent(stackChunkOopDesc* value);
@@ -67,10 +72,6 @@ public:
   inline void set_flags(uint8_t value);
   inline int max_size() const;
   inline void set_max_size(int value);
-  inline int numFrames() const;
-  inline void set_numFrames(int value);
-  inline int numOops() const;
-  inline void set_numOops(int value);
   inline int gc_sp() const;
   inline void set_gc_sp(int value);
   inline uint64_t mark_cycle() const;
@@ -102,10 +103,9 @@ public:
   inline void set_gc_mode(bool value);
   inline bool has_bitmap() const;
   inline void set_has_bitmap(bool value);
-  template <typename OopT, bool concurrent_gc> inline bool should_fix() const;
+  template <typename OopT, gc_type gc> inline bool should_fix() const;
   bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
-  inline void reset_counters();
 
   inline BitMapView bitmap() const;
   inline BitMap::idx_t bit_offset() const;
@@ -114,11 +114,10 @@ public:
   template <typename OopT> inline BitMap::idx_t bit_index_for(OopT* p) const;
   template <typename OopT> inline OopT* address_for_bit(BitMap::idx_t index) const;
 
-  //
-  bool verify(size_t* out_size = NULL, int* out_oops = NULL, int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
+  bool verify(size_t* out_size = NULL, int* out_oops = NULL,
+              int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
-  // template <bool mixed, typename RegisterMapT> bool do_frame(const StackChunkFrameStream<mixed>&, const RegisterMapT*);
-  template <class StackChunkFrameClosureType> 
+  template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   MemRegion range();
@@ -141,8 +140,8 @@ public:
 
   int num_java_frames() const;
 
-  template <bool dword_aligned> inline void copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size);
-  template <bool dword_aligned> inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
+  template <copy_alignment alignment> inline void copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size);
+  template <copy_alignment alignment> inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
 
   using oopDesc::print_on;
   void print_on(bool verbose, outputStream* st) const;
@@ -151,7 +150,8 @@ public:
   inline frame derelativize(frame fr) const;
 
 private:
-  template <bool mixed, class StackChunkFrameClosureType> inline void iterate_stack(StackChunkFrameClosureType* closure);
+  template <chunk_frames frames, class StackChunkFrameClosureType>
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
   inline intptr_t* relative_base() const;
 
   inline void relativize_frame(frame& fr) const;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2144,7 +2144,7 @@ JDWP "Java(tm) Debug Wire Protocol"
     (Command IsVirtual=15
         "<b>IsVirtual is a preview API of the Java platform.</b> "
         "<em>Preview features may be removed in a future release, or upgraded to "
-        "permanent features of the Java platform.</em>"
+        "permanent features of the Java platform.</em> Since JDWP version 19."
         "<p>"
         "Determine if a thread is a "
         "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual thread</a>."
@@ -2527,7 +2527,7 @@ JDWP "Java(tm) Debug Wire Protocol"
                     (Alt PlatformThreadsOnly=13
                         "<b>PlatformThreadsOnly is a preview API of the Java platform.</b> "
                         "<em>Preview features may be removed in a future release, or upgraded to "
-                        "permanent features of the Java platform.</em>"
+                        "permanent features of the Java platform.</em> Since JDWP version 19."
                         "<p>"
                         "For thread start and thread end events, restrict the "
                         "events so they are only sent for platform threads."

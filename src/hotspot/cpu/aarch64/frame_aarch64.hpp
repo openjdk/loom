@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -122,7 +122,12 @@
   // original sp we use that convention.
 
   intptr_t*     _unextended_sp;
-  void adjust_unextended_sp();
+  void adjust_unextended_sp() NOT_DEBUG_RETURN;
+
+  // true means _sp value is correct and we can use it to get the sender's sp
+  // of the compiled frame, otherwise, _sp value may be invalid and we can use
+  // _fp to get the sender's sp if PreserveFramePointer is enabled.
+  bool _sp_is_trusted;
 
   intptr_t* ptr_at_addr(int offset) const {
     return (intptr_t*) addr_at(offset);
@@ -164,14 +169,11 @@
   inline address  sender_pc_maybe_signed() const;
 
   // expression stack tos if we are nested in a java call
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   intptr_t* interpreter_frame_last_sp() const;
 
-  // helper to update a map with callee-saved RBP
   template <typename RegisterMapT>
   static void update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr);
-  template <typename RegisterMapT>
-  static intptr_t** saved_link_address(const RegisterMapT* map);
 
   // deoptimization support
   void interpreter_frame_set_last_sp(intptr_t* sp);
@@ -180,5 +182,7 @@
 
   // returns the sending frame, without applying any barriers
   inline frame sender_raw(RegisterMap* map) const;
+
+  void set_sp_is_trusted() { _sp_is_trusted = true; }
 
 #endif // CPU_AARCH64_FRAME_AARCH64_HPP

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -76,8 +76,7 @@ public class GetStackTraceALot {
     }
 
     public static void main(String[] args) throws Exception {
-        int iterations = args.length > 0 ? Integer.parseInt(args[0]) 
-                                         : 10_000;
+        int iterations = args.length > 0 ? Integer.parseInt(args[0])  : 10_000;
 
         final int ITERATIONS = iterations;
         final int SPIN_NANOS = 5000;

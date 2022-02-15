@@ -298,7 +298,6 @@ abstract class SeedGenerator {
             Thread t = java.security.AccessController.doPrivileged
                 (new java.security.PrivilegedAction<>() {
                         @Override
-                        @SuppressWarnings("deprecation")
                         public Thread run() {
                             ThreadGroup parent, group =
                                 Thread.currentThread().getThreadGroup();

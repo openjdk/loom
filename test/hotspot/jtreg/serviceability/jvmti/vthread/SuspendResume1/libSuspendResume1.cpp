@@ -112,7 +112,7 @@ get_cthreads(JNIEnv* jni, jthread** cthreads_p) {
   }
   *cthreads_p = tested_cthreads;
   return ct_cnt;
-} 
+}
 
 static void
 check_suspended_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, const char* func_name) {

@@ -127,7 +127,7 @@ static void
 breakpoint_hit1(jvmtiEnv *jvmti, JNIEnv* jni,
                 jthread thread, jthread cthread,
                 jboolean is_virtual, char* mname) {
-  char* tname = get_thread_name(jvmti, jni, thread);
+  char* tname = get_thread_name(jvmti, jni, cthread);
   jthread vthread = NULL;
   jvmtiError err;
 
@@ -193,7 +193,7 @@ breakpoint_hit2(jvmtiEnv *jvmti, JNIEnv* jni,
                 jthread thread, jthread cthread,
                 jboolean is_virtual, char* mname) {
   jvmtiError err;
-    
+
   // Verify that we did not get a METHOD_EXIT events when enabled on the cthread.
   if (received_method_exit_event) {
     passed = JNI_FALSE;
@@ -369,6 +369,7 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 static void JNICALL
 ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
   char* tname = get_thread_name(jvmti, jni, cthread);
+  long loc_tls_data = 0;
   jvmtiError err;
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -379,6 +380,16 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
   err = jvmti->SetThreadLocalStorage(cthread, (void*)111);
   check_jvmti_status(jni, err, "ThreadStart: error in JVMTI SetThreadLocalStorage");
 
+  // Test GetThreadLocalStorage for carrier thread.
+  err = jvmti->GetThreadLocalStorage(cthread, (void**)&loc_tls_data);
+  check_jvmti_status(jni, err, "ThreadStart: error in JVMTI GetThreadLocalStorage");
+
+  if (loc_tls_data != 111) {
+    passed = JNI_FALSE;
+    LOG("ThreadStart: FAILED: GetThreadLocalStorage for carrier thread returned value: %d, expected 111\n\n", (int)loc_tls_data);
+  } else {
+    LOG("ThreadStart: GetThreadLocalStorage for carrier thread returned value %d as expected\n\n", (int)loc_tls_data);
+  }
 
   deallocate(jvmti, jni, (void*)tname);
 }

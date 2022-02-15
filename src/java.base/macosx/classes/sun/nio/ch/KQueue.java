@@ -47,6 +47,9 @@ class KQueue {
      *        void            *udata;         // opaque user data identifier
      * };
      */
+    static {
+        IOUtil.load();
+    }
     private static final int SIZEOF_KQUEUEEVENT    = keventSize();
     private static final int OFFSET_IDENT          = identOffset();
     private static final int OFFSET_FILTER         = filterOffset();
@@ -114,8 +117,4 @@ class KQueue {
 
     static native int poll(int kqfd, long pollAddress, int nevents, long timeout)
         throws IOException;
-
-    static {
-        IOUtil.load();
-    }
 }

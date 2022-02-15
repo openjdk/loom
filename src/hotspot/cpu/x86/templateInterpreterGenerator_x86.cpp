@@ -366,7 +366,7 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
         TosState state,
         address runtime_entry) {
   address entry = __ pc();
-  
+
   const Register rthread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
 
   __ push(state);
@@ -674,7 +674,7 @@ address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) 
   const Register thread1 = NOT_LP64(rdi) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread1));
   __ push_cont_fastpath(thread1);
-  
+
   __ jump(RuntimeAddress(CAST_FROM_FN_PTR(address, StubRoutines::cont_doYield())));
   // return value is in rax
 

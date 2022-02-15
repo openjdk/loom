@@ -26,7 +26,7 @@
 import jdk.jfr.consumer.RecordingStream;
 
 /**
- * @test Re-written from jfr test ObjectAllocationSampleEvent 
+ * @test Re-written from jfr test ObjectAllocationSampleEvent
  * @summary Tests ObjectAllocationSampleEvent
  * @requires vm.hasJFR
  * @library /test/lib
@@ -44,13 +44,13 @@ public class TestObjectAllocationSampleEvent {
 class Task implements Runnable {
 
     public void run() {
-        
+
         // Needs to wait for crash...
         try {
-            RecordingStream rs = new RecordingStream();            
+            RecordingStream rs = new RecordingStream();
             Thread.sleep(1_000);
         } catch(Exception e) {
             throw new RuntimeException(e);
-        }    
+        }
     }
 }

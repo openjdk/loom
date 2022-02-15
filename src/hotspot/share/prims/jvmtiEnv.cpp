@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -960,7 +960,7 @@ JvmtiEnv::SuspendThread(jthread thread) {
     if (java_thread != current) {
       err = suspend_thread(thread_oop, java_thread, true, NULL); // single suspend
       return err;
-    } 
+    }
   }
   // Do self suspend for current JavaThread.
   err = suspend_thread(thread_oop, current, true, NULL); // single suspend
@@ -1610,10 +1610,12 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
   const char* name;
   Handle parent_group;
   ThreadPriority max_priority;
+  bool is_daemon;
 
   name         = java_lang_ThreadGroup::name(group_obj());
   parent_group = Handle(current_thread, java_lang_ThreadGroup::parent(group_obj()));
   max_priority = java_lang_ThreadGroup::maxPriority(group_obj());
+  is_daemon    = java_lang_ThreadGroup::is_daemon(group_obj());
 
   if (name != NULL) {
     info_ptr->name = (char*)jvmtiMalloc(strlen(name)+1);
@@ -1625,7 +1627,7 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 
   info_ptr->parent       = jni_reference(parent_group);
   info_ptr->max_priority = max_priority;
-  info_ptr->is_daemon    = JNI_FALSE;
+  info_ptr->is_daemon    = is_daemon;
 
   return JVMTI_ERROR_NONE;
 } /* end GetThreadGroupInfo */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,7 +30,7 @@
 #include "cds/heapShared.hpp"
 #include "cds/lambdaFormInvokers.hpp"
 #include "classfile/classFileStream.hpp"
-#include "classfile/classLoader.hpp"
+#include "classfile/classLoader.inline.hpp"
 #include "classfile/classLoaderData.hpp"
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/classLoadInfo.hpp"
@@ -2853,7 +2853,7 @@ void jio_print(const char* s, size_t len) {
     jio_fprintf(defaultStream::output_stream(), "%.*s", (int)len, s);
   } else {
     // Make an unused local variable to avoid warning from gcc compiler.
-    size_t count = ::write(defaultStream::output_fd(), s, (int)len);
+    ssize_t count = os::write(defaultStream::output_fd(), s, (int)len);
   }
 }
 
@@ -3408,6 +3408,11 @@ JVM_END
 
 // Library support ///////////////////////////////////////////////////////////////////////////
 
+JVM_LEAF(void*, JVM_LoadZipLibrary())
+  ClassLoader::load_zip_library_if_needed();
+  return ClassLoader::zip_library_handle();
+JVM_END
+
 JVM_ENTRY_NO_ENV(void*, JVM_LoadLibrary(const char* name, jboolean throwException))
   //%note jvm_ct
   char ebuf[1024];
@@ -3719,9 +3724,9 @@ JVM_ENTRY(void, JVM_LogLambdaFormInvoker(JNIEnv *env, jstring line))
     Handle h_line (THREAD, JNIHandles::resolve_non_null(line));
     char* c_line = java_lang_String::as_utf8_string(h_line());
     if (DynamicDumpSharedSpaces) {
-      // Note: LambdaFormInvokers::append_filtered and LambdaFormInvokers::append take same format which is not
+      // Note: LambdaFormInvokers::append take same format which is not
       // same as below the print format. The line does not include LAMBDA_FORM_TAG.
-      LambdaFormInvokers::append_filtered(os::strdup((const char*)c_line, mtInternal));
+      LambdaFormInvokers::append(os::strdup((const char*)c_line, mtInternal));
     }
     if (ClassListWriter::is_enabled()) {
       ClassListWriter w;
@@ -3925,12 +3930,16 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   if (first_mount) {
     // thread start
     if (JvmtiExport::can_support_virtual_threads()) {
+      JvmtiEventController::thread_started(thread);
       if (JvmtiExport::should_post_vthread_start()) {
         JvmtiExport::post_vthread_start(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_start
       if (JvmtiExport::should_post_thread_life()) {
+        // JvmtiEventController::thread_started is called here
         JvmtiExport::post_thread_start(thread);
+      } else {
+        JvmtiEventController::thread_started(thread);
       }
     }
   }
@@ -3964,6 +3973,13 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
 
   assert(!thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::start_VTMT(vthread, 1);
+
+  if (last_unmount && thread->jvmti_thread_state() != NULL) {
+    JvmtiExport::cleanup_thread(thread);
+    thread->set_jvmti_thread_state(NULL);
+    oop vt = JNIHandles::resolve(vthread);
+    java_lang_Thread::set_jvmti_thread_state(vt, NULL);
+  }
   thread->rebind_to_jvmti_thread_state_of(ct());
 #else
   fatal("Should only be called with JVMTI enabled");

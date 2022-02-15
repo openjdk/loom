@@ -157,7 +157,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 
   if (strcmp(mname, "getNextFib") != 0) {
     deallocate(jvmti, jni, (void*)mname);
-    return; // ignore unrelated events 
+    return; // ignore unrelated events
   }
   print_frame_event_info(jvmti, jni, thread, method,
                          "SingleStep", ++single_step_count);
@@ -256,7 +256,7 @@ Java_ContStackDepthTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread) 
       LOG("enableEvents: found method fibTest() to set a breakpoint\n");
 
       method = meth;
-    } 
+    }
     deallocate(jvmti, jni, (void*)mname);
   }
   if (method == NULL) {

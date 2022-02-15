@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2052,7 +2052,7 @@ int java_lang_Thread::_scopeLocalBindings_offset;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
-  macro(_scopeLocalBindings_offset, k, "scopeLocalBindings", scopeLocalSnapshot_name, false);
+  macro(_scopeLocalBindings_offset, k, "scopeLocalBindings", object_signature, false);
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -2274,15 +2274,14 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       }
 
       bool carrier = false;
-      oop vthread_scope = java_lang_VirtualThread::vthread_scope();
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->last_continuation(vthread_scope)->cont_oop() !=
+        if (thread->vthread_continuation()->cont_oop() !=
               java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
-        carrier = (thread->last_continuation(vthread_scope) != NULL);
+        carrier = (thread->vthread_continuation() != NULL);
       }
 
       const int max_depth = MaxJavaStackTraceDepth;
@@ -2365,6 +2364,7 @@ const char* java_lang_Thread::thread_status_name(oop java_thread) {
 int java_lang_ThreadGroup::_parent_offset;
 int java_lang_ThreadGroup::_name_offset;
 int java_lang_ThreadGroup::_maxPriority_offset;
+int java_lang_ThreadGroup::_daemon_offset;
 int java_lang_ThreadGroup::_ngroups_offset;
 int java_lang_ThreadGroup::_groups_offset;
 int java_lang_ThreadGroup::_nweaks_offset;
@@ -2389,6 +2389,11 @@ const char* java_lang_ThreadGroup::name(oop java_thread_group) {
 ThreadPriority java_lang_ThreadGroup::maxPriority(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
   return (ThreadPriority) java_thread_group->int_field(_maxPriority_offset);
+}
+
+bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
+  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
+  return java_thread_group->bool_field(_daemon_offset) != 0;
 }
 
 int java_lang_ThreadGroup::ngroups(oop java_thread_group) {
@@ -2417,6 +2422,7 @@ objArrayOop java_lang_ThreadGroup::weaks(oop java_thread_group) {
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
   macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
+  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
   macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false); \
   macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
   macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,               false); \
@@ -5044,7 +5050,6 @@ int jdk_internal_vm_Continuation::_tail_offset;
 int jdk_internal_vm_Continuation::_parent_offset;
 int jdk_internal_vm_Continuation::_yieldInfo_offset;
 int jdk_internal_vm_Continuation::_cs_offset;
-int jdk_internal_vm_Continuation::_reset_offset;
 int jdk_internal_vm_Continuation::_mounted_offset;
 int jdk_internal_vm_Continuation::_done_offset;
 int jdk_internal_vm_Continuation::_preempted_offset;
@@ -5072,7 +5077,6 @@ void jdk_internal_vm_ContinuationScope::serialize_offsets(SerializeClosure* f) {
   macro(_yieldInfo_offset, k, vmSymbols::yieldInfo_name(), object_signature,            false); \
   macro(_tail_offset,      k, vmSymbols::tail_name(),      stackchunk_signature,        false); \
   macro(_cs_offset,        k, vmSymbols::cs_name(),        short_signature,             false); \
-  macro(_reset_offset,     k, vmSymbols::reset_name(),     bool_signature,              false); \
   macro(_mounted_offset,   k, vmSymbols::mounted_name(),   bool_signature,              false); \
   macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
   macro(_preempted_offset, k, "preempted",                 bool_signature,              false);
@@ -5099,8 +5103,6 @@ int jdk_internal_vm_StackChunk::_flags_offset;
 int jdk_internal_vm_StackChunk::_gcSP_offset;
 int jdk_internal_vm_StackChunk::_markCycle_offset;
 int jdk_internal_vm_StackChunk::_maxSize_offset;
-int jdk_internal_vm_StackChunk::_numFrames_offset;
-int jdk_internal_vm_StackChunk::_numOops_offset;
 int jdk_internal_vm_StackChunk::_cont_offset;
 
 #define STACKCHUNK_FIELDS_DO(macro) \
@@ -5113,8 +5115,6 @@ int jdk_internal_vm_StackChunk::_cont_offset;
   macro(_gcSP_offset,      k, "gcSP",                      int_signature,        false); \
   macro(_markCycle_offset, k, "markCycle",                 long_signature,       false); \
   macro(_maxSize_offset,   k, vmSymbols::maxSize_name(),   int_signature,        false); \
-  macro(_numFrames_offset, k, vmSymbols::numFrames_name(), int_signature,        false); \
-  macro(_numOops_offset,   k, vmSymbols::numOops_name(),   int_signature,        false); \
   macro(_cont_offset,      k, "cont",                      continuation_signature, false);
 
 void jdk_internal_vm_StackChunk::compute_offsets() {

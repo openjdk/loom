@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <?xml-stylesheet type="text/xsl" href="jvmti.xsl"?>
 <!--
- Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 
  This code is free software; you can redistribute it and/or modify it
@@ -1725,7 +1725,7 @@ jvmtiEnv *jvmti;
       </errors>
     </function>
 
-    <function id="SuspendAllVirtualThreads" num="118" since="99">
+    <function id="SuspendAllVirtualThreads" num="118" since="19">
       <synopsis>Suspend All Virtual Threads</synopsis>
       <description>
         <b> SuspendAllVirtualThreads is a preview API of the Java platform. </b>
@@ -1853,7 +1853,7 @@ jvmtiEnv *jvmti;
       </errors>
     </function>
 
-   <function id="ResumeAllVirtualThreads" num="119" since="99">
+   <function id="ResumeAllVirtualThreads" num="119" since="19">
       <synopsis>Resume All Virtual Threads</synopsis>
       <description>
         <b> ResumeAllVirtualThreads is a preview API of the Java platform. </b>
@@ -2408,8 +2408,7 @@ jvmtiEnv *jvmti;
         <field id="is_daemon">
           <jboolean/>
           <description>
-            <code>JNI_FALSE</code>.
-            The concept of daemon thread group no longer exists.
+            Is this a daemon thread group?
           </description>
         </field>
       </typedef>
@@ -10577,7 +10576,7 @@ myInit() {
           called and <eventlink id="SampledObjectAlloc"></eventlink> events can be generated.
         </description>
       </capabilityfield>
-      <capabilityfield id="can_support_virtual_threads" since="99">
+      <capabilityfield id="can_support_virtual_threads" since="19">
         <description>
           <b> can_support_virtual_threads is a preview API of the Java platform. </b>
           <i>Preview features may be removed in a future release, or upgraded to
@@ -12947,7 +12946,7 @@ myInit() {
   </event>
 
  <event label="Virtual Thread Start"
-         id="VirtualThreadStart" const="JVMTI_EVENT_VIRTUAL_THREAD_START" filtered="thread" num="87" phase="start" since="99">
+         id="VirtualThreadStart" const="JVMTI_EVENT_VIRTUAL_THREAD_START" filtered="thread" num="87" phase="start" since="19">
     <description>
       <b> VirtualThreadStart is a preview API of the Java platform. </b>
       <i>Preview features may be removed in a future release, or upgraded to
@@ -12980,7 +12979,7 @@ myInit() {
   </event>
 
   <event label="Virtual Thread End"
-         id="VirtualThreadEnd" const="JVMTI_EVENT_VIRTUAL_THREAD_END" filtered="thread" num="88" phase="start" since="99">
+         id="VirtualThreadEnd" const="JVMTI_EVENT_VIRTUAL_THREAD_END" filtered="thread" num="88" phase="start" since="19">
     <description>
       <b> VirtualThreadEnd is a preview API of the Java platform. </b>
       <i>Preview features may be removed in a future release, or upgraded to

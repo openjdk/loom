@@ -26,6 +26,8 @@ package jdk.internal.vm;
 
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.vm.annotation.DontInline;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
  * A stackable scope.
@@ -78,6 +80,7 @@ public class StackableScope {
      * at the top of stack.
      * @return true if the pop succeeded, false if this scope is not the top of stack
      */
+    @DontInline @ReservedStackAccess
     public boolean tryPop() {
         if (Thread.currentThread() != owner)
             throw new WrongThreadException("Not owner");
@@ -106,6 +109,7 @@ public class StackableScope {
      *
      * @return true if this scope was at the top of the stack, otherwise false
      */
+    @DontInline @ReservedStackAccess
     public boolean popForcefully() {
         if (Thread.currentThread() != owner)
             throw new WrongThreadException("Not owner");

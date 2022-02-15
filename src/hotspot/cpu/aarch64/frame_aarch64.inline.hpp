@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -44,6 +44,7 @@ inline frame::frame() {
   _fp = NULL;
   _cb = NULL;
   _deopt_state = unknown;
+  _sp_is_trusted = false;
 }
 
 static int spin;
@@ -58,7 +59,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
-  
+
   setup(pc);
 
   _oop_map = NULL;
@@ -80,6 +81,7 @@ inline void frame::setup(address pc) {
       _deopt_state = not_deoptimized;
     }
   }
+  _sp_is_trusted = false;
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -123,6 +125,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
+  _sp_is_trusted = false;
 #ifdef ASSERT
   // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
   // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
@@ -143,7 +146,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
-  
+
   setup(pc);
 }
 
@@ -178,6 +181,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   } else {
     _deopt_state = not_deoptimized;
   }
+  _sp_is_trusted = false;
 }
 
 // Accessors
@@ -250,40 +254,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
 }
 
-
-inline int frame::interpreted_frame_num_oops(InterpreterOopMap* mask) const {
-  return   mask->num_oops()
-        + 1 // for the mirror oop
-        + ((intptr_t*)interpreter_frame_monitor_begin() - (intptr_t*)interpreter_frame_monitor_end())/BasicObjectLock::size();
-}
-
-// helper to update a map with callee-saved RBP
-
-template <typename RegisterMapT>
-void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
-  // The interpreter and compiler(s) always save EBP/RBP in a known
-  // location on entry. We must record where that location is
-  // so this if EBP/RBP was live on callout from c2 we can find
-  // the saved copy no matter what it called.
-
-  // Since the interpreter always saves EBP/RBP if we record where it is then
-  // we don't have to always save EBP/RBP on entry and exit to c2 compiled
-  // code, on entry will be enough.
-  map->set_location(rfp->as_VMReg(), (address) link_addr);
-  // this is weird "H" ought to be at a higher address however the
-  // oopMaps seems to have the "H" regs at the same address and the
-  // vanilla register.
-  // XXXX make this go away
-  if (true) {
-    map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
-  }
-}
-
-template <typename RegisterMapT>
-intptr_t** frame::saved_link_address(const RegisterMapT* map) {
-  return (intptr_t**)map->location(rfp->as_VMReg());
-}
-
 // Return address:
 
 inline address* frame::sender_pc_addr()         const { return (address*) addr_at( return_addr_offset); }
@@ -296,9 +266,9 @@ inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
-  return (intptr_t*)at<relative>(interpreter_frame_last_sp_offset);
+  return (intptr_t*)at<pointers>(interpreter_frame_last_sp_offset);
 }
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
@@ -329,16 +299,16 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-  intptr_t* last_sp = interpreter_frame_last_sp<relative>();
+  intptr_t* last_sp = interpreter_frame_last_sp<pointers>();
   if (last_sp == NULL) {
     return sp();
   } else {
     // sp() may have been extended or shrunk by an adapter.  At least
     // check that we don't fall behind the legal region.
     // For top deoptimized frame last_sp == interpreter_frame_monitor_end.
-    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<relative>(), "bad tos");
+    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<pointers>(), "bad tos");
     return last_sp;
   }
 }
@@ -355,9 +325,9 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
-  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<relative>();
+  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<pointers>();
   return monitor_end-1;
 }
 
@@ -417,6 +387,18 @@ inline const ImmutableOopMap* frame::get_oop_map() const {
   return NULL;
 }
 
+//------------------------------------------------------------------------------
+// frame::sender
+inline frame frame::sender(RegisterMap* map) const {
+  frame result = sender_raw(map);
+
+  if (map->process_frames() && !map->in_cont()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+
+  return result;
+}
+
 inline frame frame::sender_raw(RegisterMap* map) const {
   // Default is we done have to follow them. The sender_for_xxx will
   // update it accordingly
@@ -431,17 +413,14 @@ inline frame frame::sender_raw(RegisterMap* map) const {
   if (is_interpreted_frame())     return sender_for_interpreter_frame(map);
 
   assert(_cb == CodeCache::find_blob(pc()), "Must be the same");
+  if (_cb != NULL) return sender_for_compiled_frame(map);
 
-  if (_cb != NULL) {
-    return _cb->is_compiled() ? sender_for_compiled_frame<false>(map) : sender_for_compiled_frame<true>(map);
-  }
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
   return frame(sender_sp(), link(), sender_pc());
 }
 
-template <bool stub>
-frame frame::sender_for_compiled_frame(RegisterMap* map) const {
+inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // we cannot rely upon the last fp having been saved to the thread
   // in C2 code but it will have been pushed onto the stack. so we
   // have to find it relative to the unextended sp
@@ -459,9 +438,9 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     // Tell GC to use argument oopmaps for some runtime stubs that need it.
     // For C1, the runtime stub might not have oop maps, so set this flag
     // outside of update_register_map.
-    if (stub) { // compiled frames do not use callee-saved registers
+    if (!_cb->is_compiled()) { // compiled frames do not use callee-saved registers
       map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
-      if (oop_map() != NULL) { 
+      if (oop_map() != NULL) {
         _oop_map->update_register_map(this, map);
       }
     } else {
@@ -476,21 +455,35 @@ frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     update_map_with_saved_link(map, saved_fp_addr);
   }
 
-  if (Continuation::is_return_barrier_entry(sender_pc)) {	
-    if (map->walk_cont()) { // about to walk into an h-stack 	
-      return Continuation::top_frame(*this, map);	
+  if (Continuation::is_return_barrier_entry(sender_pc)) {
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
-      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);	
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);
     }
   }
 
   intptr_t* unextended_sp = sender_sp;
-  CodeBlob* sender_cb = CodeCache::find_blob_fast(sender_pc);
-  if (sender_cb != NULL) {
-    return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc, sender_cb);
-  }
-  // tty->print_cr(">>>> NO CB sender_pc: %p", sender_pc); os::print_location(tty, (intptr_t)sender_pc); print_on(tty);
   return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  // The interpreter and compiler(s) always save EBP/RBP in a known
+  // location on entry. We must record where that location is
+  // so this if EBP/RBP was live on callout from c2 we can find
+  // the saved copy no matter what it called.
+
+  // Since the interpreter always saves EBP/RBP if we record where it is then
+  // we don't have to always save EBP/RBP on entry and exit to c2 compiled
+  // code, on entry will be enough.
+  map->set_location(rfp->as_VMReg(), (address) link_addr);
+  // this is weird "H" ought to be at a higher address however the
+  // oopMaps seems to have the "H" regs at the same address and the
+  // vanilla register.
+  // XXXX make this go away
+  if (true) {
+    map->set_location(rfp->as_VMReg()->next(), (address) link_addr);
+  }
+}
 #endif // CPU_AARCH64_FRAME_AARCH64_INLINE_HPP

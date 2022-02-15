@@ -170,7 +170,7 @@ MonitorContendedEnter(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, jobject mon
   }
   if (is_lock2) {
     RawMonitorLocker rml(jvmti, jni, agent_monitor);
-    was_lock2_contended = true; 
+    was_lock2_contended = true;
   }
   if (!is_lock0) {
     return; // Not tested monitor
@@ -250,7 +250,7 @@ JNI_OnLoad(JavaVM *jvm, void *reserved) {
 
   if (test_class_0 == NULL || test_class_2 == NULL) {
     return JNI_ERR;
-  } 
+  }
   return JNI_VERSION_9;
 }
 

@@ -82,7 +82,8 @@ class RegisterMap : public StackObj {
   bool        _process_frames;          // Should frames be processed by stack watermark barriers?
   bool        _walk_cont;               // whether to walk frames on a continuation stack
 
-  NOT_PRODUCT(bool  _skip_missing;)
+  NOT_PRODUCT(bool  _skip_missing;) // ignore missing registers
+  NOT_PRODUCT(bool  _async;)        // walking frames asynchronously, at arbitrary points
 
 #ifdef ASSERT
   void check_location_valid();
@@ -118,7 +119,7 @@ class RegisterMap : public StackObj {
   address trusted_location(VMReg reg) const {
     return (address) _location[reg->value()];
   }
-    
+
   void verify(RegisterMap& other) {
     for (int i = 0; i < reg_count; ++i) {
       assert(_location[i] == other._location[i], "");
@@ -157,8 +158,11 @@ class RegisterMap : public StackObj {
   void print_on(outputStream* st) const;
   void print() const;
 
+  void set_async(bool value)        { NOT_PRODUCT(_async = value;) }
+  void set_skip_missing(bool value) { NOT_PRODUCT(_skip_missing = value;) }
+
 #ifndef PRODUCT
-  void set_skip_missing(bool value) { _skip_missing = value; }
+  bool is_async() const             { return _async; }
   bool should_skip_missing() const  { return _skip_missing; }
 
   VMReg find_register_spilled_here(void* p, intptr_t* sp);

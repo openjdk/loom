@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, 2021, Red Hat Inc. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -5344,11 +5344,11 @@ class StubGenerator: public StubCodeGenerator {
     __ add(str1, str1, wordSize);
     __ add(str2, str2, wordSize);
     if (SoftwarePrefetchHintDistance >= 0) {
+      __ align(OptoLoopAlignment);
       __ bind(LARGE_LOOP_PREFETCH);
         __ prfm(Address(str1, SoftwarePrefetchHintDistance));
         __ prfm(Address(str2, SoftwarePrefetchHintDistance));
 
-        __ align(OptoLoopAlignment);
         for (int i = 0; i < 4; i++) {
           __ ldp(tmp1, tmp1h, Address(str1, i * 16));
           __ ldp(tmp2, tmp2h, Address(str2, i * 16));
@@ -6621,7 +6621,7 @@ RuntimeStub* generate_cont_doYield() {
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
-    
+
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -6642,9 +6642,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ mov(c_rarg0, rthread);
     __ set_last_Java_frame(sp, rfp, the_pc, rscratch1);
-
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
-      
     __ reset_last_Java_frame(true);
 
     Label pinned;
@@ -6656,7 +6654,7 @@ RuntimeStub* generate_cont_doYield() {
     continuation_enter_cleanup(masm);
 
     __ bind(pinned); // pinned -- return to caller
-    
+
     __ leave();
     __ ret(lr);
 
@@ -6692,7 +6690,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
-    
+
     __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
     __ mov(sp, rscratch1);
     continuation_enter_cleanup(_masm);
@@ -6737,12 +6735,12 @@ RuntimeStub* generate_cont_doYield() {
     __ lea(rscratch1, ExternalAddress(StubRoutines::throw_StackOverflowError_entry()));
     __ br(rscratch1);
     __ bind(thaw_success);
-    
+
     // make room for the thawed frames
     __ sub(rscratch1, sp, rscratch2);
     __ andr(rscratch1, rscratch1, -16); // align
     __ mov(sp, rscratch1);
-    
+
     if (return_barrier) {
       // save original return value -- again
       __ fmovd(rscratch1, v0);
@@ -6848,14 +6846,14 @@ RuntimeStub* generate_cont_doYield() {
   static void jfr_set_last_java_frame(MacroAssembler* _masm, Register thread) {
     Register last_java_pc = c_rarg0;
     Register last_java_sp = c_rarg2;
+    __ ldr(last_java_pc, Address(sp, wordSize));
+    __ lea(last_java_sp, Address(sp, 2*wordSize));
     // __ vzeroupper();
-    __ mov(last_java_pc, lr);
-    __ mov(last_java_sp, sp);
+
     __ str(last_java_pc, Address(thread, JavaThread::last_Java_pc_offset()));
     __ str(last_java_sp, Address(thread, JavaThread::last_Java_sp_offset()));
   }
 
-  // Must be called before enter()
   static void jfr_prologue(MacroAssembler* _masm, Register thread) {
     jfr_set_last_java_frame(_masm, thread);
     __ mov(c_rarg0, rthread);
@@ -6879,8 +6877,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
     address start = __ pc();
 
-    jfr_prologue(_masm, rthread);
     __ enter();
+    jfr_prologue(_masm, rthread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
     jfr_epilogue(_masm, rthread);
     __ leave();
@@ -6895,8 +6893,8 @@ RuntimeStub* generate_cont_doYield() {
     StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
     address start = __ pc();
 
-    jfr_prologue(_masm, rthread);
     __ enter();
+    jfr_prologue(_masm, rthread);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
     jfr_epilogue(_masm, rthread);
     __ leave();
@@ -8129,7 +8127,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   return map;
 }
 
-// on entry c_rarg1 points to the continuation 
+// on entry c_rarg1 points to the continuation
 //          sp points to ContinuationEntry
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
@@ -8145,7 +8143,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ ldr(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
-  
+
   __ str(zr, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ reset_held_monitor_count(rthread);
 }
@@ -8161,7 +8159,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
   __ stop("incorrect sp1");
   __ bind(OK);
 #endif
-  
+
   __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ str(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));

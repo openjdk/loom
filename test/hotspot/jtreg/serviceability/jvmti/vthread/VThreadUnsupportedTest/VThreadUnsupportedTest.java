@@ -34,21 +34,21 @@ public class VThreadUnsupportedTest {
     private static final String AGENT_LIB = "VThreadUnsupportedTest";
     final Object lock = new Object();
     final AtomicBoolean isJNITestingCompleted = new AtomicBoolean(false);
-    
-    native boolean isCompletedTestInEvent(); 
+
+    native boolean isCompletedTestInEvent();
     native boolean testJvmtiFunctionsInJNICall(Thread vthread);
 
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
             do {
-                try { 
+                try {
                     lock.wait(10);
                 } catch (InterruptedException ie) {}
             } while (!isCompletedTestInEvent() || !isJNITestingCompleted.get());
         }
     };
 
-    void runTest() throws Exception { 
+    void runTest() throws Exception {
         Thread vthread = Thread.ofVirtual().name("VThread").start(pinnedTask);
         testJvmtiFunctionsInJNICall(vthread);
         isJNITestingCompleted.set(true);
@@ -62,7 +62,7 @@ public class VThreadUnsupportedTest {
             System.err.println("Failed to load " + AGENT_LIB + " lib");
             System.err.println("java.library.path: " + System.getProperty("java.library.path"));
             throw ex;
-        } 
+        }
         VThreadUnsupportedTest t = new VThreadUnsupportedTest();
         t.runTest();
     }

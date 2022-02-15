@@ -143,7 +143,7 @@ public:
 
   JvmtiEnvThreadEventEnable *event_enable() { return &_event_enable; }
 
-  void *get_agent_thread_local_storage_data(); 
+  void *get_agent_thread_local_storage_data();
   void set_agent_thread_local_storage_data (void *data);
 
   // If the thread is in the given method at the given
@@ -165,7 +165,7 @@ public:
   inline bool single_stepping_posted() {
     return _single_stepping_posted;
   }
-  bool is_virtual(); 
+  bool is_virtual();
 
   inline JvmtiThreadState* jvmti_thread_state() { return _state; }
 

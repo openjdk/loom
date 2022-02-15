@@ -1232,11 +1232,6 @@ class StubGenerator: public StubCodeGenerator {
       }
       __ addptr(qword_count, 4);
       __ BIND(L_end);
-      if (UseAVX >= 2) {
-        // clean upper bits of YMM registers
-        __ vpxor(xmm0, xmm0);
-        __ vpxor(xmm1, xmm1);
-      }
     } else {
       // Copy 32-bytes per iteration
       __ BIND(L_loop);
@@ -1310,11 +1305,6 @@ class StubGenerator: public StubCodeGenerator {
       }
       __ subptr(qword_count, 4);
       __ BIND(L_end);
-      if (UseAVX >= 2) {
-        // clean upper bits of YMM registers
-        __ vpxor(xmm0, xmm0);
-        __ vpxor(xmm1, xmm1);
-      }
     } else {
       // Copy 32-bytes per iteration
       __ BIND(L_loop);
@@ -7910,7 +7900,7 @@ RuntimeStub* generate_cont_doYield() {
       framesize // inclusive of return address
     };
     // assert(is_even(framesize/2), "sp not 16-byte aligned");
-    
+
     int insts_size = 512;
     int locs_size  = 64;
     CodeBuffer code(name, insts_size, locs_size);
@@ -7929,18 +7919,13 @@ RuntimeStub* generate_cont_doYield() {
 
     __ post_call_nop(); // this must be exactly after the pc value that is pushed into the frame info, we use this nop for fast CodeBlob lookup
 
-    if (ContPerfTest > 5) {
-      __ movptr(c_rarg0, r15_thread);
-      __ set_last_Java_frame(rsp, rbp, the_pc);
-
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
-      
-      __ reset_last_Java_frame(true);
-    }
+    __ movptr(c_rarg0, r15_thread);
+    __ set_last_Java_frame(rsp, rbp, the_pc);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+    __ reset_last_Java_frame(true);
 
     Label pinned;
 
-    if (ContPerfTest <= 5) { __ xorq(rax, rax); }
     __ testq(rax, rax);
     __ jcc(Assembler::notZero, pinned);
 
@@ -7975,7 +7960,7 @@ RuntimeStub* generate_cont_doYield() {
     __ get_thread(r15_thread);
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
-    
+
     __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
     continuation_enter_cleanup(_masm);
     __ pop(rbp);
@@ -8003,12 +7988,9 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    if (ContPerfTest > 105) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
-      __ movptr(rbx, rax); // rax contains the size of the frames to thaw, 0 if overflow or no more frames
-    } else {
-      __ xorq(rbx, rbx);
-    }
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::prepare_thaw), r15_thread, c_rarg1);
+    __ movptr(rbx, rax); // rax contains the size of the frames to thaw, 0 if overflow or no more frames
+
     if (return_barrier) {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
@@ -8026,15 +8008,13 @@ RuntimeStub* generate_cont_doYield() {
 
     __ subq(rsp, rbx);             // make room for the thawed frames
     __ andptr(rsp, -16);           // align
-    
+
     if (return_barrier) {
       __ push(rax); __ push_d(xmm0); // save original return value -- again
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    if (ContPerfTest > 112) {
-      __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
-    }
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
     if (return_barrier) {
@@ -8713,7 +8693,7 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
   return map;
 }
 
-// on entry c_rarg1 points to the continuation 
+// on entry c_rarg1 points to the continuation
 //          rsp points to ContinuationEntry
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
@@ -8727,7 +8707,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rax);
   __ movl(rax, Address(r15_thread, JavaThread::held_monitor_count_offset()));
   __ movl(Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()), rax);
-  
+
   __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), 0);
   __ reset_held_monitor_count(r15_thread);
 }
@@ -8743,7 +8723,7 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
   __ stop("incorrect rsp1");
   __ bind(OK);
 #endif
-  
+
   __ movptr(rbx, Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ movptr(Address(r15_thread, JavaThread::cont_fastpath_offset()), rbx);
   __ movl(rbx, Address(rsp, ContinuationEntry::parent_held_monitor_count_offset()));

@@ -214,7 +214,7 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     state->enter_interp_only_mode();
 
     if (state->get_thread() != NULL) {
-      // TODO LOOM: find out why the other place where this is called is insufficient 
+      // TODO LOOM: find out why the other place where this is called is insufficient
       Continuation::set_cont_fastpath_thread_state(state->get_thread());
     }
 
@@ -645,7 +645,7 @@ JvmtiEventControllerPrivate::recompute_enabled() {
       oop vt_oop = tp->mounted_vthread();
       if (vt_oop != NULL && java_lang_VirtualThread::is_instance(vt_oop)) {
         state = JvmtiThreadState::state_for_while_locked(tp, vt_oop);
-      } 
+      }
     }
   }
 

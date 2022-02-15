@@ -206,7 +206,7 @@ public class BufferedInputStream extends FilterInputStream {
 
         // use monitors when BufferedInputStream is sub-classed
         if (getClass() == BufferedInputStream.class) {
-            lock = new InternalLock();
+            lock = InternalLock.newLockOrNull();
         } else {
             lock = null;
         }

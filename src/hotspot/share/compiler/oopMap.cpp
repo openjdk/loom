@@ -449,37 +449,6 @@ void OopMapSet::oops_do(const frame *fr, const RegisterMap* reg_map, OopClosure*
   find_map(fr)->oops_do(fr, reg_map, f, df);
 }
 
-// void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
-//                        OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn,
-//                        OopClosure* value_fn) {
-//   find_map(fr)->oops_do(fr, reg_map, oop_fn, derived_oop_fn, value_fn);
-// }
-
-// NULL, fail, success (address)
-// void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
-//   /* The address of the ImmutableOopMap is put into the _freeze_stub and _thaw_stub
-//    * if we can't generate the stub for some reason */
-//   address default_value = Continuations::default_freeze_oops_stub();
-//   address slow_value = Continuations::freeze_oops_slow();
-
-//   assert(default_value != slow_value, "should not reach here!");
-
-//   if (_freeze_stub == default_value) {
-//     OopMapStubGenerator cgen(cb, *this);
-//     // lock this by putting the slow path in place
-//     if (Atomic::cmpxchg(&_freeze_stub, default_value, slow_value) == default_value) {
-//       if (!cgen.generate()) {
-//         Atomic::store(&_thaw_stub, (address) Continuations::thaw_oops_slow());
-//         cgen.free();
-//         return;
-//       }
-
-//       Atomic::store(&_freeze_stub, cgen.freeze_stub());
-//       Atomic::store(&_thaw_stub, cgen.thaw_stub());
-//     }
-//   }
-// }
-
 void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
                               OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn) const {
   assert(derived_oop_fn != NULL, "sanity");
@@ -580,8 +549,8 @@ void ImmutableOopMap::update_register_map(const frame *fr, RegisterMap *reg_map)
 #endif // COMPILER2
 }
 
-const ImmutableOopMap* OopMapSet::find_map(const frame *fr) { 
-  return find_map(fr->cb(), fr->pc()); 
+const ImmutableOopMap* OopMapSet::find_map(const frame *fr) {
+  return find_map(fr->cb(), fr->pc());
 }
 
 const ImmutableOopMap* OopMapSet::find_map(const CodeBlob* cb, address pc) {
@@ -740,17 +709,14 @@ bool OopMap::equals(const OopMap* other) const {
 }
 
 int ImmutableOopMapSet::find_slot_for_offset(int pc_offset) const {
+  // we might not have an oopmap at asynchronous (non-safepoint) stackwalks
   ImmutableOopMapPair* pairs = get_pairs();
-
   for (int i = 0; i < _count; ++i) {
     if (pairs[i].pc_offset() >= pc_offset) {
       ImmutableOopMapPair* last = &pairs[i];
-      assert(last->pc_offset() == pc_offset, "oopmap not found");
-      return i;
+      return last->pc_offset() == pc_offset ? i : -1;
     }
   }
-
-  guarantee(false, "failed to find oopmap for pc");
   return -1;
 }
 
@@ -771,7 +737,7 @@ const ImmutableOopMap* ImmutableOopMapSet::find_map_at_offset(int pc_offset) con
   return last->get_from(this);
 }
 
-ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap) 
+ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap)
   : _count(oopmap->count()), _num_oops(oopmap->num_oops()) {
   _num_oops = oopmap->num_oops();
   _has_derived_oops = oopmap->has_derived_oops();
@@ -1010,6 +976,8 @@ void DerivedPointerTable::update_pointers() {
     derived_pointer derived_base = to_derived_pointer(base);
     *derived_loc = derived_base + offset;
     assert(*derived_loc - derived_base == offset, "sanity check");
+
+    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
 
     if (TraceDerivedPointers) {
       tty->print_cr("Updating derived pointer@" INTPTR_FORMAT

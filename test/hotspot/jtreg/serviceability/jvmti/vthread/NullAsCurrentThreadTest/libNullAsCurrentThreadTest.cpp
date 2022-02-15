@@ -361,7 +361,7 @@ extern JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEventCallbacks callbacks;
   jvmtiCapabilities caps;
-  jvmtiError err; 
+  jvmtiError err;
 
   LOG("Agent_OnLoad: started: can_support_virtual_threads: %d\n", vt_support_enabled);
   if (jvm->GetEnv((void **) (&jvmti), JVMTI_VERSION) != JNI_OK) {

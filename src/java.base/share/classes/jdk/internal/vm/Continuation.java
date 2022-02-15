@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,7 +34,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.EnumSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -42,20 +41,18 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * TBD
+ * A one-shot delimited continuation.
  */
 public class Continuation {
     private static final Unsafe U = Unsafe.getUnsafe();
+    private static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         StackChunk.init(); // ensure StackChunk class is initialized
-        U.ensureClassInitialized(ScopeLocal.class);
+
+        String value = GetPropertyAction.privilegedGetProperty("jdk.preserveScopeLocalCache");
+        PRESERVE_SCOPE_LOCAL_CACHE = (value == null) || Boolean.parseBoolean(value);
     }
-
-    // private static final WhiteBox WB = sun.hotspot.WhiteBox.WhiteBox.getWhiteBox();
-
-    private static final boolean TRACE = isEmptyOrTrue("jdk.internal.vm.Continuation.trace");
-    private static final boolean DEBUG = TRACE | isEmptyOrTrue("jdk.internal.vm.Continuation.debug");
 
     private static final VarHandle MOUNTED;
 
@@ -77,8 +74,8 @@ public class Continuation {
         final Pinned pinned;
         private PreemptStatus(Pinned reason) { this.pinned = reason; }
         /**
-         * TBD
-         * @return TBD
+         * Whether or not the continuation is pinned.
+         * @return whether or not the continuation is pinned
          **/
         public Pinned pinned() { return pinned; }
     }
@@ -143,17 +140,12 @@ public class Continuation {
 
     private short cs; // critical section semaphore
 
-    private boolean reset = false; // perftest only
-
     private Object[] scopeLocalCache;
 
-    // private long[] nmethods = null; // grows up
-    // private int numNmethods = 0;
-
     /**
-     * TBD
-     * @param scope TBD
-     * @param target TBD
+     * Constructs a continuation
+     * @param scope the continuation's scope, used in yield
+     * @param target the continuation's body
      */
     public Continuation(ContinuationScope scope, Runnable target) {
         this.scope = scope;
@@ -174,9 +166,9 @@ public class Continuation {
     }
 
     /**
-     * TBD
-     * @param scope TBD
-     * @return TBD
+     * Returns the current innermost continuation with the given scope
+     * @param scope the scope
+     * @return the continuation
      */
     public static Continuation getCurrentContinuation(ContinuationScope scope) {
         Continuation cont = JLA.getContinuation(currentCarrierThread());
@@ -186,36 +178,27 @@ public class Continuation {
     }
 
     /**
-     * TBD
-     * @return TBD
+     * Creates a StackWalker for this continuation
+     * @return a new StackWalker
      */
     public StackWalker stackWalker() {
         return stackWalker(EnumSet.noneOf(StackWalker.Option.class));
     }
 
     /**
-     * TBD
-     * @param option TBD
-     * @return TBD
-     */
-    public StackWalker stackWalker(StackWalker.Option option) {
-        return stackWalker(EnumSet.of(Objects.requireNonNull(option)));
-    }
-
-    /**
-     * TBD
-     * @param options TBD
-     * @return TBD
+     * Creates a StackWalker for this continuation
+     * @param options the StackWalker's configuration options
+     * @return a new StackWalker
      */
     public StackWalker stackWalker(Set<StackWalker.Option> options) {
         return stackWalker(options, this.scope);
     }
 
     /**
-     * TBD
-     * @param options TBD
-     * @param scope TBD
-     * @return TBD
+     * Creates a StackWalker for this continuation and enclosing ones up to the given scope
+     * @param options the StackWalker's configuration options
+     * @param scope the delimiting continuation scope for the stack
+     * @return a new StackWalker
      */
     public StackWalker stackWalker(Set<StackWalker.Option> options, ContinuationScope scope) {
         // if (scope != null) {
@@ -234,12 +217,12 @@ public class Continuation {
     }
 
     /**
-     * TBD
-     * @return TBD
+     * Obtains a stack trace for this unmounted continuation
+     * @return the stack trace
      * @throws IllegalStateException if the continuation is mounted
      */
     public StackTraceElement[] getStackTrace() {
-        return stackWalker(StackWalker.Option.SHOW_REFLECT_FRAMES)
+        return stackWalker(EnumSet.of(StackWalker.Option.SHOW_REFLECT_FRAMES))
             .walk(s -> s.map(StackWalker.StackFrame::toStackTraceElement)
             .toArray(StackTraceElement[]::new));
     }
@@ -274,18 +257,20 @@ public class Continuation {
     }
 
     private void unmount() {
-        scopeLocalCache = JLA.scopeLocalCache();
+        if (PRESERVE_SCOPE_LOCAL_CACHE) {
+            scopeLocalCache = JLA.scopeLocalCache();
+        } else {
+            scopeLocalCache = null;
+        }
         JLA.setScopeLocalCache(null);
         setMounted(false);
     }
 
     /**
-     * TBD
+     * Mounts and runs the continuation body. If suspended, continues it from the last suspend point.
      */
     public final void run() {
         while (true) {
-            if (TRACE) System.out.println("\n++++++++++++++++++++++++++++++");
-
             mount();
 
             if (done)
@@ -301,12 +286,9 @@ public class Continuation {
 
             try {
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
-                    if (TRACE) System.out.println("ENTERING " + id());
-                    if (TRACE) System.out.println("start done: " + done);
                     enterSpecial(this, false);
                 } else {
                     assert !isEmpty();
-                    if (TRACE) System.out.println("continue done: " + done);
                     enterSpecial(this, true);
                 }
             } finally {
@@ -314,16 +296,14 @@ public class Continuation {
                 StackChunk c = tail;
 
                 try {
-                if (TRACE) System.out.println("run (after): preemted: " + preempted);
+                    assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
+                    JLA.setContinuation(currentCarrierThread(), this.parent);
+                    if (parent != null)
+                        parent.child = null;
 
-                assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
-                JLA.setContinuation(currentCarrierThread(), this.parent);
-                if (parent != null)
-                    parent.child = null;
+                    postYieldCleanup();
 
-                postYieldCleanup();
-
-                unmount();
+                    unmount();
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
             }
             // we're now in the parent continuation
@@ -349,9 +329,6 @@ public class Continuation {
 
     private void finish() {
         done = true;
-        // assert doneX;
-        // System.out.println("-- done!  " + id());
-        if (TRACE) System.out.println(">>>>>>>> DONE <<<<<<<<<<<<< " + id());
         assert isEmpty();
     }
 
@@ -391,9 +368,9 @@ public class Continuation {
     }
 
     /**
-     * TBD
+     * Suspends the current continuations up to the given scope
      *
-     * @param scope The {@link ContinuationScope} to yield
+     * @param scope The {@link ContinuationScope} to suspend
      * @return {@code true} for success; {@code false} for failure
      * @throws IllegalStateException if not currently in the given {@code scope},
      */
@@ -409,7 +386,7 @@ public class Continuation {
     }
 
     private boolean yield0(ContinuationScope scope, Continuation child) {
-        if (TRACE) System.out.println(this + " yielding on scope " + scope + ". child: " + child);
+        // System.out.println(this + " yielding on scope " + scope + ". child: " + child);
 
         preempted = false;
 
@@ -418,7 +395,7 @@ public class Continuation {
         int res = doYield();
         U.storeFence(); // needed to prevent certain transformations by the compiler
 
-        if (TRACE) System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
+        // System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
 
         try {
         assert scope != this.scope || yieldInfo == null : "scope: " + scope + " this.scope: " + this.scope + " yieldInfo: " + yieldInfo + " res: " + res;
@@ -435,7 +412,7 @@ public class Continuation {
             }
             this.yieldInfo = null;
 
-            if (TRACE) System.out.println(this + " child.yieldInfo = " + child.yieldInfo);
+            // System.out.println(this + " child.yieldInfo = " + child.yieldInfo);
         } else {
             if (res == 0 && yieldInfo != null) {
                 res = (Integer)yieldInfo;
@@ -447,7 +424,7 @@ public class Continuation {
             else
                 onPinned0(res);
 
-            if (TRACE) System.out.println(this + " res: " + res);
+            // System.out.println(this + " res: " + res);
         }
         assert yieldInfo == null;
 
@@ -459,39 +436,34 @@ public class Continuation {
     }
 
     private void onPinned0(int reason) {
-        if (TRACE) System.out.println("PINNED " + this + " reason: " + reason);
         onPinned(pinnedReason(reason));
     }
 
     /**
-     * TBD
-     * @param reason TBD
+     * Called when suspending if the continuation is pinned
+     * @param reason the reason for pinning
      */
     protected void onPinned(Pinned reason) {
-        if (DEBUG)
-            System.out.println("PINNED! " + reason);
         throw new IllegalStateException("Pinned: " + reason);
     }
 
     /**
-     * TBD
+     * Called when the continuation continues
      */
     protected void onContinue() {
-        if (TRACE)
-            System.out.println("On continue");
     }
 
     /**
-     * TBD
-     * @return TBD
+     * Tests whether this contiuation is completed
+     * @return whether this contiuation is completed
      */
     public boolean isDone() {
         return done;
     }
 
     /**
-     * TBD
-     * @return TBD
+     * Tests whether this unmounted continuation was unmounted by forceful preemption (a successful tryPreempt)
+     * @return whether this unmounted continuation was unmounted by forceful preemption
      */
     public boolean isPreempted() {
         return preempted;
@@ -550,55 +522,6 @@ public class Continuation {
         return true;
     }
 
-    // /**
-    //  * TBD
-    //  */
-    // public void doneX() {
-    //     // System.out.println("DONEX");
-    //     this.doneX = true;
-    // }
-
-
-    /**
-     * temporary testing
-     */
-    public void something_something_1() {
-        this.done = false;
-
-        setMounted(false);
-    }
-
-    /**
-     * temporary testing
-     */
-    public void something_something_2() {
-        reset = true;
-    }
-
-    /**
-     * temporary testing
-     */
-    public void something_something_3() {
-        this.done = false;
-    }
-
-    // private void pushNmethod(long nmethod) {
-    //     if (nmethods == null) {
-    //         nmethods = new long[8];
-    //     } else {
-    //         if (numNmethods == nmethods.length) {
-    //             long[] newNmethods = new long[nmethods.length * 2];
-    //             System.arraycopy(nmethods, 0, newNmethods, 0, numNmethods);
-    //             this.nmethods = newNmethods;
-    //         }
-    //     }
-    //     nmethods[numNmethods++] = nmethod;
-    // }
-
-    // private void popNmethod() {
-    //     numNmethods--;
-    // }
-
     private static Map<Long, Integer> liveNmethods = new ConcurrentHashMap<>();
 
     private void processNmethods(int before, int after) {
@@ -607,29 +530,28 @@ public class Continuation {
 
     private boolean compareAndSetMounted(boolean expectedValue, boolean newValue) {
        boolean res = MOUNTED.compareAndSet(this, expectedValue, newValue);
-    //    System.out.println("-- compareAndSetMounted:  ex: " + expectedValue + " -> " + newValue + " " + res + " " + id());
        return res;
      }
 
     private void setMounted(boolean newValue) {
-        // System.out.println("-- setMounted:  " + newValue + " " + id());
         mounted = newValue;
         // MOUNTED.setVolatile(this, newValue);
     }
 
     private String id() {
-        return Integer.toHexString(System.identityHashCode(this)) + " [" + currentCarrierThread().getId() + "]";
+        return Integer.toHexString(System.identityHashCode(this))
+                + " [" + currentCarrierThread().threadId() + "]";
     }
 
     // private native void clean0();
 
     /**
-     * TBD
+     * Tries to forcefully preempt this continuation if it is currently mounted on the given thread
      * Subclasses may throw an {@link UnsupportedOperationException}, but this does not prevent
      * the continuation from being preempted on a parent scope.
      *
-     * @param thread TBD
-     * @return TBD
+     * @param thread the thread on which to forecefully preempt this continuation
+     * @return the result of the attempt
      * @throws UnsupportedOperationException if this continuation does not support preemption
      */
     public PreemptStatus tryPreempt(Thread thread) {

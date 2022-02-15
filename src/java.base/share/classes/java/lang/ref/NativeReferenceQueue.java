@@ -42,7 +42,7 @@ final class NativeReferenceQueue<T> extends ReferenceQueue<T> {
     @Override void signal() { lock.notifyAll(); }
     @Override void await() throws InterruptedException { lock.wait(); }
     @Override void await(long timeoutMillis) throws InterruptedException {
-        lock.wait(timeoutMillis); 
+        lock.wait(timeoutMillis);
     }
 
     @Override
@@ -51,19 +51,19 @@ final class NativeReferenceQueue<T> extends ReferenceQueue<T> {
             return enqueue0(r);
         }
     }
-    
+
     @Override
     public Reference<? extends T> poll() {
         if (headIsNull())
             return null;
-        
+
         synchronized(lock) {
             return poll0();
         }
     }
 
     @Override
-    public Reference<? extends T> remove(long timeout) 
+    public Reference<? extends T> remove(long timeout)
             throws IllegalArgumentException, InterruptedException {
         if (timeout < 0)
             throw new IllegalArgumentException("Negative timeout value");

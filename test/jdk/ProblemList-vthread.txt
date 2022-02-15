@@ -4,6 +4,9 @@ java/foreign/channels/TestSocketChannels.java                         8272749 wi
 java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
 java/foreign/StdLibTest.java                                          8278992 generic-all
 
+java/foreign/TestSegmentCopy.java                                     8281222 generic-all
+java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 generic-all
+
 
 ####
 # JFR is not completely fixed to support vthreads
@@ -15,10 +18,14 @@ jdk/jfr/event/runtime/TestDirectBufferStatisticsEvent.java
 jdk/jfr/threading/TestManyVirtualThreads.java
 jdk/jfr/tool/TestPrintXML.java
 
+jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
+jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
+
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
 java/foreign/handles/Driver.java
 java/lang/ModuleTests/addXXX/Driver.java
+java/lang/invoke/MethodHandleProxies/Driver.java
 java/lang/invoke/MethodHandles/privateLookupIn/Driver.java
 java/lang/invoke/modules/Driver.java
 java/lang/invoke/modules/Driver1.java
@@ -31,13 +38,16 @@ java/lang/invoke/modules/Driver1.java
 
 ####
 # Incorrect stackwalking expectations for main thread stack trace
-
 java/lang/StackWalker/StackWalkTest.java
 java/lang/StackWalker/VerifyStackTrace.java
 java/lang/StackWalker/GetCallerClassTest.java
 java/lang/StackWalker/DumpStackTest.java
 java/lang/StackWalker/ReflectionFrames.java
 java/lang/StackWalker/NativeMethod.java
+
+# Uses custom scheduler
+java/lang/Thread/virtual/HoldsLock.java
+
 jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
 jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
@@ -79,7 +89,6 @@ jdk/jfr/event/runtime/TestThreadParkEvent.java
 # OOME in unexpected thread
 
 java/lang/ref/OOMEInReferenceHandler.java
-
 
 ####
 # incorrect using of 'test.jdk' by wrapper
@@ -208,6 +217,8 @@ java/security/AccessController/DoPrivAccompliceTest.java
 java/security/AccessController/LimitedDoPrivileged.java
 java/security/Policy/SignedJar/SignedJarTest.java
 java/security/Provider/SecurityProviderModularTest.java
+java/security/Security/signedfirst/DynStatic.java
+java/security/SignedJar/SignedJarWithCustomClassLoader.java
 javax/security/auth/login/modules/JaasModularClientTest.java
 javax/security/auth/login/modules/JaasModularDefaultHandlerTest.java
 sun/security/ssl/CertPathRestrictions/TLSRestrictions.java
@@ -255,12 +266,15 @@ sun/management/jmxremote/startstop/JMXStatusTest.java
 
 java/lang/invoke/condy/CondyNestedResolutionTest.java
 
-
 ####
 # Other incorrect test expectations (test bugs)
 
 # Test memory consumption changed a little bit
 java/lang/RuntimeTests/exec/LotsOfOutput.java
+
+###
+# transform invoked during parking, attempts recursive park that deadlocks
+java/lang/instrument/NativeMethodPrefixAgent.java
 
 
 ####
@@ -316,3 +330,6 @@ com/sun/jdi/sde/MangleTest.java
 com/sun/jdi/sde/MangleStepTest.java
 com/sun/jdi/sde/TemperatureTableTest.java
 com/sun/jdi/sde/SourceDebugExtensionTest.java
+
+# Tests using Thread.stop(), not supported on virtual threads
+jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all

@@ -325,9 +325,9 @@ public final class StackWalker {
      * <p> This {@code StackWalker} is configured to skip all
      * {@linkplain Option#SHOW_HIDDEN_FRAMES hidden frames} and
      * no {@linkplain Option#RETAIN_CLASS_REFERENCE class reference} is retained.
-     * 
+     *
      * @param contScope the continuation scope up to which (inclusive) to walk the stack
-     * 
+     *
      * @return a {@code StackWalker} configured to skip all
      * {@linkplain Option#SHOW_HIDDEN_FRAMES hidden frames} and
      * no {@linkplain Option#RETAIN_CLASS_REFERENCE class reference} is retained.

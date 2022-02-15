@@ -3039,7 +3039,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_vectorizedMismatch:
     do_vectorizedMismatch(x);
     break;
-          
+
   case vmIntrinsics::_Continuation_doYield:
     do_continuation_doYield(x);
     break;

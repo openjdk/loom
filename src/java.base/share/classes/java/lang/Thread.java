@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,9 +25,6 @@
 
 package java.lang;
 
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.security.AccessController;
 import java.security.AccessControlContext;
 import java.security.Permission;
@@ -36,14 +33,14 @@ import java.security.ProtectionDomain;
 import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.PreviewFeature;
+import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -68,11 +65,11 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <p> {@code Thread} provides a {@link Builder} and other APIs to create and
  * start threads that execute {@link Runnable} tasks. Starting a thread schedules
- * it to execute concurrently with the thread that caused it start. The newly
+ * it to execute concurrently with the thread that caused it to start. The newly
  * started thread invokes the task's {@link Runnable#run() run} method. Thread
  * defines the {@link #join() join} method to wait for a thread to terminate.
  *
- * <p> Threads have a unique {@linkplain #getId() identifier} and a {@linkplain
+ * <p> Threads have a unique {@linkplain #threadId() identifier} and a {@linkplain
  * #getName() name}. The identifier is generated when a {@code Thread} is created
  * and cannot be changed. The thread name can be specified when creating a thread
  * or can be {@linkplain #setName(String) changed} at a later time.
@@ -81,8 +78,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * local to a thread, meaning a thread can have a copy of a variable that is set to
  * a value that is independent of the value set by other threads. Thread also supports
  * {@link InheritableThreadLocal} variables that are thread local variables that are
- * inherited from the parent thread. Thread supports a special inheritable thread
- * local for the thread {@linkplain #getContextClassLoader() context-class-loader}.
+ * inherited at Thread creation time from the parent Thread. Thread supports a special
+ * inheritable thread local for the thread {@linkplain #getContextClassLoader()
+ * context-class-loader}.
  *
  * <h2><a id="platform-threads">Platform threads</a></h2>
  * <p> {@code Thread} supports the creation of <i>platform threads</i> that are
@@ -242,14 +240,30 @@ public class Thread implements Runnable {
 
     // A simple (not very) random string of bits to use when evicting
     // cache entries from the scoped variable cache.
-    int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
+    private int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
 
-    ScopeLocal.Snapshot scopeLocalBindings = ScopeLocal.EmptySnapshot.getInstance();
+    static int scopeLocalCacheVictims() {
+        return currentThread().victims;
+    }
 
-    static ScopeLocal.Snapshot scopeLocalBindings() {
+    static void setScopeLocalCacheVictims(int value) {
+        currentThread().victims = value;
+    }
+
+    // scope-local bindings
+    private Object scopeLocalBindings;
+
+    static Object scopeLocalBindings() {
         return currentThread().scopeLocalBindings;
     }
 
+    static void setScopeLocalBindings(Object bindings) {
+        currentThread().scopeLocalBindings = bindings;
+    }
+
+    /**
+     * Inherit the scope-local bindings from the given container.
+     */
     void inheritScopeLocalBindings(ThreadContainer container) {
         ScopeLocalContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
@@ -258,15 +272,15 @@ public class Thread implements Runnable {
             // bindings established for running/calling an operation
             Object bindings = snapshot.scopeLocalBindings();
             if (currentThread().scopeLocalBindings != bindings) {
-                throw new StructureViolationException("Scope local bindings have changed");
+                StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
             // bindings established by invoking bind
             if (ScopeLocalContainer.latest() != snapshot.container()) {
-                throw new StructureViolationException("Scope local bindings have changed");
+                StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
-            this.scopeLocalBindings = (ScopeLocal.Snapshot) bindings;
+            this.scopeLocalBindings = bindings;
         }
     }
 
@@ -385,10 +399,6 @@ public class Thread implements Runnable {
 
     // ScopeLocal support:
 
-    /**
-     * TBD
-     * @return TBD
-     */
     @IntrinsicCandidate
     static native Object[] scopeLocalCache();
 
@@ -519,10 +529,8 @@ public class Thread implements Runnable {
      *          if the current thread is interrupted while sleeping. The
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
-     * @throws  NullPointerException
-     *          if duration is null
      *
-     * @since 99
+     * @since 19
      */
     public static void sleep(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration);  // MAX_VALUE if > 292 years
@@ -758,7 +766,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
@@ -779,7 +787,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
@@ -812,7 +820,7 @@ public class Thread implements Runnable {
      *
      * @see Thread#ofPlatform()
      * @see Thread#ofVirtual()
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public sealed interface Builder
@@ -840,11 +848,11 @@ public class Thread implements Runnable {
          * {@code Thread}.
          *
          * @apiNote
-         * <pre>{@code
+         * {@snippet :
          *   Thread.Builder builder = Thread.ofPlatform().name("worker-", 0);
          *   Thread t1 = builder.start(task1);   // name "worker-0"
          *   Thread t2 = builder.start(task2);   // name "worker-1"
-         * }</pre>
+         * }
          *
          * @param prefix thread name prefix
          * @param start the starting value of the counter
@@ -899,8 +907,6 @@ public class Thread implements Runnable {
          * method must be invoked to schedule the thread to execute.
          * @param task the object to run when the thread executes
          * @return a new unstarted Thread
-         * @throws SecurityException if a thread group has been set and the current thread
-         *         cannot create a thread in that thread group
          * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
         Thread unstarted(Runnable task);
@@ -908,22 +914,11 @@ public class Thread implements Runnable {
         /**
          * Creates a new {@code Thread} from the current state of the builder and
          * schedules it to execute.
-         *
-         * @implSpec The default implementation invokes {@linkplain #unstarted(Runnable)
-         * unstarted} to create a {@code Thread} and then invokes its {@linkplain
-         * Thread#start() start} method to schedule it to execute.
-         *
          * @param task the object to run when the thread executes
          * @return a new started Thread
-         * @throws SecurityException if a thread group has been set and the current thread
-         *         cannot create a thread in that thread group
          * @see <a href="Thread.html#inheritance">Inheritance</a>
          */
-        default Thread start(Runnable task) {
-            Thread thread = unstarted(task);
-            thread.start();
-            return thread;
-        }
+        Thread start(Runnable task);
 
         /**
          * Returns a {@code ThreadFactory} to create threads from the current
@@ -939,7 +934,7 @@ public class Thread implements Runnable {
          * that creates platform threads.
          *
          * @see Thread#ofPlatform()
-         * @since 99
+         * @since 19
          */
         @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfPlatform extends Builder
@@ -951,6 +946,18 @@ public class Thread implements Runnable {
             @Override OfPlatform allowSetThreadLocals(boolean allow);
             @Override OfPlatform inheritInheritableThreadLocals(boolean inherit);
             @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * @throws SecurityException if a thread group has been set and the current
+             *         thread cannot create a thread in that thread group
+             */
+            @Override Thread unstarted(Runnable task);
+
+            /**
+             * @throws SecurityException if a thread group has been set and the current
+             *         thread cannot create a thread in that thread group
+             */
+            @Override Thread start(Runnable task);
 
             /**
              * Sets the thread group.
@@ -1011,7 +1018,7 @@ public class Thread implements Runnable {
          * created from a builder, have no {@link Permission permissions}.
          *
          * @see Thread#ofVirtual()
-         * @since 99
+         * @since 19
          */
         @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfVirtual extends Builder
@@ -1023,6 +1030,8 @@ public class Thread implements Runnable {
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+            /** @throws RejectedExecutionException if the scheduler cannot accept a task */
+            @Override Thread start(Runnable task);
         }
     }
 
@@ -1400,7 +1409,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
      * @see <a href="#inheritance">Inheritance</a>
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
@@ -1415,7 +1424,7 @@ public class Thread implements Runnable {
      *
      * @return {@code true} if this thread is a virtual thread
      *
-     * @since 99
+     * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
@@ -1430,9 +1439,9 @@ public class Thread implements Runnable {
      * In particular, a thread may not be restarted once it has completed
      * execution.
      *
-     * @throws     IllegalThreadStateException  if the thread was already started.
-     * @throws     java.util.concurrent.RejectedExecutionException if the thread
-     *             is virtual and the scheduler cannot accept a task
+     * @throws IllegalThreadStateException if the thread was already started
+     * @throws RejectedExecutionException if the thread is virtual and the
+     *         scheduler cannot accept a task
      */
     public void start() {
         synchronized (this) {
@@ -1753,7 +1762,7 @@ public class Thread implements Runnable {
      */
     public final boolean isAlive() {
         if (isVirtual()) {
-            State state = getState();
+            State state = threadState();
             return (state != State.NEW && state != State.TERMINATED);
         } else {
             return isAlive0();
@@ -1923,13 +1932,10 @@ public class Thread implements Runnable {
      * Returns the thread group to which this thread belongs.
      * This method returns null if the thread has terminated.
      *
-     * @deprecated ThreadGroup is obsolete.
-     *
      * @return  this thread's thread group.
      */
-    @Deprecated(since="99")
     public final ThreadGroup getThreadGroup() {
-        if (getState() == State.TERMINATED) {
+        if (threadState() == State.TERMINATED) {
             return null;
         } else {
             return isVirtual() ? VirtualThreads.THREAD_GROUP : holder.group;
@@ -2156,12 +2162,12 @@ public class Thread implements Runnable {
      * @throws  IllegalThreadStateException
      *          if this thread has not been started.
      *
-     * @since 99
+     * @since 19
      */
     public final boolean join(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration); // MAX_VALUE if > 292 years
 
-        Thread.State state = getState();
+        Thread.State state = threadState();
         if (state == State.NEW)
             throw new IllegalThreadStateException("Thread not started");
         if (state == State.TERMINATED)
@@ -2178,7 +2184,7 @@ public class Thread implements Runnable {
                 millis += 1L;
             }
             join(millis);
-            return getState() == State.TERMINATED;
+            return threadState() == State.TERMINATED;
         }
     }
 
@@ -2271,15 +2277,15 @@ public class Thread implements Runnable {
 
     /**
      * Returns a string representation of this thread. The string representation
-     * will usually include the thread's {@linkplain #getId() identifier} and name.
-     * The default implementation for platform threads includes the thread's
+     * will usually include the thread's {@linkplain #threadId() identifier} and
+     * name. The default implementation for platform threads includes the thread's
      * identifier, name, priority, and the name of the thread group.
      *
      * @return  a string representation of this thread.
      */
     public String toString() {
         StringBuilder sb = new StringBuilder("Thread[#");
-        sb.append(getId());
+        sb.append(threadId());
         sb.append(",");
         sb.append(getName());
         sb.append(",");
@@ -2391,7 +2397,6 @@ public class Thread implements Runnable {
      * </pre>
      *
      * @param  obj the object on which to test lock ownership
-     * @throws NullPointerException if obj is {@code null}
      * @return {@code true} if the current thread holds the monitor lock on
      *         the specified object.
      * @since 1.4
@@ -2539,16 +2544,15 @@ public class Thread implements Runnable {
     }
 
     /** cache of subclass security audit results */
-    /* Replace with ConcurrentReferenceHashMap when/if it appears in a future
-     * release */
     private static class Caches {
         /** cache of subclass security audit results */
-        static final ConcurrentMap<WeakClassKey,Boolean> subclassAudits =
-            new ConcurrentHashMap<>();
-
-        /** queue for WeakReferences to audited subclasses */
-        static final ReferenceQueue<Class<?>> subclassAuditsQueue =
-            new ReferenceQueue<>();
+        static final ClassValue<Boolean> subclassAudits =
+            new ClassValue<>() {
+                @Override
+                protected Boolean computeValue(Class<?> type) {
+                    return auditSubclass(type);
+                }
+            };
     }
 
     /**
@@ -2561,15 +2565,7 @@ public class Thread implements Runnable {
         if (cl == Thread.class)
             return false;
 
-        processQueue(Caches.subclassAuditsQueue, Caches.subclassAudits);
-        WeakClassKey key = new WeakClassKey(cl, Caches.subclassAuditsQueue);
-        Boolean result = Caches.subclassAudits.get(key);
-        if (result == null) {
-            result = Boolean.valueOf(auditSubclass(cl));
-            Caches.subclassAudits.putIfAbsent(key, result);
-        }
-
-        return result.booleanValue();
+        return Caches.subclassAudits.get(cl);
     }
 
     /**
@@ -2619,15 +2615,30 @@ public class Thread implements Runnable {
      * Returns the identifier of this Thread.  The thread ID is a positive
      * {@code long} number generated when this thread was created.
      * The thread ID is unique and remains unchanged during its lifetime.
-     * When a thread is terminated, this thread ID may be reused.
+     * When this thread terminates, the thread ID may be reused.
      *
-     * @return this thread's ID.
-     * @since 1.5
+     * @return this thread's ID
+     * @since 19
      */
-    public long getId() {
+    public final long threadId() {
         // The 16 most significant bits are reserved for exclusive use
         // by the JVM so these bits are excluded using TID_MASK.
         return tid & ThreadIdentifiers.TID_MASK;
+    }
+
+    /**
+     * Returns the identifier of this Thread obtained by invoking {@link #threadId()}.
+     *
+     * @return this thread's ID
+     *
+     * @deprecated This method is not final and may be overridden to return a
+     * value that is not the thread ID. Use {@link #threadId()} instead.
+     *
+     * @since 1.5
+     */
+    @Deprecated
+    public long getId() {
+        return threadId();
     }
 
     /**
@@ -2861,10 +2872,13 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
-        if (getState() == State.TERMINATED)
+        if (threadState() == State.TERMINATED) {
+            // uncaughtExceptionHandler may be set to null after thread terminates
             return null;
-        return uncaughtExceptionHandler != null ?
-            uncaughtExceptionHandler : getThreadGroup();
+        } else {
+            UncaughtExceptionHandler ueh = uncaughtExceptionHandler;
+            return (ueh != null) ? ueh : getThreadGroup();
+        }
     }
 
     /**
@@ -2899,68 +2913,6 @@ public class Thread implements Runnable {
         getUncaughtExceptionHandler().uncaughtException(this, e);
     }
 
-    /**
-     * Removes from the specified map any keys that have been enqueued
-     * on the specified reference queue.
-     */
-    static void processQueue(ReferenceQueue<Class<?>> queue,
-                             ConcurrentMap<? extends
-                             WeakReference<Class<?>>, ?> map)
-    {
-        Reference<? extends Class<?>> ref;
-        while((ref = queue.poll()) != null) {
-            map.remove(ref);
-        }
-    }
-
-    /**
-     *  Weak key for Class objects.
-     **/
-    static class WeakClassKey extends WeakReference<Class<?>> {
-        /**
-         * saved value of the referent's identity hash code, to maintain
-         * a consistent hash code after the referent has been cleared
-         */
-        private final int hash;
-
-        /**
-         * Create a new WeakClassKey to the given object, registered
-         * with a queue.
-         */
-        WeakClassKey(Class<?> cl, ReferenceQueue<Class<?>> refQueue) {
-            super(cl, refQueue);
-            hash = System.identityHashCode(cl);
-        }
-
-        /**
-         * Returns the identity hash code of the original referent.
-         */
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-
-        /**
-         * Returns true if the given object is this identical
-         * WeakClassKey instance, or, if this object's referent has not
-         * been cleared, if the given object is another WeakClassKey
-         * instance with the identical non-null referent as this one.
-         */
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == this)
-                return true;
-
-            if (obj instanceof WeakClassKey) {
-                Class<?> referent = get();
-                return (referent != null) &&
-                        (((WeakClassKey) obj).refersTo(referent));
-            } else {
-                return false;
-            }
-        }
-    }
-
     @SuppressWarnings("removal")
     private static class VirtualThreads {
         // Thread group for virtual threads.
@@ -2982,7 +2934,7 @@ public class Thread implements Runnable {
             };
             @SuppressWarnings("removal")
             ThreadGroup root = AccessController.doPrivileged(pa);
-            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY);
+            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY, false);
 
             ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)

@@ -759,7 +759,7 @@ class NativeDeoptInstruction: public NativeInstruction {
   enum Intel_specific_constants {
     instruction_prefix          = 0x0F,
     instruction_code            = 0xFF,
-    instruction_size            =    2,
+    instruction_size            =    3,
     instruction_offset          =    0,
   };
 
@@ -769,12 +769,12 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix && 
+    return ((*instr) & 0xFF) == NativeDeoptInstruction::instruction_prefix &&
       ((*(instr+1)) & 0xFF) == NativeDeoptInstruction::instruction_code;
   }
 
   // MT-safe patching
-  static void insert(address code_pos);
+  static void insert(address code_pos, bool invalidate = true);
 };
 
 #endif // CPU_X86_NATIVEINST_X86_HPP

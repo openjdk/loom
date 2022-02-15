@@ -34,7 +34,7 @@
 
 inline intptr_t ObjectMonitor::is_entered(JavaThread* current) const {
   void* owner = owner_raw();
-  if (current == owner || current->is_lock_owned((address)owner)) {
+  if (current == owner || current->is_lock_owned((address)owner)) { // is_lock_owned_current((address)owner)); see JDK-8281642
     return 1;
   }
   return 0;

@@ -526,7 +526,6 @@
   template(during_unsafe_access_name,                 "during_unsafe_access")                     \
   template(checkIndex_name,                           "checkIndex")                               \
   template(scoped_cache_shift_name,                   "SCOPED_CACHE_SHIFT")                       \
-  template(scopeLocalSnapshot_name,                   "Ljava/lang/ScopeLocal$Snapshot;")          \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \

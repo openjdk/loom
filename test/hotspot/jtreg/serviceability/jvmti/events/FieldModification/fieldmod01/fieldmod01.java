@@ -67,7 +67,7 @@ public class fieldmod01 {
     static Object obj2 = new Object();
     static int arr1[] = new int[1];
     static int arr2[] = new int[2];
-    
+
     public static void main(String args[]) {
         testKernel();
         testVirtual();

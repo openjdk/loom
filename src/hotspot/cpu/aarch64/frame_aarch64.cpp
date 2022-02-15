@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2020, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -275,12 +275,12 @@ void frame::patch_pc(Thread* thread, address pc) {
   }
 
   assert(!Continuation::is_return_barrier_entry(*pc_addr), "return barrier");
-  
+
   // Only generated code frames should be patched, therefore the return address will not be signed.
   assert(pauth_ptr_is_raw(*pc_addr), "cannot be signed");
   // Either the return address is the original one or we are going to
   // patch in the same address that's already there.
-  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "must be (pc: " INTPTR_FORMAT " _pc: " INTPTR_FORMAT " pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT  " sp: " INTPTR_FORMAT ")", p2i(pc), p2i(_pc), p2i(pc_addr), p2i(*pc_addr), p2i(sp()));
+  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "");
   DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
   _pc = pc; // must be set before call to get_deopt_original_pc
@@ -319,12 +319,12 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
-template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
 
-template <bool relative>
+template <frame::addressing pointers>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) at<relative>(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at<pointers>(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer");
@@ -357,6 +357,7 @@ frame frame::sender_for_entry_frame(RegisterMap* map) const {
   assert(map->include_argument_oops(), "should be set by clear");
   vmassert(jfa->last_Java_pc() != NULL, "not walkable");
   frame fr(jfa->last_Java_sp(), jfa->last_Java_fp(), jfa->last_Java_pc());
+  fr.set_sp_is_trusted();
 
   return fr;
 }
@@ -398,6 +399,7 @@ void frame::verify_deopt_original_pc(CompiledMethod* nm, intptr_t* unextended_sp
 
 //------------------------------------------------------------------------------
 // frame::adjust_unextended_sp
+#ifdef ASSERT
 void frame::adjust_unextended_sp() {
   // On aarch64, sites calling method handle intrinsics and lambda forms are treated
   // as any other call site. Therefore, no special action is needed when we are
@@ -409,11 +411,12 @@ void frame::adjust_unextended_sp() {
       // If the sender PC is a deoptimization point, get the original PC.
       if (sender_cm->is_deopt_entry(_pc) ||
           sender_cm->is_deopt_mh_entry(_pc)) {
-        DEBUG_ONLY(verify_deopt_original_pc(sender_cm, _unextended_sp));
+        verify_deopt_original_pc(sender_cm, _unextended_sp);
       }
     }
   }
 }
+#endif
 
 
 //------------------------------------------------------------------------------
@@ -436,27 +439,15 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   // Use the raw version of pc - the interpreter should not have signed it.
   address sender_pc = this->sender_pc_maybe_signed();
 
-  if (Continuation::is_return_barrier_entry(sender_pc)) {	
-    if (map->walk_cont()) { // about to walk into an h-stack	
-      return Continuation::top_frame(*this, map);	
+  if (Continuation::is_return_barrier_entry(sender_pc)) {
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }
   }
 
   return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
-}
-
-//------------------------------------------------------------------------------
-// frame::sender
-frame frame::sender(RegisterMap* map) const {
-  frame result = sender_raw(map);
-
-  if (map->process_frames() && !map->in_cont()) {
-    StackWatermarkSet::on_iteration(map->thread(), result);
-  }
-
-  return result;
 }
 
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
@@ -565,13 +556,13 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
 
-template <bool relative>
+template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address<relative>()[index];
+  return &interpreter_frame_tos_address<pointers>()[index];
 }
 
 #ifndef PRODUCT

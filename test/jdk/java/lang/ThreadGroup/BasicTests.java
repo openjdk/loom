@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -387,7 +387,9 @@ public class BasicTests {
         assertTrue(group3.enumerate(threads, false) == 0);
     }
 
-    // test enumerate(Thread[]) with an array of insufficient size
+    /**
+     * Test enumerate(Thread[]) with an array of insufficient size
+     */
     @Test
     public void enumerateThreads4() {
         ThreadGroup group = new ThreadGroup("group");
@@ -540,7 +542,9 @@ public class BasicTests {
         assertTrue(groups[1] == null);
     }
 
-    // test enumerate(ThreadGroup[]) with an array of insufficient size
+    /**
+     * Test enumerate(ThreadGroup[]) with an array of insufficient size
+     */
     @Test
     public void testEnumerateGroups2() throws Exception {
         ThreadGroup group = new ThreadGroup("group");
@@ -700,16 +704,26 @@ public class BasicTests {
     public void testDestroy() {
         ThreadGroup group = new ThreadGroup("group");
         assertFalse(group.isDestroyed());
-        group.destroy();
+        group.destroy();  // does nothing
         assertFalse(group.isDestroyed());
     }
 
     @Test
     public void testDaemon() {
-        ThreadGroup group = new ThreadGroup("group");
-        assertFalse(group.isDaemon());
-        group.setDaemon(true);
-        assertFalse(group.isDaemon());
+        boolean d = Thread.currentThread().getThreadGroup().isDaemon();
+
+        ThreadGroup group1 = new ThreadGroup("group1");
+        assertTrue(group1.isDaemon() == d);  // inherit
+
+        group1.setDaemon(true);
+        assertTrue(group1.isDaemon());
+        ThreadGroup group2 = new ThreadGroup(group1, "group2");
+        assertTrue(group2.isDaemon());   // inherit
+
+        group1.setDaemon(false);
+        assertFalse(group1.isDaemon());
+        ThreadGroup group3 = new ThreadGroup(group1, "group2");
+        assertFalse(group3.isDaemon());  // inherit
     }
 
     @Test

@@ -413,11 +413,11 @@ class PatchingStub: public CodeStub {
     masm->bind(_patch_site_entry);
   }
 
-  virtual int nr_immediate_oops_patched() const  { 
+  virtual int nr_immediate_oops_patched() const  {
     if (_id == load_mirror_id || _id == load_appendix_id) {
       return 1;
     }
-    return 0; 
+    return 0;
   }
 
   void install(MacroAssembler* masm, LIR_PatchCode patch_code, Register obj, CodeEmitInfo* info) {

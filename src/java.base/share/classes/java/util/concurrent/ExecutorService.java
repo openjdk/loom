@@ -393,7 +393,7 @@ public interface ExecutorService extends Executor, AutoCloseable {
      *         java.lang.RuntimePermission}{@code ("modifyThread")},
      *         or the security manager's {@code checkAccess} method
      *         denies access.
-     * @since 99
+     * @since 19
      */
     @Override
     default void close() {

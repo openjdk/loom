@@ -283,7 +283,7 @@ class BitMap {
   void verify_limit(idx_t bit) const NOT_DEBUG_RETURN;
   // Verify [beg,end) is a valid range, e.g. beg <= end <= size().
   void verify_range(idx_t beg, idx_t end) const NOT_DEBUG_RETURN;
-  
+
   // Iteration support.  Applies the closure to the index for each set bit,
   // starting from the least index in the range to the greatest, in order.
   // The iteration terminates if the closure returns false.  Returns true if

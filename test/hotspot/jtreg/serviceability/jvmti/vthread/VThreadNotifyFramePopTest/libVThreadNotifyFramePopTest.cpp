@@ -285,7 +285,7 @@ Java_VThreadNotifyFramePopTest_check(JNIEnv *jni, jclass cls) {
 
   if (breakpoint_count != 2) {
     passed = JNI_FALSE;
-   LOG("FAILED: method_exit_count == 0\n");
+   LOG("FAILED: breakpoint_count != 2\n");
   }
   if (frame_pop_count == 0) {
     passed = JNI_FALSE;

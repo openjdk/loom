@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -556,6 +556,7 @@ class java_lang_ThreadGroup : AllStatic {
   static int _parent_offset;
   static int _name_offset;
   static int _maxPriority_offset;
+  static int _daemon_offset;
 
   static int _ngroups_offset;
   static int _groups_offset;
@@ -573,6 +574,8 @@ class java_lang_ThreadGroup : AllStatic {
   static const char* name(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
+  // Daemon
+  static bool is_daemon(oop java_thread_group);
 
   // Number of strongly reachable thread groups
   static int ngroups(oop java_thread_group);
@@ -1108,7 +1111,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static int _yieldInfo_offset;
   static int _tail_offset;
   static int _cs_offset;
-  static int _reset_offset;
   static int _mounted_offset;
   static int _done_offset;
   static int _preempted_offset;
@@ -1127,7 +1129,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static inline jshort critical_section(oop ref);
   static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
-  static inline bool is_reset(oop ref);
   static inline bool is_mounted(oop ref);
   static inline bool done(oop ref);
   static inline bool is_preempted(oop ref);
@@ -1147,8 +1148,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _gcSP_offset;
   static int _markCycle_offset;
   static int _maxSize_offset;
-  static int _numFrames_offset;
-  static int _numOops_offset;
   static int _cont_offset;
 
   static void compute_offsets();
@@ -1181,10 +1180,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void set_mark_cycle(oop ref, jlong value);
   static inline jint maxSize(oop ref);
   static inline void set_maxSize(oop ref, jint value);
-  static inline jint numFrames(oop ref);
-  static inline void set_numFrames(oop ref, jint value);
-  static inline jint numOops(oop ref);
-  static inline void set_numOops(oop ref, jint value);
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
   template<typename P>

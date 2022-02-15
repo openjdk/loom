@@ -1160,6 +1160,8 @@ void nmethod::make_deoptimized() {
         break;
     }
   }
+  // Don't deopt this again.
+  mark_deoptimized();
 }
 
 void nmethod::verify_clean_inline_caches() {
@@ -1947,7 +1949,7 @@ void nmethod::do_unloading(bool unloading_occurred) {
 
 void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
   // make sure the oops ready to receive visitors
-  assert(allow_dead || is_alive(), "should not call follow on dead nmethod");
+  assert(allow_dead || is_alive(), "should not call follow on dead nmethod: %d", _state);
 
   // Prevent extra code cache walk for platforms that don't have immediate oops.
   if (relocInfo::mustIterateImmediateOopsInCode()) {

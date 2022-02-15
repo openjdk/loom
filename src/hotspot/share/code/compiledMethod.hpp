@@ -144,10 +144,11 @@ class CompiledMethod : public CodeBlob {
 
   void init_defaults();
 protected:
-  enum MarkForDeoptimizationStatus {
+  enum MarkForDeoptimizationStatus : u1 {
     not_marked,
     deoptimize,
-    deoptimize_noupdate
+    deoptimize_noupdate,
+    deoptimize_done
   };
 
   MarkForDeoptimizationStatus _mark_for_deoptimization_status; // Used for stack deoptimization
@@ -244,13 +245,17 @@ public:
   bool  is_marked_for_deoptimization() const { return _mark_for_deoptimization_status != not_marked; }
   void  mark_for_deoptimization(bool inc_recompile_counts = true);
 
+  bool  has_been_deoptimized() const { return _mark_for_deoptimization_status == deoptimize_done; }
+  void  mark_deoptimized() { _mark_for_deoptimization_status = deoptimize_done; }
+
   virtual void  make_deoptimized() { assert(false, "not supported"); };
 
   bool update_recompile_counts() const {
     // Update recompile counts when either the update is explicitly requested (deoptimize)
     // or the nmethod is not marked for deoptimization at all (not_marked).
     // The latter happens during uncommon traps when deoptimized nmethod is made not entrant.
-    return _mark_for_deoptimization_status != deoptimize_noupdate;
+    return _mark_for_deoptimization_status != deoptimize_noupdate &&
+           _mark_for_deoptimization_status != deoptimize_done;
   }
 
   // tells whether frames described by this nmethod can be deoptimized

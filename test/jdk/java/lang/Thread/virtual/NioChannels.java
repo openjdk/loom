@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
  * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
  * @compile --enable-preview -source ${jdk.version} NioChannels.java
  * @run testng/othervm/timeout=300 --enable-preview NioChannels
+ * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NioChannels
  */
 
 /**
@@ -247,7 +248,7 @@ public class NioChannels {
             }
         });
     }
-    
+
     /**
      * ServerSocketChannel accept, no blocking.
      */
@@ -635,7 +636,7 @@ public class NioChannels {
     }
 
     // -- supporting classes --
-    
+
     /**
      * Creates a loopback connection
      */

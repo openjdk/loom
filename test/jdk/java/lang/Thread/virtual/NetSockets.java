@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
  * @summary Basic tests for virtual threads using java.net sockets.
  * @compile --enable-preview -source ${jdk.version} NetSockets.java
  * @run testng/othervm/timeout=300 --enable-preview NetSockets
+ * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NetSockets
  */
 
 /**
@@ -56,7 +57,7 @@ import static org.testng.Assert.*;
 public class NetSockets {
 
     private static final long DELAY = 2000;
-    
+
     /**
      * Socket read/write, no blocking.
      */

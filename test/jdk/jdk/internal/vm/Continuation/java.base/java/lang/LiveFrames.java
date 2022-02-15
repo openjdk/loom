@@ -37,7 +37,7 @@ public class LiveFrames {
     }
 
     static final ContinuationScope FOO = new ContinuationScope() {};
-    
+
     public void test1() {
         final AtomicInteger res = new AtomicInteger(0);
         Continuation cont = new Continuation(FOO, ()-> {
@@ -49,7 +49,7 @@ public class LiveFrames {
             }
             res.set((int)r);
         });
-        
+
         int i = 0;
         while (!cont.isDone()) {
             cont.run();
@@ -60,21 +60,21 @@ public class LiveFrames {
             System.out.println("^&^ END UNMOUNTED");
         }
     }
-    
+
     static double foo(int a) {
         long x = 8;
         String s = "yyy";
         String r = bar(a + 1);
         return Integer.parseInt(r)+1;
     }
-    
+
     static String bar(long b) {
         double x = 9.99;
         String s = "zzz";
         String r = baz(b + 1);
         return "" + r;
     }
-    
+
     static String baz(long b) {
         double x = 9.99;
         String s = "zzz";
@@ -103,7 +103,7 @@ public class LiveFrames {
         });
         System.out.println("^&^ end");
     }
-    
+
 
     static void assertEquals(Object actual, Object expected) {
         if (!Objects.equals(actual, expected)) {

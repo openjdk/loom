@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,7 +27,10 @@ package jdk.internal.vm;
 import java.util.concurrent.Callable;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.DontInline;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
  * A StackableScope to represent scope-local bindings.
@@ -38,6 +41,30 @@ import jdk.internal.misc.Unsafe;
  */
 public class ScopeLocalContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+    static {
+        Unsafe.getUnsafe().ensureClassInitialized(StructureViolationExceptions.class);
+    }
+
+    /**
+     * Returns the "latest" ScopeLocalContainer (or a named subclass of one) for
+     * the current Thread. This may be on the current thread's scope task or may
+     * require walking up the tree to find it.
+     */
+    public static <T extends ScopeLocalContainer> T latest(Class<T> containerClass) {
+        StackableScope scope = head();
+        if (scope == null) {
+            scope = JLA.threadContainer(Thread.currentThread());
+            if (scope == null || scope.owner() == null)
+                return null;
+        }
+        if (containerClass.isInstance(scope)) {
+            @SuppressWarnings("unchecked")
+            T tmp = (T) scope;
+            return tmp;
+        } else {
+            return scope.enclosingScope(containerClass);
+        }
+    }
 
     /**
      * Returns the "latest" ScopeLocalContainer for the current Thread. This
@@ -45,17 +72,7 @@ public class ScopeLocalContainer extends StackableScope {
      * tree to find it.
      */
     public static ScopeLocalContainer latest() {
-        StackableScope scope = head();
-        if (scope == null) {
-            scope = JLA.threadContainer(Thread.currentThread());
-            if (scope == null || scope.owner() == null)
-                return null;
-        }
-        if (scope instanceof ScopeLocalContainer container) {
-            return container;
-        } else {
-            return scope.enclosingScope(ScopeLocalContainer.class);
-        }
+        return latest(ScopeLocalContainer.class);
     }
 
     /**
@@ -157,8 +174,6 @@ public class ScopeLocalContainer extends StackableScope {
 
     /**
      * Call an operation with this scope on the stack.
-     *
-     * Move to this ScopeLocalNode !!!
      */
     private <V> V doCall(Callable<V> op) {
         Throwable ex;
@@ -179,16 +194,18 @@ public class ScopeLocalContainer extends StackableScope {
     }
 
     /**
-     * Throws {@code ex} if not null. Throws StructureViolationException
+     * Throws {@code ex} if not null. StructureViolationException is thrown or added
+     * as a suppressed exception when {@code atTop} is false.
      */
+    @DontInline @ReservedStackAccess
     private static void throwIfFailed(Throwable ex, boolean atTop) {
         if (ex != null || !atTop) {
             if (!atTop) {
-                var e = new StructureViolationException();
+                var sve = StructureViolationExceptions.newException();
                 if (ex == null) {
-                    ex = e;
+                    ex = sve;
                 } else {
-                    ex.addSuppressed(e);
+                    ex.addSuppressed(sve);
                 }
             }
             Unsafe.getUnsafe().throwException(ex);

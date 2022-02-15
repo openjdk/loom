@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
 import java.util.Set;
@@ -571,10 +572,19 @@ public class Socket implements java.io.Closeable {
     /**
      * Connects this socket to the server.
      *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
+     * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
+     * following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread establishing a connection will
+     *        close the underlying channel and cause this method to throw
+     *        {@link ClosedByInterruptException} with the interrupt status set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
+     *        connection. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. This method will then throw
+     *        {@code SocketException} with the interrupt status set.
+     * </ol>
      *
      * @param   endpoint the {@code SocketAddress}
      * @throws  IOException if an error occurs during the connection
@@ -594,10 +604,19 @@ public class Socket implements java.io.Closeable {
      * A timeout of zero is interpreted as an infinite timeout. The connection
      * will then block until established or an error occurs.
      *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code connect}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
+     * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
+     * following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread establishing a connection will
+     *        close the underlying channel and cause this method to throw
+     *        {@link ClosedByInterruptException} with the interrupt status set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is establishing a
+     *        connection. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. This method will then throw
+     *        {@code SocketException} with the interrupt status set.
+     * </ol>
      *
      * @param   endpoint the {@code SocketAddress}
      * @param   timeout  the timeout value to be used in milliseconds.
@@ -908,6 +927,21 @@ public class Socket implements java.io.Closeable {
      * is in non-blocking mode then the input stream's {@code read} operations
      * will throw an {@link java.nio.channels.IllegalBlockingModeException}.
      *
+     * <p> Reading from the input stream is {@linkplain Thread#interrupt()
+     * interruptible} in the following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread reading from the input stream
+     *        will close the underlying channel and cause the read method to
+     *        throw {@link ClosedByInterruptException} with the interrupt
+     *        status set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is reading from the
+     *        input stream. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. The read method will then
+     *        throw {@code SocketException} with the interrupt status set.
+     * </ol>
+     *
      * <p>Under abnormal conditions the underlying connection may be
      * broken by the remote host or the network software (for example
      * a connection reset in the case of TCP connections). When a
@@ -932,11 +966,6 @@ public class Socket implements java.io.Closeable {
      *   return {@code 0}.
      *
      * </ul>
-     *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code read}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
      *
      * <p> Closing the returned {@link java.io.InputStream InputStream}
      * will close the associated socket.
@@ -1021,10 +1050,20 @@ public class Socket implements java.io.Closeable {
      * operations will throw an {@link
      * java.nio.channels.IllegalBlockingModeException}.
      *
-     * <p> For the system-default socket implementation at least, if a
-     * {@linkplain Thread#isVirtual() virtual thread} blocked in {@code write}
-     * is {@linkplain Thread#interrupt() interrupted} then the socket is closed
-     * and {@link SocketException} is thrown with the interrupt status set.
+     * <p> Writing to the output stream is {@linkplain Thread#interrupt()
+     * interruptible} in the following circumstances:
+     * <ol>
+     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *        In that case, interrupting a thread writing to the output stream
+     *        will close the underlying channel and cause the write method to
+     *        throw {@link ClosedByInterruptException} with the interrupt status
+     *        set.
+     *   <li> The socket uses the system-default socket implementation and a
+     *        {@linkplain Thread#isVirtual() virtual thread} is writing to the
+     *        output stream. In that case, interrupting the virtual thread will
+     *        cause it to wakeup and close the socket. The write method will then
+     *        throw {@code SocketException} with the interrupt status set.
+     * </ol>
      *
      * <p> Closing the returned {@link java.io.OutputStream OutputStream}
      * will close the associated socket.

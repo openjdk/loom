@@ -147,7 +147,7 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
       return err;
     }
   }
- 
+
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }

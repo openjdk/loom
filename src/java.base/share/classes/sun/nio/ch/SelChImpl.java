@@ -28,7 +28,6 @@ package sun.nio.ch;
 import java.nio.channels.Channel;
 import java.io.FileDescriptor;
 import java.io.IOException;
-import jdk.internal.misc.VirtualThreads;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 /**
@@ -84,18 +83,7 @@ public interface SelChImpl extends Channel {
      */
     default void park(int event, long nanos) throws IOException {
         if (Thread.currentThread().isVirtual()) {
-            Poller.register(getFDVal(), event);
-            try {
-                if (isOpen()) {
-                    if (nanos == 0) {
-                        VirtualThreads.park();
-                    } else {
-                        VirtualThreads.park(nanos);
-                    }
-                }
-            } finally {
-                Poller.deregister(getFDVal(), event);
-            }
+            Poller.poll(getFDVal(), event, nanos, this::isOpen);
         } else {
             long millis;
             if (nanos == 0) {

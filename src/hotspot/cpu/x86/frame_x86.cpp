@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -147,8 +147,8 @@ bool frame::safe_for_sender(JavaThread *thread) {
       saved_fp = (intptr_t*) *(sender_sp - frame::sender_sp_offset);
     }
 
-    if (Continuation::is_return_barrier_entry(sender_pc)) {	
-      Continuation::fix_continuation_bottom_sender(thread, *this, &sender_pc, &sender_sp);	
+    if (Continuation::is_return_barrier_entry(sender_pc)) {
+      Continuation::fix_continuation_bottom_sender(thread, *this, &sender_pc, &sender_sp);
     }
 
     // If the potential sender is the interpreter then we can do some more checking
@@ -275,7 +275,7 @@ void frame::patch_pc(Thread* thread, address pc) {
 
   assert(!Continuation::is_return_barrier_entry(*pc_addr), "return barrier");
 
-  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "must be (pc: " INTPTR_FORMAT " _pc: " INTPTR_FORMAT " pc_addr: " INTPTR_FORMAT " *pc_addr: " INTPTR_FORMAT  " sp: " INTPTR_FORMAT ")", p2i(pc), p2i(_pc), p2i(pc_addr), p2i(*pc_addr), p2i(sp()));
+  assert(_pc == *pc_addr || pc == *pc_addr || *pc_addr == 0, "");
   DEBUG_ONLY(address old_pc = _pc;)
   *pc_addr = pc;
   _pc = pc; // must be set before call to get_deopt_original_pc
@@ -292,9 +292,9 @@ void frame::patch_pc(Thread* thread, address pc) {
 #ifdef ASSERT
   {
     frame f(this->sp(), this->unextended_sp(), this->fp(), pc);
-    assert(f.is_deoptimized_frame() == this->is_deoptimized_frame() && f.pc() == this->pc() && f.raw_pc() == this->raw_pc(), 
+    assert(f.is_deoptimized_frame() == this->is_deoptimized_frame() && f.pc() == this->pc() && f.raw_pc() == this->raw_pc(),
       "must be (f.is_deoptimized_frame(): %d this->is_deoptimized_frame(): %d "
-      "f.pc(): " INTPTR_FORMAT " this->pc(): " INTPTR_FORMAT " f.raw_pc(): " INTPTR_FORMAT " this->raw_pc(): " INTPTR_FORMAT ")", 
+      "f.pc(): " INTPTR_FORMAT " this->pc(): " INTPTR_FORMAT " f.raw_pc(): " INTPTR_FORMAT " this->raw_pc(): " INTPTR_FORMAT ")",
       f.is_deoptimized_frame(), this->is_deoptimized_frame(), p2i(f.pc()), p2i(this->pc()), p2i(f.raw_pc()), p2i(this->raw_pc()));
   }
 #endif
@@ -326,12 +326,12 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
-template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
 
-template <bool relative>
+template <frame::addressing pointers>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) at<relative>(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at<pointers>(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer: result: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(result), p2i(fp()));
@@ -465,28 +465,14 @@ frame frame::sender_for_interpreter_frame(RegisterMap* map) const {
   address sender_pc = this->sender_pc();
 
   if (Continuation::is_return_barrier_entry(sender_pc)) {
-    if (map->walk_cont()) { // about to walk into an h-stack	
-      return Continuation::top_frame(*this, map);	
+    if (map->walk_cont()) { // about to walk into an h-stack
+      return Continuation::top_frame(*this, map);
     } else {
       Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &unextended_sp);
     }
   }
 
   return frame(sender_sp, unextended_sp, sender_fp, sender_pc);
-}
-
-
-//------------------------------------------------------------------------------
-// frame::sender
-
-frame frame::sender(RegisterMap* map) const {
-  frame result = sender_raw(map);
-
-  if (map->process_frames() && !map->in_cont()) {
-    StackWatermarkSet::on_iteration(map->thread(), result);
-  }
-
-  return result;
 }
 
 bool frame::is_interpreted_frame_valid(JavaThread* thread) const {
@@ -607,13 +593,13 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
 
-template <bool relative>
+template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address<relative>()[index];
+  return &interpreter_frame_tos_address<pointers>()[index];
 }
 
 #ifndef PRODUCT

@@ -41,12 +41,12 @@ inline CodeBlob* CodeCache::find_blob_and_oopmap(void* pc, int& slot) {
       int offset = (nop->displacement() & 0xffffff);
       cb = (CodeBlob*) ((address) pc - offset);
       slot = ((nop->displacement() >> 24) & 0xff);
-      // tty->print_cr(">>> PATCHED 22"); cb->print_on(tty);
     } else {
-      // tty->print_cr(">>> patching");
       cb = CodeCache::patch_nop(nop, pc, slot);
     }
-    assert(cb != NULL, "must be");
+
+    assert (cb != NULL, "must be");
+    // assert (cb == CodeCache::find_blob(pc), "CB: " INTPTR_FORMAT, p2i(cb));
     return cb;
   } else {
     CodeBlob* cb = CodeCache::find_blob(pc);

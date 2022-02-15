@@ -54,9 +54,7 @@ final class ThreadGroupContext {
      * @return  the application-dependent context
      */
     static ThreadGroupContext getContext() {
-        @SuppressWarnings("deprecation")
-        ThreadGroup group = Thread.currentThread().getThreadGroup();
-        return contexts.get(group);
+        return contexts.get(Thread.currentThread().getThreadGroup());
     }
 
     private volatile boolean isDesignTime;

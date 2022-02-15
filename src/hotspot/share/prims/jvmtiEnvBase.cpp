@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1136,7 +1136,7 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   jvmtiError err = JVMTI_ERROR_NONE;
 
   if (java_thread->has_last_Java_frame()) {
-    RegisterMap reg_map(java_thread, true, true);
+    RegisterMap reg_map(java_thread, true, false); // don't process frames
     ResourceMark rm(current_thread);
     javaVFrame *jvf = get_last_java_vframe(java_thread, &reg_map);
 
@@ -1278,7 +1278,7 @@ bool
 JvmtiEnvBase::cthread_with_continuation(JavaThread* jt) {
   ContinuationEntry* cont = NULL;
   if (jt->has_last_Java_frame()) {
-    cont = jt->last_continuation(java_lang_VirtualThread::vthread_scope());
+    cont = jt->vthread_continuation();
   }
   return (cont != NULL && cthread_with_mounted_vthread(jt));
 }
@@ -1550,13 +1550,12 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   // A case of non-virtual thread.
   if (!is_virtual) {
     // Thread.suspend() is used in some tests. It sets jt->is_suspended() only.
-    if (java_thread->is_thread_suspended() || 
+    if (java_thread->is_thread_suspended() ||
         (!is_passive_cthread && java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }
     java_thread->set_thread_suspended();
   }
-  assert(JvmtiVTMTDisabler::VTMT_count() == 0, "must be 0");
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
   assert(!single_suspend || (!is_virtual && java_thread->is_thread_suspended()) ||
@@ -1612,16 +1611,19 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
   if (java_thread->is_hidden_from_external_view()) {
     return JVMTI_ERROR_NONE;
   }
+  bool is_passive_cthread = is_passive_carrier_thread(java_thread, thread_h());
+
   // A case of a non-virtual thread.
   if (!is_virtual) {
     if (!java_thread->is_thread_suspended() &&
-        (thread_h() == java_thread->vthread() && !java_thread->is_suspended())) {
+        (is_passive_cthread || !java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     }
     java_thread->clear_thread_suspended();
   }
   assert(!java_thread->is_in_VTMT(), "sanity check");
-  if (is_virtual || thread_h() == java_thread->vthread()) {
+
+  if (!is_passive_cthread) {
     assert(single_suspend || is_virtual, "ResumeAllVirtualThreads should never resume non-virtual threads");
     if (java_thread->is_suspended()) {
       if (!JvmtiSuspendControl::resume(java_thread)) {

@@ -230,9 +230,6 @@ inline jshort jdk_internal_vm_Continuation::critical_section(oop ref) {
 inline void jdk_internal_vm_Continuation::set_critical_section(oop ref, jshort value) {
   ref->short_field_put(_cs_offset, value);
 }
-inline bool jdk_internal_vm_Continuation::is_reset(oop ref) {
-  return ref->bool_field(_reset_offset);
-}
 
 inline bool jdk_internal_vm_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
@@ -336,19 +333,11 @@ inline jint jdk_internal_vm_StackChunk::maxSize(oop ref) {
   return ref->int_field(_maxSize_offset);
 }
 inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, jint value) {
+#ifdef ASSERT
+  jint old = maxSize(ref);
+  log_develop_trace(jvmcont)("%s max_size: %d -> %d", value >= old ? "add" : "sub", old, value);
+#endif
   ref->int_field_put(_maxSize_offset, value);
-}
-inline jint jdk_internal_vm_StackChunk::numFrames(oop ref) {
-  return ref->int_field(_numFrames_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_numFrames(oop ref, jint value) {
-  ref->int_field_put(_numFrames_offset, value);
-}
-inline jint jdk_internal_vm_StackChunk::numOops(oop ref) {
-  return ref->int_field(_numOops_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_numOops(oop ref, jint value) {
-  ref->int_field_put(_numOops_offset, value);
 }
 
 inline void java_lang_invoke_CallSite::set_target_volatile(oop site, oop target) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -472,10 +472,28 @@ public interface JavaLangAccess {
      */
     void setScopeLocalCache(Object[] cache);
 
+
+    /**
+     * Returns the current thread's "victims" field, used to select entries
+     * from the scope local cache to evict.
+     */
+    int scopeLocalCacheVictims();
+
+    /**
+     * Sets the current thread's "victims" field, used to select entries
+     * from the scope local cache to evict.
+     */
+    void setScopeLocalCacheVictims(int value);
+
     /**
      * Return the current thread's scope local bindings.
      */
     Object scopeLocalBindings();
+
+    /**
+     * Set the current thread's scope local bindings.
+     */
+    void setScopeLocalBindings(Object bindings);
 
     /**
      * Returns the innermost mounted continuation

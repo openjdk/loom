@@ -162,7 +162,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
            TranslateError(err), err);
     return JNI_ERR;
   }
- 
+
   memset(&caps, 0, sizeof (caps));
   caps.can_suspend = 1;
   caps.can_pop_frame = 1;

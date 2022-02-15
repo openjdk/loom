@@ -55,18 +55,16 @@ abstract class AbstractLauncher extends ConnectorImpl
 
     public abstract String description();
 
-    final ThreadGroup grp;
+    ThreadGroup grp;
 
     AbstractLauncher() {
         super();
 
-        @SuppressWarnings("deprecation")
-        ThreadGroup g = Thread.currentThread().getThreadGroup();
+        grp = Thread.currentThread().getThreadGroup();
         ThreadGroup parent = null;
-        while ((parent = g.getParent()) != null) {
-            g = parent;
+        while ((parent = grp.getParent()) != null) {
+            grp = parent;
         }
-        grp = g;
     }
 
     String[] tokenizeCommand(String command, char quote) {

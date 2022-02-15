@@ -91,7 +91,7 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
 
   err = jvmti->NotifyFramePop(thread, 0);
   check_jvmti_status(jni, err, "MethodEntry: error in JVMTI NotifyFramePop");
-      
+
   print_method(jvmti, jni, method, 0);
 
 

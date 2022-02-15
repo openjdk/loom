@@ -27,8 +27,6 @@
 #
 #############################################################################
 
-compiler/intrinsics/bmi/verifycode/BzhiTestI2L.java 8268033 generic-x64
-
 vmTestbase/nsk/jvmti/SetFieldAccessWatch/setfldw001/TestDescription.java 8205957 generic-all
 
 vmTestbase/vm/mlvm/mixed/stress/regression/b6969574/INDIFY_Test.java 8265295 linux-x64,windows-x64
@@ -41,13 +39,22 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 # Loom specific
 
+compiler/codecache/stress/OverloadCompileQueueTest.java         8279653 generic-all
+
 gc/g1/plab/TestPLABPromotion.java                               8278126 generic-all
 gc/g1/plab/TestPLABResize.java                                  8278126 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#G1          8278127 generic-all
 gc/stringdedup/TestStringDeduplicationInterned.java#Parallel    8278127 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#Serial      8278127 generic-all
 gc/stringdedup/TestStringDeduplicationInterned.java#Z           8278127 generic-all
 gc/whitebox/TestWBGC.java                                       8278128 generic-all
 gc/z/TestGarbageCollectorMXBean.java                            8278129 generic-all
 
+# -Xcomp causes SA failures due to full GC during codecache sweeping
+serviceability/sa/ClhsdbScanOops.java#id0                                    8279662 generic-all
+serviceability/sa/ClhsdbScanOops.java#id1                                    8279662 generic-all
+
 serviceability/dcmd/vm/ClassLoaderStatsTest.java                8278123 generic-all
 
+serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all

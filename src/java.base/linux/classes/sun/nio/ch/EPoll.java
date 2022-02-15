@@ -50,6 +50,9 @@ class EPoll {
      *     epoll_data_t data;
      * }
      */
+    static {
+        IOUtil.load();
+    }
     private static final int SIZEOF_EPOLLEVENT   = eventSize();
     private static final int OFFSETOF_EVENTS     = eventsOffset();
     private static final int OFFSETOF_FD         = dataOffset();
@@ -115,8 +118,4 @@ class EPoll {
 
     static native int wait(int epfd, long pollAddress, int numfds, int timeout)
         throws IOException;
-
-    static {
-        IOUtil.load();
-    }
 }

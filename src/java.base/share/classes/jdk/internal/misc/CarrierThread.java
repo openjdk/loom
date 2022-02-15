@@ -89,11 +89,9 @@ public class CarrierThread extends ForkJoinWorkerThread {
     private static final ThreadGroup carrierThreadGroup() {
         return AccessController.doPrivileged(new PrivilegedAction<ThreadGroup>() {
             public ThreadGroup run() {
-                @SuppressWarnings("deprecation")
                 ThreadGroup group = JLA.currentCarrierThread().getThreadGroup();
                 for (ThreadGroup p; (p = group.getParent()) != null; )
                     group = p;
-                @SuppressWarnings("deprecation")
                 var carrierThreadsGroup = new ThreadGroup(group, "CarrierThreads");
                 return carrierThreadsGroup;
             }

@@ -33,7 +33,7 @@ import jdk.internal.misc.Unsafe;
 class WSAPoll {
     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
     private static final int ADDRESS_SIZE = UNSAFE.addressSize();
-    
+
     private WSAPoll() { }
 
     /**
@@ -43,6 +43,9 @@ class WSAPoll {
      *   SHORT revents;
      * } WSAPOLLFD;
      */
+    static {
+        IOUtil.load();
+    }
     private static final int SIZE_POLLFD    = pollfdSize();
     private static final int FD_OFFSET      = fdOffset();
     private static final int EVENTS_OFFSET  = eventsOffset();
@@ -131,8 +134,4 @@ class WSAPoll {
 
     static native int poll(long pollAddress, int numfds, int timeout)
         throws IOException;
-
-    static {
-        IOUtil.load();
-    }
 }

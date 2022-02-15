@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,28 +42,30 @@ bool stackChunkOopDesc::should_fix() const {
   const bool concurrent_gc = (UseZGC || UseShenandoahGC);
   return
     UseCompressedOops
-      ? (concurrent_gc ? should_fix<narrowOop, true>()
-                       : should_fix<narrowOop, false>())
-      : (concurrent_gc ? should_fix<oop,       true>()
-                       : should_fix<oop,       false>());
+      ? (concurrent_gc ? should_fix<narrowOop, gc_type::CONCURRENT>()
+                       : should_fix<narrowOop, gc_type::STW>())
+      : (concurrent_gc ? should_fix<oop,       gc_type::CONCURRENT>()
+                       : should_fix<oop,       gc_type::STW>());
 }
 
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
-  // tty->print_cr(">>> stackChunkOopDesc::top_frame this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()());
-  StackChunkFrameStream<true> fs(this);
+  assert (!is_empty(), "");
+  StackChunkFrameStream<chunk_frames::MIXED> fs(this);
 
   map->set_stack_chunk(this);
   fs.initialize_register_map(map);
   // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
 
   frame f = fs.to_frame();
+  // if (!maybe_fix_async_walk(f, map)) return frame();
+
+  assert (to_offset(f.sp()) == sp(), "f.offset_sp(): %d sp(): %d async: %d", f.offset_sp(), sp(), map->is_async());
   relativize_frame(f);
   f.set_frame_index(0);
   return f;
 }
 
 frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
-  // tty->print_cr(">>> stackChunkOopDesc::sender this: %p map: %p map->chunk: %p", this, map, (stackChunkOopDesc*)map->stack_chunk()()); derelativize(f).print_on<true>(tty);
   assert (map->in_cont(), "");
   assert (!map->include_argument_oops(), "");
   assert (!f.is_empty(), "");
@@ -72,7 +74,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   assert (!is_empty(), "");
 
   int index = f.frame_index();
-  StackChunkFrameStream<true> fs(this, derelativize(f));
+  StackChunkFrameStream<chunk_frames::MIXED> fs(this, derelativize(f));
   fs.next(map);
 
   if (!fs.is_done()) {
@@ -92,6 +94,25 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   return Continuation::continuation_parent_frame(map);
 }
 
+// bool stackChunkOopDesc::maybe_fix_async_walk(frame& f, RegisterMap* map) const {
+//   if (!Continuation::is_return_barrier_entry(f.pc()))
+//     return true;
+
+//   // Can happen during async stack walks, where the continuation is in the midst of a freeze/thaw
+//   assert (map->is_async(), "");
+//   address pc0 = pc();
+
+//   // we write sp first, then pc; here we read in the opposite order, so if sp is right, so is pc.
+//   OrderAccess::loadload();
+//   if (sp() == to_offset(f.sp())) {
+//     f.set_pc(pc0);
+//     return true;
+//   }
+//   assert (false, "");
+//   log_debug(jvmcont)("failed to fix frame during async stackwalk");
+//   return false;
+// }
+
 static int num_java_frames(CompiledMethod* cm, address pc) {
   int count = 0;
   for (ScopeDesc* scope = cm->scope_desc_at(pc); scope != nullptr; scope = scope->sender())
@@ -99,14 +120,16 @@ static int num_java_frames(CompiledMethod* cm, address pc) {
   return count;
 }
 
-static int num_java_frames(const StackChunkFrameStream<true>& f) {
-  assert (f.is_interpreted() || (f.cb() != nullptr && f.cb()->is_compiled() && f.cb()->as_compiled_method()->is_java_method()), "");
+static int num_java_frames(const StackChunkFrameStream<chunk_frames::MIXED>& f) {
+  assert (f.is_interpreted()
+          || (f.cb() != nullptr && f.cb()->is_compiled() && f.cb()->as_compiled_method()->is_java_method()), "");
   return f.is_interpreted() ? 1 : num_java_frames(f.cb()->as_compiled_method(), f.orig_pc());
 }
 
 int stackChunkOopDesc::num_java_frames() const {
   int n = 0;
-  for (StackChunkFrameStream<true> f(const_cast<stackChunkOopDesc*>(this)); !f.is_done(); f.next(SmallRegisterMap::instance)) {
+  for (StackChunkFrameStream<chunk_frames::MIXED> f(const_cast<stackChunkOopDesc*>(this)); !f.is_done();
+       f.next(SmallRegisterMap::instance)) {
     if (!f.is_stub()) n += ::num_java_frames(f);
   }
   return n;

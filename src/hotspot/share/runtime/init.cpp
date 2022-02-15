@@ -93,7 +93,7 @@ bool universe_post_init();  // must happen after compiler_init
 void javaClasses_init();  // must happen after vtable initialization
 void stubRoutines_init2(); // note: StubRoutines need 2-phase init
 
-void continuations_init(); // depends on flags (UseCompressedOops, LoomGenCode) and barrier sets
+void continuations_init(); // depends on flags (UseCompressedOops) and barrier sets
 
 // Do not disable thread-local-storage, as it is important for some
 // JNI/JVM/JVMTI functions and signal handlers to work properly

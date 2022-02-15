@@ -135,18 +135,10 @@ void oopDesc::release_set_klass(HeapWord* mem, Klass* k) {
   }
 }
 
-int oopDesc::klass_gap() const {
-  return *(int*)(((intptr_t)this) + klass_gap_offset_in_bytes());
-}
-
 void oopDesc::set_klass_gap(HeapWord* mem, int v) {
   if (UseCompressedClassPointers) {
     *(int*)(((char*)mem) + klass_gap_offset_in_bytes()) = v;
   }
-}
-
-void oopDesc::set_klass_gap(int v) {
-  set_klass_gap((HeapWord*)this, v);
 }
 
 bool oopDesc::is_a(Klass* k) const {
@@ -416,20 +408,20 @@ bool oopDesc::mark_must_be_preserved(markWord m) const {
   return m.must_be_preserved(this);
 }
 
-size_t oopDesc::copy_disjoint(HeapWord* to) { 
-  return copy_disjoint(to, size()); 
+size_t oopDesc::copy_disjoint(HeapWord* to) {
+  return copy_disjoint(to, size());
 }
 
-size_t oopDesc::copy_conjoint(HeapWord* to) { 
-  return copy_conjoint(to, size()); 
+size_t oopDesc::copy_conjoint(HeapWord* to) {
+  return copy_conjoint(to, size());
 }
 
-size_t oopDesc::copy_disjoint_compact(HeapWord* to) { 
-  return copy_disjoint_compact(to, compact_size()); 
+size_t oopDesc::copy_disjoint_compact(HeapWord* to) {
+  return copy_disjoint_compact(to, compact_size());
 }
 
-size_t oopDesc::copy_conjoint_compact(HeapWord* to) { 
-  return copy_conjoint_compact(to, compact_size()); 
+size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
+  return copy_conjoint_compact(to, compact_size());
 }
 
 size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {

@@ -213,7 +213,7 @@ interface LiveStackFrame extends StackFrame {
      * Gets {@code StackWalker} of the given unmounted continuation, that can get locals and operands.
      *
      * @param continuation the continuation to walk
-     * 
+     *
      * @throws SecurityException if the security manager is present and
      * denies access to {@code RuntimePermission("liveStackFrames")}
      */
