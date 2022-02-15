@@ -67,9 +67,9 @@ import jdk.internal.misc.ThreadFlock;
  * to finish with the {@code join} method, and then <em>process the results</em>.
  * Processing of results may include handling or re-throwing of exceptions.
  * {@snippet lang=java :
- *     try (var scope = new StructuredTaskScope<String>()) {
+ *     try (var scope = new StructuredTaskScope<Object>()) {
  *
- *         Future<String> future1 = scope.fork(task1);    // @highlight substring="fork"
+ *         Future<Integer> future1 = scope.fork(task1);   // @highlight substring="fork"
  *         Future<String> future2 = scope.fork(task2);    // @highlight substring="fork"
  *
  *         scope.join();                                  // @highlight substring="join"
