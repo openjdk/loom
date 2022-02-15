@@ -50,7 +50,7 @@ import jdk.internal.misc.VM;
  * <p> A thread group is weakly <a href="ref/package-summary.html#reachability">
  * <em>reachable</em></a> from its parent group so that it is eligible for garbage
  * collection when there are no {@linkplain Thread#isAlive() live} threads in the
- * group and is otherwise <i>unreachable</i>.
+ * group and the thread group is otherwise <i>unreachable</i>.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -242,7 +242,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @deprecated This method originally configured whether the thread group is
      *             a <i>daemon thread group</i> that is automatically destroyed
      *             when its last thread terminates. The concept of daemon thread
-     *             group no longer exists.
+     *             group no longer exists. A thread group is eligible to be GC'ed
+     *             when there are no live threads in the group and it is otherwise
+     *             unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
@@ -595,8 +597,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Does nothing.
      *
      * @deprecated This method was originally specified to destroy an empty
-     *             thread group. The ability to destroy a thread group no
-     *             longer exists.
+     *             thread group. The ability to explicitly destroy a thread group
+     *             no longer exists. A thread group is eligible to be GC'ed when
+     *             there are no live threads in the group and it is otherwise
+     *             unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void destroy() {
