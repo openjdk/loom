@@ -2094,6 +2094,7 @@ void JavaThread::verify_states_for_handshake() {
 
 void JavaThread::nmethods_do(CodeBlobClosure* cf) {
   DEBUG_ONLY(verify_frame_info();)
+  MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, Thread::current());)
 
   if (has_last_Java_frame()) {
     // Traverse the execution stack
