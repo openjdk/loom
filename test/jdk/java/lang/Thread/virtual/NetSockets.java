@@ -29,14 +29,6 @@
  * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NetSockets
  */
 
-/**
- * @test
- * @requires (os.family == "windows")
- * @compile --enable-preview -source ${jdk.version} NetSockets.java
- * @run testng/othervm/timeout=300 --enable-preview
- *     -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
- */
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;

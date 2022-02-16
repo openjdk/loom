@@ -29,14 +29,6 @@
  * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NioChannels
  */
 
-/**
- * @test
- * @requires (os.family == "windows")
- * @compile --enable-preview -source ${jdk.version} NioChannels.java
- * @run testng/othervm/timeout=300 --enable-preview
- *     -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NioChannels
- */
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
