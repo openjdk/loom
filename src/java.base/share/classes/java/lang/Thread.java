@@ -238,18 +238,6 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
-    // A simple (not very) random string of bits to use when evicting
-    // cache entries from the scoped variable cache.
-    private int victims = 0b1100_1001_0000_1111_1101_1010_1010_0010;
-
-    static int scopeLocalCacheVictims() {
-        return currentThread().victims;
-    }
-
-    static void setScopeLocalCacheVictims(int value) {
-        currentThread().victims = value;
-    }
-
     // scope-local bindings
     private Object scopeLocalBindings;
 

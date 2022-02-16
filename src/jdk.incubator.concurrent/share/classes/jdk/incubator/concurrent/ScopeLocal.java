@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.JavaUtilThreadLocalRandomAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.DontInline;
@@ -84,24 +85,6 @@ import jdk.internal.vm.annotation.Stable;
  *       :
  *   }
  * }</pre>
- *
- * As an alternative to the lambda expression form used above, {@link ScopeLocal} also supports
- * a <i>try-with-resources</i> form, which looks like this:
- * <pre>{@code}
- *   try (var unused = ScopeLocal.where(CREDENTIALS, creds).bind()) {
- *       :
- *       Connection connection = connectDatabase();
- *       :
- *    }
- * }</pre>
- *
- * This try-with-resources version of {@code bind()} is <i>insecure</i>: it is up
- * to the application programmer to make sure that bindings are closed at the
- * right time, in the right order. While a <i>try-with-resources</i> statement is
- * enough to guarantee this, there is no way to enforce the requirement that
- * {@link Carrier#bind} is only used in a <i>try-with-resources</i> statement.
- * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal}
- * with this <i>try-with-resources</i> binding.</p>
  *
  * @implNote Scope locals are designed to be used in fairly small numbers. {@link
  * #get} initially performs a linear search through enclosing scopes to find a
@@ -658,26 +641,25 @@ public final class ScopeLocal<T> {
             objs[n * 2] = key;
         }
 
+        private static final JavaUtilThreadLocalRandomAccess THREAD_LOCAL_RANDOM_ACCESS
+                = SharedSecrets.getJavaUtilThreadLocalRandomAccess();
+
         // Return either true or false, at pseudo-random, with a bias towards true.
         // This chooses either the primary or secondary cache slot, but the
         // primary slot is approximately twice as likely to be chosen as the
         // secondary one.
         private static boolean chooseVictim() {
-            int tmp = JLA.scopeLocalCacheVictims();
-            tmp ^= tmp << 13;
-            tmp ^= tmp >>> 17;
-            tmp ^= tmp << 5;
-            JLA.setScopeLocalCacheVictims(tmp);
-            return (tmp & 15) >= 5;
+            int r = THREAD_LOCAL_RANDOM_ACCESS.nextSecondaryThreadLocalRandomSeed();
+            return (r & 15) >= 5;
         }
 
-        @ReservedStackAccess
+        @ReservedStackAccess @DontInline
         public static void invalidate() {
             setScopeLocalCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
-        @ReservedStackAccess
+        @ReservedStackAccess @DontInline
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;

@@ -50,6 +50,8 @@ import java.util.random.RandomGenerator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
+import jdk.internal.access.JavaUtilThreadLocalRandomAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.util.random.RandomSupport;
 import jdk.internal.util.random.RandomSupport.*;
 import jdk.internal.misc.Unsafe;
@@ -404,6 +406,17 @@ public class ThreadLocalRandom extends Random {
     private static final AtomicLong seeder
         = new AtomicLong(RandomSupport.mixMurmur64(System.currentTimeMillis()) ^
                          RandomSupport.mixMurmur64(System.nanoTime()));
+
+    static class Access {
+        static {
+            SharedSecrets.setJavaUtilThreadLocalRandomAccess
+                    (new JavaUtilThreadLocalRandomAccess() {
+                        public int nextSecondaryThreadLocalRandomSeed() {
+                            return nextSecondarySeed();
+                        }
+                    });
+        }
+    }
 
     // at end of <clinit> to survive static initialization circularity
     static {

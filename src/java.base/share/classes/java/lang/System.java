@@ -2559,14 +2559,6 @@ public final class System {
                 Thread.setScopeLocalBindings(bindings);
             }
 
-            public int scopeLocalCacheVictims() {
-                return Thread.scopeLocalCacheVictims();
-            }
-
-            public void setScopeLocalCacheVictims(int victims) {
-                Thread.setScopeLocalCacheVictims(victims);
-            }
-
             public Continuation getContinuation(Thread thread) {
                 return thread.getContinuation();
             }
