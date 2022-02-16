@@ -204,6 +204,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *             <i>daemon thread group</i> that is automatically destroyed
      *             when its last thread terminates. The concept of daemon
      *             thread group no longer exists.
+     *             A thread group is eligible to be GC'ed when there are no
+     *             live threads in the group and it is otherwise unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final boolean isDaemon() {
@@ -218,6 +220,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @deprecated This method originally indicated if the thread group is
      *             destroyed. The ability to destroy a thread group and the
      *             concept of a destroyed thread group no longer exists.
+     *             A thread group is eligible to be GC'ed when there are no
+     *             live threads in the group and it is otherwise unreachable.
      *
      * @since   1.1
      */
