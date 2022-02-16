@@ -76,26 +76,50 @@ class TestHelper {
         }
     }
 
+
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param name the thread name
+     * @param characteristics thread characteristics
+     * @param task the task to run
+     */
     static void runInVirtualThread(String name, int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(name, characteristics, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param characteristics thread characteristics
+     * @param task the task to run
+     */
     static void runInVirtualThread(int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(null, characteristics, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param name the thread name
+     * @param task the task to run
+     */
     static void runInVirtualThread(String name, ThrowingRunnable task) throws Exception {
         run(name, 0, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param task the task to run
+     */
     static void runInVirtualThread(ThrowingRunnable task) throws Exception {
         run(null, 0, task);
     }
 
+    /**
+     * Returns a builder to create virtual threads that use the given scheduler.
+     */
     static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
         Thread.Builder.OfVirtual builder = Thread.ofVirtual();
         try {

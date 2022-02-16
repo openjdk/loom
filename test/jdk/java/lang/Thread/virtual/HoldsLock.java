@@ -49,7 +49,7 @@ public class HoldsLock {
     static final Object LOCK1 = new Object();
     static final Object LOCK2 = new Object();
 
-    // @Test Fails: JDK-8281642
+    @Test(enabled=false) // JDK-8281642
     public void testHoldsLock() throws Exception {
         var q = new ArrayBlockingQueue<Runnable>(5);
 
@@ -107,7 +107,8 @@ public class HoldsLock {
             LockInfo lock = info.getLockInfo();
             if (lock != null && lockAsString.equals(lock.toString())) {
                 assert false; // should never get here
-                assert tid == vthreadId : "Actual waiter is: " + info.getThreadName() + " vthread: " + vthread + " carrier: " + carrier;
+                assert tid == vthreadId : "Actual waiter is: " + info.getThreadName()
+                        + " vthread: " + vthread + " carrier: " + carrier;
             }
 
             if (tid == carrierId) {
