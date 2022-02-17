@@ -1131,8 +1131,9 @@ public:
     ContinuationHelper::set_anchor_to_entry(thread, entry);
   }
 
-  freeze_result try_freeze_fast(intptr_t* sp, bool chunk_available) {
-    if (freeze_fast(sp, chunk_available)) {
+  template <bool chunk_available>
+  freeze_result try_freeze_fast(intptr_t* sp) {
+    if (freeze_fast<chunk_available>(sp)) {
       return freeze_ok;
     }
     if (_thread != nullptr && _thread->has_pending_exception()) {
@@ -1191,7 +1192,8 @@ public:
     return available;
   }
 
-  bool freeze_fast(intptr_t* top_sp, bool chunk_available) {
+  template <bool chunk_available>
+  bool freeze_fast(intptr_t* top_sp) {
     assert (_thread != nullptr, "");
     assert(_cont.chunk_invariant(), "");
     assert (!Interpreter::contains(_cont.entryPC()), "");
@@ -1214,7 +1216,7 @@ public:
     intptr_t* orig_chunk_sp = nullptr;
   #endif
     int sp;
-    if (LIKELY(chunk_available)) {
+    if (chunk_available) { // LIKELY
       assert (chunk == _cont.tail() && is_chunk_available0, "");
       DEBUG_ONLY(allocated = false;)
       DEBUG_ONLY(orig_chunk_sp = chunk->sp_address();)
@@ -2001,7 +2003,7 @@ static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   }
 
   if (fast && fr.is_chunk_available(sp)) {
-    freeze_result res = fr.try_freeze_fast(sp, true);
+    freeze_result res = fr.template try_freeze_fast<true>(sp);
     assert (res == freeze_ok, "");
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     return freeze_epilog(current, cont, preempt);
@@ -2014,7 +2016,8 @@ static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
-    freeze_result res = fast ? fr.try_freeze_fast(sp, false) : fr.freeze_slow();
+    freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
+                             : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     return freeze_epilog(current, cont, res, preempt);
   JRT_BLOCK_END
