@@ -282,6 +282,7 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTes
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
 runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
+runtime/cds/appcds/dynamicArchive/ModulePath.java
 runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
 runtime/cds/appcds/javaldr/ArrayTest.java
 runtime/cds/appcds/javaldr/GCDuringDump.java
