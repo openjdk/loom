@@ -1,12 +1,10 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -22,22 +20,35 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package sun.nio.ch;
 
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
+/*
+ * @test
+ * bug 8280600
+ * @summary C2: assert(!had_error) failed: bad dominance
+ * @run main/othervm -Xcomp -XX:CompileOnly=TestCastIIMakesMainLoopPhiDead2 TestCastIIMakesMainLoopPhiDead2
+ */
 
-public class ConsoleStreams {
-    private ConsoleStreams() { }
+public class TestCastIIMakesMainLoopPhiDead2 {
+    static int zero = 0;
 
-    public static final InputStream in = new FileInputStream(FileDescriptor.in);
-    public static final OutputStream out = new FileOutputStream(FileDescriptor.out);
-    public static final OutputStream err = new FileOutputStream(FileDescriptor.err);
+    public static void main(String[] args) {
+        for (int i = 0; i < 100000; i++) {
+            test();
+        }
+    }
 
-    public static boolean isOutOrErrLocked(Thread thread) {
-        return false;
+    static void test() {
+        int h[] = new int[zero];
+        for (int m = 0; m < 5; m++) {
+            try {
+                for (int f = -400; f < 1; f++) {
+                    h[f] = 1; // Out of bounds store.
+                }
+            } catch (ArrayIndexOutOfBoundsException i) {
+                // Expected
+            }
+        }
     }
 }
+
+

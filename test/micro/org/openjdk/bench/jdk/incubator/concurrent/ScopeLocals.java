@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,7 +40,7 @@ import static org.openjdk.bench.jdk.incubator.concurrent.ScopeLocalsData.*;
 @Measurement(iterations=10, time=1)
 @Threads(1)
 @Fork(value = 1,
-      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.java.lang.ScopeLocalsExecutorService",
+      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.jdk.incubator.concurrent.ScopeLocalsExecutorService",
                         "-Djmh.executor=CUSTOM",
                         "-Djmh.blackhole.mode=COMPILER",
                         "--add-modules=jdk.incubator.concurrent",
@@ -144,15 +144,6 @@ public class ScopeLocals {
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bind_ScopeLocal() throws Exception {
         return HOLD_42.call(this::getClass);
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    @SuppressWarnings("try")
-    public Object TWR_bind_ScopeLocal() throws Exception {
-        try (var x = ScopeLocal.where(unbound, THE_ANSWER).bind()) {
-            return getClass();
-        }
     }
 
     @Benchmark

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2274,15 +2274,14 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       }
 
       bool carrier = false;
-      oop vthread_scope = java_lang_VirtualThread::vthread_scope();
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->last_continuation(vthread_scope)->cont_oop() !=
+        if (thread->vthread_continuation()->cont_oop() !=
               java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
-        carrier = (thread->last_continuation(vthread_scope) != NULL);
+        carrier = (thread->vthread_continuation() != NULL);
       }
 
       const int max_depth = MaxJavaStackTraceDepth;
@@ -2365,6 +2364,7 @@ const char* java_lang_Thread::thread_status_name(oop java_thread) {
 int java_lang_ThreadGroup::_parent_offset;
 int java_lang_ThreadGroup::_name_offset;
 int java_lang_ThreadGroup::_maxPriority_offset;
+int java_lang_ThreadGroup::_daemon_offset;
 int java_lang_ThreadGroup::_ngroups_offset;
 int java_lang_ThreadGroup::_groups_offset;
 int java_lang_ThreadGroup::_nweaks_offset;
@@ -2389,6 +2389,11 @@ const char* java_lang_ThreadGroup::name(oop java_thread_group) {
 ThreadPriority java_lang_ThreadGroup::maxPriority(oop java_thread_group) {
   assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
   return (ThreadPriority) java_thread_group->int_field(_maxPriority_offset);
+}
+
+bool java_lang_ThreadGroup::is_daemon(oop java_thread_group) {
+  assert(oopDesc::is_oop(java_thread_group), "thread group must be oop");
+  return java_thread_group->bool_field(_daemon_offset) != 0;
 }
 
 int java_lang_ThreadGroup::ngroups(oop java_thread_group) {
@@ -2417,6 +2422,7 @@ objArrayOop java_lang_ThreadGroup::weaks(oop java_thread_group) {
   macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
   macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
   macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
+  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
   macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false); \
   macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
   macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,               false); \
@@ -4502,11 +4508,20 @@ void java_lang_invoke_MethodType::serialize_offsets(SerializeClosure* f) {
 void java_lang_invoke_MethodType::print_signature(oop mt, outputStream* st) {
   st->print("(");
   objArrayOop pts = ptypes(mt);
-  for (int i = 0, limit = pts->length(); i < limit; i++) {
-    java_lang_Class::print_signature(pts->obj_at(i), st);
+  if (pts != NULL) {
+    for (int i = 0, limit = pts->length(); i < limit; i++) {
+      java_lang_Class::print_signature(pts->obj_at(i), st);
+    }
+  } else {
+    st->print("NULL");
   }
   st->print(")");
-  java_lang_Class::print_signature(rtype(mt), st);
+  oop rt = rtype(mt);
+  if (rt != NULL) {
+    java_lang_Class::print_signature(rt, st);
+  } else {
+    st->print("NULL");
+  }
 }
 
 Symbol* java_lang_invoke_MethodType::as_signature(oop mt, bool intern_if_not_found) {

@@ -139,7 +139,7 @@ public class ThreadImpl implements ThreadMXBean {
         long[] ids = new long[length];
         for (int i = 0; i < length; i++) {
             Thread t = threads[i];
-            ids[i] = t.getId();
+            ids[i] = t.threadId();
         }
         return ids;
     }
@@ -270,7 +270,7 @@ public class ThreadImpl implements ThreadMXBean {
         if (!isThreadCpuTimeSupported()) {
             // support current thread only
             for (int i = 0; i < ids.length; i++) {
-                if (ids[i] != Thread.currentThread().getId()) {
+                if (ids[i] != Thread.currentThread().threadId()) {
                     throw new UnsupportedOperationException(
                         "Thread CPU time measurement is only supported" +
                         " for the current thread.");
@@ -292,7 +292,7 @@ public class ThreadImpl implements ThreadMXBean {
             if (length == 1) {
                 long id = ids[0];
                 Thread thread = Thread.currentThread();
-                if (id == thread.getId()) {
+                if (id == thread.threadId()) {
                     if (isVirtual(thread)) {
                         times[0] = -1;
                     } else {
@@ -335,7 +335,7 @@ public class ThreadImpl implements ThreadMXBean {
             if (length == 1) {
                 long id = ids[0];
                 Thread thread = Thread.currentThread();
-                if (id == thread.getId()) {
+                if (id == thread.threadId()) {
                     if (isVirtual(thread)) {
                         times[0] = -1;
                     } else {
@@ -385,7 +385,7 @@ public class ThreadImpl implements ThreadMXBean {
         boolean verified = verifyThreadAllocatedMemory(id);
         if (verified) {
             Thread thread = Thread.currentThread();
-            if (id == thread.getId()) {
+            if (id == thread.threadId()) {
                 if (isVirtual(thread)) {
                     return -1L;
                 } else {
@@ -447,7 +447,7 @@ public class ThreadImpl implements ThreadMXBean {
         long[] ids = new long[threads.length];
         for (int i = 0; i < threads.length; i++) {
             Thread t = threads[i];
-            ids[i] = t.getId();
+            ids[i] = t.threadId();
         }
         return ids;
     }
@@ -469,7 +469,7 @@ public class ThreadImpl implements ThreadMXBean {
         long[] ids = new long[threads.length];
         for (int i = 0; i < threads.length; i++) {
             Thread t = threads[i];
-            ids[i] = t.getId();
+            ids[i] = t.threadId();
         }
         return ids;
     }

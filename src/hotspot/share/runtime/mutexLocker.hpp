@@ -47,7 +47,9 @@ extern Mutex*   JvmtiThreadState_lock;           // a lock on modification of JV
 extern Monitor* EscapeBarrier_lock;              // a lock to sync reallocating and relocking objects because of JVMTI access
 extern Monitor* JvmtiVTMT_lock;                  // a lock for Virtual Thread Mount Transition (VTMT) management
 extern Monitor* Heap_lock;                       // a lock on the heap
-extern Mutex*   ExpandHeap_lock;                 // a lock on expanding the heap
+#ifdef INCLUDE_PARALLELGC
+extern Mutex*   PSOldGenExpand_lock;         // a lock on expanding the heap
+#endif
 extern Mutex*   AdapterHandlerLibrary_lock;      // a lock on the AdapterHandlerLibrary
 extern Mutex*   SignatureHandlerLibrary_lock;    // a lock on the SignatureHandlerLibrary
 extern Mutex*   VtableStubs_lock;                // a lock on the VtableStubs

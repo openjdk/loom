@@ -87,7 +87,6 @@ import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
-import sun.nio.ch.ConsoleStreams;
 import sun.nio.fs.DefaultFileSystemProvider;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
@@ -2158,10 +2157,6 @@ public final class System {
         setOut0(newPrintStream(fdOut, props.getProperty("sun.stdout.encoding", StaticProperty.nativeEncoding())));
         setErr0(newPrintStream(fdErr, props.getProperty("sun.stderr.encoding", StaticProperty.nativeEncoding())));
 
-//        setIn0(new BufferedInputStream(ConsoleStreams.in));
-//        setOut0(newPrintStream(ConsoleStreams.out, props.getProperty("sun.stdout.encoding")));
-//        setErr0(newPrintStream(ConsoleStreams.err, props.getProperty("sun.stderr.encoding")));
-
         // Setup Java signal handlers for HUP, TERM, and INT (where available).
         Terminator.setup();
 
@@ -2562,14 +2557,6 @@ public final class System {
 
             public void setScopeLocalBindings(Object bindings) {
                 Thread.setScopeLocalBindings(bindings);
-            }
-
-            public int scopeLocalCacheVictims() {
-                return Thread.scopeLocalCacheVictims();
-            }
-
-            public void setScopeLocalCacheVictims(int victims) {
-                Thread.setScopeLocalCacheVictims(victims);
             }
 
             public Continuation getContinuation(Thread thread) {

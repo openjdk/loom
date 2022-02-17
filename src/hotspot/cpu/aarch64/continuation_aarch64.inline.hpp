@@ -144,11 +144,13 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
 template <typename ConfigT>
 template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
-  assert (!caller.is_interpreted_frame() || caller.unextended_sp() == (intptr_t*)caller.at<true>(frame::interpreter_frame_last_sp_offset), "");
+  assert (!caller.is_interpreted_frame()
+    || caller.unextended_sp() == (intptr_t*)caller.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
 
   intptr_t *sp, *fp; // sp is really our unextended_sp
   if (FKind::interpreted) {
-    assert ((intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset) == nullptr || f.unextended_sp() == (intptr_t*)f.at<false>(frame::interpreter_frame_last_sp_offset), "");
+    assert ((intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) == nullptr
+      || f.unextended_sp() == (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset), "");
     int locals = f.interpreter_frame_method()->max_locals();
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
     fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
@@ -182,8 +184,9 @@ inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& 
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((f.at<false>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-  assert (f.fp() > (intptr_t*)f.at<false>(frame::interpreter_frame_initial_sp_offset), "");
+  assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0)
+    || (f.unextended_sp() == f.sp()), "");
+  assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
 
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
@@ -192,10 +195,10 @@ inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& 
   relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
 
   assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
-  assert (hf.unextended_sp() == (intptr_t*)hf.at<true>(frame::interpreter_frame_last_sp_offset), "");
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            >  (intptr_t*)hf.at<true>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            <= (intptr_t*)hf.at<true>(frame::interpreter_frame_locals_offset), "");
+  assert (hf.unextended_sp() == (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_locals_offset), "");
 }
 
 template <typename ConfigT>
@@ -226,7 +229,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
 
   if (FKind::interpreted) {
     intptr_t* hsp = hf.unextended_sp();
-    const int fsize = Interpreted::frame_bottom<true>(hf) - hf.unextended_sp();
+    const int fsize = Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - hf.unextended_sp();
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);

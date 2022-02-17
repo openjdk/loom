@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -219,7 +219,7 @@ class VirtualThread extends Thread {
             // record event
             var event = new VirtualThreadSubmitFailedEvent();
             if (event.isEnabled()) {
-                event.javaThreadId = getId();
+                event.javaThreadId = threadId();
                 event.exceptionMessage = ree.getMessage();
                 event.commit();
             }
@@ -262,7 +262,7 @@ class VirtualThread extends Thread {
         // emit JFR event when starting
         if (VirtualThreadStartEvent.isTurnedOn()) {
             var event = new VirtualThreadStartEvent();
-            event.javaThreadId = getId();
+            event.javaThreadId = threadId();
             event.commit();
         }
 
@@ -278,7 +278,7 @@ class VirtualThread extends Thread {
             // emit JFR event when terminating
             if (VirtualThreadEndEvent.isTurnedOn()) {
                 var event = new VirtualThreadEndEvent();
-                event.javaThreadId = getId();
+                event.javaThreadId = threadId();
                 event.commit();
             }
 
@@ -840,7 +840,7 @@ class VirtualThread extends Thread {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("VirtualThread[#");
-        sb.append(getId());
+        sb.append(threadId());
         String name = getName();
         if (!name.isEmpty() && !name.equals("<unnamed>")) {
             sb.append(",");
@@ -870,7 +870,7 @@ class VirtualThread extends Thread {
 
     @Override
     public int hashCode() {
-        return (int) getId();
+        return (int) threadId();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -207,11 +207,9 @@ class VirtualMachineImpl extends MirrorImpl
         /* Create ThreadGroup to be used by all threads servicing
          * this VM.
          */
-        @SuppressWarnings("deprecation")
-        ThreadGroup group = new ThreadGroup(vmManager.mainGroupForJDI(),
+        threadGroupForJDI = new ThreadGroup(vmManager.mainGroupForJDI(),
                                             "JDI [" +
                                             this.hashCode() + "]");
-        threadGroupForJDI = group;
 
         /*
          * Set up a thread to communicate with the target VM over

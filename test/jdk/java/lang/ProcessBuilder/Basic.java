@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2194,7 +2194,7 @@ public class Basic {
                     // Wait until after the s.read occurs in "thread" by
                     // checking when the input stream monitor is acquired
                     // (BufferedInputStream.read is synchronized)
-                    while (!isLocked((BufferedInputStream) s, 10)) {
+                    while (!isLocked((BufferedInputStream) s)) {
                         Thread.sleep(100);
                     }
                 }
@@ -2848,7 +2848,7 @@ public class Basic {
                 if (k.isAssignableFrom(t.getClass())) pass();
                 else unexpected(t);}}
 
-    static boolean isLocked(BufferedInputStream bis, long millis) throws Exception {
+    static boolean isLocked(BufferedInputStream bis) throws Exception {
         Field lockField = BufferedInputStream.class.getDeclaredField("lock");
         lockField.setAccessible(true);
         var lock = (jdk.internal.misc.InternalLock) lockField.get(bis);
@@ -2870,7 +2870,7 @@ public class Basic {
 
             boolean isLocked() throws InterruptedException {
                 start();
-                join(millis);
+                join(10);
                 return !unlocked;
             }
         }.isLocked();

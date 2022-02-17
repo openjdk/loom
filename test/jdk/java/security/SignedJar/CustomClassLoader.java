@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,42 +19,25 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-// Old code. Might be deleted later if no uses appear.
-#if 0
+import java.io.IOException;
+import java.io.InputStream;
 
-#ifndef SHARE_COMPILER_OOPMAPSTUBGENERATOR_HPP
-#define SHARE_COMPILER_OOPMAPSTUBGENERATOR_HPP
+public class CustomClassLoader extends ClassLoader {
 
-#include "asm/assembler.hpp"
-#include "memory/allocation.hpp"
+    public CustomClassLoader(ClassLoader parent) {
+        super(parent);
+    }
 
-class ImmutableOopMap;
-class BufferBlob;
-
-class OopMapStubGenerator {
-  const CodeBlob* _cb;
-  const ImmutableOopMap& _oopmap;
-  BufferBlob* _blob;
-  address _freeze_stub;
-  address _thaw_stub;
-
-public:
-  OopMapStubGenerator(const CodeBlob* cb, const ImmutableOopMap& oopmap) : _cb(cb), _oopmap(oopmap), _blob(NULL), _freeze_stub(NULL), _thaw_stub(NULL) {}
-
-  address freeze_stub() { return _freeze_stub; }
-  address thaw_stub() { return _thaw_stub; }
-  bool generate();
-  void free();
-
-  static address thaw_stub(address freeze_stub_address);
-  static CodeBlob* code_blob(address thaw_stub_address);
-};
-
-#endif
-
-#else
-#error This code is not used
-#endif
+    @Override
+    public Class<?> findClass(String name) throws ClassNotFoundException {
+        try (InputStream is = getClass().getClassLoader()
+                .getResourceAsStream(name + ".class")) {
+            byte[] buf = is.readAllBytes();
+            return defineClass(name, buf, 0, buf.length);
+        } catch (IOException e) {
+            throw new ClassNotFoundException(e.getMessage());
+        }
+    }
+}

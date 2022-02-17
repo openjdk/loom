@@ -83,11 +83,13 @@ public class ForkJoinWorkerThread extends Thread {
 
     /**
      * Creates a ForkJoinWorkerThread operating in the given thread group and
-     * pool.
+     * pool. If the thread group is {@code null} then the thread group is chosen
+     * by the security manager or is set to the current thread's thread group.
      *
-     * @param group if non-null, the thread group for this thread
+     * @param group the thread group, can be null
      * @param pool the pool this thread works in
      * @throws NullPointerException if pool is null
+     * @since 19
      */
     protected ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool) {
         this(group, pool, false, false);
@@ -189,7 +191,6 @@ public class ForkJoinWorkerThread extends Thread {
         @SuppressWarnings("removal")
         private static final ThreadGroup innocuousThreadGroup =
             AccessController.doPrivileged(new PrivilegedAction<>() {
-                @SuppressWarnings("deprecation")
                 public ThreadGroup run() {
                     ThreadGroup group = Thread.currentThread().getThreadGroup();
                     for (ThreadGroup p; (p = group.getParent()) != null; )

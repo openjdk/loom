@@ -266,9 +266,9 @@ inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
-  return (intptr_t*)at<relative>(interpreter_frame_last_sp_offset);
+  return (intptr_t*)at<pointers>(interpreter_frame_last_sp_offset);
 }
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
@@ -299,16 +299,16 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-  intptr_t* last_sp = interpreter_frame_last_sp<relative>();
+  intptr_t* last_sp = interpreter_frame_last_sp<pointers>();
   if (last_sp == NULL) {
     return sp();
   } else {
     // sp() may have been extended or shrunk by an adapter.  At least
     // check that we don't fall behind the legal region.
     // For top deoptimized frame last_sp == interpreter_frame_monitor_end.
-    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<relative>(), "bad tos");
+    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<pointers>(), "bad tos");
     return last_sp;
   }
 }
@@ -325,9 +325,9 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
-  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<relative>();
+  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<pointers>();
   return monitor_end-1;
 }
 

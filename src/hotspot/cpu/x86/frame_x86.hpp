@@ -159,7 +159,7 @@
   inline address* sender_pc_addr() const;
 
   // expression stack tos if we are nested in a java call
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

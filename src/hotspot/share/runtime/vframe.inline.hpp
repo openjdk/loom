@@ -72,7 +72,7 @@ inline void vframeStreamCommon::next() {
       assert (_cont != NULL, "");
       assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
-      
+
       // TODO: handle ShowCarrierFrames
       oop scope = jdk_internal_vm_Continuation::scope(_cont->cont_oop());
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {

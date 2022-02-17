@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -151,6 +151,9 @@ JNIEXPORT jboolean JNICALL
 JVM_IsUseContainerSupport(void);
 
 JNIEXPORT void * JNICALL
+JVM_LoadZipLibrary();
+
+JNIEXPORT void * JNICALL
 JVM_LoadLibrary(const char *name, jboolean throwException);
 
 JNIEXPORT void JNICALL
@@ -253,8 +256,8 @@ JNIEXPORT void JNICALL
 JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
 
 JNIEXPORT jint JNICALL
-JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor, 
-                  jint frame_count, jint start_index, 
+JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor,
+                  jint frame_count, jint start_index,
                   jobjectArray frames);
 
 JNIEXPORT void JNICALL
@@ -1131,7 +1134,7 @@ JVM_GetTemporaryDirectory(JNIEnv *env);
  */
 JNIEXPORT jobjectArray JNICALL
 JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
-    
+
 /* Virtual thread support.
  */
 JNIEXPORT void JNICALL

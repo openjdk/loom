@@ -184,7 +184,6 @@ public final class InnocuousThread extends Thread {
                 (tk, "contextClassLoader");
 
             long gp = UNSAFE.objectFieldOffset(gk, "parent");
-            @SuppressWarnings("deprecation")
             ThreadGroup group = Thread.currentThread().getThreadGroup();
 
             while (group != null) {
@@ -194,16 +193,12 @@ public final class InnocuousThread extends Thread {
                 group = parent;
             }
             final ThreadGroup root = group;
-
             if (System.getSecurityManager() == null) {
-                @SuppressWarnings("deprecation")
-                ThreadGroup g = new ThreadGroup(root, "InnocuousThreadGroup");
-                INNOCUOUSTHREADGROUP = g;
+                INNOCUOUSTHREADGROUP = new ThreadGroup(root, "InnocuousThreadGroup");
             } else {
                 INNOCUOUSTHREADGROUP = AccessController.doPrivileged(
                     new PrivilegedAction<ThreadGroup>() {
                         @Override
-                        @SuppressWarnings("deprecation")
                         public ThreadGroup run() {
                             return new ThreadGroup(root, "InnocuousThreadGroup");
                         }

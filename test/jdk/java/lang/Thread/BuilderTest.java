@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,9 +39,8 @@ import static org.testng.Assert.*;
 
 public class BuilderTest {
 
-    // platform thread
     @Test
-    public void testPlatformThread1() throws Exception {
+    public void testPlatformThread() throws Exception {
         Thread parent = Thread.currentThread();
         Thread.Builder.OfPlatform builder = Thread.ofPlatform();
 
@@ -88,9 +87,8 @@ public class BuilderTest {
         assertTrue(done3.get());
     }
 
-    // virtual thread
     @Test
-    public void testVirtualThread1() throws Exception {
+    public void testVirtualThread() throws Exception {
         Thread parent = Thread.currentThread();
         Thread.Builder.OfVirtual builder = Thread.ofVirtual();
 
@@ -133,7 +131,6 @@ public class BuilderTest {
         assertTrue(done3.get());
     }
 
-    // thread name
     @Test
     public void testName1() {
         Thread.Builder builder = Thread.ofPlatform().name("duke");
@@ -204,7 +201,6 @@ public class BuilderTest {
         assertTrue(thread6.getName().equals("duke-105"));
     }
 
-    // ThreadGroup
     @Test
     public void testThreadGroup1() {
         ThreadGroup group = new ThreadGroup("groupies");
@@ -249,7 +245,6 @@ public class BuilderTest {
         }
     }
 
-    // priority
     @Test
     public void testPriority1() {
         int priority = Thread.currentThread().getPriority();
@@ -307,7 +302,6 @@ public class BuilderTest {
         Thread.ofPlatform().priority(Thread.MAX_PRIORITY + 1);
     }
 
-    // daemon status
     @Test
     public void testDaemon1() {
         Thread.Builder builder = Thread.ofPlatform().daemon(false);
@@ -347,7 +341,6 @@ public class BuilderTest {
         assertTrue(thread3.isDaemon());
     }
 
-    // stack size
     @Test
     public void testStackSize1() {
         Thread.Builder builder = Thread.ofPlatform().stackSize(1024*1024);
@@ -371,7 +364,6 @@ public class BuilderTest {
         Thread.ofPlatform().stackSize(-1);
     }
 
-    // uncaught exception handler
     @Test
     public void testUncaughtExceptionHandler1() throws Exception {
         class FooException extends RuntimeException { }
@@ -578,6 +570,10 @@ public class BuilderTest {
         assertTrue(done.get());
     }
 
+    /**
+     * Tests that a builder creates threads that do not inherit the initial values
+     * of inheritable thread locals.
+     */
     private void testNoInheritedThreadLocals(Thread.Builder builder) throws Exception {
         Object value = new Object();
         INHERITED_LOCAL.set(value);
@@ -821,7 +817,6 @@ public class BuilderTest {
         testInheritContextClassLoader(builder);
     }
 
-    // test null parameters
     @Test
     public void testNulls1() {
         Thread.Builder.OfPlatform builder = Thread.ofPlatform();

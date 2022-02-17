@@ -146,7 +146,6 @@ public class EventQueue {
 
     private EventDispatchThread dispatchThread;
 
-    @SuppressWarnings("deprecation")
     private final ThreadGroup threadGroup =
         Thread.currentThread().getThreadGroup();
     private final ClassLoader classLoader =

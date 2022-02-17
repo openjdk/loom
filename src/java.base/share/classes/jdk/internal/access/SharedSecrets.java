@@ -76,6 +76,7 @@ public class SharedSecrets {
     private static JavaNetURLAccess javaNetURLAccess;
     private static JavaNioAccess javaNioAccess;
     private static JavaUtilCollectionAccess javaUtilCollectionAccess;
+    private static JavaUtilThreadLocalRandomAccess javaUtilThreadLocalRandomAccess;
     private static JavaUtilJarAccess javaUtilJarAccess;
     private static JavaUtilZipFileAccess javaUtilZipFileAccess;
     private static JavaUtilResourceBundleAccess javaUtilResourceBundleAccess;
@@ -98,6 +99,18 @@ public class SharedSecrets {
             } catch (ClassNotFoundException e) {}
         }
         return access;
+    }
+    public static void setJavaUtilThreadLocalRandomAccess(JavaUtilThreadLocalRandomAccess access) {
+        javaUtilThreadLocalRandomAccess = access;
+    }
+
+    public static JavaUtilThreadLocalRandomAccess getJavaUtilThreadLocalRandomAccess() {
+        if (javaUtilThreadLocalRandomAccess == null) {
+            try {
+                Class.forName("java.util.concurrent.ThreadLocalRandom$Access", true, null);
+            } catch (ClassNotFoundException e) {}
+        }
+        return javaUtilThreadLocalRandomAccess;
     }
 
     public static JavaUtilJarAccess javaUtilJarAccess() {

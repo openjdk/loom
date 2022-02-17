@@ -247,19 +247,19 @@ JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
 void
 JvmtiVTMTDisabler::disable_VTMT() {
   JavaThread* thread = JavaThread::current();
-  int attempts = 10;
+  int attempts = 1000;
   {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
     assert(!thread->is_in_VTMT(), "VTMT sanity check");
     while (_SR_mode) { // suspender or resumer is a JvmtiVTMTDisabler monopolist
-      ml.wait(1000); // wait while there is an active suspender or resumer
+      ml.wait(10); // wait while there is an active suspender or resumer
     }
     if (_is_SR) {
       _SR_mode = true;
       while (_VTMT_disable_count > 0) {
-        ml.wait(1000); // wait while there is any active jvmtiVTMTDisabler
+        ml.wait(10); // wait while there is any active jvmtiVTMTDisabler
       }
     }
     Atomic::inc(&_VTMT_disable_count);
@@ -267,7 +267,7 @@ JvmtiVTMTDisabler::disable_VTMT() {
     // Block while some mount/unmount transitions are in progress.
     // Debug version fails and print diagnostic information
     while (_VTMT_count > 0) {
-      if (ml.wait(1000)) {
+      if (ml.wait(10)) {
         attempts--;
       }
       DEBUG_ONLY(if (attempts == 0) break;)
@@ -308,7 +308,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
-  int attempts = 10 * 100;
+  int attempts = 1000;
 
   // Avoid using MonitorLocker on performance critical path, use
   // two-level synchronization with lock-free operations on counters.

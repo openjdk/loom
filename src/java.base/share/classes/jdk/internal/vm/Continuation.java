@@ -539,7 +539,8 @@ public class Continuation {
     }
 
     private String id() {
-        return Integer.toHexString(System.identityHashCode(this)) + " [" + currentCarrierThread().getId() + "]";
+        return Integer.toHexString(System.identityHashCode(this))
+                + " [" + currentCarrierThread().threadId() + "]";
     }
 
     // private native void clean0();

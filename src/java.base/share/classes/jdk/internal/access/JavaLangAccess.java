@@ -472,19 +472,6 @@ public interface JavaLangAccess {
      */
     void setScopeLocalCache(Object[] cache);
 
-
-    /**
-     * Returns the current thread's "victims" field, used to select entries
-     * from the scope local cache to evict.
-     */
-    int scopeLocalCacheVictims();
-
-    /**
-     * Sets the current thread's "victims" field, used to select entries
-     * from the scope local cache to evict.
-     */
-    void setScopeLocalCacheVictims(int value);
-
     /**
      * Return the current thread's scope local bindings.
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,23 +23,8 @@
  * questions.
  */
 
-/*
- * This little utility can be used to expand the jib-profiles configuration
- * files into plain json.
- *
- * Usage:
- *
- *   jjs -scripting print-config.js -- [<jib-profiles.js>]
- *
- */
+package jdk.internal.access;
 
-var file = $ARG[0];
-if (file == null) {
-    file = new java.io.File(__DIR__, "../conf/jib-profiles.js").getCanonicalPath();
+public interface JavaUtilThreadLocalRandomAccess {
+    int nextSecondaryThreadLocalRandomSeed();
 }
-load(file);
-var input = {};
-input.get = function(dependencyName, attribute) {
-    return "\${" + dependencyName + "." + attribute + "}";
-};
-print(JSON.stringify(getJibProfiles(input), null, 2));

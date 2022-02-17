@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,10 @@
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
@@ -40,41 +44,64 @@ import static org.testng.Assert.*;
 
 public class DumpThreads {
 
+    /**
+     * Thread dump in plain text format.
+     */
     @Test
     public void testPlainText() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         Path file = genOutputPath("txt");
-        try {
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Thread vthread = forkParker(executor);
+
             mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
             cat(file);
 
-            // if the main thread is a platform thread then it should be included
-            Thread current = Thread.currentThread();
-            if (!current.isVirtual()) {
-                String expect = "#" + Thread.currentThread().getId();
-                assertTrue(count(file, expect) == 1L);
+            // virtual thread should be found
+            try {
+                assertTrue(isPresent(file, vthread));
+            } finally {
+                LockSupport.unpark(vthread);
+            }
+
+            // if the current thread is a platform thread then it should be included
+            Thread currentThread = Thread.currentThread();
+            if (!currentThread.isVirtual()) {
+                assertTrue(isPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
         }
     }
 
+    /**
+     * Thread dump in JSON format.
+     */
     @Test
     public void testJson() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         Path file = genOutputPath("json");
-        try {
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Thread vthread = forkParker(executor);
+
             mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
             cat(file);
+
             assertTrue(count(file, "threadDump") >= 1L);
             assertTrue(count(file, "threadContainers") >= 1L);
             assertTrue(count(file, "threads") >= 1L);
 
-            // if the main thread is a platform thread then it should be included
-            Thread current = Thread.currentThread();
-            if (!current.isVirtual()) {
-                String expect = "\"tid\": " + current.getId();
-                assertTrue(count(file, expect) >= 1L);
+            // virtual thread should be found
+            try {
+                assertTrue(isJsonPresent(file, vthread));
+            } finally {
+                LockSupport.unpark(vthread);
+            }
+
+            // if the current thread is a platform thread then it should be included
+            Thread currentThread = Thread.currentThread();
+            if (!currentThread.isVirtual()) {
+                assertTrue(isJsonPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
@@ -103,6 +130,39 @@ public class DumpThreads {
     public void testNull2() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         mbean.dumpThreads(genOutputPath("txt").toString(), null);
+    }
+
+    /**
+     * Submits a parking task to the given executor, returns the Thread object of
+     * the parked thread.
+     */
+    private static Thread forkParker(ExecutorService executor) throws Exception {
+        var ref = new AtomicReference<Thread>();
+        executor.submit(() -> {
+            ref.set(Thread.currentThread());
+            LockSupport.park();
+        });
+        Thread thread;
+        while ((thread = ref.get()) == null) {
+            Thread.sleep(10);
+        }
+        return thread;
+    }
+
+    /**
+     * Returns true if the file contains #<tid>
+     */
+    private static boolean isPresent(Path file, Thread thread) throws Exception {
+        String expect = "#" + thread.getId();
+        return count(file, expect) > 0;
+    }
+
+    /**
+     * Returns true if the file contains "tid": <tid>
+     */
+    private static boolean isJsonPresent(Path file, Thread thread) throws Exception {
+        String expect = "\"tid\": " + thread.getId();
+        return count(file, expect) > 0;
     }
 
     private static Path genOutputPath(String suffix) throws Exception {

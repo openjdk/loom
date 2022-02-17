@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
  */
 
 import java.lang.reflect.Field;
+import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -60,33 +61,65 @@ class TestHelper {
         boolean inherit = ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0);
         builder.inheritInheritableThreadLocals(inherit);
         Thread thread = builder.start(target);
-        thread.join();
+
+        // wait for thread to terminate
+        while (thread.join(Duration.ofSeconds(10)) == false) {
+            System.out.println("-- " + thread + " --");
+            for (StackTraceElement e : thread.getStackTrace()) {
+                System.out.println("  " + e);
+            }
+        }
+
         Exception e = exc.get();
         if (e != null) {
             throw e;
         }
     }
 
+
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param name the thread name
+     * @param characteristics thread characteristics
+     * @param task the task to run
+     */
     static void runInVirtualThread(String name, int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(name, characteristics, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param characteristics thread characteristics
+     * @param task the task to run
+     */
     static void runInVirtualThread(int characteristics, ThrowingRunnable task)
         throws Exception
     {
         run(null, characteristics, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param name the thread name
+     * @param task the task to run
+     */
     static void runInVirtualThread(String name, ThrowingRunnable task) throws Exception {
         run(name, 0, task);
     }
 
+    /**
+     * Run a task in a virutal thread and wait for it to terminate.
+     * @param task the task to run
+     */
     static void runInVirtualThread(ThrowingRunnable task) throws Exception {
         run(null, 0, task);
     }
 
+    /**
+     * Returns a builder to create virtual threads that use the given scheduler.
+     */
     static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
         Thread.Builder.OfVirtual builder = Thread.ofVirtual();
         try {

@@ -28,7 +28,7 @@ package java.lang;
 /**
  * Thrown to indicate that a method has been called on the wrong thread.
  *
- * @since 99
+ * @since 19
  */
 public class WrongThreadException extends RuntimeException {
     @java.io.Serial

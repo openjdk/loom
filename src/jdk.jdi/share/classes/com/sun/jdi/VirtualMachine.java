@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -792,12 +792,11 @@ public interface VirtualMachine extends Mirror {
      * @return {@code true} if the feature is supported, {@code false} otherwise
      *
      * @apiNote
-     * This is a temporary method to test the capability of the target VM.
+     * This is a temporary method to test the capability of the target VM. It
+     * is not intended for the main-line.
      *
      * @implSpec
      * The default implementation returns {@code false}.
-     *
-     * @since 99
      */
     default boolean supportsVirtualThreads() {
         return false;

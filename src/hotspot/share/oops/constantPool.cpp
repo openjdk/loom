@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -886,11 +886,9 @@ void ConstantPool::save_and_throw_exception(const constantPoolHandle& this_cp, i
 
 constantTag ConstantPool::constant_tag_at(int which) {
   constantTag tag = tag_at(which);
-  if (tag.is_dynamic_constant() ||
-      tag.is_dynamic_constant_in_error()) {
+  if (tag.is_dynamic_constant()) {
     BasicType bt = basic_type_for_constant_at(which);
-    // dynamic constant could return an array, treat as object
-    return constantTag::ofBasicType(is_reference_type(bt) ? T_OBJECT : bt);
+    return constantTag(constantTag::type2tag(bt));
   }
   return tag;
 }
@@ -977,7 +975,6 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
   switch (tag.value()) {
 
   case JVM_CONSTANT_UnresolvedClass:
-  case JVM_CONSTANT_UnresolvedClassInError:
   case JVM_CONSTANT_Class:
     {
       assert(cache_index == _no_index_sentinel, "should not have been set");
@@ -1045,14 +1042,6 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
     result_oop = string_at_impl(this_cp, index, cache_index, CHECK_NULL);
     break;
 
-  case JVM_CONSTANT_DynamicInError:
-  case JVM_CONSTANT_MethodHandleInError:
-  case JVM_CONSTANT_MethodTypeInError:
-    {
-      throw_resolution_error(this_cp, index, CHECK_NULL);
-      break;
-    }
-
   case JVM_CONSTANT_MethodHandle:
     {
       int ref_kind                 = this_cp->method_handle_ref_kind_at(index);
@@ -1066,11 +1055,14 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
                               callee_index, name->as_C_string(), signature->as_C_string());
       }
 
-      Klass* callee = klass_at_impl(this_cp, callee_index, CHECK_NULL);
+      Klass* callee = klass_at_impl(this_cp, callee_index, THREAD);
+      if (HAS_PENDING_EXCEPTION) {
+        save_and_throw_exception(this_cp, index, tag, CHECK_NULL);
+      }
 
       // Check constant pool method consistency
       if ((callee->is_interface() && m_tag.is_method()) ||
-          ((!callee->is_interface() && m_tag.is_interface_method()))) {
+          (!callee->is_interface() && m_tag.is_interface_method())) {
         ResourceMark rm(THREAD);
         stringStream ss;
         ss.print("Inconsistent constant pool data in classfile for class %s. "
@@ -1082,17 +1074,18 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
                  index,
                  callee->is_interface() ? "CONSTANT_MethodRef" : "CONSTANT_InterfaceMethodRef",
                  callee->is_interface() ? "CONSTANT_InterfaceMethodRef" : "CONSTANT_MethodRef");
-        THROW_MSG_NULL(vmSymbols::java_lang_IncompatibleClassChangeError(), ss.as_string());
+        Exceptions::fthrow(THREAD_AND_LOCATION, vmSymbols::java_lang_IncompatibleClassChangeError(), "%s", ss.as_string());
+        save_and_throw_exception(this_cp, index, tag, CHECK_NULL);
       }
 
       Klass* klass = this_cp->pool_holder();
       Handle value = SystemDictionary::link_method_handle_constant(klass, ref_kind,
                                                                    callee, name, signature,
                                                                    THREAD);
-      result_oop = value();
       if (HAS_PENDING_EXCEPTION) {
         save_and_throw_exception(this_cp, index, tag, CHECK_NULL);
       }
+      result_oop = value();
       break;
     }
 
@@ -1137,10 +1130,15 @@ oop ConstantPool::resolve_constant_at_impl(const constantPoolHandle& this_cp,
     result_oop = java_lang_boxing_object::create(T_DOUBLE, &prim_value, CHECK_NULL);
     break;
 
+  case JVM_CONSTANT_UnresolvedClassInError:
+  case JVM_CONSTANT_DynamicInError:
+  case JVM_CONSTANT_MethodHandleInError:
+  case JVM_CONSTANT_MethodTypeInError:
+    throw_resolution_error(this_cp, index, CHECK_NULL);
+    break;
+
   default:
-    DEBUG_ONLY( tty->print_cr("*** %p: tag at CP[%d/%d] = %d",
-                              this_cp(), index, cache_index, tag.value()));
-    assert(false, "unexpected constant tag");
+    fatal("unexpected constant tag at CP %p[%d/%d] = %d", this_cp(), index, cache_index, tag.value());
     break;
   }
 
@@ -2219,10 +2217,11 @@ int ConstantPool::copy_cpool_bytes(int cpool_size,
 // recorded in their constant pool cache. The on_stack-ness of the constant pool controls whether
 // memory for the method is reclaimed.
 bool ConstantPool::on_stack() const {
-  if (_cache == NULL || _pool_holder == NULL) return false; // removed in loading
-
   // See nmethod::is_not_on_continuation_stack for explanation of what this means.
-  bool not_on_vthread_stack = CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
+  // cpCache is null when doing default method processing during class loading, so
+  // won't be on a continuation stack.
+  bool not_on_vthread_stack = _cache == nullptr ||
+          CodeCache::marking_cycle() >= align_up(cache()->marking_cycle(), 2) + 2;
   return (_flags &_on_stack) != 0 || !not_on_vthread_stack;
 }
 

@@ -31,8 +31,8 @@
 
 import jdk.incubator.concurrent.ScopeLocal;
 import jdk.incubator.concurrent.StructuredTaskScope;
-import jdk.incubator.concurrent.StructuredTaskScope.WithShutdownOnSuccess;
-import jdk.incubator.concurrent.StructuredTaskScope.WithShutdownOnFailure;
+import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnSuccess;
+import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnFailure;
 import jdk.incubator.concurrent.StructureViolationException;
 import java.time.Duration;
 import java.io.IOException;
@@ -1144,15 +1144,15 @@ public class StructuredTaskScopeTest {
             expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new WithShutdownOnSuccess("", null));
-        try (var scope = new WithShutdownOnSuccess<Object>()) {
+        expectThrows(NullPointerException.class, () -> new ShutdownOnSuccess("", null));
+        try (var scope = new ShutdownOnSuccess<Object>()) {
             expectThrows(NullPointerException.class, () -> scope.fork(null));
             expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
             expectThrows(NullPointerException.class, () -> scope.result(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new WithShutdownOnFailure("", null));
-        try (var scope = new WithShutdownOnFailure()) {
+        expectThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
+        try (var scope = new ShutdownOnFailure()) {
             expectThrows(NullPointerException.class, () -> scope.fork(null));
             expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
             expectThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
@@ -1160,20 +1160,20 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnSuccess with no completed tasks.
+     * Test ShutdownOnSuccess with no completed tasks.
      */
-    public void testWithShutdownOnSuccess1() throws Exception {
-        try (var scope = new WithShutdownOnSuccess<String>()) {
+    public void testShutdownOnSuccess1() throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>()) {
             expectThrows(IllegalStateException.class, () -> scope.result());
             expectThrows(IllegalStateException.class, () -> scope.result(e -> null));
         }
     }
 
     /**
-     * Test WithShutdownOnSuccess with tasks that completed normally.
+     * Test ShutdownOnSuccess with tasks that completed normally.
      */
-    public void testWithShutdownOnSuccess2() throws Exception {
-        try (var scope = new WithShutdownOnSuccess<String>()) {
+    public void testShutdownOnSuccess2() throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>()) {
 
             // two tasks complete normally
             scope.fork(() -> "foo");
@@ -1187,10 +1187,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnSuccess with tasks that completed normally and abnormally.
+     * Test ShutdownOnSuccess with tasks that completed normally and abnormally.
      */
-    public void testWithShutdownOnSuccess3() throws Exception {
-        try (var scope = new WithShutdownOnSuccess<String>()) {
+    public void testShutdownOnSuccess3() throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>()) {
 
             // one task completes normally, the other with an exception
             scope.fork(() -> "foo");
@@ -1203,10 +1203,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnSuccess with a task that completed with an exception.
+     * Test ShutdownOnSuccess with a task that completed with an exception.
      */
-    public void testWithShutdownOnSuccess4() throws Exception {
-        try (var scope = new WithShutdownOnSuccess<String>()) {
+    public void testShutdownOnSuccess4() throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>()) {
 
             // tasks completes with exception
             scope.fork(() -> { throw new ArithmeticException(); });
@@ -1221,10 +1221,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnSuccess with a cancelled task.
+     * Test ShutdownOnSuccess with a cancelled task.
      */
-    public void testWithShutdownOnSuccess5() throws Exception {
-        try (var scope = new WithShutdownOnSuccess<String>()) {
+    public void testShutdownOnSuccess5() throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>()) {
 
             // cancelled task
             var future = scope.fork(() -> {
@@ -1243,10 +1243,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnFailure with no completed tasks.
+     * Test ShutdownOnFailure with no completed tasks.
      */
-    public void testWithShutdownOnFailure1() throws Throwable {
-        try (var scope = new WithShutdownOnFailure()) {
+    public void testShutdownOnFailure1() throws Throwable {
+        try (var scope = new ShutdownOnFailure()) {
             assertTrue(scope.exception().isEmpty());
             scope.throwIfFailed();
             scope.throwIfFailed(e -> new FooException(e));
@@ -1254,10 +1254,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnFailure with tasks that completed normally.
+     * Test ShutdownOnFailure with tasks that completed normally.
      */
-    public void testWithShutdownOnFailure2() throws Throwable {
-        try (var scope = new WithShutdownOnFailure()) {
+    public void testShutdownOnFailure2() throws Throwable {
+        try (var scope = new ShutdownOnFailure()) {
             scope.fork(() -> "foo");
             scope.fork(() -> "bar");
             scope.join();
@@ -1270,10 +1270,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnFailure with tasks that completed normally and abnormally.
+     * Test ShutdownOnFailure with tasks that completed normally and abnormally.
      */
-    public void testWithShutdownOnFailure3() throws Throwable {
-        try (var scope = new WithShutdownOnFailure()) {
+    public void testShutdownOnFailure3() throws Throwable {
+        try (var scope = new ShutdownOnFailure()) {
 
             // one task completes normally, the other with an exception
             scope.fork(() -> "foo");
@@ -1293,10 +1293,10 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test WithShutdownOnFailure with a cancelled task.
+     * Test ShutdownOnFailure with a cancelled task.
      */
-    public void testWithShutdownOnFailure4() throws Throwable {
-        try (var scope = new WithShutdownOnFailure()) {
+    public void testShutdownOnFailure4() throws Throwable {
+        try (var scope = new ShutdownOnFailure()) {
 
             var future = scope.fork(() -> {
                 Thread.sleep(60_000);

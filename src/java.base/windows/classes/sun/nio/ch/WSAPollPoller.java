@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -175,7 +175,8 @@ class WSAPollPoller extends Poller {
         while ((fd = registerQueue.pollFirst()) != null) {
             short events = (reading()) ? Net.POLLIN : Net.POLLOUT;
             int index = add(fd, events);
-            fdToIndex.put(fd, index);
+            Integer previous = fdToIndex.put(fd, index);
+            assert previous == null;
         }
     }
 
@@ -302,7 +303,7 @@ class WSAPollPoller extends Poller {
      */
     private static PipeImpl makePipe() throws IOException {
         try {
-            return JLA.executeOnCarrierThread(() -> new PipeImpl(null, false));
+            return JLA.executeOnCarrierThread(() -> new PipeImpl(null, true, false));
         } catch (IOException ioe) {
             throw ioe;
         } catch (Throwable e) {

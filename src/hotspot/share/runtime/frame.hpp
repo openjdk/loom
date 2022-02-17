@@ -36,6 +36,10 @@
 # include "stack_zero.hpp"
 #endif
 
+// defined in wingdi.h
+#undef ABSOLUTE
+#undef RELATIVE
+
 typedef class BytecodeInterpreter* interpreterState;
 
 class CodeBlob;
@@ -82,6 +86,10 @@ class frame {
   deopt_state _deopt_state;
 
  public:
+  // Do internal pointers in interpreter frames use absolute adddresses or relative (to fp)
+  // Interpreter frames in stack chunks use relative addressing; on the stack they use absolute addressing
+  enum class addressing { ABSOLUTE, RELATIVE };
+
   // Constructors
   frame();
 
@@ -231,8 +239,8 @@ class frame {
   intptr_t  at(int index) const                  { return *addr_at(index); }
   // in interpreter frames in continuation stacks, internal addresses are relative to fp.
   intptr_t  at_relative(int index) const         { return (intptr_t)(fp() + fp()[index]); }
-  template <bool relative>
-  intptr_t at(int index) const                   { return relative ? at_relative(index) : at(index); }
+  template <addressing pointers>
+  intptr_t at(int index) const                   { return pointers == addressing::RELATIVE ? at_relative(index) : at(index); }
 
   // accessors for locals
   oop obj_at(int offset) const                   { return *obj_at_addr(offset);  }
@@ -294,7 +302,7 @@ class frame {
   // Locals
 
   // The _at version returns a pointer because the address is used for GC.
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   intptr_t* interpreter_frame_local_at(int index) const;
 
   void interpreter_frame_set_locals(intptr_t* locs);
@@ -329,17 +337,17 @@ class frame {
 
   // expression stack (may go up or down, direction == 1 or -1)
  public:
-  template <bool relative = false> intptr_t* interpreter_frame_expression_stack() const;
+  template <addressing pointers = addressing::ABSOLUTE> intptr_t* interpreter_frame_expression_stack() const;
 
   // The _at version returns a pointer because the address is used for GC.
-  template <bool relative = false> intptr_t* interpreter_frame_expression_stack_at(jint offset) const;
+  template <addressing pointers = addressing::ABSOLUTE> intptr_t* interpreter_frame_expression_stack_at(jint offset) const;
 
   // top of expression stack
-  template <bool relative = false> intptr_t* interpreter_frame_tos_at(jint offset) const;
-  template <bool relative = false> intptr_t* interpreter_frame_tos_address() const;
+  template <addressing pointers = addressing::ABSOLUTE> intptr_t* interpreter_frame_tos_at(jint offset) const;
+  template <addressing pointers = addressing::ABSOLUTE> intptr_t* interpreter_frame_tos_address() const;
 
 
-  template <bool relative = false> jint  interpreter_frame_expression_stack_size() const;
+  template <addressing pointers = addressing::ABSOLUTE> jint  interpreter_frame_expression_stack_size() const;
 
   intptr_t* interpreter_frame_sender_sp() const;
 
@@ -360,14 +368,14 @@ class frame {
   //                                 this value is >= BasicObjectLock::size(), and may be rounded up
 
   BasicObjectLock* interpreter_frame_monitor_begin() const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   BasicObjectLock* interpreter_frame_monitor_end()   const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   BasicObjectLock* next_monitor_in_interpreter_frame(BasicObjectLock* current) const;
   BasicObjectLock* previous_monitor_in_interpreter_frame(BasicObjectLock* current) const;
   static int interpreter_frame_monitor_size();
 
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void interpreter_frame_verify_monitor(BasicObjectLock* value) const;
 
   // Return/result value from this interpreter frame
@@ -415,15 +423,15 @@ class frame {
  public:
   void print_value() const { print_value_on(tty,NULL); }
   void print_value_on(outputStream* st, JavaThread *thread) const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void print_on(outputStream* st) const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void interpreter_frame_print_on(outputStream* st) const;
   void print_on_error(outputStream* st, char* buf, int buflen, bool verbose = false) const;
   static void print_C_frame(outputStream* st, char* buf, int buflen, address pc);
 
   // Add annotated descriptions of memory locations belonging to this frame to values
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void describe(FrameValues& values, int frame_no, const RegisterMap* reg_map=NULL);
   void describe_top(FrameValues& values);
 
@@ -435,12 +443,12 @@ class frame {
 
   // Oops-do's
   void oops_compiled_arguments_do(Symbol* signature, bool has_receiver, bool has_appendix, const RegisterMap* reg_map, OopClosure* f) const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache = true) const;
 
  private:
   void oops_interpreted_arguments_do(Symbol* signature, bool has_receiver, OopClosure* f) const;
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   void oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const;
 
   // Iteration of oops
@@ -512,7 +520,7 @@ class FrameValues {
     return a->location - b->location;
   }
 
-  void print_on(outputStream* out, int min_index, int max_index, intptr_t* v0, intptr_t* v1, bool relative = false);
+  void print_on(outputStream* out, int min_index, int max_index, intptr_t* v0, intptr_t* v1, frame::addressing pointers = frame::addressing::ABSOLUTE);
 
  public:
   // Used by frame functions to describe locations.

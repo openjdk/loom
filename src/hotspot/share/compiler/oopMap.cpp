@@ -449,37 +449,6 @@ void OopMapSet::oops_do(const frame *fr, const RegisterMap* reg_map, OopClosure*
   find_map(fr)->oops_do(fr, reg_map, f, df);
 }
 
-// void OopMapSet::all_do(const frame *fr, const RegisterMap *reg_map,
-//                        OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn,
-//                        OopClosure* value_fn) {
-//   find_map(fr)->oops_do(fr, reg_map, oop_fn, derived_oop_fn, value_fn);
-// }
-
-// NULL, fail, success (address)
-// void ImmutableOopMap::generate_stub(const CodeBlob* cb) const {
-//   /* The address of the ImmutableOopMap is put into the _freeze_stub and _thaw_stub
-//    * if we can't generate the stub for some reason */
-//   address default_value = Continuations::default_freeze_oops_stub();
-//   address slow_value = Continuations::freeze_oops_slow();
-
-//   assert(default_value != slow_value, "should not reach here!");
-
-//   if (_freeze_stub == default_value) {
-//     OopMapStubGenerator cgen(cb, *this);
-//     // lock this by putting the slow path in place
-//     if (Atomic::cmpxchg(&_freeze_stub, default_value, slow_value) == default_value) {
-//       if (!cgen.generate()) {
-//         Atomic::store(&_thaw_stub, (address) Continuations::thaw_oops_slow());
-//         cgen.free();
-//         return;
-//       }
-
-//       Atomic::store(&_freeze_stub, cgen.freeze_stub());
-//       Atomic::store(&_thaw_stub, cgen.thaw_stub());
-//     }
-//   }
-// }
-
 void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
                               OopClosure* oop_fn, DerivedOopClosure* derived_oop_fn) const {
   assert(derived_oop_fn != NULL, "sanity");

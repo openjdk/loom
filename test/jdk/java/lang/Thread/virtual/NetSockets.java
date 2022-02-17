@@ -29,14 +29,6 @@
  * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NetSockets
  */
 
-/**
- * @test
- * @requires (os.family == "windows")
- * @compile --enable-preview -source ${jdk.version} NetSockets.java
- * @run testng/othervm/timeout=300 --enable-preview
- *     -Djdk.PollerProvider=sun.nio.ch.WSAPollPollerProvider NetSockets
- */
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -625,19 +617,25 @@ public class NetSockets {
      * Creates a loopback connection
      */
     static class Connection implements Closeable {
-        private final ServerSocket ss;
         private final Socket s1;
         private final Socket s2;
         Connection() throws IOException {
-            ServerSocket ss = new ServerSocket();
             var lh = InetAddress.getLoopbackAddress();
-            ss.bind(new InetSocketAddress(lh, 0));
-            Socket s = new Socket();
-            s.connect(ss.getLocalSocketAddress());
+            try (var listener = new ServerSocket()) {
+                listener.bind(new InetSocketAddress(lh, 0));
+                Socket s1 = new Socket();
+                Socket s2;
+                try {
+                    s1.connect(listener.getLocalSocketAddress(), 10_000);
+                    s2 = listener.accept();
+                } catch (IOException ioe) {
+                    s1.close();
+                    throw ioe;
+                }
+                this.s1 = s1;
+                this.s2 = s2;
+            }
 
-            this.ss = ss;
-            this.s1 = s;
-            this.s2 = ss.accept();
         }
         Socket socket1() {
             return s1;
@@ -647,9 +645,8 @@ public class NetSockets {
         }
         @Override
         public void close() throws IOException {
-            if (ss != null) ss.close();
-            if (s1 != null) s1.close();
-            if (s2 != null) s2.close();
+            s1.close();
+            s2.close();
         }
     }
 

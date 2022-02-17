@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -556,6 +556,7 @@ class java_lang_ThreadGroup : AllStatic {
   static int _parent_offset;
   static int _name_offset;
   static int _maxPriority_offset;
+  static int _daemon_offset;
 
   static int _ngroups_offset;
   static int _groups_offset;
@@ -573,6 +574,8 @@ class java_lang_ThreadGroup : AllStatic {
   static const char* name(oop java_thread_group);
   // maxPriority in group
   static ThreadPriority maxPriority(oop java_thread_group);
+  // Daemon
+  static bool is_daemon(oop java_thread_group);
 
   // Number of strongly reachable thread groups
   static int ngroups(oop java_thread_group);

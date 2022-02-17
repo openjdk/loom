@@ -488,7 +488,7 @@ public class ThreadFlock implements AutoCloseable {
 
     @Override
     public String toString() {
-        String id = getClass().getName() + "@" + System.identityHashCode(this);
+        String id = Objects.toIdentityString(this);
         if (name != null) {
             return name + "/" + id;
         } else {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -777,6 +777,7 @@ nmethod::nmethod(
     _comp_level              = comp_level;
     _orig_pc_offset          = orig_pc_offset;
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
+    _marking_cycle           = CodeCache::marking_cycle();
 
     // Section offsets
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
@@ -1949,7 +1950,7 @@ void nmethod::do_unloading(bool unloading_occurred) {
 
 void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
   // make sure the oops ready to receive visitors
-  assert(allow_dead || is_alive(), "should not call follow on dead nmethod");
+  assert(allow_dead || is_alive(), "should not call follow on dead nmethod: %d", _state);
 
   // Prevent extra code cache walk for platforms that don't have immediate oops.
   if (relocInfo::mustIterateImmediateOopsInCode()) {

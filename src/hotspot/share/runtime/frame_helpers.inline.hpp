@@ -73,16 +73,16 @@ public:
   static inline intptr_t* frame_top(const frame& f, InterpreterOopMap* mask);
   static inline intptr_t* frame_top(const frame& f);
   static inline intptr_t* frame_top(const frame& f, int callee_argsize, bool callee_interpreted);
-  template <bool relative = false>
+  template <frame::addressing pointers = frame::addressing::ABSOLUTE>
   static inline intptr_t* frame_bottom(const frame& f);
-  template <bool relative = false>
+  template <frame::addressing pointers = frame::addressing::ABSOLUTE>
   static inline intptr_t* sender_unextended_sp(const frame& f);
-  template <bool relative = false>
+  template <frame::addressing pointers = frame::addressing::ABSOLUTE>
   static inline int stack_argsize(const frame& f);
 
   static inline address* return_pc_address(const frame& f);
   static inline address return_pc(const frame& f);
-  template <bool relative>
+  template <frame::addressing pointers>
   static void patch_sender_sp(frame& f, intptr_t* sp);
 
   static int size(const frame& f, InterpreterOopMap* mask);
@@ -206,10 +206,10 @@ address Interpreted::return_pc(const frame& f) {
 }
 
 int Interpreted::size(const frame&f) {
-  return Interpreted::frame_bottom<true>(f) - Interpreted::frame_top(f);
+  return Interpreted::frame_bottom<frame::addressing::RELATIVE>(f) - Interpreted::frame_top(f);
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline int Interpreted::stack_argsize(const frame& f) {
   return f.interpreter_frame_method()->size_of_parameters();
 }

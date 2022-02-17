@@ -135,11 +135,14 @@ inline static bool is_oop_fixed(oop obj, int offset) {
   return before == after;
 }
 
-template <typename OopT, bool concurrent_gc>
+template <typename OopT, gc_type gc>
 inline bool stackChunkOopDesc::should_fix() const {
+  OrderAccess::loadload();
   if (UNLIKELY(is_gc_mode())) return true;
   // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
-  if (concurrent_gc) return !is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset());
+  if (gc == gc_type::CONCURRENT && !is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset()))
+    return true;
+  OrderAccess::loadload();
   return false;
 }
 
@@ -221,14 +224,14 @@ inline address stackChunkOopDesc::interpreter_frame_bcp(const frame& fr) {
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_expression_stack_at(const frame& fr, int index) const {
-  return derelativize(fr).interpreter_frame_expression_stack_at<true>(index);
+  return derelativize(fr).interpreter_frame_expression_stack_at<frame::addressing::RELATIVE>(index);
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_local_at(const frame& fr, int index) const {
-  return derelativize(fr).interpreter_frame_local_at<true>(index);
+  return derelativize(fr).interpreter_frame_local_at<frame::addressing::RELATIVE>(index);
 }
 
-template <bool dword_aligned>
+template <copy_alignment alignment>
 inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size) {
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)",
     p2i(from), p2i(from + size), size, size << LogBytesPerWord);
@@ -239,10 +242,10 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
   assert (to >= start_address(), "");
   assert (to + size <= end_address(), "");
 
-  InstanceStackChunkKlass::copy_from_stack_to_chunk<dword_aligned>(from, to, size);
+  InstanceStackChunkKlass::copy_from_stack_to_chunk<alignment>(from, to, size);
 }
 
-template <bool dword_aligned>
+template <copy_alignment alignment>
 inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size) {
   log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(from), from - start_address(), relative_base() - from, p2i(from + size), from + size - start_address(),
@@ -253,7 +256,7 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
   assert (from >= start_address(), "");
   assert (from + size <= end_address(), "");
 
-  InstanceStackChunkKlass::copy_from_chunk_to_stack<dword_aligned>(from, to, size);
+  InstanceStackChunkKlass::copy_from_chunk_to_stack<alignment>(from, to, size);
 }
 
 inline BitMapView stackChunkOopDesc::bitmap() const {
@@ -292,8 +295,8 @@ inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
 
 template <class StackChunkFrameClosureType>
 inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
-  has_mixed_frames() ? InstanceStackChunkKlass::iterate_stack<true >(this, closure)
-                     : InstanceStackChunkKlass::iterate_stack<false>(this, closure);
+  has_mixed_frames() ? InstanceStackChunkKlass::iterate_stack<chunk_frames::MIXED>(this, closure)
+                     : InstanceStackChunkKlass::iterate_stack<chunk_frames::COMPILED_ONLY>(this, closure);
 }
 
 inline MemRegion stackChunkOopDesc::range() {

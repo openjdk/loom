@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,10 +37,9 @@ import java.util.stream.Stream;
 import jdk.internal.misc.VM;
 
 /**
- * A thread group represents a set of <a href="Thread.html#platform-threads">
- * platform threads</a>. In addition, a thread group can also include other
- * thread groups. The thread groups form a tree in which every thread group
- * except the initial thread group has a parent.
+ * A thread group represents a set of threads. In addition, a thread group can
+ * also include other thread groups. The thread groups form a tree in which
+ * every thread group except the initial thread group has a parent.
  *
  * <p> A thread group has a name and maximum priority. The name is specified
  * when creating the group and cannot be changed. The group's maximum priority
@@ -51,7 +50,7 @@ import jdk.internal.misc.VM;
  * <p> A thread group is weakly <a href="ref/package-summary.html#reachability">
  * <em>reachable</em></a> from its parent group so that it is eligible for garbage
  * collection when there are no {@linkplain Thread#isAlive() live} threads in the
- * group and is otherwise <i>unreachable</i>.
+ * group and the thread group is otherwise <i>unreachable</i>.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -74,6 +73,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private final ThreadGroup parent;
     private final String name;
     private volatile int maxPriority;
+    private volatile boolean daemon;
 
     // strongly reachable from this group
     private int ngroups;
@@ -97,10 +97,12 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Creates a ThreadGroup without any permission or other checks.
      */
-    ThreadGroup(ThreadGroup parent, String name, int maxPriority) {
+    ThreadGroup(ThreadGroup parent, String name, int maxPriority, boolean daemon) {
         this.parent = parent;
         this.name = name;
         this.maxPriority = maxPriority;
+        if (daemon)
+            this.daemon = true;
         if (VM.isBooted()) {
             parent.synchronizedAddWeak(this);
         } else {
@@ -112,7 +114,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     private ThreadGroup(Void unused, ThreadGroup parent, String name) {
-        this(parent, name, parent.getMaxPriority());
+        this(parent, name, parent.maxPriority, parent.daemon);
     }
 
     private static Void checkParentAccess(ThreadGroup parent) {
@@ -130,16 +132,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param   name   the name of the new thread group, can be {@code null}
      * @throws  SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
-     *
-     * @deprecated
-     * Thread groups provided a way in early Java releases to group threads and
-     * provide a form of <i>job control</i> for threads. Thread groups supported
-     * the isolation of applets and defined methods intended for diagnostic
-     * purposes. It should be rare for new applications to create ThreadGroups.
-     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
-    @Deprecated(since="99")
     public ThreadGroup(String name) {
         this(Thread.currentThread().getThreadGroup(), name);
     }
@@ -155,16 +149,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @param     name     the name of the new thread group, can be {@code null}
      * @throws    SecurityException  if the current thread cannot create a
      *               thread in the specified thread group.
-     *
-     * @deprecated
-     * Thread groups provided a way in early Java releases to group threads and
-     * provide a form of <i>job control</i> for threads. Thread groups supported
-     * the isolation of applets and defined methods intended for diagnostic
-     * purposes. It should be rare for new applications to create ThreadGroups.
-     *
      * @see     java.lang.ThreadGroup#checkAccess()
      */
-    @Deprecated(since="99")
     public ThreadGroup(ThreadGroup parent, String name) {
         this(checkParentAccess(parent), parent, name);
     }
@@ -211,18 +197,19 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Returns false.
-     *
-     * @return false
+     * {@return the daemon status of this thread group}
+     * The daemon status is not used for anything.
      *
      * @deprecated This method originally indicated if the thread group is a
      *             <i>daemon thread group</i> that is automatically destroyed
      *             when its last thread terminates. The concept of daemon
      *             thread group no longer exists.
+     *             A thread group is eligible to be GC'ed when there are no
+     *             live threads in the group and it is otherwise unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final boolean isDaemon() {
-        return false;
+        return daemon;
     }
 
     /**
@@ -233,6 +220,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * @deprecated This method originally indicated if the thread group is
      *             destroyed. The ability to destroy a thread group and the
      *             concept of a destroyed thread group no longer exists.
+     *             A thread group is eligible to be GC'ed when there are no
+     *             live threads in the group and it is otherwise unreachable.
      *
      * @since   1.1
      */
@@ -242,18 +231,29 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Does nothing.
+     * Sets the daemon status of this thread group.
+     * The daemon status is not used for anything.
+     * <p>
+     * First, the {@code checkAccess} method of this thread group is
+     * called with no arguments; this may result in a security exception.
      *
-     * @param daemon  ignored
+     * @param      daemon the daemon status
+     * @throws     SecurityException  if the current thread cannot modify
+     *               this thread group.
+     * @see        java.lang.SecurityException
+     * @see        java.lang.ThreadGroup#checkAccess()
      *
-     * @deprecated This method originally changed the <i>daemon status</i> of
-     *             the thread group. A daemon thread group was automatically
-     *             destroyed when its last thread terminated. The concept of
-     *             daemon thread group and the concept of a destroyed thread
-     *             group no longer exists.
+     * @deprecated This method originally configured whether the thread group is
+     *             a <i>daemon thread group</i> that is automatically destroyed
+     *             when its last thread terminates. The concept of daemon thread
+     *             group no longer exists. A thread group is eligible to be GC'ed
+     *             when there are no live threads in the group and it is otherwise
+     *             unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void setDaemon(boolean daemon) {
+        checkAccess();
+        this.daemon = daemon;
     }
 
     /**
@@ -601,8 +601,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Does nothing.
      *
      * @deprecated This method was originally specified to destroy an empty
-     *             thread group. The ability to destroy a thread group no
-     *             longer exists.
+     *             thread group. The ability to explicitly destroy a thread group
+     *             no longer exists. A thread group is eligible to be GC'ed when
+     *             there are no live threads in the group and it is otherwise
+     *             unreachable.
      */
     @Deprecated(since="16", forRemoval=true)
     public final void destroy() {
