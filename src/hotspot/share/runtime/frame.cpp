@@ -331,19 +331,13 @@ bool frame::can_be_deoptimized() const {
 }
 
 void frame::deoptimize(JavaThread* thread) {
-  // tty->print_cr(">>> frame::deoptimize");
-  // print_on(tty);
   assert(thread == NULL
          || (thread->frame_anchor()->has_last_Java_frame() &&
              thread->frame_anchor()->walkable()), "must be");
   // Schedule deoptimization of an nmethod activation with this frame.
   assert(_cb != NULL && _cb->is_compiled(), "must be");
 
-  // log_develop_trace(jvmcont)(">>>> frame::deoptimize %ld", os::current_thread_id());
-  // tty->print_cr(">>>> frame::deoptimize: %ld", os::current_thread_id()); print_on(tty);
-
-  // If the call site is a MethodHandle call site use the MH deopt
-  // handler.
+  // If the call site is a MethodHandle call site use the MH deopt handler.
   CompiledMethod* cm = (CompiledMethod*) _cb;
   address deopt = cm->is_method_handle_return(pc()) ?
                         cm->deopt_mh_handler_begin() :
