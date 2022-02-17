@@ -165,6 +165,9 @@ private:
                            Bytecodes::Code  bc,
                            constantTag      tag);
 
+  ciConstant unbox_primitive_value(ciObject* cibox, BasicType expected_bt = T_ILLEGAL);
+  ciConstant get_resolved_constant(const constantPoolHandle& cpool, int obj_index);
+
   // Get a ciObject from the object factory.  Ensures uniqueness
   // of ciObjects.
   ciObject* get_object(oop o) {
@@ -431,6 +434,8 @@ public:
   }
   ciInstance* unloaded_ciinstance();
 
+  ciInstanceKlass* get_box_klass_for_primitive_type(BasicType type);
+    
   ciKlass*  find_system_klass(ciSymbol* klass_name);
 
   // Note:  To find a class from its name string, use ciSymbol::make,

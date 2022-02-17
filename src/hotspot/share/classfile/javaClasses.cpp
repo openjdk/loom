@@ -4508,11 +4508,20 @@ void java_lang_invoke_MethodType::serialize_offsets(SerializeClosure* f) {
 void java_lang_invoke_MethodType::print_signature(oop mt, outputStream* st) {
   st->print("(");
   objArrayOop pts = ptypes(mt);
-  for (int i = 0, limit = pts->length(); i < limit; i++) {
-    java_lang_Class::print_signature(pts->obj_at(i), st);
+  if (pts != NULL) {
+    for (int i = 0, limit = pts->length(); i < limit; i++) {
+      java_lang_Class::print_signature(pts->obj_at(i), st);
+    }
+  } else {
+    st->print("NULL");
   }
   st->print(")");
-  java_lang_Class::print_signature(rtype(mt), st);
+  oop rt = rtype(mt);
+  if (rt != NULL) {
+    java_lang_Class::print_signature(rt, st);
+  } else {
+    st->print("NULL");
+  }
 }
 
 Symbol* java_lang_invoke_MethodType::as_signature(oop mt, bool intern_if_not_found) {
