@@ -2537,12 +2537,8 @@ public class Flow {
                     lint.isEnabled(Lint.LintCategory.TRY)) {
                 for (JCVariableDecl resVar : resourceVarDecls) {
                     if (unrefdResources.includes(resVar.sym)) {
-                        // Project Loom local: we don't want to see warnings for ScopeLocalBinders.
-                        String resVarType = resVar.vartype.toString();
-                        if (!"jdk.incurbator.concurrent.ScopeLocal.Binder".equals(resVarType)) {
-                            log.warning(Lint.LintCategory.TRY, resVar.pos(),
+                        log.warning(Lint.LintCategory.TRY, resVar.pos(),
                                     Warnings.TryResourceNotReferenced(resVar.sym));
-                        }
                         unrefdResources.remove(resVar.sym);
                     }
                 }
