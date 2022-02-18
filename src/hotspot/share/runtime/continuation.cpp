@@ -130,9 +130,6 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 static bool is_safe_to_preempt(JavaThread* thread);
 template<typename ConfigT> static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt);
 
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
-static FreezeContFnT cont_freeze = nullptr;
-
 enum thaw_kind {
   thaw_top = 0,
   thaw_return_barrier = 1,
@@ -141,9 +138,6 @@ enum thaw_kind {
 
 static inline int prepare_thaw0(JavaThread* thread, bool return_barrier);
 template<typename ConfigT> static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind);
-
-typedef intptr_t* (*ThawContFnT)(JavaThread*, thaw_kind);
-static ThawContFnT cont_thaw = nullptr;
 
 extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
 extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
@@ -177,71 +171,6 @@ public:
     // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
 };
-
-class ConfigResolve {
-public:
-  static void resolve() { resolve_compressed(); }
-
-  static void resolve_compressed() {
-    UseCompressedOops ? resolve_gc<true>()
-                      : resolve_gc<false>();
-  }
-
-  template <bool use_compressed>
-  static void resolve_gc() {
-    BarrierSet* bs = BarrierSet::barrier_set();
-    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
-    switch (bs->kind()) {
-#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
-      case BarrierSet::bs_name: {                                       \
-        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
-      }                                                                 \
-        break;
-      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
-#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
-
-    default:
-      fatal("BarrierSet resolving not implemented");
-    };
-  }
-
-  template <bool use_compressed, typename BarrierSetT>
-  static void resolve() {
-    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
-    cont_freeze = SelectedConfigT::freeze;
-    cont_thaw   = SelectedConfigT::thaw;
-    // SelectedConfigT::print();
-  }
-};
-
-void continuations_init() {
-  Continuations::init();
-}
-
-void Continuations::init() {
-  ConfigResolve::resolve();
-  InstanceStackChunkKlass::resolve_memcpy_functions();
-  Continuation::init();
-}
-
-void Continuations::print_statistics() {
-}
-
-#define CC (char*)  /*cast a literal from (const char*)*/
-#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
-
-static JNINativeMethod CONT_methods[] = {
-    {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_TryForceYield0)},
-    {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
-};
-
-void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
-    Thread* thread = Thread::current();
-    assert(thread->is_Java_thread(), "");
-    ThreadToNativeFromVM trans((JavaThread*)thread);
-    int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
-    guarantee(status == JNI_OK && !env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
-}
 
 class SmallRegisterMap;
 
@@ -559,11 +488,9 @@ static int num_java_frames(ContMirror& cont) {
 
 /////////////////////////////////////////////////////////////////
 
-void Continuation::init() {
-}
-
 // Entry point to freeze. Transitions are handled manually
-JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* current, intptr_t* sp))
+template<typename ConfigT>
+static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
   // current->frame_anchor()->set_last_Java_sp(sp);
   // current->frame_anchor()->make_walkable(current);
 
@@ -573,8 +500,11 @@ JRT_BLOCK_ENTRY(int, Continuation::freeze(JavaThread* current, intptr_t* sp))
     current->set_cont_fastpath(nullptr);
   }
 
-  return cont_freeze(current, sp, false);
+  return ConfigT::freeze(current, sp, false);
 JRT_END
+
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
+static FreezeContFnT cont_freeze = nullptr;
 
 // Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
 // May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
@@ -631,15 +561,14 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   return prepare_thaw0(thread, return_barrier);
 JRT_END
 
-JRT_LEAF(intptr_t*, Continuation::thaw(JavaThread* thread, int kind))
+template<typename ConfigT>
+static JRT_LEAF(intptr_t*, thaw(JavaThread* thread, int kind))
   // TODO: JRT_LEAF and NoHandleMark is problematic for JFR events.
   // vFrameStreamCommon allocates Handles in RegisterMap for continuations.
   // JRT_ENTRY instead?
   ResetNoHandleMark rnhm;
 
-  intptr_t* sp = cont_thaw(thread, (thaw_kind)kind);
-  // ContinuationHelper::clear_anchor(thread);
-  return sp;
+  return ConfigT::thaw(thread, (thaw_kind)kind);
 JRT_END
 
 typedef void (*cont_jump_from_sp_t)();
@@ -3067,3 +2996,92 @@ static void print_frames(JavaThread* thread, outputStream* st) {
   st->print_cr("======= end frames =========");
 }
 #endif
+
+static address thaw_entry   = nullptr;
+static address freeze_entry = nullptr;
+
+address Continuation::thaw_entry() {
+  assert (::thaw_entry != nullptr,  "");
+  return ::thaw_entry;
+}
+
+address Continuation::freeze_entry() {
+  assert (::freeze_entry != nullptr, "");
+  return ::freeze_entry;
+}
+
+class ConfigResolve {
+public:
+  static void resolve() { resolve_compressed(); }
+
+  static void resolve_compressed() {
+    UseCompressedOops ? resolve_gc<true>()
+                      : resolve_gc<false>();
+  }
+
+private:
+  template <bool use_compressed>
+  static void resolve_gc() {
+    BarrierSet* bs = BarrierSet::barrier_set();
+    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
+    switch (bs->kind()) {
+#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
+      case BarrierSet::bs_name: {                                       \
+        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
+      }                                                                 \
+        break;
+      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
+#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
+
+    default:
+      fatal("BarrierSet resolving not implemented");
+    };
+  }
+
+  template <bool use_compressed, typename BarrierSetT>
+  static void resolve() {
+    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
+
+    freeze_entry = (address)freeze<SelectedConfigT>;
+    thaw_entry   = (address)thaw<SelectedConfigT>;
+
+    cont_freeze = SelectedConfigT::freeze; // used by Continuation::try_force_yield
+
+    // SelectedConfigT::print();
+  }
+};
+
+void continuations_init1() { Continuations::init1(); }
+
+void Continuations::init1() {
+  Continuation::init();
+}
+
+void continuations_init2() { Continuations::init2(); }
+
+void Continuations::init2() {
+  InstanceStackChunkKlass::resolve_memcpy_functions();
+}
+
+void Continuations::print_statistics() {
+}
+
+void Continuation::init() {
+  ConfigResolve::resolve();
+}
+
+#define CC (char*)  /*cast a literal from (const char*)*/
+#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
+
+static JNINativeMethod CONT_methods[] = {
+    {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_TryForceYield0)},
+    {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
+};
+
+void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
+    Thread* thread = Thread::current();
+    assert(thread->is_Java_thread(), "");
+    ThreadToNativeFromVM trans((JavaThread*)thread);
+    int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
+    guarantee(status == JNI_OK && !env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
+}

@@ -7921,7 +7921,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ movptr(c_rarg0, r15_thread);
     __ set_last_Java_frame(rsp, rbp, the_pc);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+    __ call_VM_leaf(Continuation::freeze_entry(), 2);
     __ reset_last_Java_frame(true);
 
     Label pinned;
@@ -8014,7 +8014,7 @@ RuntimeStub* generate_cont_doYield() {
     }
 
     __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
+    __ call_VM_leaf(Continuation::thaw_entry(), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
     if (return_barrier) {
