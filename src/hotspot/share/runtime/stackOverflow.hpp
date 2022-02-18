@@ -353,7 +353,7 @@ class StackOverflow {
     _shadow_zone_growth_watermark =
       stack_base();
   }
-    
+
   address stack_overflow_limit() const { return _stack_overflow_limit; }
 };
 

@@ -435,7 +435,7 @@ public:
   ciInstance* unloaded_ciinstance();
 
   ciInstanceKlass* get_box_klass_for_primitive_type(BasicType type);
-    
+
   ciKlass*  find_system_klass(ciSymbol* klass_name);
 
   // Note:  To find a class from its name string, use ciSymbol::make,
