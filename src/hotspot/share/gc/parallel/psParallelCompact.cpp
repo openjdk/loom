@@ -985,7 +985,7 @@ void PSParallelCompact::pre_compact()
   // Increment the invocation count
   heap->increment_total_collections(true);
 
-  CodeCache::increment_marking_cycle();
+  CodeCache::start_marking_cycle();
 
   // We need to track unique mark sweep invocations as well.
   _total_invocations++;
@@ -1017,7 +1017,7 @@ void PSParallelCompact::post_compact()
   GCTraceTime(Info, gc, phases) tm("Post Compact", &_gc_timer);
   ParCompactionManager::remove_all_shadow_regions();
 
-  CodeCache::increment_marking_cycle();
+  CodeCache::finish_marking_cycle();
 
   for (unsigned int id = old_space_id; id < last_space_id; ++id) {
     // Clear the marking bitmap, summary data and split info.
