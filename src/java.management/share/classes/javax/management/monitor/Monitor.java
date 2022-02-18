@@ -1597,8 +1597,8 @@ public abstract class Monitor
         final String namePrefix;
         static final String nameSuffix = "]";
 
-        @SuppressWarnings("removal")
         public DaemonThreadFactory(String poolName) {
+            @SuppressWarnings("removal")
             SecurityManager s = System.getSecurityManager();
             group = (s != null) ? s.getThreadGroup() :
                                   Thread.currentThread().getThreadGroup();
