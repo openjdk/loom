@@ -359,7 +359,7 @@ void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state
     return;
   }
 
-if (target->is_handshake_safe_for(current)) {
+  if (target->is_handshake_safe_for(current)) {
     hs.do_thread(target);
   } else {
     Handshake::execute(&hs, target);
