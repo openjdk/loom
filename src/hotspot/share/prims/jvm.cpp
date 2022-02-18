@@ -3923,10 +3923,11 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
   oop vt = JNIHandles::resolve(vthread);
 
   thread->rebind_to_jvmti_thread_state_of(vt);
-
+  if (first_mount) {
+    JvmtiEventController::thread_started(thread);
+  }
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
-
   if (first_mount) {
     // thread start
     if (JvmtiExport::can_support_virtual_threads()) {
