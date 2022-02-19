@@ -141,7 +141,8 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
 }
 
 template <typename ConfigT>
-template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
+template<typename FKind>
+frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
   assert (!caller.is_interpreted_frame()
     || caller.unextended_sp() == (intptr_t*)caller.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
