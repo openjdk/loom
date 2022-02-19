@@ -416,6 +416,7 @@ public interface JavaLangAccess {
      * @param statusCode the status code
      */
     void exit(int statusCode);
+
     /**
      * Returns an array of all platform threads.
      */
