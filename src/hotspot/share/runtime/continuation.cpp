@@ -128,7 +128,7 @@ const char* freeze_result_names[6] = {
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
 static bool is_safe_to_preempt(JavaThread* thread);
-template<typename ConfigT> static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt);
+template<typename ConfigT> static inline int freeze0(JavaThread* current, intptr_t* const sp);
 
 enum thaw_kind {
   thaw_top = 0,
@@ -153,8 +153,13 @@ public:
   static const gc_type _gc = BarrierSetT::is_concurrent_gc() ? gc_type::CONCURRENT : gc_type::STW;
   // static const bool _post_barrier = post_barrier;
 
-  static int freeze(JavaThread* thread, intptr_t* sp, bool preempt) {
-    return freeze0<SelfT>(thread, sp, preempt);
+  static int freeze(JavaThread* thread, intptr_t* const sp) {
+    return freeze0<SelfT, false>(thread, sp);
+  }
+
+  __COLD
+  static int freeze_preempt(JavaThread* thread, intptr_t* const sp) {
+    return freeze0<SelfT, true>(thread, sp);
   }
 
   static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
@@ -500,11 +505,11 @@ static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
     current->set_cont_fastpath(nullptr);
   }
 
-  return ConfigT::freeze(current, sp, false);
+  return ConfigT::freeze(current, sp);
 JRT_END
 
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, bool);
-static FreezeContFnT cont_freeze = nullptr;
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
+static FreezeContFnT preempt_freeze = nullptr;
 
 // Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
 // May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
@@ -545,7 +550,7 @@ int Continuation::try_force_yield(JavaThread* target, const oop cont) {
   }
 
   assert (target->has_last_Java_frame(), "");
-  int res = cont_freeze(target, target->last_Java_sp(), true);
+  int res = preempt_freeze(target, target->last_Java_sp());
   log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
   if (res == 0) { // success
     target->set_cont_preempt(true);
@@ -980,7 +985,7 @@ private:
   JavaThread* const _thread;
   ContMirror& _cont;
   bool _barriers;
-  const bool _preempt;
+  const bool _preempt; // used only on the slow path
 
   intptr_t *_bottom_address;
   intptr_t *_top_address;
@@ -1891,13 +1896,10 @@ static int early_return(int res, JavaThread* thread) {
   return res;
 }
 
-static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preempt) {
+static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
   assert (verify_continuation<__LINE__>(cont.mirror()), "");
   assert (!cont.is_empty(), "");
 
-  if (!preempt) {
-    StackWatermarkSet::after_unwind(thread);
-  }
 
   thread->set_cont_yield(false);
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
@@ -1905,18 +1907,18 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont, bool preem
   return 0;
 }
 
-static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res, bool preempt) {
+static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
     assert (verify_continuation<__LINE__>(cont.mirror()), "");
     return early_return(res, thread);
   }
 
   JVMTI_yield_cleanup(thread, cont); // can safepoint
-  return freeze_epilog(thread, cont, preempt);
+  return freeze_epilog(thread, cont);
 }
 
-template<typename ConfigT>
-static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
+template<typename ConfigT, bool preempt>
+static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
   assert (current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
@@ -1953,20 +1955,23 @@ static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
   bool fast = can_freeze_fast(current);
   assert (!fast || current->held_monitor_count() == 0, "");
 
+  // no need to templatize on preempt, as it's currently only used on the slow path
   Freeze<ConfigT> fr(current, cont, preempt);
 
-  if (UNLIKELY(preempt)) {
+  if (preempt) { // UNLIKELY
     freeze_result res = fr.freeze_slow();
     cont.set_preempted(true);
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
-    return freeze_epilog(current, cont, res, preempt);
+    return freeze_epilog(current, cont, res);
   }
 
   if (fast && fr.is_chunk_available(sp)) {
     freeze_result res = fr.template try_freeze_fast<true>(sp);
     assert (res == freeze_ok, "");
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
-    return freeze_epilog(current, cont, preempt);
+    freeze_epilog(current, cont);
+    StackWatermarkSet::after_unwind(current);
+    return 0;
   }
 
   // if (current->held_monitor_count() > 0) {
@@ -1979,7 +1984,9 @@ static int freeze0(JavaThread* current, intptr_t* const sp, bool preempt) {
     freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
                              : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
-    return freeze_epilog(current, cont, res, preempt);
+    freeze_epilog(current, cont, res);
+    StackWatermarkSet::after_unwind(current);
+    return res;
   JRT_BLOCK_END
 }
 
@@ -3043,9 +3050,10 @@ private:
     typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
 
     freeze_entry = (address)freeze<SelectedConfigT>;
-    thaw_entry   = (address)thaw<SelectedConfigT>;
+    preempt_freeze = SelectedConfigT::freeze_preempt;
 
-    cont_freeze = SelectedConfigT::freeze; // used by Continuation::try_force_yield
+    // if we want, we could templatize by king and have three different that entries
+    thaw_entry   = (address)thaw<SelectedConfigT>;
 
     // SelectedConfigT::print();
   }

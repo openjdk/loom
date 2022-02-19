@@ -8013,7 +8013,11 @@ RuntimeStub* generate_cont_doYield() {
       __ push(rax); __ push_d(xmm0); // save original return value -- again
     }
 
-    __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
+    // If we want, we can templatize thaw by kind, and have three different entries
+    if (exception)           __ movl(c_rarg1, (int32_t)2);
+    else if (return_barrier) __ movl(c_rarg1, (int32_t)1);
+    else                     __ movl(c_rarg1, (int32_t)0);
+
     __ call_VM_leaf(Continuation::thaw_entry(), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
