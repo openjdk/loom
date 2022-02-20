@@ -144,10 +144,23 @@ public class ThreadAPI {
     }
 
     /**
-     * Test Thread::start, thread already started.
+     * Test Thread::start.
      */
     @Test
     public void testStart1() throws Exception {
+        var ref = new AtomicBoolean();
+        var thread = Thread.ofVirtual().unstarted(() -> ref.set(true));
+        assertFalse(ref.get());
+        thread.start();
+        thread.join();
+        assertTrue(ref.get());
+    }
+
+    /**
+     * Test Thread::start, thread already started.
+     */
+    @Test
+    public void testStart2() throws Exception {
         var thread = Thread.ofVirtual().start(LockSupport::park);
         try {
             assertThrows(IllegalThreadStateException.class, thread::start);
@@ -161,7 +174,7 @@ public class ThreadAPI {
      * Test Thread::start, thread already terminated.
      */
     @Test
-    public void testStart2() throws Exception {
+    public void testStart3() throws Exception {
         var thread = Thread.ofVirtual().start(() -> { });
         thread.join();
         assertThrows(IllegalThreadStateException.class, thread::start);
@@ -2030,6 +2043,48 @@ public class ThreadAPI {
             int n = vgroup.enumerate(threads, /*recurse*/true);
             assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
+    }
+
+    /**
+     * Test equals and hashCode.
+     */
+    @Test
+    public void testEqualsAndHashCode() throws Exception {
+        Thread vthread1 = Thread.ofVirtual().unstarted(LockSupport::park);
+        Thread vthread2 = Thread.ofVirtual().unstarted(LockSupport::park);
+
+        // unstarted
+        assertEquals(vthread1, vthread1);
+        assertNotEquals(vthread1, vthread2);
+        assertEquals(vthread2, vthread2);
+        assertNotEquals(vthread2, vthread1);
+        int hc1 = vthread1.hashCode();
+        int hc2 = vthread2.hashCode();
+
+        vthread1.start();
+        vthread2.start();
+        try {
+            // started, maybe running or parked
+            assertEquals(vthread1, vthread1);
+            assertNotEquals(vthread1, vthread2);
+            assertEquals(vthread2, vthread2);
+            assertNotEquals(vthread2, vthread1);
+            assertTrue(vthread1.hashCode() == hc1);
+            assertTrue(vthread2.hashCode() == hc2);
+        } finally {
+            LockSupport.unpark(vthread1);
+            LockSupport.unpark(vthread2);
+        }
+        vthread1.join();
+        vthread2.join();
+
+        // terminated
+        assertEquals(vthread1, vthread1);
+        assertNotEquals(vthread1, vthread2);
+        assertEquals(vthread2, vthread2);
+        assertNotEquals(vthread2, vthread1);
+        assertTrue(vthread1.hashCode() == hc1);
+        assertTrue(vthread2.hashCode() == hc2);
     }
 
     /**
