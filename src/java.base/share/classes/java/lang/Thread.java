@@ -668,7 +668,7 @@ public class Thread implements Runnable {
                     this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
                 }
                 ClassLoader parentLoader = contextClassLoader(parent);
-                if (VM.isBooted() && parentLoader == ClassLoaders.NOT_SUPPORTED) {
+                if (VM.isBooted() && !isSupportedClassLoader(parentLoader)) {
                     // parent does not support thread locals so no CCL to inherit
                     this.contextClassLoader = ClassLoader.getSystemClassLoader();
                 } else {
@@ -719,7 +719,7 @@ public class Thread implements Runnable {
                 this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parentMap);
             }
             ClassLoader parentLoader = contextClassLoader(parent);
-            if (parentLoader != ClassLoaders.NOT_SUPPORTED) {
+            if (isSupportedClassLoader(parentLoader)) {
                 this.contextClassLoader = parentLoader;
             } else {
                 // parent does not support thread locals so no CCL to inherit
@@ -1512,7 +1512,9 @@ public class Thread implements Runnable {
      */
     private void exit() {
         // pop any remaining scopes from the stack, this may block
-        StackableScope.popAll();
+        if (headStackableScopes != null) {
+            StackableScope.popAll();
+        }
 
         // notify container that thread is exiting
         ThreadContainer container = threadContainer();
@@ -2311,7 +2313,7 @@ public class Thread implements Runnable {
         ClassLoader cl = this.contextClassLoader;
         if (cl == null)
             return null;
-        if (cl == ClassLoaders.NOT_SUPPORTED)
+        if (!isSupportedClassLoader(cl))
             cl = ClassLoader.getSystemClassLoader();
         @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
@@ -2351,7 +2353,7 @@ public class Thread implements Runnable {
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("setContextClassLoader"));
         }
-        if (contextClassLoader == ClassLoaders.NOT_SUPPORTED) {
+        if (!isSupportedClassLoader(contextClassLoader)) {
             throw new UnsupportedOperationException(
                 "Thread is not allowed to set values for its copy of thread-local variables");
         }
@@ -2370,6 +2372,20 @@ public class Thread implements Runnable {
             };
             NOT_SUPPORTED = AccessController.doPrivileged(pa);
         }
+    }
+
+    /**
+     * Returns true if the given ClassLoader is a "supported" class loader. All
+     * class loaders, except ClassLoaders.NOT_SUPPORTED, are considered supported.
+     * This method allows the initialization of ClassLoaders to be delayed until
+     * it is required.
+     */
+    private static boolean isSupportedClassLoader(ClassLoader loader) {
+        if (loader == null)
+            return true;
+        if (loader == jdk.internal.loader.ClassLoaders.appClassLoader())
+            return true;
+        return loader != ClassLoaders.NOT_SUPPORTED;
     }
 
     /**
