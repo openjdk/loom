@@ -490,6 +490,11 @@ class VirtualThread extends Thread {
         start(ThreadContainers.root());
     }
 
+    @Override
+    public void run() {
+        // do nothing
+    }
+
     /**
      * Parks the current virtual thread until it is unparked or interrupted.
      * If already unparked then the parking permit is consumed and this method

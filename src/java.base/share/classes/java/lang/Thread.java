@@ -1471,25 +1471,22 @@ public class Thread implements Runnable {
     private native void start0();
 
     /**
-     * If this thread was constructed using a separate
-     * {@code Runnable} run object, then that
-     * {@code Runnable} object's {@code run} method is called;
-     * otherwise, this method does nothing and returns.
-     * This method does nothing when invoked on a {@linkplain #isVirtual()
-     * virtual} thread.
-     * <p>
-     * Subclasses of {@code Thread} should override this method.
+     * Run by a thread when it executes. Subclasses of {@code Thread} may override
+     * this method. When not overridden, and this thread was created with a {@link
+     * Runnable} task, then the task's {@link Runnable#run() run} method is invoked.
+     * When not overridden and this thread was created without a {@code Runnable}
+     * task then this method does nothing.
      *
-     * @see     #start()
-     * @see     #Thread(ThreadGroup, Runnable, String)
+     * <p> This method is not intended to be invoked directly. If this thread is a
+     * platform thread created with a {@code Runnable} task then invoking this method
+     * will invoke the task's {@code run} method. If this thread is a virtual thread
+     * then invoking this method directly does nothing.
      */
     @Override
     public void run() {
-        if (!isVirtual()) {
-            Runnable task = holder.task;
-            if (task != null) {
-                task.run();
-            }
+        Runnable task = holder.task;
+        if (task != null) {
+            task.run();
         }
     }
 
@@ -1573,8 +1570,6 @@ public class Thread implements Runnable {
      * @throws     UnsupportedOperationException if invoked on a virtual thread
      * @see        #interrupt()
      * @see        #checkAccess()
-     * @see        #run()
-     * @see        #start()
      * @see        ThreadDeath
      * @see        ThreadGroup#uncaughtException(Thread,Throwable)
      * @see        SecurityManager#checkAccess(Thread)
@@ -1763,7 +1758,7 @@ public class Thread implements Runnable {
      * <p>
      * First, the {@code checkAccess} method of this thread is called
      * with no arguments. This may result in throwing a
-     * {@code SecurityException }(in the current thread).
+     * {@code SecurityException} (in the current thread).
      * <p>
      * If the thread is alive, it is suspended and makes no further
      * progress unless and until it is resumed.
@@ -2438,8 +2433,6 @@ public class Thread implements Runnable {
      *        if a security manager exists and its
      *        {@code checkPermission} method doesn't allow
      *        getting the stack trace of thread.
-     * @see SecurityManager#checkPermission
-     * @see RuntimePermission
      * @see Throwable#getStackTrace
      *
      * @since 1.5
@@ -2516,8 +2509,6 @@ public class Thread implements Runnable {
      *        {@code checkPermission} method doesn't allow
      *        getting the stack trace of thread.
      * @see #getStackTrace
-     * @see SecurityManager#checkPermission
-     * @see RuntimePermission
      * @see Throwable#getStackTrace
      *
      * @since 1.5
@@ -2845,12 +2836,10 @@ public class Thread implements Runnable {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(
-                new RuntimePermission("setDefaultUncaughtExceptionHandler")
-                    );
+                new RuntimePermission("setDefaultUncaughtExceptionHandler"));
         }
-
-         defaultUncaughtExceptionHandler = eh;
-     }
+        defaultUncaughtExceptionHandler = eh;
+    }
 
     /**
      * Returns the default handler invoked when a thread abruptly terminates
