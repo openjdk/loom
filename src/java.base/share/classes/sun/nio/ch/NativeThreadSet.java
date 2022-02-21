@@ -25,8 +25,6 @@
 
 package sun.nio.ch;
 
-import jdk.internal.vm.Continuation;
-
 // Special-purpose data structure for sets of native threads
 
 
