@@ -1471,9 +1471,9 @@ public class Thread implements Runnable {
     private native void start0();
 
     /**
-     * Run by a thread when it executes. Subclasses of {@code Thread} may override
+     * Run by the thread when it executes. Subclasses of {@code Thread} may override
      * this method. When not overridden, and this thread was created with a {@link
-     * Runnable} task, then the task's {@link Runnable#run() run} method is invoked.
+     * Runnable} task, then it invokes the task's {@link Runnable#run() run} method.
      * When not overridden and this thread was created without a {@code Runnable}
      * task then this method does nothing.
      *
