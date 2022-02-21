@@ -495,11 +495,12 @@ public class ServerSocket implements java.io.Closeable {
      * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
      * following circumstances:
      * <ol>
-     *   <li> The socket is associated with a {@link ServerSocketChannel
-     *        ServerSocketChannel}. In that case, interrupting a thread accepting
-     *        a connection will close the underlying channel and cause this
-     *        method to throw {@link java.nio.channels.ClosedByInterruptException}
-     *        with the interrupt status set.
+     *   <li> The socket is {@linkplain ServerSocketChannel#socket() associated}
+     *        with a {@link ServerSocketChannel SocketChannel}. In that case,
+     *        interrupting a thread accepting a connection will close the
+     *        underlying channel and cause this method to throw {@link
+     *        java.nio.channels.ClosedByInterruptException} with the interrupt
+     *        status set.
      *   <li> The socket uses the system-default socket implementation and a
      *        {@linkplain Thread#isVirtual() virtual thread} is accepting a
      *        connection. In that case, interrupting the virtual thread will
