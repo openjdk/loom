@@ -197,8 +197,10 @@ CodeBlobClosure* NMethodSweeper::prepare_mark_active_nmethods() {
   */
 void NMethodSweeper::do_stack_scanning() {
   assert(!CodeCache_lock->owned_by_self(), "just checking");
-  // There are stacks in the heap that need to be scanned.
-  Universe::heap()->collect_for_codecache();
+  if (Continuations::enabled()) {
+    // There are continuation stacks in the heap that need to be scanned.
+    Universe::heap()->collect_for_codecache();
+  }
   if (wait_for_stack_scanning()) {
     CodeBlobClosure* code_cl;
     {

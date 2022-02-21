@@ -65,7 +65,6 @@ class NativeThreadSet {
                 if (elts[i] == 0) {
                     elts[i] = th;
                     used++;
-                    Continuation.pin();
                     return i;
                 }
             }
@@ -81,7 +80,6 @@ class NativeThreadSet {
     void remove(int i) {
         synchronized (this) {
             assert (elts[i] == NativeThread.currentKernelThread()) || (elts[i] == -1);
-            Continuation.unpin();
             elts[i] = 0;
             used--;
             if (used == 0 && waitingToEmpty)

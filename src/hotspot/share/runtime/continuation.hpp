@@ -42,6 +42,7 @@ public:
   static void print_statistics();
   static void init1();
   static void init2();
+  static bool enabled(); // TODO: used while virtual threads are in Preview; remove when GA
 };
 
 void continuations_init1();

@@ -1220,6 +1220,8 @@ void nmethod::mark_as_maybe_on_continuation() {
 }
 
 bool nmethod::is_not_on_continuation_stack() {
+  if (!Continuations::enabled()) return true;
+
   // Odd marking cycles are found during concurrent marking. Even numbers are found
   // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
   // normal execution). Therefore we align up by 2 so that nmethods encountered during

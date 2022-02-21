@@ -54,6 +54,7 @@
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
+#include "runtime/arguments.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
@@ -3072,6 +3073,12 @@ void Continuations::init2() {
 }
 
 void Continuations::print_statistics() {
+}
+
+// While virtual threads are in Preview, there are some VM mechanisms we disable if continuations aren't used
+// See NMethodSweeper::do_stack_scanning and nmethod::is_not_on_continuation_stack
+bool Continuations::enabled() {
+  return vmClasses::Continuation_klass()->is_initialized(); // Arguments::enable_preview();
 }
 
 void Continuation::init() {
