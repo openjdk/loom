@@ -95,7 +95,9 @@ static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // address p is readable and *(intptr_t*)p != errvalue
 
 template<int x> NOINLINE static bool verify_continuation(oop cont) { return Continuation::debug_verify_continuation(cont); }
+#define VERIFY_CONTINUATION(cont) verify_continuation<__LINE__>((cont))
 template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
+#define VERIFY_STACK_CHUNK(chunk) verify_stack_chunk<__LINE__>((chunk))
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
@@ -1264,7 +1266,7 @@ public:
     }
 
     assert (_cont.chunk_invariant(tty), "");
-    assert (verify_stack_chunk<__LINE__>(chunk), "");
+    assert (VERIFY_STACK_CHUNK(chunk), "");
 
   #if CONT_JFR
     EventContinuationFreezeYoung e;
@@ -1279,7 +1281,7 @@ public:
     return true;
   }
 
- freeze_result freeze_slow() {
+ NOINLINE freeze_result freeze_slow() {
   #ifdef ASSERT
     ResourceMark rm;
   #endif
@@ -1582,7 +1584,7 @@ public:
 #endif
   }
 
-  freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
+  NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
 #if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     { // TODO PD
       assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
@@ -1898,9 +1900,8 @@ static int early_return(int res, JavaThread* thread) {
 }
 
 static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
-  assert (verify_continuation<__LINE__>(cont.mirror()), "");
+  assert (VERIFY_CONTINUATION(cont.mirror()), "");
   assert (!cont.is_empty(), "");
-
 
   thread->set_cont_yield(false);
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
@@ -1910,7 +1911,7 @@ static inline int freeze_epilog(JavaThread* thread, ContMirror& cont) {
 
 static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
-    assert (verify_continuation<__LINE__>(cont.mirror()), "");
+    assert (VERIFY_CONTINUATION(cont.mirror()), "");
     return early_return(res, thread);
   }
 
@@ -1943,13 +1944,13 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert (oopCont == current->last_continuation()->cont_oop(), "");
   assert (ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
-  assert (verify_continuation<__LINE__>(oopCont), "");
+  assert (VERIFY_CONTINUATION(oopCont), "");
   ContMirror cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
-    assert (verify_continuation<__LINE__>(cont.mirror()), "");
+    assert (VERIFY_CONTINUATION(cont.mirror()), "");
     return early_return(freeze_pinned_cs, current);
   }
 
@@ -2097,7 +2098,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
   oop cont = thread->last_continuation()->cont_oop();
   assert (cont == ContinuationHelper::get_continuation(thread), "");
-  assert (verify_continuation<__LINE__>(cont), "");
+  assert (VERIFY_CONTINUATION(cont), "");
 
   stackChunkOop chunk = jdk_internal_vm_Continuation::tail(cont);
   assert (chunk != nullptr, "");
@@ -2107,7 +2108,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   }
   assert (chunk != nullptr, "");
   assert (!chunk->is_empty(), "");
-  assert (verify_stack_chunk<__LINE__>(chunk), "");
+  assert (VERIFY_STACK_CHUNK(chunk), "");
 
   int size = chunk->max_size();
   guarantee (size > 0, "");
@@ -2173,7 +2174,7 @@ public:
   intptr_t* thaw(thaw_kind kind) {
     assert (!Interpreter::contains(_cont.entryPC()), "");
 
-    assert (verify_continuation<__LINE__>(_cont.mirror()), "");
+    assert (VERIFY_CONTINUATION(_cont.mirror()), "");
     assert (!jdk_internal_vm_Continuation::done(_cont.mirror()), "");
     assert (!_cont.is_empty(), "");
 
@@ -2332,7 +2333,7 @@ public:
     // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
   }
 
-  intptr_t* thaw_slow(stackChunkOop chunk, bool return_barrier) {
+  NOINLINE intptr_t* thaw_slow(stackChunkOop chunk, bool return_barrier) {
     assert (!_cont.is_empty(), "");
     assert (chunk != nullptr, "");
     assert (!chunk->is_empty(), "");
@@ -2765,7 +2766,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (!jdk_internal_vm_Continuation::done(oopCont), "");
   assert (oopCont == ContinuationHelper::get_continuation(thread), "");
-  assert (verify_continuation<__LINE__>(oopCont), "");
+  assert (VERIFY_CONTINUATION(oopCont), "");
 
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
@@ -2783,7 +2784,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   thread->reset_held_monitor_count();
 
-  assert (verify_continuation<__LINE__>(cont.mirror()), "");
+  assert (VERIFY_CONTINUATION(cont.mirror()), "");
 
 #ifdef ASSERT
   intptr_t* sp0 = sp;
@@ -2807,7 +2808,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   CONT_JFR_ONLY(cont.post_jfr_event(&event, thread);)
 
-  assert (verify_continuation<__LINE__>(cont.mirror()), "");
+  assert (VERIFY_CONTINUATION(cont.mirror()), "");
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
 
   return sp;
