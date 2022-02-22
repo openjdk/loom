@@ -372,9 +372,6 @@ class CollectedHeap : public CHeapObj<mtGC> {
                                                        size_t size,
                                                        Metaspace::MetadataType mdtype);
 
-  // Continuation support
-  virtual void collect_for_codecache();
-
   // Return true, if accesses to the object would require barriers.
   // This is used by continuations to copy chunks of a thread stack into StackChunk object or out of a StackChunk
   // object back into the thread stack. These chunks may contain references to objects. It is crucial that

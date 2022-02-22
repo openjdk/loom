@@ -199,7 +199,7 @@ void NMethodSweeper::do_stack_scanning() {
   assert(!CodeCache_lock->owned_by_self(), "just checking");
   if (Continuations::enabled()) {
     // There are continuation stacks in the heap that need to be scanned.
-    Universe::heap()->collect_for_codecache();
+    Universe::heap()->collect(GCCause::_codecache_GC_threshold);
   }
   if (wait_for_stack_scanning()) {
     CodeBlobClosure* code_cl;

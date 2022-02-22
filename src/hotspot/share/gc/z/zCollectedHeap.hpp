@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -73,9 +73,6 @@ public:
   virtual bool is_maximal_no_gc() const;
   virtual bool is_in(const void* p) const;
   virtual inline bool requires_barriers(oop obj) const;
-
-  // Continuation support
-  virtual void collect_for_codecache();
 
   virtual uint32_t hash_oop(oop obj) const;
 

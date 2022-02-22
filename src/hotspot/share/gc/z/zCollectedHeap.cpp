@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -169,11 +169,6 @@ MetaWord* ZCollectedHeap::satisfy_failed_metadata_allocation(ClassLoaderData* lo
 
 void ZCollectedHeap::collect(GCCause::Cause cause) {
   _driver->collect(cause);
-}
-
-void ZCollectedHeap::collect_for_codecache() {
-  // Start synchronous GC
-  collect(GCCause::_codecache_GC_threshold);
 }
 
 void ZCollectedHeap::collect_as_vm_thread(GCCause::Cause cause) {
