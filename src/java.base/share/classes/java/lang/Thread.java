@@ -438,25 +438,22 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
+
+        if (currentThread() instanceof VirtualThread vthread) {
+            long nanos = MILLISECONDS.toNanos(millis);
+            vthread.sleepNanos(nanos);
+            return;
+        }
+
         if (ThreadSleepEvent.isTurnedOn()) {
             ThreadSleepEvent event = new ThreadSleepEvent();
             try {
-                event.time = NANOSECONDS.convert(millis, MILLISECONDS);
+                event.time = MILLISECONDS.toNanos(millis);
                 event.begin();
-                sleepMillis(millis);
+                sleep0(millis);
             } finally {
                 event.commit();
             }
-        } else {
-            sleepMillis(millis);
-        }
-    }
-
-    private static void sleepMillis(long millis) throws InterruptedException {
-        Thread thread = currentThread();
-        if (thread instanceof VirtualThread vthread) {
-            long nanos = NANOSECONDS.convert(millis, MILLISECONDS);
-            vthread.sleepNanos(nanos);
         } else {
             sleep0(millis);
         }
@@ -523,28 +520,17 @@ public class Thread implements Runnable {
         if (nanos < 0)
             return;
 
-        Thread thread = currentThread();
-        if (thread instanceof VirtualThread vthread) {
-            if (ThreadSleepEvent.isTurnedOn()) {
-                ThreadSleepEvent event = new ThreadSleepEvent();
-                try {
-                    event.time = nanos;
-                    event.begin();
-                    vthread.sleepNanos(nanos);
-                } finally {
-                    event.commit();
-                }
-            } else {
-                vthread.sleepNanos(nanos);
-            }
-        } else {
-            // convert to milliseconds, ceiling rounding mode
-            long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
-            if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
-                millis += 1L;
-            }
-            sleep(millis);
+        if (currentThread() instanceof VirtualThread vthread) {
+            vthread.sleepNanos(nanos);
+            return;
         }
+
+        // convert to milliseconds
+        long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
+        if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
+            millis += 1L;
+        }
+        sleep(millis);
     }
 
     /**
@@ -587,7 +573,7 @@ public class Thread implements Runnable {
     public static void onSpinWait() {}
 
     /**
-     * Returns the context class loader to inherit from the given parent thread
+     * Returns the context class loader to inherit from the given parent thread.
      */
     private static ClassLoader contextClassLoader(Thread parent) {
         @SuppressWarnings("removal")
@@ -595,7 +581,9 @@ public class Thread implements Runnable {
         if (sm == null || isCCLOverridden(parent.getClass())) {
             return parent.getContextClassLoader();
         } else {
-            return parent.contextClassLoader;
+            // getContextClassLoader not trusted
+            ClassLoader cl = parent.contextClassLoader;
+            return (isSupportedClassLoader(cl)) ? cl : ClassLoader.getSystemClassLoader();
         }
     }
 
@@ -624,8 +612,6 @@ public class Thread implements Runnable {
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
-            //assert !attached;
-
             // the security manager can choose the thread group
             if (security != null) {
                 g = security.getThreadGroup();
@@ -654,7 +640,7 @@ public class Thread implements Runnable {
         }
         this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
 
-        // thread locals and scoped variables
+        // thread locals
         if (!attached) {
             if ((characteristics & NO_THREAD_LOCALS) != 0) {
                 this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
@@ -834,6 +820,8 @@ public class Thread implements Runnable {
          * {@code Thread}.
          *
          * @apiNote
+         * The following example creates a builder that is invoked twice to start
+         * two threads named "{@code worker-0}" and "{@code worker-1}".
          * {@snippet :
          *   Thread.Builder builder = Thread.ofPlatform().name("worker-", 0);
          *   Thread t1 = builder.start(task1);   // name "worker-0"
@@ -2050,7 +2038,7 @@ public class Thread implements Runnable {
                     do {
                         wait(delay);
                     } while (isAlive() && (delay = millis -
-                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
+                             NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
                 }
             } else {
                 while (isAlive()) {
@@ -2098,10 +2086,19 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException("nanosecond timeout value out of range");
         }
 
+        if (this instanceof VirtualThread vthread) {
+            if (isAlive()) {
+                // convert arguments to a total in nanoseconds
+                long totalNanos = MILLISECONDS.toNanos(millis);
+                totalNanos += Math.min(Long.MAX_VALUE - totalNanos, nanos);
+                vthread.joinNanos(totalNanos);
+            }
+            return;
+        }
+
         if (nanos > 0 && millis < Long.MAX_VALUE) {
             millis++;
         }
-
         join(millis);
     }
 
@@ -2160,15 +2157,15 @@ public class Thread implements Runnable {
 
         if (this instanceof VirtualThread vthread) {
             return vthread.joinNanos(nanos);
-        } else {
-            // convert to milliseconds, ceiling rounding mode
-            long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
-            if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
-                millis += 1L;
-            }
-            join(millis);
-            return threadState() == State.TERMINATED;
         }
+
+        // convert to milliseconds
+        long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
+        if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
+            millis += 1L;
+        }
+        join(millis);
+        return threadState() == State.TERMINATED;
     }
 
     /**
@@ -2755,8 +2752,6 @@ public class Thread implements Runnable {
         return jdk.internal.misc.VM.toThreadState(holder.threadStatus);
     }
 
-    // Added in JSR-166
-
     /**
      * Interface for handlers invoked when a {@code Thread} abruptly
      * terminates due to an uncaught exception.
@@ -2820,7 +2815,7 @@ public class Thread implements Runnable {
      * defer to the thread's {@code ThreadGroup} object, as that could cause
      * infinite recursion.
      *
-     * @param eh the object to use as the default uncaught exception handler.
+     * @param ueh the object to use as the default uncaught exception handler.
      * If {@code null} then there is no default handler.
      *
      * @throws SecurityException if a security manager is present and it denies
@@ -2831,14 +2826,14 @@ public class Thread implements Runnable {
      * @see ThreadGroup#uncaughtException
      * @since 1.5
      */
-    public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
+    public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
         @SuppressWarnings("removal")
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             sm.checkPermission(
                 new RuntimePermission("setDefaultUncaughtExceptionHandler"));
         }
-        defaultUncaughtExceptionHandler = eh;
+        defaultUncaughtExceptionHandler = ueh;
     }
 
     /**
@@ -2879,7 +2874,7 @@ public class Thread implements Runnable {
      * exceptions by having its uncaught exception handler explicitly set.
      * If no such handler is set then the thread's {@code ThreadGroup}
      * object acts as its handler.
-     * @param eh the object to use as this thread's uncaught exception
+     * @param ueh the object to use as this thread's uncaught exception
      * handler. If {@code null} then this thread has no explicit handler.
      * @throws  SecurityException  if the current thread is not allowed to
      *          modify this thread.
@@ -2887,9 +2882,9 @@ public class Thread implements Runnable {
      * @see ThreadGroup#uncaughtException
      * @since 1.5
      */
-    public void setUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
+    public void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
         checkAccess();
-        uncaughtExceptionHandler(eh);
+        uncaughtExceptionHandler(ueh);
     }
 
     void uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
