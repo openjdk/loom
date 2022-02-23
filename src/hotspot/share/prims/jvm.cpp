@@ -3936,11 +3936,10 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
         JvmtiExport::post_vthread_start(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_start
-      if (JvmtiExport::should_post_thread_life()) {
+      if (!DisableVirtualThreadCompatibleLifecycleEvents &&
+          JvmtiExport::should_post_thread_life()) {
         // JvmtiEventController::thread_started is called here
         JvmtiExport::post_thread_start(thread);
-      } else {
-        JvmtiEventController::thread_started(thread);
       }
     }
   }
@@ -3966,7 +3965,8 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_vthread_end(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_end
-      if (JvmtiExport::should_post_thread_life()) {
+      if (!DisableVirtualThreadCompatibleLifecycleEvents &&
+          JvmtiExport::should_post_thread_life()) {
         JvmtiExport::post_thread_end(thread);
       }
     }
