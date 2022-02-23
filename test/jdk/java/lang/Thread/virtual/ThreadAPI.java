@@ -26,7 +26,7 @@
  * @summary Test Thread API with virtual threads
  * @modules java.base/java.lang:+open
  * @compile --enable-preview -source ${jdk.version} ThreadAPI.java TestHelper.java
- * @run testng/othervm --enable-preview ThreadAPI
+ * @run testng/othervm/timeout=300 --enable-preview ThreadAPI
  */
 
 import java.time.Duration;
@@ -302,7 +302,9 @@ public class ThreadAPI {
 
         thread.join();
         thread.join(0);
+        thread.join(0, 0);
         thread.join(100);
+        thread.join(100, 0);
         assertThrows(IllegalThreadStateException.class,
                 () -> thread.join(Duration.ofMillis(-100)));
         assertThrows(IllegalThreadStateException.class,
@@ -327,6 +329,9 @@ public class ThreadAPI {
         var thread = Thread.ofVirtual().start(LockSupport::park);
         try {
             thread.join(100);
+            thread.join(100, 0);
+            thread.join(100, 100);
+            thread.join(0, 100);
             assertFalse(thread.join(Duration.ofMillis(-100)));
             assertFalse(thread.join(Duration.ofMillis(0)));
             assertFalse(thread.join(Duration.ofMillis(100)));
@@ -421,7 +426,10 @@ public class ThreadAPI {
             Thread.sleep(10);
         }
         thread.join();
+        thread.join(0);
+        thread.join(0, 0);
         thread.join(100);
+        thread.join(100, 0);
         assertTrue(thread.join(Duration.ofMillis(-100)));
         assertTrue(thread.join(Duration.ofMillis(0)));
         assertTrue(thread.join(Duration.ofMillis(100)));
@@ -1142,6 +1150,9 @@ public class ThreadAPI {
     public void testSleep1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             assertThrows(IllegalArgumentException.class, () -> Thread.sleep(-1));
+            assertThrows(IllegalArgumentException.class, () -> Thread.sleep(-1, 0));
+            assertThrows(IllegalArgumentException.class, () -> Thread.sleep(0, -1));
+            assertThrows(IllegalArgumentException.class, () -> Thread.sleep(0, 1_000_000));
         });
         TestHelper.runInVirtualThread(() -> Thread.sleep(Duration.ofMillis(-1)));
     }
@@ -1152,6 +1163,7 @@ public class ThreadAPI {
     @Test
     public void testSleep2() throws Exception {
         TestHelper.runInVirtualThread(() -> Thread.sleep(0));
+        TestHelper.runInVirtualThread(() -> Thread.sleep(0, 0));
         TestHelper.runInVirtualThread(() -> Thread.sleep(Duration.ofMillis(0)));
     }
 
@@ -1163,6 +1175,11 @@ public class ThreadAPI {
         TestHelper.runInVirtualThread(() -> {
             long start = millisTime();
             Thread.sleep(2000);
+            expectDuration(start, /*min*/1900, /*max*/4000);
+        });
+        TestHelper.runInVirtualThread(() -> {
+            long start = millisTime();
+            Thread.sleep(2000, 0);
             expectDuration(start, /*min*/1900, /*max*/4000);
         });
         TestHelper.runInVirtualThread(() -> {
@@ -1193,7 +1210,31 @@ public class ThreadAPI {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
+                Thread.sleep(0, 0);
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // expected
+                assertFalse(me.isInterrupted());
+            }
+        });
+
+        TestHelper.runInVirtualThread(() -> {
+            Thread me = Thread.currentThread();
+            me.interrupt();
+            try {
                 Thread.sleep(1000);
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // expected
+                assertFalse(me.isInterrupted());
+            }
+        });
+
+        TestHelper.runInVirtualThread(() -> {
+            Thread me = Thread.currentThread();
+            me.interrupt();
+            try {
+                Thread.sleep(1000, 0);
                 assertTrue(false);
             } catch (InterruptedException e) {
                 // expected
@@ -1243,6 +1284,18 @@ public class ThreadAPI {
             TestHelper.scheduleInterrupt(t, 2000);
             try {
                 Thread.sleep(20*1000);
+                assertTrue(false);
+            } catch (InterruptedException e) {
+                // interrupt status should be clearer
+                assertFalse(t.isInterrupted());
+            }
+        });
+
+        TestHelper.runInVirtualThread(() -> {
+            Thread t = Thread.currentThread();
+            TestHelper.scheduleInterrupt(t, 2000);
+            try {
+                Thread.sleep(20*1000, 0);
                 assertTrue(false);
             } catch (InterruptedException e) {
                 // interrupt status should be clearer
