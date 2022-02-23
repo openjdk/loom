@@ -32,8 +32,6 @@ import java.lang.StackWalker.StackFrame;
 import java.lang.annotation.Native;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.HashSet;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -148,7 +146,7 @@ final class StackStreamFactory {
                 this.contScope = VirtualThread.continuationScope();
                 this.continuation = null;
             } else {
-                this.contScope = walker.getContScope();
+                this.contScope = scope;
                 this.continuation = walker.getContinuation();
             }
         }
@@ -320,7 +318,6 @@ final class StackStreamFactory {
             }
 
             this.anchor = anchor;  // set anchor for this bulk stack frame traversal
-            int numFrames = bufEndIndex - bufStartIndex;
             frameBuffer.setBatch(depth, bufStartIndex, bufEndIndex);
 
             // traverse all frames and perform the action on the stack frames, if specified
