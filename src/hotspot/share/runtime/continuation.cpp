@@ -1131,7 +1131,8 @@ public:
     intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
     const int       stack_argsize = _cont.argsize();
     intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(stack_argsize); // see alignment in thaw
-    const int       size    = stack_bottom - stack_top;
+
+    const int size = stack_bottom - stack_top;
 
     log_develop_trace(jvmcont)("freeze_fast size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
       size, stack_argsize, p2i(stack_top), p2i(stack_bottom));
@@ -1155,10 +1156,10 @@ public:
       sp = chunk->sp();
 
       if (sp < chunk->stack_size()) { // we are copying into a non-empty chunk
+        DEBUG_ONLY(empty = false;)
         assert (sp < (chunk->stack_size() - chunk->argsize()), "");
         assert (*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
-        DEBUG_ONLY(empty = false;)
         sp += stack_argsize; // we overlap; we'll overwrite the chunk's top frame's callee arguments
         assert (sp <= chunk->stack_size(), "");
 
@@ -1171,8 +1172,8 @@ public:
         // we don't patch the pc at this time, so as not to make the stack unwalkable
       } else { // the chunk is empty
         DEBUG_ONLY(empty = true;)
-
         assert(sp == chunk->stack_size(), "");
+
         chunk->set_max_size(size);
         chunk->set_argsize(stack_argsize);
       }
