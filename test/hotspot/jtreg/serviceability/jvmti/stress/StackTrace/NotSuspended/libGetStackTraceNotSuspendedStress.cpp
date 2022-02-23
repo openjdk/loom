@@ -82,7 +82,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     jint count = 0;
     jvmtiError err;
 
-    millisleep(100);
+    sleep_ms(100);
 
     err = jvmti->GetAllThreads(&count, &threads);
     if (err == JVMTI_ERROR_WRONG_PHASE) {

@@ -104,7 +104,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 
         eventsReceived = 0;
         LOG("Enable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni,JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
+        enable_events_notifications(jvmti, jni,JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
 
         LOG("Let threads to run and finish\n");
         if (!agent_resume_sync())
@@ -133,7 +133,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
             for (time = 0; time < timeout; time += delta) {
                 if (eventsReceived >= threadsCount)
                     break;
-                nsk_jvmti_sleep(delta);
+                sleep_sec(delta);
             }
 
             if (eventsReceived < threadsCount) {
@@ -144,7 +144,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Disable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni, JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
+        enable_events_notifications(jvmti, jni, JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
 
         LOG("Wait for thread to finish\n");
         if (!agent_wait_for_sync(timeout))

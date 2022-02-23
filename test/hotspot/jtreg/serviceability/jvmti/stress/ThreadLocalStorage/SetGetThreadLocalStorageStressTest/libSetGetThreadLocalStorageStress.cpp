@@ -128,7 +128,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     jthread *threads = NULL;
     jint count = 0;
 
-    millisleep(10);
+    sleep_ms(10);
 
     RawMonitorLocker rml(jvmti, jni, monitor);
     if (!is_vm_running) {

@@ -60,7 +60,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     /* perform testing */
     {
         LOG("Find thread: %s\n", THREAD_NAME);
-        testedThread = nsk_jvmti_threadByName(jvmti, jni,THREAD_NAME);
+        testedThread = find_thread_by_name(jvmti, jni,THREAD_NAME);
         if (testedThread == NULL) {
           return;
         }
@@ -68,7 +68,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 
         eventsReceived = 0;
         LOG("Enable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni, JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
+        enable_events_notifications(jvmti, jni, JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
 
         LOG("Suspend thread: %p\n", (void*)testedThread);
         jvmtiError err = jvmti->SuspendThread(testedThread);
@@ -95,7 +95,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
             for (time = 0; time < timeout; time += delta) {
                 if (eventsReceived > 0)
                     break;
-                nsk_jvmti_sleep(delta);
+                sleep_sec(delta);
             }
             if (eventsReceived <= 0) {
                 COMPLAIN("Thread has not run and finished after resuming\n");
@@ -104,7 +104,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Disable event: %s\n", "THREAD_END");
-        nsk_jvmti_enableEvents(jvmti, jni,JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
+        enable_events_notifications(jvmti, jni,JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
 
         LOG("Wait for thread to finish\n");
         if (!agent_wait_for_sync(timeout))

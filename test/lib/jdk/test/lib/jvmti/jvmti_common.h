@@ -722,11 +722,6 @@ jthread find_thread_by_name(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   return found_thread;
 }
 
-jthread nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
-  return find_thread_by_name(jvmti, jni, name);
-}
-
-
 /*
  * JVMTI Extension Mechanism
  */
@@ -832,7 +827,7 @@ set_event_notification_mode(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode mode, j
 }
 
 int
-nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
+enable_events_notifications(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
   for (int i = 0; i < size; i++) {
     check_jvmti_status(jni, jvmti->SetEventNotificationMode(enable, list[i], thread), "");
   }
@@ -840,7 +835,7 @@ nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int 
 }
 
 void
-millisleep(int millis) {
+sleep_ms(int millis) {
 #ifdef _WIN32
   Sleep(millis);
 #else
@@ -849,7 +844,7 @@ millisleep(int millis) {
 }
 
 void
-nsk_jvmti_sleep(jlong timeout) {
+sleep_sec(jlong timeout) {
   int seconds = (int)((timeout + 999) / 1000);
 #ifdef _WIN32
   Sleep(1000L * seconds);

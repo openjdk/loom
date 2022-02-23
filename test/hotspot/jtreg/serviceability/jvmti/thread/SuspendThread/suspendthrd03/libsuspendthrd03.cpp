@@ -56,7 +56,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     int late_count;
 
     LOG("Find thread: %s\n", THREAD_NAME);
-    testedThread = nsk_jvmti_threadByName(jvmti, jni, THREAD_NAME);
+    testedThread = find_thread_by_name(jvmti, jni, THREAD_NAME);
     if (testedThread == NULL) {
       return;
     }

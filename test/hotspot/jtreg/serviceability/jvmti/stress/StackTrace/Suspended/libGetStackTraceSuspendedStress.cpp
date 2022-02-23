@@ -210,7 +210,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   //check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) vname), "Error in Deallocate");
 
     iter++;
-    millisleep(20);
+    sleep_ms(20);
   }
   LOG("Agent: finished\n");
 }
