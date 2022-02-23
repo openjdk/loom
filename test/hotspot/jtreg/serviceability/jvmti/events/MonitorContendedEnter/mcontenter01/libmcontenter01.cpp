@@ -87,7 +87,7 @@ static int clean() {
                                         JVMTI_EVENT_MONITOR_CONTENDED_ENTER,
                                         NULL);
   if (err != JVMTI_ERROR_NONE) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
   }
 
   jni->DeleteGlobalRef(expected_object);
@@ -104,12 +104,12 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
   jni = agentJNI;
 
   /* wait for initial sync */
-  if (!nsk_jvmti_waitForSync(timeout)) {
+  if (!agent_wait_for_sync(timeout)) {
     return;
   }
 
   if (!prepare()) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return;
   }
 
@@ -117,23 +117,23 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
   eventsCount = 0;
 
   /* resume debugee to catch MonitorContendedEnter event */
-  if (!((nsk_jvmti_resumeSync() == NSK_TRUE) && (nsk_jvmti_waitForSync(timeout) ==NSK_TRUE))) {
+  if (!((agent_resume_sync() == NSK_TRUE) && (agent_wait_for_sync(timeout) ==NSK_TRUE))) {
     return;
   }
-  NSK_DISPLAY1("Number of MonitorContendedEnter events: %d\n", eventsCount);
+  LOG("Number of MonitorContendedEnter events: %d\n", eventsCount);
 
   if (eventsCount == 0) {
-    NSK_COMPLAIN0("No any MonitorContendedEnter event\n");
-    nsk_jvmti_setFailStatus();
+    COMPLAIN("No any MonitorContendedEnter event\n");
+    set_agent_fail_status();
   }
 
   if (!clean()) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return;
   }
 
 /* resume debugee after last sync */
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
 }
 
@@ -159,7 +159,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jint res;
 
   timeout = 60000; //TODO fix
-  NSK_DISPLAY1("Timeout: %d msc\n", (int) timeout);
+  LOG("Timeout: %d msc\n", (int) timeout);
 
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
   if (res != JNI_OK || jvmti == NULL) {
@@ -200,7 +200,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  nsk_jvmti_setAgentProc(agentProc, NULL);
+  set_agent_proc(agentProc, NULL);
 
   return JNI_OK;
 }

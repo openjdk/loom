@@ -53,42 +53,42 @@ static jthread testedThread = NULL;
 static void JNICALL
 agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 
-    NSK_DISPLAY0("Wait for thread to start\n");
-    if (!nsk_jvmti_waitForSync(timeout))
+    LOG("Wait for thread to start\n");
+    if (!agent_wait_for_sync(timeout))
         return;
 
     /* perform testing */
     {
-        NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
+        LOG("Find thread: %s\n", THREAD_NAME);
         testedThread = nsk_jvmti_threadByName(jvmti, jni,THREAD_NAME);
         if (testedThread == NULL) {
           return;
         }
-        NSK_DISPLAY1("  ... found thread: %p\n", (void*)testedThread);
+        LOG("  ... found thread: %p\n", (void*)testedThread);
 
         eventsReceived = 0;
-        NSK_DISPLAY1("Enable event: %s\n", "THREAD_END");
+        LOG("Enable event: %s\n", "THREAD_END");
         nsk_jvmti_enableEvents(jvmti, jni, JVMTI_ENABLE, EVENTS_COUNT, eventsList, NULL);
 
-        NSK_DISPLAY1("Suspend thread: %p\n", (void*)testedThread);
+        LOG("Suspend thread: %p\n", (void*)testedThread);
         jvmtiError err = jvmti->SuspendThread(testedThread);
         if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
+          set_agent_fail_status();
           return;
         }
 
-        NSK_DISPLAY0("Let thread to run and finish\n");
-        if (!nsk_jvmti_resumeSync())
+        LOG("Let thread to run and finish\n");
+        if (!agent_resume_sync())
             return;
 
-        NSK_DISPLAY1("Resume thread: %p\n", (void*)testedThread);
+        LOG("Resume thread: %p\n", (void*)testedThread);
         err = jvmti->ResumeThread(testedThread);
         if (err != JVMTI_ERROR_NONE) {
-          nsk_jvmti_setFailStatus();
+          set_agent_fail_status();
           return;
         }
 
-        NSK_DISPLAY1("Check that THREAD_END event received for timeout: %ld ms\n", (long)timeout);
+        LOG("Check that THREAD_END event received for timeout: %ld ms\n", (long)timeout);
         {
             jlong delta = 1000;
             jlong time;
@@ -98,24 +98,24 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
                 nsk_jvmti_sleep(delta);
             }
             if (eventsReceived <= 0) {
-                NSK_COMPLAIN0("Thread has not run and finished after resuming\n");
-                nsk_jvmti_setFailStatus();
+                COMPLAIN("Thread has not run and finished after resuming\n");
+                set_agent_fail_status();
             }
         }
 
-        NSK_DISPLAY1("Disable event: %s\n", "THREAD_END");
+        LOG("Disable event: %s\n", "THREAD_END");
         nsk_jvmti_enableEvents(jvmti, jni,JVMTI_DISABLE, EVENTS_COUNT, eventsList, NULL);
 
-        NSK_DISPLAY0("Wait for thread to finish\n");
-        if (!nsk_jvmti_waitForSync(timeout))
+        LOG("Wait for thread to finish\n");
+        if (!agent_wait_for_sync(timeout))
             return;
 
-        NSK_DISPLAY0("Delete thread reference\n");
+        LOG("Delete thread reference\n");
         jni->DeleteGlobalRef(testedThread);
     }
 
-    NSK_DISPLAY0("Let debugee to finish\n");
-    if (!nsk_jvmti_resumeSync())
+    LOG("Let debugee to finish\n");
+    if (!agent_resume_sync())
         return;
 }
 
@@ -126,10 +126,10 @@ JNIEXPORT void JNICALL
 callbackThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
     /* check if event is for tested thread */
     if (thread != NULL && jni->IsSameObject(testedThread, thread)) {
-        NSK_DISPLAY1("  ... received THREAD_END event for tested thread: %p\n", (void*)thread);
+        LOG("  ... received THREAD_END event for tested thread: %p\n", (void*)thread);
         eventsReceived++;
     } else {
-        NSK_DISPLAY1("  ... received THREAD_END event for unknown thread: %p\n", (void*)thread);
+        LOG("  ... received THREAD_END event for unknown thread: %p\n", (void*)thread);
     }
 }
 
@@ -174,7 +174,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+  if (!set_agent_proc(agentProc, NULL)) {
     return JNI_ERR;
   }
 

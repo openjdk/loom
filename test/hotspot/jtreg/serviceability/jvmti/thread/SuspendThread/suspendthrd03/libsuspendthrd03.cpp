@@ -44,10 +44,10 @@ static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
   jvmtiError err;
   /* Original agentProc test block starts here: */
-  NSK_DISPLAY0("Wait for thread to start\n");
+  LOG("Wait for thread to start\n");
   // SP2.1-n - notify agent is waiting and wait
   // SP3.1-w - wait to start test
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
 
   /* perform testing */
@@ -55,32 +55,32 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     jthread testedThread = NULL;
     int late_count;
 
-    NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
+    LOG("Find thread: %s\n", THREAD_NAME);
     testedThread = nsk_jvmti_threadByName(jvmti, jni, THREAD_NAME);
     if (testedThread == NULL) {
       return;
     }
-    NSK_DISPLAY1("  ... found thread: %p\n", (void *) testedThread);
+    LOG("  ... found thread: %p\n", (void *) testedThread);
 
-    NSK_DISPLAY1("Suspend thread: %p\n", (void *) testedThread);
+    LOG("Suspend thread: %p\n", (void *) testedThread);
     err = jvmti->SuspendThread(testedThread);
     if (err != JVMTI_ERROR_NONE) {
-      nsk_jvmti_setFailStatus();
+      set_agent_fail_status();
       return;
     }
 
-    NSK_DISPLAY0("Let thread to run and finish\n");
+    LOG("Let thread to run and finish\n");
     // SP5.1-n - notify suspend done
-    if (!nsk_jvmti_resumeSync())
+    if (!agent_resume_sync())
       return;
 
-    NSK_DISPLAY1("Get state vector for thread: %p\n", (void *) testedThread);
+    LOG("Get state vector for thread: %p\n", (void *) testedThread);
     {
       jint state = 0;
 
       err = jvmti->GetThreadState(testedThread, &state);
       if (err != JVMTI_ERROR_NONE) {
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
         return;
       }
       LOG("  ... got state vector: %s (%d)\n", TranslateState(state), (int) state);
@@ -89,20 +89,20 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
         LOG("SuspendThread() does not turn on flag SUSPENDED:\n"
                "#   state: %s (%d)\n",
                TranslateState(state), (int) state);
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
       }
     }
 
-    NSK_DISPLAY1("Resume thread: %p\n", (void *) testedThread);
+    LOG("Resume thread: %p\n", (void *) testedThread);
     err = jvmti->ResumeThread(testedThread);
     if (err != JVMTI_ERROR_NONE) {
-      nsk_jvmti_setFailStatus();
+      set_agent_fail_status();
       return;
     }
     /* Original agentProc test block ends here. */
 
     /*
-     * Using LOG() instead of NSK_DISPLAY1() in this loop
+     * Using LOG() instead of LOG() in this loop
      * in order to slow down the rate of SuspendThread() calls.
      */
     for (late_count = 0; late_count < N_LATE_CALLS; late_count++) {
@@ -115,12 +115,12 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
         break;
       }
 
-      // Only resume a thread if suspend worked. Using NSK_DISPLAY1()
+      // Only resume a thread if suspend worked. Using LOG()
       // here because we want ResumeThread() to be faster.
-      NSK_DISPLAY1("INFO: Late resume thread: %p\n", (void *) testedThread);
+      LOG("INFO: Late resume thread: %p\n", (void *) testedThread);
       err = jvmti->ResumeThread(testedThread);
       if (err != JVMTI_ERROR_NONE) {
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
         return;
       }
     }
@@ -131,19 +131,19 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
            (late_count == N_LATE_CALLS) ? "NOT " : "");
 
     /* Second part of original agentProc test block starts here: */
-    NSK_DISPLAY0("Wait for thread to finish\n");
+    LOG("Wait for thread to finish\n");
     // SP4.1-n - notify agent is waiting and wait
     // SP6.1-w - wait to end test
-    if (!nsk_jvmti_waitForSync(timeout))
+    if (!agent_wait_for_sync(timeout))
       return;
 
-    NSK_DISPLAY0("Delete thread reference\n");
+    LOG("Delete thread reference\n");
     jni->DeleteGlobalRef(testedThread);
   }
 
-  NSK_DISPLAY0("Let debugee to finish\n");
+  LOG("Let debugee to finish\n");
   // SP7.1-n - notify agent end
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
   /* Second part of original agentProc test block ends here. */
 }
@@ -175,7 +175,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
   /* register agent proc and arg */
-  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+  if (!set_agent_proc(agentProc, NULL)) {
     return JNI_ERR;
   }
 

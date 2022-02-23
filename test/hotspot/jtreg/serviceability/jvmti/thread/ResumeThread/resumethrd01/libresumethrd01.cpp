@@ -42,34 +42,34 @@ static jlong timeout = 0;
 static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
   jvmtiError err;
-  NSK_DISPLAY0("Wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  LOG("Wait for thread to start\n");
+  if (!agent_wait_for_sync(timeout))
     return;
 
   /* perform testing */
   {
     jthread testedThread = NULL;
 
-    NSK_DISPLAY1("Find thread: %s\n", THREAD_NAME);
+    LOG("Find thread: %s\n", THREAD_NAME);
     testedThread = nsk_jvmti_threadByName(jvmti, jni, THREAD_NAME);
     if (testedThread == NULL) {
       return;
     }
-    NSK_DISPLAY1("  ... found thread: %p\n", (void *) testedThread);
+    LOG("  ... found thread: %p\n", (void *) testedThread);
 
-    NSK_DISPLAY1("Suspend thread: %p\n", (void *) testedThread);
+    LOG("Suspend thread: %p\n", (void *) testedThread);
     suspend_thread(jvmti, jni, testedThread);
 
-    NSK_DISPLAY1("Resume thread: %p\n", (void *) testedThread);
+    LOG("Resume thread: %p\n", (void *) testedThread);
     resume_thread(jvmti, jni, testedThread);
 
-    NSK_DISPLAY1("Get state vector for thread: %p\n", (void *) testedThread);
+    LOG("Get state vector for thread: %p\n", (void *) testedThread);
     {
       jint state = 0;
 
       err = jvmti->GetThreadState(testedThread, &state);
       if (err != JVMTI_ERROR_NONE) {
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
         return;
       }
       LOG("  ... got state vector: %s (%d)", TranslateState(state), (int) state);
@@ -78,24 +78,24 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
         LOG("SuspendThread() does not turn off flag SUSPENDED:\n"
                "#   state:  %s (%d)\n",
                TranslateState(state), (int) state);
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
       }
     }
 
-    NSK_DISPLAY0("Let thread to run and finish\n");
-    if (!nsk_jvmti_resumeSync())
+    LOG("Let thread to run and finish\n");
+    if (!agent_resume_sync())
       return;
 
-    NSK_DISPLAY0("Wait for thread to finish\n");
-    if (!nsk_jvmti_waitForSync(timeout))
+    LOG("Wait for thread to finish\n");
+    if (!agent_wait_for_sync(timeout))
       return;
 
-    NSK_DISPLAY0("Delete thread reference\n");
+    LOG("Delete thread reference\n");
     jni->DeleteGlobalRef(testedThread);
   }
 
-  NSK_DISPLAY0("Let debugee to finish\n");
-  if (!nsk_jvmti_resumeSync())
+  LOG("Let debugee to finish\n");
+  if (!agent_resume_sync())
     return;
 }
 
@@ -127,7 +127,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+  if (!set_agent_proc(agentProc, NULL)) {
     return JNI_ERR;
   }
 

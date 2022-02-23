@@ -133,7 +133,7 @@ Java_nativemethbind04_check(
         "\thas not been invoked as expected\n");
   } else {
     result = STATUS_FAILED;
-    NSK_COMPLAIN1(
+    COMPLAIN(
         "TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
         "\t%d calls\texpected: 0\n\n",
         origCalls);
@@ -146,7 +146,7 @@ Java_nativemethbind04_check(
         redirCalls);
   } else {
     result = STATUS_FAILED;
-    NSK_COMPLAIN1(
+    COMPLAIN(
         "TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
         "\t%d calls of redirected method\texpected: 1\n\n",
         redirCalls);

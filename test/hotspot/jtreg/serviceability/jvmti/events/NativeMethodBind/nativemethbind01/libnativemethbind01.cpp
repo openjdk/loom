@@ -134,7 +134,7 @@ Java_nativemethbind01_nativeMethod(
     testedCls = jni->FindClass(CLASS_SIG);
     if (testedCls == NULL) {
       result = STATUS_FAILED;
-      NSK_COMPLAIN1("TEST FAILURE: unable to find class \"%s\"\n\n",
+      COMPLAIN("TEST FAILURE: unable to find class \"%s\"\n\n",
                     CLASS_SIG);
       return;
     }
@@ -148,7 +148,7 @@ Java_nativemethbind01_nativeMethod(
                  METHODS[1][0], METHODS[1][1], CLASS_SIG);
     if (jni->RegisterNatives(testedCls, &meth, 1) != 0) {
       result = STATUS_FAILED;
-      NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
+      COMPLAIN("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
                     METHODS[1][0], METHODS[1][1], CLASS_SIG);
     }
   }
@@ -166,7 +166,7 @@ Java_nativemethbind01_check(
     }
     else {
       result = STATUS_FAILED;
-      NSK_COMPLAIN3(
+      COMPLAIN(
           "TEST FAILED: wrong number of NativeMethodBind events for the method \"%s\":\n"
           "got: %d\texpected: %d\n\n",
           METHODS[i][0], bindEv[i][0], bindEv[i][1]);

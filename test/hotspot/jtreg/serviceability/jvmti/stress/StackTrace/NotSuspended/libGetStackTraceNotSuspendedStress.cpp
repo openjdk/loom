@@ -69,10 +69,10 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
   static jlong timeout = 0;
   LOG("Agent: wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout)) {
+  if (!agent_wait_for_sync(timeout)) {
     return;
   }
-  if (!nsk_jvmti_resumeSync()) {
+  if (!agent_resume_sync()) {
     return;
   }
   LOG("Agent: started\n");
@@ -132,7 +132,7 @@ extern JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *res
     return JNI_ERR;
   }
 
-  if (nsk_jvmti_setAgentProc(agentProc, NULL) != NSK_TRUE) {
+  if (set_agent_proc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
 
