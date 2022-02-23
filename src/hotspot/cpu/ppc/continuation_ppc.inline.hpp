@@ -39,13 +39,23 @@ static inline intptr_t** link_address(const frame& f) {
   return NULL;
 }
 
+inline int ContinuationHelper::frame_align_words(int size) {
+  Unimplemented();
+  return 0;
+}
+
+inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
+  Unimplemented();
+  return NULL;
+}
+
 template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(RegisterMapT* map, const frame& f) {
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
   Unimplemented();
 }
 
 template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(RegisterMapT* map, const frame& f) {
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMapT* map) {
   Unimplemented();
 }
 
@@ -79,12 +89,6 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
 template <typename ConfigT>
 inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   Unimplemented();
-}
-
-template <typename ConfigT>
-inline intptr_t* Freeze<ConfigT>::align_bottom(intptr_t* bottom, int argsize) {
-  Unimplemented();
-  return NULL;
 }
 
 template <typename ConfigT>
@@ -164,12 +168,6 @@ void Thaw<ConfigT>::patch_chunk_pd(intptr_t* sp) {
 template <typename ConfigT>
 inline void Thaw<ConfigT>::prefetch_chunk_pd(void* start, int size) {
   Unimplemented();
-}
-
-template <typename ConfigT>
-inline intptr_t* Thaw<ConfigT>::align_chunk(intptr_t* vsp) {
-  Unimplemented();
-  return NULL;
 }
 
 #endif // CPU_PPC_CONTINUATION_PPC_INLINE_HPP

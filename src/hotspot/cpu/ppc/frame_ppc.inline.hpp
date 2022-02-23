@@ -171,13 +171,13 @@ inline void frame::interpreter_frame_set_esp(intptr_t* esp)                   { 
 inline void frame::interpreter_frame_set_top_frame_sp(intptr_t* top_frame_sp) { get_ijava_state()->top_frame_sp = (intptr_t) top_frame_sp; }
 inline void frame::interpreter_frame_set_sender_sp(intptr_t* sender_sp)       { get_ijava_state()->sender_sp = (intptr_t) sender_sp; }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   return (intptr_t*)interpreter_frame_monitor_end() - 1;
 }
 
 // top of expression stack
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return ((intptr_t*) get_ijava_state()->esp) + Interpreter::stackElementWords;
 }
@@ -228,7 +228,7 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   Unimplemented();
   return NULL;
@@ -237,11 +237,6 @@ inline intptr_t* frame::interpreter_frame_last_sp() const {
 inline int frame::sender_sp_ret_address_offset() {
   Unimplemented();
   return 0;
-}
-
-template <typename RegisterMapT>
-void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
-  Unimplemented();
 }
 
 inline void frame::set_unextended_sp(intptr_t* value) {
@@ -254,6 +249,61 @@ inline int frame::offset_unextended_sp() const {
 }
 
 inline void frame::set_offset_unextended_sp(int value) {
+  Unimplemented();
+}
+
+//------------------------------------------------------------------------------
+// frame::sender
+
+frame frame::sender(RegisterMap* map) const {
+  frame result = sender_raw(map);
+
+  if (map->process_frames()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+
+  return result;
+}
+
+inline frame frame::sender_raw(RegisterMap* map) const {
+  // Default is we do have to follow them. The sender_for_xxx will
+  // update it accordingly.
+  map->set_include_argument_oops(false);
+
+  if (is_entry_frame())       return sender_for_entry_frame(map);
+  if (is_interpreted_frame()) return sender_for_interpreter_frame(map);
+  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
+
+  if (_cb != NULL) return sender_for_compiled_frame(map);
+
+  // Must be native-compiled frame, i.e. the marshaling code for native
+  // methods that exists in the core system.
+  return frame(sender_sp(), sender_pc());
+}
+
+inline frame frame::sender_for_compiled_frame(RegisterMap *map) const {
+  assert(map != NULL, "map must be set");
+
+  // Frame owned by compiler.
+  address pc = *compiled_sender_pc_addr(_cb);
+  frame caller(compiled_sender_sp(_cb), pc);
+
+  // Now adjust the map.
+
+  // Get the rest.
+  if (map->update_map()) {
+    // Tell GC to use argument oopmaps for some runtime stubs that need it.
+    map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
+    if (_cb->oop_maps() != NULL) {
+      OopMapSet::update_register_map(this, map);
+    }
+  }
+
+  return caller;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
   Unimplemented();
 }
 

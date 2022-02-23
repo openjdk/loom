@@ -115,7 +115,7 @@ inline intptr_t* frame::interpreter_frame_mdp_addr() const {
   return NULL; // silence compiler warnings
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return get_interpreterState()->_stack + 1;
 }
@@ -129,7 +129,7 @@ inline int frame::interpreter_frame_monitor_size() {
   return BasicObjectLock::size();
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end - 1;
@@ -183,7 +183,7 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   Unimplemented();
   return NULL;
@@ -192,11 +192,6 @@ inline intptr_t* frame::interpreter_frame_last_sp() const {
 inline int frame::sender_sp_ret_address_offset() {
   Unimplemented();
   return 0;
-}
-
-template <typename RegisterMapT>
-void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
-  Unimplemented();
 }
 
 inline void frame::set_unextended_sp(intptr_t* value) {
@@ -222,6 +217,30 @@ inline int frame::frame_size() const {
 inline address* frame::sender_pc_addr() const {
   ShouldNotCallThis();
   return NULL;
+}
+
+//------------------------------------------------------------------------------
+// frame::sender
+
+inline frame frame::sender(RegisterMap* map) const {
+  // Default is not to follow arguments; the various
+  // sender_for_xxx methods update this accordingly.
+  map->set_include_argument_oops(false);
+
+  frame result = zeroframe()->is_entry_frame() ?
+                 sender_for_entry_frame(map) :
+                 sender_for_nonentry_frame(map);
+
+  if (map->process_frames()) {
+    StackWatermarkSet::on_iteration(map->thread(), result);
+  }
+
+  return result;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
+  Unimplemented();
 }
 
 #endif // CPU_ZERO_FRAME_ZERO_INLINE_HPP
