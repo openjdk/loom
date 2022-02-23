@@ -206,6 +206,9 @@ public:
   static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
   static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
 
+  static inline int frame_align_words(int size);
+  static inline intptr_t* frame_align_pointer(intptr_t* sp);
+
   template <copy_alignment = copy_alignment::DWORD_ALIGNED>
   static inline void copy_from_stack(void* from, void* to, size_t size);
   template <copy_alignment = copy_alignment::DWORD_ALIGNED>
@@ -320,7 +323,7 @@ public:
   intptr_t* entrySP() const { return _entry->entry_sp(); }
   intptr_t* entryFP() const { return _entry->entry_fp(); }
   address   entryPC() const { return _entry->entry_pc(); }
-  int argsize()       const { return _entry->argsize(); }
+  int argsize()       const { assert (_entry->argsize() >= 0, ""); return _entry->argsize(); }
   void set_argsize(int value) { _entry->set_argsize(value); }
 
   bool is_empty() const { return last_nonempty_chunk() == nullptr; }
@@ -1003,7 +1006,6 @@ private:
   template <typename FKind, bool bottom> inline void patch_pd(frame& callee, const frame& caller);
   inline void patch_chunk_pd(intptr_t* vsp, intptr_t* hsp);
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
-  inline intptr_t* align_bottom(intptr_t* vsp, int argsize);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
   template<typename FKind> static inline frame sender(const frame& f);
@@ -1015,7 +1017,7 @@ public:
 
     assert (thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
 
-    int argsize = bottom_argsize();
+    int argsize = _cont.argsize();
     _bottom_address = _cont.entrySP() - argsize;
     DEBUG_ONLY(_cont.entry()->verify_cookie();)
 
@@ -1084,14 +1086,6 @@ public:
     return freeze_slow();
   }
 
-
-  inline int bottom_argsize() {
-    int argsize = _cont.argsize(); // in words
-    log_develop_trace(jvmcont)("bottom_argsize: %d", argsize);
-    assert (argsize >= 0, "argsize: %d", argsize);
-    return argsize;
-  }
-
   // returns true iff there's room in the chunk for a fast, compiled-frame-only freeze
   // TODO PERF: consider inlining in stub
   bool is_chunk_available(intptr_t* top_sp
@@ -1107,20 +1101,21 @@ public:
 
     // assert (CodeCache::find_blob(*(address*)(top_sp - SENDER_SP_RET_ADDRESS_OFFSET)) == StubRoutines::cont_doYield_stub(), ""); -- fails on Windows
     assert (StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
-    intptr_t* const top = top_sp + ContinuationHelper::frame_metadata;
-    const int argsize = bottom_argsize();
-    intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
-    int size = bottom - top; // in words
+    intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
+    const int       stack_argsize = _cont.argsize();
+    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(stack_argsize);
 
-    const int sp = chunk->sp();
-    if (sp < chunk->stack_size()) {
-      size -= argsize;
+    int size = stack_bottom - stack_top; // in words
+
+    const int chunk_sp = chunk->sp();
+    if (chunk_sp < chunk->stack_size()) {
+      size -= stack_argsize;
     }
     assert (size > 0, "");
 
-    bool available = sp - ContinuationHelper::frame_metadata >= size;
+    bool available = chunk_sp - ContinuationHelper::frame_metadata >= size;
     log_develop_trace(jvmcont)("is_chunk_available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
-      available, argsize, size, p2i(top), p2i(bottom));
+      available, stack_argsize, size, p2i(stack_top), p2i(stack_bottom));
     DEBUG_ONLY(if (out_size != nullptr) *out_size = size;)
     return available;
   }
@@ -1128,18 +1123,18 @@ public:
   template <bool chunk_available>
   bool freeze_fast(intptr_t* top_sp) {
     assert (_thread != nullptr, "");
-    assert(_cont.chunk_invariant(tty), "");
+    assert (_cont.chunk_invariant(tty), "");
     assert (!Interpreter::contains(_cont.entryPC()), "");
-
-    stackChunkOop chunk = _cont.tail();
-
     assert (StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
-    intptr_t* const top = top_sp + ContinuationHelper::frame_metadata;
-    const int argsize = bottom_argsize();
-    intptr_t* const bottom = align_bottom(_cont.entrySP(), argsize);
-    const int size = bottom - top; // in words
+
+    // properties of the continuation on the stack; all sizes are in words
+    intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
+    const int       stack_argsize = _cont.argsize();
+    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(stack_argsize); // see alignment in thaw
+    const int       size    = stack_bottom - stack_top;
+
     log_develop_trace(jvmcont)("freeze_fast size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
-      size, argsize, p2i(top), p2i(bottom));
+      size, stack_argsize, p2i(stack_top), p2i(stack_bottom));
     assert (size > 0, "");
 
   #ifdef ASSERT
@@ -1148,11 +1143,15 @@ public:
     bool is_chunk_available0 = is_chunk_available(top_sp, &is_chunk_available_size);
     intptr_t* orig_chunk_sp = nullptr;
   #endif
-    int sp;
+
+    stackChunkOop chunk = _cont.tail();
+    int sp; // this is the chunk's sp which we'll compute as the target for copying
     if (chunk_available) { // LIKELY
-      assert (chunk == _cont.tail() && is_chunk_available0, "");
       DEBUG_ONLY(allocated = false;)
       DEBUG_ONLY(orig_chunk_sp = chunk->sp_address();)
+
+      assert (is_chunk_available0, "");
+
       sp = chunk->sp();
 
       if (sp < chunk->stack_size()) { // we are copying into a non-empty chunk
@@ -1160,23 +1159,26 @@ public:
         assert (*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
         DEBUG_ONLY(empty = false;)
-        sp += argsize; // we overlap
+        sp += stack_argsize; // we overlap; we'll overwrite the chunk's top frame's callee arguments
         assert (sp <= chunk->stack_size(), "");
 
-        chunk->set_max_size(chunk->max_size() + size - argsize);
+        chunk->set_max_size(chunk->max_size() + size - stack_argsize);
 
-        intptr_t* const bottom_sp = bottom - argsize;
+        intptr_t* const bottom_sp = stack_bottom - stack_argsize;
         assert (bottom_sp == _bottom_address, "");
         assert (*(address*)(bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
         patch_chunk_pd(bottom_sp, chunk->sp_address());
         // we don't patch the pc at this time, so as not to make the stack unwalkable
       } else { // the chunk is empty
-        assert(sp == chunk->stack_size(), "sp: %d chunk->stack_size(): %d", sp, chunk->stack_size());
         DEBUG_ONLY(empty = true;)
+
+        assert(sp == chunk->stack_size(), "");
         chunk->set_max_size(size);
-        chunk->set_argsize(argsize);
+        chunk->set_argsize(stack_argsize);
       }
-    } else {
+    } else { // no chunk; allocate
+      DEBUG_ONLY(empty = true; allocated = true;)
+
       assert (_thread->thread_state() == _thread_in_vm, "");
       assert (!is_chunk_available(top_sp), "");
       assert (_thread->cont_fastpath(), "");
@@ -1186,15 +1188,12 @@ public:
         return false;
       }
 
-      DEBUG_ONLY(empty = true;)
-      DEBUG_ONLY(allocated = true;)
-
       sp = size + ContinuationHelper::frame_metadata;
       DEBUG_ONLY(orig_chunk_sp = chunk->start_address() + sp;)
 
       assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
-      // They'll then be stored twice: in the chunk and in the parent
+      // They'll then be stored twice: in the chunk and in the parent chunk's top frame
 
       _cont.set_tail(chunk);
 
@@ -1207,30 +1206,30 @@ public:
       }
 
       chunk->set_max_size(size);
-      chunk->set_argsize(argsize);
+      chunk->set_argsize(stack_argsize);
     }
 
     assert (chunk != nullptr, "");
+    assert (chunk->is_stackChunk(), "");
     assert (!chunk->has_mixed_frames(), "");
     assert (!chunk->is_gc_mode(), "");
     assert (!chunk->has_bitmap(), "");
+    assert (!chunk->requires_barriers(), "");
+    assert (chunk == _cont.tail(), "");
 
     // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
     // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
-    // will either see no continuation or a consistent chunk.
+    // will either see no continuation on the stack, or a consistent chunk.
     unwind_frames();
     OrderAccess::storestore();
 
     NoSafepointVerifier nsv;
-    assert (chunk->is_stackChunk(), "");
-    assert (!chunk->requires_barriers(), "");
-    assert (chunk == _cont.tail(), "");
-    // assert (!chunk->is_gc_mode(), "allocated: %d empty: %d", allocated, empty);
-    assert (sp <= chunk->stack_size(), "");
 
     log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
-      p2i((oopDesc*)chunk), chunk->stack_size(), sp, argsize);
+      p2i((oopDesc*)chunk), chunk->stack_size(), sp, stack_argsize);
+    assert (sp <= chunk->stack_size(), "");
     assert (sp >= size, "");
+
     sp -= size;
     assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "");
 
@@ -1239,13 +1238,13 @@ public:
 
     log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT,
                                 p2i(chunk->start_address()), sp, p2i(chunk_top));
-    intptr_t* from = top       - ContinuationHelper::frame_metadata;
+    intptr_t* from = stack_top - ContinuationHelper::frame_metadata;
     intptr_t* to   = chunk_top - ContinuationHelper::frame_metadata;
     copy_to_chunk(from, to, size + ContinuationHelper::frame_metadata);
     // Because we're not patched yet, the chunk is now in a bad state
 
     // patch pc
-    intptr_t* chunk_bottom_sp = chunk_top + size - argsize;
+    intptr_t* chunk_bottom_sp = chunk_top + size - stack_argsize;
     assert (empty || *(address*)(chunk_bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
     *(address*)(chunk_bottom_sp - frame::sender_sp_ret_address_offset()) = chunk->pc();
 
@@ -1254,7 +1253,7 @@ public:
     chunk->set_sp(sp);
     chunk->set_gc_sp(sp);
     assert (chunk->sp_address() == chunk_top, "");
-    chunk->set_pc(*(address*)(top - frame::sender_sp_ret_address_offset()));
+    chunk->set_pc(*(address*)(stack_top - frame::sender_sp_ret_address_offset()));
 
     _cont.write();
 
@@ -2147,7 +2146,6 @@ private:
   template<typename FKind, bool bottom> inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom);
   void patch_chunk_pd(intptr_t* sp);
-  inline intptr_t* align_chunk(intptr_t* vsp);
   inline void prefetch_chunk_pd(void* start, int size_words);
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
@@ -2211,7 +2209,7 @@ public:
     int size = chunk->stack_size() - sp; // this initial size could be reduced if it's a partial thaw
     int argsize;
 
-    intptr_t* const hsp = chunk->start_address() + sp;
+    intptr_t* const chunk_sp = chunk->start_address() + sp;
 
     // TODO: explain it's not currently used
     // Instead of invoking barriers on oops in thawed frames, we use the gcSP; see StackChunkFrameStream::get_initial_sp
@@ -2219,10 +2217,10 @@ public:
 
     bool partial, empty;
     if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (size < threshold))) {
+      DEBUG_ONLY(_mode = 1;)
       prefetch_chunk_pd(chunk->start_address(), size); // prefetch anticipating memcpy starting at highest address
 
       partial = false;
-      DEBUG_ONLY(_mode = 1;)
 
       argsize = chunk->argsize();
       empty = true;
@@ -2234,11 +2232,11 @@ public:
       log_develop_trace(jvmcont)("set max_size: 0");
       // chunk->set_pc(nullptr);
     } else { // thaw a single frame
-      partial = true;
       DEBUG_ONLY(_mode = 2;)
+      partial = true;
 
       StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
-      assert (hsp == f.sp() && hsp == f.unextended_sp(), "");
+      assert (chunk_sp == f.sp() && chunk_sp == f.unextended_sp(), "");
       size = f.cb()->frame_size();
       argsize = f.stack_argsize();
       f.next(SmallRegisterMap::instance);
@@ -2254,7 +2252,7 @@ public:
       } else {
         chunk->set_sp(chunk->sp() + size);
         chunk->set_max_size(chunk->max_size() - size);
-        address top_pc = *(address*)(hsp + size - frame::sender_sp_ret_address_offset());
+        address top_pc = *(address*)(chunk_sp + size - frame::sender_sp_ret_address_offset());
         chunk->set_pc(top_pc);
       }
       assert (empty == chunk->is_empty(), "");
@@ -2266,15 +2264,15 @@ public:
     log_develop_trace(jvmcont)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
                                 partial, is_last, empty, size, argsize);
 
-    intptr_t* vsp = _cont.entrySP();
-    intptr_t* bottom_sp = align_chunk(vsp - argsize);
+    intptr_t* stack_sp = _cont.entrySP();
+    intptr_t* bottom_sp = ContinuationHelper::frame_align_pointer(stack_sp - argsize);
 
-    vsp -= size;
-    assert (argsize != 0 || vsp == align_chunk(vsp), "");
-    vsp = align_chunk(vsp);
+    stack_sp -= size;
+    assert (argsize != 0 || stack_sp == ContinuationHelper::frame_align_pointer(stack_sp), "");
+    stack_sp = ContinuationHelper::frame_align_pointer(stack_sp);
 
-    intptr_t* from = hsp - ContinuationHelper::frame_metadata;
-    intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
+    intptr_t* from = chunk_sp - ContinuationHelper::frame_metadata;
+    intptr_t* to   = stack_sp - ContinuationHelper::frame_metadata;
     copy_from_chunk(from, to, size + ContinuationHelper::frame_metadata);
     assert (_cont.entrySP() - 1 <= to + size + ContinuationHelper::frame_metadata
               && to + size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
@@ -2302,7 +2300,7 @@ public:
   #endif
 
 #ifdef ASSERT
-  intptr_t* sp0 = vsp;
+  intptr_t* sp0 = stack_sp;
   ContinuationHelper::set_anchor(_thread, sp0);
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
@@ -2314,7 +2312,7 @@ public:
   ContinuationHelper::clear_anchor(_thread);
 #endif
 
-    return vsp;
+    return stack_sp;
   }
 
   template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
