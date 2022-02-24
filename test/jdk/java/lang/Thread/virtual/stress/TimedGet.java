@@ -41,7 +41,7 @@ public class TimedGet {
     static final String RESULT = "foo";
 
     public static void main(String... args) throws InterruptedException {
-        int threadCount = 500_000;
+        int threadCount = 250_000;
         if (args.length > 0) {
             threadCount = Integer.parseInt(args[0]);
         }

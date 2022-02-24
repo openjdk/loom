@@ -2179,7 +2179,9 @@ public final class System {
     static ModuleLayer bootLayer;
 
     /*
-     * Invoked by VM.  Phase 2 module system initialization.
+     * Invoked by VM. Phase 2 starts the finalizer and reference handler
+     * threads, and initializes the module system.
+     *
      * Only classes in java.base can be loaded in this phase.
      *
      * @param printToStderr print exceptions to stderr rather than stdout
@@ -2188,7 +2190,10 @@ public final class System {
      * @return JNI_OK for success, JNI_ERR for failure
      */
     private static int initPhase2(boolean printToStderr, boolean printStackTrace) {
+        // start Finalizer and Reference Handler threads
+        SharedSecrets.getJavaLangRefAccess().startThreads();
 
+        // initialize the module system
         try {
             bootLayer = ModuleBootstrap.boot();
         } catch (Exception | Error e) {

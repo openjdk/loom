@@ -1286,7 +1286,7 @@ public class ThreadAPI {
                 Thread.sleep(20*1000);
                 assertTrue(false);
             } catch (InterruptedException e) {
-                // interrupt status should be clearer
+                // interrupt status should be cleared
                 assertFalse(t.isInterrupted());
             }
         });
@@ -1298,7 +1298,7 @@ public class ThreadAPI {
                 Thread.sleep(20*1000, 0);
                 assertTrue(false);
             } catch (InterruptedException e) {
-                // interrupt status should be clearer
+                // interrupt status should be cleared
                 assertFalse(t.isInterrupted());
             }
         });
@@ -1310,7 +1310,7 @@ public class ThreadAPI {
                 Thread.sleep(Duration.ofSeconds(20));
                 assertTrue(false);
             } catch (InterruptedException e) {
-                // interrupt status should be clearer
+                // interrupt status should be cleared
                 assertFalse(t.isInterrupted());
             }
         });
@@ -1412,7 +1412,7 @@ public class ThreadAPI {
                 }
                 assertTrue(false);
             } catch (InterruptedException e) {
-                // interrupt status should be clearer
+                // interrupt status should be cleared
                 assertFalse(t.isInterrupted());
             }
         });
@@ -1451,7 +1451,6 @@ public class ThreadAPI {
         assertTrue(duration <= max,
                 "Duration " + duration + "ms, expected <= " + max + "ms");
     }
-
 
     /**
      * Test Thread.xxxContextClassLoader from the current thread.

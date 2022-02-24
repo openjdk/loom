@@ -334,8 +334,6 @@ public:
   inline stackChunkOop nonempty_chunk(stackChunkOop chunk) const;
   stackChunkOop find_chunk_by_address(void* p) const;
 
-  stackChunkOop allocate_stack_chunk(size_t stack_size, bool is_preempt);
-
 #if CONT_JFR
   inline void record_interpreted_frame() { _e_num_interpreted_frames++; }
   inline void record_size_copied(int size) { _e_size += size << LogBytesPerWord; }
@@ -420,28 +418,6 @@ stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
     }
   }
   return nullptr;
-}
-
-/* try to allocate a chunk from the tlab, if it doesn't work allocate one using the allocate
- * method. In the later case we might have done a safepoint and need to reload our oops */
-stackChunkOop ContMirror::allocate_stack_chunk(size_t stack_size, bool is_preempt) {
-  InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
-  size_t size_in_words = klass->instance_size(stack_size);
-
-  assert(is_preempt || _thread == JavaThread::current(), "should be current");
-  JavaThread* current = is_preempt ? JavaThread::current() : _thread;
-
-  StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
-  HeapWord* start = current->tlab().allocate(size_in_words);
-  if (start != nullptr) {
-    return (stackChunkOop)allocator.initialize(start);
-  }
-
-  //HandleMark hm(current);
-  Handle conth(current, _cont);
-  stackChunkOop result = (stackChunkOop)allocator.allocate();
-  post_safepoint(conth);
-  return result;
 }
 
 #if CONT_JFR
@@ -1146,22 +1122,22 @@ public:
   #endif
 
     stackChunkOop chunk = _cont.tail();
-    int sp; // this is the chunk's sp which we'll compute as the target for copying
+    int sp_before; // the chunk's sp before the freeze, adjusted to point beyond the stack-passed arguments in the topmost frame
     if (chunk_available) { // LIKELY
       DEBUG_ONLY(allocated = false;)
       DEBUG_ONLY(orig_chunk_sp = chunk->sp_address();)
 
       assert (is_chunk_available0, "");
 
-      sp = chunk->sp();
+      sp_before = chunk->sp();
 
-      if (sp < chunk->stack_size()) { // we are copying into a non-empty chunk
+      if (sp_before < chunk->stack_size()) { // we are copying into a non-empty chunk
         DEBUG_ONLY(empty = false;)
-        assert (sp < (chunk->stack_size() - chunk->argsize()), "");
+        assert (sp_before < (chunk->stack_size() - chunk->argsize()), "");
         assert (*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
-        sp += stack_argsize; // we overlap; we'll overwrite the chunk's top frame's callee arguments
-        assert (sp <= chunk->stack_size(), "");
+        sp_before += stack_argsize; // we overlap; we'll overwrite the chunk's top frame's callee arguments
+        assert (sp_before <= chunk->stack_size(), "");
 
         chunk->set_max_size(chunk->max_size() + size - stack_argsize);
 
@@ -1172,7 +1148,7 @@ public:
         // we don't patch the pc at this time, so as not to make the stack unwalkable
       } else { // the chunk is empty
         DEBUG_ONLY(empty = true;)
-        assert(sp == chunk->stack_size(), "");
+        assert(sp_before == chunk->stack_size(), "");
 
         chunk->set_max_size(size);
         chunk->set_argsize(stack_argsize);
@@ -1188,26 +1164,24 @@ public:
       if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath())) {
         return false;
       }
-
-      sp = size + ContinuationHelper::frame_metadata;
-      DEBUG_ONLY(orig_chunk_sp = chunk->start_address() + sp;)
-
       assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
-      // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
-      // They'll then be stored twice: in the chunk and in the parent chunk's top frame
-
       _cont.set_tail(chunk);
 
-      if (UNLIKELY(ConfigT::requires_barriers(chunk))) { // probably humongous
+      if (UNLIKELY(_barriers)) { // probably humongous
         log_develop_trace(jvmcont)("allocation requires barriers; retrying slow");
-        chunk->set_argsize(0);
-        chunk->set_sp(sp);
-        _barriers = true;
+        init_empty_chunk(chunk);
         return false;
       }
 
       chunk->set_max_size(size);
       chunk->set_argsize(stack_argsize);
+
+      // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
+      // They'll then be stored twice: in the chunk and in the parent chunk's top frame
+      sp_before = size + ContinuationHelper::frame_metadata;
+      assert (sp_before == chunk->stack_size(), "");
+
+      DEBUG_ONLY(orig_chunk_sp = chunk->start_address() + sp_before;)
     }
 
     assert (chunk != nullptr, "");
@@ -1227,18 +1201,18 @@ public:
     NoSafepointVerifier nsv;
 
     log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
-      p2i((oopDesc*)chunk), chunk->stack_size(), sp, stack_argsize);
-    assert (sp <= chunk->stack_size(), "");
-    assert (sp >= size, "");
+      p2i((oopDesc*)chunk), chunk->stack_size(), sp_before, stack_argsize);
+    assert (sp_before <= chunk->stack_size(), "");
+    assert (sp_before >= size, "");
 
-    sp -= size;
-    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp) == is_chunk_available_size, "");
+    int sp_after = sp_before - size; // the chunk's new sp, after freeze
+    assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp_after) == is_chunk_available_size, "");
 
-    intptr_t* chunk_top = chunk->start_address() + sp;
+    intptr_t* chunk_top = chunk->start_address() + sp_after;
     assert (empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
     log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT,
-                                p2i(chunk->start_address()), sp, p2i(chunk_top));
+                                p2i(chunk->start_address()), sp_after, p2i(chunk_top));
     intptr_t* from = stack_top - ContinuationHelper::frame_metadata;
     intptr_t* to   = chunk_top - ContinuationHelper::frame_metadata;
     copy_to_chunk(from, to, size + ContinuationHelper::frame_metadata);
@@ -1251,8 +1225,8 @@ public:
 
     // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
     OrderAccess::storestore();
-    chunk->set_sp(sp);
-    chunk->set_gc_sp(sp);
+    chunk->set_sp(sp_after);
+    chunk->set_gc_sp(sp_after);
     assert (chunk->sp_address() == chunk_top, "");
     chunk->set_pc(*(address*)(stack_top - frame::sender_sp_ret_address_offset()));
 
@@ -1492,7 +1466,6 @@ public:
       chunk->set_gc_sp(sp);
       chunk->set_argsize(argsize);
       assert (chunk->is_empty(), "");
-      _barriers = ConfigT::requires_barriers(chunk);
 
       if (_barriers) { log_develop_trace(jvmcont)("allocation requires barriers"); }
 
@@ -1772,9 +1745,19 @@ public:
     return false;
   }
 
+  void init_empty_chunk(stackChunkOop chunk) {
+    chunk->set_sp(chunk->stack_size());
+    chunk->set_pc(nullptr);
+    chunk->set_argsize(0);
+  }
+
+  int remaining_in_chunk(stackChunkOop chunk) {
+    return chunk->stack_size() - chunk->sp();
+  }
+
   stackChunkOop allocate_chunk(size_t size) {
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
-    stackChunkOop chunk = _cont.allocate_stack_chunk(size, _preempt);
+    stackChunkOop chunk = allocate_stack_chunk(size);
     if (chunk == nullptr) { // OOM
       return nullptr;
     }
@@ -1813,8 +1796,33 @@ public:
     return chunk;
   }
 
-  int remaining_in_chunk(stackChunkOop chunk) {
-    return chunk->stack_size() - chunk->sp();
+  stackChunkOop allocate_stack_chunk(size_t stack_size) {
+    InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
+    size_t size_in_words = klass->instance_size(stack_size);
+
+    JavaThread* current = _preempt ? JavaThread::current() : _thread;
+    assert(current == JavaThread::current(), "should be current");
+
+    stackChunkOop chunk;
+    StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
+    HeapWord* start = current->tlab().allocate(size_in_words);
+    if (start != nullptr) {
+      chunk = (stackChunkOop)allocator.initialize(start);
+
+      assert (chunk != nullptr, "");
+      assert (!ConfigT::requires_barriers(chunk), ""); // we skip requires_barriers in the TLAB case; can be expensive
+    } else {
+      //HandleMark hm(current);
+      Handle conth(current, _cont.mirror());
+      chunk = (stackChunkOop)allocator.allocate(); // can safepoint
+      _cont.post_safepoint(conth);
+
+      if (chunk != nullptr) {
+        _barriers = ConfigT::requires_barriers(chunk);
+      }
+    }
+
+    return chunk;
   }
 };
 
