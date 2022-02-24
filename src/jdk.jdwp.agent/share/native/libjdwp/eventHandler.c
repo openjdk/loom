@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -694,28 +694,6 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
              * TO DO: Report, but don't die
              */
             eventBag = NULL;  /* to shut up lint */
-        }
-    }
-
-    /* We want the vthread start/end events to mimic thread start/end events */
-    /* vthread fixme: We can remove this now because cbVThreadStart/End set to THREAD_START/END. */
-    if (ei == EI_VIRTUAL_THREAD_START) {
-        ei = EI_THREAD_START;
-        JDI_ASSERT(JNI_FALSE);
-    }
-    if (ei == EI_VIRTUAL_THREAD_END) {
-        ei = EI_THREAD_END;
-        JDI_ASSERT(JNI_FALSE);
-    }
-
-    if (gdata->vthreadsSupported && gdata->trackAllVThreads) {
-        /* Add the vthread if we haven't added it before. */
-        if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
-            // vthread fixme: we can actually get rid of the threadControl_addVThread call now since
-            // the call to threadControl_onEventHandlerEntry above should always end up adding
-            // the vthread. Leave in place with an assert for now just to make sure.
-            JDI_ASSERT(threadControl_isKnownVThread(thread));
-            threadControl_addVThread(thread);
         }
     }
 
