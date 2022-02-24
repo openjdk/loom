@@ -107,7 +107,7 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
                                  : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
 
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
-  assert (!to_chunk->has_bitmap()|| to_chunk->is_gc_mode(), "");
+  assert (!to_chunk->has_bitmap() || to_chunk->is_gc_mode(), "");
   if (!to_chunk->has_bitmap()) {
     build_bitmap(to_chunk);
   }
