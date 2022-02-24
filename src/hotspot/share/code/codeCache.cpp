@@ -1230,7 +1230,7 @@ void CodeCache::make_marked_nmethods_not_entrant(GrowableArray<CompiledMethod*>*
 void CodeCache::make_marked_nmethods_deoptimized(GrowableArray<CompiledMethod*>* marked) {
   for (int i = 0; i < marked->length(); i++) {
     CompiledMethod* nm = marked->at(i);
-    if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized()) {
+    if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized() && !nm->is_zombie()) {
       nm->make_deoptimized();
     }
   }
