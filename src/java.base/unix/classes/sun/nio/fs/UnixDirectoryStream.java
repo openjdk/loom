@@ -195,7 +195,7 @@ class UnixDirectoryStream
 
         @Override
         public boolean hasNext() {
-            iteratorLock.tryLock();
+            iteratorLock.lock();
             try {
                 if (nextEntry == null && !atEof)
                     nextEntry = readNextEntry();
@@ -207,7 +207,7 @@ class UnixDirectoryStream
 
         @Override
         public Path next() {
-            iteratorLock.tryLock();
+            iteratorLock.lock();
             try {
                 Path result;
                 if (nextEntry == null && !atEof) {
