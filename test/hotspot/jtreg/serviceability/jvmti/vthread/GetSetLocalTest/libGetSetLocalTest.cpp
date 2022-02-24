@@ -98,31 +98,6 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *mna
 }
 
 static void
-disable_mount_unmount_events(jvmtiEnv *jvmti, JNIEnv *jni) {
-  jvmtiError err;
-
-  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
-    fatal(jni, "error in JVMTI SetEventNotificationMode");
-  }
-
-  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
-  if (err != JVMTI_ERROR_NONE) {
-    LOG("error in JVMTI SetEventNotificationMode: %d\n", err);
-    fatal(jni, "error in JVMTI SetEventNotificationMode");
-  }
-}
-
-static void
-print_vthread_event_info(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jthread vthread, const char *event_name) {
-  char* tname = get_thread_name(jvmti, jni, vthread);
-
-  LOG("\n#### %s event: thread: %s, vthread: %p\n", event_name, tname, vthread);
-  deallocate(jvmti, jni, (void*)tname);
-}
-
-static void
 test_GetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread,
               int depth, int frame_count, Values *exp_values) {
   jobject msg = NULL;
@@ -443,11 +418,11 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
   LOG("testSuspendedVirtualThreads: started for virtual thread: %s\n", tname);
 
   // Test each of these cases only once: unmounted, positive depth, frame count 0.
-  while (iter++ < 200 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
+  while (iter++ < 100 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
     jmethodID method = NULL;
     jlocation location = 0;
 
-    sleep_ms(10);
+    sleep_ms(5);
 
     jvmtiError err = jvmti->SuspendThread(vthread);
     check_jvmti_status(jni, err, "testSuspendedVirtualThreads: error in JVMTI SuspendThread");
@@ -478,8 +453,9 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
     }
     if (depth >=0 && (case_0 || case_1 || case_2)) {
       LOG("testSuspendedVirtualThreads: iter: %d\n", iter);
+#if 0
       print_stack_trace(jvmti, jni, vthread);
-
+#endif
       test_GetSetLocal(jvmti, jni, vthread, depth, frame_count);
     }
 

@@ -33,7 +33,7 @@ import java.util.concurrent.*;
 public class GetSetLocalTest {
     private static final String agentLib = "GetSetLocalTest";
 
-    static final int MSG_COUNT = 20*1000;
+    static final int MSG_COUNT = 600*1000;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
     static native void enableEvents(Thread thread);
     static native void testSuspendedVirtualThreads(Thread thread);
