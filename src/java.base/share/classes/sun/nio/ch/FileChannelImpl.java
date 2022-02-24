@@ -1350,7 +1350,8 @@ public class FileChannelImpl
             int n;
             do {
                 if (Thread.currentThread().isVirtual()) {
-                    n = Blocker.managedBlock(() -> nd.lock(fd, true, position, size, shared));
+                    long len = size;
+                    n = Blocker.managedBlock(() -> nd.lock(fd, true, position, len, shared));
                 } else {
                     n = nd.lock(fd, true, position, size, shared);
                 }
