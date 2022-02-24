@@ -61,7 +61,6 @@
 
 #ifdef ASSERT
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-extern "C" JNIEXPORT void pns2();
 #endif
 
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
@@ -169,9 +168,14 @@ inline bool StackChunkFrameStream<frame_kind>::is_compiled() const {
   return cb() != nullptr && _cb->is_compiled();
 }
 
-template <chunk_frames frame_kind>
-inline bool StackChunkFrameStream<frame_kind>::is_interpreted() const {
-  return frame_kind == chunk_frames::MIXED ? (!is_done() && Interpreter::contains(pc())) : false;
+template <>
+inline bool StackChunkFrameStream<chunk_frames::MIXED>::is_interpreted() const {
+  return !is_done() && Interpreter::contains(pc());
+}
+
+template <>
+inline bool StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::is_interpreted() const {
+  return false;
 }
 
 template <chunk_frames frame_kind>

@@ -606,12 +606,16 @@ void GenCollectedHeap::do_collection(bool           full,
       increment_total_full_collections();
     }
 
+    CodeCache::start_marking_cycle();
+
     collect_generation(_old_gen,
                        full,
                        size,
                        is_tlab,
                        run_verification && VerifyGCLevel <= 1,
                        do_clear_all_soft_refs);
+
+    CodeCache::finish_marking_cycle();
 
     // Adjust generation sizes.
     _old_gen->compute_new_size();
@@ -1168,10 +1172,6 @@ void GenCollectedHeap::gc_prologue(bool full) {
   // Walk generations
   GenGCPrologueClosure blk(full);
   generation_iterate(&blk, false);  // not old-to-young.
-
-  if (full) {
-    CodeCache::increment_marking_cycle();
-  }
 };
 
 class GenGCEpilogueClosure: public GenCollectedHeap::GenClosure {
@@ -1190,10 +1190,6 @@ void GenCollectedHeap::gc_epilogue(bool full) {
   size_t actual_gap = pointer_delta((HeapWord*) (max_uintx-3), *(end_addr()));
   guarantee(!CompilerConfig::is_c2_or_jvmci_compiler_enabled() || actual_gap > (size_t)FastAllocateSizeLimit, "inline allocation wraps");
 #endif // COMPILER2_OR_JVMCI
-
-  if (full) {
-    CodeCache::increment_marking_cycle();
-  }
 
   resize_all_tlabs();
 

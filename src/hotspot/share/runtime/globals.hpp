@@ -686,6 +686,10 @@ const intx ObjectAlignmentInBytes = 8;
                "Disable the use of stack guard pages if the JVM is loaded " \
                "on the primordial process thread")                          \
                                                                             \
+  product(bool, DisableVirtualThreadCompatibleLifecycleEvents, false, EXPERIMENTAL,\
+               "Disable generation of virtual thread ThreadStart and "      \
+               "ThreadEnd events for virtual thread unaware agents")        \
+                                                                            \
   /* notice: the max range value here is max_jint, not max_intx  */         \
   /* because of overflow issue                                   */         \
   product(intx, AsyncDeflationInterval, 250, DIAGNOSTIC,                    \

@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
@@ -490,6 +491,11 @@ class VirtualThread extends Thread {
         start(ThreadContainers.root());
     }
 
+    @Override
+    public void run() {
+        // do nothing
+    }
+
     /**
      * Parks the current virtual thread until it is unparked or interrupted.
      * If already unparked then the parking permit is consumed and this method
@@ -714,39 +720,61 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Sleep the current thread for the given sleep time (in nanoseconds)
-     *
-     * @implNote This implementation parks the thread for the given sleeping time
-     * and will therefore be observed in PARKED state during the sleep. Parking
-     * will consume the parking permit so this method makes available the parking
-     * permit after the sleep. This will observed as a spurious, but benign, wakeup
-     * when the thread subsequently attempts to park.
+     * Sleep the current thread for the given sleep time (in nanoseconds).
      *
      * @throws InterruptedException if interrupted while sleeping
      */
     void sleepNanos(long nanos) throws InterruptedException {
         assert Thread.currentThread() == this;
         if (nanos >= 0) {
-            if (getAndClearInterrupt())
-                throw new InterruptedException();
-            if (nanos == 0) {
-                tryYield();
-            } else {
-                // park for the sleep time
+            if (ThreadSleepEvent.isTurnedOn()) {
+                ThreadSleepEvent event = new ThreadSleepEvent();
                 try {
-                    long remainingNanos = nanos;
-                    long startNanos = System.nanoTime();
-                    while (remainingNanos > 0) {
-                        parkNanos(remainingNanos);
-                        if (getAndClearInterrupt()) {
-                            throw new InterruptedException();
-                        }
-                        remainingNanos = nanos - (System.nanoTime() - startNanos);
-                    }
+                    event.time = nanos;
+                    event.begin();
+                    doSleepNanos(nanos);
                 } finally {
-                    // may have been unparked while sleeping
-                    setParkPermit(true);
+                    event.commit();
                 }
+            } else {
+                doSleepNanos(nanos);
+            }
+        }
+    }
+
+    /**
+     * Sleep the current thread for the given sleep time (in nanoseconds). If
+     * nanos is 0 then the thread will attempt to yield.
+     *
+     * @implNote This implementation parks the thread for the given sleeping time
+     * and will therefore be observed in PARKED state during the sleep. Parking
+     * will consume the parking permit so this method makes available the parking
+     * permit after the sleep. This may be observed as a spurious, but benign,
+     * wakeup when the thread subsequently attempts to park.
+     *
+     * @throws InterruptedException if interrupted while sleeping
+     */
+    private void doSleepNanos(long nanos) throws InterruptedException {
+        assert nanos >= 0;
+        if (getAndClearInterrupt())
+            throw new InterruptedException();
+        if (nanos == 0) {
+            tryYield();
+        } else {
+            // park for the sleep time
+            try {
+                long remainingNanos = nanos;
+                long startNanos = System.nanoTime();
+                while (remainingNanos > 0) {
+                    parkNanos(remainingNanos);
+                    if (getAndClearInterrupt()) {
+                        throw new InterruptedException();
+                    }
+                    remainingNanos = nanos - (System.nanoTime() - startNanos);
+                }
+            } finally {
+                // may have been unparked while sleeping
+                setParkPermit(true);
             }
         }
     }

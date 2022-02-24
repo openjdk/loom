@@ -118,9 +118,9 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   /* scaffold objects */
   static jlong timeout = 0;
   LOG("Wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
   LOG("Started.....\n");
 
@@ -128,7 +128,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     jthread *threads = NULL;
     jint count = 0;
 
-    millisleep(10);
+    sleep_ms(10);
 
     RawMonitorLocker rml(jvmti, jni, monitor);
     if (!is_vm_running) {
@@ -287,7 +287,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  if (nsk_jvmti_setAgentProc(agentProc, NULL) != NSK_TRUE) {
+  if (set_agent_proc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
   return JNI_OK;

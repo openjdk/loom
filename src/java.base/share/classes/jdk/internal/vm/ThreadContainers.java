@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import sun.nio.ch.Poller;
+import sun.security.action.GetPropertyAction;
 
 /**
  * This class consists exclusively of static methods to support debugging and
@@ -176,11 +177,25 @@ public class ThreadContainers {
     }
 
     /**
-     * Root container.
+     * Root container. Contains all platform threads that are not started in a
+     * container, plus some (or all) virtual threads that are started directly
+     * with the Thread API.
      */
     private static class RootContainer extends ThreadContainer {
+        private static final Set<Thread> VTHREADS;
+        private static final LongAdder VTHREAD_COUNT;
+        static {
+            String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllThreads");
+            if (s != null && (s.isEmpty() || Boolean.parseBoolean(s))) {
+                VTHREADS = ConcurrentHashMap.newKeySet();
+                VTHREAD_COUNT = null; //new LongAdder();
+            } else {
+                VTHREADS = null;
+                VTHREAD_COUNT = new LongAdder();
+            }
+        }
         static final RootContainer INSTANCE = new RootContainer();
-        private static final LongAdder VTHREAD_COUNT = new LongAdder();
+
         private RootContainer() {
             super(true);
         }
@@ -202,17 +217,28 @@ public class ThreadContainers {
             long platformThreadCount = Stream.of(JLA.getAllThreads())
                     .filter(t -> JLA.threadContainer(t) == null)
                     .count();
-            return platformThreadCount + VTHREAD_COUNT.sum();
+            Set<Thread> vthreads = VTHREADS;
+            if (vthreads != null) {
+                return platformThreadCount + vthreads.size();
+            } else {
+                return platformThreadCount + VTHREAD_COUNT.sum();
+            }
         }
         @Override
         public Stream<Thread> threads() {
             // platform threads that are not in a container
             Stream<Thread> s1 = Stream.of(JLA.getAllThreads())
                     .filter(t -> JLA.threadContainer(t) == null);
-            // virtual threads in the root container that are blocked on I/O
-            Stream<Thread> s2 = Poller.blockedThreads()
-                    .filter(t -> t.isVirtual()
-                            && JLA.threadContainer(t) == this);
+            // virtual threads in this container, all or only those blocked on I/O.
+            Stream<Thread> s2;
+            Set<Thread> vthreads = VTHREADS;
+            if (vthreads != null) {
+                s2 = vthreads.stream();
+            } else {
+                s2 = Poller.blockedThreads()
+                        .filter(t -> t.isVirtual()
+                                && JLA.threadContainer(t) == this);
+            }
             return Stream.concat(s1, s2);
         }
         @Override
@@ -222,12 +248,22 @@ public class ThreadContainers {
         @Override
         public void onStart(Thread thread) {
             assert thread.isVirtual();
-            VTHREAD_COUNT.add(1L);
+            Set<Thread> vthreads = VTHREADS;
+            if (vthreads != null) {
+                vthreads.add(thread);
+            } else {
+                VTHREAD_COUNT.add(1L);
+            }
         }
         @Override
         public void onExit(Thread thread) {
             assert thread.isVirtual();
-            VTHREAD_COUNT.add(-11L);
+            Set<Thread> vthreads = VTHREADS;
+            if (vthreads != null) {
+                vthreads.remove(thread);
+            } else {
+                VTHREAD_COUNT.add(-1L);
+            }
         }
         @Override
         public StackableScope previous() {

@@ -86,7 +86,7 @@ public final class StackTraceElement implements java.io.Serializable {
      */
     private String fileName;
     /**
-     * The contintation name.
+     * The continuation name.
      */
     private String contScopeName;
     /**

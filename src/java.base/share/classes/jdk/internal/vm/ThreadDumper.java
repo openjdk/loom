@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,7 +42,7 @@ import java.util.List;
  *
  * This class defines methods to dump threads to an output stream or file in
  * plain text or JSON format. Virtual threads are located if they are created in
- * a structured way with a ThreadExecutor.
+ * a structured way with a ThreadFlock.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
@@ -73,6 +73,8 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
+     *
+     * This method is invoked by the VN to implement the JavaThread.dump command.
      */
     public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
         return dumpThreads(file, okayToOverwrite, false);
@@ -80,6 +82,8 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
+     *
+     * This method is invoked by the VN to implement the JavaThread.dump command.
      */
     public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
         return dumpThreads(file, okayToOverwrite, true);
@@ -88,6 +92,8 @@ public class ThreadDumper {
     /**
      * Generate a thread dump in plain text format to the given output stream,
      * UTF-8 encoded.
+     *
+     * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
@@ -111,6 +117,8 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in JSON format to the given output stream, UTF-8 encoded.
+     *
+     * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      */
     public static void dumpThreadsToJson(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);

@@ -817,6 +817,20 @@ void CodeCache::increment_marking_cycle() {
   bs_nm->arm_all_nmethods();
 }
 
+bool CodeCache::is_marking_cycle_active() {
+  return (_marking_cycle % 2) == 1;
+}
+
+void CodeCache::start_marking_cycle() {
+  assert(!is_marking_cycle_active(), "Previous marking cycle never ended");
+  increment_marking_cycle();
+}
+
+void CodeCache::finish_marking_cycle() {
+  assert(is_marking_cycle_active(), "Marking cycle started before last one finished");
+  increment_marking_cycle();
+}
+
 CodeCache::UnloadingScope::UnloadingScope(BoolObjectClosure* is_alive)
   : _is_unloading_behaviour(is_alive)
 {

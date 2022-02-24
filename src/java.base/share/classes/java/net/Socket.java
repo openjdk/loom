@@ -575,7 +575,8 @@ public class Socket implements java.io.Closeable {
      * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
      * following circumstances:
      * <ol>
-     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *   <li> The socket is {@linkplain SocketChannel#socket() associated} with
+     *        a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread establishing a connection will
      *        close the underlying channel and cause this method to throw
      *        {@link ClosedByInterruptException} with the interrupt status set.
@@ -607,7 +608,8 @@ public class Socket implements java.io.Closeable {
      * <p> This method is {@linkplain Thread#interrupt() interruptible} in the
      * following circumstances:
      * <ol>
-     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *   <li> The socket is {@linkplain SocketChannel#socket() associated} with
+     *        a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread establishing a connection will
      *        close the underlying channel and cause this method to throw
      *        {@link ClosedByInterruptException} with the interrupt status set.
@@ -930,7 +932,8 @@ public class Socket implements java.io.Closeable {
      * <p> Reading from the input stream is {@linkplain Thread#interrupt()
      * interruptible} in the following circumstances:
      * <ol>
-     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *   <li> The socket is {@linkplain SocketChannel#socket() associated} with
+     *        a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread reading from the input stream
      *        will close the underlying channel and cause the read method to
      *        throw {@link ClosedByInterruptException} with the interrupt
@@ -1053,7 +1056,8 @@ public class Socket implements java.io.Closeable {
      * <p> Writing to the output stream is {@linkplain Thread#interrupt()
      * interruptible} in the following circumstances:
      * <ol>
-     *   <li> The socket is associated with a {@link SocketChannel SocketChannel}.
+     *   <li> The socket is {@linkplain SocketChannel#socket() associated} with
+     *        a {@link SocketChannel SocketChannel}.
      *        In that case, interrupting a thread writing to the output stream
      *        will close the underlying channel and cause the write method to
      *        throw {@link ClosedByInterruptException} with the interrupt status

@@ -47,19 +47,19 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   err = jvmti->GetPhase(&phase);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to obtain phase of the VM execution during SingleStep callback\n\n");
+    COMPLAIN("TEST FAILED: unable to obtain phase of the VM execution during SingleStep callback\n\n");
   } else {
     if (phase != JVMTI_PHASE_LIVE) {
       wrongStepEv++;
       result = STATUS_FAILED;
-      NSK_COMPLAIN1("TEST FAILED: SingleStep event received during non-live phase %s\n", TranslatePhase(phase));
+      COMPLAIN("TEST FAILED: SingleStep event received during non-live phase %s\n", TranslatePhase(phase));
     }
   }
 }
 
 void JNICALL
 VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
-  NSK_DISPLAY0("VMDeath event received\n");
+  LOG("VMDeath event received\n");
 
   if (wrongStepEv != 0) {
     LOG(
@@ -120,7 +120,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* set event callback */
-  NSK_DISPLAY0("setting event callbacks ...\n");
+  LOG("setting event callbacks ...\n");
   (void) memset(&callbacks, 0, sizeof(callbacks));
   callbacks.SingleStep = &SingleStep;
   callbacks.VMDeath = &VMDeath;
@@ -129,7 +129,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  NSK_DISPLAY0("setting event callbacks done\nenabling JVMTI events ...\n");
+  LOG("setting event callbacks done\nenabling JVMTI events ...\n");
   err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_SINGLE_STEP, NULL);
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
@@ -139,7 +139,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  NSK_DISPLAY0("enabling the events done\n\n");
+  LOG("enabling the events done\n\n");
 
   return JNI_OK;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,7 +40,7 @@ import static java.lang.StackWalker.Option.*;
  * Helper class to print the virtual thread stack trace when its carrier thread is
  * pinned.
  *
- * The class maintains a mapping of Class to the hashes of stack traces that are by
+ * The class maintains a mapping of Class object to the hashes of stack traces that are
  * pinned by code in that Class. This is used to avoid printing the same stack trace
  * many times.
  */

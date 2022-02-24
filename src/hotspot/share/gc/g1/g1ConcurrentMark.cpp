@@ -814,7 +814,14 @@ G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1Concu
 void G1ConcurrentMark::pre_concurrent_start(GCCause::Cause cause) {
   assert_at_safepoint_on_vm_thread();
 
-  CodeCache::increment_marking_cycle();
+  if (CodeCache::is_marking_cycle_active()) {
+    // It's possible that a preceding initiating young GC decided
+    // that there is no need to do any concurrent marking. In that
+    // case, no remark was ever run. Yet the liveness information
+    // was indeed complete. We finish it here.
+    CodeCache::finish_marking_cycle();
+  }
+  CodeCache::start_marking_cycle();
 
   G1PreConcurrentStartTask cl(cause, this);
   G1CollectedHeap::heap()->run_batch_task(&cl);
@@ -1307,7 +1314,7 @@ void G1ConcurrentMark::remark() {
   _remark_times.add((now - start) * 1000.0);
 
   policy->record_concurrent_mark_remark_end();
-  CodeCache::increment_marking_cycle();
+  CodeCache::finish_marking_cycle();
 }
 
 class G1ReclaimEmptyRegionsTask : public WorkerTask {

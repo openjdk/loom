@@ -161,9 +161,9 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
 
   static jlong timeout = 0;
   LOG("Agent: waiting to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
 
   LOG("Agent: started\n");
@@ -210,7 +210,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   //check_jvmti_status(jni, jvmti->Deallocate((unsigned char *) vname), "Error in Deallocate");
 
     iter++;
-    millisleep(20);
+    sleep_ms(20);
   }
   LOG("Agent: finished\n");
 }
@@ -252,7 +252,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  if (nsk_jvmti_setAgentProc(agentProc, NULL) != NSK_TRUE) {
+  if (set_agent_proc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
 

@@ -137,12 +137,15 @@ inline static bool is_oop_fixed(oop obj, int offset) {
 
 template <typename OopT, gc_type gc>
 inline bool stackChunkOopDesc::should_fix() const {
-  OrderAccess::loadload();
   if (UNLIKELY(is_gc_mode())) return true;
-  // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
-  if (gc == gc_type::CONCURRENT && !is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset()))
-    return true;
-  OrderAccess::loadload();
+
+  if (gc == gc_type::CONCURRENT) {
+    // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
+    if (UNLIKELY(!is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset())))
+      return true;
+  }
+
+  OrderAccess::loadload(); // we must see all writes prior to last oop/gc_mode
   return false;
 }
 

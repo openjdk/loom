@@ -330,7 +330,7 @@ public class BuilderTest {
 
     @Test
     public void testDaemon3() {
-        Thread.Builder builder = Thread.ofVirtual();
+        Thread.Builder builder = Thread.ofPlatform().daemon();
 
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
@@ -340,6 +340,36 @@ public class BuilderTest {
         assertTrue(thread2.isDaemon());
         assertTrue(thread3.isDaemon());
     }
+
+    @Test
+    public void testDaemon4() {
+        Thread.Builder builder = Thread.ofPlatform();
+
+        Thread thread1 = builder.unstarted(() -> { });
+        Thread thread2 = builder.start(() -> { });
+        Thread thread3 = builder.factory().newThread(() -> { });
+
+        // daemon status should be inherited
+        boolean d = Thread.currentThread().isDaemon();
+        assertTrue(thread1.isDaemon() == d);
+        assertTrue(thread2.isDaemon() == d);
+        assertTrue(thread3.isDaemon() == d);
+    }
+
+    @Test
+    public void testDaemon5() {
+        Thread.Builder builder = Thread.ofVirtual();
+
+        Thread thread1 = builder.unstarted(() -> { });
+        Thread thread2 = builder.start(() -> { });
+        Thread thread3 = builder.factory().newThread(() -> { });
+
+        // daemon status should always be true
+        assertTrue(thread1.isDaemon());
+        assertTrue(thread2.isDaemon());
+        assertTrue(thread3.isDaemon());
+    }
+
 
     @Test
     public void testStackSize1() {

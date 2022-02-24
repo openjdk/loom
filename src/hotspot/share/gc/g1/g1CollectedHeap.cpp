@@ -1003,7 +1003,6 @@ void G1CollectedHeap::abort_concurrent_cycle() {
   // Abandon current iterations of concurrent marking and concurrent
   // refinement, if any are in progress.
   concurrent_mark()->concurrent_cycle_abort();
-  CodeCache::increment_marking_cycle();
 }
 
 void G1CollectedHeap::prepare_heap_for_full_collection() {

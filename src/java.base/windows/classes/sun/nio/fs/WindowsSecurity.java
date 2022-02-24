@@ -105,7 +105,8 @@ class WindowsSecurity {
         final boolean needToRevert = elevated;
 
         // prevent yielding with privileges
-        Continuation.pin();
+        if (Thread.currentThread().isVirtual()) // TODO: remove condition after Preview
+            Continuation.pin();
 
         return () -> {
             try {
@@ -124,7 +125,8 @@ class WindowsSecurity {
                 }
             } finally {
                 LocalFree(pLuid);
-                Continuation.unpin();
+                if (Thread.currentThread().isVirtual()) // TODO: remove condition after Preview
+                    Continuation.unpin();
             }
         };
     }

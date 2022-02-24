@@ -1124,6 +1124,7 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
 
 void nmethod::make_deoptimized() {
   assert (method() == NULL || can_be_deoptimized(), "");
+  assert (!is_zombie(), "");
 
   CompiledICLocker ml(this);
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");
@@ -1220,6 +1221,8 @@ void nmethod::mark_as_maybe_on_continuation() {
 }
 
 bool nmethod::is_not_on_continuation_stack() {
+  if (!Continuations::enabled()) return true;
+
   // Odd marking cycles are found during concurrent marking. Even numbers are found
   // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
   // normal execution). Therefore we align up by 2 so that nmethods encountered during

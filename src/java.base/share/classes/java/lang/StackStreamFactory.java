@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,8 +32,6 @@ import java.lang.StackWalker.StackFrame;
 import java.lang.annotation.Native;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.HashSet;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -148,7 +146,7 @@ final class StackStreamFactory {
                 this.contScope = VirtualThread.continuationScope();
                 this.continuation = null;
             } else {
-                this.contScope = walker.getContScope();
+                this.contScope = scope;
                 this.continuation = walker.getContinuation();
             }
         }
@@ -250,7 +248,7 @@ final class StackStreamFactory {
          */
         final R walk() {
             checkState(NEW);
-            return continuation != null
+            return (continuation != null)
                 ? Continuation.wrapWalk(continuation, contScope, this::walkHelper)
                 : walkHelper();
         }
@@ -320,8 +318,6 @@ final class StackStreamFactory {
             }
 
             this.anchor = anchor;  // set anchor for this bulk stack frame traversal
-
-            int numFrames = bufEndIndex - bufStartIndex;
             frameBuffer.setBatch(depth, bufStartIndex, bufEndIndex);
 
             // traverse all frames and perform the action on the stack frames, if specified
@@ -334,7 +330,9 @@ final class StackStreamFactory {
         private int getNextBatch() {
             int nextBatchSize = Math.min(maxDepth - depth, getNextBatchSize());
 
-            if (!frameBuffer.isActive() || nextBatchSize <= 0 || (frameBuffer.isAtBottom() && !hasMoreContinuations())) {
+            if (!frameBuffer.isActive()
+                    || (nextBatchSize <= 0)
+                    || (frameBuffer.isAtBottom() && !hasMoreContinuations())) {
                 if (isDebug) {
                     System.out.format("  more stack walk done%n");
                 }
@@ -354,7 +352,9 @@ final class StackStreamFactory {
         }
 
         private boolean hasMoreContinuations() {
-            return continuation != null && continuation.getScope() != contScope && continuation.getParent() != null;
+            return (continuation != null)
+                    && (continuation.getScope() != contScope)
+                    && (continuation.getParent() != null);
         }
 
         private void setContinuation(Continuation cont) {
@@ -546,7 +546,8 @@ final class StackStreamFactory {
 
             @Override
             final boolean filter(int index) {
-                return stackFrames[index].declaringClass() == Continuation.class && "yield0".equals(stackFrames[index].getMethodName());
+                return stackFrames[index].declaringClass() == Continuation.class
+                        && "yield0".equals(stackFrames[index].getMethodName());
             }
         }
 

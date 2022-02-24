@@ -140,7 +140,7 @@ check_suspended_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, con
           func_name, TranslateState(state), (int)state);
       fflush(0);
     }
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     fatal(jni, "check_resumed_state: expected SUSPENDED flag in thread state");
   }
 }
@@ -171,7 +171,7 @@ check_resumed_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, const
           func_name, TranslateState(state), (int)state);
       fflush(0);
     }
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     fatal(jni, "check_resumed_state: NOT expected SUSPENDED flag in thread state");
   }
 }
@@ -339,7 +339,7 @@ Java_SuspendResume1_TestSuspendResume(JNIEnv* jni, jclass cls) {
 
 JNIEXPORT jint JNICALL
 Java_SuspendResume1_GetStatus(JNIEnv* jni, jclass cls) {
-  return nsk_jvmti_getStatus();
+  return get_agent_status();
 }
 
 static void JNICALL
@@ -379,7 +379,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI AddCapabilities: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return JNI_ERR;
   }
 
@@ -390,7 +390,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI SetEventCallbacks: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return JNI_ERR;
   }
 
@@ -399,7 +399,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI SetEventNotificationMode: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
    return JNI_ERR;
   }
 

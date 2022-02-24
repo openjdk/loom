@@ -615,8 +615,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * output. This method is useful only for debugging.
      */
     public void list() {
-        @SuppressWarnings("deprecation")
         Map<ThreadGroup, List<Thread>> map = Stream.of(Thread.getAllThreads())
+                .filter(t -> parentOf(t.getThreadGroup()))
                 .collect(Collectors.groupingBy(Thread::getThreadGroup));
         list(map, System.out, 0);
     }

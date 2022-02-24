@@ -59,9 +59,7 @@ public class LocalExecutionControl extends DirectExecutionControl {
 
     @Override
     protected String invoke(Method doitMethod) throws Exception {
-        @SuppressWarnings("deprecation")
-        ThreadGroup group = new ThreadGroup("JShell process local execution");
-        execThreadGroup = group;
+        execThreadGroup = new ThreadGroup("JShell process local execution");
 
         AtomicReference<InvocationTargetException> iteEx = new AtomicReference<>();
         AtomicReference<IllegalAccessException> iaeEx = new AtomicReference<>();
@@ -136,7 +134,12 @@ public class LocalExecutionControl extends DirectExecutionControl {
                 throw new InternalException("Process-local code snippets thread group is null. Aborting stop.");
             }
 
-            execThreadGroup.stop();  // throw UOE
+            int threadCount = execThreadGroup.activeCount() + 16;
+            Thread[] threads = new Thread[threadCount];
+            threadCount = execThreadGroup.enumerate(threads);
+            for (int i = 0; i < threadCount; i++) {
+                threads[i].stop();
+            }
         }
     }
 

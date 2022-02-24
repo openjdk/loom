@@ -108,7 +108,7 @@ void ZMark::start() {
   // marking information for all pages.
   ZGlobalSeqNum++;
 
-  CodeCache::increment_marking_cycle();
+  CodeCache::start_marking_cycle();
 
   // Reset flush/continue counters
   _nproactiveflush = 0;
@@ -807,7 +807,7 @@ bool ZMark::end() {
   // Update statistics
   ZStatMark::set_at_mark_end(_nproactiveflush, _nterminateflush, _ntrycomplete, _ncontinue);
 
-  CodeCache::increment_marking_cycle();
+  CodeCache::finish_marking_cycle();
 
   // Mark completed
   return true;

@@ -184,9 +184,6 @@ compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      82
 compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           8276711 generic-all
 compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              8276711 generic-all
 
-runtime/ErrorHandling/NestedThreadsListHandleInErrorHandlingTest.java         8269959 generic-all
-runtime/ErrorHandling/ThreadsListHandleInErrorHandlingTest.java               8269959 generic-all
-
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	          8264699 generic-all
 
 # SA needs update

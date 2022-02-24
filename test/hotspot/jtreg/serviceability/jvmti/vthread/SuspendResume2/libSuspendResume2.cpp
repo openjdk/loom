@@ -79,7 +79,7 @@ check_suspended_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, con
   if ((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0) {
     LOG("\n## Agent: FAILED: %s did not turn on SUSPENDED flag:\n"
         "#  state: %s (%d)\n\n", func_name, TranslateState(state), (int)state);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
   }
 }
 
@@ -97,7 +97,7 @@ check_resumed_state(JNIEnv* jni, jthread thread, int thr_idx, char* tname, const
   if (!((state & (JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_TERMINATED)) == 0)) {
     LOG("\n## Agent: FAILED: %s did not turn off SUSPENDED flag:\n"
         "#   state: %s (%d)\n\n", func_name, TranslateState(state), (int)state);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
   }
 }
 
@@ -261,7 +261,7 @@ VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
 
 JNIEXPORT jint JNICALL
 Java_SuspendResume2_GetStatus(JNIEnv* jni, jclass cls) {
-  return nsk_jvmti_getStatus();
+  return get_agent_status();
 }
 
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
@@ -294,7 +294,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI AddCapabilities: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return JNI_ERR;
   }
 
@@ -305,7 +305,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI SetEventCallbacks: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return JNI_ERR;
   }
 
@@ -314,7 +314,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent init: error in JVMTI SetEventNotificationMode: %s (%d)\n",
            TranslateError(err), err);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
    return JNI_ERR;
   }
 

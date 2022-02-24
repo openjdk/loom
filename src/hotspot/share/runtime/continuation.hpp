@@ -40,10 +40,13 @@ class ContinuationEntry;
 class Continuations : public AllStatic {
 public:
   static void print_statistics();
-  static void init();
+  static void init1();
+  static void init2();
+  static bool enabled(); // TODO: used while virtual threads are in Preview; remove when GA
 };
 
-void continuations_init();
+void continuations_init1();
+void continuations_init2();
 
 class javaVFrame;
 class JavaThread;
@@ -52,9 +55,11 @@ class Continuation : AllStatic {
 public:
   static void init();
 
-  static int freeze(JavaThread* thread, intptr_t* sp);
+  static address freeze_entry();
+  // static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
-  static intptr_t* thaw(JavaThread* thread, int kind);
+  static address thaw_entry();
+  // static intptr_t* thaw(JavaThread* thread, int kind);
   static int try_force_yield(JavaThread* thread, oop cont);
   static void jump_from_safepoint(JavaThread* thread);
 

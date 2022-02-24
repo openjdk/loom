@@ -827,7 +827,11 @@ public:
     }
 
     log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
-    if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
+    LogTarget(Trace, jvmcont) lt;
+    if (lt.develop_is_enabled()) {
+      LogStream ls(lt);
+      f.print_on(&ls);
+    }
     assert (f.pc() != nullptr,
       "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
       !_chunk->requires_barriers(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));

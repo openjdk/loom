@@ -50,6 +50,22 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   *la = new_value;
 }
 
+inline int ContinuationHelper::frame_align_words(int size) {
+#ifdef _LP64
+  return size & 1;
+#else
+  return 0;
+#endif
+}
+
+inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
+#ifdef _LP64
+  sp = align_down(sp, 16);
+  assert((intptr_t)sp % 16 == 0, "");
+#endif
+  return sp;
+}
+
 template<typename FKind, typename RegisterMapT>
 inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
@@ -113,14 +129,6 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
 }
 
 template <typename ConfigT>
-inline intptr_t* Freeze<ConfigT>::align_bottom(intptr_t* bottom, int argsize) {
-#ifdef _LP64
-  bottom -= (argsize & 1);
-#endif
-  return bottom;
-}
-
-template <typename ConfigT>
 template<typename FKind>
 inline frame Freeze<ConfigT>::sender(const frame& f) {
   assert (FKind::is_instance(f), "");
@@ -141,7 +149,8 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
 }
 
 template <typename ConfigT>
-template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
+template<typename FKind>
+frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
   assert (!caller.is_interpreted_frame()
     || caller.unextended_sp() == (intptr_t*)caller.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
@@ -338,15 +347,6 @@ inline void Thaw<ConfigT>::prefetch_chunk_pd(void* start, int size) {
   size <<= LogBytesPerWord;
   Prefetch::read(start, size);
   Prefetch::read(start, size - 64);
-}
-
-template <typename ConfigT>
-inline intptr_t* Thaw<ConfigT>::align_chunk(intptr_t* vsp) {
-#ifdef _LP64
-  vsp = align_down(vsp, 16);
-  assert((intptr_t)vsp % 16 == 0, "");
-#endif
-  return vsp;
 }
 
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP
