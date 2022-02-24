@@ -1164,9 +1164,6 @@ public:
       if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath())) {
         return false;
       }
-      assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
-      _cont.set_tail(chunk);
-
       if (UNLIKELY(_barriers)) { // probably humongous
         log_develop_trace(jvmcont)("allocation requires barriers; retrying slow");
         init_empty_chunk(chunk);
@@ -1468,8 +1465,6 @@ public:
       assert (chunk->is_empty(), "");
 
       if (_barriers) { log_develop_trace(jvmcont)("allocation requires barriers"); }
-
-      _cont.set_tail(chunk);
       // jdk_internal_vm_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
     } else {
       log_develop_trace(jvmcont)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
@@ -1755,22 +1750,39 @@ public:
     return chunk->stack_size() - chunk->sp();
   }
 
-  stackChunkOop allocate_chunk(size_t size) {
+  stackChunkOop allocate_chunk(size_t stack_size) {
     log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
-    stackChunkOop chunk = allocate_stack_chunk(size);
-    if (chunk == nullptr) { // OOM
-      return nullptr;
-    }
-    assert (chunk->stack_size() == (int)size, "");
-    assert (chunk->size() >= size, "chunk->size(): %zu size: %zu", chunk->size(), size);
-    assert ((intptr_t)chunk->start_address() % 8 == 0, "");
 
-    stackChunkOop chunk0 = _cont.tail();
-    if (chunk0 != (oop)nullptr && chunk0->is_empty()) {
-      // chunk0 = chunk0->is_parent_null<typename ConfigT::OopT>() ? (oop)nullptr : chunk0->parent();
-      chunk0 = chunk0->parent();
-      assert (chunk0 == (oop)nullptr || !chunk0->is_empty(), "");
+    InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
+    size_t size_in_words = klass->instance_size(stack_size);
+
+    JavaThread* current = _preempt ? JavaThread::current() : _thread;
+    assert(current == JavaThread::current(), "should be current");
+
+    stackChunkOop chunk;
+    StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
+    HeapWord* start = current->tlab().allocate(size_in_words);
+    if (start != nullptr) {
+      chunk = (stackChunkOop)allocator.initialize(start);
+
+      assert (chunk != nullptr, "");
+      // requires_barriers can be expensive
+      assert (!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
+    } else {
+      //HandleMark hm(current);
+      Handle conth(current, _cont.mirror());
+      chunk = (stackChunkOop)allocator.allocate(); // can safepoint
+      _cont.post_safepoint(conth);
+
+      if (chunk == nullptr)  // OOME
+        return nullptr;
+
+      _barriers = ConfigT::requires_barriers(chunk);
     }
+
+    assert (chunk->stack_size() == (int)stack_size, "");
+    assert (chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
+    assert ((intptr_t)chunk->start_address() % 8 == 0, "");
 
     // TODO PERF: maybe just memset 0, and only set non-zero fields.
     // chunk->set_pc(nullptr);
@@ -1786,42 +1798,20 @@ public:
     assert (chunk->mark_cycle() == 0, "");
     assert (chunk->max_size() == 0, "");
 
+    chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
+
+    stackChunkOop chunk0 = _cont.tail();
+    if (chunk0 != (oop)nullptr && chunk0->is_empty()) {
+      // chunk0 = chunk0->is_parent_null<typename ConfigT::OopT>() ? (oop)nullptr : chunk0->parent();
+      chunk0 = chunk0->parent();
+      assert (chunk0 == (oop)nullptr || !chunk0->is_empty(), "");
+    }
     // fields are uninitialized
     chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
     chunk->set_cont_raw<typename ConfigT::OopT>(_cont.mirror());
+    assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
 
-    // Promote young chunks quickly
-    chunk->set_mark(chunk->mark().set_age(15));
-
-    return chunk;
-  }
-
-  stackChunkOop allocate_stack_chunk(size_t stack_size) {
-    InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
-    size_t size_in_words = klass->instance_size(stack_size);
-
-    JavaThread* current = _preempt ? JavaThread::current() : _thread;
-    assert(current == JavaThread::current(), "should be current");
-
-    stackChunkOop chunk;
-    StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
-    HeapWord* start = current->tlab().allocate(size_in_words);
-    if (start != nullptr) {
-      chunk = (stackChunkOop)allocator.initialize(start);
-
-      assert (chunk != nullptr, "");
-      assert (!ConfigT::requires_barriers(chunk), ""); // we skip requires_barriers in the TLAB case; can be expensive
-    } else {
-      //HandleMark hm(current);
-      Handle conth(current, _cont.mirror());
-      chunk = (stackChunkOop)allocator.allocate(); // can safepoint
-      _cont.post_safepoint(conth);
-
-      if (chunk != nullptr) {
-        _barriers = ConfigT::requires_barriers(chunk);
-      }
-    }
-
+    _cont.set_tail(chunk);
     return chunk;
   }
 };
