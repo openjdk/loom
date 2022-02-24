@@ -111,6 +111,10 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
         fr->print_on(tty);
       }
 #endif
+      if (loc == NULL) {
+        tty->print("oops reg: "); omv.reg()->print_on(tty); tty->cr();
+        fr->print_on(tty);
+      }
       guarantee(loc != NULL, "missing saved register");
       if ( omv.type() == OopMapValue::oop_value ) {
         oop val = *loc;
