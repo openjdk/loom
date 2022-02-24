@@ -397,11 +397,11 @@ public:
 
   // Constructor for object or non-object setter
   VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, jint depth,
-                        jint index, BasicType type, jvalue value);
+                                jint index, BasicType type, jvalue value);
 
   // Constructor for object getter
   VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Handle vthread_h, JavaThread* calling_thread,
-                        jint depth, int index);
+                                jint depth, int index);
 
   VMOp_Type type() const { return VMOp_VirtualThreadGetOrSetLocal; }
 

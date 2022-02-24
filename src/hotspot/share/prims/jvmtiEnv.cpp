@@ -2212,12 +2212,13 @@ JvmtiEnv::GetLocalObject(jthread thread, jint depth, jint slot, jobject* value_p
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
-                                   current_thread, depth, slot);
+                                     current_thread, depth, slot);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2252,12 +2253,13 @@ JvmtiEnv::GetLocalInstance(jthread thread, jint depth, jobject* value_ptr){
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetReceiver op(this, Handle(current_thread, thread_obj),
-                                 current_thread, depth);
+                                   current_thread, depth);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2293,12 +2295,13 @@ JvmtiEnv::GetLocalInt(jthread thread, jint depth, jint slot, jint* value_ptr) {
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
-                                   depth, slot, T_INT);
+                                     depth, slot, T_INT);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2334,12 +2337,13 @@ JvmtiEnv::GetLocalLong(jthread thread, jint depth, jint slot, jlong* value_ptr) 
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
-                                   depth, slot, T_LONG);
+                                     depth, slot, T_LONG);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2375,12 +2379,13 @@ JvmtiEnv::GetLocalFloat(jthread thread, jint depth, jint slot, jfloat* value_ptr
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
-                                   depth, slot, T_FLOAT);
+                                     depth, slot, T_FLOAT);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2416,12 +2421,13 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
   // doit_prologue(), but after doit() is finished with it.
   ResourceMark rm(current_thread);
   HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
   oop thread_obj = JNIHandles::resolve_external_guard(thread);
 
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     // Support for virtual threads
     VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
-                                   depth, slot, T_DOUBLE);
+                                     depth, slot, T_DOUBLE);
     VMThread::execute(&op);
     err = op.result();
     if (err == JVMTI_ERROR_NONE) {
@@ -2445,78 +2451,188 @@ JvmtiEnv::GetLocalDouble(jthread thread, jint depth, jint slot, jdouble* value_p
 } /* end GetLocalDouble */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::SetLocalObject(JavaThread* java_thread, jint depth, jint slot, jobject value) {
+JvmtiEnv::SetLocalObject(jthread thread, jint depth, jint slot, jobject value) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
   jvalue val;
   val.l = value;
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_OBJECT, val);
-  VMThread::execute(&op);
-  return op.result();
+
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+                                     depth, slot, T_OBJECT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_OBJECT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  }
+  return err;
 } /* end SetLocalObject */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::SetLocalInt(JavaThread* java_thread, jint depth, jint slot, jint value) {
+JvmtiEnv::SetLocalInt(jthread thread, jint depth, jint slot, jint value) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
   jvalue val;
   val.i = value;
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_INT, val);
-  VMThread::execute(&op);
-  return op.result();
+
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+                                     depth, slot, T_INT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_INT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  }
+  return err;
 } /* end SetLocalInt */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::SetLocalLong(JavaThread* java_thread, jint depth, jint slot, jlong value) {
+JvmtiEnv::SetLocalLong(jthread thread, jint depth, jint slot, jlong value) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
   jvalue val;
   val.j = value;
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_LONG, val);
-  VMThread::execute(&op);
-  return op.result();
+
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+                                     depth, slot, T_LONG, val);
+    VMThread::execute(&op);
+    err = op.result();
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_LONG, val);
+    VMThread::execute(&op);
+    err = op.result();
+  }
+  return err;
 } /* end SetLocalLong */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::SetLocalFloat(JavaThread* java_thread, jint depth, jint slot, jfloat value) {
+JvmtiEnv::SetLocalFloat(jthread thread, jint depth, jint slot, jfloat value) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
   jvalue val;
   val.f = value;
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_FLOAT, val);
-  VMThread::execute(&op);
-  return op.result();
+
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+                                     depth, slot, T_FLOAT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_FLOAT, val);
+    VMThread::execute(&op);
+    err = op.result();
+  }
+  return err;
 } /* end SetLocalFloat */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 // depth - pre-checked as non-negative
 jvmtiError
-JvmtiEnv::SetLocalDouble(JavaThread* java_thread, jint depth, jint slot, jdouble value) {
+JvmtiEnv::SetLocalDouble(jthread thread, jint depth, jint slot, jdouble value) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
   // rm object is created to clean up the javaVFrame created in
   // doit_prologue(), but after doit() is finished with it.
-  ResourceMark rm;
+  ResourceMark rm(current_thread);
+  HandleMark hm(current_thread);
+  JvmtiVTMTDisabler vtmt_disabler;
+  oop thread_obj = JNIHandles::resolve_external_guard(thread);
   jvalue val;
   val.d = value;
-  VM_GetOrSetLocal op(java_thread, depth, slot, T_DOUBLE, val);
-  VMThread::execute(&op);
-  return op.result();
+
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    // Support for virtual threads
+    VM_VirtualThreadGetOrSetLocal op(this, Handle(current_thread, thread_obj),
+                                     depth, slot, T_DOUBLE, val);
+    VMThread::execute(&op);
+    err = op.result();
+  } else {
+    // Support for ordinary threads
+    ThreadsListHandle tlh(current_thread);
+    err = get_JavaThread(tlh.list(), thread, &java_thread);
+    if (err != JVMTI_ERROR_NONE) {
+      return err;
+    }
+    VM_GetOrSetLocal op(java_thread, depth, slot, T_DOUBLE, val);
+    VMThread::execute(&op);
+    err = op.result();
+  }
+  return err;
 } /* end SetLocalDouble */
 
 

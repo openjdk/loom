@@ -609,7 +609,7 @@ void VM_BaseGetOrSetLocal::doit() {
     return;
   };
 
-  if (_set && Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
     _result = JVMTI_ERROR_OPAQUE_FRAME; // deferred locals currently unsupported in continuations
     return;
   }
@@ -647,6 +647,11 @@ void VM_BaseGetOrSetLocal::doit() {
     // possible the compiler emitted some locals as constant values,
     // meaning they are not mutable.
     if (can_be_deoptimized(_jvf)) {
+      // continuation can't be unmounted at this point (it was checked/reported in get_java_vframe)
+      if (Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+        _result = JVMTI_ERROR_OPAQUE_FRAME; // can't deoptimize for top continuation frame
+        return;
+      }
 
       // Schedule deoptimization so that eventually the local
       // update will be written to an interpreter frame.
@@ -819,9 +824,11 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(_vthread_h());
   javaVFrame* jvf = NULL;
+  bool is_cont_mounted = jdk_internal_vm_Continuation::is_mounted(cont);
 
   assert(cont != NULL, "vthread contintuation must not be NULL");
-  if (jdk_internal_vm_Continuation::is_mounted(cont)) {
+
+  if (is_cont_mounted) {
     oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
     JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
     vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
@@ -849,7 +856,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
     return NULL;
   }
 
-  if (!jvf->is_java_frame()) {
+  if ((_set && !is_cont_mounted) || !jvf->is_java_frame()) {
     _result = JVMTI_ERROR_OPAQUE_FRAME;
     return NULL;
   }

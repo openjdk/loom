@@ -6135,7 +6135,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="frame"/>
+          <jthread null="current" frame="frame" impl="noconvert"/>
           <description>
             The thread of the frame containing the variable's value.
           </description>
@@ -6174,6 +6174,10 @@ class C2 extends C1 implements I2 {
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Not a visible frame
         </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not the topmost frame of a virtual thread suspended at a breakpoint,
+          single step or similar event
+        </error>
       </errors>
     </function>
 
@@ -6191,7 +6195,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="frame"/>
+          <jthread null="current" frame="frame" impl="noconvert"/>
           <description>
             The thread of the frame containing the variable's value.
           </description>
@@ -6228,6 +6232,10 @@ class C2 extends C1 implements I2 {
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Not a visible frame
         </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not the topmost frame of a virtual thread suspended at a breakpoint,
+          single step or similar event
+        </error>
       </errors>
     </function>
 
@@ -6243,7 +6251,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="frame"/>
+          <jthread null="current" frame="frame" impl="noconvert"/>
           <description>
             The thread of the frame containing the variable's value.
           </description>
@@ -6277,6 +6285,10 @@ class C2 extends C1 implements I2 {
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Not a visible frame
         </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not the topmost frame of a virtual thread suspended at a breakpoint,
+          single step or similar event
+        </error>
       </errors>
     </function>
 
@@ -6292,7 +6304,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="frame"/>
+          <jthread null="current" frame="frame" impl="noconvert"/>
           <description>
             The thread of the frame containing the variable's value.
           </description>
@@ -6326,6 +6338,10 @@ class C2 extends C1 implements I2 {
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Not a visible frame
         </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not the topmost frame of a virtual thread suspended at a breakpoint,
+          single step or similar event
+        </error>
       </errors>
     </function>
 
@@ -6341,7 +6357,7 @@ class C2 extends C1 implements I2 {
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current" frame="frame"/>
+          <jthread null="current" frame="frame" impl="noconvert"/>
           <description>
             The thread of the frame containing the variable's value.
           </description>
@@ -6374,6 +6390,10 @@ class C2 extends C1 implements I2 {
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Not a visible frame
+        </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          Not the topmost frame of a virtual thread suspended at a breakpoint,
+          single step or similar event
         </error>
       </errors>
     </function>
