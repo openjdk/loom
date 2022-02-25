@@ -30,6 +30,7 @@
 
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -114,28 +115,41 @@ public class DumpThreads {
         }
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
-    public void testRelativePath1() throws Exception {
+    /**
+     * Test that dumpThreads throws if the output file already exists.
+     */
+    @Test
+    public void testFileAlreadyExsists() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN);
+        String file = Files.createFile(genOutputPath("txt")).toString();
+        assertThrows(FileAlreadyExistsException.class,
+                () -> mbean.dumpThreads(file, ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(FileAlreadyExistsException.class,
+                () -> mbean.dumpThreads(file, ThreadDumpFormat.JSON));
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
-    public void testRelativePath2() throws Exception {
+    /**
+     * Test that dumpThreads throws if the file path is relative.
+     */
+    @Test
+    public void testRelativePath() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads("threads.json", ThreadDumpFormat.JSON);
+        assertThrows(IllegalArgumentException.class,
+                () -> mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(IllegalArgumentException.class,
+                () -> mbean.dumpThreads("threads.json", ThreadDumpFormat.JSON));
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull1() throws Exception {
+    /**
+     * Test that dumpThreads throws with null parameters.
+     */
+    @Test
+    public void testNull() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull2() throws Exception {
-        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(genOutputPath("txt").toString(), null);
+        assertThrows(NullPointerException.class,
+                () -> mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(NullPointerException.class,
+                () -> mbean.dumpThreads(genOutputPath("txt").toString(), null));
     }
 
     /**

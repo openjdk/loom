@@ -120,8 +120,8 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
     public void setVMOption(String name, String value);
 
     /**
-     * Generate a thread dump to the given file in the given format. The
-     * {@code outputFile} parameter must be an absolute path.
+     * Generate a thread dump to the given file in the given format. The file
+     * must not exist. The {@code outputFile} parameter must be an absolute path.
      *
      * <p> The thread dump will include output for all platform threads. It may
      * include output for some or all virtual threads.
@@ -137,7 +137,8 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      * @param  outputFile the path to the file to create
      * @param  format the format to use (TEXT_PLAIN or JSON)
      * @throws IllegalArgumentException if the file path is not absolute
-     * @throws IOException if an I/O exception is thrown writing to the file
+     * @throws IOException if the file already exists or an I/O exception is
+     *         thrown writing to the file
      * @throws NullPointerException if either parameter is {@code null}.
      * @throws SecurityException
      *         If a security manager is set and its {@link
