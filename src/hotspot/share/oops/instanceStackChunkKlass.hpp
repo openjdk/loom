@@ -79,6 +79,7 @@ Chunk layout:
          |     |   |                   |
          |     |   | frame             |
          |     |   |                   |
+         |     |   | callee stack args |
          |     |   | ----------------- |<--\
          |     |   | pc                |   |
          |     |   | rbp               |   |
