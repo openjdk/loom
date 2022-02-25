@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -244,12 +244,12 @@ public class thread001 {
                                   if (checkedThreads[i][1].equals("0")) {
                                       checkedThreads[i][1] = "1";
                                   } else {
-                                      // When using the Virtual wrapper, the main thread is renamed to old-m-a-i-n,
+                                      // When using the jtreg wrapper, the main thread is renamed to old-m-a-i-n,
                                       // and a new "main" vthread is created. However, the rename happens after
                                       // the debug agent has already generated the THREAD_START event for the
                                       // original "main", so we end up with two THREAD_START events for "main".
                                       // We need to allow for this.
-                                      if ("Virtual".equals(System.getProperty("main.wrapper")) &&
+                                      if ((System.getProperty("main.wrapper") != null) &&
                                               checkedThreads[i][0].equals("main") &&
                                               checkedThreads[i][1].equals("1")) {
                                           checkedThreads[i][1] = "2";
