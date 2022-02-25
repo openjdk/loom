@@ -41,6 +41,7 @@ import static sun.nio.fs.UnixConstants.*;
  * Linux/Mac implementation of java.nio.file.Path
  */
 class UnixPath implements Path {
+
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     private final UnixFileSystem fs;
