@@ -878,7 +878,6 @@ printUsage(void)
  "onuncaught=y|n                   debug on any uncaught?            n\n"
  "timeout=<timeout value>          for listen/attach in milliseconds n\n"
  "enumeratevthreads=y|n            thread lists include all vthreads n\n"
- "notifyvthreads=y|n               send vthread START/END events     y\n"
  "mutf8=y|n                        output modified utf-8             n\n"
  "quiet=y|n                        control over terminal messages    n\n"));
 
@@ -1028,7 +1027,6 @@ parseOptions(char *options)
     /* Set vthread debugging level. */
     gdata->vthreadsSupported = JNI_TRUE;
     gdata->enumerateVThreads = JNI_FALSE;
-    gdata->notifyVThreads = JNI_TRUE;
 
     /* Options being NULL will end up being an error. */
     if (options == NULL) {
@@ -1140,18 +1138,6 @@ parseOptions(char *options)
                 gdata->enumerateVThreads = JNI_TRUE;
             } else if (strcmp(current, "n") == 0) {
                 gdata->enumerateVThreads = JNI_FALSE;
-            } else {
-                goto syntax_error;
-            }
-            current += strlen(current) + 1;
-        } else if (strcmp(buf, "notifyvthreads") == 0) {
-            if (!get_tok(&str, current, (int)(end - current), ',')) {
-                goto syntax_error;
-            }
-            if (strcmp(current, "y") == 0) {
-                gdata->notifyVThreads = JNI_TRUE;
-            } else if (strcmp(current, "n") == 0) {
-                gdata->notifyVThreads = JNI_FALSE;
             } else {
                 goto syntax_error;
             }
