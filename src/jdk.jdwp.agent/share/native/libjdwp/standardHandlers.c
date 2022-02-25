@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -151,9 +151,13 @@ standardHandlers_defaultHandler(EventIndex ei)
         case EI_MONITOR_CONTENDED_ENTERED:
         case EI_MONITOR_WAIT:
         case EI_MONITOR_WAITED:
-        case EI_VIRTUAL_THREAD_START: /* vthread fixme: assert? */
-        case EI_VIRTUAL_THREAD_END:
             return &genericHandler;
+
+        /* These events should have been converted the THREAD_START and THREAD_END already. */
+        case EI_VIRTUAL_THREAD_START:
+        case EI_VIRTUAL_THREAD_END:
+            /* This NULL will trigger a AGENT_ERROR_INVALID_EVENT_TYPE */
+            return NULL;
 
         case EI_CLASS_PREPARE:
             return &handleClassPrepare;
