@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1027,7 +1027,6 @@ parseOptions(char *options)
 
     /* Set vthread debugging level. */
     gdata->vthreadsSupported = JNI_TRUE;
-    gdata->trackAllVThreads = JNI_FALSE;
     gdata->enumerateVThreads = JNI_FALSE;
     gdata->notifyVThreads = JNI_TRUE;
 
@@ -1144,7 +1143,6 @@ parseOptions(char *options)
             } else {
                 goto syntax_error;
             }
-            gdata->trackAllVThreads = gdata->enumerateVThreads;
             current += strlen(current) + 1;
         } else if (strcmp(buf, "notifyvthreads") == 0) {
             if (!get_tok(&str, current, (int)(end - current), ',')) {
