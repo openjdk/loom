@@ -603,17 +603,11 @@ class DatagramChannelImpl
         assert readLock.isHeldByCurrentThread()
                 && sm != null && remoteAddress == null;
 
-        ByteBuffer bb = Util.getTemporaryDirectBuffer(dst.remaining());
-        try {
-            boolean blocking = isBlocking();
-            for (;;) {
-                int n = receive(bb, false);
-                if (blocking) {
-                    while (IOStatus.okayToRetry(n) && isOpen()) {
-                        park(Net.POLLIN);
-                        n = receive(bb, false);
-                    }
-                }
+        for (;;) {
+            int n;
+            ByteBuffer bb = Util.getTemporaryDirectBuffer(dst.remaining());
+            try {
+                n = receive(bb, false);
                 if (n >= 0) {
                     // sender address is in socket address buffer
                     InetSocketAddress isa = sourceSocketAddress();
@@ -624,14 +618,17 @@ class DatagramChannelImpl
                         return isa;
                     } catch (SecurityException se) {
                         // ignore datagram
-                        bb.clear();
                     }
-                } else {
-                    return null;
                 }
+            } finally {
+                Util.releaseTemporaryDirectBuffer(bb);
             }
-        } finally {
-            Util.releaseTemporaryDirectBuffer(bb);
+
+            if (isBlocking() && IOStatus.okayToRetry(n) && isOpen()) {
+                park(Net.POLLIN);
+            } else {
+                return null;
+            }
         }
     }
 
