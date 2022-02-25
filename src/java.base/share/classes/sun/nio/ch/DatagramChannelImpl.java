@@ -636,116 +636,127 @@ class DatagramChannelImpl
     }
 
     /**
-     * Receives a datagram into the given buffer.
+     * Attempts to receive a datagram into the given byte array.
+     * @param connected true if the channel is connected
+     */
+    private DatagramInfo tryReceive(byte[] b, int off, int len, boolean connected)
+        throws IOException
+    {
+        ByteBuffer dst = Util.getTemporaryDirectBuffer(len);
+        assert dst.position() == 0;
+        try {
+            InetSocketAddress sender = null;
+            int n = receive(dst, connected);
+            if (n >= 0) {
+                sender = sourceSocketAddress();
+
+                // check security manager when not connected
+                if (!connected) {
+                    @SuppressWarnings("removal")
+                    SecurityManager sm = System.getSecurityManager();
+                    if (sm != null) {
+                        try {
+                            sm.checkAccept(sender.getAddress().getHostAddress(),
+                                           sender.getPort());
+                        } catch (SecurityException e) {
+                            // drop datagram
+                            sender = null;
+                            n = IOStatus.UNAVAILABLE;
+                        }
+                    }
+                }
+
+                // copy datagram into byte array
+                if (n > 0) {
+                    dst.flip();
+                    dst.get(b, off, n);
+                }
+            }
+            return new DatagramInfo(sender, n);
+        } finally{
+            Util.offerFirstTemporaryDirectBuffer(dst);
+        }
+    }
+
+    /**
+     * Receive a datagram into the given byte array with a timeout.
+     * @param connected true if the channel is connected
+     * @throws SocketTimeoutException if the receive timeout elapses
+     */
+    private DatagramInfo timedReceive(byte[] b, int off, int len, long nanos, boolean connected)
+        throws IOException
+    {
+        long startNanos = System.nanoTime();
+        DatagramInfo result = tryReceive(b, off, len, connected);
+        while (result.length() == IOStatus.UNAVAILABLE && isOpen()) {
+            long remainingNanos = nanos - (System.nanoTime() - startNanos);
+            if (remainingNanos <= 0) {
+                throw new SocketTimeoutException("Read timed out");
+            }
+            park(Net.POLLIN, remainingNanos);
+            result = tryReceive(b, off, len, connected);
+        }
+        return result;
+    }
+
+    /**
+     * Receives a datagram into the given byte array.
      *
-     * @apiNote This method is for use by the socket adaptor. The buffer is
-     * assumed to be trusted, meaning it is not accessible to user code.
+     * @apiNote This method is for use by the socket adaptor.
      *
      * @throws IllegalBlockingModeException if the channel is non-blocking
      * @throws SocketTimeoutException if the timeout elapses
      */
-    SocketAddress blockingReceive(ByteBuffer dst, long nanos) throws IOException {
+    DatagramInfo blockingReceive(byte[] b, int off, int len, long nanos)
+        throws IOException
+    {
+        Objects.checkFromIndexSize(off, len, b.length);
+
         readLock.lock();
         try {
             ensureOpen();
             if (!isBlocking())
                 throw new IllegalBlockingModeException();
-            @SuppressWarnings("removal")
-            SecurityManager sm = System.getSecurityManager();
-            boolean connected = isConnected();
-            SocketAddress sender;
-            do {
+
+            DatagramInfo result = null;
+            try {
+                SocketAddress remote = beginRead(true, false);
+                lockedConfigureNonBlockingIfNeeded();
+                boolean connected = (remote != null);
                 if (nanos > 0) {
-                    sender = trustedBlockingReceive(dst, nanos);
-                } else {
-                    sender = trustedBlockingReceive(dst);
-                }
-                // check sender when security manager set and not connected
-                if (sm != null && !connected) {
-                    InetSocketAddress isa = (InetSocketAddress) sender;
+
+                    // timed receive, change socket to non-blocking
+                    lockedConfigureBlocking(false);
                     try {
-                        sm.checkAccept(isa.getAddress().getHostAddress(), isa.getPort());
-                    } catch (SecurityException e) {
-                        sender = null;
+                        result = timedReceive(b, off, len, nanos, connected);
+                    } finally {
+                        // restore socket to blocking mode
+                        tryLockedConfigureBlocking(true);
                     }
+
+                } else {
+
+                    // untimed receive
+                    result = tryReceive(b, off, len, connected);
+                    while (IOStatus.okayToRetry(result.length()) && isOpen()) {
+                        park(Net.POLLIN);
+                        result = tryReceive(b, off, len, connected);
+                    }
+
                 }
-            } while (sender == null);
-            return sender;
+                return result;
+            } finally {
+                endRead(true, (result != null && result.length() > 0));
+            }
         } finally {
             readLock.unlock();
         }
     }
 
     /**
-     * Receives a datagram into given buffer. This method is used to support
-     * the socket adaptor. The buffer is assumed to be trusted.
-     * @throws SocketTimeoutException if the timeout elapses
+     * Receives a datagram into the buffer.
+     * @param connected true if the channel is connected
      */
-    private SocketAddress trustedBlockingReceive(ByteBuffer dst)
-        throws IOException
-    {
-        assert readLock.isHeldByCurrentThread() && isBlocking();
-        SocketAddress sender = null;
-        try {
-            SocketAddress remote = beginRead(true, false);
-            boolean connected = (remote != null);
-            lockedConfigureNonBlockingIfNeeded();
-            int n = receive(dst, connected);
-            while (IOStatus.okayToRetry(n) && isOpen()) {
-                park(Net.POLLIN);
-                n = receive(dst, connected);
-            }
-            if (n >= 0) {
-                // sender address is in socket address buffer
-                sender = sourceSocketAddress();
-            }
-            return sender;
-        } finally {
-            endRead(true, (sender != null));
-        }
-    }
-
-    /**
-     * Receives a datagram into given buffer with a timeout. This method is
-     * used to support the socket adaptor. The buffer is assumed to be trusted.
-     * @throws SocketTimeoutException if the timeout elapses
-     */
-    private SocketAddress trustedBlockingReceive(ByteBuffer dst, long nanos)
-        throws IOException
-    {
-        assert readLock.isHeldByCurrentThread() && isBlocking();
-        SocketAddress sender = null;
-        try {
-            SocketAddress remote = beginRead(true, false);
-            boolean connected = (remote != null);
-
-            // change socket to non-blocking
-            lockedConfigureBlocking(false);
-            try {
-                long startNanos = System.nanoTime();
-                int n = receive(dst, connected);
-                while (n == IOStatus.UNAVAILABLE && isOpen()) {
-                    long remainingNanos = nanos - (System.nanoTime() - startNanos);
-                    if (remainingNanos <= 0) {
-                        throw new SocketTimeoutException("Receive timed out");
-                    }
-                    park(Net.POLLIN, remainingNanos);
-                    n = receive(dst, connected);
-                }
-                if (n >= 0) {
-                    // sender address is in socket address buffer
-                    sender = sourceSocketAddress();
-                }
-                return sender;
-            } finally {
-                // restore socket to blocking mode (if channel is open)
-                tryLockedConfigureBlocking(true);
-            }
-        } finally {
-            endRead(true, (sender != null));
-        }
-    }
-
     private int receive(ByteBuffer dst, boolean connected) throws IOException {
         int pos = dst.position();
         int lim = dst.limit();
@@ -866,19 +877,96 @@ class DatagramChannelImpl
     }
 
     /**
-     * Sends a datagram from the bytes in given buffer.
+     * Attempts to write a datagram.
+     */
+    private int tryWrite(byte[] b, int off, int len) throws IOException {
+        ByteBuffer src = Util.getTemporaryDirectBuffer(len);
+        assert src.position() == 0;
+        try {
+            src.put(b, off, len);
+            src.flip();
+            return IOUtil.write(fd, src, -1, nd);
+        } finally {
+            Util.offerFirstTemporaryDirectBuffer(src);
+        }
+    }
+
+    /**
+     * Attempts to send a datagram to the given target address.
+     */
+    private int trySend(byte[] b, int off, int len, InetSocketAddress target)
+        throws IOException
+    {
+        ByteBuffer src = Util.getTemporaryDirectBuffer(len);
+        assert src.position() == 0;
+        try {
+            src.put(b, off, len);
+            src.flip();
+            return send(fd, src, target);
+        } finally {
+            Util.offerFirstTemporaryDirectBuffer(src);
+        }
+    }
+
+    /**
+     * Sends a datagram from the bytes in given byte array.
      *
      * @apiNote This method is for use by the socket adaptor.
      *
      * @throws IllegalBlockingModeException if the channel is non-blocking
      */
-    void blockingSend(ByteBuffer src, SocketAddress target) throws IOException {
+    void blockingSend(byte[] b, int off, int len, SocketAddress target)
+        throws IOException
+    {
+        Objects.checkFromIndexSize(off, len, b.length);
+        InetSocketAddress isa = Net.checkAddress(target, family);
         writeLock.lock();
         try {
             ensureOpen();
             if (!isBlocking())
                 throw new IllegalBlockingModeException();
-            send(src, target);
+
+            boolean completed = false;
+            try {
+                SocketAddress remote = beginWrite(true, false);
+                lockedConfigureNonBlockingIfNeeded();
+                if (remote != null) {
+                    // connected
+                    if (!target.equals(remote)) {
+                        throw new AlreadyConnectedException();
+                    }
+                    int n = tryWrite(b, off, len);
+                    while (IOStatus.okayToRetry(n) && isOpen()) {
+                        park(Net.POLLOUT);
+                        n = tryWrite(b, off, len);
+                    }
+                    completed = (n > 0);
+                } else {
+                    // not connected
+                    @SuppressWarnings("removal")
+                    SecurityManager sm = System.getSecurityManager();
+                    InetAddress ia = isa.getAddress();
+                    if (sm != null) {
+                        if (ia.isMulticastAddress()) {
+                            sm.checkMulticast(ia);
+                        } else {
+                            sm.checkConnect(ia.getHostAddress(), isa.getPort());
+                        }
+                    }
+                    if (ia.isLinkLocalAddress())
+                        isa = IPAddressUtil.toScopedAddress(isa);
+                    if (isa.getPort() == 0)
+                        throw new SocketException("Can't send to port 0");
+                    int n = trySend(b, off, len, isa);
+                    while (IOStatus.okayToRetry(n) && isOpen()) {
+                        park(Net.POLLOUT);
+                        n = trySend(b, off, len, isa);
+                    }
+                    completed = (n >= 0);
+                }
+            } finally {
+                endWrite(true, completed);
+            }
         } finally {
             writeLock.unlock();
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,14 +37,13 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketOption;
 import java.net.SocketTimeoutException;
 import java.net.StandardSocketOptions;
-import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.DatagramChannel;
@@ -190,66 +189,59 @@ public class DatagramSocketAdaptor
 
     @Override
     public void send(DatagramPacket p) throws IOException {
-        ByteBuffer bb = null;
-        try {
-            InetSocketAddress target;
-            synchronized (p) {
-                // copy bytes to temporary direct buffer
-                int len = p.getLength();
-                bb = Util.getTemporaryDirectBuffer(len);
-                bb.put(p.getData(), p.getOffset(), len);
-                bb.flip();
+        byte[] ba;
+        int off;
+        int len;
+        InetSocketAddress target;
 
-                // target address
-                if (p.getAddress() == null) {
-                    InetSocketAddress remote = dc.remoteAddress();
-                    if (remote == null) {
-                        // not specified by DatagramSocket
-                        throw new IllegalArgumentException("Address not set");
-                    }
-                    // set address/port to maintain compatibility with DatagramSocket
-                    p.setAddress(remote.getAddress());
-                    p.setPort(remote.getPort());
-                    target = remote;
-                } else {
-                    target = (InetSocketAddress) p.getSocketAddress();
+        synchronized (p) {
+            ba = p.getData();
+            off = p.getOffset();
+            len = p.getLength();
+
+            // target address
+            if (p.getAddress() == null) {
+                InetSocketAddress remote = dc.remoteAddress();
+                if (remote == null) {
+                    throw new IllegalArgumentException("Address not set");
                 }
+                // set address/port to maintain legacy compatibility
+                p.setAddress(remote.getAddress());
+                p.setPort(remote.getPort());
+                target = remote;
+            } else {
+                target = (InetSocketAddress) p.getSocketAddress();
             }
-            // send datagram
-            try {
-                dc.blockingSend(bb, target);
-            } catch (AlreadyConnectedException e) {
-                throw new IllegalArgumentException("Connected and packet address differ");
-            } catch (ClosedChannelException e) {
-                var exc = new SocketException("Socket closed");
-                exc.initCause(e);
-                throw exc;
-            }
-        } finally {
-            if (bb != null) {
-                Util.offerFirstTemporaryDirectBuffer(bb);
-            }
+        }
+
+        // send datagram
+        try {
+            dc.blockingSend(ba, off, len, target);
+        } catch (AlreadyConnectedException e) {
+            throw new IllegalArgumentException("Connected and packet address differ");
+        } catch (ClosedChannelException e) {
+            var exc = new SocketException("Socket closed");
+            exc.initCause(e);
+            throw exc;
         }
     }
 
     @Override
     public void receive(DatagramPacket p) throws IOException {
-        // get temporary direct buffer with a capacity of p.bufLength
-        int bufLength = DatagramPackets.getBufLength(p);
-        ByteBuffer bb = Util.getTemporaryDirectBuffer(bufLength);
+        byte[] ba;
+        int off;
+        int len;
+
+        synchronized (p) {
+            ba = p.getData();
+            off = p.getOffset();
+            len = DatagramPackets.getBufLength(p);
+        }
+
+        DatagramInfo result;
         try {
             long nanos = MILLISECONDS.toNanos(timeout);
-            SocketAddress sender = dc.blockingReceive(bb, nanos);
-            bb.flip();
-            synchronized (p) {
-                // copy bytes to the DatagramPacket and set length
-                int len = Math.min(bb.limit(), DatagramPackets.getBufLength(p));
-                bb.get(p.getData(), p.getOffset(), len);
-                DatagramPackets.setLength(p, len);
-
-                // sender address
-                p.setSocketAddress(sender);
-            }
+            result = dc.blockingReceive(ba, off, len, nanos);
         } catch (SocketTimeoutException e) {
             throw e;
         } catch (InterruptedIOException e) {
@@ -263,8 +255,11 @@ public class DatagramSocketAdaptor
             var exc = new SocketException("Socket closed");
             exc.initCause(e);
             throw exc;
-        } finally {
-            Util.offerFirstTemporaryDirectBuffer(bb);
+        }
+
+        synchronized (p) {
+            DatagramPackets.setLength(p, result.length());
+            p.setSocketAddress(result.sender());
         }
     }
 
@@ -729,18 +724,16 @@ public class DatagramSocketAdaptor
          * used at this time because it sets both the length and bufLength fields.
          */
         static void setLength(DatagramPacket p, int value) {
-            synchronized (p) {
-                LENGTH.set(p, value);
-            }
+            assert Thread.holdsLock(p);
+            LENGTH.set(p, value);
         }
 
         /**
          * Returns the value of the DatagramPacket.bufLength field.
          */
         static int getBufLength(DatagramPacket p) {
-            synchronized (p) {
-                return (int) BUF_LENGTH.get(p);
-            }
+            assert Thread.holdsLock(p);
+            return (int) BUF_LENGTH.get(p);
         }
     }
 
