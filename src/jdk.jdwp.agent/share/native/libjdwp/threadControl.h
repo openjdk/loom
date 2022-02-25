@@ -75,7 +75,6 @@ void threadControl_saveCLEInfo(JNIEnv *env, jthread thread, EventIndex ei,
 jlong threadControl_getFrameGeneration(jthread thread);
 
 jthread *threadControl_allVThreads(jint *numVThreads);
-jboolean threadControl_isKnownVThread(jthread vthread);
 
 /***** debugging *****/
 

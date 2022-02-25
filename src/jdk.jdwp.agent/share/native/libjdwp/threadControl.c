@@ -1584,10 +1584,10 @@ threadControl_suspendCount(jthread thread, jint *count)
     if (node != NULL) {
         *count = node->suspendCount;
     } else {
-        /*
-         * If the node is in neither list, the debugger never suspended
-         * this thread, so the suspend count is 0.
-         */
+      /*
+       * If the node is in neither list, the debugger never suspended
+       * this thread, so the suspend count is 0.
+       */
       if (isVThread(thread)) {
           jint vthread_state = 0;
           jvmtiError error = threadState(thread, &vthread_state);
@@ -2875,14 +2875,6 @@ threadControl_allVThreads(jint *numVThreads)
     debugMonitorExit(threadLock);
 
     return vthreads;
-}
-
-jboolean threadControl_isKnownVThread(jthread vthread) {
-    ThreadNode *vthreadNode;
-    debugMonitorEnter(threadLock);
-    vthreadNode = findThread(&runningVThreads, vthread);
-    debugMonitorExit(threadLock);
-    return vthreadNode != NULL;
 }
 
 /***** debugging *****/
