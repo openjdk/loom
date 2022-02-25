@@ -84,6 +84,76 @@
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing
 
+/*
+ * This file contains the implementation of continuation freezing (yield) and thawing (run).
+ *
+ * This code is very latency-critical and very hot. An ordinary and well-behaved server application
+ * would likely call these operations many thousands of times every second, on every core, for
+ * the entire duration of the application*.
+ *
+ * Freeze might be called every time the application performs any I/O operation, every time it
+ * acquires a j.u.c. lock, every time it takes a message from a queue, and thaw can be called
+ * multiple times in each of those cases, as it is called by the return barrier, which may be
+ * invoked on method return.
+ *
+ * The *amortized* budget for each of those two operations is ~100-150ns. That is why, for
+ * example, every effort is made to avoid Java-VM transitions as much as possible.
+ */
+
+/************************************************
+
+Thread-stack layout on freeze/thaw
+
+             +----------------------------+
+             |      .                     |
+             |      .                     |
+             |      .                     |
+             |   carrier frames           |
+             |                            |
+             |----------------------------|
+             |                            |
+             |   Continuation.run         |
+             |                            |
+             |============================|
+             |   enterSpecial frame       |
+             |                            |
+        ^    |  int argsize               |
+        |    |  oopDesc* cont             |
+        |    |  oopDesc* chunk            |
+        |    |  ContinuationEntry* parent |
+        |    |  ...                       |
+        |    |----------------------------| <----- JavaThread::_cont_entry
+Address |    |  pc                        |
+        |    |  rbp                       |
+        |    |  ?alignment word?          |
+        |    |============================| <--\
+        |    |                            |    |   argsize (might not be 2-word aligned)
+        |    |  stack-passed args         |    |   words
+        |    |----------------------------|    |
+        |    |                            |    |
+        |    |  frame                     |    |
+        |    |                            |    |
+             +----------------------------|    |
+             |                            |    |  Continuation frames to be frozen/thawed
+             |  frame                     |    |
+             |                            |    |
+             |----------------------------|    |
+             |                            |    |
+             |  frame                     |    |
+             |                            |    |
+             |----------------------------| <--/
+             |                            |
+             |  doYield stub              |
+             |                            |
+             |============================|
+             |                            |
+             |  Native freeze/thaw frames |
+             |                            |
+             +----------------------------+
+
+
+************************************************/
+
 // TODO: See AbstractAssembler::generate_stack_overflow_check,
 // Compile::bang_size_in_bytes(), m->as_SafePoint()->jvms()->interpreter_frame_size()
 // when we stack-bang, we need to update a thread field with the lowest (farthest) bang point.
@@ -1419,9 +1489,6 @@ public:
         }
       }
     }
-    // else if (FKind::interpreted) {
-    //   argsize = 0;
-    // }
 
     log_develop_trace(jvmcont)("finalize _size: %d overlap: %d unextended_sp: %d", _size, overlap, unextended_sp);
 

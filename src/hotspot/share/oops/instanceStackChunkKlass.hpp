@@ -50,6 +50,55 @@ template <chunk_frames = chunk_frames::MIXED> class StackChunkFrameStream;
 // Interpreter frames in chunks have their internal pointers converted to
 // relative offsets from sp. Derived pointers in compiled frames might also
 // be converted to relative offsets from their base.
+
+/************************************************
+
+Chunk layout:
+
+                   +-------------------+
+                   |                   |
+                   |  oop bitmap       |
+                   |                   |
+                   | ----------------- |
+                   |                   |
+                   |  [empty]          |
+                   |                   |
+                  -|===================|
+                /  |                   |
+               |   | stack-passed args |  argsize
+               |   |                   |  words
+               |   | ----------------- |
+               |   |                   |
+         ^     |   | frame             |
+         |     |   |                   |
+         |   size  | ----------------- |
+         |   words |                   |
+         |     |   | frame             |
+         |     |   |                   |
+ Address |     |   | ----------------- |
+         |     |   |                   |
+         |     |   | frame             |
+         |     |   |                   |
+         |     |   | ----------------- |<--\
+         |     |   | pc                |   |
+         |     |   | rbp               |   |
+         |     |   |                   |   |
+         |     |   | [empty]           |   |
+         |     \   |                   |   |
+                 - |===================|   |
+                   | int maxSize       |   |
+                   | long markCycle    |   |
+                   | int gcSP          |   |
+                   | long pc           |   |
+            header | byte flags        |   |
+                   | int argsize       |   |
+                   | int sp            +---/
+                   | int size          |
+                   +-------------------+
+
+************************************************/
+
+
 class InstanceStackChunkKlass: public InstanceKlass {
 private:
   enum class copy_type { CONJOINT, DISJOINT };
