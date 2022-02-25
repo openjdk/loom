@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -97,6 +98,8 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
+        ps.format("%s %s%n",  Instant.now(), Runtime.version());
+        ps.println();
         dumpThreads(ThreadContainers.root(), ps);
         ps.flush();
     }
@@ -132,8 +135,13 @@ public class ThreadDumper {
     private static void dumpThreadsToJson(PrintStream out) {
         out.println("{");
         out.println("  \"threadDump\": {");
-        out.println("    \"threadContainers\": [");
 
+        String now = Instant.now().toString();
+        String runtimeVersion = Runtime.version().toString();
+        out.format("    \"time\": \"%s\",%n", escape(now));
+        out.format("    \"runtimeVersion\": \"%s\",%n", escape(runtimeVersion));
+
+        out.println("    \"threadContainers\": [");
         List<ThreadContainer> containers = allContainers();
         Iterator<ThreadContainer> iterator = containers.iterator();
         while (iterator.hasNext()) {
@@ -143,6 +151,7 @@ public class ThreadDumper {
         }
 
         out.println("    ]");   // end of threadContainers
+
         out.println("  }");   // end threadDump
         out.println("}");  // end object
     }

@@ -57,6 +57,10 @@ public class DumpThreads {
             mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
             cat(file);
 
+            // runtime version should be on first line
+            String vs = Runtime.version().toString();
+            assertTrue(firstLine(file).contains(vs));
+
             // virtual thread should be found
             try {
                 assertTrue(isPresent(file, vthread));
@@ -88,6 +92,8 @@ public class DumpThreads {
             cat(file);
 
             assertTrue(count(file, "threadDump") >= 1L);
+            assertTrue(count(file, "time") >= 1L);
+            assertTrue(count(file, "runtimeVersion") >= 1L);
             assertTrue(count(file, "threadContainers") >= 1L);
             assertTrue(count(file, "threads") >= 1L);
 
@@ -181,6 +187,12 @@ public class DumpThreads {
     private static void cat(Path file) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             stream.forEach(System.out::println);
+        }
+    }
+
+    private String firstLine(Path file) throws Exception {
+        try (Stream<String> stream = Files.lines(file)) {
+            return stream.findFirst().orElseThrow();
         }
     }
 }
