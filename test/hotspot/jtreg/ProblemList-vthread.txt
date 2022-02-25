@@ -502,14 +502,9 @@ vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
 
 ####
-## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
+## JVMTI SetLocalXXX() is returning OPAQUE_FRAME because vthreads are not except with topmost farme.
 
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
 vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
-vmTestbase/nsk/jdb/set/set002/set002.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue001/setvalue001.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue003/setvalue003.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue004/setvalue004.java
 
 ####
 ## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
