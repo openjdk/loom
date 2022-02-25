@@ -112,7 +112,6 @@ typedef struct {
     jmethodID           systemGetProperty;
     jmethodID           setProperty;
     jthreadGroup        systemThreadGroup;
-    jthreadGroup        vthreadThreadGroup;
     jobject             agent_properties;
 
     jint                cachedJvmtiVersion;

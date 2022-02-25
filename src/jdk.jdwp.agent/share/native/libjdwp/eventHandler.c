@@ -1333,33 +1333,9 @@ cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
     /*tty_message("cbVThreadStart: vthread=%p", vthread);*/
     JDI_ASSERT(gdata->vthreadsSupported);
 
-    /*
-     * Now would be a good time to cache the ThreadGroup for vthreads (carrier threads)
-     * if we haven't already.
-     */
-    if (gdata->vthreadThreadGroup == NULL) {
-        jvmtiThreadInfo info;
-        jvmtiError error;
-
-        (void)memset(&info, 0, sizeof(info));
-        error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-            (gdata->jvmti, vthread, &info);
-
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "could not get vthread ThreadGroup");
-        } else {
-            debugMonitorEnter(callbackBlock); /* vthread fixme: any monitor will do, but there probably is a better choice. */
-            /* Make sure there wasn't a race before setting. saveGlobalRef() will assert if the
-             * target is not NULL. */
-            if (gdata->vthreadThreadGroup == NULL) {
-                saveGlobalRef(env, info.thread_group, &gdata->vthreadThreadGroup);
-            }
-            debugMonitorExit(callbackBlock);
-        }
-    }
-
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
+        /* Convert to THREAD_START event. */
         info.ei         = EI_THREAD_START;
         info.thread     = vthread;
         event_callback(env, &info);
@@ -1381,6 +1357,7 @@ cbVThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
 
     BEGIN_CALLBACK() {
         (void)memset(&info,0,sizeof(info));
+        /* Convert to THREAD_END event. */
         info.ei         = EI_THREAD_END;
         info.thread     = vthread;
         event_callback(env, &info);
