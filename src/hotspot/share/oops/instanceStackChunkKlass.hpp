@@ -65,7 +65,7 @@ Chunk layout:
                    |                   |
                   -|===================|
                 /  |                   |
-               |   | stack-passed args |  argsize
+               |   | caller stack args |  argsize
                |   |                   |  words
                |   | ----------------- |
                |   |                   |

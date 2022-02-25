@@ -102,7 +102,8 @@ static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one
 
 /************************************************
 
-Thread-stack layout on freeze/thaw
+Thread-stack layout on freeze/thaw.
+See corresponding stack-chunk layout in instanceStackChunkKlass.hpp
 
              +----------------------------+
              |      .                     |
@@ -128,7 +129,7 @@ Address |    |  pc                        |
         |    |  ?alignment word?          |
         |    |============================| <--\
         |    |                            |    |   argsize (might not be 2-word aligned)
-        |    |  stack-passed args         |    |   words
+        |    |  caller stack args         |    |   words. Caller is still in the chunk.
         |    |----------------------------|    |
         |    |                            |    |
         |    |  frame                     |    |
@@ -143,7 +144,7 @@ Address |    |  pc                        |
              |                            |    |
              |----------------------------| <--/
              |                            |
-             |  doYield stub              |
+             |  doYield/safepoint stub    | When preempting forcefully, we could have a safepoint stub instead of a doYield stub
              |                            |
              |============================|
              |                            |
