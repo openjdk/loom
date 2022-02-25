@@ -56,14 +56,10 @@ inline CodeBlob* CodeCache::find_blob_and_oopmap(void* pc, int& slot) {
 }
 
 inline int CodeCache::find_oopmap_slot_fast(void* pc) {
-  int slot = -1;
   NativePostCallNop* nop = nativePostCallNop_at((address) pc);
-  if (LIKELY(nop != NULL)) {
-    if (LIKELY(nop->displacement() != 0)) {
-      slot = ((nop->displacement() >> 24) & 0xff);
-    }
-  }
-  return slot;
+  return (nop != NULL && nop->displacement() != 0)
+      ? ((nop->displacement() >> 24) & 0xff)
+      : -1;
 }
 
 #endif
