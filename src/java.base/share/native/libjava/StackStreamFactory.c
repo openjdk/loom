@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -24,7 +24,7 @@
  */
 
 /*
- *      Implementation of class StackStreamfactory and AbstractStackWalker
+ *      Implementation of class StackStreamFactory and AbstractStackWalker
  */
 
 #include <stdio.h>
@@ -84,5 +84,5 @@ JNIEXPORT jint JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalke
 JNIEXPORT void JNICALL Java_java_lang_StackStreamFactory_00024AbstractStackWalker_setContinuation
   (JNIEnv *env, jobject stackstream, jlong anchor, jobjectArray frames, jobject cont)
 {
-  JVM_SetStackWalkContinuation(env, stackstream, anchor, frames, cont);
+    JVM_SetStackWalkContinuation(env, stackstream, anchor, frames, cont);
 }
