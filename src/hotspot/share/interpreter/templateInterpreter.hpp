@@ -118,7 +118,6 @@ class TemplateInterpreter: public AbstractInterpreter {
   static EntryPoint _trace_code;
 #endif // !PRODUCT
   static EntryPoint _return_entry[number_of_return_entries];    // entry points to return to from a call
-  static EntryPoint _return_entryX[number_of_return_entries];    // entry points to return to from a call
   static EntryPoint _earlyret_entry;                            // entry point to return early from a call
   static EntryPoint _deopt_entry[number_of_deopt_entries];      // entry points to return to from a deoptimization
   static address    _deopt_reexecute_return_entry;
