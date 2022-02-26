@@ -3912,6 +3912,10 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
+  if (DisableJVMTIVirtualThreadTransitions) {
+    assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
+    return;
+  }
   JvmtiVTMTDisabler::start_VTMT(vthread, 0);
 #else
   fatal("Should only be called with JVMTI enabled");
@@ -3920,6 +3924,10 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
+  if (DisableJVMTIVirtualThreadTransitions) {
+    assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
+    return;
+  }
   oop vt = JNIHandles::resolve(vthread);
 
   thread->rebind_to_jvmti_thread_state_of(vt);
@@ -3951,6 +3959,10 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
 #if INCLUDE_JVMTI
+  if (DisableJVMTIVirtualThreadTransitions) {
+    assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
+    return;
+  }
   HandleMark hm(thread);
   Handle ct(thread, thread->threadObj());
 
@@ -3987,6 +3999,10 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
 #if INCLUDE_JVMTI
+  if (DisableJVMTIVirtualThreadTransitions) {
+    assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
+    return;
+  }
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 1);
 #else

@@ -690,6 +690,10 @@ const intx ObjectAlignmentInBytes = 8;
                "Disable generation of virtual thread ThreadStart and "      \
                "ThreadEnd events for virtual thread unaware agents")        \
                                                                             \
+  product(bool, DisableJVMTIVirtualThreadTransitions, false, EXPERIMENTAL,  \
+               "Disable JVMTI virtual thread mount/unmount transitions to " \
+               "avoid performance overhead for agents that don't need them")\
+                                                                            \
   /* notice: the max range value here is max_jint, not max_intx  */         \
   /* because of overflow issue                                   */         \
   product(intx, AsyncDeflationInterval, 250, DIAGNOSTIC,                    \
