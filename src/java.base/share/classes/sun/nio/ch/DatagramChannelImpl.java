@@ -651,7 +651,8 @@ class DatagramChannelImpl
                     @SuppressWarnings("removal")
                     SecurityManager sm = System.getSecurityManager();
                     if (sm != null) {
-                        InetSocketAddress sender = sourceSocketAddress();
+                        // invoke decode directly to avoid touch cache
+                        InetSocketAddress sender = sourceSockAddr.decode();
                         try {
                             sm.checkAccept(sender.getAddress().getHostAddress(),
                                            sender.getPort());
@@ -754,6 +755,7 @@ class DatagramChannelImpl
         }
 
         // set datagram length and sender address
+        assert n >= 0 && sender != null;
         synchronized (p) {
             DatagramPackets.setLength(p, n);
             p.setSocketAddress(sender);
