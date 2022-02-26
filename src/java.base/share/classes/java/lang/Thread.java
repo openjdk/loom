@@ -361,10 +361,10 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Sets the Thread object to be returned by Thread.currentThread().
+     * Returns the Thread object for the current carrier thread.
      */
     @IntrinsicCandidate
-    native void setCurrentThread(Thread thread);
+    static native Thread currentCarrierThread();
 
     /**
      * Returns the Thread object for the current thread.
@@ -374,14 +374,10 @@ public class Thread implements Runnable {
     public static native Thread currentThread();
 
     /**
-     * Returns the current carrier thread.
+     * Sets the Thread object to be returned by Thread.currentThread().
      */
-    static Thread currentCarrierThread() {
-        return currentThread0();
-    }
-
     @IntrinsicCandidate
-    private static native Thread currentThread0();
+    native void setCurrentThread(Thread thread);
 
     // ScopeLocal support:
 

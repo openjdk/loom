@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -245,12 +245,12 @@ class methodHandle;
    do_name(     arraycopy_name,                                  "arraycopy")                                           \
    do_signature(arraycopy_signature,                             "(Ljava/lang/Object;ILjava/lang/Object;II)V")          \
                                                                                                                         \
-  do_intrinsic(_currentThread0,           java_lang_Thread,       currentThread0_name, currentThread_signature,   F_SN)  \
+  do_intrinsic(_currentCarrierThread,     java_lang_Thread,       currentCarrierThread_name, currentThread_signature,   F_SN)  \
   do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,    F_SN)  \
   do_intrinsic(_scopeLocalCache,          java_lang_Thread,       scopeLocalCache_name, scopeLocalCache_signature, F_SN)  \
   do_intrinsic(_setScopeLocalCache,       java_lang_Thread,       setScopeLocalCache_name, setScopeLocalCache_signature, F_SN) \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
-   do_name(     currentThread0_name,                             "currentThread0")                                      \
+   do_name(     currentCarrierThread_name,                       "currentCarrierThread")                                \
    do_name(     currentThread_name,                              "currentThread")                                       \
    do_name(     scopeLocalCache_name,                            "scopeLocalCache")                                     \
    do_name(     setScopeLocalCache_name,                         "setScopeLocalCache")                                  \

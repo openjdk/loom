@@ -246,15 +246,6 @@ JVM_CallStackWalk(JNIEnv *env, jobject stackStream, jlong mode,
                   jint skip_frames, jobject contScope, jobject cont,
                   jint frame_count, jint start_index, jobjectArray frames);
 
-JNIEXPORT jobject JNICALL
-JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
-
-JNIEXPORT void JNICALL
-JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
-
-JNIEXPORT void JNICALL
-JVM_SetCurrentThread(JNIEnv *env, jclass threadClass, jobject theThread);
-
 JNIEXPORT jint JNICALL
 JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jlong mode, jlong anchor,
                   jint frame_count, jint start_index,
@@ -291,10 +282,13 @@ JNIEXPORT void JNICALL
 JVM_Sleep(JNIEnv *env, jclass threadClass, jlong millis);
 
 JNIEXPORT jobject JNICALL
-JVM_CurrentThread0(JNIEnv *env, jclass threadClass);
+JVM_CurrentCarrierThread(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT jobject JNICALL
 JVM_CurrentThread(JNIEnv *env, jclass threadClass);
+
+JNIEXPORT void JNICALL
+JVM_SetCurrentThread(JNIEnv *env, jobject thisThread, jobject theThread);
 
 JNIEXPORT void JNICALL
 JVM_Interrupt(JNIEnv *env, jobject thread);
@@ -317,6 +311,12 @@ JVM_SetNativeThreadName(JNIEnv *env, jobject jthread, jstring name);
 /* getStackTrace() and getAllStackTraces() method */
 JNIEXPORT jobjectArray JNICALL
 JVM_DumpThreads(JNIEnv *env, jclass threadClass, jobjectArray threads);
+
+JNIEXPORT jobject JNICALL
+JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
+
+JNIEXPORT void JNICALL
+JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
 /*
  * jdk.internal.vm.Continuation

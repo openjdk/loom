@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1314,8 +1314,8 @@ void LIRGenerator::do_getModifiers(Intrinsic* x) {
   __ branch_destination(L_done->label());
 }
 
-// Example: Thread.currentThread0()
-void LIRGenerator::do_currentThread0(Intrinsic* x) {
+// Example: Thread.currentCarrierThread()
+void LIRGenerator::do_currentCarrierThread(Intrinsic* x) {
   assert(x->number_of_arguments() == 0, "wrong type");
   LIR_Opr temp = new_register(T_ADDRESS);
   LIR_Opr reg = rlock_result(x);
@@ -2970,7 +2970,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_getModifiers:   do_getModifiers(x);  break;
   case vmIntrinsics::_getClass:       do_getClass(x);      break;
   case vmIntrinsics::_getObjectSize:  do_getObjectSize(x); break;
-  case vmIntrinsics::_currentThread0: do_currentThread0(x); break;
+  case vmIntrinsics::_currentCarrierThread: do_currentCarrierThread(x); break;
   case vmIntrinsics::_currentThread:  do_vthread(x);       break;
   case vmIntrinsics::_scopeLocalCache: do_scopeLocalCache(x); break;
 

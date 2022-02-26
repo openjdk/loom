@@ -471,7 +471,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
 
-  case vmIntrinsics::_currentThread0:           return inline_native_currentThread0();
+  case vmIntrinsics::_currentCarrierThread:     return inline_native_currentCarrierThread();
   case vmIntrinsics::_currentThread:            return inline_native_currentThread();
   case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
@@ -3218,10 +3218,35 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
 #endif // JFR_HAVE_INTRINSICS
 
-//------------------------inline_native_currentThread0------------------
-bool LibraryCallKit::inline_native_currentThread0() {
+//------------------------inline_native_currentCarrierThread------------------
+bool LibraryCallKit::inline_native_currentCarrierThread() {
   Node* junk = NULL;
   set_result(generate_current_thread(junk));
+  return true;
+}
+
+//------------------------inline_native_currentThread------------------
+bool LibraryCallKit::inline_native_currentThread() {
+  Node* junk = NULL;
+  set_result(generate_virtual_thread(junk));
+  return true;
+}
+
+//------------------------inline_native_setVthread------------------
+bool LibraryCallKit::inline_native_setCurrentThread() {
+  assert(C->method()->changes_current_thread(),
+         "method changes current Thread but is not annotated ChangesCurrentThread");
+  Node* arr = argument(1);
+  Node* thread = _gvn.transform(new ThreadLocalNode());
+  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::vthread_offset()));
+  Node* thread_obj_handle
+    = make_load(NULL, p, p->bottom_type()->is_ptr(), T_OBJECT, MemNode::unordered);
+  thread_obj_handle = _gvn.transform(thread_obj_handle);
+  const TypePtr *adr_type = _gvn.type(thread_obj_handle)->isa_ptr();
+  // Stores of oops to native memory not supported yet by BarrierSetC2::store_at_resolved
+  // access_store_at(NULL, thread_obj_handle, adr_type, arr, _gvn.type(arr), T_OBJECT, IN_NATIVE | MO_UNORDERED);
+  store_to_memory(control(), thread_obj_handle, arr, T_OBJECT, adr_type, MemNode::unordered);
+
   return true;
 }
 
@@ -3261,31 +3286,6 @@ bool LibraryCallKit::inline_native_setScopeLocalCache() {
   const TypePtr *adr_type = _gvn.type(cache_obj_handle)->isa_ptr();
   store_to_memory(control(), cache_obj_handle, arr, T_OBJECT, adr_type,
                   MemNode::unordered);
-
-  return true;
-}
-
-//------------------------inline_native_currentThread------------------
-bool LibraryCallKit::inline_native_currentThread() {
-  Node* junk = NULL;
-  set_result(generate_virtual_thread(junk));
-  return true;
-}
-
-//------------------------inline_native_setVthread------------------
-bool LibraryCallKit::inline_native_setCurrentThread() {
-  assert(C->method()->changes_current_thread(),
-         "method changes current Thread but is not annotated ChangesCurrentThread");
-  Node* arr = argument(1);
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::vthread_offset()));
-  Node* thread_obj_handle
-    = make_load(NULL, p, p->bottom_type()->is_ptr(), T_OBJECT, MemNode::unordered);
-  thread_obj_handle = _gvn.transform(thread_obj_handle);
-  const TypePtr *adr_type = _gvn.type(thread_obj_handle)->isa_ptr();
-  // Stores of oops to native memory not supported yet by BarrierSetC2::store_at_resolved
-  // access_store_at(NULL, thread_obj_handle, adr_type, arr, _gvn.type(arr), T_OBJECT, IN_NATIVE | MO_UNORDERED);
-  store_to_memory(control(), thread_obj_handle, arr, T_OBJECT, adr_type, MemNode::unordered);
 
   return true;
 }

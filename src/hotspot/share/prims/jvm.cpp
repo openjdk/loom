@@ -3094,10 +3094,21 @@ JVM_ENTRY(void, JVM_Sleep(JNIEnv* env, jclass threadClass, jlong millis))
   HOTSPOT_THREAD_SLEEP_END(0);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_CurrentThread0(JNIEnv* env, jclass threadClass))
+JVM_ENTRY(jobject, JVM_CurrentCarrierThread(JNIEnv* env, jclass threadClass))
   oop jthread = thread->threadObj();
   assert(jthread != NULL, "no current thread!");
   return JNIHandles::make_local(THREAD, jthread);
+JVM_END
+
+JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
+  oop theThread = thread->vthread();
+  assert (theThread != (oop)NULL, "no current thread!");
+  return JNIHandles::make_local(THREAD, theThread);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
+                                     jobject theThread))
+  thread->set_vthread(JNIHandles::resolve(theThread));
 JVM_END
 
 JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))
@@ -3108,35 +3119,6 @@ JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))
     // jthread refers to a live JavaThread.
     receiver->interrupt();
   }
-JVM_END
-
-JVM_ENTRY(jobject, JVM_ScopeLocalCache(JNIEnv* env, jclass threadClass))
-  oop theCache = thread->scopeLocalCache();
-  if (theCache) {
-    arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
-  }
-  return JNIHandles::make_local(THREAD, theCache);
-JVM_END
-
-JVM_ENTRY(void, JVM_SetScopeLocalCache(JNIEnv* env, jclass threadClass,
-                                   jobject theCache))
-  arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
-  if (objs != NULL) {
-    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
-  }
-  thread->set_scopeLocalCache(objs);
-JVM_END
-
-JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
-  oop theThread = thread->vthread();
-  assert (theThread != (oop)NULL, "no current thread!");
-  return JNIHandles::make_local(THREAD, theThread);
-JVM_END
-
-JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jclass threadClass,
-                                     jobject theThread))
-  thread->set_vthread(JNIHandles::resolve(theThread));
 JVM_END
 
 // Return true iff the current thread has locked the object passed in
@@ -3175,6 +3157,24 @@ JVM_ENTRY(void, JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring na
     const char *thread_name = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(name));
     os::set_native_thread_name(thread_name);
   }
+JVM_END
+
+JVM_ENTRY(jobject, JVM_ScopeLocalCache(JNIEnv* env, jclass threadClass))
+  oop theCache = thread->scopeLocalCache();
+  if (theCache) {
+    arrayOop objs = arrayOop(theCache);
+    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
+  }
+  return JNIHandles::make_local(THREAD, theCache);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetScopeLocalCache(JNIEnv* env, jclass threadClass,
+                                   jobject theCache))
+  arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
+  if (objs != NULL) {
+    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
+  }
+  thread->set_scopeLocalCache(objs);
 JVM_END
 
 // java.lang.SecurityManager ///////////////////////////////////////////////////////////////////////
