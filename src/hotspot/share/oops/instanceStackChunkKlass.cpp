@@ -46,6 +46,9 @@
 #include "utilities/bitMap.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
+#ifdef ASSERT
+#include "logging/logStream.hpp"
+#endif
 
 #define FIX_DERIVED_POINTERS true
 
