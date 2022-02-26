@@ -33,6 +33,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner.Cleanable;
 import java.lang.reflect.Method;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -636,28 +637,26 @@ class DatagramChannelImpl
      * Attempts to receive a datagram into the given byte array.
      * @param connected true if the channel is connected
      */
-    private DatagramInfo tryReceive(byte[] b, int off, int len, boolean connected)
+    private int tryReceive(byte[] b, int off, int len, boolean connected)
         throws IOException
     {
         ByteBuffer dst = Util.getTemporaryDirectBuffer(len);
         assert dst.position() == 0;
         try {
-            InetSocketAddress sender = null;
+
             int n = receive(dst, connected);
             if (n >= 0) {
-                sender = sourceSocketAddress();
-
                 // check security manager when not connected
                 if (!connected) {
                     @SuppressWarnings("removal")
                     SecurityManager sm = System.getSecurityManager();
                     if (sm != null) {
+                        InetSocketAddress sender = sourceSocketAddress();
                         try {
                             sm.checkAccept(sender.getAddress().getHostAddress(),
                                            sender.getPort());
                         } catch (SecurityException e) {
-                            // drop datagram
-                            sender = null;
+                            // ignore datagram
                             n = IOStatus.UNAVAILABLE;
                         }
                     }
@@ -669,7 +668,7 @@ class DatagramChannelImpl
                     dst.get(b, off, n);
                 }
             }
-            return new DatagramInfo(sender, n);
+            return n;
         } finally{
             Util.offerFirstTemporaryDirectBuffer(dst);
         }
@@ -680,34 +679,41 @@ class DatagramChannelImpl
      * @param connected true if the channel is connected
      * @throws SocketTimeoutException if the receive timeout elapses
      */
-    private DatagramInfo timedReceive(byte[] b, int off, int len, long nanos, boolean connected)
+    private int timedReceive(byte[] b, int off, int len, long nanos, boolean connected)
         throws IOException
     {
         long startNanos = System.nanoTime();
-        DatagramInfo result = tryReceive(b, off, len, connected);
-        while (result.length() == IOStatus.UNAVAILABLE && isOpen()) {
+        int n = tryReceive(b, off, len, connected);
+        while (n == IOStatus.UNAVAILABLE && isOpen()) {
             long remainingNanos = nanos - (System.nanoTime() - startNanos);
             if (remainingNanos <= 0) {
                 throw new SocketTimeoutException("Read timed out");
             }
             park(Net.POLLIN, remainingNanos);
-            result = tryReceive(b, off, len, connected);
+            n = tryReceive(b, off, len, connected);
         }
-        return result;
+        return n;
     }
 
     /**
-     * Receives a datagram into the given byte array.
+     * Receives a datagram into the byte array of the given DatagramPacket.
      *
      * @apiNote This method is for use by the socket adaptor.
      *
      * @throws IllegalBlockingModeException if the channel is non-blocking
      * @throws SocketTimeoutException if the timeout elapses
      */
-    DatagramInfo blockingReceive(byte[] b, int off, int len, long nanos)
-        throws IOException
-    {
-        Objects.checkFromIndexSize(off, len, b.length);
+    void blockingReceive(DatagramPacket p, long nanos) throws IOException {
+        byte[] ba; int off, len;
+        synchronized (p) {
+            ba = p.getData();
+            off = p.getOffset();
+            len = DatagramPackets.getBufLength(p);
+        }
+        Objects.checkFromIndexSize(off, len, ba.length);
+
+        int n = -1;
+        InetSocketAddress sender = null;
 
         readLock.lock();
         try {
@@ -715,38 +721,42 @@ class DatagramChannelImpl
             if (!isBlocking())
                 throw new IllegalBlockingModeException();
 
-            DatagramInfo result = null;
             try {
                 SocketAddress remote = beginRead(true, false);
                 lockedConfigureNonBlockingIfNeeded();
                 boolean connected = (remote != null);
                 if (nanos > 0) {
-
                     // timed receive, change socket to non-blocking
                     lockedConfigureBlocking(false);
                     try {
-                        result = timedReceive(b, off, len, nanos, connected);
+                        n = timedReceive(ba, off, len, nanos, connected);
                     } finally {
                         // restore socket to blocking mode
                         tryLockedConfigureBlocking(true);
                     }
-
                 } else {
-
                     // untimed receive
-                    result = tryReceive(b, off, len, connected);
-                    while (IOStatus.okayToRetry(result.length()) && isOpen()) {
+                    n = tryReceive(ba, off, len, connected);
+                    while (IOStatus.okayToRetry(n) && isOpen()) {
                         park(Net.POLLIN);
-                        result = tryReceive(b, off, len, connected);
+                        n = tryReceive(ba, off, len, connected);
                     }
-
                 }
-                return result;
+                if (n >= 0) {
+                    // sender address is in socket address buffer
+                    sender = sourceSocketAddress();
+                }
             } finally {
-                endRead(true, (result != null && result.length() > 0));
+                endRead(true, n >= 0);
             }
         } finally {
             readLock.unlock();
+        }
+
+        // set datagram length and sender address
+        synchronized (p) {
+            DatagramPackets.setLength(p, n);
+            p.setSocketAddress(sender);
         }
     }
 
@@ -2010,6 +2020,44 @@ class DatagramChannelImpl
                 NativeSocketAddress.freeAll(sockAddrs);
             }
         };
+    }
+
+    /**
+     * Defines static methods to get/set DatagramPacket fields and workaround
+     * DatagramPacket deficiencies.
+     */
+    private static class DatagramPackets {
+        private static final VarHandle LENGTH;
+        private static final VarHandle BUF_LENGTH;
+        static {
+            try {
+                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                    MethodHandles.privateLookupIn(DatagramPacket.class, MethodHandles.lookup());
+                @SuppressWarnings("removal")
+                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
+                LENGTH = l.findVarHandle(DatagramPacket.class, "length", int.class);
+                BUF_LENGTH = l.findVarHandle(DatagramPacket.class, "bufLength", int.class);
+            } catch (Exception e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
+        /**
+         * Sets the DatagramPacket.length field. DatagramPacket.setLength cannot be
+         * used at this time because it sets both the length and bufLength fields.
+         */
+        static void setLength(DatagramPacket p, int value) {
+            assert Thread.holdsLock(p);
+            LENGTH.set(p, value);
+        }
+
+        /**
+         * Returns the value of the DatagramPacket.bufLength field.
+         */
+        static int getBufLength(DatagramPacket p) {
+            assert Thread.holdsLock(p);
+            return (int) BUF_LENGTH.get(p);
+        }
     }
 
     // -- Native methods --

@@ -189,9 +189,7 @@ public class DatagramSocketAdaptor
 
     @Override
     public void send(DatagramPacket p) throws IOException {
-        byte[] ba;
-        int off;
-        int len;
+        byte[] ba; int off, len;
         InetSocketAddress target;
 
         synchronized (p) {
@@ -228,20 +226,9 @@ public class DatagramSocketAdaptor
 
     @Override
     public void receive(DatagramPacket p) throws IOException {
-        byte[] ba;
-        int off;
-        int len;
-
-        synchronized (p) {
-            ba = p.getData();
-            off = p.getOffset();
-            len = DatagramPackets.getBufLength(p);
-        }
-
-        DatagramInfo result;
+        long nanos = MILLISECONDS.toNanos(timeout);
         try {
-            long nanos = MILLISECONDS.toNanos(timeout);
-            result = dc.blockingReceive(ba, off, len, nanos);
+            dc.blockingReceive(p, nanos);
         } catch (SocketTimeoutException e) {
             throw e;
         } catch (InterruptedIOException e) {
@@ -255,11 +242,6 @@ public class DatagramSocketAdaptor
             var exc = new SocketException("Socket closed");
             exc.initCause(e);
             throw exc;
-        }
-
-        synchronized (p) {
-            DatagramPackets.setLength(p, result.length());
-            p.setSocketAddress(result.sender());
         }
     }
 
@@ -697,44 +679,6 @@ public class DatagramSocketAdaptor
      */
     private InetAddress anyInetAddress() {
         return new InetSocketAddress(0).getAddress();
-    }
-
-    /**
-     * Defines static methods to get/set DatagramPacket fields and workaround
-     * DatagramPacket deficiencies.
-     */
-    private static class DatagramPackets {
-        private static final VarHandle LENGTH;
-        private static final VarHandle BUF_LENGTH;
-        static {
-            try {
-                PrivilegedExceptionAction<Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(DatagramPacket.class, MethodHandles.lookup());
-                @SuppressWarnings("removal")
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                LENGTH = l.findVarHandle(DatagramPacket.class, "length", int.class);
-                BUF_LENGTH = l.findVarHandle(DatagramPacket.class, "bufLength", int.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
-        /**
-         * Sets the DatagramPacket.length field. DatagramPacket.setLength cannot be
-         * used at this time because it sets both the length and bufLength fields.
-         */
-        static void setLength(DatagramPacket p, int value) {
-            assert Thread.holdsLock(p);
-            LENGTH.set(p, value);
-        }
-
-        /**
-         * Returns the value of the DatagramPacket.bufLength field.
-         */
-        static int getBufLength(DatagramPacket p) {
-            assert Thread.holdsLock(p);
-            return (int) BUF_LENGTH.get(p);
-        }
     }
 
     /**
