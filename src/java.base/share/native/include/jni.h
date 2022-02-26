@@ -1873,7 +1873,7 @@ struct JNIEnv_ {
         return functions->GetModule(this, clazz);
     }
 
-    /* Loom */
+    /* Virtual threads */
 
     jboolean IsVirtualThread(jobject obj) {
         return functions->IsVirtualThread(this, obj);
