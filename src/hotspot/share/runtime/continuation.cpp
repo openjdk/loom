@@ -88,16 +88,20 @@ static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one
  * This file contains the implementation of continuation freezing (yield) and thawing (run).
  *
  * This code is very latency-critical and very hot. An ordinary and well-behaved server application
- * would likely call these operations many thousands of times every second, on every core, for
- * the entire duration of the application*.
+ * would likely call these operations many thousands of times per second second, on every core.
  *
  * Freeze might be called every time the application performs any I/O operation, every time it
  * acquires a j.u.c. lock, every time it takes a message from a queue, and thaw can be called
  * multiple times in each of those cases, as it is called by the return barrier, which may be
  * invoked on method return.
  *
- * The *amortized* budget for each of those two operations is ~100-150ns. That is why, for
+ * The amortized budget for each of those two operations is ~100-150ns. That is why, for
  * example, every effort is made to avoid Java-VM transitions as much as possible.
+ *
+ * On the fast path, all frames are known to be compiled, and the chunk requires no barriers
+ * and so frames simply copied, and the bottom-most one is patched.
+ * On the slow path, internal pointers in interpreted frames are de/relativized to/from offsets
+ * and absolute pointers, and barriers invoked.
  */
 
 /************************************************
@@ -123,14 +127,16 @@ See corresponding stack-chunk layout in instanceStackChunkKlass.hpp
         |    |  oopDesc* chunk            |
         |    |  ContinuationEntry* parent |
         |    |  ...                       |
-        |    |----------------------------| <----- JavaThread::_cont_entry
-Address |    |  pc                        |
-        |    |  rbp                       |
-        |    |  ?alignment word?          |
-        |    |============================| <--\
-        |    |                            |    |   argsize (might not be 2-word aligned)
-        |    |  caller stack args         |    |   words. Caller is still in the chunk.
+        |    |============================| <------ JavaThread::_cont_entry
+        |    |  ? alignment word ?        |
+        |    |----------------------------| <--\
+        |    |                            |    |
+        |    |  ? caller stack args ?     |    |   argsize (might not be 2-word aligned) words
+Address |    |                            |    |   Caller is still in the chunk.
         |    |----------------------------|    |
+        |    |  pc (? return barrier ?)   |    |  This pc contains the return barrier
+        |    |  rbp                       |    |  When the bottom-most frame isn't the last on in the continuation.
+        |    |============================|    |
         |    |                            |    |
         |    |  frame                     |    |
         |    |                            |    |
