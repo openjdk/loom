@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -155,18 +155,18 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedWrite(b);
+                implWrite(b);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedWrite(b);
+                implWrite(b);
             }
         }
     }
 
-    private void lockedWrite(int b) throws IOException {
+    private void implWrite(int b) throws IOException {
         growIfNeeded(1);
         if (count >= buf.length) {
             flushBuffer();
@@ -195,18 +195,18 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedWrite(b, off, len);
+                implWrite(b, off, len);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedWrite(b, off, len);
+                implWrite(b, off, len);
             }
         }
     }
 
-    private void lockedWrite(byte[] b, int off, int len) throws IOException {
+    private void implWrite(byte[] b, int off, int len) throws IOException {
         int max = (maxBufSize > 0) ? maxBufSize : buf.length;
         if (len >= max) {
             /* If the request length exceeds the max size of the output buffer,
@@ -236,18 +236,18 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedFlush();
+                implFlush();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedFlush();
+                implFlush();
             }
         }
     }
 
-    private void lockedFlush() throws IOException {
+    private void implFlush() throws IOException {
         flushBuffer();
         out.flush();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -447,18 +447,18 @@ public class PrintStream extends FilterOutputStream
         if (lock != null) {
             lock.lock();
             try {
-                lockedFlush();
+                implFlush();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedFlush();
+                implFlush();
             }
         }
     }
 
-    private void lockedFlush() {
+    private void implFlush() {
         try {
             ensureOpen();
             out.flush();
@@ -481,18 +481,18 @@ public class PrintStream extends FilterOutputStream
         if (lock != null) {
             lock.lock();
             try {
-                lockedClose();
+                implClose();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedClose();
+                implClose();
             }
         }
     }
 
-    private void lockedClose() {
+    private void implClose() {
         if (!closing) {
             closing = true;
             try {
@@ -585,13 +585,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWrite(b);
+                    implWrite(b);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWrite(b);
+                    implWrite(b);
                 }
             }
         }
@@ -603,7 +603,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWrite(int b) throws IOException {
+    private void implWrite(int b) throws IOException {
         ensureOpen();
         out.write(b);
         if ((b == '\n') && autoFlush)
@@ -630,13 +630,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWrite(buf, off, len);
+                    implWrite(buf, off, len);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWrite(buf, off, len);
+                    implWrite(buf, off, len);
                 }
             }
         }
@@ -648,7 +648,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWrite(byte[] buf, int off, int len) throws IOException {
+    private void implWrite(byte[] buf, int off, int len) throws IOException {
         ensureOpen();
         out.write(buf, off, len);
         if (autoFlush)
@@ -725,13 +725,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWrite(buf);
+                    implWrite(buf);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWrite(buf);
+                    implWrite(buf);
                 }
             }
         } catch (InterruptedIOException x) {
@@ -741,7 +741,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWrite(char[] buf) throws IOException {
+    private void implWrite(char[] buf) throws IOException {
         ensureOpen();
         textOut.write(buf);
         textOut.flushBuffer();
@@ -764,13 +764,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWriteln(buf);
+                    implWriteln(buf);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWriteln(buf);
+                    implWriteln(buf);
                 }
             }
         }
@@ -782,7 +782,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWriteln(char[] buf) throws IOException {
+    private void implWriteln(char[] buf) throws IOException {
         ensureOpen();
         textOut.write(buf);
         textOut.newLine();
@@ -797,13 +797,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWrite(s);
+                    implWrite(s);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWrite(s);
+                    implWrite(s);
                 }
             }
         }
@@ -815,7 +815,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWrite(String s) throws IOException {
+    private void implWrite(String s) throws IOException {
         ensureOpen();
         textOut.write(s);
         textOut.flushBuffer();
@@ -833,13 +833,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedWriteln(s);
+                    implWriteln(s);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedWriteln(s);
+                    implWriteln(s);
                 }
             }
         }
@@ -851,7 +851,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedWriteln(String s) throws IOException {
+    private void implWriteln(String s) throws IOException {
         ensureOpen();
         textOut.write(s);
         textOut.newLine();
@@ -866,13 +866,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedNewLine();
+                    implNewLine();
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedNewLine();
+                    implNewLine();
                 }
             }
         }
@@ -884,7 +884,7 @@ public class PrintStream extends FilterOutputStream
         }
     }
 
-    private void lockedNewLine() throws IOException {
+    private void implNewLine() throws IOException {
         ensureOpen();
         textOut.newLine();
         textOut.flushBuffer();
@@ -1353,13 +1353,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedFormat(format, args);
+                    implFormat(format, args);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedFormat(format, args);
+                    implFormat(format, args);
                 }
             }
         } catch (InterruptedIOException x) {
@@ -1370,7 +1370,7 @@ public class PrintStream extends FilterOutputStream
         return this;
     }
 
-    private void lockedFormat(String format, Object ... args) throws IOException {
+    private void implFormat(String format, Object ... args) throws IOException {
         ensureOpen();
         if ((formatter == null) || (formatter.locale() != Locale.getDefault(Locale.Category.FORMAT)))
             formatter = new Formatter((Appendable) this);
@@ -1422,13 +1422,13 @@ public class PrintStream extends FilterOutputStream
             if (lock != null) {
                 lock.lock();
                 try {
-                    lockedFormat(l, format, args);
+                    implFormat(l, format, args);
                 } finally {
                     lock.unlock();
                 }
             } else {
                 synchronized (this) {
-                    lockedFormat(format, args);
+                    implFormat(format, args);
                 }
             }
         } catch (InterruptedIOException x) {
@@ -1439,7 +1439,7 @@ public class PrintStream extends FilterOutputStream
         return this;
     }
 
-    private void lockedFormat(Locale l, String format, Object ... args) throws IOException {
+    private void implFormat(Locale l, String format, Object ... args) throws IOException {
         ensureOpen();
         if ((formatter == null) || (formatter.locale() != l))
             formatter = new Formatter(this, l);

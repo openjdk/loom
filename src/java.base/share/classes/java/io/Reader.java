@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -307,18 +307,18 @@ public abstract class Reader implements Readable, Closeable {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedSkip(n);
+                return implSkip(n);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedSkip(n);
+                return implSkip(n);
             }
         }
     }
 
-    private long lockedSkip(long n) throws IOException {
+    private long implSkip(long n) throws IOException {
         int nn = (int) Math.min(n, maxSkipBufferSize);
         if ((skipBuffer == null) || (skipBuffer.length < nn))
             skipBuffer = new char[nn];

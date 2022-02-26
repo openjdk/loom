@@ -25,9 +25,8 @@
 
 package java.io;
 
-import jdk.internal.misc.InternalLock;
-
 import java.util.Objects;
+import jdk.internal.misc.InternalLock;
 
 /**
  * A {@code PushbackInputStream} adds

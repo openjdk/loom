@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -156,18 +156,18 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedFlushBuffer();
+                implFlushBuffer();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedFlushBuffer();
+                implFlushBuffer();
             }
         }
     }
 
-    private void lockedFlushBuffer() throws IOException {
+    private void implFlushBuffer() throws IOException {
         ensureOpen();
         if (nextChar == 0)
             return;
@@ -185,18 +185,18 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(c);
+                implWrite(c);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(c);
+                implWrite(c);
             }
         }
     }
 
-    private void lockedWrite(int c) throws IOException {
+    private void implWrite(int c) throws IOException {
         ensureOpen();
         growIfNeeded(1);
         if (nextChar >= nChars)
@@ -239,18 +239,18 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(cbuf, off, len);
+                implWrite(cbuf, off, len);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(cbuf, off, len);
+                implWrite(cbuf, off, len);
             }
         }
     }
 
-    private void lockedWrite(char[] cbuf, int off, int len) throws IOException {
+    private void implWrite(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         Objects.checkFromIndexSize(off, len, cbuf.length);
         if (len == 0) {
@@ -306,18 +306,18 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(s, off, len);
+                implWrite(s, off, len);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(s, off, len);
+                implWrite(s, off, len);
             }
         }
     }
 
-    private void lockedWrite(String s, int off, int len) throws IOException {
+    private void implWrite(String s, int off, int len) throws IOException {
         ensureOpen();
         growIfNeeded(len);
         int b = off, t = off + len;
@@ -352,18 +352,18 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedFlush();
+                implFlush();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedFlush();
+                implFlush();
             }
         }
     }
 
-    private void lockedFlush() throws IOException {
+    private void implFlush() throws IOException {
         flushBuffer();
         out.flush();
     }
@@ -373,19 +373,19 @@ public class BufferedWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedClose();
+                implClose();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedClose();
+                implClose();
             }
         }
     }
 
     @SuppressWarnings("try")
-    private void lockedClose() throws IOException {
+    private void implClose() throws IOException {
         if (out == null) {
             return;
         }
