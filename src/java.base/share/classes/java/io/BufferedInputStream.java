@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -461,18 +461,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                return lockAvailable();
+                return lockedAvailable();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                return lockAvailable();
+                return lockedAvailable();
             }
         }
     }
 
-    private int lockAvailable() throws IOException {
+    private int lockedAvailable() throws IOException {
         int n = count - pos;
         int avail = getInIfOpen().available();
         return n > (Integer.MAX_VALUE - avail)
