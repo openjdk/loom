@@ -92,14 +92,18 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
     )
     (Command AllThreads=4
-        "Returns the live "
-        "<a href=../../api/java.base/java/lang/Thread.html#platform-threads>platform threads</a> "
-        "in the target VM. The returned list contains platform threads created with "
-        "the java.lang.Thread API and all native threads attached to the target VM "
-        "through JNI. It does not contain "
-        "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual threads</a>. "
-        "Threads that have not yet been started and threads that have completed "
-        "their execution are also not included in the returned list."
+        "Returns the live threads in the target VM. Threads that have not yet "
+        "started or threads that have terminated are not included in the list."
+        "<p>"
+        "The returned list contains a threadID for each live "
+        "<a href=../../api/java.base/java/lang/Thread.html#platform-threads>platform thread</a> "
+        "in the target VM. This includes platform threads created with the Thread "
+        "API and and all native threads attached to the target VM with JNI code."
+        "<p>"
+        "It is implementation dependent if the list contains threadIDs for live "
+        "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual threads</a> "
+        "in the target VM. The target VM may not return threadIDs for virtual threads, "
+        "or it may be configured to return a threadID for some or all virtual threads."
         (Out
         )
         (Reply

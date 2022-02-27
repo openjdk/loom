@@ -1533,7 +1533,7 @@ jvmtiEnv *jvmti;
         It does not include virtual threads.
         A thread is live if <code>java.lang.Thread.isAlive()</code>
         would return <code>true</code>, that is, the thread has
-        been started and has not yet died.
+        been started and has not yet terminated.
         The universe of threads is determined by the context of the <jvmti/>
         environment, which typically is all threads attached to the VM.
       </description>
@@ -1607,7 +1607,7 @@ jvmtiEnv *jvmti;
         Java programming language threads.
         A thread is live if <code>java.lang.Thread.isAlive()</code>
         would return <code>true</code>, that is, the thread has
-        been started and has not yet died.
+        been started and has not yet terminated.
         The universe of threads is determined
         by the context of the <jvmti/>
         environment, which, typically, is all threads attached to the VM,
@@ -1986,7 +1986,7 @@ jvmtiEnv *jvmti;
           <jthreadGroup/>
           <description>
             The thread group to which this thread belongs.
-            <code>NULL</code> if the thread has died.
+            <code>NULL</code> if the thread has terminated.
           </description>
         </field>
         <field id="context_class_loader">
@@ -2213,7 +2213,7 @@ jvmtiEnv *jvmti;
         If enabled, a <eventlink id="ThreadStart"/> event will be sent.
         <p/>
         Since the thread has been started, the thread will be live when this function
-        returns, unless the thread has died immediately.
+        returns, unless the thread terminated immediately.
         <p/>
         The thread group of the thread is ignored -- specifically, the thread is not
         added to the thread group and the thread is not seen on queries of the thread
@@ -11919,7 +11919,7 @@ myInit() {
     </errorid>
     <errorid id="JVMTI_ERROR_THREAD_NOT_ALIVE" num="15">
       This operation requires the thread to be alive--that is,
-      it must be started and not yet have died.
+      it must be started and not yet terminated.
     </errorid>
     <errorid id="JVMTI_ERROR_CLASS_NOT_PREPARED" num="22">
       The class has been loaded but not yet prepared.
