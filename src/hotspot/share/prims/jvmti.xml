@@ -5831,6 +5831,13 @@ class C2 extends C1 implements I2 {
       The mapping of variables to
       slot numbers can be obtained with the function
       <functionlink id="GetLocalVariableTable"></functionlink>.
+      <p/>
+      The <code>GetLocalXXX</code> functions may be to used retrieve the value of
+      a local variable contained in the frame of a virtual thread.
+      The <code>SetLocalXXX</code> functions may be used to set the value of a
+      local variable in the topmost frame of a virtual thread suspended at a
+      breakpoint or single step event. An implementation may support setting locals
+      in other cases.
     </intro>
 
     <function id="GetLocalObject" num="21">
@@ -6175,8 +6182,9 @@ class C2 extends C1 implements I2 {
           Not a visible frame
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not the topmost frame of a virtual thread suspended at a breakpoint,
-          single step or similar event
+          The thread is a virtual thread and the implementation does not support
+          setting the value of locals in the frame of the given depth.
+          See <internallink id="local">Local Variables</internallink>.
         </error>
       </errors>
     </function>
@@ -6233,8 +6241,9 @@ class C2 extends C1 implements I2 {
           Not a visible frame
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not the topmost frame of a virtual thread suspended at a breakpoint,
-          single step or similar event
+          The thread is a virtual thread and the implementation does not support
+          setting the value of locals in the frame of the given depth.
+          See <internallink id="local">Local Variables</internallink>.
         </error>
       </errors>
     </function>
@@ -6286,8 +6295,9 @@ class C2 extends C1 implements I2 {
           Not a visible frame
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not the topmost frame of a virtual thread suspended at a breakpoint,
-          single step or similar event
+          The thread is a virtual thread and the implementation does not support
+          setting the value of locals in the frame of the given depth.
+          See <internallink id="local">Local Variables</internallink>.
         </error>
       </errors>
     </function>
@@ -6339,8 +6349,9 @@ class C2 extends C1 implements I2 {
           Not a visible frame
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not the topmost frame of a virtual thread suspended at a breakpoint,
-          single step or similar event
+          The thread is a virtual thread and the implementation does not support
+          setting the value of locals in the frame of the given depth.
+          See <internallink id="local">Local Variables</internallink>.
         </error>
       </errors>
     </function>
@@ -6392,8 +6403,9 @@ class C2 extends C1 implements I2 {
           Not a visible frame
         </error>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Not the topmost frame of a virtual thread suspended at a breakpoint,
-          single step or similar event
+          The thread is a virtual thread and the implementation does not support
+          setting the value of locals in the frame of the given depth.
+          See <internallink id="local">Local Variables</internallink>.
         </error>
       </errors>
     </function>
