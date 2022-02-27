@@ -1163,6 +1163,10 @@ public class TTY implements EventNotifier {
             }
         }
 
+        if (connectSpec.startsWith("com.sun.jdi.CommandLineLaunch:")) {
+            connectSpec += "enumeratevthreads=y,";
+        }
+
         try {
             Env.init(connectSpec, launchImmediately, traceFlags, javaArgs);
             new TTY();
