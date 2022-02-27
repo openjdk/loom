@@ -469,6 +469,29 @@ inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_wo
   return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
 }
 
+template <typename OopT>
+inline static bool is_oop_fixed(oop obj, int offset) {
+  OopT value = *obj->field_addr<OopT>(offset);
+  intptr_t before = *(intptr_t*)&value;
+  intptr_t after  = cast_from_oop<intptr_t>(NativeAccess<>::oop_load(&value));
+  // tty->print_cr(">>> fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before == after, before, after);
+  return before == after;
+}
+
+template <typename OopT, gc_type gc>
+inline bool InstanceStackChunkKlass::should_fix(stackChunkOop chunk) {
+  if (UNLIKELY(chunk->is_gc_mode())) return true;
+
+  if (gc == gc_type::CONCURRENT) {
+    // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
+    if (UNLIKELY(!is_oop_fixed<OopT>(chunk, jdk_internal_vm_StackChunk::cont_offset())))
+      return true;
+  }
+
+  OrderAccess::loadload(); // we must see all writes prior to last oop/gc_mode
+  return false;
+}
+
 template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
 void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<frame_kind>& f,
                                           const RegisterMapT* map) {

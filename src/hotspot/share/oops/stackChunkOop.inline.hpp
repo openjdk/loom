@@ -126,27 +126,9 @@ inline bool stackChunkOopDesc::requires_barriers() const {
   return Universe::heap()->requires_barriers(as_oop());
 }
 
-template <typename OopT>
-inline static bool is_oop_fixed(oop obj, int offset) {
-  OopT value = *obj->field_addr<OopT>(offset);
-  intptr_t before = *(intptr_t*)&value;
-  intptr_t after  = cast_from_oop<intptr_t>(NativeAccess<>::oop_load(&value));
-  // tty->print_cr(">>> fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before == after, before, after);
-  return before == after;
-}
-
 template <typename OopT, gc_type gc>
 inline bool stackChunkOopDesc::should_fix() const {
-  if (UNLIKELY(is_gc_mode())) return true;
-
-  if (gc == gc_type::CONCURRENT) {
-    // the last oop traversed in this object -- see InstanceStackChunkKlass::oop_oop_iterate
-    if (UNLIKELY(!is_oop_fixed<OopT>(as_oop(), jdk_internal_vm_StackChunk::cont_offset())))
-      return true;
-  }
-
-  OrderAccess::loadload(); // we must see all writes prior to last oop/gc_mode
-  return false;
+  return InstanceStackChunkKlass::should_fix<OopT, gc>(const_cast<stackChunkOopDesc*>(this));
 }
 
 inline bool stackChunkOopDesc::has_mixed_frames() const         { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }

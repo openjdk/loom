@@ -198,10 +198,13 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  template <barrier_type barrier>
+  template <typename OopT, gc_type>
+  static inline bool should_fix(const stackChunkOop chunk);
+
+  template <barrier_type>
   static void do_barriers(stackChunkOop chunk);
 
-  template <barrier_type barrier, chunk_frames frames, typename RegisterMapT>
+  template <barrier_type, chunk_frames frames, typename RegisterMapT>
   inline static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>

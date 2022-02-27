@@ -428,7 +428,7 @@ size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
   // if (is_stackChunk()) tty->print_cr(">>> copy_disjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
     size_t res = klass()->copy_disjoint(this, to, word_size);
     assert (word_size == res, "");
     return res;
@@ -440,7 +440,7 @@ size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
 size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
   assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     size_t res = klass()->copy_disjoint_compact(this, to);
     assert (word_size == res, "");
     return res;
@@ -452,7 +452,7 @@ size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
   // if (is_stackChunk()) tty->print_cr(">>> copy_conjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
   assert(word_size == (size_t)size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
     size_t res = klass()->copy_conjoint(this, to, word_size);
     assert (word_size == res, "");
     return res;
@@ -464,7 +464,7 @@ size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
 size_t oopDesc::copy_conjoint_compact(HeapWord* to, size_t word_size) {
   assert(word_size == (size_t)compact_size() || size_might_change(), "");
   int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
+  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
     size_t res = klass()->copy_conjoint_compact(this, to);
     assert (word_size == res, "");
     return res;

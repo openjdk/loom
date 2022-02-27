@@ -35,24 +35,22 @@ inline CodeBlob* CodeCache::find_blob_fast(void* pc) {
 
 inline CodeBlob* CodeCache::find_blob_and_oopmap(void* pc, int& slot) {
   NativePostCallNop* nop = nativePostCallNop_at((address) pc);
-  if (LIKELY(nop != NULL)) {
-    CodeBlob* cb;
-    if (LIKELY(nop->displacement() != 0)) {
+  CodeBlob* cb;
+  if (nop != NULL) {
+    if (nop->displacement() != 0) { // common fast-path
       int offset = (nop->displacement() & 0xffffff);
       cb = (CodeBlob*) ((address) pc - offset);
       slot = ((nop->displacement() >> 24) & 0xff);
     } else {
       cb = CodeCache::patch_nop(nop, pc, slot);
     }
-
-    assert (cb != NULL, "must be");
-    // assert (cb == CodeCache::find_blob(pc), "CB: " INTPTR_FORMAT, p2i(cb));
-    return cb;
+    // assert (cb == CodeCache::find_blob(pc), "");
   } else {
-    CodeBlob* cb = CodeCache::find_blob(pc);
+    cb = CodeCache::find_blob(pc);
     slot = -1;
-    return cb;
   }
+  assert (cb != NULL, "must be");
+  return cb;
 }
 
 inline int CodeCache::find_oopmap_slot_fast(void* pc) {
