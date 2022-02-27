@@ -2634,7 +2634,13 @@ threadControl_setPendingInterrupt(jthread thread)
 {
     ThreadNode *node;
 
-    // vthread fixme: should this work for vthreads?
+    /*
+     * vmTestbase/nsk/jdb/kill/kill001/kill001.java seems to be the only code
+     * that triggers this function. Is uses ThreadReference.Stop.
+     *
+     * Since ThreadReference.Stop is not supported for vthreads, we should never
+     * get here with a vthread.
+     */
     JDI_ASSERT(!isVThread(thread));
 
     debugMonitorEnter(threadLock);
@@ -2653,7 +2659,10 @@ threadControl_stop(jthread thread, jobject throwable)
     ThreadNode *node;
     jvmtiError  error;
 
-    // vthread fixme: should this work for vthreads?
+    /*
+     * Since ThreadReference.Stop is not supported for vthreads, we should never
+     * get here with a vthread.
+     */
     JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
