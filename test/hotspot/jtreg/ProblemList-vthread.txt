@@ -4,6 +4,29 @@ vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                  
 
 
 ##########
+
+vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock02/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock03/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock04/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock01/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock02/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock03/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock04/TestDescription.java
+
+##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
 
 ####
