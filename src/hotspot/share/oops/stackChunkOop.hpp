@@ -104,7 +104,6 @@ public:
   inline bool has_bitmap() const;
   inline void set_has_bitmap(bool value);
   template <typename OopT, gc_type gc> inline bool should_fix() const;
-  bool should_fix() const; // non-templatized version
   inline bool requires_barriers() const;
 
   inline BitMapView bitmap() const;

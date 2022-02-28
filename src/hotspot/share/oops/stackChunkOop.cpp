@@ -38,16 +38,6 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
 }
 #endif
 
-bool stackChunkOopDesc::should_fix() const {
-  const bool concurrent_gc = (UseZGC || UseShenandoahGC);
-  return
-    UseCompressedOops
-      ? (concurrent_gc ? should_fix<narrowOop, gc_type::CONCURRENT>()
-                       : should_fix<narrowOop, gc_type::STW>())
-      : (concurrent_gc ? should_fix<oop,       gc_type::CONCURRENT>()
-                       : should_fix<oop,       gc_type::STW>());
-}
-
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   assert (!is_empty(), "");
   StackChunkFrameStream<chunk_frames::MIXED> fs(this);
@@ -146,4 +136,3 @@ void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
     InstanceStackChunkKlass::print_chunk(const_cast<stackChunkOopDesc*>(this), verbose, st);
   }
 }
-
