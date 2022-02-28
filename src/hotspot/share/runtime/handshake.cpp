@@ -313,7 +313,7 @@ void HandshakeOperation::do_handshake(JavaThread* thread) {
 
   // Only actually execute the operation for non terminated threads.
   if (!thread->is_terminated()) {
-    //NoSafepointVerifier nsv;
+    NoSafepointVerifier nsv;
     _handshake_cl->do_thread(thread);
   }
 
@@ -500,7 +500,7 @@ bool HandshakeState::process_by_self(bool allow_suspend) {
   // Handshakes cannot safely safepoint.
   // The exception to this rule is the asynchronous suspension handshake.
   // It by-passes the NSV by manually doing the transition.
-  //NoSafepointVerifier nsv;
+  NoSafepointVerifier nsv;
 
   while (has_operation()) {
     MutexLocker ml(&_lock, Mutex::_no_safepoint_check_flag);
