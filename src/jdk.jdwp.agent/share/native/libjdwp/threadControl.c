@@ -505,10 +505,6 @@ static void
 moveNode(ThreadList *source, ThreadList *dest, ThreadNode *node)
 {
     removeNode(source, node);
-    // vthread fixme: we should really fix the caller to pass the right list
-    if (node->is_vthread && dest == &runningThreads) {
-        dest = &runningVThreads;
-    }
     JDI_ASSERT(findThread(dest, node->thread) == NULL);
     addNode(dest, node);
 }
@@ -2316,7 +2312,7 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
      */
     node = findThread(&otherThreads, thread);
     if (node != NULL) {
-        moveNode(&otherThreads, &runningThreads, node);
+        moveNode(&otherThreads, (node->is_vthread ? &runningVThreads : &runningThreads), node);
         /* Now that we know the thread has started, we can set its TLS.*/
         setThreadLocalStorage(thread, (void*)node);
     } else {
