@@ -1957,7 +1957,7 @@ static inline bool can_freeze_fast(JavaThread* thread) {
               || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "");
 
   // We also clear thread->cont_fastpath on deoptimization (notify_deopt) and when we thaw interpreted frames
-  bool fast = UseContinuationFastPath && thread->cont_fastpath();
+  bool fast = thread->cont_fastpath() && UseContinuationFastPath;
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "");
   fast = fast && thread->held_monitor_count() == 0;
   // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d",

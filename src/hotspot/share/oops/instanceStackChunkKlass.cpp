@@ -65,14 +65,12 @@ MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_stack_to_chunk = nullptr;
 MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
 
 void InstanceStackChunkKlass::resolve_memcpy_functions() {
-  if (!StubRoutines::has_word_memcpy() || UseNewCode) { // TODO LOOM
+  if (!StubRoutines::has_word_memcpy()) {
     memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
     memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
   } else {
-    memcpy_fn_from_stack_to_chunk = UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_up_nt()
-                                                                 : (MemcpyFnT)StubRoutines::word_memcpy_up();
-    memcpy_fn_from_chunk_to_stack = UseContinuationStreamingCopy ? (MemcpyFnT)StubRoutines::word_memcpy_down_nt()
-                                                                 : (MemcpyFnT)StubRoutines::word_memcpy_down();
+    memcpy_fn_from_stack_to_chunk = (MemcpyFnT)StubRoutines::word_memcpy_up();
+    memcpy_fn_from_chunk_to_stack = (MemcpyFnT)StubRoutines::word_memcpy_down();
   }
   assert (memcpy_fn_from_stack_to_chunk != nullptr, "");
   assert (memcpy_fn_from_chunk_to_stack != nullptr, "");

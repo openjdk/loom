@@ -2007,20 +2007,17 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, TrimContinuationChunksInGC, false,                          \
-         "Trim stack chunks when copying objects in GC")                    \
-                                                                            \
-  product(bool, UseChunkBitmaps, false,                                     \
-         "Generate oop bitmaps for continuation chunks")                    \
-                                                                            \
-  product(bool, UseContinuationFastPath, true,                              \
-          "Use fast-path frame walking in continuations")                   \
-                                                                            \
-  product(bool, UseContinuationStreamingCopy, false,                        \
-          "Use streaming memory when copying continuation stack chunks")    \
-                                                                            \
   develop(bool, VerifyContinuations, true,                                  \
           "Verify continuation consistency")                                \
+                                                                            \
+  develop(bool, UseContinuationFastPath, true,                              \
+          "Use fast-path frame walking in continuations")                   \
+                                                                            \
+  product(bool, TrimContinuationChunksInGC, false,                          \
+         "Trim stack chunks when copying objects in GC (PREVIEW)")          \
+                                                                            \
+  product(bool, UseChunkBitmaps, false,                                     \
+         "Generate oop bitmaps for continuation chunks (PREVIEW)")          \
                                                                             \
   product(intx, ScopeLocalCacheSize, 16,                                    \
           "Size of the cache for scoped values")                            \
