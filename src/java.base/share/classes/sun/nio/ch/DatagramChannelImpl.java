@@ -669,7 +669,6 @@ class DatagramChannelImpl
                     dst.flip();
                     dst.get(b, off, n);
                 } else {
-                    assert len == 0;
                     n = 0;
                 }
             }
