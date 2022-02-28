@@ -1094,7 +1094,8 @@ resumeThreadByNode(ThreadNode *node)
                 error = JVMTI_ERROR_NONE;
             }
         }
-        // vthread fixme: If this is a vthread and suspendCount == 0, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread and suspendCount == 0,
+        // we should delete the node.
     }
 
     return error;
@@ -1221,7 +1222,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
-        // vthread fixme: If this is a vthread, we should delete the node.
+        // TODO - vthread node: If this is a vthread, we should delete the node.
         return JVMTI_ERROR_NONE;
     }
 
@@ -1372,7 +1373,7 @@ commonResumeList(JNIEnv *env)
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
 
-        // vthread fixme: If this is a vthread, we should delete the node.
+        // TODO - vthread node: If this is a vthread, we should delete the node.
     }
     deleteArray(results);
     deleteArray(reqList);
