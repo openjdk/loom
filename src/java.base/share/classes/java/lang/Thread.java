@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
@@ -258,11 +257,6 @@ public class Thread implements Runnable {
             // bindings established for running/calling an operation
             Object bindings = snapshot.scopeLocalBindings();
             if (currentThread().scopeLocalBindings != bindings) {
-                StructureViolationExceptions.throwException("Scope local bindings have changed");
-            }
-
-            // bindings established by invoking bind
-            if (ScopeLocalContainer.latest() != snapshot.container()) {
                 StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
