@@ -126,7 +126,8 @@ static jvmtiError threadControl_removeDebugThread(jthread thread);
  */
 static ThreadList runningThreads;
 static ThreadList otherThreads;
-static ThreadList runningVThreads; /* VThreads we have seen. */
+static ThreadList runningVThreads; /* VThreads we are tracking (not necessarily all vthreads). */
+static jint       numRunningVThreads;
 
 #define MAX_DEBUG_THREADS 10
 static int debugThreadCount;
@@ -332,6 +333,9 @@ removeNode(ThreadList *list, ThreadNode *node)
     node->next = NULL;
     node->prev = NULL;
     node->list = NULL;
+    if (list == &runningVThreads) {
+        numRunningVThreads--;
+    }
 }
 
 /* Add a ThreadNode to a ThreadList */
@@ -349,6 +353,9 @@ addNode(ThreadList *list, ThreadNode *node)
         list->first = node;
     }
     node->list = list;
+    if (list == &runningVThreads) {
+        numRunningVThreads++;
+    }
 }
 
 static ThreadNode *
@@ -2861,16 +2868,19 @@ threadControl_allVThreads(jint *numVThreads)
 
     env = getEnv();
     debugMonitorEnter(threadLock);
+    *numVThreads = numRunningVThreads;
 
-    /* Count the number of vthreads */
-    /* vthread fixme: we should keep a running total so no counting is needed. */
-    *numVThreads = 0;
-    for (node = runningVThreads.first; node != NULL; node = node->next) {
-        (*numVThreads)++;
+    if (gdata->assertOn) {
+        /* Count the number of vthreads just to make sure we are tracking the count properly. */
+        jint countedVThreads = 0;
+        for (node = runningVThreads.first; node != NULL; node = node->next) {
+            countedVThreads++;
+        }
+        JDI_ASSERT(countedVThreads == numRunningVThreads);
     }
 
     /* Allocate and fill in the vthreads array. */
-    vthreads = jvmtiAllocate(*numVThreads * sizeof(jthread*));
+    vthreads = jvmtiAllocate(numRunningVThreads * sizeof(jthread*));
     if (vthreads != NULL) {
         int i = 0;
         for (node = runningVThreads.first; node != NULL;  node = node->next) {
