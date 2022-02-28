@@ -542,7 +542,6 @@ getAllThreads(PacketInputStream *in, PacketOutputStream *out)
         jthread *theVThreads;
 
         theThreads = allThreads(&threadCount);
-        /* vthread fixme: need to remove this vthread support. They should never be returned by allAthreads. */
         if (gdata->enumerateVThreads) {
             theVThreads = threadControl_allVThreads(&vthreadCount);
         } else {
