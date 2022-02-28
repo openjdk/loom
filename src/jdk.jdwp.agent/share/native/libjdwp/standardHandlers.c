@@ -153,7 +153,7 @@ standardHandlers_defaultHandler(EventIndex ei)
         case EI_MONITOR_WAITED:
             return &genericHandler;
 
-        /* These events should have been converted the THREAD_START and THREAD_END already. */
+        /* These events should have been converted to THREAD_START and THREAD_END already. */
         case EI_VIRTUAL_THREAD_START:
         case EI_VIRTUAL_THREAD_END:
             /* This NULL will trigger a AGENT_ERROR_INVALID_EVENT_TYPE */
