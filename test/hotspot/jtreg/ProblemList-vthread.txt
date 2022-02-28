@@ -9,6 +9,8 @@ vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java
 vmTestbase/gc/lock/malloc/malloclock02/TestDescription.java
 vmTestbase/gc/lock/malloc/malloclock03/TestDescription.java
 vmTestbase/gc/lock/malloc/malloclock04/TestDescription.java
+vmTestbase/gc/lock/jni/jnilock001/TestDescription.java
+vmTestbase/gc/lock/jni/jnilock003/TestDescription.java
 vmTestbase/gc/lock/jniref/jniglobalreflock01/TestDescription.java
 vmTestbase/gc/lock/jniref/jniglobalreflock02/TestDescription.java
 vmTestbase/gc/lock/jniref/jniglobalreflock03/TestDescription.java
@@ -17,6 +19,10 @@ vmTestbase/gc/lock/jniref/jnireflock01/TestDescription.java
 vmTestbase/gc/lock/jniref/jnireflock02/TestDescription.java
 vmTestbase/gc/lock/jniref/jnireflock03/TestDescription.java
 vmTestbase/gc/lock/jniref/jnireflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock04/TestDescription.java
 vmTestbase/gc/lock/jniref/jniweakglobalreflock01/TestDescription.java
 vmTestbase/gc/lock/jniref/jniweakglobalreflock02/TestDescription.java
 vmTestbase/gc/lock/jniref/jniweakglobalreflock03/TestDescription.java
