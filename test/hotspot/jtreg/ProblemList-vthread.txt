@@ -6,6 +6,7 @@ vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                  
 ##########
 
 # 8282492
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java
 vmTestbase/vm/gc/compact/Humongous_NonbranchyTree/TestDescription.java
 vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java
