@@ -109,59 +109,58 @@ static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one
 Thread-stack layout on freeze/thaw.
 See corresponding stack-chunk layout in instanceStackChunkKlass.hpp
 
-             +----------------------------+
-             |      .                     |
-             |      .                     |
-             |      .                     |
-             |   carrier frames           |
-             |                            |
-             |----------------------------|
-             |                            |
-             |    Continuation.run        |
-             |                            |
-             |============================|
-             |    enterSpecial frame      |
-             |  pc                        |
-             |  rbp                       |
-             |  -----                     |
-        ^    |  int argsize               | = ContinuationEntry
-        |    |  oopDesc* cont             |
-        |    |  oopDesc* chunk            |
-        |    |  ContinuationEntry* parent |
-        |    |  ...                       |
-        |    |============================| <------ JavaThread::_cont_entry
-        |    |  ? alignment word ?        |
-        |    |----------------------------| <--\
-        |    |                            |    |
-        |    |  ? caller stack args ?     |    |   argsize (might not be 2-word aligned) words
-Address |    |                            |    |   Caller is still in the chunk.
-        |    |----------------------------|    |
-        |    |  pc (? return barrier ?)   |    |  This pc contains the return barrier
-        |    |  rbp                       |    |  When the bottom-most frame isn't the last on in the continuation.
-        |    |============================|    |
-        |    |                            |    |
-        |    |    frame                   |    |
-        |    |                            |    |
-             +----------------------------|     \__ Continuation frames to be frozen/thawed
-             |                            |     /
-             |    frame                   |    |
-             |                            |    |
-             |----------------------------|    |
-             |                            |    |
-             |    frame                   |    |
-             |                            |    |
-             |----------------------------| <--/
-             |                            |
-             |    doYield/safepoint stub  | When preempting forcefully, we could have a safepoint stub instead of a doYield stub
-             |                            |
-             |============================|
-             |                            |
-             |  Native freeze/thaw frames |
-             |      .                     |
-             |      .                     |
-             |      .                     |
-             +----------------------------+
-
+            +----------------------------+
+            |      .                     |
+            |      .                     |
+            |      .                     |
+            |   carrier frames           |
+            |                            |
+            |----------------------------|
+            |                            |
+            |    Continuation.run        |
+            |                            |
+            |============================|
+            |    enterSpecial frame      |
+            |  pc                        |
+            |  rbp                       |
+            |  -----                     |
+        ^   |  int argsize               | = ContinuationEntry
+        |   |  oopDesc* cont             |
+        |   |  oopDesc* chunk            |
+        |   |  ContinuationEntry* parent |
+        |   |  ...                       |
+        |   |============================| <------ JavaThread::_cont_entry
+        |   |  ? alignment word ?        |
+        |   |----------------------------| <--\
+        |   |                            |    |
+        |   |  ? caller stack args ?     |    |   argsize (might not be 2-word aligned) words
+Address |   |                            |    |   Caller is still in the chunk.
+        |   |----------------------------|    |
+        |   |  pc (? return barrier ?)   |    |  This pc contains the return barrier when the bottom-most frame
+        |   |  rbp                       |    |  isn't the last one in the continuation.
+        |   |============================|    |
+        |   |                            |    |
+        |   |    frame                   |    |
+        |   |                            |    |
+            +----------------------------|     \__ Continuation frames to be frozen/thawed
+            |                            |     /
+            |    frame                   |    |
+            |                            |    |
+            |----------------------------|    |
+            |                            |    |
+            |    frame                   |    |
+            |                            |    |
+            |----------------------------| <--/
+            |                            |
+            |    doYield/safepoint stub  | When preempting forcefully, we could have a safepoint stub
+            |                            | instead of a doYield stub
+            |============================|
+            |                            |
+            |  Native freeze/thaw frames |
+            |      .                     |
+            |      .                     |
+            |      .                     |
+            +----------------------------+
 
 ************************************************/
 

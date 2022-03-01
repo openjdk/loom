@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -227,11 +227,7 @@ class nmethod : public CompiledMethod {
 
   int _compile_id;                           // which compilation made this nmethod
   int _comp_level;                           // compilation level
-  int _nr_oops;
- public:
-  int nr_oops() const { return _nr_oops; }
-  void verify_nr_oops();
-  int count_oops();
+
  private:
 
   // protected by CodeCache_lock
@@ -558,8 +554,6 @@ public:
   nmethod* osr_link() const                       { return _osr_link; }
   void     set_osr_link(nmethod *n)               { _osr_link = n; }
 
-  void set_immediate_oops_patched(int nr)         { _nr_oops += nr; }
-
   // Verify calls to dead methods have been cleaned.
   void verify_clean_inline_caches();
 
@@ -602,8 +596,8 @@ public:
 #endif
 
  public:
-  void oops_do(OopClosure* f) { oops_do(f, false, false); }
-  void oops_do(OopClosure* f, bool allow_dead, bool allow_null = false);
+  void oops_do(OopClosure* f) { oops_do(f, false); }
+  void oops_do(OopClosure* f, bool allow_dead);
 
   // All-in-one claiming of nmethods: returns true if the caller successfully claimed that
   // nmethod.
