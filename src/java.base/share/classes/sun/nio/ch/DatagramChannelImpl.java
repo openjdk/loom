@@ -604,6 +604,7 @@ class DatagramChannelImpl
         assert readLock.isHeldByCurrentThread()
                 && sm != null && remoteAddress == null;
 
+        boolean blocking = isBlocking();
         for (;;) {
             int n;
             ByteBuffer bb = Util.getTemporaryDirectBuffer(dst.remaining());
@@ -625,7 +626,7 @@ class DatagramChannelImpl
                 Util.releaseTemporaryDirectBuffer(bb);
             }
 
-            if (isBlocking() && IOStatus.okayToRetry(n) && isOpen()) {
+            if (blocking && IOStatus.okayToRetry(n) && isOpen()) {
                 park(Net.POLLIN);
             } else {
                 return null;
