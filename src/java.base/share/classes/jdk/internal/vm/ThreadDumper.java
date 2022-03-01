@@ -98,7 +98,9 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        ps.format("%s %s%n",  Instant.now(), Runtime.version());
+        ps.println(processId());
+        ps.println(Instant.now());
+        ps.println(Runtime.version());
         ps.println();
         dumpThreads(ThreadContainers.root(), ps);
         ps.flush();
@@ -138,6 +140,7 @@ public class ThreadDumper {
 
         String now = Instant.now().toString();
         String runtimeVersion = Runtime.version().toString();
+        out.format("    \"processId\": %d,%n", processId());
         out.format("    \"time\": \"%s\",%n", escape(now));
         out.format("    \"runtimeVersion\": \"%s\",%n", escape(runtimeVersion));
 
@@ -149,7 +152,6 @@ public class ThreadDumper {
             boolean more = iterator.hasNext();
             dumpThreadsToJson(container, out, more);
         }
-
         out.println("    ]");   // end of threadContainers
 
         out.println("  }");   // end threadDump
@@ -268,5 +270,16 @@ public class ThreadDumper {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Returns the process ID or -1 if not supported.
+     */
+    private static long processId() {
+        try {
+            return ProcessHandle.current().pid();
+        } catch (UnsupportedOperationException e) {
+            return -1L;
+        }
     }
 }

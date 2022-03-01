@@ -54,25 +54,28 @@ public class DumpThreads {
         Path file = genOutputPath("txt");
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Thread vthread = forkParker(executor);
-
-            mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
-            cat(file);
-
-            // runtime version should be on first line
-            String vs = Runtime.version().toString();
-            assertTrue(firstLine(file).contains(vs));
-
-            // virtual thread should be found
             try {
+                mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
+                cat(file);
+
+                // pid should be on the first line
+                String pid = "" + ProcessHandle.current().pid();
+                assertTrue(line(file, 0).contains(pid));
+
+                // runtime version should be on third line
+                String vs = Runtime.version().toString();
+                assertTrue(line(file, 2).contains(vs));
+
+                // virtual thread should be found
                 assertTrue(isPresent(file, vthread));
+
+                // if the current thread is a platform thread then it should be included
+                Thread currentThread = Thread.currentThread();
+                if (!currentThread.isVirtual()) {
+                    assertTrue(isPresent(file, currentThread));
+                }
             } finally {
                 LockSupport.unpark(vthread);
-            }
-
-            // if the current thread is a platform thread then it should be included
-            Thread currentThread = Thread.currentThread();
-            if (!currentThread.isVirtual()) {
-                assertTrue(isPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
@@ -88,27 +91,27 @@ public class DumpThreads {
         Path file = genOutputPath("json");
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Thread vthread = forkParker(executor);
-
-            mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
-            cat(file);
-
-            assertTrue(count(file, "threadDump") >= 1L);
-            assertTrue(count(file, "time") >= 1L);
-            assertTrue(count(file, "runtimeVersion") >= 1L);
-            assertTrue(count(file, "threadContainers") >= 1L);
-            assertTrue(count(file, "threads") >= 1L);
-
-            // virtual thread should be found
             try {
+                mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
+                cat(file);
+
+                assertTrue(count(file, "threadDump") >= 1L);
+                assertTrue(count(file, "time") >= 1L);
+                assertTrue(count(file, "runtimeVersion") >= 1L);
+                assertTrue(count(file, "threadContainers") >= 1L);
+                assertTrue(count(file, "threads") >= 1L);
+
+                // virtual thread should be found
                 assertTrue(isJsonPresent(file, vthread));
+
+                // if the current thread is a platform thread then it should be included
+                Thread currentThread = Thread.currentThread();
+                if (!currentThread.isVirtual()) {
+                    assertTrue(isJsonPresent(file, currentThread));
+                }
+
             } finally {
                 LockSupport.unpark(vthread);
-            }
-
-            // if the current thread is a platform thread then it should be included
-            Thread currentThread = Thread.currentThread();
-            if (!currentThread.isVirtual()) {
-                assertTrue(isJsonPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
@@ -204,9 +207,9 @@ public class DumpThreads {
         }
     }
 
-    private String firstLine(Path file) throws Exception {
+    private String line(Path file, long n) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
-            return stream.findFirst().orElseThrow();
+            return stream.skip(n).findFirst().orElseThrow();
         }
     }
 }
