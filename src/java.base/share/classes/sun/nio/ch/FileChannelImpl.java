@@ -1159,7 +1159,12 @@ public class FileChannelImpl
             synchronized (positionLock) {
                 long filesize;
                 do {
-                    filesize = nd.size(fd);
+                    long comp = Blocker.begin();
+                    try {
+                        filesize = nd.size(fd);
+                    } finally {
+                        Blocker.end(comp);
+                    }
                 } while ((filesize == IOStatus.INTERRUPTED) && isOpen());
                 if (!isOpen())
                     return null;
@@ -1171,7 +1176,12 @@ public class FileChannelImpl
                     }
                     int rv;
                     do {
-                        rv = nd.truncate(fd, position + size);
+                        long comp = Blocker.begin();
+                        try {
+                            rv = nd.truncate(fd, position + size);
+                        } finally {
+                            Blocker.end(comp);
+                        }
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
