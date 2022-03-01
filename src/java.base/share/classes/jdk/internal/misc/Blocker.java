@@ -63,7 +63,9 @@ public class Blocker {
         Thread t = JLA.currentCarrierThread();
         if (t instanceof CarrierThread ct && !ct.inBlocking()) {
             ct.beginBlocking();
-            return ForkJoinPools.beginCompensatedBlock(ct.getPool());
+            long comp = ForkJoinPools.beginCompensatedBlock(ct.getPool());
+            assert JLA.currentCarrierThread() == ct;
+            return comp;
         } else {
             return 0;
         }

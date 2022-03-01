@@ -3472,7 +3472,7 @@ public class ForkJoinPool extends AbstractExecutorService {
             if ((comp = tryCompensate(ctl)) >= 0) {
                 return (comp == 0) ? 0L : RC_UNIT;
             } else {
-                Thread.yield();  // ??
+                Thread.onSpinWait();
             }
         }
     }
