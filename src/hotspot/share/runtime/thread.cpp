@@ -776,8 +776,9 @@ static void call_postVMInitHook(TRAPS) {
 // Initialized by VMThread at vm_global_init
 static OopStorage* _thread_oop_storage = NULL;
 
-oop JavaThread::threadObj() const    {
-  return _threadObj.resolve();
+OopStorage* JavaThread::thread_oop_storage() {
+  assert(_thread_oop_storage != NULL, "not yet initialized");
+  return _thread_oop_storage;
 }
 
 void JavaThread::set_threadOopHandles(oop p) {
@@ -787,8 +788,8 @@ void JavaThread::set_threadOopHandles(oop p) {
   _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
-oop JavaThread::scopeLocalCache() const {
-  return _scopeLocalCache.resolve();
+oop JavaThread::threadObj() const    {
+  return _threadObj.resolve();
 }
 
 oop JavaThread::vthread() const {
@@ -800,14 +801,13 @@ void JavaThread::set_vthread(oop p) {
   _vthread.replace(p);
 }
 
+oop JavaThread::scopeLocalCache() const {
+  return _scopeLocalCache.resolve();
+}
+
 void JavaThread::set_scopeLocalCache(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _scopeLocalCache.replace(p);
-}
-
-OopStorage* JavaThread::thread_oop_storage() {
-  assert(_thread_oop_storage != NULL, "not yet initialized");
-  return _thread_oop_storage;
 }
 
 void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name,

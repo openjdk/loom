@@ -117,12 +117,14 @@ See corresponding stack-chunk layout in instanceStackChunkKlass.hpp
              |                            |
              |----------------------------|
              |                            |
-             |   Continuation.run         |
+             |    Continuation.run        |
              |                            |
              |============================|
-             |   enterSpecial frame       |
-             |                            |
-        ^    |  int argsize               |
+             |    enterSpecial frame      |
+             |  pc                        |
+             |  rbp                       |
+             |  -----                     |
+        ^    |  int argsize               | = ContinuationEntry
         |    |  oopDesc* cont             |
         |    |  oopDesc* chunk            |
         |    |  ContinuationEntry* parent |
@@ -138,24 +140,26 @@ Address |    |                            |    |   Caller is still in the chunk.
         |    |  rbp                       |    |  When the bottom-most frame isn't the last on in the continuation.
         |    |============================|    |
         |    |                            |    |
-        |    |  frame                     |    |
+        |    |    frame                   |    |
         |    |                            |    |
-             +----------------------------|    |
-             |                            |    |  Continuation frames to be frozen/thawed
-             |  frame                     |    |
+             +----------------------------|     \__ Continuation frames to be frozen/thawed
+             |                            |     /
+             |    frame                   |    |
              |                            |    |
              |----------------------------|    |
              |                            |    |
-             |  frame                     |    |
+             |    frame                   |    |
              |                            |    |
              |----------------------------| <--/
              |                            |
-             |  doYield/safepoint stub    | When preempting forcefully, we could have a safepoint stub instead of a doYield stub
+             |    doYield/safepoint stub  | When preempting forcefully, we could have a safepoint stub instead of a doYield stub
              |                            |
              |============================|
              |                            |
              |  Native freeze/thaw frames |
-             |                            |
+             |      .                     |
+             |      .                     |
+             |      .                     |
              +----------------------------+
 
 
@@ -3133,18 +3137,14 @@ private:
 };
 
 void continuations_init1() { Continuations::init1(); }
+void continuations_init2() { Continuations::init2(); }
 
 void Continuations::init1() {
   Continuation::init();
 }
 
-void continuations_init2() { Continuations::init2(); }
-
 void Continuations::init2() {
   InstanceStackChunkKlass::resolve_memcpy_functions();
-}
-
-void Continuations::print_statistics() {
 }
 
 // While virtual threads are in Preview, there are some VM mechanisms we disable if continuations aren't used
