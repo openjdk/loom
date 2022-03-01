@@ -486,7 +486,7 @@ public interface JavaLangAccess {
     /**
      * Returns the innermost mounted continuation
      */
-     Continuation getContinuation(Thread thread);
+    Continuation getContinuation(Thread thread);
 
     /**
      * Sets the innermost mounted continuation

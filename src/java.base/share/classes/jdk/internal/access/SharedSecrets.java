@@ -100,6 +100,7 @@ public class SharedSecrets {
         }
         return access;
     }
+
     public static void setJavaUtilThreadLocalRandomAccess(JavaUtilThreadLocalRandomAccess access) {
         javaUtilThreadLocalRandomAccess = access;
     }
