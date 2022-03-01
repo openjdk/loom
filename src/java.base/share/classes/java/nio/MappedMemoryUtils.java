@@ -98,14 +98,13 @@ import jdk.internal.misc.Unsafe;
             long offset = mappingOffset(address, index);
             long mappingAddress = mappingAddress(address, offset, index);
             long mappingLength = mappingLength(offset, length);
+            long comp = Blocker.begin();
             try {
-                if (Thread.currentThread().isVirtual()) {
-                    Blocker.managedBlock(() -> force0(fd, mappingAddress, mappingLength));
-                } else {
-                    force0(fd, mappingAddress, mappingLength);
-                }
+                force0(fd, mappingAddress, mappingLength);
             } catch (IOException cause) {
                 throw new UncheckedIOException(cause);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }

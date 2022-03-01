@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,225 +30,91 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool.ManagedBlocker;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * Defines static methods to execute blocking tasks on virtual threads.
- * If the carrier thread is a CarrierThread then the task runs in a
- * ForkJoinPool.ManagedBlocker to that its pool may be expanded to support
+ * Defines static methods to mark the beginning and end of a possibly blocking
+ * operation. The methods are intended to be used with try-finally as follows:
+ * {@snippet lang=java :
+ *     long comp = Blocker.begin();
+ *     try {
+ *         // blocking operation
+ *     } finally {
+ *         Blocker.end(comp);
+ *     }
+ * }
+ * If invoked from a virtual thread and the underlying carrier thread is a
+ * CarrierThread then the code in the block runs as if it were in run in
+ * ForkJoinPool.ManagedBlocker. This means the pool can be expanded to support
  * additional parallelism during the blocking operation.
  */
 public class Blocker {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    private static final MethodHandle compensatedBlock;
-    static {
-        try {
-            PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
-            @SuppressWarnings("removal")
-            MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-            MethodType methodType = MethodType.methodType(void.class, ManagedBlocker.class);
-            compensatedBlock = l.findVirtual(ForkJoinPool.class, "compensatedBlock", methodType);
-        } catch (Exception e) {
-            throw new InternalError(e);
-        }
-    }
-
     private Blocker() { }
 
     /**
-     * A task that returns a result and may throw an exception.
+     * Marks the beginning of possibly blocking operation.
      */
-    @FunctionalInterface
-    public interface BlockingCallable<V, X extends Throwable> {
-        V call() throws X;
-    }
-
-    /**
-     * A task that may throw an exception.
-     */
-    @FunctionalInterface
-    public interface BlockingRunnable<X extends Throwable> {
-        void run() throws X;
-    }
-
-    private static class CallableBlocker<V, X extends Throwable> implements ManagedBlocker {
-        private final BlockingCallable<V, X> task;
-        private boolean done;
-        private V result;
-
-        CallableBlocker(BlockingCallable<V, X> task) {
-            this.task = task;
-        }
-
-        V result() {
-            return result;
-        }
-
-        @Override
-        public boolean block() {
-            try {
-                result = task.call();
-            } catch (Throwable e) {
-                U.throwException(e);
-            } finally {
-                done = true;
-            }
-            return true;
-        }
-
-        @Override
-        public boolean isReleasable() {
-            return done;
-        }
-    }
-
-    private static class RunnableBlocker<X extends Throwable> implements ManagedBlocker {
-        private final BlockingRunnable<X> task;
-        private boolean done;
-
-        RunnableBlocker(BlockingRunnable<X> task) {
-            this.task = task;
-        }
-
-        @Override
-        public boolean block() {
-            try {
-                task.run();
-            } catch (Throwable e) {
-                U.throwException(e);
-            } finally {
-                done = true;
-            }
-            return true;
-        }
-
-        @Override
-        public boolean isReleasable() {
-            return done;
-        }
-    }
-
-    /**
-     * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a CarrierThread then the
-     * pool may be expanded to support additional parallelism during the call to
-     * this method.
-     */
-    public static <V, X extends Throwable> V managedBlock(BlockingCallable<V, X> task) {
+    public static long begin() {
         Thread t = JLA.currentCarrierThread();
-        if (t instanceof CarrierThread ct && !ct.blocked()) {
-            ct.blocked(true);
-            try {
-                var blocker = new CallableBlocker<>(task);
-                compensatedBlock.invoke(ct.getPool(), blocker);
-                return blocker.result();
-            } catch (Throwable e) {
-                U.throwException(e);
-            } finally {
-                ct.blocked(false);
-            }
-            assert false;  // should not get here
-        }
-
-        // run directly
-        try {
-            return task.call();
-        } catch (Throwable e) {
-            U.throwException(e);
-            return null;
+        if (t instanceof CarrierThread ct && !ct.inBlocking()) {
+            ct.beginBlocking();
+            return ForkJoinPools.beginCompensatedBlock(ct.getPool());
+        } else {
+            return 0;
         }
     }
 
     /**
-     * Executes a task that may block and pin the current thread. If invoked on a
-     * virtual thread and the current carrier thread is in a CarrierThread then the
-     * pool may be expanded to support additional parallelism during the call to
-     * this method.
+     * Marks the end an operation that may have blocked.
      */
-    public static <X extends Throwable> void managedBlock(BlockingRunnable<X> task) {
-        Thread t = JLA.currentCarrierThread();
-        if (t instanceof CarrierThread ct && !ct.blocked()) {
-            ct.blocked(true);
-            try {
-                compensatedBlock.invoke(ct.getPool(), new RunnableBlocker<>(task));
-                return;
-            } catch (Throwable e) {
-                U.throwException(e);
-            } finally {
-                ct.blocked(false);
-            }
-            assert false;  // should not get here
-        }
-
-        // run directly
-        try {
-            task.run();
-        } catch (Throwable e) {
-            U.throwException(e);
+    public static void end(long post) {
+        if (post > 0) {
+            assert JLA.currentCarrierThread() instanceof CarrierThread ct && ct.inBlocking();
+            CarrierThread ct = (CarrierThread) JLA.currentCarrierThread();
+            ForkJoinPools.endCompensatedBlock(ct.getPool(), post);
+            ct.endBlocking();
         }
     }
 
     /**
-     * Runs the given task in a background thread pool.
+     * Defines static methods to invoke non-public ForkJoinPool methods.
      */
-    public static <V> V runInThreadPool(Callable<V> task) {
-        Future<V> future = ThreadPool.THREAD_POOL.submit(task);
-        boolean interrupted = false;
-        try {
-            for (;;) {
-                try {
-                    return future.get();
-                } catch (ExecutionException e) {
-                    U.throwException(e.getCause());
-                    return null;
-                } catch (InterruptedException e) {
-                    interrupted = true;
-                }
-            }
-        } finally {
-            if (interrupted) Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
-     * Runs the given task in a background thread pool.
-     */
-    public static void runInThreadPool(Runnable task) {
-        Future<?> future = ThreadPool.THREAD_POOL.submit(task);
-        boolean interrupted = false;
-        try {
-            for (;;) {
-                try {
-                    future.get();
-                } catch (ExecutionException e) {
-                    U.throwException(e.getCause());
-                } catch (InterruptedException e) {
-                    interrupted = true;
-                }
-            }
-        } finally {
-            if (interrupted) Thread.currentThread().interrupt();
-        }
-    }
-
-    private static class ThreadPool {
-        private static final ExecutorService THREAD_POOL;
+    private static class ForkJoinPools {
+        private static final MethodHandle beginCompensatedBlock, endCompensatedBlock;
         static {
-            int parallelism = Runtime.getRuntime().availableProcessors() << 1;
-            ThreadFactory factory = task -> InnocuousThread.newThread(task);
-            THREAD_POOL = Executors.newFixedThreadPool(parallelism, factory);
+            try {
+                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
+                    MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
+                @SuppressWarnings("removal")
+                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
+                MethodType methodType = MethodType.methodType(long.class);
+                beginCompensatedBlock = l.findVirtual(ForkJoinPool.class, "beginCompensatedBlock", methodType);
+                methodType = MethodType.methodType(void.class, long.class);
+                endCompensatedBlock = l.findVirtual(ForkJoinPool.class, "endCompensatedBlock", methodType);
+
+            } catch (Exception e) {
+                throw new InternalError(e);
+            }
+        }
+        static long beginCompensatedBlock(ForkJoinPool pool) {
+            try {
+                return (long) beginCompensatedBlock.invoke(pool);
+            } catch (Throwable e) {
+                U.throwException(e);
+            }
+            return 0;
+        }
+        static void endCompensatedBlock(ForkJoinPool pool, long post) {
+            try {
+                endCompensatedBlock.invoke(pool, post);
+            } catch (Throwable e) {
+                U.throwException(e);
+            }
         }
     }
 }

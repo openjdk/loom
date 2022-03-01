@@ -49,7 +49,7 @@ public class CarrierThread extends ForkJoinWorkerThread {
     private static final long INHERITABLETHREADLOCALS;
     private static final long INHERITEDACCESSCONTROLCONTEXT;
 
-    private boolean blocked;    // true if executing blocker
+    private boolean blocking;    // true if in blocking op
 
     public CarrierThread(ForkJoinPool pool) {
         super(CARRIER_THREADGROUP, pool);
@@ -59,19 +59,27 @@ public class CarrierThread extends ForkJoinWorkerThread {
     }
 
     /**
-     * For use by {@link Blocker} to test if the thread is executing a blocking operation.
+     * For use by {@link Blocker} to test if the thread is in a blocking operation.
      */
-    boolean blocked() {
+    boolean inBlocking() {
         //assert JLA.currentCarrierThread() == this;
-        return blocked;
+        return blocking;
     }
 
     /**
-     * For use by {@link Blocker} to set whether the thread is executing a blocking operation.
+     * For use by {@link Blocker} to mark the start of a blocking operation.
      */
-    void blocked(boolean b) {
-        //assert JLA.currentCarrierThread() == this;
-        this.blocked = b;
+    void beginBlocking() {
+        //assert JLA.currentCarrierThread() == this && !blocking;
+        blocking = true;
+    }
+
+    /**
+     * For use by {@link Blocker} to mark the end of a blocking operation.
+     */
+    void endBlocking() {
+        //assert JLA.currentCarrierThread() == this && blocking;
+        blocking = false;
     }
 
     @Override

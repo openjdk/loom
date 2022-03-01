@@ -250,12 +250,11 @@ class UnixCopyFile {
             try {
                 // transfer bytes to target file
                 try {
-                    int dst = fo;
-                    int src = fi;
-                    if (Thread.currentThread().isVirtual()) {
-                        Blocker.managedBlock(() -> transfer(dst, src, addressToPollForCancel));
-                    } else {
-                        transfer(dst, src, addressToPollForCancel);
+                    long comp = Blocker.begin();
+                    try {
+                        transfer(fo, fi, addressToPollForCancel);
+                    } finally {
+                        Blocker.end(comp);
                     }
                 } catch (UnixException x) {
                     x.rethrowAsIOException(source, target);

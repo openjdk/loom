@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -68,21 +68,16 @@ class WindowsNativeDispatcher {
         throws WindowsException
     {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() ->
-                        CreateFile0(buffer.address(),
-                                    dwDesiredAccess,
-                                    dwShareMode,
-                                    lpSecurityAttributes,
-                                    dwCreationDisposition,
-                                    dwFlagsAndAttributes));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return CreateFile0(buffer.address(),
                                    dwDesiredAccess,
                                    dwShareMode,
                                    lpSecurityAttributes,
                                    dwCreationDisposition,
                                    dwFlagsAndAttributes);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -118,10 +113,11 @@ class WindowsNativeDispatcher {
      */
     static void DeleteFile(String path) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> DeleteFile0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 DeleteFile0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -136,10 +132,11 @@ class WindowsNativeDispatcher {
      */
     static void CreateDirectory(String path, long lpSecurityAttributes) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> CreateDirectory0(buffer.address(), lpSecurityAttributes));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 CreateDirectory0(buffer.address(), lpSecurityAttributes);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -153,10 +150,11 @@ class WindowsNativeDispatcher {
      */
     static void RemoveDirectory(String path) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> RemoveDirectory0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 RemoveDirectory0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -202,10 +200,11 @@ class WindowsNativeDispatcher {
     static FirstFile FindFirstFile(String path) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
             FirstFile data = new FirstFile();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> FindFirstFile0(buffer.address(), data));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 FindFirstFile0(buffer.address(), data);
+            } finally {
+                Blocker.end(comp);
             }
             return data;
         }
@@ -231,10 +230,11 @@ class WindowsNativeDispatcher {
      */
     static long FindFirstFile(String path, long address) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> FindFirstFile1(buffer.address(), address));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return FindFirstFile1(buffer.address(), address);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -250,10 +250,11 @@ class WindowsNativeDispatcher {
      * @return  lpFindFileData->cFileName or null
      */
     static String FindNextFile(long handle, long address) throws WindowsException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> FindNextFile0(handle, address));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return FindNextFile0(handle, address);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native String FindNextFile0(long handle, long address)
@@ -270,10 +271,11 @@ class WindowsNativeDispatcher {
     static FirstStream FindFirstStream(String path) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
             FirstStream data = new FirstStream();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> FindFirstStream0(buffer.address(), data));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 FindFirstStream0(buffer.address(), data);
+            } finally {
+                Blocker.end(comp);
             }
             if (data.handle() == WindowsConstants.INVALID_HANDLE_VALUE)
                 return null;
@@ -298,10 +300,11 @@ class WindowsNativeDispatcher {
      * )
      */
     static String FindNextStream(long handle) throws WindowsException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> FindNextStream0(handle));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return FindNextStream0(handle);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native String FindNextStream0(long handle) throws WindowsException;
@@ -322,10 +325,11 @@ class WindowsNativeDispatcher {
     static void GetFileInformationByHandle(long handle, long address)
         throws WindowsException
     {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> GetFileInformationByHandle0(handle, address));
-        } else {
+        long comp = Blocker.begin();
+        try {
             GetFileInformationByHandle0(handle, address);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void GetFileInformationByHandle0(long handle, long address)
@@ -347,13 +351,12 @@ class WindowsNativeDispatcher {
     {
         try (NativeBuffer sourceBuffer = asNativeBuffer(source);
              NativeBuffer targetBuffer = asNativeBuffer(target)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() ->
-                    CopyFileEx0(sourceBuffer.address(), targetBuffer.address(), flags,
-                                addressToPollForCancel));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 CopyFileEx0(sourceBuffer.address(), targetBuffer.address(), flags,
-                            addressToPollForCancel);
+                        addressToPollForCancel);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -372,11 +375,11 @@ class WindowsNativeDispatcher {
     {
         try (NativeBuffer sourceBuffer = asNativeBuffer(source);
              NativeBuffer targetBuffer = asNativeBuffer(target)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() ->
-                    MoveFileEx0(sourceBuffer.address(), targetBuffer.address(), flags));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 MoveFileEx0(sourceBuffer.address(), targetBuffer.address(), flags);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -390,10 +393,11 @@ class WindowsNativeDispatcher {
      */
     static int GetFileAttributes(String path) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> GetFileAttributes0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return GetFileAttributes0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -409,10 +413,11 @@ class WindowsNativeDispatcher {
         throws WindowsException
     {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> SetFileAttributes0(buffer.address(), dwFileAttributes));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 SetFileAttributes0(buffer.address(), dwFileAttributes);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -428,10 +433,11 @@ class WindowsNativeDispatcher {
      */
     static void GetFileAttributesEx(String path, long address) throws WindowsException {
         try (NativeBuffer buffer = asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> GetFileAttributesEx0(buffer.address(), address));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 GetFileAttributesEx0(buffer.address(), address);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -449,10 +455,11 @@ class WindowsNativeDispatcher {
     static void SetFileTime(long handle, long createTime, long lastAccessTime, long lastWriteTime)
         throws WindowsException
     {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> SetFileTime0(handle, createTime, lastAccessTime, lastWriteTime));
-        } else {
+        long comp = Blocker.begin();
+        try {
             SetFileTime0(handle, createTime, lastAccessTime, lastWriteTime);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void SetFileTime0(long handle,

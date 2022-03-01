@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1050,10 +1050,11 @@ public class InetAddress implements java.io.Serializable {
             Objects.requireNonNull(host);
             Objects.requireNonNull(policy);
             InetAddress[] addrs;
-            if (Thread.currentThread().isVirtual()) {
-                addrs = Blocker.managedBlock(() -> impl.lookupAllHostAddr(host, policy));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 addrs = impl.lookupAllHostAddr(host, policy);
+            } finally {
+                Blocker.end(comp);
             }
             return Arrays.stream(addrs);
         }
@@ -1063,10 +1064,11 @@ public class InetAddress implements java.io.Serializable {
             if (addr.length != Inet4Address.INADDRSZ && addr.length != Inet6Address.INADDRSZ) {
                 throw new IllegalArgumentException("Invalid address length");
             }
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> impl.getHostByAddr(addr));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return impl.getHostByAddr(addr);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }

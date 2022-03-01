@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -166,10 +166,11 @@ class UnixFileSystem extends FileSystem {
     @Override
     public String canonicalize(String path) throws IOException {
         if (!useCanonCaches) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> canonicalize0(path));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return canonicalize0(path);
+            } finally {
+                Blocker.end(comp);
             }
         } else {
             String res = cache.get(path);
@@ -192,10 +193,11 @@ class UnixFileSystem extends FileSystem {
                     }
                 }
                 if (res == null) {
-                    if (Thread.currentThread().isVirtual()) {
-                        res = Blocker.managedBlock(() -> canonicalize0(path));
-                    } else {
+                    long comp = Blocker.begin();
+                    try {
                         res = canonicalize0(path);
+                    } finally {
+                        Blocker.end(comp);
                     }
                     cache.put(path, res);
                     if (useCanonPrefixCache &&
@@ -268,10 +270,11 @@ class UnixFileSystem extends FileSystem {
     @Override
     public int getBooleanAttributes(File f) {
         int rv;
-        if (Thread.currentThread().isVirtual()) {
-            rv = Blocker.managedBlock(() -> getBooleanAttributes0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             rv = getBooleanAttributes0(f);
+        } finally {
+            Blocker.end(comp);
         }
         return rv | isHidden(f);
     }
@@ -279,10 +282,11 @@ class UnixFileSystem extends FileSystem {
     @Override
     public boolean hasBooleanAttributes(File f, int attributes) {
         int rv;
-        if (Thread.currentThread().isVirtual()) {
-            rv = Blocker.managedBlock(() -> getBooleanAttributes0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             rv = getBooleanAttributes0(f);
+        } finally {
+            Blocker.end(comp);
         }
         if ((attributes & BA_HIDDEN) != 0) {
             rv |= isHidden(f);
@@ -296,40 +300,44 @@ class UnixFileSystem extends FileSystem {
 
     @Override
     public boolean checkAccess(File f, int access) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> checkAccess0(f, access));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return checkAccess0(f, access);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean checkAccess0(File f, int access);
 
     @Override
     public long getLastModifiedTime(File f) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> getLastModifiedTime0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return getLastModifiedTime0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native long getLastModifiedTime0(File f);
 
     @Override
     public long getLength(File f) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> getLength0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return getLength0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native long getLength0(File f);
 
     @Override
     public boolean setPermission(File f, int access, boolean enable, boolean owneronly) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> setPermission0(f, access, enable, owneronly));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return setPermission0(f, access, enable, owneronly);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean setPermission0(File f, int access, boolean enable, boolean owneronly);
@@ -338,10 +346,11 @@ class UnixFileSystem extends FileSystem {
 
     @Override
     public boolean createFileExclusively(String path) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> createFileExclusively0(path));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return createFileExclusively0(path);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean createFileExclusively0(String path) throws IOException;
@@ -359,30 +368,33 @@ class UnixFileSystem extends FileSystem {
         if (useCanonPrefixCache) {
             javaHomePrefixCache.clear();
         }
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> delete0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return delete0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean delete0(File f);
 
     @Override
     public String[] list(File f) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> list0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return list0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native String[] list0(File f);
 
     @Override
     public boolean createDirectory(File f) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> createDirectory0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return createDirectory0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean createDirectory0(File f);
@@ -400,30 +412,33 @@ class UnixFileSystem extends FileSystem {
         if (useCanonPrefixCache) {
             javaHomePrefixCache.clear();
         }
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> rename0(f1, f2));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return rename0(f1, f2);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean rename0(File f1, File f2);
 
     @Override
     public boolean setLastModifiedTime(File f, long time) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> setLastModifiedTime0(f, time));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return setLastModifiedTime0(f, time);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean setLastModifiedTime0(File f, long time);
 
     @Override
     public boolean setReadOnly(File f) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> setReadOnly0(f));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return setReadOnly0(f);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native boolean setReadOnly0(File f);
@@ -448,10 +463,11 @@ class UnixFileSystem extends FileSystem {
 
     @Override
     public long getSpace(File f, int t) {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> getSpace0(f, t));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return getSpace0(f, t);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native long getSpace0(File f, int t);

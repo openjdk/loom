@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,6 +35,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import jdk.internal.misc.Blocker;
 import jdk.internal.misc.Unsafe;
 
 /**
@@ -110,7 +111,12 @@ class PollSelectorImpl extends SelectorImpl {
             int numPolled;
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                numPolled = poll(to);
+                long comp = Blocker.begin();
+                try {
+                    numPolled = poll(pollArray.address(), pollArraySize, to);
+                } finally {
+                    Blocker.end(comp);
+                }
                 if (numPolled == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout
                     long adjust = System.nanoTime() - startTime;
@@ -129,11 +135,6 @@ class PollSelectorImpl extends SelectorImpl {
 
         processDeregisterQueue();
         return processEvents(action);
-    }
-
-    @Override
-    protected int implPoll(long timeout) throws IOException {
-        return poll(pollArray.address(), pollArraySize, (int) timeout);
     }
 
     /**
