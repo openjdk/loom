@@ -51,24 +51,33 @@ import jdk.internal.access.SharedSecrets;
  * additional parallelism during the blocking operation.
  */
 public class Blocker {
-    private static final Unsafe U = Unsafe.getUnsafe();
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+    private static final JavaLangAccess JLA;
+    static {
+        JLA = SharedSecrets.getJavaLangAccess();
+        if (JLA == null) {
+            throw new InternalError("JavaLangAccess not setup");
+        }
+    }
 
     private Blocker() { }
+
+    private static Thread currentCarrierThread() {
+        return JLA.currentCarrierThread();
+    }
 
     /**
      * Marks the beginning of possibly blocking operation.
      */
     public static long begin() {
-        Thread t = JLA.currentCarrierThread();
-        if (t instanceof CarrierThread ct && !ct.inBlocking()) {
+        if (VM.isBooted()
+                && currentCarrierThread() instanceof CarrierThread ct && !ct.inBlocking()) {
             ct.beginBlocking();
             long comp = ForkJoinPools.beginCompensatedBlock(ct.getPool());
-            assert JLA.currentCarrierThread() == ct;
+            assert currentCarrierThread() == ct;
             return comp;
-        } else {
-            return 0;
         }
+
+        return 0;
     }
 
     /**
@@ -76,8 +85,8 @@ public class Blocker {
      */
     public static void end(long post) {
         if (post > 0) {
-            assert JLA.currentCarrierThread() instanceof CarrierThread ct && ct.inBlocking();
-            CarrierThread ct = (CarrierThread) JLA.currentCarrierThread();
+            assert currentCarrierThread() instanceof CarrierThread ct && ct.inBlocking();
+            CarrierThread ct = (CarrierThread) currentCarrierThread();
             ForkJoinPools.endCompensatedBlock(ct.getPool(), post);
             ct.endBlocking();
         }
@@ -87,6 +96,7 @@ public class Blocker {
      * Defines static methods to invoke non-public ForkJoinPool methods.
      */
     private static class ForkJoinPools {
+        private static final Unsafe U = Unsafe.getUnsafe();
         private static final MethodHandle beginCompensatedBlock, endCompensatedBlock;
         static {
             try {
