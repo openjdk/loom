@@ -471,6 +471,11 @@ public class VM {
      */
     public static native String[] getRuntimeArguments();
 
+    /**
+     * {@return true if preview features are enabled}
+     */
+    public static native boolean isPreviewEnabled();
+
     static {
         initialize();
     }

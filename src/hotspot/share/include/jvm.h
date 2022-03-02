@@ -168,6 +168,9 @@ JVM_IsSupportedJNIVersion(jint version);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetVmArguments(JNIEnv *env);
 
+JNIEXPORT jboolean JNICALL
+JVM_IsPreviewEnabled(JNIEnv* env);
+
 JNIEXPORT void JNICALL
 JVM_InitializeFromArchive(JNIEnv* env, jclass cls);
 
