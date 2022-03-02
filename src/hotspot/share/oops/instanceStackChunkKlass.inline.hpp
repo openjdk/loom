@@ -78,11 +78,10 @@ template <chunk_frames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, bool gc) DEBUG_ONLY(: _chunk(chunk)) {
   assert (chunk->is_stackChunk(), "");
   assert (frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
-  // assert (!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
   _end = chunk->bottom_address();
-  _sp = chunk->start_address() + get_initial_sp(chunk, gc);
+  _sp = chunk->start_address() + chunk->sp();
   assert (_sp <= chunk->end_address() + InstanceStackChunkKlass::metadata_words(), "");
 
   get_cb();
@@ -249,25 +248,6 @@ inline void StackChunkFrameStream<frame_kind>::get_oopmap(address pc, int oopmap
 }
 
 template <chunk_frames frame_kind>
-inline int StackChunkFrameStream<frame_kind>::get_initial_sp(stackChunkOop chunk, bool gc) {
-  int chunk_sp = chunk->sp();
-  // we don't invoke write barriers on oops in thawed frames, so we use the gcSP field to traverse thawed frames
-  // if (gc && chunk_sp != chunk->gc_sp() && chunk->requires_barriers()) {
-  //   uint64_t marking_cycle = CodeCache::marking_cycle() >> 1;
-  //   uint64_t chunk_marking_cycle = chunk->mark_cycle() >> 1;
-  //   if (marking_cycle == chunk_marking_cycle) {
-  //     // Marking isn't finished, so we need to traverse thawed frames
-  //     chunk_sp = chunk->gc_sp();
-  //     assert (chunk_sp >= 0 && chunk_sp <= chunk->sp(), "");
-  //   } else {
-  //     chunk->set_gc_sp(chunk_sp); // atomic; benign race
-  //   }
-  // }
-  assert (chunk_sp >= 0, "");
-  return chunk_sp;
-}
-
-template <chunk_frames frame_kind>
 template <typename RegisterMapT>
 inline void* StackChunkFrameStream<frame_kind>::reg_to_loc(VMReg reg, const RegisterMapT* map) const {
   assert (!is_done(), "");
@@ -346,8 +326,6 @@ template <class OopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* closure, const RegisterMapT* map) const {
   if (is_interpreted()) {
     frame f = to_frame();
-    // InterpreterOopMap mask;
-    // f.interpreted_frame_oop_map(&mask);
     f.oops_interpreted_do<frame::addressing::RELATIVE>(closure, nullptr, true);
   } else {
     DEBUG_ONLY(int oops = 0;)
@@ -363,9 +341,6 @@ inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* clos
       assert (p != nullptr, "");
       assert ((_has_stub && _index == 1) || is_in_frame(p), "");
 
-      // if ((intptr_t*)p >= end) continue; // we could be walking the bottom frame's stack-passed args, belonging to the caller
-
-      // if (!SkipNullValue::should_skip(*p))
       log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT,
         omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
         omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
@@ -448,7 +423,6 @@ inline static bool is_oop_fixed(oop obj, int offset) {
   OopT value = *obj->field_addr<OopT>(offset);
   intptr_t before = *(intptr_t*)&value;
   intptr_t after  = cast_from_oop<intptr_t>(NativeAccess<>::oop_load(&value));
-  // tty->print_cr(">>> fixed %d: " INTPTR_FORMAT " -> " INTPTR_FORMAT, before == after, before, after);
   return before == after;
 }
 
@@ -506,7 +480,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
       Devirtualizer::do_klass(closure, this);
     }
   }
-  // InstanceKlass::oop_oop_iterate_bounded<T>(obj, closure, mr);
   oop_oop_iterate_stack_bounded<gc_type::STW>(chunk, closure, mr);
   oop_oop_iterate_header_bounded<T>(chunk, closure, mr);
 }
@@ -590,8 +563,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
 
 template <chunk_frames frame_kind, class StackChunkFrameClosureType>
 inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure) {
-  // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " frame_kind: %d", p2i(this), frame_kind);
-
   const SmallRegisterMap* map = SmallRegisterMap::instance;
   assert (!map->in_cont(), "");
 
@@ -599,15 +570,10 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
   bool should_continue = true;
 
   if (f.is_stub()) {
-    // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " safepoint yield stub frame: %d", p2i(this), f.index());
-    // if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
-
     RegisterMap full_map((JavaThread*)nullptr, true, false, true);
     full_map.set_include_argument_oops(false);
 
     f.next(&full_map);
-
-    // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " safepoint yield caller frame: %d", p2i(this), f.index());
 
     assert (!f.is_done(), "");
     assert (f.is_compiled(), "");
@@ -619,13 +585,9 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
   assert (!f.is_stub(), "");
 
   for(; should_continue && !f.is_done(); f.next(map)) {
-    // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " frame: %d interpreted: %d", p2i(this), f.index(), f.is_interpreted());
-    // if (log_develop_is_enabled(Trace, jvmcont)) f.print_on(tty);
     if (frame_kind == chunk_frames::MIXED) f.handle_deopted(); // in slow mode we might freeze deoptimized frames
     should_continue = closure->template do_frame<frame_kind>((const StackChunkFrameStream<frame_kind>&)f, map);
-    // if (!should_continue) log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " stop", p2i(this));
   }
-  // log_develop_trace(jvmcont)("stackChunkOopDesc::iterate_stack this: " INTPTR_FORMAT " done index: %d", p2i(this), f.index());
 }
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_INLINE_HPP

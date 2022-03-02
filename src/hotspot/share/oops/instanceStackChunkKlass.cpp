@@ -59,7 +59,7 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
  : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
-   // see oopDesc::size_given_klass TODO perf
+  // see oopDesc::size_given_klass
    const jint lh = Klass::instance_layout_helper(size_helper(), true);
    set_layout_helper(lh);
    assert (layout_helper_is_instance(layout_helper()), "");
@@ -98,8 +98,6 @@ template size_t InstanceStackChunkKlass::copy<InstanceStackChunkKlass::copy_type
 size_t InstanceStackChunkKlass::compact_oop_size(oop obj) const {
   assert (obj->is_stackChunk(), "");
   stackChunkOop chunk = (stackChunkOop)obj;
-  // We don't trim chunks with ZGC. See copy_compact
-  // if (UseZGC) return instance_size(chunk->stack_size());
   int used_stack_in_words = chunk->stack_size() - chunk->sp() + metadata_words();
   assert (used_stack_in_words <= chunk->stack_size(), "");
   return align_object_size(size_helper() + used_stack_in_words + bitmap_size(used_stack_in_words));
@@ -124,8 +122,7 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   const int from_sp = chunk->sp();
   assert (from_sp >= metadata_words(), "");
 
-  // ZGC usually relocates objects into allocating regions that don't require barriers, which keeps/makes the chunk mutable.
-  if (from_sp <= metadata_words() /*|| UseZGC*/) {
+  if (from_sp <= metadata_words()) {
     assert (oop_size(obj) == compact_oop_size(obj), "");
     return copy<overlap>(obj, to_addr, oop_size(obj));
   }
@@ -144,8 +141,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   HeapWord* const start_of_bitmap0 = start_of_bitmap(obj);
 #endif
 
-  // tty->print_cr(">>> CPY %s %p-%p (%d) -> %p-%p (%d) [%d] -- %d", disjoint ? "DIS" : "CON", cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(obj) + header + from_size, from_size, to_addr, to_addr + header + to_stack_size, to_stack_size, old_compact_size, chunk->is_gc_mode());
-
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
 
@@ -155,7 +150,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   for (int i = first; 0 <= i && i <= 2; i += stride) {
     switch(i) { // copy header and update it
     case 0:
-      // tty->print_cr(">>> CPY header %p-%p -> %p-%p (%d)", from_addr, from_addr + header , to_addr, to_addr + header, header);
       if (to_addr != from_addr) {
         overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_addr, to_addr, header)
                                        : Copy::aligned_conjoint_words(from_addr, to_addr, header);
@@ -169,7 +163,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
         assert ((from_addr + header) == start_of_stack0, "");
         HeapWord* from_start = from_addr + header + from_sp - metadata_words();
         HeapWord* to_start = to_addr + header;
-        // tty->print_cr(">>> CPY stack  %p-%p -> %p-%p (%d)", from_start, from_start + to_stack_size , to_start, to_start + to_stack_size, to_stack_size);
         overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_start, to_start, to_stack_size)
                                        : Copy::aligned_conjoint_words(from_start, to_start, to_stack_size);
       }
@@ -180,7 +173,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
         assert (from_bitmap_size >= to_bitmap_size, "");
         HeapWord* from_start = from_addr + header + from_stack_size + (from_bitmap_size - to_bitmap_size);
         HeapWord* to_start = to_addr + header + to_stack_size;
-        // tty->print_cr(">>> CPY bitmap  %p-%p -> %p-%p (%d)", from_start, from_start + to_bitmap_size , to_start, to_start + to_bitmap_size, to_bitmap_size);
         overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_start, to_start, to_bitmap_size)
                                        : Copy::aligned_conjoint_words(from_start, to_start, to_bitmap_size);
       }
@@ -199,9 +191,6 @@ size_t InstanceStackChunkKlass::copy_compact(oop obj, HeapWord* to_addr) {
   assert (from_sp <= metadata_words() ?  (to_chunk->size() == old_size) : (to_chunk->size() < old_size), "");
   assert (to_chunk->verify(), "");
 
-  // assert (to_chunk->requires_barriers(), ""); // G1 sometimes compacts a young region and *then* turns it old
-  // ((G1CollectedHeap*)Universe::heap())->heap_region_containing(oop(to_addr))->print();
-
   return align_object_size(header + to_stack_size + to_bitmap_size);
 }
 
@@ -214,7 +203,6 @@ int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {
 
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
-  // InstanceKlass::oop_print_on(obj, st);
   print_chunk((stackChunkOop)obj, false, st);
 }
 #endif
@@ -230,7 +218,6 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    // assert (Universe::heap()->is_in_or_null(base), "not an oop"); -- base might be invalid at this point
     if (base != (oop)nullptr) {
       assert (!CompressedOops::is_base(base), "");
 
@@ -249,7 +236,7 @@ public:
 #endif
 
       OrderAccess::loadload();
-      intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
+      intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
       if (derived_int_val <= 0) {
         return;
       }
@@ -258,8 +245,6 @@ public:
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
       assert (offset >= 0, "");
-      // assert (offset >= 0 && offset <= (base->size() << LogHeapWordSize), ""); -- base might be invalid at this point
-      // there could be a benign race here; we write a negative offset to let the sign bit signify it's an offset rather than an address
       Atomic::store((intptr_t*)derived_loc, -offset);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
@@ -284,7 +269,6 @@ public:
       // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset <= 0) {
         offset = -offset;
-        // assert (offset >= 0 && (size_t)offset <= (base->size() << LogHeapWordSize), ""); -- see StackChunkVerifyDerivedPointersClosure
         Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
       }
     }
@@ -319,13 +303,11 @@ public:
     : _closure(closure),
       _chunk(chunk),
       _bound(bound),
-      _mutated(false),
       _num_oops(0) {}
 
   virtual void do_oop(oop* p)       override { do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }
 
-  bool _mutated;
   int _num_oops;
 
   template <typename T>
@@ -333,7 +315,6 @@ public:
     if (_bound.contains(p)) {
       T before = *p;
       Devirtualizer::do_oop(_closure, p);
-      _mutated |= before != *p;
       _num_oops++;
     }
   }
@@ -358,11 +339,6 @@ public:
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    // if (Continuation::is_return_barrier_entry(f.pc())) {
-    //   assert ((int)(f.sp() - chunk->start_address(chunk)) < chunk->sp(), ""); // only happens when starting from gcSP
-    //   return;
-    // }
-
     _num_frames++;
     assert (_closure != nullptr, "");
 
@@ -386,19 +362,13 @@ public:
           OrderAccess::storestore();
         }
         InstanceStackChunkKlass::relativize_derived_pointers<gc>(f, map);
-        // OrderAccess::storestore();
       }
     }
 
     StackChunkOopIterateFilterClosure<OopClosureType> cl(_closure, _chunk, _bound);
     f.iterate_oops(&cl, map);
-    bool mutated_oops = cl._mutated;
-    _num_oops += cl._num_oops;// f.oopmap()->num_oops();
+    _num_oops += cl._num_oops;
 
-    // TODO: A ZGC-specific optimization that depends on the one in iterate_derived_pointers
-    // if (FIX_DERIVED_POINTERS && concurrent_gc && mutated_oops && _chunk->is_gc_mode()) {
-    //   InstanceStackChunkKlass::derelativize_derived_pointers(f, map);
-    // }
     return true;
   }
 };
@@ -411,7 +381,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   if (gc == gc_type::CONCURRENT) {
     do_destructive_processing = true;
   } else {
-    if (SafepointSynchronize::is_at_safepoint() /*&& !chunk->is_gc_mode()*/) {
+    if (SafepointSynchronize::is_at_safepoint()) {
       do_destructive_processing = true;
       chunk->set_gc_mode(true);
     } else {
@@ -422,11 +392,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
 
   OopOopIterateStackClosure<gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
   chunk->iterate_stack(&frame_closure);
-
-  // if (FIX_DERIVED_POINTERS && gc == gc_type::CONCURRENT) {
-  //   OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
-  //   chunk->set_gc_mode(false);
-  // }
 
   assert (frame_closure._num_frames >= 0, "");
   assert (frame_closure._num_oops >= 0, "");
@@ -471,12 +436,6 @@ void InstanceStackChunkKlass::relativize_derived_pointers(const StackChunkFrameS
   f.iterate_derived_pointers(&derived_closure, map);
 }
 
-template <chunk_frames frame_kind, typename RegisterMapT>
-void InstanceStackChunkKlass::derelativize_derived_pointers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-  DerelativizeDerivedPointers derived_closure;
-  f.iterate_derived_pointers(&derived_closure, map);
-}
-
 template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
 template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
 template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
@@ -518,8 +477,6 @@ void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunk
     f.iterate_oops(&oops_closure, map);
   }
   OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
-
-  // if (has_derived) derelativize_derived_pointers(f, map); // we do this in fix_thawed_frame
 }
 
 template void InstanceStackChunkKlass::do_barriers0<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk, const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
@@ -657,13 +614,6 @@ void InstanceStackChunkKlass::build_bitmap(stackChunkOop chunk) {
   chunk->set_gc_mode(true); // must be set *after* the above closure
 }
 
-// NOINLINE void InstanceStackChunkKlass::fix_chunk(stackChunkOop chunk) {
-//   log_develop_trace(jvmcont)("fix_stack_chunk young: %d", !chunk->requires_barriers());
-//   FixChunkIterateStackClosure frame_closure(chunk);
-//   chunk->iterate_stack(&frame_closure);
-//   log_develop_trace(jvmcont)("fix_stack_chunk ------- end -------");
-// }
-
 template <typename RegisterMapT>
 void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map) {
   if (chunk->has_bitmap() && UseCompressedOops) {
@@ -749,7 +699,6 @@ public:
     oop base = (_chunk->has_bitmap() && UseCompressedOops)
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
-    // (oop)NativeAccess<>::oop_load((oop*)base_loc);
     if (base != nullptr) {
       ZGC_ONLY(if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) return;)
       assert (!CompressedOops::is_base(base), "");
@@ -760,11 +709,6 @@ public:
       offset = offset <= 0
                   ? -offset
                   : offset - cast_from_oop<intptr_t>(base);
-
-      // Has been seen to fail on AArch64, where we have lots of derived pointers, with +any derived pointers into arrays.
-      // It looks as if a derived pointer appears live in the oopMap but isn't pointing into the object.
-      // This might be the result of address computation floating above corresponding range check for array access.
-      // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu", offset, base->size() << LogHeapWordSize);
     } else {
       assert (*derived_loc == derived_pointer(0), "");
     }
@@ -792,7 +736,6 @@ public:
     int fsize = f.frame_size() - ((f.is_interpreted() == _callee_interpreted) ? _argsize : 0);
     int num_oops = f.num_oops();
     assert (num_oops >= 0, "");
-    // tty->print_cr(">>> fsize: %d f.frame_size(): %d callee_interpreted: %d callee_argsize: %d", fsize, f.frame_size(), _callee_interpreted, _argsize);
 
     _argsize   = f.stack_argsize();
     _size     += fsize;
@@ -819,15 +762,6 @@ public:
       log_develop_trace(jvmcont)("debug_verify_stack_chunk i2c");
       _num_i2c++;
     }
-
-    // if (_cb != nullptr && _cb->is_nmethod()) {
-    //   nmethod* nm = cb->as_nmethod();
-    //   if (check_deopt && nm->is_marked_for_deoptimization() && nm->is_not_entrant()) {
-    //     tty->print_cr("-- FOUND NON ENTRANT NMETHOD IN CHUNK: ");
-    //     if (nm->method() != nullptr) nm->method()->print_on(tty);
-    //     nm->print_on(tty);
-    //   }
-    // }
 
     StackChunkVerifyOopsClosure oops_closure(_chunk, f.unextended_sp());
     f.iterate_oops(&oops_closure, map);

@@ -243,9 +243,6 @@ private:
   template <gc_type, chunk_frames frames, typename RegisterMapT>
   static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
-  template <chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
-  static void derelativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
   template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
   static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
@@ -334,7 +331,6 @@ public:
   inline intptr_t* derelativize(int offset) const;
   inline void get_oopmap() const;
   inline void get_oopmap(address pc, int oopmap_slot) const;
-  static inline int get_initial_sp(stackChunkOop chunk, bool gc);
 
   template <typename RegisterMapT> inline void update_reg_map_pd(RegisterMapT* map);
 
