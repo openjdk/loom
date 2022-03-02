@@ -3819,11 +3819,12 @@ encode %{
     C2_MacroAssembler _masm(&cbuf);
     int method_index = resolved_method_index(cbuf);
     address call = __ ic_call((address)$meth$$method, method_index);
-    __ post_call_nop();
     if (call == NULL) {
       ciEnv::current()->record_failure("CodeCache is full");
       return;
-    } else if (Compile::current()->max_vector_size() > 0) {
+    } 
+    __ post_call_nop();
+    if (Compile::current()->max_vector_size() > 0) {
       __ reinitialize_ptrue();
     }
   %}
@@ -3847,11 +3848,11 @@ encode %{
     CodeBlob *cb = CodeCache::find_blob(entry);
     if (cb) {
       address call = __ trampoline_call(Address(entry, relocInfo::runtime_call_type));
-      __ post_call_nop();
       if (call == NULL) {
         ciEnv::current()->record_failure("CodeCache is full");
         return;
       }
+      __ post_call_nop();
     } else {
       Label retaddr;
       __ adr(rscratch2, retaddr);
