@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -38,8 +38,6 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 #############################################################################
 
 # Loom specific
-
-compiler/codecache/stress/OverloadCompileQueueTest.java         8279653 generic-all
 
 gc/g1/plab/TestPLABPromotion.java                               8278126 generic-all
 gc/g1/plab/TestPLABResize.java                                  8278126 generic-all
