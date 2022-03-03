@@ -631,12 +631,12 @@ class java_lang_VirtualThread : AllStatic {
   static oop vthread_scope();
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
-  static jshort state(oop vthread);
-  static JavaThreadStatus map_state_to_thread_status(jint state);
+  static u2 state(oop vthread);
+  static JavaThreadStatus map_state_to_thread_status(int state);
   static bool notify_jvmti_events();
-  static void set_notify_jvmti_events(jboolean enable);
+  static void set_notify_jvmti_events(bool enable);
   static void init_static_notify_jvmti_events();
-  static jlong set_jfrTraceId(oop vthread, jlong id);
+  static int64_t set_jfrTraceId(oop vthread, int64_t id);
 };
 
 
@@ -1136,6 +1136,14 @@ class jdk_internal_vm_Continuation: AllStatic {
 };
 
 // Interface to jdk.internal.vm.StackChunk objects
+#define STACKCHUNK_INJECTED_FIELDS(macro)                               \
+  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)   \
+  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)   \
+  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false) \
+  macro(jdk_internal_vm_StackChunk, gcSP,      int_signature, false)    \
+  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)    \
+  macro(jdk_internal_vm_StackChunk, markCycle, long_signature, false)
+
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
  private:
@@ -1149,6 +1157,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _markCycle_offset;
   static int _maxSize_offset;
   static int _cont_offset;
+
 
   static void compute_offsets();
  public:
@@ -1164,22 +1173,28 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline bool is_parent_null(oop ref); // bypasses barriers for a faster test
   template<typename P>
   static inline void set_parent_raw(oop ref, oop value);
-  static inline jint size(oop ref);
-  static inline void set_size(HeapWord* ref, jint value);
-  static inline jint sp(oop ref);
-  static inline void set_sp(oop ref, jint value);
-  static inline jlong pc(oop ref);
-  static inline void set_pc(oop ref, jlong value);
-  static inline jint argsize(oop ref);
-  static inline void set_argsize(oop ref, jint value);
+
+  static inline int size(oop ref);
+  static inline void set_size(HeapWord* ref, int value);
+
+  static inline int sp(oop ref);
+  static inline void set_sp(oop ref, int value);
+  static inline intptr_t pc(oop ref);
+  static inline void set_pc(oop ref, intptr_t value);
+  static inline int argsize(oop ref);
+  static inline void set_argsize(oop ref, int value);
   static inline jbyte flags(oop ref);
   static inline void set_flags(oop ref, jbyte value);
-  static inline jint gc_sp(oop ref);
-  static inline void set_gc_sp(oop ref, jint value);
-  static inline jlong mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, jlong value);
-  static inline jint maxSize(oop ref);
-  static inline void set_maxSize(oop ref, jint value);
+
+  static inline int gc_sp(oop ref);
+  static inline void set_gc_sp(oop ref, int value);
+  static inline int64_t mark_cycle(oop ref);
+  static inline void set_mark_cycle(oop ref, int64_t value);
+
+  static inline int maxSize(oop ref);
+  static inline void set_maxSize(oop ref, int value);
+
+ // cont oop's processing is essential for the chunk's GC protocol
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
   template<typename P>
@@ -2008,7 +2023,8 @@ class InjectedField {
   STACKFRAMEINFO_INJECTED_FIELDS(macro)     \
   MODULE_INJECTED_FIELDS(macro)             \
   THREAD_INJECTED_FIELDS(macro)             \
-  INTERNALERROR_INJECTED_FIELDS(macro)
+  INTERNALERROR_INJECTED_FIELDS(macro)      \
+  STACKCHUNK_INJECTED_FIELDS(macro)
 
 
 // Interface to hard-coded offset checking

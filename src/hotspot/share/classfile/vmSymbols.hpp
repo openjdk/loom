@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -493,6 +493,9 @@
   template(signers_name,                              "signers_name")                             \
   template(source_file_name,                          "source_file")                              \
   template(loader_data_name,                          "loader_data")                              \
+  template(cont_name,                                 "cont")                                     \
+  template(gcSP_name,                                 "gcSP")                                     \
+  template(markCycle_name,                            "markCycle")                                \
   template(vmdependencies_name,                       "vmdependencies")                           \
   template(last_cleanup_name,                         "last_cleanup")                             \
   template(loader_name,                               "loader")                                   \
