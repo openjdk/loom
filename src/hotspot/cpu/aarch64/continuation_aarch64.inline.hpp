@@ -283,6 +283,11 @@ inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t
   *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = bottom - 1;
 }
 
+static inline void derelativize(intptr_t* const fp, int offset) {
+  intptr_t* addr = fp + offset;
+  *addr = (intptr_t)(fp + *addr);
+}
+
 template <typename ConfigT>
 inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   intptr_t* vfp = f.fp();
@@ -293,24 +298,6 @@ inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& 
 
 template <typename ConfigT>
 inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
-  // if (caller.is_interpreted_frame()) {
-  //   // Deoptimization likes ample room between interpreted frames and compiled frames.
-  //   // This is due to caller_adjustment calculation in Deoptimization::fetch_unroll_info_helper.
-  //   // An attempt to simplify that calculation and make more room during deopt has failed some tests.
-
-  //   int addedWords = 0;
-
-  //   // SharedRuntime::gen_i2c_adapter makes room that's twice as big as required for the stack-passed arguments by counting slots but subtracting words from rsp
-  //   assert (VMRegImpl::stack_slot_size == 4, "");
-  //   int argsize = hf.compiled_frame_stack_argsize();
-  //   assert (argsize >= 0, "");
-  //   addedWords += (argsize /* / 2*/) >> LogBytesPerWord; // Not sure why dividing by 2 is not big enough.
-
-  //   log_develop_trace(jvmcont)("Aligning compiled frame 0: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(vsp), p2i(vsp - addedWords));
-  //   vsp -= addedWords;
-  //   log_develop_trace(jvmcont)("Aligning sender sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(caller.sp()), p2i(caller.sp() - addedWords));
-  //   caller.set_sp(caller.sp() - addedWords);
-  // }
 #ifdef _LP64
   if (((intptr_t)vsp & 0xf) != 0) {
     assert(caller.is_interpreted_frame() || (bottom && hf.compiled_frame_stack_argsize() % 2 != 0), "");

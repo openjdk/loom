@@ -2808,11 +2808,6 @@ public:
     assert(Frame::assert_frame_laid_out(f), "");
   }
 
-  static inline void derelativize(intptr_t* const fp, int offset) {
-    intptr_t* addr = fp + offset;
-    *addr = (intptr_t)(fp + *addr);
-  }
-
   static void JVMTI_continue_cleanup(JavaThread* thread) {
 #if INCLUDE_JVMTI
     invalidate_JVMTI_stack(thread);

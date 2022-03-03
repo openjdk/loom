@@ -53,10 +53,6 @@
 
 #if INCLUDE_ZGC
 #include "gc/z/zAddress.inline.hpp"
-#define FIX_DERIVED_POINTERS true
-#endif
-#if INCLUDE_SHENANDOAHGC
-#define FIX_DERIVED_POINTERS true
 #endif
 
 #ifdef ASSERT
