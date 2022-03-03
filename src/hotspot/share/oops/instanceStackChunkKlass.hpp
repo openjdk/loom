@@ -114,7 +114,7 @@ private:
   template <chunk_frames frames> friend class StackChunkFrameStream;
   friend class FixChunkIterateStackClosure;
   friend class MarkMethodsStackClosure;
-  template <gc_type gc, typename OopClosureType> friend class OopOopIterateStackClosure;
+  template <gc_type gc> friend class OopOopIterateStackClosure;
   template <barrier_type barrier> friend class DoBarriersStackClosure;
 
 public:
@@ -195,6 +195,8 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
+  static void relativize_chunk(stackChunkOop chunk);
+
   template <typename OopT, gc_type>
   static inline bool should_fix(const stackChunkOop chunk);
 
@@ -207,9 +209,10 @@ public:
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
+  static void build_bitmap(stackChunkOop chunk);
+
 private:
   static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
-  void build_bitmap(stackChunkOop chunk);
 
   template<copy_type disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
 

@@ -79,12 +79,12 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
   stackChunkOop chunk = (stackChunkOop)obj;
 
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
-  assert (from_addr != to_addr, "");
   overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
                                  : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
 
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
   assert (!to_chunk->has_bitmap() || to_chunk->is_gc_mode(), "");
+
   if (!to_chunk->has_bitmap()) {
     build_bitmap(to_chunk);
   }
@@ -119,37 +119,38 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    if (base != (oop)nullptr) {
-      assert (!CompressedOops::is_base(base), "");
+    if (base == (oop)nullptr) {
+      assert (*derived_loc == derived_pointer(0), "");
+      return;
+    }
+    assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-      if (gc == gc_type::CONCURRENT && UseZGC) {
-        if (ZAddress::is_good(cast_from_oop<uintptr_t>(base)))
-          return;
-      }
-#endif
-#if INCLUDE_SHENANDOAHGC
-      if (gc == gc_type::CONCURRENT && UseShenandoahGC) {
-        if (!ShenandoahHeap::heap()->in_collection_set(base)) {
-          return;
-        }
-      }
-#endif
-
-      OrderAccess::loadload();
-      intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
-      if (derived_int_val <= 0) {
+    if (gc == gc_type::CONCURRENT && UseZGC) {
+      if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
         return;
       }
-
-      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
-      intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-      assert (offset >= 0, "");
-      Atomic::store((intptr_t*)derived_loc, -offset);
-    } else {
-      assert (*derived_loc == derived_pointer(0), "");
     }
+#endif
+#if INCLUDE_SHENANDOAHGC
+    if (gc == gc_type::CONCURRENT && UseShenandoahGC) {
+      if (!ShenandoahHeap::heap()->in_collection_set(base)) {
+        return;
+      }
+    }
+#endif
+
+    OrderAccess::loadload();
+    intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
+    if (derived_int_val <= 0) {
+      return;
+    }
+
+    // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
+    // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
+    intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
+    assert (offset >= 0, "");
+    Atomic::store((intptr_t*)derived_loc, -offset);
   }
 };
 
@@ -221,18 +222,16 @@ public:
   }
 };
 
-template <gc_type gc, typename OopClosureType>
+template <gc_type gc>
 class OopOopIterateStackClosure {
   stackChunkOop _chunk;
-  const bool _do_destructive_processing;
-  OopClosureType * const _closure;
+  OopIterateClosure* const _closure;
   MemRegion _bound;
 
 public:
   int _num_frames, _num_oops;
-  OopOopIterateStackClosure(stackChunkOop chunk, bool do_destructive_processing, OopClosureType* closure, MemRegion mr)
+  OopOopIterateStackClosure(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr)
     : _chunk(chunk),
-      _do_destructive_processing(do_destructive_processing),
       _closure(closure),
       _bound(mr),
       _num_frames(0),
@@ -243,7 +242,7 @@ public:
     _num_frames++;
     assert (_closure != nullptr, "");
 
-    if (Devirtualizer::do_metadata(_closure)) {
+    if (_closure->do_metadata()) {
       if (f.is_interpreted()) {
         Method* im = f.to_frame().interpreter_frame_method();
         _closure->do_method(im);
@@ -255,18 +254,7 @@ public:
       }
     }
 
-    if (_do_destructive_processing) { // evacuation always takes place at a safepoint; for concurrent iterations, we skip derived pointers, which is ok b/c coarse card marking is used for chunks
-      assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
-      if (f.is_compiled() && f.oopmap()->has_derived_oops()) {
-        if (gc == gc_type::CONCURRENT) {
-          _chunk->set_gc_mode(true);
-          OrderAccess::storestore();
-        }
-        InstanceStackChunkKlass::relativize_derived_pointers<gc>(f, map);
-      }
-    }
-
-    StackChunkOopIterateFilterClosure<OopClosureType> cl(_closure, _chunk, _bound);
+    StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _chunk, _bound);
     f.iterate_oops(&cl, map);
     _num_oops += cl._num_oops;
 
@@ -278,20 +266,7 @@ template <gc_type gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   assert (chunk->is_stackChunk(), "");
 
-  bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
-  if (gc == gc_type::CONCURRENT) {
-    do_destructive_processing = true;
-  } else {
-    if (SafepointSynchronize::is_at_safepoint()) {
-      do_destructive_processing = true;
-      chunk->set_gc_mode(true);
-    } else {
-      do_destructive_processing = false;
-    }
-    assert (!SafepointSynchronize::is_at_safepoint() || chunk->is_gc_mode(), "");
-  }
-
-  OopOopIterateStackClosure<gc, OopIterateClosure> frame_closure(chunk, do_destructive_processing, closure, mr);
+  OopOopIterateStackClosure<gc> frame_closure(chunk, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
   assert (frame_closure._num_frames >= 0, "");
@@ -405,6 +380,33 @@ public:
 template <InstanceStackChunkKlass::barrier_type barrier>
 void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
   DoBarriersStackClosure<barrier> closure(chunk);
+  chunk->iterate_stack(&closure);
+}
+
+class RelativizeStackClosure {
+  const stackChunkOop _chunk;
+public:
+  RelativizeStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
+
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+    bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
+    if (has_derived) {
+      RelativizeDerivedPointers<gc_type::CONCURRENT> derived_closure;
+      f.iterate_derived_pointers(&derived_closure, map);
+    }
+    return true;
+  }
+};
+
+void InstanceStackChunkKlass::relativize_chunk(stackChunkOop chunk) {
+  if (chunk->is_gc_mode()) {
+    // Already relativized
+    return;
+  }
+  chunk->set_gc_mode(true);
+  OrderAccess::storestore();
+  RelativizeStackClosure closure(chunk);
   chunk->iterate_stack(&closure);
 }
 

@@ -32,6 +32,7 @@
 #include "gc/shared/ageTable.inline.hpp"
 #include "gc/shared/cardTableRS.hpp"
 #include "gc/shared/collectorCounters.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gcArguments.hpp"
 #include "gc/shared/gcHeapSummary.hpp"
 #include "gc/shared/gcLocker.hpp"
@@ -696,6 +697,7 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
   _promotion_failed = true;
   _promotion_failed_info.register_copy_failure(old->size());
   _preserved_marks_set.get()->push_if_necessary(old, old->mark());
+  ContinuationGCSupport::transform_stack_chunk(old);
   // forward to self
   old->forward_to(old);
 

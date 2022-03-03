@@ -86,7 +86,7 @@ size_t G1FullGCCompactTask::G1CompactRegionClosure::apply(oop obj) {
   // copy object and reinit its mark
   HeapWord* obj_addr = cast_from_oop<HeapWord*>(obj);
   assert(size <= INT_MAX, "sanity check");
-  assert(obj_addr != destination || size > (size_t)obj->size(), "everything in this pass should be moving or compressed in place");
+  assert(obj_addr != destination, "everything in this pass should be moving or compressed in place");
   obj->copy_conjoint(destination, size);
   cast_to_oop(destination)->init_mark();
   assert(cast_to_oop(destination)->klass() != NULL, "should have a class");
