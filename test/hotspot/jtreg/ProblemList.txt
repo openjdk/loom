@@ -197,8 +197,6 @@ vmTestbase/nsk/stress/strace/strace002.java                                   82
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
-gtest/GTestWrapper.java                                                       0000000 generic-all
-
 runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
 
 gc/metaspace/TestPerfCountersAndMemoryPools.java                              8278109 generic-all
