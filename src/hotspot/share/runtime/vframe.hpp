@@ -90,6 +90,9 @@ class vframe: public ResourceObj {
   // Returns the next javaVFrame on the stack (skipping all other kinds of frame)
   javaVFrame *java_sender() const;
 
+  // Is the current frame the entry to a virtual thread's stack
+  bool is_vthread_entry() const;
+
   // Call when resuming a walk (calling [java_]sender) on a frame we'e already walked past
   void restore_register_map() const;
 

@@ -182,6 +182,7 @@ class frame {
   // testers
   bool is_first_frame() const; // oldest frame? (has no sender)
   bool is_first_java_frame() const;              // same for Java frame
+  bool is_first_vthread_frame(JavaThread* thread) const;
 
   bool is_interpreted_frame_valid(JavaThread* thread) const;       // performs sanity checks on interpreted frames.
 

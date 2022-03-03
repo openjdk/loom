@@ -746,7 +746,7 @@ static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, i
   return cont;
 }
 
-static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
+oop Continuation::get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
   assert (thread != nullptr, "");
   ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
   return cont != nullptr ? cont->continuation() : (oop)nullptr;

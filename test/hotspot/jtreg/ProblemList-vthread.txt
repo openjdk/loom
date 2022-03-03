@@ -166,6 +166,8 @@ runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
 serviceability/tmtools/jstack/DaemonThreadTest.java
 serviceability/dcmd/thread/JavaThreadDumpTest.java
+serviceability/dcmd/thread/PrintTest.java
+serviceability/dcmd/thread/PrintConcurrentLocksTest.java
 
 ####
 # TODO check what are the cds issues with vthread

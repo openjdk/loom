@@ -114,11 +114,11 @@ vframe* vframe::sender() const {
   if (_fr.is_entry_frame() && _fr.is_first_frame()) return NULL;
   frame s = _fr.real_sender(&temp_map);
   if (s.is_first_frame()) return NULL;
-  if (Continuation::is_continuation_enterSpecial(s)) {
-    if (Continuation::continuation_scope(Continuation::get_continuation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
-      return NULL;
-  }
   return vframe::new_vframe(&s, &temp_map, thread());
+}
+
+bool vframe::is_vthread_entry() const {
+  return _fr.is_first_vthread_frame(register_map()->thread());
 }
 
 vframe* vframe::top() const {
@@ -131,7 +131,9 @@ vframe* vframe::top() const {
 javaVFrame* vframe::java_sender() const {
   vframe* f = sender();
   while (f != NULL) {
-    if (f->is_java_frame() && !javaVFrame::cast(f)->method()->is_continuation_enter_intrinsic()) return javaVFrame::cast(f);
+    if (f->is_vthread_entry()) break;
+    if (f->is_java_frame() && !javaVFrame::cast(f)->method()->is_continuation_enter_intrinsic())
+      return javaVFrame::cast(f);
     f = f->sender();
   }
   return NULL;

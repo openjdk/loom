@@ -272,6 +272,12 @@ bool frame::is_first_java_frame() const {
   return s.is_first_frame();
 }
 
+bool frame::is_first_vthread_frame(JavaThread* thread) const {
+  return Continuation::is_continuation_enterSpecial(*this)
+    // the enterSpecial frame is considered out of the continuation, so we subtract 1 from sp
+    && Continuation::continuation_scope(Continuation::get_continuation_for_sp(thread, sp()-2))
+          == java_lang_VirtualThread::vthread_scope();
+}
 
 bool frame::entry_frame_is_first() const {
   return entry_frame_call_wrapper()->is_first_frame();

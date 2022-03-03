@@ -72,6 +72,7 @@ public:
 
   static bool is_mounted(JavaThread* thread, oop cont_scope);
 
+  static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp);
   static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
 
   static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
