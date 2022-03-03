@@ -219,7 +219,7 @@ JVM_DefineArchivedModules
 JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
 
-# Virtual thread support
+# Virtual thread notifications for JVMTI
 JVM_VirtualThreadMountBegin
 JVM_VirtualThreadMountEnd
 JVM_VirtualThreadUnmountBegin
