@@ -761,7 +761,7 @@ define SetupRunJtregTestBody
 
   ifneq ($$(JTREG_MAIN_WRAPPER), )
     JT_HOME = $$(JT_HOME_MW)
-    $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER) -vmoption:--enable-preview
+    $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER)
   endif
 
   ifneq ($$(JTREG_LAUNCHER_OPTIONS), )
