@@ -39,6 +39,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.PreviewFeature;
+import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
@@ -760,6 +761,7 @@ public class Thread implements Runnable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
+        PreviewFeatures.ensureEnabled();
         return new ThreadBuilders.VirtualThreadBuilder();
     }
 
@@ -1384,6 +1386,7 @@ public class Thread implements Runnable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
+        PreviewFeatures.ensureEnabled();
         var thread = new VirtualThread(null, null, 0, task);
         thread.start();
         return thread;

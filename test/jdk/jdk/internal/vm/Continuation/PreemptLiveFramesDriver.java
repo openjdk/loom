@@ -27,9 +27,9 @@
  * @build java.base/java.lang.PreemptLiveFrames
  * @modules java.base/jdk.internal.vm
  *
- * @run main/othervm -Xint PreemptLiveFramesDriver
- * @run main/othervm -XX:-TieredCompilation -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
- * @run main/othervm -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
+ * @run main/othervm --enable-preview -Xint PreemptLiveFramesDriver
+ * @run main/othervm --enable-preview -XX:-TieredCompilation -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
+ * @run main/othervm --enable-preview -XX:+TieredCompilation -XX:TieredStopAtLevel=3 -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,java/lang/PreemptLiveFrames PreemptLiveFramesDriver
  */
 
 public class PreemptLiveFramesDriver {

@@ -25,6 +25,7 @@
 
 package jdk.internal.vm;
 
+import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -48,6 +49,8 @@ public class Continuation {
     private static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
+        PreviewFeatures.ensureEnabled();
+
         StackChunk.init(); // ensure StackChunk class is initialized
 
         String value = GetPropertyAction.privilegedGetProperty("jdk.preserveScopeLocalCache");

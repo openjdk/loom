@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,8 +27,8 @@
  * @modules java.base/jdk.internal.vm
  * @build java.base/java.lang.StackWalkerHelper
  *
- * @run testng/othervm -Xint Scoped
- * @run testng/othervm -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Scoped Scoped
+ * @run testng/othervm --enable-preview -Xint Scoped
+ * @run testng/othervm --enable-preview -Xcomp -XX:CompileOnly=jdk/internal/vm/Continuation,Scoped Scoped
  */
 
 import jdk.internal.vm.Continuation;
