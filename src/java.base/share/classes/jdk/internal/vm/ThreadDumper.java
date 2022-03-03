@@ -41,20 +41,38 @@ import java.util.List;
 /**
  * Thread dump support.
  *
- * This class defines methods to dump threads to an output stream or file in
- * plain text or JSON format. Virtual threads are located if they are created in
- * a structured way with a ThreadFlock.
+ * This class defines methods to dump threads to an output stream or file in plain
+ * text or JSON format.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
+
+    /**
+     * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
+     *
+     * This method is invoked by the VM for the JavaThread.dump diagnostic command.
+     */
+    public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, false);
+    }
+
+    /**
+     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
+     *
+     * This method is invoked by the VM for the JavaThread.dump diagnostic command.
+     */
+    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
+        return dumpThreads(file, okayToOverwrite, true);
+    }
 
     /**
      * Generate a thread dump in plain text or JSON format to the given file, UTF-8 encoded.
      */
     private static byte[] dumpThreads(String file, boolean okayToOverwrite, boolean json) {
         Path path = Path.of(file).toAbsolutePath();
-        OpenOption[] options = (okayToOverwrite) ?
-                new OpenOption[0] : new OpenOption[] { StandardOpenOption.CREATE_NEW };
+        OpenOption[] options = (okayToOverwrite)
+                ? new OpenOption[0]
+                : new OpenOption[] { StandardOpenOption.CREATE_NEW };
         String reply;
         try (OutputStream out = Files.newOutputStream(path, options);
              PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8)) {
@@ -70,24 +88,6 @@ public class ThreadDumper {
             reply = String.format("Failed: %s%n", ioe);
         }
         return reply.getBytes(StandardCharsets.UTF_8);
-    }
-
-    /**
-     * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
-     *
-     * This method is invoked by the VN to implement the JavaThread.dump command.
-     */
-    public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
-        return dumpThreads(file, okayToOverwrite, false);
-    }
-
-    /**
-     * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
-     *
-     * This method is invoked by the VN to implement the JavaThread.dump command.
-     */
-    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
-        return dumpThreads(file, okayToOverwrite, true);
     }
 
     /**
