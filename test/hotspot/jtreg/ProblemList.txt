@@ -197,10 +197,6 @@ vmTestbase/nsk/stress/strace/strace002.java                                   82
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
-vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_cl/TestDescription.java 8277989 generic-all
-vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_class/TestDescription.java 8277989 generic-all
-vmTestbase/gc/g1/unloading/tests/unloading_redefinition_inMemoryCompilation_keep_obj/TestDescription.java 8277989 generic-all
-
 gtest/GTestWrapper.java                                                       0000000 generic-all
 
 runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
