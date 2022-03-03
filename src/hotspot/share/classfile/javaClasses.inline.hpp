@@ -199,6 +199,16 @@ inline oop java_lang_Thread::continuation(oop java_thread) {
   return java_thread->obj_field(_continuation_offset);
 }
 
+inline oop java_lang_VirtualThread::vthread_scope() {
+  oop base = vmClasses::VirtualThread_klass()->static_field_base_raw();
+  return base->obj_field(static_vthread_scope_offset);
+}
+
+inline int64_t java_lang_VirtualThread::set_jfrTraceId(oop ref, int64_t id) {
+  ref->long_field_put(java_lang_Thread::_tid_offset, id);
+  return id;
+}
+
 inline oop jdk_internal_vm_ContinuationScope::name(oop ref) {
   return ref->obj_field(_name_offset);
 }
@@ -244,16 +254,6 @@ inline void jdk_internal_vm_Continuation::set_preempted(oop ref, bool value) {
   ref->bool_field_put(_preempted_offset, (jboolean)value);
 }
 
-inline oop java_lang_VirtualThread::vthread_scope() {
-  oop base = vmClasses::VirtualThread_klass()->static_field_base_raw();
-  return base->obj_field(static_vthread_scope_offset);
-}
-
-inline jlong java_lang_VirtualThread::set_jfrTraceId(oop ref, jlong id) {
-  ref->long_field_put(java_lang_Thread::_tid_offset, id);
-  return id;
-}
-
 inline oop jdk_internal_vm_StackChunk::parent(oop ref) {
   return ref->obj_field(_parent_offset);
 }
@@ -287,52 +287,52 @@ inline void jdk_internal_vm_StackChunk::set_cont_raw(oop ref, oop value) {
   RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_cont_offset), value);
 }
 
-inline jint jdk_internal_vm_StackChunk::size(oop ref) {
+inline int jdk_internal_vm_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_size(HeapWord* ref, jint value) {
+inline void jdk_internal_vm_StackChunk::set_size(HeapWord* ref, int value) {
   *(cast_to_oop(ref))->field_addr<jint>(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
-inline jint jdk_internal_vm_StackChunk::sp(oop ref) {
+inline int jdk_internal_vm_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_sp(oop ref, jint value) {
+inline void jdk_internal_vm_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
 }
-inline jlong jdk_internal_vm_StackChunk::pc(oop ref) {
+inline intptr_t jdk_internal_vm_StackChunk::pc(oop ref) {
   return ref->long_field(_pc_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_pc(oop ref, jlong value) {
+inline void jdk_internal_vm_StackChunk::set_pc(oop ref, intptr_t value) {
   ref->long_field_put(_pc_offset, value);
 }
-inline jint jdk_internal_vm_StackChunk::argsize(oop ref) {
+inline int jdk_internal_vm_StackChunk::argsize(oop ref) {
   return ref->int_field(_argsize_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_argsize(oop ref, jint value) {
+inline void jdk_internal_vm_StackChunk::set_argsize(oop ref, int value) {
   ref->int_field_put(_argsize_offset, value);
 }
-inline jbyte jdk_internal_vm_StackChunk::flags(oop ref) {
-  return ref->byte_field(_flags_offset);
+inline uint8_t jdk_internal_vm_StackChunk::flags(oop ref) {
+  return Atomic::load(ref->field_addr<uint8_t>(_flags_offset));
 }
-inline void jdk_internal_vm_StackChunk::set_flags(oop ref, jbyte value) {
-  ref->byte_field_put(_flags_offset, value);
+inline void jdk_internal_vm_StackChunk::set_flags(oop ref, uint8_t value) {
+  Atomic::store(ref->field_addr<uint8_t>(_flags_offset), value);
 }
-inline jint jdk_internal_vm_StackChunk::gc_sp(oop ref) {
+inline int jdk_internal_vm_StackChunk::gc_sp(oop ref) {
   return ref->int_field(_gcSP_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_gc_sp(oop ref, jint value) {
+inline void jdk_internal_vm_StackChunk::set_gc_sp(oop ref, int value) {
   ref->int_field_put(_gcSP_offset, value);
 }
-inline jlong jdk_internal_vm_StackChunk::mark_cycle(oop ref) {
-  return ref->long_field(_markCycle_offset);
+inline uint64_t jdk_internal_vm_StackChunk::mark_cycle(oop ref) {
+  return (uint64_t)ref->long_field(_markCycle_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_mark_cycle(oop ref, jlong value) {
-  ref->long_field_put(_markCycle_offset, value);
+inline void jdk_internal_vm_StackChunk::set_mark_cycle(oop ref, uint64_t value) {
+  ref->long_field_put(_markCycle_offset, (jlong)value);
 }
-inline jint jdk_internal_vm_StackChunk::maxSize(oop ref) {
+inline int jdk_internal_vm_StackChunk::maxSize(oop ref) {
   return ref->int_field(_maxSize_offset);
 }
-inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, jint value) {
+inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, int value) {
 #ifdef ASSERT
   jint old = maxSize(ref);
   log_develop_trace(jvmcont)("%s max_size: %d -> %d", value >= old ? "add" : "sub", old, value);

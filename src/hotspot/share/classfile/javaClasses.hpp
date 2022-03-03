@@ -1183,13 +1183,13 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void set_pc(oop ref, intptr_t value);
   static inline int argsize(oop ref);
   static inline void set_argsize(oop ref, int value);
-  static inline jbyte flags(oop ref);
-  static inline void set_flags(oop ref, jbyte value);
+  static inline uint8_t flags(oop ref);
+  static inline void set_flags(oop ref, uint8_t value);
 
   static inline int gc_sp(oop ref);
   static inline void set_gc_sp(oop ref, int value);
-  static inline int64_t mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, int64_t value);
+  static inline uint64_t mark_cycle(oop ref);
+  static inline void set_mark_cycle(oop ref, uint64_t value);
 
   static inline int maxSize(oop ref);
   static inline void set_maxSize(oop ref, int value);
