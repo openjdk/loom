@@ -33,22 +33,27 @@
 class Control : public AllStatic {
   static bool _suspend_done;
   static bool _block_done;
+  static bool _second_block_done;
  public:
   static bool suspend_done() { return Atomic::load(&_suspend_done); }
   static bool block_done() { return Atomic::load(&_block_done); }
   static void set_suspend_done() { Atomic::store(&_suspend_done, true); }
   static void set_block_done() { Atomic::store(&_block_done, true); }
+
+  static bool second_block_done() { return Atomic::load(&_second_block_done); }
+  static void set_second_block_done() { Atomic::store(&_second_block_done, true); }
 };
 
 bool Control::_suspend_done = false;
 bool Control::_block_done = false;
+bool Control::_second_block_done = false;
 
 class BlockeeThread : public JavaTestThread {
   public:
   BlockeeThread(Semaphore* post) : JavaTestThread(post) {}
   virtual ~BlockeeThread() {}
   void main_run() {
-    while (!Control::suspend_done()) {
+    while (!Control::second_block_done()) {
       ThreadBlockInVM tbivm(this);
     }
   }
@@ -123,6 +128,7 @@ class AnotherBlockingThread : public JavaTestThread {
         done = true;
       }
     }
+    Control::set_second_block_done();
   }
 };
 
