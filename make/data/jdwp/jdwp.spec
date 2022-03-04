@@ -2097,6 +2097,11 @@ JDWP "Java(tm) Debug Wire Protocol"
         "command and resumption of thread execution, the "
         "state of the stack is undefined. "
         "<p>"
+        "The target VM may not support, or may only provide limited support, for "
+        "this command when the thread is a virtual thread. It may, for example, "
+        "only support this command when the virtual thread is suspended at a "
+        "breakpoint or singlestep event."
+        "<p>"
         "No further instructions are executed in the called "
         "method. Specifically, finally blocks are not executed. Note: "
         "this can cause inconsistent states in the application. "
@@ -2633,6 +2638,11 @@ JDWP "Java(tm) Debug Wire Protocol"
         "determine the correct local variable index. (Typically, this
         "index can be determined for method arguments from the method "
         "signature without access to the local variable table information.) "
+        "<p>"
+        "If the thread is a virtual thread then this command can be used to set "
+        "the value of local variables in the the topmost frame when the thread is "
+        "suspended at a breakpoint or single step event. The target VM may support "
+        "setting local variables in other cases."
         (Out
             (threadObject thread "The frame's thread. ")
             (frame frame "The frame ID. ")
@@ -2648,7 +2658,9 @@ JDWP "Java(tm) Debug Wire Protocol"
         (ErrorSet
             (Error INVALID_THREAD)
             (Error INVALID_OBJECT)
-            (Error INVALID_FRAMEID)
+            (Error INVALID_FRAMEID   "Invalid frameID, or the thread is a virtual thread "
+                                     "and the implementation does not support setting the "
+                                     "value of local variables in the frame.")
             (Error VM_DEAD)
         )
     )
@@ -2678,6 +2690,11 @@ JDWP "Java(tm) Debug Wire Protocol"
         "are added back and if the invoke was not <code>invokestatic</code>, "
         "<code>objectref</code> is added back as well. The Java virtual machine "
         "program counter is restored to the opcode of the invoke instruction."
+        "<p>"
+        "The target VM may not support, or may only provide limited support, for this "
+        "command when the thread is a virtual thread. It may, for example, only support "
+        "this command when the virtual thread is suspended at a breakpoint or singlestep "
+        "event."
         "<p>"
         "Since JDWP version 1.4. Requires canPopFrames capability - see "
         "<a href=\"#JDWP_VirtualMachine_CapabilitiesNew\">CapabilitiesNew</a>."
@@ -3129,7 +3146,8 @@ JDWP "Java(tm) Debug Wire Protocol"
 )
 (ConstantSet Error
     (Constant NONE                   =0   "No error has occurred.")
-    (Constant INVALID_THREAD         =10  "Passed thread is null, is not a valid thread or has exited.")
+    (Constant INVALID_THREAD         =10  "The thread is null, not a valid thread, "
+                                          "or the thread has terminated.")
     (Constant INVALID_THREAD_GROUP   =11  "Thread group invalid.")
     (Constant INVALID_PRIORITY       =12  "Invalid priority.")
     (Constant THREAD_NOT_SUSPENDED   =13  "If the specified thread has not been "
