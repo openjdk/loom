@@ -202,9 +202,8 @@ public class Thread implements Runnable {
     // thread name
     private volatile String name;
 
-    // thread id. Effectively final, but volatile
-    // for atomic loads (read/written by VM)
-    private volatile long tid;
+    // thread id.
+    private final long tid;
 
     // context ClassLoader
     private volatile ClassLoader contextClassLoader;

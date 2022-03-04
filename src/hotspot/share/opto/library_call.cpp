@@ -2990,12 +2990,12 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   // Load the threadObj for the CarrierThread.
   Node* const threadObj = generate_current_thread(tls_ptr);
-  // Load the tid field from the thread object, since the field is volatile it is done atomically.
+  // Load the tid field from the thread object.
   Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J");
 
   // Load the vthread field.
   Node* const vthread = generate_virtual_thread(tls_ptr);
-  // Load the tid field from the vthread object, since the field is volatile it is done atomically.
+  // Load the tid field from the vthread object.
   Node* vthread_tid_value = load_field_from_object(vthread, "tid", "J");
 
   // Load the address of java event writer jobject handle from the jfr_thread_local structure.
@@ -3188,7 +3188,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
  */
 void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
-  // Load the tid field from the thread, since the field is volatile it is done atomically.
+  // Load the tid field from the thread.
   Node* tid = load_field_from_object(thread, "tid", "J");
   // Store the tid to the jfr thread local.
   Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + THREAD_ID_OFFSET_JFR));
