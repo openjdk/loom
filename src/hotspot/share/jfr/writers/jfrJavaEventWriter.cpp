@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -182,6 +182,7 @@ static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
   static const char signature[] = "(JJJJZ)V";
   JavaValue result(T_OBJECT);
   JfrJavaArguments args(&result, klass, method, signature, CHECK_NULL);
+
   // parameters
   args.push_long((jlong)buffer->pos());
   args.push_long((jlong)buffer->end());
@@ -192,7 +193,7 @@ static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
   return result.get_jobject();
 }
 
-jobject JfrJavaEventWriter::event_writer(JavaThread* t, traceid tid /* 0 */) {
+jobject JfrJavaEventWriter::event_writer(JavaThread* t) {
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
   JfrThreadLocal* const tl = t->jfr_thread_local();
   assert(tl->shelved_buffer() == NULL, "invariant");
@@ -200,9 +201,8 @@ jobject JfrJavaEventWriter::event_writer(JavaThread* t, traceid tid /* 0 */) {
   if (h_writer != NULL) {
     oop writer = JNIHandles::resolve_non_null(h_writer);
     assert(writer != NULL, "invariant");
-    // primarily for supporting Virtual Threads
     const jlong event_writer_tid = writer->long_field(thread_id_offset);
-    const jlong current_tid = tid != 0 ? tid : (jlong)JFR_THREAD_ID(t);
+    const jlong current_tid = static_cast<jlong>(JFR_THREAD_ID(t));
     if (event_writer_tid != current_tid) {
       writer->long_field_put(thread_id_offset, current_tid);
     }

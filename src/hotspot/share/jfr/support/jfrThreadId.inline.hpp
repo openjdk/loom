@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -22,25 +22,21 @@
 *
 */
 
-#ifndef SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP
-#define SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP
+#ifndef SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
+#define SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
 
+#include "classfile/javaClasses.inline.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
-#include "memory/allocation.hpp"
-#include "oops/oopsHierarchy.hpp"
+#include "memory/allocation.inline.hpp"
 
-class JavaThread;
-
-class JfrJavaThread : public AllStatic {
-  friend class JfrRecorder;
- private:
-  static bool initialize(bool notify_virtual_threads);
+class ThreadIdAccess : AllStatic {
  public:
-  static traceid contextual_thread_id(const JavaThread* jt, bool* is_virtual = NULL);
-  static traceid virtual_thread_id(oop vthread, const JavaThread* jt);
-  static traceid java_thread_id(const JavaThread* jt);
-  static bool is_virtual(const JavaThread* jt);
-  static oop virtual_thread(const JavaThread* jt);
+  static traceid load(oop ref) {
+    return static_cast<traceid>(java_lang_Thread::thread_id_raw(ref));
+  }
+  static void store(oop ref, traceid value) {
+    java_lang_VirtualThread::set_jfr_traceid(ref, static_cast<jlong>(value));
+  }
 };
 
-#endif // SHARE_JFR_SUPPORT_JFRJAVATHREAD_HPP
+#endif // SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP

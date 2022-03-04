@@ -29,7 +29,6 @@
 #include "jfr/recorder/stacktrace/jfrStackTrace.hpp"
 #include "jfr/recorder/storage/jfrBuffer.hpp"
 #include "jfr/support/jfrMethodLookup.hpp"
-
 #include "memory/allocation.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
 #include "runtime/handles.inline.hpp"
@@ -152,7 +151,6 @@ class JfrVframeStream : public vframeStreamCommon {
  public:
   JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode);
   void next_vframe();
-  bool continuation_scope_end_condition() const;
 };
 
 inline void JfrVframeStream::seek_stable_frame() {
@@ -181,7 +179,7 @@ _continuation(jt->last_continuation()->cont_oop()), _continuation_scope(NULL), _
 }
 
 inline bool JfrVframeStream::at_continuation_entry_frame() const {
-  return _continuation != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame);
+  return _continuation != nullptr && Continuation::is_continuation_enterSpecial(_frame);
 }
 
 inline void JfrVframeStream::set_parent_continuation() {
@@ -189,29 +187,28 @@ inline void JfrVframeStream::set_parent_continuation() {
 }
 
 inline void JfrVframeStream::set_continuation_scope() {
-  if (_continuation != (oop)NULL) {
+  if (_continuation != nullptr) {
     _continuation_scope = jdk_internal_vm_Continuation::scope(_continuation);
   }
 }
 
 #ifdef ASSERT
 void JfrVframeStream::assert_continuation_state() const {
-  assert(_reg_map.cont() == (oop)NULL || (_continuation == _reg_map.cont()),
+  assert(_reg_map.cont() == nullptr || (_continuation == _reg_map.cont()),
     "map.cont: " INTPTR_FORMAT " JfrVframeStream: " INTPTR_FORMAT,
     p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_continuation));
 }
 #endif
 
 inline bool JfrVframeStream::at_continuation_scope_entry_frame() {
-  assert(_continuation_scope == (oop)NULL || _continuation != (oop)NULL, "must be");
+  assert(_continuation_scope == nullptr || _continuation != nullptr, "must be");
   if (!at_continuation_entry_frame()) {
     return false;
   }
-  if (_continuation_scope != (oop)NULL && jdk_internal_vm_Continuation::scope(_continuation) == _continuation_scope) {
+  if (_continuation_scope != nullptr && jdk_internal_vm_Continuation::scope(_continuation) == _continuation_scope) {
     return true;
   }
   set_parent_continuation();
-  // set_continuation_scope();
   DEBUG_ONLY(assert_continuation_state();)
   return false;
 }
@@ -252,28 +249,16 @@ void JfrVframeStream::next_vframe() {
   up();
 }
 
-inline bool JfrVframeStream::continuation_scope_end_condition() const {
-  assert(_mode == at_end_mode, "invariant");
-  return _continuation_scope_end_condition;
-}
-
-inline bool is_virtual(JavaThread* jt) {
-  assert(jt != NULL, "invariant");
-  assert(jt->threadObj() != (oop)NULL, "invariant");
-  return jt->vthread() != jt->threadObj();
-}
-
 static const size_t min_valid_free_size_bytes = 16;
 
 static inline bool is_full(const JfrBuffer* enqueue_buffer) {
   return enqueue_buffer->free_size() < min_valid_free_size_bytes;
 }
 
-bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtual_thread) {
+bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame) {
   assert(jt != NULL, "invariant");
   Thread* current_thread = Thread::current();
   assert(jt != current_thread, "invariant");
-  assert(virtual_thread != NULL, "invariant");
   // Explicitly monitor the available space of the thread-local buffer used for enqueuing klasses as part of tagging methods.
   // We do this because if space becomes sparse, we cannot rely on the implicit allocation of a new buffer as part of the
   // regular tag mechanism. If the free list is empty, a malloc could result, and the problem with that is that the thread
@@ -317,7 +302,6 @@ bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtu
     _frames[count] = JfrStackFrame(mid, bci, type, method->line_number_from_bci(bci), method->method_holder());
     count++;
   }
-  *virtual_thread = _reached_root ? vfs.continuation_scope_end_condition() : is_virtual(jt);
   _lineno = true;
   _nr_of_frames = count;
   return count > 0;

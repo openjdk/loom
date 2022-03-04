@@ -265,7 +265,9 @@ class StubRoutines: AllStatic {
   static address _cont_returnBarrierExc;
   static address _cont_interpreter_forced_preempt_return;
 
+  JFR_ONLY(static RuntimeStub* _jfr_write_checkpoint_stub;)
   JFR_ONLY(static address _jfr_write_checkpoint;)
+  JFR_ONLY(static RuntimeStub* _jfr_get_event_writer_stub;)
   JFR_ONLY(static address _jfr_get_event_writer;)
 
   // Safefetch stubs.

@@ -95,7 +95,7 @@ class JfrStackTrace : public JfrCHeapObj {
 
   bool record(JavaThread* current_thread, int skip);
   bool record(JavaThread* current_thread, const frame& frame, int skip);
-  bool record_async(JavaThread* other_thread, const frame& frame, bool* virtual_thread);
+  bool record_async(JavaThread* other_thread, const frame& frame);
 
   bool have_lineno() const { return _lineno; }
   bool full_stacktrace() const { return _reached_root; }

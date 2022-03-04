@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -77,16 +77,8 @@ void Jfr::on_thread_start(Thread* t) {
   JfrThreadLocal::on_start(t);
 }
 
-void Jfr::on_thread_start(jobject carrier_thread, jobject vthread) {
-  JfrThreadLocal::on_vthread_start(JfrJavaSupport::get_native(carrier_thread), vthread);
-}
-
 void Jfr::on_thread_exit(Thread* t) {
   JfrThreadLocal::on_exit(t);
-}
-
-void Jfr::on_thread_exit(jobject carrier_thread, jobject vthread) {
-  JfrThreadLocal::on_vthread_exit(JfrJavaSupport::get_native(carrier_thread), vthread);
 }
 
 void Jfr::exclude_thread(Thread* t) {
@@ -99,6 +91,10 @@ void Jfr::include_thread(Thread* t) {
 
 bool Jfr::is_excluded(Thread* t) {
   return t != NULL && t->jfr_thread_local()->is_excluded();
+}
+
+void Jfr::on_set_current_thread(JavaThread* jt, oop thread) {
+  JfrThreadLocal::on_set_current_thread(jt, thread);
 }
 
 void Jfr::on_vm_shutdown(bool exception_handler) {
@@ -128,6 +124,10 @@ JRT_END
 
 address Jfr::epoch_address() {
   return JfrTraceIdEpoch::epoch_address();
+}
+
+address Jfr::epoch_generation_address() {
+  return JfrTraceIdEpoch::epoch_generation_address();
 }
 
 address Jfr::signal_address() {

@@ -458,6 +458,7 @@ class java_lang_Thread : AllStatic {
   static jlong stackSize(oop java_thread);
   // Thread ID
   static jlong thread_id(oop java_thread);
+  static jlong thread_id_raw(oop java_thread);
   static ByteSize thread_id_offset();
   // Continuation
   static inline oop continuation(oop java_thread);
@@ -636,7 +637,7 @@ class java_lang_VirtualThread : AllStatic {
   static bool notify_jvmti_events();
   static void set_notify_jvmti_events(bool enable);
   static void init_static_notify_jvmti_events();
-  static int64_t set_jfrTraceId(oop vthread, int64_t id);
+  static void set_jfr_traceid(oop vthread, jlong id);
 };
 
 

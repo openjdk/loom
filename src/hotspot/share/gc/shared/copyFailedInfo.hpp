@@ -71,7 +71,7 @@ class PromotionFailedInfo : public CopyFailedInfo {
 
   void register_copy_failure(size_t size) {
     CopyFailedInfo::register_copy_failure(size);
-    _thread_trace_id = JFR_THREAD_ID(Thread::current());
+    _thread_trace_id = JFR_VM_THREAD_ID(Thread::current());
   }
 
   void reset() {

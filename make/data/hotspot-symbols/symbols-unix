@@ -122,6 +122,7 @@ JVM_GetMethodTypeAnnotations
 JVM_GetNanoTimeAdjustment
 JVM_GetNestHost
 JVM_GetNestMembers
+JVM_GetNextThreadIdOffset
 JVM_GetPermittedSubclasses
 JVM_GetPrimitiveArrayElement
 JVM_GetProperties

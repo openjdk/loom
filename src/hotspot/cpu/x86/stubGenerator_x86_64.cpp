@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -8097,60 +8097,100 @@ RuntimeStub* generate_cont_doYield() {
 
 #if INCLUDE_JFR
 
-  static void jfr_set_last_java_frame(MacroAssembler* _masm) {
-    Register last_java_pc = c_rarg0;
-    Register last_java_sp = c_rarg2;
-    __ movptr(last_java_pc, Address(rsp, 0));
-    __ lea(last_java_sp, Address(rsp, wordSize));
-    __ vzeroupper();
-    __ movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), last_java_pc);
-    __ movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
-  }
-
-  static void jfr_prologue(MacroAssembler* _masm) {
-    jfr_set_last_java_frame(_masm);
+  static void jfr_prologue(address the_pc, MacroAssembler* _masm) {
+    __ set_last_Java_frame(rsp, rbp, the_pc);
     __ movptr(c_rarg0, r15_thread);
   }
 
-  // Handle is dereference here using correct load constructs.
+  // Handle is dereferenced here using correct load constructs.
   static void jfr_epilogue(MacroAssembler* _masm) {
-    __ reset_last_Java_frame(false);
+    __ reset_last_Java_frame(true);
     Label null_jobject;
     __ testq(rax, rax);
     __ jcc(Assembler::zero, null_jobject);
     DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
     BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, r15_thread);
+    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg0, r15_thread);
     __ bind(null_jobject);
   }
 
-  // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
-  // Runtime will return a jobject handle to the event writer. The handle is dereferenced and the return value
-  // is the event writer oop.
-  address generate_jfr_write_checkpoint() {
-    StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
+  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
+  RuntimeStub* generate_jfr_write_checkpoint() {
+    const char* name = "jfr_write_checkpoint";
+
+    enum layout {
+      rbp_off,
+      rbpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+
+    int insts_size = 512;
+    int locs_size = 64;
+    CodeBuffer code(name, insts_size, locs_size);
+    OopMapSet* oop_maps = new OopMapSet();
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* _masm = masm;
 
     address start = __ pc();
-    jfr_prologue(_masm);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
-    jfr_epilogue(_masm);
+    __ enter();
+    int frame_complete = __ pc() - start;
+    address the_pc = __ pc();
+    jfr_prologue(the_pc, _masm);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 1);
+    __ reset_last_Java_frame(true); // no epilogue, not returning anything
+    __ leave();
     __ ret(0);
 
-    return start;
+    OopMap* map = new OopMap(framesize, 1); // rbp
+    oop_maps->add_gc_map(the_pc - start, map);
+
+    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
+      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
+                                    oop_maps, false);
+    return stub;
   }
 
   // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
   // The handle is dereferenced and the return value is the event writer oop.
-  address generate_jfr_get_event_writer() {
-    StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
-    address start = __ pc();
+  RuntimeStub* generate_jfr_get_event_writer() {
+    const char* name = "jfr_get_event_writer";
 
-    jfr_prologue(_masm);
+    enum layout {
+      rbp_off,
+      rbpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+
+    int insts_size = 512;
+    int locs_size = 64;
+    CodeBuffer code(name, insts_size, locs_size);
+    OopMapSet* oop_maps = new OopMapSet();
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* _masm = masm;
+
+    address start = __ pc();
+    __ enter();
+    int frame_complete = __ pc() - start;
+    address the_pc = __ pc();
+    jfr_prologue(the_pc, _masm);
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
     jfr_epilogue(_masm);
+    __ leave();
     __ ret(0);
 
-    return start;
+    OopMap* map = new OopMap(framesize, 1); // rbp
+    oop_maps->add_gc_map(the_pc - start, map);
+
+    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
+      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
+                                    oop_maps, false);
+    return stub;
   }
 
 #endif // INCLUDE_JFR
@@ -8393,8 +8433,10 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
     StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
 
-    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = generate_jfr_write_checkpoint();)
-    JFR_ONLY(StubRoutines::_jfr_get_event_writer = generate_jfr_get_event_writer();)
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint_stub = generate_jfr_write_checkpoint();)
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = StubRoutines::_jfr_write_checkpoint_stub->entry_point();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer_stub = generate_jfr_get_event_writer();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer = StubRoutines::_jfr_get_event_writer_stub->entry_point();)
   }
 
   void generate_all() {

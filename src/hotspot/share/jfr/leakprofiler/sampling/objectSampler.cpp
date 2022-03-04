@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -155,7 +155,8 @@ static traceid get_thread_id(JavaThread* thread, bool* virtual_thread) {
   if (tl->is_excluded()) {
     return 0;
   }
-  return JfrThreadLocal::thread_id(thread, virtual_thread);
+  *virtual_thread = tl->is_vthread(thread);
+  return JfrThreadLocal::thread_id(thread);
 }
 
 static JfrBlobHandle get_thread_blob(JavaThread* thread, traceid tid, bool virtual_thread) {

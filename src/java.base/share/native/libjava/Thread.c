@@ -55,6 +55,7 @@ static JNINativeMethod methods[] = {
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
     {"scopeLocalCache",  "()[" OBJ,    (void *)&JVM_ScopeLocalCache},
     {"setScopeLocalCache", "([" OBJ ")V",(void *)&JVM_SetScopeLocalCache},
+    {"getNextThreadIdOffset", "()J",     (void *)&JVM_GetNextThreadIdOffset}
 };
 
 #undef THD

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -88,7 +88,7 @@ class JfrCheckpointThreadClosure : public ThreadClosure {
   void do_thread(Thread* t);
 };
 
-// only static thread ids, VirtualThread ids are handled dynamically
+// Only static thread ids, VirtualThread are handled dynamically.
 void JfrCheckpointThreadClosure::do_thread(Thread* t) {
   assert(t != NULL, "invariant");
   ++_count;
@@ -277,19 +277,19 @@ void JfrThreadConstant::serialize(JfrCheckpointWriter& writer) {
   writer.write(name);
   writer.write(JfrThreadId::os_id(_thread));
   if (!_thread->is_Java_thread()) {
-    writer.write((const char*)NULL); // java name
-    writer.write((traceid)0);        // java thread id
-    writer.write((traceid)0);        // java thread group
-    writer.write<bool>(false);       // isVirtual
+    writer.write((const char*)nullptr); // java name
+    writer.write((traceid)0); // java thread id
+    writer.write((traceid)0); // java thread group
+    writer.write<bool>(false); // isVirtual
   } else {
     writer.write(name);
-    writer.write(JfrThreadId::id(_thread, _vthread));
-    const bool vthread = _vthread != NULL;
+    writer.write(JfrThreadId::jfr_id(_thread, _tid));
+    const bool vthread = _vthread != nullptr;
     // VirtualThread threadgroup reserved id 1
     const traceid thread_group_id = vthread ? 1 :
       JfrThreadGroup::thread_group_id(JavaThread::cast(_thread), Thread::current());
     writer.write(thread_group_id);
-    writer.write<bool>(vthread);    // isVirtual
+    writer.write<bool>(vthread); // isVirtual
     // VirtualThread threadgroup already serialized invariant
     if (!vthread) {
       JfrThreadGroup::serialize(&writer, thread_group_id);

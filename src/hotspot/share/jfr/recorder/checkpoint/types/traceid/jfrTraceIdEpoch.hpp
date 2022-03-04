@@ -72,6 +72,10 @@ class JfrTraceIdEpoch : AllStatic {
     return (address)&_epoch_state;
   }
 
+  static address epoch_generation_address() {
+    return (address)&_generation;
+  }
+
   static u1 current() {
     return _epoch_state ? (u1)1 : (u1)0;
   }

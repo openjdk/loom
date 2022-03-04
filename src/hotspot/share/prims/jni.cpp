@@ -3507,7 +3507,7 @@ static void post_thread_start_event(const JavaThread* jt) {
   assert(jt != NULL, "invariant");
   EventThreadStart event;
   if (event.should_commit()) {
-    event.set_thread(JFR_THREAD_ID(jt));
+    event.set_thread(JFR_VM_THREAD_ID(jt));
     event.set_parentThread((traceid)0);
 #if INCLUDE_JFR
     if (EventThreadStart::is_stacktrace_enabled()) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -204,9 +204,8 @@ inline oop java_lang_VirtualThread::vthread_scope() {
   return base->obj_field(static_vthread_scope_offset);
 }
 
-inline int64_t java_lang_VirtualThread::set_jfrTraceId(oop ref, int64_t id) {
-  ref->long_field_put(java_lang_Thread::_tid_offset, id);
-  return id;
+inline void java_lang_VirtualThread::set_jfr_traceid(oop ref, jlong id) {
+  Atomic::store(ref->field_addr<jlong>(java_lang_Thread::_tid_offset), id);
 }
 
 inline oop jdk_internal_vm_ContinuationScope::name(oop ref) {

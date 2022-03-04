@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -78,14 +78,14 @@ void JfrCheckpointManager::destroy() {
 
 JfrCheckpointManager::JfrCheckpointManager(JfrChunkWriter& cw) :
   _global_mspace(NULL),
-  _java_thread_local_mspace(NULL),
+  _thread_local_mspace(NULL),
   _chunkwriter(cw) {}
 
 JfrCheckpointManager::~JfrCheckpointManager() {
   JfrTraceIdLoadBarrier::destroy();
   JfrTypeManager::destroy();
   delete _global_mspace;
-  delete _java_thread_local_mspace;
+  delete _thread_local_mspace;
 }
 
 static const size_t global_buffer_prealloc_count = 2;
@@ -107,11 +107,11 @@ bool JfrCheckpointManager::initialize() {
   }
   assert(_global_mspace->free_list_is_empty(), "invariant");
 
-  assert(_java_thread_local_mspace == NULL, "invariant");
-  _java_thread_local_mspace = new JfrThreadLocalCheckpointMspace();
-  if (_java_thread_local_mspace == NULL || !_java_thread_local_mspace->initialize(thread_local_buffer_size,
-                                                                                  JFR_MSPACE_UNLIMITED_CACHE_SIZE,
-                                                                                  thread_local_buffer_prealloc_count)) {
+  assert(_thread_local_mspace == NULL, "invariant");
+  _thread_local_mspace = new JfrThreadLocalCheckpointMspace();
+  if (_thread_local_mspace == NULL || !_thread_local_mspace->initialize(thread_local_buffer_size,
+                                                                        JFR_MSPACE_UNLIMITED_CACHE_SIZE,
+                                                                        thread_local_buffer_prealloc_count)) {
     return false;
   }
   return JfrTypeManager::initialize() && JfrTraceIdLoadBarrier::initialize();
@@ -187,14 +187,12 @@ static void release(JfrBuffer* buffer) {
 
 BufferPtr JfrCheckpointManager::get_thread_local(Thread* thread) {
   assert(thread != NULL, "invariant");
-  assert(thread->is_Java_thread(), "invariant");
   return JfrTraceIdEpoch::epoch() ? thread->jfr_thread_local()->_checkpoint_buffer_epoch_1 :
                                     thread->jfr_thread_local()->_checkpoint_buffer_epoch_0;
 }
 
 void JfrCheckpointManager::set_thread_local(Thread* thread, BufferPtr buffer) {
   assert(thread != NULL, "invariant");
-  assert(thread->is_Java_thread(), "invariant");
   if (JfrTraceIdEpoch::epoch()) {
     thread->jfr_thread_local()->_checkpoint_buffer_epoch_1 = buffer;
   } else {
@@ -204,8 +202,7 @@ void JfrCheckpointManager::set_thread_local(Thread* thread, BufferPtr buffer) {
 
 BufferPtr JfrCheckpointManager::acquire_thread_local(size_t size, Thread* thread) {
   assert(thread != NULL, "invariant");
-  assert(thread->is_Java_thread(), "invariant");
-  JfrBuffer* const buffer = instance()._java_thread_local_mspace->acquire(size, thread);
+  JfrBuffer* const buffer = instance()._thread_local_mspace->acquire(size, thread);
   assert(buffer != NULL, "invariant");
   assert(buffer->free_size() >= size, "invariant");
   buffer->set_context(thread_local_context);
@@ -365,7 +362,7 @@ size_t JfrCheckpointManager::write() {
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_native(JavaThread::current()));
   WriteOperation wo(_chunkwriter);
   MutexedWriteOperation mwo(wo);
-  _java_thread_local_mspace->iterate(mwo, true); // previous epoch list
+  _thread_local_mspace->iterate(mwo, true); // previous epoch list
   assert(_global_mspace->free_list_is_empty(), "invariant");
   ReleaseOperation ro(_global_mspace, _global_mspace->live_list(true));
   WriteReleaseOperation wro(&mwo, &ro);
@@ -380,7 +377,7 @@ size_t JfrCheckpointManager::clear() {
   JfrTraceIdLoadBarrier::clear();
   clear_type_set();
   DiscardOperation discard_operation(mutexed); // mutexed discard mode
-  _java_thread_local_mspace->iterate(discard_operation, true); // previous epoch list
+  _thread_local_mspace->iterate(discard_operation, true); // previous epoch list
   ReleaseOperation ro(_global_mspace, _global_mspace->live_list(true));
   DiscardReleaseOperation discard_op(&discard_operation, &ro);
   assert(_global_mspace->free_list_is_empty(), "invariant");
@@ -484,7 +481,7 @@ size_t JfrCheckpointManager::flush_type_set() {
   if (_new_checkpoint.is_signaled_with_reset()) {
     WriteOperation wo(_chunkwriter);
     MutexedWriteOperation mwo(wo);
-    _java_thread_local_mspace->iterate(mwo); // current epoch list
+    _thread_local_mspace->iterate(mwo); // current epoch list
     assert(_global_mspace->live_list_is_nonempty(), "invariant");
     process_live_list(mwo, _global_mspace); // current epoch list
   }

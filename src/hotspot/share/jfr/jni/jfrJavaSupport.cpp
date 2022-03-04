@@ -68,8 +68,7 @@ void JfrJavaSupport::check_java_thread_in_java(JavaThread* t) {
   check_java_thread_state(t, _thread_in_Java);
 }
 
-static void check_new_unstarted_java_thread(JavaThread* jt, jobject vthread = NULL) {
-  if (vthread != NULL) return;
+static void check_new_unstarted_java_thread(JavaThread* jt) {
   check_java_thread_state(jt, _thread_new);
 }
 #endif
@@ -124,6 +123,10 @@ void JfrJavaSupport::destroy_global_weak_jni_handle(jweak handle) {
 
 oop JfrJavaSupport::resolve_non_null(jobject obj) {
   return JNIHandles::resolve_non_null(obj);
+}
+
+oop JfrJavaSupport::resolve(jobject obj) {
+  return JNIHandles::resolve(obj);
 }
 
 /*
@@ -656,16 +659,24 @@ class ThreadExclusionListAccess : public StackObj {
 Semaphore ThreadExclusionListAccess::_mutex_semaphore(1);
 static GrowableArray<jweak>* exclusion_list = NULL;
 
-static bool equals(const jweak excluded_thread, Handle target_thread) {
-  return JfrJavaSupport::resolve_non_null(excluded_thread) == target_thread();
+static inline bool equals(Handle target_thread, oop excluded_thread) {
+  return target_thread() == excluded_thread;
 }
 
 static int find_exclusion_thread_idx(Handle thread) {
-  if (exclusion_list != NULL) {
-    for (int i = 0; i < exclusion_list->length(); ++i) {
-      if (equals(exclusion_list->at(i), thread)) {
-        return i;
-      }
+  if (exclusion_list == NULL) return -1;
+  for (int i = 0; i < exclusion_list->length(); ++i) {
+    const jweak weak_handle = exclusion_list->at(i);
+    if (weak_handle == nullptr) {
+      continue;
+    }
+    oop excluded_thread = JfrJavaSupport::resolve(weak_handle);
+    if (excluded_thread == nullptr) {
+      JfrJavaSupport::destroy_global_weak_jni_handle(weak_handle);
+      exclusion_list->at_put(i, nullptr);
+    }
+    if (equals(thread, excluded_thread)) {
+      return i;
     }
   }
   return -1;
@@ -728,16 +739,17 @@ static void remove_thread_from_exclusion_list(jobject thread) {
 }
 
 // includes removal
-static bool check_exclusion_state_on_thread_start(Handle h_threadObj) {
+static bool check_exclusion_state_on_thread_start(JavaThread* jt) {
+  Handle h_obj(jt, jt->threadObj());
   ThreadExclusionListAccess lock;
-  if (thread_is_not_excluded(h_threadObj)) {
+  if (thread_is_not_excluded(h_obj)) {
     return false;
   }
-  remove_thread_from_exclusion_list(h_threadObj);
+  remove_thread_from_exclusion_list(h_obj);
   return true;
 }
 
-JavaThread* JfrJavaSupport::get_native(jobject thread) {
+static JavaThread* get_native(jobject thread) {
   ThreadsListHandle tlh;
   JavaThread* native_thread = NULL;
   (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
@@ -828,19 +840,16 @@ bool JfrJavaSupport::set_handler(jobject clazz, jobject handler, TRAPS) {
   return true;
 }
 
-bool JfrJavaSupport::on_thread_start(JavaThread* jt, jobject vthread) {
-  assert(jt != NULL, "invariant");
-  assert(Thread::current() == jt, "invariant");
-  DEBUG_ONLY(check_new_unstarted_java_thread(jt, vthread);)
-  HandleMark hm(jt);
-  const oop threadObj = vthread != NULL ? resolve_non_null(vthread) : jt->threadObj();
-  Handle h_obj(jt, threadObj);
-  if (check_exclusion_state_on_thread_start(h_obj)) {
-    if (vthread != NULL) {
-      exclude(vthread);
-    } else {
-      JfrThreadLocal::exclude(jt);
-    }
+bool JfrJavaSupport::on_thread_start(Thread* t) {
+  assert(t != NULL, "invariant");
+  assert(Thread::current() == t, "invariant");
+  if (!t->is_Java_thread()) {
+    return true;
+  }
+  DEBUG_ONLY(check_new_unstarted_java_thread(JavaThread::cast(t));)
+  HandleMark hm(t);
+  if (check_exclusion_state_on_thread_start(JavaThread::cast(t))) {
+    JfrThreadLocal::exclude(t);
     return false;
   }
   return true;

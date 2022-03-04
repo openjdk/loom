@@ -1174,7 +1174,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
   // get the owner's thread id for the MonitorEnter event
   // if it is enabled and the thread isn't suspended
   if (not_suspended && EventJavaMonitorEnter::is_enabled()) {
-    _previous_owner_tid = JFR_THREAD_ID(current);
+    _previous_owner_tid = JFR_VM_THREAD_ID(current);
   }
 #endif
 
@@ -1674,7 +1674,7 @@ void ObjectMonitor::INotify(JavaThread* current) {
     iterator->TState = ObjectWaiter::TS_ENTER;
 
     iterator->_notified = 1;
-    iterator->_notifier_tid = JFR_THREAD_ID(current);
+    iterator->_notifier_tid = JFR_VM_THREAD_ID(current);
 
     ObjectWaiter* list = _EntryList;
     if (list != NULL) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,7 +54,6 @@ class JfrRecorder : public JfrCHeapObj {
   static bool create_stringpool();
   static bool create_thread_sampling();
   static bool create_event_throttler();
-  static bool create_virtual_thread_support();
   static bool create_components();
   static void destroy_components();
   static void on_recorder_thread_exit();

@@ -430,7 +430,7 @@ TRACE_REQUEST_FUNC(ThreadAllocationStatistics) {
     JavaThread* const jt = iter.next();
     assert(jt != NULL, "invariant");
     allocated.append(jt->cooked_allocated_bytes());
-    thread_ids.append(JFR_THREAD_ID(jt));
+    thread_ids.append(JFR_VM_THREAD_ID(jt));
   }
 
   // Write allocation statistics to buffer.

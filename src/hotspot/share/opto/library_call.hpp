@@ -247,6 +247,7 @@ class LibraryCallKit : public GraphKit {
 #ifdef JFR_HAVE_INTRINSICS
   bool inline_native_classID();
   bool inline_native_getEventWriter();
+  void extend_setCurrentThread(Node* jt, Node* thread);
 #endif
   bool inline_native_Class_query(vmIntrinsics::ID id);
   bool inline_native_subtype_check();

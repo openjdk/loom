@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,8 @@ class JfrThreadLocal {
   JfrBuffer* _checkpoint_buffer_epoch_1;
   mutable JfrStackFrame* _stackframes;
   JfrBlobHandle _thread;
-  mutable traceid _thread_id;
+  mutable traceid _contextual_thread_id;
+  mutable traceid _vm_thread_id;
   mutable traceid _thread_id_alias;
   u8 _data_lost;
   traceid _stack_trace_id;
@@ -56,6 +57,7 @@ class JfrThreadLocal {
   mutable u4 _stackdepth;
   volatile jint _entering_suspend_flag;
   mutable volatile int _critical_section;
+  bool _vthread;
   bool _excluded;
   bool _dead;
   traceid _parent_trace_id;
@@ -65,7 +67,8 @@ class JfrThreadLocal {
   JfrStackFrame* install_stackframes() const;
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
-  static traceid assign_thread_id(const Thread* t);
+  static traceid assign_thread_id(const Thread* t, JfrThreadLocal* tl);
+  static void assign_java_thread_id(const Thread* t);
 
  public:
   JfrThreadLocal();
@@ -128,12 +131,17 @@ class JfrThreadLocal {
     _stackdepth = depth;
   }
 
-  // jfr contextual thread id
-  static traceid thread_id(const Thread* t, bool* is_virtual = NULL);
-  static traceid virtual_thread_id(const Thread* t, oop vthread);
-  // jfr hardware thread id
-  static traceid vm_thread_id(const Thread* t);
+  // Contextually defined thread id that is volatile,
+  // a function of Java carrier thread mounts / unmounts.
+  static traceid thread_id(const Thread* t);
+  static bool is_vthread(JavaThread* jt);
 
+  // Non-volatile thread id, for Java carrier threads and non-java threads.
+  static traceid vm_thread_id(const Thread* t);
+  static traceid vm_thread_id(const Thread* t, JfrThreadLocal* tl);
+
+  // To impersonate is to temporarily masquerade as another thread.
+  // For example, when writing an event that should be attributed to some other thread.
   static void impersonate(const Thread* t, traceid other_thread_id);
   static void stop_impersonating(const Thread* t);
   static bool is_impersonating(const Thread* t);
@@ -206,18 +214,6 @@ class JfrThreadLocal {
     _wallclock_time = wallclock_time;
   }
 
-  traceid trace_id() const {
-    return _thread_id;
-  }
-
-  traceid* const trace_id_addr() const {
-    return &_thread_id;
-  }
-
-  void set_trace_id(traceid id) const {
-    _thread_id = id;
-  }
-
   bool is_excluded() const {
     return _excluded;
   }
@@ -233,14 +229,15 @@ class JfrThreadLocal {
   static void exclude(Thread* t);
   static void include(Thread* t);
 
+  // Hooks
+  static void on_set_current_thread(JavaThread* jt, oop thread);
   static void on_start(Thread* t);
-  static void on_vthread_start(JavaThread* jt, jobject vthread);
   static void on_exit(Thread* t);
-  static void on_vthread_exit(JavaThread* jt, jobject vthread);
 
   // Code generation
-  static ByteSize trace_id_offset();
   static ByteSize java_event_writer_offset();
+  static ByteSize trace_id_offset();
+  static ByteSize vthread_offset();
 
   friend class JfrJavaThread;
   friend class JfrCheckpointManager;

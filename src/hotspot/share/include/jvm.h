@@ -321,6 +321,9 @@ JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
 JNIEXPORT void JNICALL
 JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
+JNIEXPORT jlong JNICALL
+JVM_GetNextThreadIdOffset(JNIEnv *env, jclass threadClass);
+
 /*
  * jdk.internal.vm.Continuation
  */

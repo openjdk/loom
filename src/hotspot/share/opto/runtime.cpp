@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -759,15 +759,12 @@ const TypeFunc* OptoRuntime::void_void_Type() {
 
  const TypeFunc* OptoRuntime::jfr_write_checkpoint_Type() {
    // create input type (domain)
-   const Type **fields = TypeTuple::fields(2);
-   fields[TypeFunc::Parms + 0] = TypeLong::LONG;
-   fields[TypeFunc::Parms + 1] = Type::HALF;
-   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms + 2, fields);
+   const Type **fields = TypeTuple::fields(0);
+   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms, fields);
 
    // create result type (range)
    fields = TypeTuple::fields(0);
-   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms + 0, fields);
-
+   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
    return TypeFunc::make(domain, range);
  }
 

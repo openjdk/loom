@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,6 +23,8 @@
  */
 
 #include "precompiled.hpp"
+#include "classfile/systemDictionary.hpp"
+#include "classfile/vmSymbols.hpp"
 #include "jfr/metadata/jfrSerializer.hpp"
 #include "jfr/recorder/checkpoint/jfrCheckpointWriter.hpp"
 #include "jfr/recorder/checkpoint/types/jfrType.hpp"
@@ -114,7 +116,7 @@ void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
   Thread* const current = Thread::current(); // not necessarily the same as t
   assert(current != NULL, "invariant");
   ResourceMark rm(current);
-  JfrCheckpointWriter writer(current, true, THREADS, !current->is_Java_thread());
+  JfrCheckpointWriter writer(current, true, THREADS, false); // thread local lease
   writer.write_type(TYPE_THREAD);
   JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
@@ -198,6 +200,16 @@ static bool register_static_type(JfrTypeId id, bool permit_cache, JfrSerializer*
   return true;
 }
 
+// This klass is explicitly loaded to ensure the thread group for virtual threads is available.
+static bool load_virtual_thread_group(TRAPS) {
+  Symbol* const virtual_thread_group_sym = vmSymbols::java_lang_Thread_VirtualThreads();
+  assert(virtual_thread_group_sym != nullptr, "invariant");
+  Klass* const k_vthread_group = SystemDictionary::resolve_or_fail(virtual_thread_group_sym, false, CHECK_false);
+  assert(k_vthread_group != nullptr, "invariant");
+  k_vthread_group->initialize(THREAD);
+  return true;
+}
+
 bool JfrTypeManager::initialize() {
   SerializerRegistrationGuard guard;
   register_static_type(TYPE_FLAGVALUEORIGIN, true, new FlagValueOriginConstant());
@@ -215,7 +227,7 @@ bool JfrTypeManager::initialize() {
   register_static_type(TYPE_THREADSTATE, true, new ThreadStateConstant());
   register_static_type(TYPE_BYTECODE, true, new BytecodeConstant());
   register_static_type(TYPE_COMPILERTYPE, true, new CompilerTypeConstant());
-  return true;
+  return load_virtual_thread_group(JavaThread::current());
 }
 
 // implementation for the static registration function exposed in the JfrSerializer api

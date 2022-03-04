@@ -2213,11 +2213,15 @@ JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
   }
 }
 
+jlong java_lang_Thread::thread_id_raw(oop java_thread) {
+  return Atomic::load(java_thread->field_addr<jlong>(_tid_offset));
+}
+
 jlong java_lang_Thread::thread_id(oop java_thread) {
   // The 16 most significant bits can be used for tracing
   // so these bits are excluded using a mask.
   static const jlong tid_mask = (((jlong)1) << 48) - 1;
-  return java_thread->long_field(_tid_offset) & tid_mask;
+  return thread_id_raw(java_thread) & tid_mask;
 }
 
 ByteSize java_lang_Thread::thread_id_offset() {

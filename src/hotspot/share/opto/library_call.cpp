@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2952,39 +2952,35 @@ bool LibraryCallKit::inline_native_classID() {
 }
 
 /*
-    jobject h_event_writer = Thread::jfr_thread_local()->java_event_writer();
-    if (h_event_writer == NULL) {
-      return NULL;
+  jobject h_event_writer = Thread::jfr_thread_local()->java_event_writer();
+  if (h_event_writer == NULL) {
+    return NULL;
+  }
+  oop threadObj = Thread::threadObj();
+  oop vthread = java_lang_Thread::vthread(threadObj);
+  traceid tid;
+  if (vthread != threadObj) {  // i.e. current thread is virtual
+    traceid value = java_lang_VirtualThread::tid(vthread);
+    tid = value & tid_mask;
+    traceid epoch = value >> epoch_shift;
+    traceid current_epoch = JfrTraceIdEpoch::current_generation();
+    if (epoch != current_epoch) {
+      write_checkpoint(tid);
     }
-    oop threadObj = Thread::threadObj();
-    oop vthread = java_lang_Thread::vthread(threadObj);
-    traceid tid;
-    if (vthread != threadObj) {  // i.e. current thread is virtual
-      traceid value = java_lang_VirtualThread::tid(vthread);
-      tid = value & tid_mask;
-      traceid epoch = value >> epoch_shift;
-      traceid current_epoch = JfrTraceIdEpoch::current_generation();
-      if (epoch != current_epoch) {
-        traceid update_value = current_epoch << epoch_shift;
-        update_value |= tid;
-        java_lang_VirtualThread::set_tid(vthread, update_value);
-        write_checkpoint(tid);
-      }
-    } else {
-      tid = java_lang_Thread::tid(threadObj);
-    }
-    oop event_writer = JNIHandles::resolve_non_null(h_event_writer);
-    traceid tid_in_event_writer = getField(event_writer, "threadID");
-    if (tid_in_event_writer != tid) {
-      setField(event_writer, "threadID", tid);
-    }
-    return event_writer;
-
+  } else {
+    tid = java_lang_Thread::tid(threadObj);
+  }
+  oop event_writer = JNIHandles::resolve_non_null(h_event_writer);
+  traceid tid_in_event_writer = getField(event_writer, "threadID");
+  if (tid_in_event_writer != tid) {
+    setField(event_writer, "threadID", tid);
+  }
+  return event_writer
  */
 bool LibraryCallKit::inline_native_getEventWriter() {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
 
-  // save input memory and i_o state
+  // Save input memory and i_o state.
   Node* input_memory_state = reset_memory();
   set_all_memory(input_memory_state);
   Node* input_io_state = i_o();
@@ -2992,123 +2988,88 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // TLS
   Node* tls_ptr = _gvn.transform(new ThreadLocalNode());
 
-  // load offset of jfr_thread_local
-  Node* jobj_ptr = basic_plus_adr(top(), tls_ptr, in_bytes(THREAD_LOCAL_WRITER_OFFSET_JFR));
-
-  // Load eventwriter jobject handle from the jfr_thread_local
-  Node* jobj = make_load(control(), jobj_ptr, TypeRawPtr::BOTTOM, T_ADDRESS, MemNode::unordered);
-
-  // Null check the jobject handle
-  Node* jobj_cmp_null = _gvn.transform(new CmpPNode(jobj, null()));
-  Node* test_jobj_ne_null = _gvn.transform(new BoolNode(jobj_cmp_null, BoolTest::ne));
-  IfNode* iff_jobj_ne_null = create_and_map_if(control(), test_jobj_ne_null, PROB_MAX, COUNT_UNKNOWN);
-
-  // false path, jobj is null
-  Node* jobj_is_null = _gvn.transform(new IfFalseNode(iff_jobj_ne_null));
-
-  // true path, jobj is not null
-  Node* jobj_is_not_null = _gvn.transform(new IfTrueNode(iff_jobj_ne_null));
-
-  // load the threadObj for the CarrierThread
+  // Load the threadObj for the CarrierThread.
   Node* const threadObj = generate_current_thread(tls_ptr);
-
-  // load the vthread field
-  Node* const vthreadObj = generate_virtual_thread(tls_ptr);
-
-  // vthread != threadObj
-  RegionNode* threadObj_result_rgn = new RegionNode(PATH_LIMIT);
-  record_for_igvn(threadObj_result_rgn);
-  PhiNode*    thread_id_mem = new PhiNode(threadObj_result_rgn, Type::MEMORY, TypePtr::BOTTOM);
-  PhiNode*    thread_id_io = new PhiNode(threadObj_result_rgn, Type::ABIO);
-  record_for_igvn(thread_id_io);
-  PhiNode*    thread_id_val = new PhiNode(threadObj_result_rgn, TypeLong::LONG);
-  record_for_igvn(thread_id_val);
-
-  // If vthread != thread, this is a virtual thread
-  Node* vthreadObj_cmp_threadObj = _gvn.transform(new CmpPNode(vthreadObj, threadObj));
-  Node* test_vthreadObj_ne_threadObj = _gvn.transform(new BoolNode(vthreadObj_cmp_threadObj, BoolTest::ne));
-  IfNode* iff_vthreadObj_ne_threadObj =
-    create_and_map_if(jobj_is_not_null, test_vthreadObj_ne_threadObj, PROB_FAIR, COUNT_UNKNOWN);
-
-  // false branch, fallback to threadObj
-  Node* virtual_thread_is_threadObj = _gvn.transform(new IfFalseNode(iff_vthreadObj_ne_threadObj));
+  // Load the tid field from the thread object, since the field is volatile it is done atomically.
   Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J");
 
-  // true branch, this is a virtual thread
-  Node* virtual_thread_is_not_threadObj = _gvn.transform(new IfTrueNode(iff_vthreadObj_ne_threadObj));
-  // read the thread id from the vthread
-  Node* vthread_obj_tid_value = load_field_from_object(vthreadObj, "tid", "J");
+  // Load the vthread field.
+  Node* const vthread = generate_virtual_thread(tls_ptr);
+  // Load the tid field from the vthread object, since the field is volatile it is done atomically.
+  Node* vthread_tid_value = load_field_from_object(vthread, "tid", "J");
 
-  // bit shift and mask
+  // Load the address of java event writer jobject handle from the jfr_thread_local structure.
+  Node* jobj_ptr = basic_plus_adr(top(), tls_ptr, in_bytes(THREAD_LOCAL_WRITER_OFFSET_JFR));
+
+  // Load the eventwriter jobject handle.
+  Node* jobj = make_load(control(), jobj_ptr, TypeRawPtr::BOTTOM, T_ADDRESS, MemNode::unordered);
+
+  // Null check the jobject handle.
+  Node* jobj_cmp_null = _gvn.transform(new CmpPNode(jobj, null()));
+  Node* test_jobj_not_equal_null = _gvn.transform(new BoolNode(jobj_cmp_null, BoolTest::ne));
+  IfNode* iff_jobj_not_equal_null = create_and_map_if(control(), test_jobj_not_equal_null, PROB_MAX, COUNT_UNKNOWN);
+
+  // False path, jobj is null.
+  Node* jobj_is_null = _gvn.transform(new IfFalseNode(iff_jobj_not_equal_null));
+
+  // True path, jobj is not null.
+  Node* jobj_is_not_null = _gvn.transform(new IfTrueNode(iff_jobj_not_equal_null));
+
+  // If vthread != threadObj, this is a virtual thread.
+  Node* vthread_cmp_threadObj = _gvn.transform(new CmpPNode(vthread, threadObj));
+  Node* test_vthread_not_equal_threadObj = _gvn.transform(new BoolNode(vthread_cmp_threadObj, BoolTest::ne));
+  IfNode* iff_vthread_not_equal_threadObj =
+    create_and_map_if(jobj_is_not_null, test_vthread_not_equal_threadObj, PROB_FAIR, COUNT_UNKNOWN);
+
+  // False branch, fallback to threadObj.
+  Node* vthread_equal_threadObj = _gvn.transform(new IfFalseNode(iff_vthread_not_equal_threadObj));
+  // True branch, this is a virtual thread.
+  Node* vthread_not_equal_threadObj = _gvn.transform(new IfTrueNode(iff_vthread_not_equal_threadObj));
+
+  // Bit shift and mask.
   Node* const epoch_shift = _gvn.intcon(jfr_epoch_shift);
   Node* const tid_mask = _gvn.longcon(jfr_id_mask);
 
-  // mask off the epoch information from the thread id
-  Node* const vthread_obj_tid = _gvn.transform(new AndLNode(vthread_obj_tid_value, tid_mask));
-  // shift thread id value down for last epoch
-  Node* const vthread_epoch = _gvn.transform(new URShiftLNode(vthread_obj_tid_value, epoch_shift));
+  // Mask off the epoch information from the thread id.
+  Node* const vthread_tid = _gvn.transform(new AndLNode(vthread_tid_value, tid_mask));
+  // Shift down the thread id value for last epoch information.
+  Node* const vthread_epoch_shifted = _gvn.transform(new URShiftLNode(vthread_tid_value, epoch_shift));
+  Node* const vthread_epoch = _gvn.transform(new ConvL2INode(vthread_epoch_shifted));
 
-  // epoch compare
-  RegionNode* epoch_compare_rgn = new RegionNode(PATH_LIMIT);
-  record_for_igvn(epoch_compare_rgn);
-  PhiNode*    epoch_compare_mem = new PhiNode(epoch_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
-  record_for_igvn(epoch_compare_mem);
-  PhiNode*    epoch_compare_io = new PhiNode(epoch_compare_rgn, Type::ABIO);
-  record_for_igvn(epoch_compare_io);
+  // Load the current epoch generation. The value is unsigned 16-bit, so we type it as T_CHAR.
+  Node* epoch_generation_address = makecon(TypeRawPtr::make(Jfr::epoch_generation_address()));
+  Node* current_epoch_generation = make_load(vthread_not_equal_threadObj, epoch_generation_address, TypeInt::CHAR, T_CHAR, MemNode::unordered);
 
-  Node* saved_ctl = control();
-  set_control(virtual_thread_is_not_threadObj);
-  TypePtr* const no_memory_effects = NULL;
-  // make a runtime call to get the current epoch
-  Node* call_epoch_generation = make_runtime_call(RC_LEAF | RC_NO_FP,
-                                                  OptoRuntime::void_long_Type(),
-                                                  (address)JFR_EPOCH_GENERATION_FUNCTION,
-                                                  "epoch_generation", no_memory_effects);
-  // restore
-  set_control(saved_ctl);
+  // Compare the epoch in the vthread to the current epoch generation.
+  Node* const epoch_cmp = _gvn.transform(new CmpUNode(current_epoch_generation, vthread_epoch));
+  Node* test_epoch_not_equal = _gvn.transform(new BoolNode(epoch_cmp, BoolTest::ne));
+  IfNode* iff_epoch_not_equal = create_and_map_if(vthread_not_equal_threadObj, test_epoch_not_equal, PROB_FAIR, COUNT_UNKNOWN);
 
-  Node* current_epoch_gen_control = _gvn.transform(new ProjNode(call_epoch_generation, TypeFunc::Control));
-  Node* current_epoch_gen_value = _gvn.transform(new ProjNode(call_epoch_generation, TypeFunc::Parms));
+  // True path, epoch is not equal, write a checkpoint for the vthread.
+  Node* epoch_is_not_equal = _gvn.transform(new IfTrueNode(iff_epoch_not_equal));
 
-  // compare epoch in vthread to the current epoch generation
-  Node* const epoch_cmp = _gvn.transform(new CmpLNode(current_epoch_gen_value, vthread_epoch));
-  Node* test_epoch_ne = _gvn.transform(new BoolNode(epoch_cmp, BoolTest::ne));
-  IfNode* iff_epoch_ne = create_and_map_if(current_epoch_gen_control, test_epoch_ne, PROB_FAIR, COUNT_UNKNOWN);
-
-  // true path, epochs are not equal, there is a need to write a checkpoint for the vthread
-  Node* epoch_is_not_equal = _gvn.transform(new IfTrueNode(iff_epoch_ne));
-  // get the field offset for storing and updated tid and epoch value
-  Node* const tid_field_address = field_address_from_object(vthreadObj, "tid", "J", false);
-  const TypePtr* tid_field_address_type = _gvn.type(tid_field_address)->isa_ptr();
-
-  // shift up current epoch generation value
-  Node* left_shifted_current_epoch_gen = _gvn.transform(new LShiftLNode(current_epoch_gen_value, epoch_shift));
-  // OR the shifted epoch generation value with the threadid
-  Node* current_epoch_gen_and_tid = _gvn.transform(new OrLNode(vthread_obj_tid, left_shifted_current_epoch_gen));
-  // store back the current_epoch_gen_and_tid into the vthreadObject
-  Node* vthreadObj_epoch_gen_memory_store = store_to_memory(epoch_is_not_equal,
-                                                            tid_field_address,
-                                                            current_epoch_gen_and_tid,
-                                                            T_LONG,
-                                                            tid_field_address_type,
-                                                            MemNode::unordered);
-
-  // call out to the VM in order to write a checkpoint for the vthread
-  saved_ctl = control();
   set_control(epoch_is_not_equal);
-  // call can safepoint
+
+  // Make a runtime call, which can safepoint, to write a checkpoint for the vthread for this epoch.
+  // The call also updates the native thread local thread id and the vthread with the current epoch.
   Node* call_write_checkpoint = make_runtime_call(RC_NO_LEAF,
                                                   OptoRuntime::jfr_write_checkpoint_Type(),
                                                   StubRoutines::jfr_write_checkpoint(),
-                                                  "write_checkpoint", TypePtr::BOTTOM, vthread_obj_tid, top());
-  // restore
-  set_control(saved_ctl);
+                                                  "write_checkpoint", TypePtr::BOTTOM);
   Node* call_write_checkpoint_control = _gvn.transform(new ProjNode(call_write_checkpoint, TypeFunc::Control));
 
-  // false path, epochs are the same, no need to write new checkpoint information
-  Node* epoch_is_equal = _gvn.transform(new IfFalseNode(iff_epoch_ne));
+  // False path, epoch is equal, checkpoint information is valid.
+  Node* epoch_is_equal = _gvn.transform(new IfFalseNode(iff_epoch_not_equal));
 
-  // need memory and IO
+  // vthread epoch != current epoch
+  RegionNode* epoch_compare_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(epoch_compare_rgn);
+  PhiNode* epoch_compare_mem = new PhiNode(epoch_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  record_for_igvn(epoch_compare_mem);
+  PhiNode* epoch_compare_io = new PhiNode(epoch_compare_rgn, Type::ABIO);
+  record_for_igvn(epoch_compare_io);
+
+  // Need memory and IO.
   epoch_compare_rgn->init_req(_true_path, call_write_checkpoint_control);
   epoch_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
   epoch_compare_io->init_req(_true_path, i_o());
@@ -3116,104 +3077,154 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   epoch_compare_mem->init_req(_false_path, input_memory_state);
   epoch_compare_io->init_req(_false_path, input_io_state);
 
-  // merge the threadObj branch
-  threadObj_result_rgn->init_req(_true_path, _gvn.transform(epoch_compare_rgn));
-  threadObj_result_rgn->init_req(_false_path, virtual_thread_is_threadObj);
-  thread_id_mem->init_req(_true_path, _gvn.transform(epoch_compare_mem));
-  thread_id_mem->init_req(_false_path, input_memory_state);
-  thread_id_io->init_req(_true_path, _gvn.transform(epoch_compare_io));
-  thread_id_io->init_req(_false_path, input_io_state);
-  thread_id_val->init_req(_true_path, _gvn.transform(vthread_obj_tid));
-  thread_id_val->init_req(_false_path, _gvn.transform(thread_obj_tid));
+  // vthread != threadObj
+  RegionNode* vthread_compare_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(vthread_compare_rgn);
+  PhiNode* vthread_compare_mem = new PhiNode(vthread_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  PhiNode* vthread_compare_io = new PhiNode(vthread_compare_rgn, Type::ABIO);
+  record_for_igvn(vthread_compare_io);
+  PhiNode* tid = new PhiNode(vthread_compare_rgn, TypeLong::LONG);
+  record_for_igvn(tid);
 
-  // update memory and io state
-  set_all_memory(_gvn.transform(thread_id_mem));
-  set_i_o(_gvn.transform(thread_id_io));
+  // Merge the vthread_compare and the epoch compare regions.
+  vthread_compare_rgn->init_req(_true_path, _gvn.transform(epoch_compare_rgn));
+  vthread_compare_rgn->init_req(_false_path, vthread_equal_threadObj);
+  vthread_compare_mem->init_req(_true_path, _gvn.transform(epoch_compare_mem));
+  vthread_compare_mem->init_req(_false_path, input_memory_state);
+  vthread_compare_io->init_req(_true_path, _gvn.transform(epoch_compare_io));
+  vthread_compare_io->init_req(_false_path, input_io_state);
+  tid->init_req(_true_path, _gvn.transform(vthread_tid));
+  tid->init_req(_false_path, _gvn.transform(thread_obj_tid));
 
-  // load the event writer oop by dereferencing the jobject handle
-  saved_ctl = control();
-  set_control(_gvn.transform(threadObj_result_rgn));
+  // Update branch state.
+  set_control(_gvn.transform(vthread_compare_rgn));
+  set_all_memory(_gvn.transform(vthread_compare_mem));
+  set_i_o(_gvn.transform(vthread_compare_io));
+
+  // Load the event writer oop by dereferencing the jobject handle.
   ciKlass* klass_EventWriter = env()->find_system_klass(ciSymbol::make("jdk/jfr/internal/EventWriter"));
   assert(klass_EventWriter->is_loaded(), "invariant");
   ciInstanceKlass* const instklass_EventWriter = klass_EventWriter->as_instance_klass();
   const TypeKlassPtr* const aklass = TypeKlassPtr::make(instklass_EventWriter);
   const TypeOopPtr* const xtype = aklass->as_instance_type();
   Node* event_writer = access_load(jobj, xtype, T_OBJECT, IN_NATIVE | C2_CONTROL_DEPENDENT_LOAD);
-  // restore
-  set_control(saved_ctl);
 
-  // load the current thread id from the event writer object
+  // Load the current thread id from the event writer object.
   Node* const event_writer_tid = load_field_from_object(event_writer, "threadID", "J");
-  // get the field offset to store an updated tid value later (conditionally)
+  // Get the field offset to, conditionally, store an updated tid value later.
   Node* const event_writer_tid_field = field_address_from_object(event_writer, "threadID", "J", false);
   const TypePtr* event_writer_tid_field_type = _gvn.type(event_writer_tid_field)->isa_ptr();
 
-  // thread id compare
-  RegionNode* tid_compare_rgn = new RegionNode(PATH_LIMIT);
-  record_for_igvn(tid_compare_rgn);
-  PhiNode*    tid_compare_mem = new PhiNode(tid_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
-  record_for_igvn(tid_compare_mem);
-  PhiNode*    tid_compare_io = new PhiNode(tid_compare_rgn, Type::ABIO);
-  record_for_igvn(tid_compare_io);
+  RegionNode* event_writer_tid_compare_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(event_writer_tid_compare_rgn);
+  PhiNode* event_writer_tid_compare_mem = new PhiNode(event_writer_tid_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  record_for_igvn(event_writer_tid_compare_mem);
+  PhiNode* event_writer_tid_compare_io = new PhiNode(event_writer_tid_compare_rgn, Type::ABIO);
+  record_for_igvn(event_writer_tid_compare_io);
 
-  // compare current tid to what is stored in the event writer object
-  Node* const tid_cmp = _gvn.transform(new CmpLNode(event_writer_tid, _gvn.transform(thread_id_val)));
-  Node* test_tid_ne = _gvn.transform(new BoolNode(tid_cmp, BoolTest::ne));
-  IfNode* iff_tid_ne = create_and_map_if(_gvn.transform(threadObj_result_rgn), test_tid_ne, PROB_FAIR, COUNT_UNKNOWN);
+  // Compare the current tid from the thread object to what is currently stored in the event writer object.
+  Node* const tid_cmp = _gvn.transform(new CmpLNode(event_writer_tid, _gvn.transform(tid)));
+  Node* test_tid_not_equal = _gvn.transform(new BoolNode(tid_cmp, BoolTest::ne));
+  IfNode* iff_tid_not_equal = create_and_map_if(_gvn.transform(vthread_compare_rgn), test_tid_not_equal, PROB_FAIR, COUNT_UNKNOWN);
 
-  // true path, tid not equal, need to store tid value to the event writer
-  Node* tid_is_not_equal = _gvn.transform(new IfTrueNode(iff_tid_ne));
+  // True path, tid is not equal, need to update the tid in the event writer.
+  Node* tid_is_not_equal = _gvn.transform(new IfTrueNode(iff_tid_not_equal));
   record_for_igvn(tid_is_not_equal);
-  // update the event writer with the current thread id value
+  // Store the tid to the eventwriter.
   Node* event_writer_tid_memory_store = store_to_memory(tid_is_not_equal,
                                                         event_writer_tid_field,
-                                                        thread_id_val,
+                                                        tid,
                                                         T_LONG,
                                                         event_writer_tid_field_type,
                                                         MemNode::unordered);
 
-  // false path, tids are the same, no update
-  Node* tid_is_equal = _gvn.transform(new IfFalseNode(iff_tid_ne));
+  // False path, tids are the same.
+  Node* tid_is_equal = _gvn.transform(new IfFalseNode(iff_tid_not_equal));
 
-  // update controls
-  tid_compare_rgn->init_req(_true_path, tid_is_not_equal);
-  tid_compare_rgn->init_req(_false_path, tid_is_equal);
+  // Update controls.
+  event_writer_tid_compare_rgn->init_req(_true_path, tid_is_not_equal);
+  event_writer_tid_compare_rgn->init_req(_false_path, tid_is_equal);
 
-  // update memory phi node
-  tid_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
-  tid_compare_mem->init_req(_false_path, _gvn.transform(thread_id_mem));
+  // Update memory phi nodes.
+  event_writer_tid_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
+  event_writer_tid_compare_mem->init_req(_false_path, _gvn.transform(vthread_compare_mem));
+  event_writer_tid_compare_io->init_req(_true_path, _gvn.transform(i_o()));
+  event_writer_tid_compare_io->init_req(_false_path, _gvn.transform(vthread_compare_io));
 
-  // update io phi node
-  tid_compare_io->init_req(_true_path, _gvn.transform(i_o()));
-  tid_compare_io->init_req(_false_path, _gvn.transform(thread_id_io));
+  // Result of top level CFG, Memory, IO and Value.
+  RegionNode* result_rgn = new RegionNode(PATH_LIMIT);
+  PhiNode* result_mem = new PhiNode(result_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  PhiNode* result_io = new PhiNode(result_rgn, Type::ABIO);
+  PhiNode* result_value = new PhiNode(result_rgn, TypeInstPtr::BOTTOM);
 
-  // result of top level CFG, Memory, IO and Value
-  RegionNode* result_reg = new RegionNode(PATH_LIMIT);
-  PhiNode*    result_mem = new PhiNode(result_reg, Type::MEMORY, TypePtr::BOTTOM);
-  PhiNode*    result_io = new PhiNode(result_reg, Type::ABIO);
-  PhiNode*    result_val = new PhiNode(result_reg, TypeInstPtr::BOTTOM);
+  // Result control.
+  result_rgn->init_req(_true_path, _gvn.transform(event_writer_tid_compare_rgn));
+  result_rgn->init_req(_false_path, jobj_is_null);
 
-  // result control
-  result_reg->init_req(_true_path, _gvn.transform(tid_compare_rgn));
-  result_reg->init_req(_false_path, jobj_is_null);
-
-  // result memory
-  result_mem->init_req(_true_path, _gvn.transform(tid_compare_mem));
+  // Result memory.
+  result_mem->init_req(_true_path, _gvn.transform(event_writer_tid_compare_mem));
   result_mem->init_req(_false_path, _gvn.transform(input_memory_state));
 
-  // result io
-  result_io->init_req(_true_path, _gvn.transform(tid_compare_io));
+  // Result IO.
+  result_io->init_req(_true_path, _gvn.transform(event_writer_tid_compare_io));
   result_io->init_req(_false_path, _gvn.transform(input_io_state));
 
-  // result values
-  result_val->init_req(_true_path, _gvn.transform(event_writer)); // return event writer oop
-  result_val->init_req(_false_path, null()); // return NULL
+  // Result value.
+  result_value->init_req(_true_path, _gvn.transform(event_writer)); // return event writer oop
+  result_value->init_req(_false_path, null()); // return NULL
 
-  // set output state
+  // Set output state.
+  set_control(_gvn.transform(result_rgn));
   set_all_memory(_gvn.transform(result_mem));
   set_i_o(_gvn.transform(result_io));
-  set_result(result_reg, result_val);
+  set_result(result_rgn, result_value);
   return true;
+}
+
+/*
+ * Thread::jfr_thread_local()->_thread_id = java_lang_Thread::tid(thread);
+ * OrderAccess::storestore();
+ * Thread::jfr_thread_local()->_vthread = carrierThread != thread;
+ */
+void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
+  enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
+  // Load the tid field from the thread, since the field is volatile it is done atomically.
+  Node* tid = load_field_from_object(thread, "tid", "J");
+  // Store the tid to the jfr thread local.
+  Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + THREAD_ID_OFFSET_JFR));
+  store_to_memory(control(), thread_id_offset, tid, T_LONG, TypeRawPtr::BOTTOM, MemNode::unordered, true);
+
+  Node* const carrierThread = generate_current_thread(jt);
+  // If thread != carrierThread, this is a virtual thread.
+  Node* thread_cmp_carrierThread = _gvn.transform(new CmpPNode(thread, carrierThread));
+  Node* test_thread_not_equal_carrierThread = _gvn.transform(new BoolNode(thread_cmp_carrierThread, BoolTest::ne));
+  IfNode* iff_thread_not_equal_carrierThread =
+    create_and_map_if(control(), test_thread_not_equal_carrierThread, PROB_FAIR, COUNT_UNKNOWN);
+
+  Node* vthread_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_OFFSET_JFR));
+
+  // False branch, carrierThread, set _vthread field to false.
+  Node* thread_equal_carrierThread = _gvn.transform(new IfFalseNode(iff_thread_not_equal_carrierThread));
+  Node* vthread_false = store_to_memory(control(), vthread_offset, _gvn.intcon(0), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+
+  // True branch, virtual thread, set _vthread field to true;
+  Node* thread_not_equal_carrierThread = _gvn.transform(new IfTrueNode(iff_thread_not_equal_carrierThread));
+  Node* vthread_true = store_to_memory(control(), vthread_offset, _gvn.intcon(1), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+
+  RegionNode* thread_compare_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(thread_compare_rgn);
+  PhiNode* thread_compare_mem = new PhiNode(thread_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  record_for_igvn(thread_compare_mem);
+
+  // Merge the thread_compare memory.
+  thread_compare_rgn->init_req(_true_path, thread_not_equal_carrierThread);
+  thread_compare_mem->init_req(_true_path, _gvn.transform(vthread_true));
+  thread_compare_rgn->init_req(_false_path, thread_equal_carrierThread);
+  thread_compare_mem->init_req(_false_path, _gvn.transform(vthread_false));
+
+  // Set output state.
+  set_control(_gvn.transform(thread_compare_rgn));
+  set_all_memory(_gvn.transform(thread_compare_mem));
 }
 
 #endif // JFR_HAVE_INTRINSICS
@@ -3246,7 +3257,7 @@ bool LibraryCallKit::inline_native_setCurrentThread() {
   // Stores of oops to native memory not supported yet by BarrierSetC2::store_at_resolved
   // access_store_at(NULL, thread_obj_handle, adr_type, arr, _gvn.type(arr), T_OBJECT, IN_NATIVE | MO_UNORDERED);
   store_to_memory(control(), thread_obj_handle, arr, T_OBJECT, adr_type, MemNode::unordered);
-
+  JFR_ONLY(extend_setCurrentThread(thread, arr);)
   return true;
 }
 

@@ -45,6 +45,7 @@ class JfrJavaSupport : public AllStatic {
   static jweak global_weak_jni_handle(const jobject handle, JavaThread* t);
   static void destroy_global_weak_jni_handle(jweak handle);
 
+  static oop resolve(jobject obj);
   static oop resolve_non_null(jobject obj);
   static void notify_all(jobject obj, TRAPS);
   static void set_array_element(jobjectArray arr, jobject element, int index, JavaThread* t);
@@ -95,17 +96,14 @@ class JfrJavaSupport : public AllStatic {
   static void throw_class_format_error(const char* message, TRAPS);
   static void throw_runtime_exception(const char* message, TRAPS);
 
-  // visibility graph
   static bool is_jdk_jfr_module_available();
   static bool is_jdk_jfr_module_available(outputStream* stream, TRAPS);
 
-  // thread
-  static JavaThread* get_native(jobject thread);
   static jlong jfr_thread_id(jobject thread);
   static void exclude(jobject thread);
   static void include(jobject thread);
   static bool is_excluded(jobject thread);
-  static bool on_thread_start(JavaThread* jt, jobject vthread = NULL);
+  static bool on_thread_start(Thread* t);
 
   static jobject get_handler(jobject clazz, TRAPS);
   static bool set_handler(jobject clazz, jobject handler, TRAPS);

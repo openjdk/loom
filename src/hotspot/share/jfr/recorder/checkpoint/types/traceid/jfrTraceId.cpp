@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,7 +26,6 @@
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/symbolTable.hpp"
-#include "classfile/systemDictionary.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.inline.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
@@ -42,48 +41,6 @@
 #include "runtime/thread.inline.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
-
-static int next_tid_offset = invalid_offset;
-static jclass thread_identifiers = NULL;
-
-static bool setup_thread_identifiers(TRAPS) {
-  const char class_name[] = "java/lang/Thread$ThreadIdentifiers";
-  Symbol * const k_sym = SymbolTable::new_symbol(class_name);
-  assert(k_sym != NULL, "invariant");
-  Klass * klass = SystemDictionary::resolve_or_fail(k_sym, true, CHECK_false);
-  assert(klass != NULL, "invariant");
-  assert(klass->is_instance_klass(), "invariant");
-  assert(InstanceKlass::cast(klass)->is_initialized(), "invariant");
-  const char next_tid_name[] = "nextTid";
-  Symbol * const next_tid_symbol = SymbolTable::new_symbol(next_tid_name);
-  assert(next_tid_symbol != NULL, "invariant");
-  assert(invalid_offset == next_tid_offset, "invariant");
-  if (!JfrJavaSupport::compute_field_offset(next_tid_offset, klass, next_tid_symbol, vmSymbols::long_signature(), true)) {
-    return false;
-  }
-  assert(invalid_offset != next_tid_offset, "invariant");
-  assert(thread_identifiers == NULL, "invariant");
-  thread_identifiers = (jclass)JfrJavaSupport::global_jni_handle(klass->java_mirror(), THREAD);
-  return thread_identifiers != NULL;
-}
-
-bool JfrTraceId::initialize() {
-  static bool initialized = false;
-  if (!initialized) {
-    initialized = setup_thread_identifiers(JavaThread::current());
-  }
-  return initialized;
-}
-
-static traceid next_thread_id() {
-  assert(thread_identifiers != NULL, "invariant");
-  const oop base = JfrJavaSupport::resolve_non_null(thread_identifiers);
-  traceid next;
-  do {
-    next = HeapAccess<>::load_at(base, (ptrdiff_t)next_tid_offset);
-  } while (HeapAccess<>::atomic_cmpxchg_at(base, (ptrdiff_t)next_tid_offset, next, next + 1) != next);
-  return next;
-}
 
 // returns updated value
 static traceid atomic_inc(traceid volatile* const dest, traceid stride = 1) {
@@ -191,10 +148,6 @@ void JfrTraceId::assign(const ClassLoaderData* cld) {
 
 traceid JfrTraceId::assign_primitive_klass_id() {
   return next_class_id();
-}
-
-traceid JfrTraceId::assign_thread_id() {
-  return next_thread_id();
 }
 
 // A mirror representing a primitive class (e.g. int.class) has no reified Klass*,

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -28,21 +28,19 @@
 #include "utilities/macros.hpp"
 
 #if INCLUDE_JFR
-#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 
 class JfrIntrinsicSupport {
  public:
   static void* get_event_writer(JavaThread* t);
-  static void* write_checkpoint(JavaThread* t, traceid tid);
+  static void write_checkpoint(JavaThread* t);
 };
 
 #define JFR_HAVE_INTRINSICS
 #define JFR_TIME_FUNCTION JfrTime::time_function()
 #define JFR_GET_EVENT_WRITER_FUNCTION JfrIntrinsicSupport::get_event_writer
 #define JFR_WRITE_CHECKPOINT_FUNCTION JfrIntrinsicSupport::write_checkpoint
-#define JFR_EPOCH_GENERATION_FUNCTION JfrTraceIdEpoch::epoch_generation
 
 #define JFR_TEMPLATES(template) \
   template(jdk_jfr_internal_JVM,                                      "jdk/jfr/internal/JVM")                     \

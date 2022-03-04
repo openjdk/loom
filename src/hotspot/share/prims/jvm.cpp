@@ -86,6 +86,7 @@
 #include "runtime/reflection.hpp"
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
+#include "runtime/threadIdentifiers.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vmOperations.hpp"
@@ -3108,7 +3109,13 @@ JVM_END
 
 JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
                                      jobject theThread))
-  thread->set_vthread(JNIHandles::resolve(theThread));
+  oop threadObj = JNIHandles::resolve(theThread);
+  thread->set_vthread(threadObj);
+  JFR_ONLY(Jfr::on_set_current_thread(thread, threadObj);)
+JVM_END
+
+JVM_ENTRY(jlong, JVM_GetNextThreadIdOffset(JNIEnv* env, jclass threadClass))
+  return ThreadIdentifiers::unsafe_offset();
 JVM_END
 
 JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))

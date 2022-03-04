@@ -443,7 +443,7 @@ void before_exit(JavaThread* thread) {
 
   EventThreadEnd event;
   if (event.should_commit()) {
-    event.set_thread(JFR_THREAD_ID(thread));
+    event.set_thread(JFR_VM_THREAD_ID(thread));
     event.commit();
   }
 

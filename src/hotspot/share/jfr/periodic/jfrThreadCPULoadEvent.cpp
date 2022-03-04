@@ -123,7 +123,7 @@ void JfrThreadCPULoadEvent::send_events() {
       event.set_starttime(event_time);
       if (jt != periodic_thread) {
         // Commit reads the thread id from this thread's trace data, so put it there temporarily
-        JfrThreadLocal::impersonate(periodic_thread, JFR_THREAD_ID(jt));
+        JfrThreadLocal::impersonate(periodic_thread, JFR_VM_THREAD_ID(jt));
       } else {
         JfrThreadLocal::impersonate(periodic_thread, periodic_thread_id);
       }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -185,8 +185,7 @@ void OSThreadSampler::protected_task(const os::SuspendedThreadTaskContext& conte
   JfrGetCallTrace trace(true, jt);
   frame topframe;
   if (trace.get_topframe(context.ucontext(), topframe)) {
-    bool virtual_thread;
-    if (_stacktrace.record_async(jt, topframe, &virtual_thread)) {
+    if (_stacktrace.record_async(jt, topframe)) {
       /* If we managed to get a topframe and a stacktrace, create an event
       * and put it into our array. We can't call Jfr::_stacktraces.add()
       * here since it would allocate memory using malloc. Doing so while
@@ -195,7 +194,7 @@ void OSThreadSampler::protected_task(const os::SuspendedThreadTaskContext& conte
       EventExecutionSample *ev = _closure.next_event();
       ev->set_starttime(_suspend_time);
       ev->set_endtime(_suspend_time); // fake to not take an end time
-      ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
+      ev->set_sampledThread(JFR_THREAD_ID(jt));
       ev->set_state(static_cast<u8>(java_lang_Thread::get_thread_status(_thread_oop)));
     }
   }
@@ -222,10 +221,10 @@ class JfrNativeSamplerCallback : public os::CrashProtectionCallback {
   bool _success;
 };
 
-static void write_native_event(JfrThreadSampleClosure& closure, bool virtual_thread, JavaThread* jt, oop thread_oop) {
+static void write_native_event(JfrThreadSampleClosure& closure, JavaThread* jt, oop thread_oop) {
   EventNativeMethodSample *ev = closure.next_event_native();
   ev->set_starttime(JfrTicks::now());
-  ev->set_sampledThread(virtual_thread ? JFR_THREAD_ID(jt) : JFR_VM_THREAD_ID(jt));
+  ev->set_sampledThread(JFR_THREAD_ID(jt));
   ev->set_state(static_cast<u8>(java_lang_Thread::get_thread_status(thread_oop)));
 }
 
@@ -246,10 +245,9 @@ void JfrNativeSamplerCallback::call() {
     return;
   }
   topframe = first_java_frame;
-  bool virtual_thread;
-  _success = _stacktrace.record_async(_jt, topframe, &virtual_thread);
+  _success = _stacktrace.record_async(_jt, topframe);
   if (_success) {
-    write_native_event(_closure, virtual_thread, _jt, _thread_oop);
+    write_native_event(_closure, _jt, _thread_oop);
   }
 }
 
