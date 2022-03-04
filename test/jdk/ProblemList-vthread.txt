@@ -73,11 +73,14 @@ java/lang/Thread/MainThreadTest.java
 java/lang/management/ThreadMXBean/ThreadLists.java
 
 ####
-# JFR tests check events for test main thread only or expect to find MainThread
 
+# JFR tests check events for test main thread only or expect to find MainThread
 jdk/jfr/event/io/TestFileStreamEvents.java
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 jdk/jfr/event/runtime/TestThreadStartEvent.java
+
+# test expects to find virtual thread frames in thread dump
+jdk/jfr/event/runtime/TestThreadDumpEvent.java
 
 # the VirtualThreadStartEvent is loaded before main() in wrapper
 jdk/jfr/jvm/TestGetAllEventClasses.java
