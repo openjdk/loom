@@ -734,16 +734,29 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
 }
 
 jint
-JvmtiEnvBase::get_vthread_state(oop thread_oop) {
-  jshort vt_state = java_lang_VirtualThread::state(thread_oop);
-  jint state = (jint) java_lang_VirtualThread::map_state_to_thread_status(vt_state);
+JvmtiEnvBase::get_vthread_state(oop thread_oop, JavaThread* java_thread) {
+  jint state = 0;
   bool ext_suspended = JvmtiVTSuspender::is_vthread_suspended(thread_oop);
+  jint interrupted = java_lang_Thread::interrupted(thread_oop);
 
+  if (java_thread != NULL) {
+    // If virtual thread is blocked on a monitor eneter the BLOCKED_ON_MONITOR_ENTER bit
+    // is set for carrier thread instead of virtual.
+    // Other state bits except filtered ones are expected to be the same.
+    oop ct_oop = java_lang_VirtualThread::carrier_thread(thread_oop);
+    jint filtered_bits = JVMTI_THREAD_STATE_SUSPENDED | JVMTI_THREAD_STATE_INTERRUPTED;
+
+    // this call can trigger a safepoint, so thread_oop must not be used after it
+    state = get_thread_state(ct_oop, java_thread) & ~filtered_bits;
+  } else {
+    jshort vt_state = java_lang_VirtualThread::state(thread_oop);
+    state = (jint)java_lang_VirtualThread::map_state_to_thread_status(vt_state);
+  }
   if (ext_suspended && ((state & JVMTI_THREAD_STATE_ALIVE) != 0)) {
     state &= ~java_lang_VirtualThread::RUNNING;
     state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_RUNNABLE | JVMTI_THREAD_STATE_SUSPENDED;
   }
-  if (java_lang_Thread::interrupted(thread_oop)) {
+  if (interrupted) {
     state |= JVMTI_THREAD_STATE_INTERRUPTED;
   }
   return state;
@@ -1304,6 +1317,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       // the cv_external_thread_to_JavaThread is expected to correctly set the
       // thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
       if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
+        *thread_oop_p = thread_oop;
         return err;
       }
     }
@@ -1708,7 +1722,7 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
 
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    state = JvmtiEnvBase::get_vthread_state(thread_oop);
+    state = JvmtiEnvBase::get_vthread_state(thread_oop, thr);
 
     if ((state & JVMTI_THREAD_STATE_ALIVE) != 0) {
       javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_oop);

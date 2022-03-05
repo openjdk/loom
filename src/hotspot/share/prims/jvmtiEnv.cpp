@@ -859,31 +859,14 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
   JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
 
-  if (thread == NULL) {
-    java_thread = current_thread;
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-
-    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
-  } else {
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-    if (err != JVMTI_ERROR_NONE) {
-      // We got an error code so we don't have a JavaThread *, but
-      // only return an error from here if we didn't get a valid
-      // thread_oop.
-      // In a vthread case the cv_external_thread_to_JavaThread is expected to correctly set
-      // the thread_oop and return JVMTI_ERROR_INVALID_THREAD which we ignore here.
-      if (thread_oop == NULL) {
-        return err;
-      }
-      // We have a valid thread_oop so we can return some thread state.
-    }
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE && err != JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return err;
   }
 
   // Support for virtual thread
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    *thread_state_ptr = JvmtiEnvBase::get_vthread_state(thread_oop);
+    *thread_state_ptr = JvmtiEnvBase::get_vthread_state(thread_oop, java_thread);
   } else {
     *thread_state_ptr = JvmtiEnvBase::get_thread_state(thread_oop, java_thread);
   }
