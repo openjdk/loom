@@ -57,27 +57,6 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
-typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
-
-void InstanceStackChunkKlass::default_memcpy(void* from, void* to, size_t size) {
-  memcpy(to, from, size << LogBytesPerWord);
-}
-
-MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_stack_to_chunk = nullptr;
-MemcpyFnT InstanceStackChunkKlass::memcpy_fn_from_chunk_to_stack = nullptr;
-
-void InstanceStackChunkKlass::resolve_memcpy_functions() {
-  if (!StubRoutines::has_word_memcpy()) {
-    memcpy_fn_from_stack_to_chunk = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
-    memcpy_fn_from_chunk_to_stack = (MemcpyFnT)InstanceStackChunkKlass::default_memcpy;
-  } else {
-    memcpy_fn_from_stack_to_chunk = (MemcpyFnT)StubRoutines::word_memcpy_up();
-    memcpy_fn_from_chunk_to_stack = (MemcpyFnT)StubRoutines::word_memcpy_down();
-  }
-  assert (memcpy_fn_from_stack_to_chunk != nullptr, "");
-  assert (memcpy_fn_from_chunk_to_stack != nullptr, "");
-}
-
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
  : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
    // see oopDesc::size_given_klass TODO perf
@@ -85,8 +64,6 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
    set_layout_helper(lh);
    assert (layout_helper_is_instance(layout_helper()), "");
    assert (layout_helper_needs_slow_path(layout_helper()), "");
-
-  //  resolve_memcpy_functions(); -- too early here
 }
 
 size_t InstanceStackChunkKlass::oop_size(oop obj) const {

@@ -249,13 +249,8 @@ private:
   template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
   static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
-  typedef void (*MemcpyFnT)(void* src, void* dst, size_t count);
-  static void resolve_memcpy_functions();
-  static MemcpyFnT memcpy_fn_from_stack_to_chunk;
-  static MemcpyFnT memcpy_fn_from_chunk_to_stack;
   template <copy_alignment alignment> inline static void copy_from_stack_to_chunk(void* from, void* to, size_t size);
   template <copy_alignment alignment> inline static void copy_from_chunk_to_stack(void* from, void* to, size_t size);
-  static void default_memcpy(void* from, void* to, size_t size);
 };
 
 template <chunk_frames frame_kind>

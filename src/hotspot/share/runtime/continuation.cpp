@@ -3130,15 +3130,10 @@ private:
   }
 };
 
-void continuations_init1() { Continuations::init1(); }
-void continuations_init2() { Continuations::init2(); }
+void continuations_init() { Continuations::init(); }
 
-void Continuations::init1() {
+void Continuations::init() {
   Continuation::init();
-}
-
-void Continuations::init2() {
-  InstanceStackChunkKlass::resolve_memcpy_functions();
 }
 
 // While virtual threads are in Preview, there are some VM mechanisms we disable if continuations aren't used

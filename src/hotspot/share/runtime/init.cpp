@@ -93,8 +93,7 @@ bool universe_post_init();  // must happen after compiler_init
 void javaClasses_init();  // must happen after vtable initialization
 void stubRoutines_init2(); // note: StubRoutines need 2-phase init
 
-void continuations_init1(); // depends on flags (UseCompressedOops) and barrier sets
-void continuations_init2(); // depends on stubs
+void continuations_init(); // depends on flags (UseCompressedOops) and barrier sets
 
 // Do not disable thread-local-storage, as it is important for some
 // JNI/JVM/JVMTI functions and signal handlers to work properly
@@ -129,8 +128,8 @@ jint init_globals() {
 
   AsyncLogWriter::initialize();
   gc_barrier_stubs_init();  // depends on universe_init, must be before interpreter_init
-  continuations_init1(); // must precede continuation stub generation
-  stubRoutines_initContinuationStubs(); // depends on continuations_init1
+  continuations_init(); // must precede continuation stub generation
+  stubRoutines_initContinuationStubs(); // depends on continuations_init
   interpreter_init_stub();  // before methods get loaded
   accessFlags_init();
   InterfaceSupport_init();
@@ -165,8 +164,6 @@ jint init_globals() {
   }
   stubRoutines_init2(); // note: StubRoutines need 2-phase init
   MethodHandles::generate_adapters();
-
-  continuations_init2();
 
   // All the flags that get adjusted by VM_Version_init and os::init_2
   // have been set so dump the flags now.

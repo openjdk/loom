@@ -39,13 +39,11 @@ class ContinuationEntry;
 // TODO: remove
 class Continuations : public AllStatic {
 public:
-  static void init1();
-  static void init2();
+  static void init();
   static bool enabled(); // TODO: used while virtual threads are in Preview; remove when GA
 };
 
-void continuations_init1();
-void continuations_init2();
+void continuations_init();
 
 class javaVFrame;
 class JavaThread;
