@@ -80,6 +80,9 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *mna
   jvmtiError err;
 
   err = jvmti->GetStackTrace(vthread, 0, MAX_FRAME_COUNT, frames, &count);
+  if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return -1; // VM or target thread completed its work
+  }
   check_jvmti_status(jni, err, "find_method_depth: error in JVMTI GetStackTrace");
 
   for (int depth = 0; depth < count; depth++) {
@@ -88,6 +91,9 @@ find_method_depth(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread, const char *mna
     char* sign = NULL;
 
     err = jvmti->GetMethodName(method, &name, &sign, NULL);
+    if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+      return -1; // VM or target thread completed its work
+    }
     check_jvmti_status(jni, err, "find_method_depth: error in JVMTI GetMethodName");
 
     if (strcmp(name, mname) == 0) {
@@ -422,9 +428,12 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
     jmethodID method = NULL;
     jlocation location = 0;
 
-    sleep_ms(5);
+    sleep_ms(1);
 
     jvmtiError err = jvmti->SuspendThread(vthread);
+    if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+      break; // VM or target thread completed its work
+    }
     check_jvmti_status(jni, err, "testSuspendedVirtualThreads: error in JVMTI SuspendThread");
 
     jthread cthread = get_carrier_thread(jvmti, jni, vthread);
@@ -460,6 +469,9 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
     }
 
     err = jvmti->ResumeThread(vthread);
+    if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+      break; // VM or target thread completed its work
+    }
     check_jvmti_status(jni, err, "testSuspendedVirtualThreads: error in JVMTI ResumeThread");
 
     if (cthread != 0) jni->DeleteLocalRef(cthread);

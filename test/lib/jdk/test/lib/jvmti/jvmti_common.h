@@ -247,6 +247,9 @@ get_thread_name(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
   memset(&thr_info, 0, sizeof(thr_info));
   err = jvmti->GetThreadInfo(thread, &thr_info);
+  if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return NULL; // VM or target thread completed its work
+  }
   check_jvmti_status(jni, err, "get_thread_name: error in JVMTI GetThreadInfo call");
 
   return thr_info.name == NULL ? (char*)"<Unnamed thread>" : thr_info.name;
