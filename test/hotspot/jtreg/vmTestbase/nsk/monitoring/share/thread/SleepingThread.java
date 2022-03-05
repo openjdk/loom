@@ -37,7 +37,6 @@ public class SleepingThread extends RecursiveMonitoringThread {
         private static final String[] expectedMethods = {
                 "java.lang.Thread.sleep",
                 "java.lang.Thread.sleep0",
-                "java.lang.Thread.sleepMillis",
                 "jdk.internal.event.ThreadSleepEvent.<clinit>",
                 "jdk.internal.event.ThreadSleepEvent.isTurnedOn",
                 "jdk.internal.event.ThreadSleepEvent.isEnabled",

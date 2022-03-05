@@ -141,13 +141,10 @@ public class strace001 {
         expectedSystemTrace = new String[]{
                 "java.lang.Thread.sleep",
                 "java.lang.Thread.sleep0",
-                "java.lang.Thread.getVirtualThread",
-                "java.lang.Thread.sleepMillis",
                 "java.lang.Thread.yield",
                 "java.lang.Thread.yield0",
                 "java.lang.Thread.currentCarrierThread",
                 "java.lang.Thread.currentThread",
-                "java.lang.Thread.currentThread0",
                 "jdk.internal.event.ThreadSleepEvent.<clinit>",
                 "jdk.internal.event.ThreadSleepEvent.isTurnedOn",
                 "jdk.internal.event.ThreadSleepEvent.isEnabled"
