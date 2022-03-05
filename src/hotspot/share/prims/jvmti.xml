@@ -1904,9 +1904,6 @@ jvmtiEnv *jvmti;
       <synopsis>Stop Thread</synopsis>
       <description>
         Send the specified asynchronous exception to the specified platform thread.
-        Normally, this function is used to kill the specified thread with an
-        instance of the exception <code>ThreadDeath</code>, similar to
-        <code>java.lang.Thread.stop</code>.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
@@ -9715,7 +9712,8 @@ myInit() {
           <paramlink id="event_thread"/> is non-<code>NULL</code> and is not a valid thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_ALIVE">
-          <paramlink id="event_thread"/> is non-<code>NULL</code> and is not live (has not been started or is now dead).
+          <paramlink id="event_thread"/> is non-<code>NULL</code> and is not alive
+          (has not been started or has terminated).
         </error>
         <error id="JVMTI_ERROR_ILLEGAL_ARGUMENT">
           thread level control was attempted on events which do not

@@ -1273,7 +1273,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   if (loader != NULL) {
     // Do the same as Thread.getContextClassLoader and set context_class_loader to be
     // the system class loader then the field value is the "not supported" placeholder.
-    if (loader == java_lang_Thread_ClassLoaders::get_NOT_SUPPORTED()) {
+    if (loader == java_lang_Thread_ContextClassLoaders::get_NOT_SUPPORTED()) {
       loader = SystemDictionary::java_system_loader();
     }
   }

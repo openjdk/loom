@@ -202,7 +202,7 @@ public class Thread implements Runnable {
     // thread name
     private volatile String name;
 
-    // thread id.
+    // thread id
     private final long tid;
 
     // context ClassLoader
@@ -271,15 +271,9 @@ public class Thread implements Runnable {
      * identifier for the primordial thread.
      */
     private static class ThreadIdentifiers {
-        private static final Unsafe U;
-        private static final long NEXT_TID_OFFSET;
+        private static final Unsafe U = Unsafe.getUnsafe();
+        private static final long NEXT_TID_OFFSET = getNextThreadIdOffset();
         private static final long TID_MASK = (1L << 48) - 1;
-
-        static {
-            U = Unsafe.getUnsafe();
-            NEXT_TID_OFFSET = getNextThreadIdOffset();
-        }
-
         static long next() {
             return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
         }
@@ -631,7 +625,7 @@ public class Thread implements Runnable {
             }
         }
 
-        // permission checks when creating a chld Thread
+        // permission checks when creating a chlid Thread
         if (!attached && security != null) {
             security.checkAccess(g);
             if (isCCLOverridden(getClass())) {
@@ -652,7 +646,7 @@ public class Thread implements Runnable {
             if ((characteristics & NO_THREAD_LOCALS) != 0) {
                 this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
                 this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-                this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
+                this.contextClassLoader = ContextClassLoaders.NOT_SUPPORTED;
             } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
                 ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
                 if (parentMap != null
@@ -703,7 +697,7 @@ public class Thread implements Runnable {
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-            this.contextClassLoader = ClassLoaders.NOT_SUPPORTED;
+            this.contextClassLoader = ContextClassLoaders.NOT_SUPPORTED;
         } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
@@ -2356,13 +2350,13 @@ public class Thread implements Runnable {
         }
         if (!isSupportedClassLoader(contextClassLoader)) {
             throw new UnsupportedOperationException(
-                "Thread is not allowed to set values for its copy of thread-local variables");
+                "The context class loader cannot be set");
         }
         contextClassLoader = cl;
     }
 
     @SuppressWarnings("removal")
-    private static class ClassLoaders {
+    private static class ContextClassLoaders {
         static final ClassLoader NOT_SUPPORTED;
         static {
             PrivilegedAction<ClassLoader> pa = new PrivilegedAction<>() {
@@ -2386,7 +2380,7 @@ public class Thread implements Runnable {
             return true;
         if (loader == jdk.internal.loader.ClassLoaders.appClassLoader())
             return true;
-        return loader != ClassLoaders.NOT_SUPPORTED;
+        return loader != ContextClassLoaders.NOT_SUPPORTED;
     }
 
     /**
@@ -2635,7 +2629,7 @@ public class Thread implements Runnable {
      *
      * @since 1.5
      */
-    @Deprecated
+    @Deprecated(since="19")
     public long getId() {
         return threadId();
     }

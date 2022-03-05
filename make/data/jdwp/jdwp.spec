@@ -2008,6 +2008,11 @@ JDWP "Java(tm) Debug Wire Protocol"
     )
     (Command Stop=10
         "Stops the thread with an asynchronous exception. "
+        "<p>"
+        "The target VM may not support, or may only provide limited support, for "
+        "this command when the thread is a virtual thread. It may, for example, "
+        "only support this command when the virtual thread is suspended at a "
+        "breakpoint or singlestep event."
         (Out
             (threadObject thread "The thread object ID. ")
             (object throwable "Asynchronous exception. This object must "
@@ -2016,7 +2021,10 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD)
+            (Error INVALID_THREAD "The thread is null, not a valid thread, the thread "
+                                  "has terminated, or the thread is a virtual thread "
+                                  "and the target VM does not support stopping it with "
+                                  "an asynchronous exception at this time.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
                                   "exception has been garbage collected.")
             (Error VM_DEAD)

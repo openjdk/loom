@@ -51,7 +51,7 @@ class RecordComponent;
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
   f(java_lang_Thread_VirtualThreads) \
-  f(java_lang_Thread_ClassLoaders) \
+  f(java_lang_Thread_ContextClassLoaders) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
@@ -535,9 +535,9 @@ class java_lang_Thread_VirtualThreads : AllStatic {
 };
 
 
-// Interface to java.lang.Thread$ClassLoaders objects
+// Interface to java.lang.Thread$ContextClassLoaders objects
 
-class java_lang_Thread_ClassLoaders : AllStatic {
+class java_lang_Thread_ContextClassLoaders : AllStatic {
  private:
   static int _static_NOT_SUPPORTED_offset;
 
