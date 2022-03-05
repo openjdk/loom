@@ -39,6 +39,7 @@ static int frame_pop_count = 0;
 static int brkptBreakpointHit = 0;
 static jboolean received_method_exit_event = JNI_FALSE;
 static jboolean passed = JNI_TRUE;
+static bool done = false;
 
 static jmethodID *test_methods = NULL;
 jint test_method_count = 0;
@@ -273,6 +274,9 @@ breakpoint_hit3(jvmtiEnv *jvmti, JNIEnv* jni,
 static void JNICALL
 Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   jthread cthread = NULL;
   char* mname = get_method_name(jvmti, jni, method);
   jboolean is_virtual = jni->IsVirtualThread(thread);
@@ -283,7 +287,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     deallocate(jvmti, jni, (void*)mname);
     return;
   }
-
   RawMonitorLocker rml(jvmti, jni, event_mon);
 
   brkptBreakpointHit++;
@@ -305,12 +308,14 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     LOG("FAILED: Breakpoint: too many brkpt breakpoints.\n");
     passed = JNI_FALSE;
   }
-
   deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -321,13 +326,15 @@ MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
 
   // print_frame_event_info(jvmti, jni, thread, method, "MethodEntry", method_entry_count);
 
-
   deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
            jboolean was_popped_by_exception, jvalue return_value) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -345,13 +352,15 @@ MethodExit(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 
     set_event_notification_mode(jvmti, jni, JVMTI_DISABLE, JVMTI_EVENT_METHOD_EXIT, thread);
   }
-
   deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
          jboolean was_popped_by_exception) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   char* mname = get_method_name(jvmti, jni, method);
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -362,12 +371,14 @@ FramePop(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
 
   print_frame_event_info(jvmti, jni, thread, method, "FramePop", frame_pop_count);
 
-
   deallocate(jvmti, jni, (void*)mname);
 }
 
 static void JNICALL
 ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   char* tname = get_thread_name(jvmti, jni, cthread);
   long loc_tls_data = 0;
   jvmtiError err;
@@ -390,12 +401,14 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread cthread) {
   } else {
     LOG("ThreadStart: GetThreadLocalStorage for carrier thread returned value %d as expected\n\n", (int)loc_tls_data);
   }
-
   deallocate(jvmti, jni, (void*)tname);
 }
 
 static void JNICALL
 VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   char* tname = get_thread_name(jvmti, jni, vthread);
   jvmtiError err;
   jboolean is_virtual = jni->IsVirtualThread(vthread);
@@ -409,13 +422,15 @@ VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread) {
   err = jvmti->SetThreadLocalStorage(vthread, (void*)222);
   check_jvmti_status(jni, err, "VirtualThreadMount: error in JVMTI SetThreadLocalStorage");
 
-
   deallocate(jvmti, jni, (void*)tname);
 }
 
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadMount(jvmtiEnv *jvmti, ...) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   jmethodID method = NULL;
   jlocation loc = 0L;
   char* mname = NULL;
@@ -451,7 +466,6 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
   err = jvmti->SetThreadLocalStorage(thread, (void*)222);
   check_jvmti_status(jni, err, "VirtualThreadMount: error in JVMTI SetThreadLocalStorage");
 
-
   deallocate(jvmti, jni, (void*)mname);
   deallocate(jvmti, jni, (void*)cname);
 }
@@ -459,6 +473,9 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
+  if (done) {
+    return; // avoid failures with JVMTI_ERROR_WRONG_PHASE
+  }
   jmethodID method = NULL;
   jlocation loc = 0L;
   char* mname = NULL;
@@ -489,7 +506,6 @@ VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
   check_jvmti_status(jni, err, "VirtualThreadUnmount: error in JVMTI NotifyFramePop");
 
   print_frame_event_info(jvmti, jni, thread, method, "VirtualThreadUnmount", vthread_unmounted_count);
-
 
   deallocate(jvmti, jni, (void*)mname);
   deallocate(jvmti, jni, (void*)cname);
@@ -527,7 +543,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
            TranslateError(err), err);
     return JNI_ERR;
   }
-
   memset(&caps, 0, sizeof(caps));
   caps.can_generate_breakpoint_events = 1;
   caps.can_generate_frame_pop_events = 1;
@@ -540,13 +555,11 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     LOG("Agent_OnLoad: Error in JVMTI AddCapabilities: %d\n", err);
     return JNI_ERR;
   }
-
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(jvmtiEventCallbacks));
   if (err != JVMTI_ERROR_NONE) {
     LOG("Agent_OnLoad: Error in JVMTI SetEventCallbacks: %d\n", err);
     return JNI_ERR;
   }
-
   set_event_notification_mode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, NULL);
   set_event_notification_mode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   set_event_notification_mode(jvmti, JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
@@ -554,8 +567,6 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   event_mon = create_raw_monitor(jvmti, "Events Monitor");
 
   LOG("Agent_OnLoad finished\n");
-
-
   return JNI_OK;
 }
 
@@ -575,11 +586,12 @@ Java_MethodExitTest_enableEvents(JNIEnv *jni, jclass klass, jthread thread, jcla
   set_event_notification_mode(jvmti, jni, JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
 
   LOG("enableEvents: finished\n");
-
 }
 
 JNIEXPORT jboolean JNICALL
 Java_MethodExitTest_check(JNIEnv *jni, jclass cls) {
+  done = true; // defence against failures with JVMTI_ERROR_WRONG_PHASE
+
   LOG("\n");
   LOG("check: started\n");
 
@@ -597,11 +609,8 @@ Java_MethodExitTest_check(JNIEnv *jni, jclass cls) {
     passed = JNI_FALSE;
     LOG("FAILED: frame_pop_count == 0\n");
   }
-
   LOG("check: finished\n");
   LOG("\n");
-
-
   return passed;
 }
 } // extern "C"
