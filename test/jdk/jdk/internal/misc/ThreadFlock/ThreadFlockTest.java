@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
  * @test
  * @summary Basic tests for ThreadFlock
  * @modules java.base/jdk.internal.misc
- * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} ThreadFlockTest.java
  * @run testng/othervm --enable-preview ThreadFlockTest
  */
@@ -38,8 +37,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import jdk.internal.misc.ThreadFlock;
-import jdk.incubator.concurrent.ScopeLocal;
-import jdk.incubator.concurrent.StructureViolationException;
 
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -356,26 +353,6 @@ public class ThreadFlockTest {
         } else {
             assertTrue(cause instanceof WrongThreadException);
         }
-    }
-
-    /**
-     * Test that start inherits scope-local bindings.
-     */
-    @Test(dataProvider = "factories")
-    public void testStartInheritsScopeLocals(ThreadFactory factory) throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        String value = ScopeLocal.where(NAME, "fred").call(() -> {
-            var result = new AtomicReference<String>();
-            try (var flock = ThreadFlock.open(null)) {
-                Thread thread = factory.newThread(() -> {
-                    // child
-                    result.set(NAME.get());
-                });
-                flock.start(thread);
-            }
-            return result.get();
-        });
-        assertEquals(value, "fred");
     }
 
     /**
@@ -950,146 +927,18 @@ public class ThreadFlockTest {
     /**
      * Test that closing an enclosing thread flock closes a nested thread flocks.
      */
-    public void testStructureViolation1() {
+    public void testStructureViolation() {
         try (var flock1 = ThreadFlock.open("flock1")) {
             try (var flock2 = ThreadFlock.open("flock2")) {
                 try {
                     flock1.close();
                     assertTrue(false);
-                } catch (StructureViolationException expected) { }
+                } catch (RuntimeException e) {
+                    assertTrue(e.toString().contains("Structure"));
+                }
                 assertTrue(flock1.isClosed());
                 assertTrue(flock2.isClosed());
             }
-        }
-    }
-
-    /**
-     * Test exiting a scope local operation should close nested thread flocks.
-     */
-    public void testStructureViolation2() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        class Box {
-            ThreadFlock flock1;
-            ThreadFlock flock2;
-        }
-        var box = new Box();
-        try {
-            ScopeLocal.where(name, "x1").run(() -> {
-                box.flock1 = ThreadFlock.open(null);
-                box.flock2 = ThreadFlock.open(null);
-            });
-            assertTrue(false);
-        } catch (StructureViolationException expected) { }
-        assertTrue(box.flock1.isClosed());
-        assertTrue(box.flock2.isClosed());
-    }
-
-    /**
-     * Test closing a thread flock with enclosing scope local operations and
-     * thread flocks. This test closes enclosing flock1.
-     */
-    public void testStructureViolation3() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
-                try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
-                        try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
-                                var flock4 = ThreadFlock.open("flock4");
-
-                                try {
-                                    flock1.close();
-                                    assertTrue(false);
-                                } catch (StructureViolationException expected) { }
-
-                                assertTrue(flock1.isClosed());
-                                assertTrue(flock2.isClosed());
-                                assertTrue(flock3.isClosed());
-                                assertTrue(flock4.isClosed());
-
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    }
-
-    /**
-     * Test closing a thread flock with enclosing scope local operations and
-     * thread flocks. This test closes enclosing flock2.
-     */
-    public void testStructureViolation4() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
-                try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
-                        try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
-                                var flock4 = ThreadFlock.open("flock4");
-
-                                try {
-                                    flock2.close();
-                                    assertTrue(false);
-                                } catch (StructureViolationException expected) { }
-
-                                assertFalse(flock1.isClosed());
-                                assertTrue(flock2.isClosed());
-                                assertTrue(flock3.isClosed());
-                                assertTrue(flock4.isClosed());
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    }
-
-    /**
-     * Test closing a thread flock with enclosing scope local operations and
-     * thread flocks. This test closes enclosing flock3.
-     */
-    public void testStructureViolation5() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
-                try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
-                        try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
-                                var flock4 = ThreadFlock.open("flock4");
-
-                                try {
-                                    flock3.close();
-                                    assertTrue(false);
-                                } catch (StructureViolationException expected) { }
-
-                                assertFalse(flock1.isClosed());
-                                assertFalse(flock2.isClosed());
-                                assertTrue(flock3.isClosed());
-                                assertTrue(flock4.isClosed());
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    }
-
-    /**
-     * Test that start throws StructureViolationException if scope-local bindings
-     * have changed.
-     */
-    @Test(dataProvider = "factories")
-    public void testStructureViolation6(ThreadFactory factory) throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var flock = ThreadFlock.open(null)) {
-            ScopeLocal.where(NAME, "fred").run(() -> {
-                Thread thread = factory.newThread(() -> { });
-                expectThrows(StructureViolationException.class, () -> flock.start(thread));
-            });
         }
     }
 
