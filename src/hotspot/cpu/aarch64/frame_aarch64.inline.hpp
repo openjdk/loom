@@ -417,6 +417,10 @@ inline frame frame::sender_raw(RegisterMap* map) const {
 
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
+
+  // Native code may or may not have signed the return address, we have no way to be sure or what
+  // signing methods they used. Instead, just ensure the stripped value is used.
+
   return frame(sender_sp(), link(), sender_pc());
 }
 
@@ -426,13 +430,15 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // have to find it relative to the unextended sp
 
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
-  intptr_t* sender_sp = unextended_sp() + _cb->frame_size();
-  assert (sender_sp == real_fp(), "");
+  intptr_t* l_sender_sp = (!PreserveFramePointer || _sp_is_trusted) ? unextended_sp() + _cb->frame_size()
+                                                                    : sender_sp();
+  assert (l_sender_sp == real_fp(), "");
 
   // the return_address is always the word on the stack
-  address sender_pc = (address) *(sender_sp-1);
+  // For ROP protection, C1/C2 will have signed the sender_pc, but there is no requirement to authenticate it here.
+  address sender_pc = pauth_strip_verifiable((address) *(l_sender_sp-1), (address) *(l_sender_sp-2));
 
-  intptr_t** saved_fp_addr = (intptr_t**) (sender_sp - frame::sender_sp_offset);
+  intptr_t** saved_fp_addr = (intptr_t**) (l_sender_sp - frame::sender_sp_offset);
 
   if (map->update_map()) {
     // Tell GC to use argument oopmaps for some runtime stubs that need it.
@@ -459,12 +465,12 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     if (map->walk_cont()) { // about to walk into an h-stack
       return Continuation::top_frame(*this, map);
     } else {
-      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &l_sender_sp);
     }
   }
 
-  intptr_t* unextended_sp = sender_sp;
-  return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
+  intptr_t* unextended_sp = l_sender_sp;
+  return frame(l_sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
 template <typename RegisterMapT>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2020, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -835,6 +835,7 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   __ ldr(rcpool, Address(rcpool, ConstantPool::cache_offset_in_bytes()));
   __ stp(rlocals, rcpool, Address(sp, 2 * wordSize));
 
+  __ protect_return_address();
   __ stp(rfp, lr, Address(sp, 10 * wordSize));
   __ lea(rfp, Address(sp, 10 * wordSize));
 
@@ -1762,6 +1763,8 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
     // adapter frames in C2.
     Label caller_not_deoptimized;
     __ ldr(c_rarg1, Address(rfp, frame::return_addr_offset * wordSize));
+    // This is a return address, so requires authenticating for PAC.
+    __ authenticate_return_address(c_rarg1, rscratch1);
     __ super_call_VM_leaf(CAST_FROM_FN_PTR(address,
                                InterpreterRuntime::interpreter_contains), c_rarg1);
     __ cbnz(r0, caller_not_deoptimized);
@@ -1951,6 +1954,7 @@ void TemplateInterpreterGenerator::set_vtos_entry_points(Template* t,
 address TemplateInterpreterGenerator::generate_trace_code(TosState state) {
   address entry = __ pc();
 
+  __ protect_return_address();
   __ push(lr);
   __ push(state);
   __ push(RegSet::range(r0, r15), sp);
@@ -1961,6 +1965,7 @@ address TemplateInterpreterGenerator::generate_trace_code(TosState state) {
   __ pop(RegSet::range(r0, r15), sp);
   __ pop(state);
   __ pop(lr);
+  __ authenticate_return_address();
   __ ret(lr);                                   // return from result handler
 
   return entry;
