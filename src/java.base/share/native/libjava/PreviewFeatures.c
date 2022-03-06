@@ -22,34 +22,13 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.internal.misc;
 
-/**
- * Defines static methods to test if preview features are enabled at run-time.
- */
-public class PreviewFeatures {
-    private static final boolean ENABLED = isPreviewEnabled();
+ #include "jni.h"
+ #include "jvm.h"
 
-    private PreviewFeatures() {
-    }
+ #include "jdk_internal_misc_PreviewFeatures.h"
 
-    /**
-     * {@return true if preview features are enabled, otherwise false}
-     */
-    public static boolean isEnabled() {
-        return true; // FIXME: return true until test environment ready
-    }
-
-    /**
-     * Ensures that preview features are enabled.
-     * @throws UnsupportedOperationException if preview features are not enabled
-     */
-    public static void ensureEnabled() {
-        if (!isEnabled()) {
-            throw new UnsupportedOperationException(
-                "Preview Features not enabled, need to run with --enable-preview");
-        }
-    }
-
-    private static native boolean isPreviewEnabled();
-}
+ JNIEXPORT jboolean JNICALL
+ Java_jdk_internal_misc_PreviewFeatures_isPreviewEnabled(JNIEnv *env, jclass cls) {
+     return JVM_IsPreviewEnabled(env);
+ }

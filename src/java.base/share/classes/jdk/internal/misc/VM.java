@@ -74,8 +74,6 @@ public class VM {
 
     /**
      * Waits for the init level to get the given value.
-     *
-     * @see java.lang.ref.Finalizer
      */
     public static void awaitInitLevel(int value) throws InterruptedException {
         synchronized (lock) {
@@ -470,11 +468,6 @@ public class VM {
      * file is read and expanded in place of -XX:VMOptionFile option.
      */
     public static native String[] getRuntimeArguments();
-
-    /**
-     * {@return true if preview features are enabled}
-     */
-    public static native boolean isPreviewEnabled();
 
     static {
         initialize();
