@@ -35,14 +35,12 @@ static int breakpoint_count = 0;
 static int vt_mounted_count = 0;
 static int vt_unmounted_count = 0;
 static jboolean pass_status = JNI_TRUE;
+static bool done = false;
 
 static void
 print_frame_event_info(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method,
                        const char* event_name, int event_count) {
   char* tname = get_thread_name(jvmti, jni, thread);
-  if (tname == NULL) {
-    return; // got JVMTI_ERROR_WRONG_PHASE
-  }
   char* mname = get_method_name(jvmti, jni, method);
   char* cname = get_method_class_name(jvmti, jni, method);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
@@ -75,6 +73,9 @@ set_breakpoint(JNIEnv *jni, jclass klass, const char *mname)
 static void JNICALL
 Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
            jmethodID method, jlocation location) {
+  if (done) {
+    return; // defence against JVMTI_ERROR_WRONG_PHASE failures
+  }
   char* mname = get_method_name(jvmti, jni, method);
 
   if (strcmp(mname, "run") != 0 && strcmp(mname, "yield") != 0) {
@@ -84,9 +85,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
     return;
   }
   char* tname = get_thread_name(jvmti, jni, thread);
-  if (tname == NULL) {
-    return; // got JVMTI_ERROR_WRONG_PHASE
-  }
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -101,10 +99,10 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread,
 
 static void JNICALL
 ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  char* tname = get_thread_name(jvmti, jni, thread);
-  if (tname == NULL) {
-    return; // got JVMTI_ERROR_WRONG_PHASE
+  if (done) {
+    return; // defence against JVMTI_ERROR_WRONG_PHASE failures
   }
+  char* tname = get_thread_name(jvmti, jni, thread);
   {
     RawMonitorLocker rml(jvmti, jni, event_mon);
     LOG("\nThreadStart: thread: %p, name: %s\n", (void *) thread, tname);
@@ -115,10 +113,10 @@ ThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
 static void JNICALL
 VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
-  char* tname = get_thread_name(jvmti, jni, thread);
-  if (tname == NULL) {
-    return; // got JVMTI_ERROR_WRONG_PHASE
+  if (done) {
+    return; // defence against JVMTI_ERROR_WRONG_PHASE failures
   }
+  char* tname = get_thread_name(jvmti, jni, thread);
   const char* virt = jni->IsVirtualThread(thread) ? "virtual" : "carrier";
 
   RawMonitorLocker rml(jvmti, jni, event_mon);
@@ -130,6 +128,9 @@ VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadMount(jvmtiEnv *jvmti, ...) {
+  if (done) {
+    return; // defence against JVMTI_ERROR_WRONG_PHASE failures
+  }
   jmethodID method = NULL;
   jlocation loc = 0L;
   jvmtiError err;
@@ -158,6 +159,9 @@ VirtualThreadMount(jvmtiEnv *jvmti, ...) {
 // Parameters: (jvmtiEnv *jvmti, JNIEnv* jni, jthread thread)
 static void JNICALL
 VirtualThreadUnmount(jvmtiEnv *jvmti, ...) {
+  if (done) {
+    return; // defence against JVMTI_ERROR_WRONG_PHASE failures
+  }
   jmethodID method = NULL;
   jlocation loc = 0L;
   jvmtiError err;
@@ -290,12 +294,29 @@ Java_BreakpointInYieldTest_enableEvents(JNIEnv *jni, jclass klass, jthread threa
 
 JNIEXPORT jboolean JNICALL
 Java_BreakpointInYieldTest_check(JNIEnv *jni, jclass cls) {
+  jvmtiError err;
+  done = true; // defence against JVMTI_ERROR_WRONG_PHASE failures
+
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_THREAD_START, NULL);
+  check_jvmti_status(jni, err, "check: error in JVMTI SetEventNotificationMode: disable THREAD_START");
+
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
+  check_jvmti_status(jni, err, "check: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_START");
+
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, EXT_EVENT_VIRTUAL_THREAD_MOUNT, NULL);
+  check_jvmti_status(jni, err, "check: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_MOUNT");
+
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, EXT_EVENT_VIRTUAL_THREAD_UNMOUNT, NULL);
+  check_jvmti_status(jni, err, "check: error in JVMTI SetEventNotificationMode: disable VIRTUAL_THREAD_UNMOUNT");
+
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_BREAKPOINT, NULL);
+  check_jvmti_status(jni, err, "check: error in JVMTI SetEventNotificationMode: disable BREAKPOINT");
+
   LOG("\n");
   LOG("check: breakpoint_count:     %d\n", breakpoint_count);
   LOG("check: vt_mounted_count:     %d\n", vt_mounted_count);
   LOG("check: vt_unmounted_count:   %d\n", vt_unmounted_count);
   LOG("\n");
-
 
   return pass_status;
 }
