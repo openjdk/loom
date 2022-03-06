@@ -666,11 +666,13 @@ class DatagramChannelImpl
                 }
 
                 // copy datagram into byte array
-                if (n > 0 && len > 0) {
-                    dst.flip();
-                    dst.get(b, off, n);
-                } else {
-                    n = 0;
+                if (n > 0) {
+                    if (len > 0) {
+                        dst.flip();
+                        dst.get(b, off, n);
+                    } else {
+                        n = 0;
+                    }
                 }
             }
             return n;
