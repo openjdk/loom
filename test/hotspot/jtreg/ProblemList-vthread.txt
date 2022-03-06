@@ -243,6 +243,7 @@ runtime/cds/appcds/VerifierTest_1A.java
 runtime/cds/appcds/VerifierTest_1B.java
 runtime/cds/appcds/VerifierTest_2.java
 runtime/cds/appcds/WideIloadTest.java
+runtime/cds/appcds/TestParallelGCWithCDS.java
 runtime/cds/appcds/XShareAutoWithChangedJar.java
 runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java
 runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java
@@ -253,6 +254,7 @@ runtime/cds/appcds/cacheObject/DifferentHeapSizes.java
 runtime/cds/appcds/cacheObject/GCStressTest.java
 runtime/cds/appcds/cacheObject/HeapFragmentationTest.java
 runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java
+runtime/cds/appcds/cacheObject/ArchivedEnumTest.java
 runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
 runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
 runtime/cds/appcds/cacheObject/RedefineClassTest.java
