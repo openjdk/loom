@@ -26,7 +26,7 @@
  * @summary Verifies JVMTI support for Continuations
  * @compile ContinuationTest.java
  * @modules java.base/jdk.internal.vm
- * @run main/othervm/native -agentlib:ContinuationTest ContinuationTest
+ * @run main/othervm/native --enable-preview -agentlib:ContinuationTest ContinuationTest
  */
 
 import jdk.internal.vm.Continuation;
