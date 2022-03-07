@@ -1505,7 +1505,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
   exception_offset = __ pc() - start;
 
   continuation_enter_cleanup(masm);
-  __ addptr(rsp, 1*wordSize);
+  __ pop(rbp);
 
   __ movptr(rbx, rax); // save the exception
   __ movptr(c_rarg0, Address(rsp, 0));
