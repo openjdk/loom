@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 SAP SE. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -486,7 +486,7 @@
   address* sender_pc_addr(void) const;
 
  public:
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   inline intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

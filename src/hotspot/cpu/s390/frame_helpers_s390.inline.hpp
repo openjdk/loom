@@ -49,7 +49,7 @@ inline address* Interpreted::return_pc_address(const frame& f) {
   return NULL;
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
   Unimplemented();
 }
@@ -73,7 +73,7 @@ inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask)
   return NULL;
 }
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
   Unimplemented();
   return NULL;

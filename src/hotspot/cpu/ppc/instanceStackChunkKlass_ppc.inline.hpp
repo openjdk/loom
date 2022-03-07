@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022 Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,68 +40,68 @@ int InstanceStackChunkKlass::align_wiggle()   {
 }
 
 #ifdef ASSERT
-template <bool mixed>
-inline bool StackChunkFrameStream<mixed>::is_in_frame(void* p0) const {
+template <chunk_frames frame_kind>
+inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
   Unimplemented();
   return true;
 }
 #endif
 
-template <bool mixed>
-inline frame StackChunkFrameStream<mixed>::to_frame() const {
+template <chunk_frames frame_kind>
+inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
   Unimplemented();
   return frame();
 }
 
-template <bool mixed>
-inline address StackChunkFrameStream<mixed>::get_pc() const {
+template <chunk_frames frame_kind>
+inline address StackChunkFrameStream<frame_kind>::get_pc() const {
   Unimplemented();
   return NULL;
 }
 
-template <bool mixed>
-inline intptr_t* StackChunkFrameStream<mixed>::fp() const {
+template <chunk_frames frame_kind>
+inline intptr_t* StackChunkFrameStream<frame_kind>::fp() const {
   Unimplemented();
   return NULL;
 }
 
-template <bool mixed>
-inline intptr_t* StackChunkFrameStream<mixed>::derelativize(int offset) const {
+template <chunk_frames frame_kind>
+inline intptr_t* StackChunkFrameStream<frame_kind>::derelativize(int offset) const {
   Unimplemented();
   return NULL;
 }
 
-template <bool mixed>
-inline intptr_t* StackChunkFrameStream<mixed>::unextended_sp_for_interpreter_frame() const {
+template <chunk_frames frame_kind>
+inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
   Unimplemented();
   return NULL;
 }
 
-template <bool mixed>
-intptr_t* StackChunkFrameStream<mixed>::next_sp_for_interpreter_frame() const {
+template <chunk_frames frame_kind>
+intptr_t* StackChunkFrameStream<frame_kind>::next_sp_for_interpreter_frame() const {
   Unimplemented();
   return NULL;
 }
 
-template <bool mixed>
-inline void StackChunkFrameStream<mixed>::next_for_interpreter_frame() {
+template <chunk_frames frame_kind>
+inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   Unimplemented();
 }
 
-template <bool mixed>
-inline int StackChunkFrameStream<mixed>::interpreter_frame_size() const {
+template <chunk_frames frame_kind>
+inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   Unimplemented();
   return 0;
 }
 
-template <bool mixed>
-inline int StackChunkFrameStream<mixed>::interpreter_frame_stack_argsize() const {
+template <chunk_frames frame_kind>
+inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() const {
   Unimplemented();
   return 0;
 }
 
-template <bool mixed>
-inline int StackChunkFrameStream<mixed>::interpreter_frame_num_oops() const {
+template <chunk_frames frame_kind>
+inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const {
   Unimplemented();
   return 0;
 }
@@ -116,19 +116,19 @@ inline void stackChunkOopDesc::derelativize_frame_pd(frame& fr) const {
 
 template<>
 template<>
-inline void StackChunkFrameStream<true>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map_pd(RegisterMap* map) {
   Unimplemented();
 }
 
 template<>
 template<>
-inline void StackChunkFrameStream<false>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map_pd(RegisterMap* map) {
   Unimplemented();
 }
 
-template <bool mixed>
+template <chunk_frames frame_kind>
 template <typename RegisterMapT>
-inline void StackChunkFrameStream<mixed>::update_reg_map_pd(RegisterMapT* map) {}
+inline void StackChunkFrameStream<frame_kind>::update_reg_map_pd(RegisterMapT* map) {}
 
 // Java frames don't have callee saved registers (except for rfp), so we can use a smaller RegisterMap
 class SmallRegisterMap {

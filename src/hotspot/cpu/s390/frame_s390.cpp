@@ -230,54 +230,12 @@ frame frame::sender_for_interpreter_frame(RegisterMap *map) const {
   return frame(sender_sp(), sender_pc(), (intptr_t*)(ijava_state()->sender_sp));
 }
 
-template <bool stub>
-frame frame::sender_for_compiled_frame(RegisterMap *map) const {
-  assert(map != NULL, "map must be set");
-  // Frame owned by compiler.
-
-  address pc = *compiled_sender_pc_addr(_cb);
-  frame caller(compiled_sender_sp(_cb), pc);
-
-  // Now adjust the map.
-
-  // Get the rest.
-  if (map->update_map()) {
-    // Tell GC to use argument oopmaps for some runtime stubs that need it.
-    map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
-    if (_cb->oop_maps() != NULL) {
-      OopMapSet::update_register_map(this, map);
-    }
-  }
-
-  return caller;
-}
-
 intptr_t* frame::compiled_sender_sp(CodeBlob* cb) const {
   return sender_sp();
 }
 
 address* frame::compiled_sender_pc_addr(CodeBlob* cb) const {
   return sender_pc_addr();
-}
-
-frame frame::sender(RegisterMap* map) const {
-  // Default is we don't have to follow them. The sender_for_xxx will
-  // update it accordingly.
-  map->set_include_argument_oops(false);
-
-  if (is_entry_frame()) {
-    return sender_for_entry_frame(map);
-  }
-  if (is_interpreted_frame()) {
-    return sender_for_interpreter_frame(map);
-  }
-  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
-  if (_cb != NULL) {
-    return sender_for_compiled_frame<false>(map);
-  }
-  // Must be native-compiled frame, i.e. the marshaling code for native
-  // methods that exists in the core system.
-  return frame(sender_sp(), sender_pc());
 }
 
 void frame::patch_pc(Thread* thread, address pc) {
@@ -686,18 +644,18 @@ intptr_t *frame::initial_deoptimization_info() {
 }
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
+template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
 
-template <bool relative>
+template <frame::addressing pointers>
 inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return interpreter_frame_monitors();
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
+template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
 
-template <bool relative>
+template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   return &interpreter_frame_tos_address()[offset];
 }

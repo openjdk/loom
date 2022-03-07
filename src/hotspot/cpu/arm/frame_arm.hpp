@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -123,7 +123,7 @@
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }
 
-  template <bool relative = false>
+  template <addressing pointers = addressing::ABSOLUTE>
   inline intptr_t* interpreter_frame_last_sp() const;
 
 #endif // CPU_ARM_FRAME_ARM_HPP
