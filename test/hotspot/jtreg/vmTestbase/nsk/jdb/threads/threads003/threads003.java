@@ -113,7 +113,7 @@ public class threads003 extends JdbTest {
             failure("Unexpected number of " + THREAD_NAME + " was listed: " + threads.length +
                     "\n\texpected value: " + KNOWN_THREADS);
         }
-        
+
         // Now make sure the correct threads were reported.
         for (int i = 0; i < threads.length; i++) {
             // Switch to the thread. The reply should be the new prompt with the thread's name.
