@@ -1307,11 +1307,13 @@ public:
     delete _base;
     delete _derived;
   }
+  bool is_good(oop* p) {
+    return *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
+  }
   void describe(FrameValues& values, int frame_no) {
     for (int i = 0; i < _oops->length(); i++) {
       oop* p = _oops->at(i);
-      bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
-      values.describe(frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", frame_no));
+      values.describe(frame_no, (intptr_t*)p, err_msg("oop%s for #%d", is_good(p) ? "" : " (BAD)", frame_no));
     }
     for (int i = 0; i < _narrow_oops->length(); i++) {
       narrowOop* p = _narrow_oops->at(i);
@@ -1403,7 +1405,8 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
     values.describe(-1, info_address,
                     err_msg("- %d locals %d max stack", m->max_locals(), m->max_stack()), 2);
-    values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
+    // return address will be emitted by caller in describe_pd
+    // values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
 
     if (m->max_locals() > 0) {
       intptr_t* l0 = interpreter_frame_local_at<pointers>(0);
@@ -1564,10 +1567,6 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
 
   // platform dependent additional data
   describe_pd(values, frame_no);
-}
-
-void frame::describe_top(FrameValues& values) {
-  describe_top_pd(values);
 }
 #endif
 

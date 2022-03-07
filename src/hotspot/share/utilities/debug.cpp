@@ -715,6 +715,10 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue) {
   return p != NULL && SafeFetchN((intptr_t*)const_cast<void*>(p), errvalue) != errvalue;
 }
 
+extern "C" bool dbg_is_good_oop(oop o) {
+  return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass();
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Test multiple STATIC_ASSERT forms in various scopes.
 

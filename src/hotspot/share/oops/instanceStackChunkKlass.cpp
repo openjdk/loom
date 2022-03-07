@@ -968,7 +968,6 @@ public:
     HandleMark hm(Thread::current());
 
     frame fr = f.to_frame();
-    if (_frame_no == 0) fr.describe_top(_values);
     fr.template describe<frame::addressing::RELATIVE>(_values, _frame_no++, get_map(map, f.sp()));
     return true;
   }

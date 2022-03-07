@@ -419,7 +419,6 @@ class frame {
   const char* print_name() const;
 
   void describe_pd(FrameValues& values, int frame_no);
-  void describe_top_pd(FrameValues& values);
 
  public:
   void print_value() const { print_value_on(tty,NULL); }
@@ -434,7 +433,6 @@ class frame {
   // Add annotated descriptions of memory locations belonging to this frame to values
   template <addressing pointers = addressing::ABSOLUTE>
   void describe(FrameValues& values, int frame_no, const RegisterMap* reg_map=NULL);
-  void describe_top(FrameValues& values);
 
   // Conversion from a VMReg to physical stack location
   template <typename RegisterMapT>
@@ -502,7 +500,6 @@ class FrameValue {
     owner = -1;
     priority = 0;
   }
-
 };
 
 
