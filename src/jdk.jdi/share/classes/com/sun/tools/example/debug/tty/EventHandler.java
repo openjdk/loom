@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +37,8 @@ package com.sun.tools.example.debug.tty;
 import com.sun.jdi.*;
 import com.sun.jdi.event.*;
 import com.sun.jdi.request.EventRequest;
+import com.sun.jdi.request.EventRequestManager;
+import com.sun.jdi.request.ThreadDeathRequest;
 
 public class EventHandler implements Runnable {
 
@@ -46,10 +48,12 @@ public class EventHandler implements Runnable {
     boolean completed = false;
     String shutdownMessageKey;
     boolean stopOnVMStart;
+    boolean trackAllVthreads;
 
-    EventHandler(EventNotifier notifier, boolean stopOnVMStart) {
+    EventHandler(EventNotifier notifier, boolean stopOnVMStart, boolean trackAllVthreads) {
         this.notifier = notifier;
         this.stopOnVMStart = stopOnVMStart;
+        this.trackAllVthreads = trackAllVthreads;
         this.thread = new Thread(this, "event-handler");
         this.thread.start();
     }
@@ -95,6 +99,32 @@ public class EventHandler implements Runnable {
 
     private boolean handleEvent(Event event) {
         notifier.receivedEvent(event);
+
+        /*
+         * See if the event thread is a vthread that we need to start tracking.
+         */
+        ThreadReference eventThread = null;
+        if (event instanceof ClassPrepareEvent) {
+            eventThread = ((ClassPrepareEvent)event).thread();
+        } else if (event instanceof LocatableEvent) {
+            eventThread = ((LocatableEvent)event).thread();
+        }
+        if (eventThread != null) {
+            // This is a vthread we haven't seen before, so add it to our list.
+            assert eventThread.isVirtual();
+            boolean added = ThreadInfo.addThread(eventThread);
+            // If we added it, we need to make sure it eventually gets removed. Usually
+            // this happens when the ThreadDeathEvent comes in, but if !trackAllVthreads,
+            // then the ThreadDeathReqest was setup to filter out vthreads. So we'll need
+            // to create a special ThreadDeathReqest just to detect when this vthread dies.
+            if (added && !trackAllVthreads) {
+                EventRequestManager erm = Env.vm().eventRequestManager();
+                ThreadDeathRequest tdr = erm.createThreadDeathRequest();
+                tdr.addThreadFilter(eventThread);
+                tdr.enable();
+                //System.out.println("TDR added: " + thread);
+            }
+        }
 
         if (event instanceof ExceptionEvent) {
             return exceptionEvent(event);
@@ -264,8 +294,17 @@ public class EventHandler implements Runnable {
     }
 
     private boolean threadDeathEvent(Event event) {
-        ThreadDeathEvent tee = (ThreadDeathEvent)event;
-        ThreadInfo.removeThread(tee.thread());
+        ThreadDeathEvent tde = (ThreadDeathEvent)event;
+        ThreadReference thread = tde.thread();
+        ThreadInfo.removeThread(thread);
+
+        if (!trackAllVthreads && thread.isVirtual()) {
+            // Remove the ThreadDeathRequest used for this event since it was created
+            // just to remove this one vthread.
+            EventRequestManager erm = Env.vm().eventRequestManager();
+            erm.deleteEventRequest(event.request());
+            //System.out.println("TDR removed: " + thread);
+        }
         return false;
     }
 

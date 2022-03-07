@@ -74,6 +74,8 @@ public class TTY implements EventNotifier {
 
     private volatile boolean shuttingDown = false;
 
+    private static boolean trackAllVthreads = false;
+
     /**
      * The number of the next source line to target for {@code list}, if any.
      */
@@ -564,7 +566,7 @@ public class TTY implements EventNotifier {
                              * arg 2 is false).
                              */
                             if ((handler == null) && Env.connection().isOpen()) {
-                                handler = new EventHandler(this, false);
+                                handler = new EventHandler(this, false, trackAllVthreads);
                             }
                         } else if (cmd.equals("memory")) {
                             evaluator.commandMemory();
@@ -792,7 +794,7 @@ public class TTY implements EventNotifier {
              * immediately, telling it (through arg 2) to stop on the
              * VM start event.
              */
-            this.handler = new EventHandler(this, true);
+            this.handler = new EventHandler(this, true, trackAllVthreads);
         }
         try {
             BufferedReader in =
@@ -972,6 +974,8 @@ public class TTY implements EventNotifier {
                         return;
                     }
                 }
+            } else if (token.equals("-trackallvthreads")) {
+                trackAllVthreads = true;
             } else if (token.equals("-X")) {
                 usageError("Use java minus X to see");
                 return;
@@ -1163,12 +1167,12 @@ public class TTY implements EventNotifier {
             }
         }
 
-        if (connectSpec.startsWith("com.sun.jdi.CommandLineLaunch:")) {
-            connectSpec += "enumeratevthreads=y,";
+        if (connectSpec.startsWith("com.sun.jdi.CommandLineLaunch:") && trackAllVthreads) {
+            //connectSpec += "enumeratevthreads=y,";
         }
 
         try {
-            Env.init(connectSpec, launchImmediately, traceFlags, javaArgs);
+            Env.init(connectSpec, launchImmediately, traceFlags, trackAllVthreads, javaArgs);
             new TTY();
         } catch(Exception e) {
             MessageOutput.printException("Internal exception:", e);
