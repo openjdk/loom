@@ -1862,13 +1862,12 @@ public:
     assert ((intptr_t)chunk->start_address() % 8 == 0, "");
 
     // TODO PERF: maybe just memset 0, and only set non-zero fields.
-    // chunk->set_pc(nullptr);
-    // chunk->set_argsize(0);
     chunk->clear_flags();
     chunk->set_gc_mode(false);
     chunk->set_max_size(0);
     chunk->set_mark_cycle(0);
-    // chunk->set_pc(nullptr); // TODO PERF: necessary?
+    // chunk->set_pc(nullptr);
+    // chunk->set_argsize(0);
 
     assert (chunk->flags() == 0, "");
     assert (chunk->is_gc_mode() == false, "");
