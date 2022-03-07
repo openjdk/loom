@@ -625,7 +625,7 @@ public class Thread implements Runnable {
             }
         }
 
-        // permission checks when creating a chlid Thread
+        // permission checks when creating a child Thread
         if (!attached && security != null) {
             security.checkAccess(g);
             if (isCCLOverridden(getClass())) {
