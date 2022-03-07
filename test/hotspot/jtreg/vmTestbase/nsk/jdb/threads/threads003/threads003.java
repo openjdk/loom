@@ -34,7 +34,7 @@
  *  It also tests that vthreads where no event is received are not tracked.
  *  The debugee starts 5 'MyThreads'. The odd numbered threads call a
  *  method that has been setup as a breakpoint. The others do not. All
- *  5 are then suspended on a lock that the main thread posseses. The 
+ *  5 are then suspended on a lock that the main thread posseses. The
  *  'threads' command is issued at this point. The test passes if
  *  only 'MyThreads-1' and 'MyThreads-3' are reported.
  *
