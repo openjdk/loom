@@ -182,12 +182,8 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
     /**
      * Start the Finalizer thread as a daemon thread.
      */
-    static void startFinalizerThread() {
+    static void startFinalizerThread(ThreadGroup tg) {
         if (ENABLED) {
-            ThreadGroup tg = Thread.currentThread().getThreadGroup();
-            for (ThreadGroup tgn = tg;
-                 tgn != null;
-                 tg = tgn, tgn = tg.getParent());
             Thread finalizer = new FinalizerThread(tg);
             finalizer.setPriority(Thread.MAX_PRIORITY - 2);
             finalizer.setDaemon(true);
