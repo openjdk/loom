@@ -268,7 +268,6 @@ public:
   static const int align_wiggle; // size, in words, of maximum shift in frame position due to alignment
 
   static oop get_continuation(JavaThread* thread);
-  static inline frame last_frame(JavaThread* thread);
   static bool stack_overflow_check(JavaThread* thread, int size, address sp);
 
   static inline void clear_anchor(JavaThread* thread);

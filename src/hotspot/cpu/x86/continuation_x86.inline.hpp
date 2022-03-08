@@ -80,20 +80,6 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
-// creates the yield stub frame faster than JavaThread::last_frame
-inline frame ContinuationHelper::last_frame(JavaThread* thread) {
-  JavaFrameAnchor* anchor = thread->frame_anchor();
-  assert (anchor->last_Java_sp() != nullptr, "");
-  assert (anchor->last_Java_pc() != nullptr, "");
-
-  assert (StubRoutines::cont_doYield_stub()->contains(anchor->last_Java_pc()), "");
-  assert (StubRoutines::cont_doYield_stub()->oop_maps()->count() == 1, "");
-
-  return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(), nullptr, nullptr, true);
-  // return frame(anchor->last_Java_sp(), anchor->last_Java_sp(), anchor->last_Java_fp(), anchor->last_Java_pc(),
-  //   StubRoutines::cont_doYield_stub(), StubRoutines::cont_doYield_stub()->oop_map_for_slot(0, anchor->last_Java_pc()), true);
-}
-
 frame ContinuationEntry::to_frame() {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
