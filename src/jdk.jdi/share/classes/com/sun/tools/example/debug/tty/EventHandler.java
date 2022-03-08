@@ -110,9 +110,11 @@ public class EventHandler implements Runnable {
             eventThread = ((LocatableEvent)event).thread();
         }
         if (eventThread != null) {
-            // This is a vthread we haven't seen before, so add it to our list.
+            // This might be a vthread we haven't seen before, so add it to the list.
             boolean added = ThreadInfo.addThread(eventThread);
             if (added) {
+                // If added, it should be a vthread. Platform threads are always added
+                // when the ThreadStart event arrives, so should already be in the list.
                 assert eventThread.isVirtual();
             }
             // If we added it, we need to make sure it eventually gets removed. Usually
