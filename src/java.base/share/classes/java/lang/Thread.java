@@ -842,8 +842,11 @@ public class Thread implements Runnable {
          * ThreadLocal thread-local} variables. The default is to allow. If not allowed,
          * then any attempt by the thread to set a value for a thread-local with the
          * {@link ThreadLocal#set(Object) set} method throws {@code
-         * UnsupportedOperationException} and the {@link ThreadLocal#get() get} method
-         * always returns the {@linkplain ThreadLocal#initialValue() initial-value}.
+         * UnsupportedOperationException}. Any attempt to set the thread's context
+         * class loader with {@link Thread#setContextClassLoader(ClassLoader)
+         * setContextClassLoader} also throws. The {@link ThreadLocal#get() get} method
+         * always returns the {@linkplain ThreadLocal#initialValue() initial-value}
+         * when thread locals are not allowed.
          *
          * @apiNote This method is intended for cases where there are a large number of
          * threads and where potentially unbounded memory usage due to thread locals is
