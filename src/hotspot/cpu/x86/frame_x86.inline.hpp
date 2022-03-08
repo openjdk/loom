@@ -333,12 +333,7 @@ PRAGMA_NONNULL_IGNORED
 inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop *)map->location(rax->as_VMReg(), sp());
   guarantee(result_adr != NULL, "bad register save location");
-  oop result = *result_adr;
-
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  result = NativeAccess<>::oop_load(&result);
-
-  return result;
+  return *result_adr;
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {

@@ -593,8 +593,6 @@ oop SharedRuntime::retrieve_receiver( Symbol* sig, frame caller ) {
   int args_size = ArgumentSizeComputer(sig).size() + 1;
   assert(args_size <= caller.interpreter_frame_expression_stack_size(), "receiver must be on interpreter stack");
   oop result = cast_to_oop(*caller.interpreter_frame_tos_at(args_size - 1));
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  result = NativeAccess<>::oop_load(&result);
   assert(Universe::heap()->is_in(result) && oopDesc::is_oop(result), "receiver must be an oop");
   return result;
 }

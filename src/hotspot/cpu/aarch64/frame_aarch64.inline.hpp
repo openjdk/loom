@@ -347,12 +347,7 @@ inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop *)map->location(r0->as_VMReg(), sp());
   PRAGMA_DIAG_POP
   guarantee(result_adr != NULL, "bad register save location");
-  oop result = *result_adr;
-
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  result = NativeAccess<>::oop_load(&result);
-
-  return result;
+  return *result_adr;
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {

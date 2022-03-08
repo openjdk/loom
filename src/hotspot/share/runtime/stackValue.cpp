@@ -42,6 +42,17 @@
 template StackValue* StackValue::create_stack_value(ScopeValue*, address, const RegisterMap*);
 template StackValue* StackValue::create_stack_value(ScopeValue*, address, const SmallRegisterMap*);
 
+template <typename OopT>
+static oop read_oop_local(OopT* p) {
+  // We can't do a native access directly from p because load barriers
+  // may self-heal. If that happens on a base pointer for compressed oops,
+  // then there will be a crash later on. Only the stack watermark API is
+  // allowed to heal oops, because it heals derived pointers before their
+  // corresponding base pointers.
+  oop obj = RawAccess<>::oop_load(p);
+  return NativeAccess<>::oop_load(&obj);
+}
+
 template<typename RegisterMapT>
 StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map) {
   if (sv->is_location()) {
@@ -107,11 +118,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, c
         value.noop = *(narrowOop*) value_addr;
       }
       // Decode narrowoop
-      oop val = CompressedOops::decode(value.noop);
-      // Deoptimization must make sure all oops have passed load barriers
-      // TODO: Erik: remove after integration with concurrent stack scanning
-      // TODO: HeapAccess when in_cont?
-      val = NativeAccess<>::oop_load(&val);
+      oop val = read_oop_local(&value.noop);
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);
     }
@@ -132,9 +139,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, c
          val = (oop)NULL;
       }
 #endif
-      // Deoptimization must make sure all oops have passed load barriers
-      // TODO: Erik: remove after integration with concurrent stack scanning
-      val = NativeAccess<>::oop_load(&val);
+      val = read_oop_local(&val);
       assert(oopDesc::is_oop_or_null(val), "bad oop found at " INTPTR_FORMAT, p2i(value_addr));
       Handle h(Thread::current(), val); // Wrap a handle around the oop
       return new StackValue(h);
