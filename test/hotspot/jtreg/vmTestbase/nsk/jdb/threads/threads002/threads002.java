@@ -43,7 +43,8 @@
  * @run main/othervm
  *      nsk.jdb.threads.threads002.threads002
  *      -arch=${os.family}-${os.simpleArch}
- *      -waittime=5 -verbose
+ *      -waittime=5
+ *      -verbose
  *      -debugee.vmkind=java
  *      -transport.address=dynamic
  *      -jdb=${test.jdk}/bin/jdb

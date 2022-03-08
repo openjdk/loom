@@ -50,7 +50,8 @@
  * @run main/othervm
  *      nsk.jdb.kill.kill001.kill001
  *      -arch=${os.family}-${os.simpleArch}
- *      -waittime=1 -verbose
+ *      -waittime=1 
+ *      -verbose
  *      -debugee.vmkind=java
  *      -transport.address=dynamic
  *      -jdb=${test.jdk}/bin/jdb
