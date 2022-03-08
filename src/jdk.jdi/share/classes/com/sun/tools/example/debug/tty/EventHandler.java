@@ -104,10 +104,10 @@ public class EventHandler implements Runnable {
          * See if the event thread is a vthread that we need to start tracking.
          */
         ThreadReference eventThread = null;
-        if (event instanceof ClassPrepareEvent) {
-            eventThread = ((ClassPrepareEvent)event).thread();
-        } else if (event instanceof LocatableEvent) {
-            eventThread = ((LocatableEvent)event).thread();
+        if (event instanceof ClassPrepareEvent evt) {
+            eventThread = evt.thread();
+        } else if (event instanceof LocatableEvent evt) {
+            eventThread = evt.thread();
         }
         if (eventThread != null) {
             // This might be a vthread we haven't seen before, so add it to the list.
