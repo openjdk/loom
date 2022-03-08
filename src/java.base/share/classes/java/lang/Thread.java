@@ -1912,10 +1912,10 @@ public class Thread implements Runnable {
      * @return  this thread's thread group.
      */
     public final ThreadGroup getThreadGroup() {
-        if (threadState() == State.TERMINATED) {
-            return null;
-        } else {
+        if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
             return isVirtual() ? VirtualThreads.THREAD_GROUP : holder.group;
+        } else {
+            return null;   // terminated
         }
     }
 
