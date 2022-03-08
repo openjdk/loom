@@ -101,23 +101,8 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
 }
 
 /////
-
-template <typename ConfigT>
-inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
-  stackChunkOop chunk = _cont.tail();
-  assert (chunk->is_in_chunk(hf.sp() - 1), "");
-  assert (chunk->is_in_chunk(hf.sp() - frame::sender_sp_offset), "");
-
-  *(hf.sp() - 1) = (intptr_t)hf.pc();
-
-  intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
-  *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
-                                       : (intptr_t)hf.fp();
-}
-
-template <typename ConfigT>
 template<typename FKind>
-inline frame Freeze<ConfigT>::sender(const frame& f) {
+inline frame FreezeBase::sender(const frame& f) {
   assert (FKind::is_instance(f), "");
   if (FKind::interpreted) {
     return frame(f.sender_sp(), f.interpreter_frame_sender_sp(), f.link(), f.sender_pc());
@@ -133,6 +118,40 @@ inline frame Freeze<ConfigT>::sender(const frame& f) {
   return sender_cb != nullptr
     ? frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb, slot == -1 ? nullptr : sender_cb->oop_map_for_slot(slot, sender_pc))
     : frame(sender_sp, sender_sp, *link_addr, sender_pc);
+}
+
+inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+  intptr_t* vfp = f.fp();
+  intptr_t* hfp = hf.fp();
+  assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
+  assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0)
+    || (f.unextended_sp() == f.sp()), "");
+  assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
+
+  // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
+  *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
+  *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
+
+  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
+
+  assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
+  assert (hf.unextended_sp() == (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_locals_offset), "");
+}
+
+template <typename ConfigT>
+inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
+  stackChunkOop chunk = _cont.tail();
+  assert (chunk->is_in_chunk(hf.sp() - 1), "");
+  assert (chunk->is_in_chunk(hf.sp() - frame::sender_sp_offset), "");
+
+  *(hf.sp() - 1) = (intptr_t)hf.pc();
+
+  intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
+  *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
+                                       : (intptr_t)hf.fp();
 }
 
 template <typename ConfigT>
@@ -175,28 +194,6 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 }
 
 template <typename ConfigT>
-inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
-  intptr_t* vfp = f.fp();
-  intptr_t* hfp = hf.fp();
-  assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0)
-    || (f.unextended_sp() == f.sp()), "");
-  assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
-
-  // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
-  *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
-  *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
-
-  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
-
-  assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
-  assert (hf.unextended_sp() == (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            >  (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_locals_offset), "");
-}
-
-template <typename ConfigT>
 template <typename FKind, bool bottom>
 inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
   if (caller.is_interpreted_frame()) {
@@ -210,6 +207,18 @@ inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
 template <typename ConfigT>
 inline void Freeze<ConfigT>::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
   *(vsp - frame::sender_sp_offset) = *(hsp - frame::sender_sp_offset);
+}
+
+////////
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+  intptr_t* vfp = f.fp();
+
+  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
+  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
+}
+
+inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+  *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = bottom - 1;
 }
 
 template <typename ConfigT>
@@ -262,24 +271,6 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
       : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
   }
-}
-
-template <typename ConfigT>
-inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
-  *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = bottom - 1;
-}
-
-static inline void derelativize(intptr_t* const fp, int offset) {
-  intptr_t* addr = fp + offset;
-  *addr = (intptr_t)(fp + *addr);
-}
-
-template <typename ConfigT>
-inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
-  intptr_t* vfp = f.fp();
-
-  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
-  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
 }
 
 template <typename ConfigT>

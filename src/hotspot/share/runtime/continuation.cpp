@@ -993,8 +993,21 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
 /////////////// FREEZE ////
 
+class FreezeBase { // avoids the template of the Freeze class
+protected:
+  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
+  template<typename FKind> static inline frame sender(const frame& f);
+
+  static inline void relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
+    assert (*(hfp + offset) == *(vfp + offset), "");
+    intptr_t* addr = hfp + offset;
+    intptr_t value = *(intptr_t**)addr - vfp;
+    *addr = value;
+  }
+};
+
 template <typename ConfigT>
-class Freeze {
+class Freeze : public FreezeBase {
 private:
   JavaThread* const _thread;
   ContMirror& _cont;
@@ -1014,9 +1027,6 @@ private:
   template <typename FKind, bool bottom> inline void patch_pd(frame& callee, const frame& caller);
   inline void patch_chunk_pd(intptr_t* vsp, intptr_t* hsp);
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
-  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
-
-  template<typename FKind> static inline frame sender(const frame& f);
 
 public:
 
@@ -1751,13 +1761,6 @@ public:
     assert(_cont.chunk_invariant(tty), "");
   }
 
-  static inline void relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
-    assert (*(hfp + offset) == *(vfp + offset), "");
-    intptr_t* addr = hfp + offset;
-    intptr_t value = *(intptr_t**)addr - vfp;
-    *addr = value;
-  }
-
   inline bool stack_overflow() { // detect stack overflow in recursive native code
     JavaThread* t = !_preempt ? _thread : JavaThread::current();
     assert (t == JavaThread::current(), "");
@@ -1899,6 +1902,7 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   return false;
 }
 #endif
+
 static inline bool can_freeze_fast(JavaThread* thread) {
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
   // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
@@ -2148,8 +2152,19 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   return size;
 }
 
+class ThawBase { // avoids the template of the Thaw class
+protected:
+  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
+  static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
+
+  static inline void derelativize(intptr_t* const fp, int offset) {
+    intptr_t* addr = fp + offset;
+    *addr = (intptr_t)(fp + *addr);
+  }
+};
+
 template <typename ConfigT>
-class Thaw {
+class Thaw : public ThawBase {
 private:
   JavaThread* _thread;
   ContMirror& _cont;
@@ -2170,8 +2185,6 @@ private:
   void patch_chunk_pd(intptr_t* sp);
   inline void prefetch_chunk_pd(void* start, int size_words);
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
-  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
-  static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
   void maybe_set_fastpath(intptr_t* sp) { if (sp > _fastpath) _fastpath = sp; }
 
 public:
