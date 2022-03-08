@@ -111,8 +111,10 @@ public class EventHandler implements Runnable {
         }
         if (eventThread != null) {
             // This is a vthread we haven't seen before, so add it to our list.
-            assert eventThread.isVirtual();
             boolean added = ThreadInfo.addThread(eventThread);
+            if (added) {
+                assert eventThread.isVirtual();
+            }
             // If we added it, we need to make sure it eventually gets removed. Usually
             // this happens when the ThreadDeathEvent comes in, but if !trackAllVthreads,
             // then the ThreadDeathReqest was setup to filter out vthreads. So we'll need
@@ -122,7 +124,6 @@ public class EventHandler implements Runnable {
                 ThreadDeathRequest tdr = erm.createThreadDeathRequest();
                 tdr.addThreadFilter(eventThread);
                 tdr.enable();
-                //System.out.println("TDR added: " + thread);
             }
         }
 
@@ -303,7 +304,6 @@ public class EventHandler implements Runnable {
             // just to remove this one vthread.
             EventRequestManager erm = Env.vm().eventRequestManager();
             erm.deleteEventRequest(event.request());
-            //System.out.println("TDR removed: " + thread);
         }
         return false;
     }

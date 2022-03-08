@@ -71,10 +71,9 @@ public class TTY implements EventNotifier {
      * The name of this tool.
      */
     private static final String progname = "jdb";
+    private static boolean trackAllVthreads;
 
-    private volatile boolean shuttingDown = false;
-
-    private static boolean trackAllVthreads = false;
+    private volatile boolean shuttingDown;
 
     /**
      * The number of the next source line to target for {@code list}, if any.
@@ -997,6 +996,8 @@ public class TTY implements EventNotifier {
                    token.startsWith("-ss") || token.startsWith("-oss") ) {
 
                 javaArgs = addArgument(javaArgs, token);
+            } else if (token.startsWith("-R")) {
+                javaArgs = addArgument(javaArgs, token.substring(2));
             } else if (token.equals("-tclassic")) {
                 usageError("Classic VM no longer supported.");
                 return;
