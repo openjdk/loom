@@ -200,10 +200,9 @@ public interface StackFrame extends Mirror, Locatable {
      * according to the rules described in {@link #visibleVariables}.
      * <p>
      * In the case of virtual threads, the target VM supports setting values
-     * of local variables when this frame is the topmost frame and the
-     * thread is suspended at a breakpoint or single step event. The target VM
-     * may support setting local variables in other cases.
-     * TDB on exception to throw.
+     * of local variables when this frame is the topmost frame and the thread
+     * is suspended at a breakpoint or single step event. The target VM may
+     * support setting local variables in other cases.
      * <p>
      * Object values must be assignment compatible with the variable type
      * (This implies that the variable type must be loaded through the
@@ -224,6 +223,9 @@ public interface StackFrame extends Mirror, Locatable {
      * @throws InvalidStackFrameException if this stack frame has become
      * invalid. Once the frame's thread is resumed, the stack frame is
      * no longer valid.
+     * @throws OpaqueFrameException if this frame is on the call stack of a
+     * virtual thread and the target VM does not support setting the value of
+     * local variables in this frame.
      * @throws VMCannotBeModifiedException if the VirtualMachine is read-only.
      * @see VirtualMachine#canBeModified()
      */

@@ -2148,7 +2148,10 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error THREAD_NOT_ALIVE)
             (Error OPAQUE_FRAME      "Attempted to return early from "
                                      "a frame corresponding to a native "
-                                     "method. Or the implementation is "
+                                     "method. "
+                                     "The thread is a virtual thread and the target "
+                                     "VM is unable force its current frame to return. "
+                                     "Or the implementation is "
                                      "unable to provide this functionality "
                                      "on this frame.")
             (Error NO_MORE_FRAMES)
@@ -2648,7 +2651,7 @@ JDWP "Java(tm) Debug Wire Protocol"
         "signature without access to the local variable table information.) "
         "<p>"
         "If the thread is a virtual thread then this command can be used to set "
-        "the value of local variables in the the topmost frame when the thread is "
+        "the value of local variables in the the top-most frame when the thread is "
         "suspended at a breakpoint or single step event. The target VM may support "
         "setting local variables in other cases."
         (Out
@@ -2666,9 +2669,10 @@ JDWP "Java(tm) Debug Wire Protocol"
         (ErrorSet
             (Error INVALID_THREAD)
             (Error INVALID_OBJECT)
-            (Error INVALID_FRAMEID   "Invalid frameID, or the thread is a virtual thread "
-                                     "and the implementation does not support setting the "
-                                     "value of local variables in the frame.")
+            (Error INVALID_FRAMEID)
+            (Error OPAQUE_FRAME      "The thread is a virtual thread and the target VM "
+                                     "does not support setting the value of local "
+                                     "variables in the frame.")
             (Error VM_DEAD)
         )
     )
@@ -2719,6 +2723,10 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error THREAD_NOT_SUSPENDED)
             (Error NO_MORE_FRAMES)
             (Error INVALID_FRAMEID)
+            (Error OPAQUE_FRAME      "If one or more of the frames to pop is a native "
+                                     "method or its caller is a native method, or the "
+                                     "thread is a virtual thread and the implementation "
+                                     "is unable to pop the frames.")
             (Error NOT_IMPLEMENTED)
             (Error VM_DEAD)
         )

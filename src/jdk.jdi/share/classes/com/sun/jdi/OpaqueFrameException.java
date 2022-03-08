@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,20 +26,26 @@
 package com.sun.jdi;
 
 /**
- * Thrown to indicate an operation cannot be completed because
- * it is not valid for a native method.
+ * Thrown to indicate an operation could not be performed on a frame.
  *
- * @author Gordon Hirsch
- * @since  1.3
+ * @since 19
  */
-public class NativeMethodException extends OpaqueFrameException {
-    private static final long serialVersionUID = 3924951669039469992L;
+public class OpaqueFrameException extends RuntimeException {
+    private static final long serialVersionUID = -6590097682282386695L;
 
-    public NativeMethodException() {
+    /**
+     * Constructs a OpaqueFrameException with no detail message.
+     */
+    public OpaqueFrameException() {
         super();
     }
 
-    public NativeMethodException(String message) {
+    /**
+     * Constructs a OpaqueFrameException with the given detail message.
+     *
+     * @param message the detail messag, can be {@code null}
+     */
+    public OpaqueFrameException(String message) {
         super(message);
     }
 }

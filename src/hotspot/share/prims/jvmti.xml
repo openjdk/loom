@@ -2964,8 +2964,6 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           <jthread/>
             <description>
               The thread whose current frame is to be popped.
-              The <code>thread</code> may not be a virtual thread. Otherwise, the error code
-              <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
             </description>
         </param>
       </parameters>
@@ -2974,14 +2972,15 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           Called or calling method is a native method.
           The implementation is unable to pop this frame.
         </error>
+        <error id="JVMTI_ERROR_OPAQUE_FRAME">
+          The thread is a virtual thread and the implementation is unable
+          to pop this frame.
+        </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
         </error>
         <error id="JVMTI_ERROR_NO_MORE_FRAMES">
           There are less than two stack frames on the call stack.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
       </errors>
     </function>
@@ -3083,8 +3082,6 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       for the specified thread at
       the time the function is called.
       <p/>
-      The <code>thread</code> may not be a virtual thread. Otherwise, the error code
-      <errorlink id="JVMTI_ERROR_INVALID_THREAD"></errorlink> will be returned.
       The specified thread must be suspended or must be the current thread.
       The return occurs when execution of Java programming
       language code is resumed on this thread.
@@ -3141,6 +3138,8 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Attempted to return early from a frame
           corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
           Or the implementation is unable to provide
           this functionality on this frame.
         </error>
@@ -3151,9 +3150,6 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The supplied <paramlink id="value"/> is not compatible with the
           result type of the called method.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3194,6 +3190,8 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Attempted to return early from a frame
           corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
           Or the implementation is unable to provide
           this functionality on this frame.
         </error>
@@ -3202,9 +3200,6 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
           <code>int</code>, <code>short</code>,
           <code>char</code>, <code>byte</code>, or
           <code>boolean</code>.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3243,14 +3238,13 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Attempted to return early from a frame
           corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
           Or the implementation is unable to provide
           this functionality on this frame.
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>long</code>.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3289,14 +3283,13 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Attempted to return early from a frame
           corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
           Or the implementation is unable to provide
           this functionality on this frame.
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>float</code>.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3333,14 +3326,15 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </parameters>
       <errors>
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
-          Attempted to return early from a frame corresponding to a native method.
-          Or the implementation is unable to provide this functionality on this frame.
+          Attempted to return early from a frame
+          corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
+          Or the implementation is unable to provide
+          this functionality on this frame.
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The result type of the called method is not <code>double</code>.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
@@ -3373,14 +3367,13 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
         <error id="JVMTI_ERROR_OPAQUE_FRAME">
           Attempted to return early from a frame
           corresponding to a native method.
+          The thread is a virtual thread and the implementation is
+          unable to force its current frame to return.
           Or the implementation is unable to provide
           this functionality on this frame.
         </error>
         <error id="JVMTI_ERROR_TYPE_MISMATCH">
           The called method has a result type.
-        </error>
-        <error id="JVMTI_ERROR_INVALID_THREAD">
-          <paramlink id="thread"/> is a virtual thread.
         </error>
         <error id="JVMTI_ERROR_THREAD_NOT_SUSPENDED">
           Thread was not suspended and was not the current thread.
