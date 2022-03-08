@@ -131,8 +131,10 @@ public class kill001 extends JdbTest {
 
         // Continue each of the threads that received the "kill" exception. Not needed
         // for the vthread case since they are not actually killed.
-        if (!vthreadMode) for (int i = 0; i < numThreads; i++) {
-            reply = jdb.receiveReplyFor(JdbCommand.cont);
+        if (!vthreadMode) {
+            for (int i = 0; i < numThreads; i++) {
+                reply = jdb.receiveReplyFor(JdbCommand.cont);
+            }
         }
 
         // make sure the debugger is at a breakpoint
