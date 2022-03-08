@@ -414,7 +414,6 @@ public:
 
 #ifdef ASSERT
   inline bool is_entry_frame(const frame& f);
-  bool has_mixed_frames();
   bool chunk_invariant(outputStream* st);
 #endif
 };
@@ -508,11 +507,6 @@ template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* j
 #ifdef ASSERT
 inline bool ContMirror::is_entry_frame(const frame& f) {
   return f.sp() == entrySP();
-}
-
-bool ContMirror::has_mixed_frames() {
-  for (stackChunkOop c = tail(); c != nullptr; c = c->parent()) if (c->has_mixed_frames()) return true;
-  return false;
 }
 
 bool ContMirror::chunk_invariant(outputStream* st) {
