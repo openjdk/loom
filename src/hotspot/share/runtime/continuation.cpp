@@ -2848,12 +2848,6 @@ static bool is_good_oop(oop o) {
   return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass();
 }
 
-template <class P>
-static void verify_oop_at(P* p) {
-  oop obj = (oop)NativeAccess<>::oop_load(p);
-  assert(oopDesc::is_oop_or_null(obj), "");
-}
-
 class ThawVerifyOopsClosure: public OopClosure {
   intptr_t* _p;
   outputStream* _st;
