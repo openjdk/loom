@@ -50,8 +50,7 @@ class RecordComponent;
   f(java_lang_Throwable) \
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
-  f(java_lang_Thread_VirtualThreads) \
-  f(java_lang_Thread_ContextClassLoaders) \
+  f(java_lang_Thread_Constants) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
@@ -520,35 +519,21 @@ class java_lang_Thread_FieldHolder : AllStatic {
   friend class JavaClasses;
 };
 
-// Interface to java.lang.Thread$VirtualThreads objects
+// Interface to java.lang.Thread$Constants objects
 
-class java_lang_Thread_VirtualThreads : AllStatic {
+class java_lang_Thread_Constants : AllStatic {
  private:
-  static int _static_THREAD_GROUP_offset;
+  static int _static_VTHREAD_GROUP_offset;
+  static int _static_NOT_SUPPORTED_CLASSLOADER_offset;
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
  public:
-  static oop get_THREAD_GROUP();
+  static oop get_VTHREAD_GROUP();
+  static oop get_NOT_SUPPORTED_CLASSLOADER();
 
   friend class JavaClasses;
 };
-
-
-// Interface to java.lang.Thread$ContextClassLoaders objects
-
-class java_lang_Thread_ContextClassLoaders : AllStatic {
- private:
-  static int _static_NOT_SUPPORTED_offset;
-
-  static void compute_offsets();
-  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
- public:
-  static oop get_NOT_SUPPORTED();
-
-  friend class JavaClasses;
-};
-
 
 // Interface to java.lang.ThreadGroup objects
 

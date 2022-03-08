@@ -63,8 +63,7 @@
   template(java_lang_StringUTF16,                     "java/lang/StringUTF16")                    \
   template(java_lang_Thread,                          "java/lang/Thread")                         \
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
-  template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
-  template(java_lang_Thread_ContextClassLoaders,      "java/lang/Thread$ContextClassLoaders")     \
+  template(java_lang_Thread_Constants,                "java/lang/Thread$Constants")               \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \

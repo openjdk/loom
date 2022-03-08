@@ -1257,7 +1257,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
     if (java_lang_VirtualThread::state(thread_obj()) == java_lang_VirtualThread::TERMINATED) {
       thread_group = Handle(current_thread, NULL);
     } else {
-      thread_group = Handle(current_thread, java_lang_Thread_VirtualThreads::get_THREAD_GROUP());
+      thread_group = Handle(current_thread, java_lang_Thread_Constants::get_VTHREAD_GROUP());
     }
   } else {
     priority = java_lang_Thread::priority(thread_obj());
@@ -1273,7 +1273,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   if (loader != NULL) {
     // Do the same as Thread.getContextClassLoader and set context_class_loader to be
     // the system class loader then the field value is the "not supported" placeholder.
-    if (loader == java_lang_Thread_ContextClassLoaders::get_NOT_SUPPORTED()) {
+    if (loader == java_lang_Thread_Constants::get_NOT_SUPPORTED_CLASSLOADER()) {
       loader = SystemDictionary::java_system_loader();
     }
   }

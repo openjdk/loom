@@ -1981,53 +1981,36 @@ JavaThreadStatus java_lang_Thread_FieldHolder::get_thread_status(oop holder) {
 }
 
 
-int java_lang_Thread_VirtualThreads::_static_THREAD_GROUP_offset = 0;
+int java_lang_Thread_Constants::_static_VTHREAD_GROUP_offset = 0;
+int java_lang_Thread_Constants::_static_NOT_SUPPORTED_CLASSLOADER_offset = 0;
 
-#define THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(macro) \
-  macro(_static_THREAD_GROUP_offset, k, "THREAD_GROUP", threadgroup_signature, true);
+#define THREAD_CONSTANTS_STATIC_FIELDS_DO(macro) \
+  macro(_static_VTHREAD_GROUP_offset, k, "VTHREAD_GROUP", threadgroup_signature, true); \
+  macro(_static_NOT_SUPPORTED_CLASSLOADER_offset, k, "NOT_SUPPORTED_CLASSLOADER", classloader_signature, true);
 
-void java_lang_Thread_VirtualThreads::compute_offsets() {
-  assert(_static_THREAD_GROUP_offset == 0, "offsets should be initialized only once");
+void java_lang_Thread_Constants::compute_offsets() {
+  assert(_static_VTHREAD_GROUP_offset == 0, "offsets should be initialized only once");
 
-  InstanceKlass* k = vmClasses::Thread_VirtualThreads_klass();
-  THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+  InstanceKlass* k = vmClasses::Thread_Constants_klass();
+  THREAD_CONSTANTS_STATIC_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
 #if INCLUDE_CDS
-void java_lang_Thread_VirtualThreads::serialize_offsets(SerializeClosure* f) {
-  THREAD_VIRTUAL_THREADS_STATIC_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+void java_lang_Thread_Constants::serialize_offsets(SerializeClosure* f) {
+  THREAD_CONSTANTS_STATIC_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
-oop java_lang_Thread_VirtualThreads::get_THREAD_GROUP() {
-  InstanceKlass* k = vmClasses::Thread_VirtualThreads_klass();
+oop java_lang_Thread_Constants::get_VTHREAD_GROUP() {
+  InstanceKlass* k = vmClasses::Thread_Constants_klass();
   oop base = k->static_field_base_raw();
-  return base->obj_field(_static_THREAD_GROUP_offset);
+  return base->obj_field(_static_VTHREAD_GROUP_offset);
 }
 
-
-int java_lang_Thread_ContextClassLoaders::_static_NOT_SUPPORTED_offset = 0;
-
-#define THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(macro) \
-  macro(_static_NOT_SUPPORTED_offset, k, "NOT_SUPPORTED", classloader_signature, true);
-
-void java_lang_Thread_ContextClassLoaders::compute_offsets() {
-  assert(_static_NOT_SUPPORTED_offset == 0, "offsets should be initialized only once");
-
-  InstanceKlass* k = vmClasses::Thread_ContextClassLoaders_klass();
-  THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(FIELD_COMPUTE_OFFSET);
-}
-
-#if INCLUDE_CDS
-void java_lang_Thread_ContextClassLoaders::serialize_offsets(SerializeClosure* f) {
-  THREAD_CLASS_LOADERS_STATIC_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
-}
-#endif
-
-oop java_lang_Thread_ContextClassLoaders::get_NOT_SUPPORTED() {
-  InstanceKlass* k = vmClasses::Thread_ContextClassLoaders_klass();
+oop java_lang_Thread_Constants::get_NOT_SUPPORTED_CLASSLOADER() {
+  InstanceKlass* k = vmClasses::Thread_Constants_klass();
   oop base = k->static_field_base_raw();
-  return base->obj_field(_static_NOT_SUPPORTED_offset);
+  return base->obj_field(_static_NOT_SUPPORTED_CLASSLOADER_offset);
 }
 
 int java_lang_Thread::_holder_offset;

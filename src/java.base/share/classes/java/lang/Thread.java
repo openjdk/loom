@@ -646,7 +646,7 @@ public class Thread implements Runnable {
             if ((characteristics & NO_THREAD_LOCALS) != 0) {
                 this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
                 this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-                this.contextClassLoader = ContextClassLoaders.NOT_SUPPORTED;
+                this.contextClassLoader = Constants.NOT_SUPPORTED_CLASSLOADER;
             } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
                 ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
                 if (parentMap != null
@@ -691,13 +691,13 @@ public class Thread implements Runnable {
 
         this.name = (name != null) ? name : "<unnamed>";
         this.tid = ThreadIdentifiers.next();
-        this.inheritedAccessControlContext = VirtualThreads.ACCESS_CONTROL_CONTEXT;
+        this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
 
         // thread locals
         if ((characteristics & NO_THREAD_LOCALS) != 0) {
             this.threadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
-            this.contextClassLoader = ContextClassLoaders.NOT_SUPPORTED;
+            this.contextClassLoader = Constants.NOT_SUPPORTED_CLASSLOADER;
         } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
@@ -1913,7 +1913,7 @@ public class Thread implements Runnable {
      */
     public final ThreadGroup getThreadGroup() {
         if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
-            return isVirtual() ? VirtualThreads.THREAD_GROUP : holder.group;
+            return isVirtual() ? Constants.VTHREAD_GROUP : holder.group;
         } else {
             return null;   // terminated
         }
@@ -1925,7 +1925,7 @@ public class Thread implements Runnable {
     static ThreadGroup getCurrentThreadGroup() {
         Thread thread = Thread.currentThread();
         if (thread.isVirtual()) {
-            return VirtualThreads.THREAD_GROUP;
+            return Constants.VTHREAD_GROUP;
         } else {
             return thread.holder.group;
         }
@@ -2358,20 +2358,6 @@ public class Thread implements Runnable {
         contextClassLoader = cl;
     }
 
-    @SuppressWarnings("removal")
-    private static class ContextClassLoaders {
-        static final ClassLoader NOT_SUPPORTED;
-        static {
-            PrivilegedAction<ClassLoader> pa = new PrivilegedAction<>() {
-                @Override
-                public ClassLoader run() {
-                    return new ClassLoader(null) { };
-                }
-            };
-            NOT_SUPPORTED = AccessController.doPrivileged(pa);
-        }
-    }
-
     /**
      * Returns true if the given ClassLoader is a "supported" class loader. All
      * class loaders, except ClassLoaders.NOT_SUPPORTED, are considered supported.
@@ -2383,7 +2369,7 @@ public class Thread implements Runnable {
             return true;
         if (loader == jdk.internal.loader.ClassLoaders.appClassLoader())
             return true;
-        return loader != ContextClassLoaders.NOT_SUPPORTED;
+        return loader != Constants.NOT_SUPPORTED_CLASSLOADER;
     }
 
     /**
@@ -2905,17 +2891,23 @@ public class Thread implements Runnable {
         getUncaughtExceptionHandler().uncaughtException(this, e);
     }
 
+    /**
+     * Holder class for constants.
+     */
     @SuppressWarnings("removal")
-    private static class VirtualThreads {
+    private static class Constants {
         // Thread group for virtual threads.
-        static final ThreadGroup THREAD_GROUP;
+        static final ThreadGroup VTHREAD_GROUP;
 
         // AccessControlContext that doesn't support any permissions.
         @SuppressWarnings("removal")
-        static final AccessControlContext ACCESS_CONTROL_CONTEXT;
+        static final AccessControlContext NO_PERMISSIONS_ACC;
+
+        // Placeholder TCCL when thread locals not supported
+        static final ClassLoader NOT_SUPPORTED_CLASSLOADER;
 
         static {
-            PrivilegedAction<ThreadGroup> pa = new PrivilegedAction<>() {
+            var getThreadGroup  = new PrivilegedAction<ThreadGroup>() {
                 @Override
                 public ThreadGroup run() {
                     ThreadGroup parent = Thread.currentCarrierThread().getThreadGroup();
@@ -2925,12 +2917,22 @@ public class Thread implements Runnable {
                 }
             };
             @SuppressWarnings("removal")
-            ThreadGroup root = AccessController.doPrivileged(pa);
-            THREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY, false);
+            ThreadGroup root = AccessController.doPrivileged(getThreadGroup);
+            VTHREAD_GROUP = new ThreadGroup(root, "VirtualThreads", NORM_PRIORITY, false);
 
-            ACCESS_CONTROL_CONTEXT = new AccessControlContext(new ProtectionDomain[] {
+            NO_PERMISSIONS_ACC = new AccessControlContext(new ProtectionDomain[] {
                 new ProtectionDomain(null, null)
             });
+
+            var createClassLoader = new PrivilegedAction<ClassLoader>() {
+                @Override
+                public ClassLoader run() {
+                    return new ClassLoader(null) { };
+                }
+            };
+            @SuppressWarnings("removal")
+            ClassLoader loader = AccessController.doPrivileged(createClassLoader);
+            NOT_SUPPORTED_CLASSLOADER = loader;
         }
     }
 

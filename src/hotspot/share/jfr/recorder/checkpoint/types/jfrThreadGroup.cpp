@@ -357,7 +357,7 @@ void JfrThreadGroup::write_thread_group_entries(JfrCheckpointWriter& writer) con
   writer.write_count(number_of_tg_entries + 1); // + VirtualThread group
   writer.write_key(1);      // 1 is reserved for VirtualThread group
   writer.write<traceid>(0); // parent
-  const oop vgroup = java_lang_Thread_VirtualThreads::get_THREAD_GROUP();
+  const oop vgroup = java_lang_Thread_Constants::get_VTHREAD_GROUP();
   assert(vgroup != (oop)NULL, "invariant");
   const char* const vgroup_name = java_lang_ThreadGroup::name(vgroup);
   assert(vgroup_name != NULL, "invariant");
