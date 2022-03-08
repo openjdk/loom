@@ -68,10 +68,7 @@ public:
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
 
-  static bool is_mounted(JavaThread* thread, oop cont_scope);
-
   static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp);
-  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
 
   static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
@@ -85,8 +82,6 @@ public:
   static oop continuation_scope(oop cont);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
-  static stackChunkOop last_nonempty_chunk(oop continuation);
-  static stackChunkOop continuation_parent_chunk(stackChunkOop chunk);
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
 
   // pins/unpins the innermost mounted continuation; returns true on success or false if there's no continuation or the operation failed
@@ -110,10 +105,6 @@ private:
 
 #ifdef ASSERT
 public:
-  static bool debug_is_stack_chunk(Klass* klass);
-  static bool debug_is_stack_chunk(oop obj);
-  static bool debug_is_continuation(Klass* klass);
-  static bool debug_is_continuation(oop obj);
   static bool debug_verify_continuation(oop cont);
   static void debug_print_continuation(oop cont, outputStream* st = NULL);
 #endif
@@ -192,10 +183,7 @@ public:
   }
 
   oop cont_oop() { return this != NULL ? continuation() : (oop)NULL; }
-  oop cont_raw() { return _cont; }
-  oop chunk()        { return _chunk; }
-  void set_continuation(oop c) { _cont = c;  }
-  void set_chunk(oop c)        { _chunk = c; }
+  oop chunk()    { return _chunk; }
 
 #ifdef ASSERT
   static bool assert_entry_frame_laid_out(JavaThread* thread);

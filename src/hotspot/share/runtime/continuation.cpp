@@ -288,11 +288,6 @@ public:
 
   static inline int frame_align_words(int size);
   static inline intptr_t* frame_align_pointer(intptr_t* sp);
-
-  template <copy_alignment = copy_alignment::DWORD_ALIGNED>
-  static inline void copy_from_stack(void* from, void* to, size_t size);
-  template <copy_alignment = copy_alignment::DWORD_ALIGNED>
-  static inline void copy_to_stack(void* from, void* to, size_t size);
 };
 
 oop ContinuationHelper::get_continuation(JavaThread* thread) {
@@ -391,7 +386,6 @@ public:
   oop mirror()                       { return _cont; }
   stackChunkOop tail() const         { return _tail; }
   void set_tail(stackChunkOop chunk) { _tail = chunk; }
-  inline void set_empty() { _tail = nullptr; }
 
   oop parent() { return jdk_internal_vm_Continuation::parent(_cont); }
   bool is_preempted() { return jdk_internal_vm_Continuation::is_preempted(_cont); }
@@ -410,7 +404,6 @@ public:
   const frame last_frame();
 
   stackChunkOop last_nonempty_chunk() const { return nonempty_chunk(_tail); }
-  stackChunkOop prev_nonempty_chunk(stackChunkOop chunk) const { return nonempty_chunk(chunk->parent()); }
   inline stackChunkOop nonempty_chunk(stackChunkOop chunk) const;
   stackChunkOop find_chunk_by_address(void* p) const;
 
@@ -725,10 +718,6 @@ bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap
   return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
 }
 
-bool Continuation::is_mounted(JavaThread* thread, oop cont_scope) {
-  return last_continuation(thread, cont_scope) != nullptr;
-}
-
 static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
   return cont->entry_sp() > sp;
 }
@@ -750,10 +739,6 @@ oop Continuation::get_continuation_for_sp(JavaThread* thread, intptr_t* const sp
   assert (thread != nullptr, "");
   ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
   return cont != nullptr ? cont->continuation() : (oop)nullptr;
-}
-
-oop Continuation::get_continuation_for_frame(JavaThread* thread, const frame& f) {
-  return get_continuation_for_sp(thread, f.unextended_sp());
 }
 
 bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
@@ -844,16 +829,6 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
   oop sc = continuation_scope(cont);
   assert(sc != nullptr, "");
   return sc == cont_scope;
-}
-
-stackChunkOop Continuation::last_nonempty_chunk(oop continuation) {
-  return ContMirror(continuation).last_nonempty_chunk();
-}
-
-stackChunkOop Continuation::continuation_parent_chunk(stackChunkOop chunk) {
-  assert(chunk->cont() != nullptr, "");
-  oop cont_parent = jdk_internal_vm_Continuation::parent(chunk->cont());
-  return cont_parent != nullptr ? Continuation::last_nonempty_chunk(cont_parent) : nullptr;
 }
 
 bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
@@ -978,22 +953,6 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
 }
 
 #ifdef ASSERT
-bool Continuation::debug_is_stack_chunk(Klass* k) {
-  return k->is_instance_klass() && InstanceKlass::cast(k)->is_stack_chunk_instance_klass();
-}
-
-bool Continuation::debug_is_stack_chunk(oop obj) {
-  return obj != (oop)nullptr && obj->is_stackChunk();
-}
-
-bool Continuation::debug_is_continuation(Klass* klass) {
-  return klass->is_subtype_of(vmClasses::Continuation_klass());
-}
-
-bool Continuation::debug_is_continuation(oop obj) {
-  return obj->is_a(vmClasses::Continuation_klass());
-}
-
 NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
   assert (contOop != (oop)nullptr, "");
@@ -1820,10 +1779,6 @@ public:
     chunk->set_sp(chunk->stack_size());
     chunk->set_pc(nullptr);
     chunk->set_argsize(0);
-  }
-
-  int remaining_in_chunk(stackChunkOop chunk) {
-    return chunk->stack_size() - chunk->sp();
   }
 
   stackChunkOop allocate_chunk(size_t stack_size) {

@@ -405,7 +405,7 @@ public:
 
 template <gc_type gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  assert (Continuation::debug_is_stack_chunk(chunk), "");
+  assert (chunk->is_stackChunk(), "");
 
   bool do_destructive_processing; // should really be `= closure.is_destructive()`, if we had such a thing
   if (gc == gc_type::CONCURRENT) {
