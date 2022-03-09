@@ -2681,8 +2681,9 @@ static void call_initPhase1(TRAPS) {
                                          vmSymbols::void_method_signature(), CHECK);
 }
 
-// Phase 2. Module system initialization and start reference handler threads.
-//     Only java.base classes can be loaded until phase 2 completes.
+// Phase 2. Module system initialization
+//     This will initialize the module system.  Only java.base classes
+//     can be loaded until phase 2 completes.
 //
 //     Call System.initPhase2 after the compiler initialization and jsr292
 //     classes get initialized because module initialization runs a lot of java

@@ -191,7 +191,6 @@ public abstract class Reference<T> {
     /* High-priority thread to enqueue pending References
      */
     private static class ReferenceHandler extends Thread {
-
         ReferenceHandler(ThreadGroup g, String name) {
             super(g, null, name, 0, false);
         }
@@ -313,8 +312,8 @@ public abstract class Reference<T> {
                 for (ThreadGroup tgn = tg;
                      tgn != null;
                      tg = tgn, tgn = tg.getParent());
-                Finalizer.startFinalizerThread(tg);
                 Reference.startReferenceHandlerThread(tg);
+                Finalizer.startFinalizerThread(tg);
             }
 
             @Override
