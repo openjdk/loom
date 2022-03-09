@@ -2193,7 +2193,6 @@ public final class System {
      */
     private static int initPhase2(boolean printToStderr, boolean printStackTrace) {
 
-        // initialize the module system
         try {
             bootLayer = ModuleBootstrap.boot();
         } catch (Exception | Error e) {

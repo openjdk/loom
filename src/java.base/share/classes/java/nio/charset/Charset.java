@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 
 package java.nio.charset;
 
-import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.nio.cs.ThreadLocalCoders;
 import sun.security.action.GetPropertyAction;
@@ -48,6 +47,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -371,13 +371,23 @@ public abstract class Charset
             };
     }
 
-    // gate to prevent recursive provider lookups
-    private static class Holder {
-        static final Gate LOOKUP_GATE = Gate.create();
-    }
+    private static class ThreadTracker {
+        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
 
-    private static Gate gate() {
-        return Holder.LOOKUP_GATE;
+        /**
+         * Adds the current thread to thread set. Returns true if
+         * added, false if already in the set.
+         */
+        static boolean tryBegin() {
+            return THREADS.add(Thread.currentThread());
+        }
+
+        /**
+         * Removes the current thread from the thread set.
+         */
+        static void end() {
+            THREADS.remove(Thread.currentThread());
+        }
     }
 
     @SuppressWarnings("removal")
@@ -393,10 +403,10 @@ public abstract class Charset
         //
         if (!VM.isBooted())
             return null;
-
-        if (!gate().tryEnter())
+        if (!ThreadTracker.tryBegin()) {
             // Avoid recursive provider lookups
             return null;
+        }
         try {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
@@ -413,7 +423,7 @@ public abstract class Charset
                 });
 
         } finally {
-            gate().exit();
+            ThreadTracker.end();
         }
     }
 

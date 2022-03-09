@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,10 +42,11 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Gate;
 import jdk.internal.misc.VM;
 import sun.net.util.IPAddressUtil;
 import sun.security.util.SecurityConstants;
@@ -1343,19 +1344,30 @@ public final class URL implements java.io.Serializable {
         };
     }
 
-    // gate to prevent recursive provider lookups
-    private static class Holder {
-        static final Gate LOOKUP_GATE = Gate.create();
-    }
+    private static class ThreadTracker {
+        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
 
-    private static Gate gate() {
-        return Holder.LOOKUP_GATE;
+        /**
+         * Adds the current thread to thread set. Returns true if
+         * added, false if already in the set.
+         */
+        static boolean tryBegin() {
+            return THREADS.add(Thread.currentThread());
+        }
+
+        /**
+         * Removes the current thread from the thread set.
+         */
+        static void end() {
+            THREADS.remove(Thread.currentThread());
+        }
     }
 
     @SuppressWarnings("removal")
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (!gate().tryEnter())
+        if (!ThreadTracker.tryBegin()) {
             throw new Error("Circular loading of URL stream handler providers detected");
+        }
         try {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
@@ -1371,7 +1383,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            gate().exit();
+            ThreadTracker.end();
         }
     }
 

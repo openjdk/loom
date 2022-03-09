@@ -27,7 +27,6 @@ package java.util.jar;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaUtilZipFileAccess;
-import jdk.internal.misc.Gate;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.ManifestEntryVerifier;
 
@@ -45,10 +44,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -151,7 +150,6 @@ public class JarFile extends ZipFile {
     private static final Runtime.Version RUNTIME_VERSION;
     private static final boolean MULTI_RELEASE_ENABLED;
     private static final boolean MULTI_RELEASE_FORCED;
-    private static final Gate INITIALIZING_GATE = Gate.create();
     // The maximum size of array to allocate. Some VMs reserve some header words in an array.
     private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
 
@@ -1037,6 +1035,31 @@ public class JarFile extends ZipFile {
         }
     }
 
+    private static class ThreadTracker {
+        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
+
+        /**
+         * Adds the current thread to thread set.
+         */
+        static void begin() {
+            THREADS.add(Thread.currentThread());
+        }
+
+        /**
+         * Removes the current thread from the thread set.
+         */
+        static void end() {
+            THREADS.remove(Thread.currentThread());
+        }
+
+        /**
+         * Returns true if the given thread is in the thread set.
+         */
+        static boolean contains(Thread thread) {
+            return THREADS.contains(thread);
+        }
+    }
+
     synchronized void ensureInitialization() {
         try {
             maybeInstantiateVerifier();
@@ -1044,18 +1067,18 @@ public class JarFile extends ZipFile {
             throw new RuntimeException(e);
         }
         if (jv != null && !jvInitialized) {
-            INITIALIZING_GATE.enter();
+            ThreadTracker.begin();
             try {
                 initializeVerifier();
                 jvInitialized = true;
             } finally {
-                INITIALIZING_GATE.exit();
+                ThreadTracker.end();
             }
         }
     }
 
     static boolean isInitializing() {
-        return INITIALIZING_GATE.inside();
+        return ThreadTracker.contains(Thread.currentThread());
     }
 
     /*
