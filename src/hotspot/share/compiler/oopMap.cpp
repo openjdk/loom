@@ -472,6 +472,8 @@ void ImmutableOopMap::oops_do(const frame *fr, const RegisterMap *reg_map,
   case DerivedPointerIterationMode::_ignore:
     derived_cl = &ignore_cl;
     break;
+  default:
+    guarantee (false, "unreachable");
   }
   OopMapDo<OopClosure, DerivedOopClosure, SkipNullValue> visitor(oop_fn, derived_cl);
   visitor.oops_do(fr, reg_map, this);

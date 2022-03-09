@@ -504,8 +504,8 @@ jint frame::interpreter_frame_expression_stack_size() const {
     stack_size = (interpreter_frame_tos_address<pointers>() -
                   interpreter_frame_expression_stack<pointers>() + 1)/element_size;
   }
-  assert( stack_size <= (size_t)max_jint, "stack size too big");
-  return ((jint)stack_size);
+  assert (stack_size <= (size_t)max_jint, "stack size too big");
+  return (jint)stack_size;
 }
 
 
@@ -1317,6 +1317,7 @@ public:
     }
     for (int i = 0; i < _narrow_oops->length(); i++) {
       narrowOop* p = _narrow_oops->at(i);
+      // we can't check for bad compressed oops, as decoding them might crash
       values.describe(frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", frame_no));
     }
     assert(_base->length() == _derived->length(), "should be the same");

@@ -208,7 +208,7 @@ public:
 
   JavaThread* thread() const {
   #ifndef ASSERT
-    guarantee (false, "");
+    guarantee (false, "unreachable");
   #endif
     return nullptr;
   }
