@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,7 +35,7 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * A ForkJoinWorkerThread that can be used as a carrier thread by the default scheduler.
+ * A ForkJoinWorkerThread that can be used as a carrier thread.
  */
 public class CarrierThread extends ForkJoinWorkerThread {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
