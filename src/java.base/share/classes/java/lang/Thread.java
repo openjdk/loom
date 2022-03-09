@@ -177,7 +177,7 @@ public class Thread implements Runnable {
         final ThreadGroup group;
         final Runnable task;
         final long stackSize;
-        int priority;
+        volatile int priority;
         boolean daemon;
         volatile int threadStatus;
         boolean stillborn;
