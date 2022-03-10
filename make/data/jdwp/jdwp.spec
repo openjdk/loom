@@ -3181,7 +3181,9 @@ JDWP "Java(tm) Debug Wire Protocol"
     (Constant INVALID_FRAMEID        =30  "Invalid jframeID.")
     (Constant NO_MORE_FRAMES         =31  "There are no more Java or JNI frames on the "
                                           "call stack.")
-    (Constant OPAQUE_FRAME           =32  "Information about the frame is not available.")
+    (Constant OPAQUE_FRAME           =32  "Information about the frame is not available "
+                                          "(e.g. native frame) or the target VM is unable "
+                                          "to perform an operation on the frame.")
     (Constant NOT_CURRENT_FRAME      =33  "Operation can only be performed on current frame.")
     (Constant TYPE_MISMATCH          =34  "The variable is not an appropriate type for "
                                           "the function used.")
