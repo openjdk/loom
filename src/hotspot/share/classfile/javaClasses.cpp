@@ -209,7 +209,6 @@ class BacktraceBuilder: public StackObj {
   typeArrayOop    _bcis;
   objArrayOop     _mirrors;
   typeArrayOop    _names; // Needed to insulate method name against redefinition.
-  objArrayOop     _conts;
   // True if the top frame of the backtrace is omitted because it shall be hidden.
   bool            _has_hidden_top_frame;
   int             _index;
@@ -248,11 +247,6 @@ class BacktraceBuilder: public StackObj {
     assert(names != NULL, "names array should be initialized in backtrace");
     return names;
   }
-  static objArrayOop get_conts(objArrayHandle chunk) {
-    objArrayOop conts = objArrayOop(chunk->obj_at(trace_conts_offset));
-    assert(conts != NULL, "conts array should be initialized in backtrace");
-    return conts;
-  }
   static bool has_hidden_top_frame(objArrayHandle chunk) {
     oop hidden = chunk->obj_at(trace_hidden_offset);
     return hidden != NULL;
@@ -261,7 +255,7 @@ class BacktraceBuilder: public StackObj {
  public:
 
   // constructor for new backtrace
-  BacktraceBuilder(TRAPS): _head(NULL), _methods(NULL), _bcis(NULL), _mirrors(NULL), _names(NULL), _conts(NULL), _has_hidden_top_frame(false) {
+  BacktraceBuilder(TRAPS): _head(NULL), _methods(NULL), _bcis(NULL), _mirrors(NULL), _names(NULL), _has_hidden_top_frame(false) {
     expand(CHECK);
     _backtrace = Handle(THREAD, _head);
     _index = 0;
@@ -272,12 +266,10 @@ class BacktraceBuilder: public StackObj {
     _bcis = get_bcis(backtrace);
     _mirrors = get_mirrors(backtrace);
     _names = get_names(backtrace);
-    _conts = get_conts(backtrace);
     _has_hidden_top_frame = has_hidden_top_frame(backtrace);
     assert(_methods->length() == _bcis->length() &&
            _methods->length() == _mirrors->length() &&
-           _mirrors->length() == _names->length() &&
-           _names->length() == _conts->length(),
+           _mirrors->length() == _names->length(),
            "method and source information arrays should match");
 
     // head is the preallocated backtrace
@@ -305,9 +297,6 @@ class BacktraceBuilder: public StackObj {
     typeArrayOop names = oopFactory::new_symbolArray(trace_chunk_size, CHECK);
     typeArrayHandle new_names(THREAD, names);
 
-    objArrayOop conts = oopFactory::new_objectArray(trace_chunk_size, CHECK);
-    objArrayHandle new_conts(THREAD, conts);
-
     if (!old_head.is_null()) {
       old_head->obj_at_put(trace_next_offset, new_head());
     }
@@ -315,7 +304,6 @@ class BacktraceBuilder: public StackObj {
     new_head->obj_at_put(trace_bcis_offset, new_bcis());
     new_head->obj_at_put(trace_mirrors_offset, new_mirrors());
     new_head->obj_at_put(trace_names_offset, new_names());
-    new_head->obj_at_put(trace_conts_offset, new_conts());
     new_head->obj_at_put(trace_hidden_offset, NULL);
 
     _head    = new_head();
@@ -323,7 +311,6 @@ class BacktraceBuilder: public StackObj {
     _bcis = new_bcis();
     _mirrors = new_mirrors();
     _names  = new_names();
-    _conts  = new_conts();
     _index = 0;
   }
 
@@ -331,7 +318,7 @@ class BacktraceBuilder: public StackObj {
     return _backtrace();
   }
 
-  inline void push(Method* method, int bci, oop contScopeName, TRAPS) {
+  inline void push(Method* method, int bci, TRAPS) {
     // Smear the -1 bci to 0 since the array only holds unsigned
     // shorts.  The later line number lookup would just smear the -1
     // to a 0 even if it could be recorded.
@@ -339,10 +326,8 @@ class BacktraceBuilder: public StackObj {
 
     if (_index >= trace_chunk_size) {
       methodHandle mhandle(THREAD, method);
-      Handle chandle(THREAD, contScopeName);
       expand(CHECK);
       method = mhandle();
-      contScopeName = chandle();
     }
 
     _methods->ushort_at_put(_index, method->orig_method_idnum());
@@ -357,8 +342,6 @@ class BacktraceBuilder: public StackObj {
     // from being unloaded while we still have this stack trace.
     assert(method->method_holder()->java_mirror() != NULL, "never push null for mirror");
     _mirrors->obj_at_put(_index, method->method_holder()->java_mirror());
-
-    _conts->obj_at_put(_index, contScopeName);
 
     _index++;
   }
@@ -383,9 +366,8 @@ struct BacktraceElement : public StackObj {
   int _version;
   Symbol* _name;
   Handle _mirror;
-  Handle _cont; // the continuation scope name (String)
-  BacktraceElement(Handle mirror, int mid, int version, int bci, Symbol* name, Handle cont) :
-                   _method_id(mid), _bci(bci), _version(version), _name(name), _mirror(mirror), _cont(cont) {}
+  BacktraceElement(Handle mirror, int mid, int version, int bci, Symbol* name) :
+                   _method_id(mid), _bci(bci), _version(version), _name(name), _mirror(mirror) {}
 };
 
 class BacktraceIterator : public StackObj {
@@ -395,7 +377,6 @@ class BacktraceIterator : public StackObj {
   typeArrayHandle _methods;
   typeArrayHandle _bcis;
   typeArrayHandle _names;
-  objArrayHandle  _conts;
 
   void init(objArrayHandle result, Thread* thread) {
     // Get method id, bci, version and mirror from chunk
@@ -405,7 +386,6 @@ class BacktraceIterator : public StackObj {
       _bcis = typeArrayHandle(thread, BacktraceBuilder::get_bcis(_result));
       _mirrors = objArrayHandle(thread, BacktraceBuilder::get_mirrors(_result));
       _names = typeArrayHandle(thread, BacktraceBuilder::get_names(_result));
-      _conts = objArrayHandle(thread, BacktraceBuilder::get_conts(_result));
       _index = 0;
     }
   }
@@ -420,8 +400,7 @@ class BacktraceIterator : public StackObj {
                         _methods->ushort_at(_index),
                         Backtrace::version_at(_bcis->int_at(_index)),
                         Backtrace::bci_at(_bcis->int_at(_index)),
-                        _names->symbol_at(_index),
-                        Handle(thread, _conts->obj_at(_index)));
+                        _names->symbol_at(_index));
     _index++;
 
     if (_index >= java_lang_Throwable::trace_chunk_size) {
@@ -2312,7 +2291,6 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     methodHandle method(THREAD, gstc._methods->at(i));
     oop element = java_lang_StackTraceElement::create(method,
                                                       gstc._bcis->at(i),
-                                                      cont_handles->at(i),
                                                       CHECK_NULL);
     trace->obj_at_put(i, element);
   }
@@ -2762,7 +2740,6 @@ void java_lang_Throwable::java_printStackTrace(Handle throwable, TRAPS) {
 void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHandle& method, TRAPS) {
   if (!StackTraceInThrowable) return;
   ResourceMark rm(THREAD);
-  HandleMark hm(THREAD);
 
   // Start out by clearing the backtrace for this object, in case the VM
   // runs out of memory while allocating the stack trace
@@ -2780,7 +2757,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
   // with bci 0
   if (!thread->has_last_Java_frame()) {
     if (max_depth >= 1 && method() != NULL) {
-      bt.push(method(), 0, NULL, CHECK);
+      bt.push(method(), 0, CHECK);
       log_info(stacktrace)("%s, %d", throwable->klass()->external_name(), 1);
       set_depth(throwable(), 1);
       set_backtrace(throwable(), bt.backtrace());
@@ -2805,11 +2782,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
   bool show_carrier = ShowCarrierFrames;
-  Handle cont_h(THREAD, thread->last_continuation()->cont_oop());
+  ContinuationEntry* cont = thread->last_continuation();
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
-    oop contScopeName = (cont_h() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(cont_h())) : (oop)NULL;
 
     // Compiled java method case.
     if (decode_offset != 0) {
@@ -2820,12 +2796,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
     } else {
       if (fr.is_first_frame()) break;
 
-      if (cont_h() != NULL && Continuation::is_continuation_enterSpecial(fr)) {
-        oop scope = jdk_internal_vm_Continuation::scope(cont_h());
-        if (!show_carrier && scope == java_lang_VirtualThread::vthread_scope()) break;
-
-        Handle parent_h(THREAD, jdk_internal_vm_Continuation::parent(cont_h()));
-        cont_h =  parent_h;
+      if (Continuation::is_continuation_enterSpecial(fr)) {
+        assert (cont == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
+        if (!show_carrier && cont->scope() == java_lang_VirtualThread::vthread_scope()) break;
+        cont = cont->parent();
       }
 
       address pc = fr.pc();
@@ -2906,7 +2880,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       }
     }
 
-    bt.push(method, bci, contScopeName, CHECK);
+    bt.push(method, bci, CHECK);
     total_count++;
   }
 
@@ -2971,7 +2945,7 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
   // fill in as much stack trace as possible
   int chunk_count = 0;
   for (;!st.at_end(); st.next()) {
-    bt.push(st.method(), st.bci(), NULL, CHECK);
+    bt.push(st.method(), st.bci(), CHECK);
     chunk_count++;
 
     // Bail-out for deep stacks
@@ -3019,7 +2993,6 @@ void java_lang_Throwable::get_stack_trace_elements(int depth, Handle backtrace,
                                          bte._version,
                                          bte._bci,
                                          bte._name,
-                                         bte._cont,
                                          CHECK);
   }
 }
@@ -3100,7 +3073,7 @@ bool java_lang_Throwable::get_top_method_and_bci(oop throwable, Method** method,
   return true;
 }
 
-oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, Handle contScope, TRAPS) {
+oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, TRAPS) {
   // Allocate java.lang.StackTraceElement instance
   InstanceKlass* k = vmClasses::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
@@ -3111,13 +3084,13 @@ oop java_lang_StackTraceElement::create(const methodHandle& method, int bci, Han
   Handle element = k->allocate_instance_handle(CHECK_NULL);
 
   int version = method->constants()->version();
-  fill_in(element, method->method_holder(), method, version, bci, method->name(), contScope, CHECK_NULL);
+  fill_in(element, method->method_holder(), method, version, bci, method->name(), CHECK_NULL);
   return element();
 }
 
 void java_lang_StackTraceElement::fill_in(Handle element,
                                           InstanceKlass* holder, const methodHandle& method,
-                                          int version, int bci, Symbol* name, Handle contScopeName, TRAPS) {
+                                          int version, int bci, Symbol* name, TRAPS) {
   assert(element->is_a(vmClasses::StackTraceElement_klass()), "sanity check");
 
   ResourceMark rm(THREAD);
@@ -3167,9 +3140,6 @@ void java_lang_StackTraceElement::fill_in(Handle element,
     java_lang_StackTraceElement::set_fileName(element(), source_file);
     java_lang_StackTraceElement::set_lineNumber(element(), line_number);
   }
-
-  // Fill in continuation scope
-  java_lang_StackTraceElement::set_contScopeName(element(), contScopeName());
 }
 
 void java_lang_StackTraceElement::decode_file_and_line(Handle java_class,
@@ -3277,13 +3247,11 @@ void java_lang_StackFrameInfo::to_stack_trace_element(Handle stackFrame, Handle 
   Klass* clazz = java_lang_Class::as_Klass(java_lang_invoke_MemberName::clazz(mname()));
   InstanceKlass* holder = InstanceKlass::cast(clazz);
   Method* method = java_lang_StackFrameInfo::get_method(stackFrame, holder, CHECK);
-  oop contScope = stackFrame->obj_field(java_lang_StackFrameInfo::_contScope_offset);
-  Handle contScopeName(THREAD, contScope != (oop)NULL ? jdk_internal_vm_ContinuationScope::name(contScope) : (oop)NULL);
 
   short version = stackFrame->short_field(_version_offset);
   int bci = stackFrame->int_field(_bci_offset);
   Symbol* name = method->name();
-  java_lang_StackTraceElement::fill_in(stack_trace_element, holder, methodHandle(THREAD, method), version, bci, name, contScopeName, CHECK);
+  java_lang_StackTraceElement::fill_in(stack_trace_element, holder, methodHandle(THREAD, method), version, bci, name, CHECK);
 }
 
 void java_lang_StackTraceElement::set_contScopeName(oop element, oop value) {

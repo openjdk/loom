@@ -573,7 +573,6 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _bci = jvf->bci();
   _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
   _locked_monitors = NULL;
-  _cont_scope_name = OopHandle(_thread_service_storage, (jvf->continuation() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
     Thread* current_thread = Thread::current();
     ResourceMark rm(current_thread);
@@ -599,7 +598,6 @@ StackFrameInfo::~StackFrameInfo() {
     delete _locked_monitors;
   }
   _class_holder.release(_thread_service_storage);
-  _cont_scope_name.release(_thread_service_storage);
 }
 
 void StackFrameInfo::metadata_do(void f(Metadata*)) {
@@ -614,7 +612,6 @@ void StackFrameInfo::print_on(outputStream* st) const {
     oop o = _locked_monitors->at(i).resolve();
     st->print_cr("\t- locked <" INTPTR_FORMAT "> (a %s)", p2i(o), o->klass()->external_name());
   }
-
 }
 
 // Iterate through monitor cache to find JNI locked monitors
@@ -737,8 +734,7 @@ Handle ThreadStackTrace::allocate_fill_stack_trace_element_array(TRAPS) {
   for (int j = 0; j < _depth; j++) {
     StackFrameInfo* frame = _frames->at(j);
     methodHandle mh(THREAD, frame->method());
-    Handle contScopeNameH(THREAD, frame->cont_scope_name().resolve());
-    oop element = java_lang_StackTraceElement::create(mh, frame->bci(), contScopeNameH, CHECK_NH);
+    oop element = java_lang_StackTraceElement::create(mh, frame->bci(), CHECK_NH);
     backtrace->obj_at_put(j, element);
   }
   return backtrace;

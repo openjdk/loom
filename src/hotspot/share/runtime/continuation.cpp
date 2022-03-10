@@ -684,6 +684,11 @@ ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThr
   return nullptr;
 }
 
+ContinuationEntry* Continuation::get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
+  assert (is_continuation_enterSpecial(f), "");
+  return (ContinuationEntry*)f.unextended_sp();
+}
+
 // When walking the virtual stack, this method returns true
 // iff the frame is a thawed continuation frame whose
 // caller is still frozen on the h-stack.

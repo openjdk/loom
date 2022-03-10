@@ -62,6 +62,7 @@ public:
 
   static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f);
 
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
@@ -183,6 +184,7 @@ public:
   }
 
   oop cont_oop() { return this != NULL ? continuation() : (oop)NULL; }
+  oop scope()    { return Continuation::continuation_scope(cont_oop()); }
   oop chunk()    { return _chunk; }
 
 #ifdef ASSERT

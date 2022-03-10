@@ -1689,10 +1689,10 @@ class java_lang_StackTraceElement: AllStatic {
 
  public:
   // Create an instance of StackTraceElement
-  static oop create(const methodHandle& method, int bci, Handle contScopeName, TRAPS);
+  static oop create(const methodHandle& method, int bci, TRAPS);
 
   static void fill_in(Handle element, InstanceKlass* holder, const methodHandle& method,
-                      int version, int bci, Symbol* name, Handle contScopeName, TRAPS);
+                      int version, int bci, Symbol* name, TRAPS);
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
