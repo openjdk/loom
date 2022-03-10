@@ -137,7 +137,7 @@ public:
   // caller. That locking ensures the operation is "atomic" with the list
   // modification wrto operations that hold the NJTList_lock and either also
   // hold the Threads_lock or are at a safepoint.
-  virtual void on_thread_attach(Thread* thread) {}
+  virtual void on_thread_attach(Thread* thread);
   virtual void on_thread_detach(Thread* thread) {}
 
   virtual void make_parsable(JavaThread* thread) {}
