@@ -177,10 +177,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom specific
 
-compiler/codecache/cli/TestSegmentedCodeCacheOption.java                      8276711 generic-all
-compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java           8276711 generic-all
-compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java              8276711 generic-all
-
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	          8264699 generic-all
 
 # SA needs update
