@@ -34,6 +34,8 @@ class JfrStackFrame;
 class Thread;
 
 class JfrThreadLocal {
+  friend class JfrIntrinsicSupport;
+  friend class JfrRecorder;
  private:
   jobject _java_event_writer;
   mutable JfrBuffer* _java_buffer;
@@ -57,6 +59,7 @@ class JfrThreadLocal {
   mutable u4 _stackdepth;
   volatile jint _entering_suspend_flag;
   mutable volatile int _critical_section;
+  u2 _vthread_epoch;
   bool _vthread;
   bool _excluded;
   bool _dead;
@@ -68,7 +71,9 @@ class JfrThreadLocal {
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
   static traceid assign_thread_id(const Thread* t, JfrThreadLocal* tl);
-  static void assign_java_thread_id(const Thread* t);
+  static traceid contextual_id(const Thread* t);
+  static void set_vthread_epoch(const JavaThread* jt, traceid id, u2 epoch);
+  static u2 vthread_epoch(const JavaThread* jt);
 
  public:
   JfrThreadLocal();
@@ -134,7 +139,7 @@ class JfrThreadLocal {
   // Contextually defined thread id that is volatile,
   // a function of Java carrier thread mounts / unmounts.
   static traceid thread_id(const Thread* t);
-  static bool is_vthread(JavaThread* jt);
+  static bool is_vthread(const JavaThread* jt);
 
   // Non-volatile thread id, for Java carrier threads and non-java threads.
   static traceid vm_thread_id(const Thread* t);
@@ -230,14 +235,16 @@ class JfrThreadLocal {
   static void include(Thread* t);
 
   // Hooks
-  static void on_set_current_thread(JavaThread* jt, oop thread);
   static void on_start(Thread* t);
   static void on_exit(Thread* t);
+  static void on_set_current_thread(JavaThread* jt, oop thread);
+  static void on_java_thread_start(JavaThread* starter, JavaThread* startee);
 
   // Code generation
   static ByteSize java_event_writer_offset();
   static ByteSize trace_id_offset();
   static ByteSize vthread_offset();
+  static ByteSize vthread_epoch_offset();
 
   friend class JfrJavaThread;
   friend class JfrCheckpointManager;

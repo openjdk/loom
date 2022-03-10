@@ -199,14 +199,24 @@ inline oop java_lang_Thread::continuation(oop java_thread) {
   return java_thread->obj_field(_continuation_offset);
 }
 
+inline int64_t java_lang_Thread::thread_id(oop java_thread) {
+  return java_thread->long_field(_tid_offset);
+}
+
 inline oop java_lang_VirtualThread::vthread_scope() {
   oop base = vmClasses::VirtualThread_klass()->static_field_base_raw();
   return base->obj_field(static_vthread_scope_offset);
 }
 
-inline void java_lang_VirtualThread::set_jfr_traceid(oop ref, jlong id) {
-  Atomic::store(ref->field_addr<jlong>(java_lang_Thread::_tid_offset), id);
+#if INCLUDE_JFR
+inline u2 java_lang_VirtualThread::jfr_epoch(oop ref) {
+  return ref->short_field(_jfr_epoch_offset);
 }
+
+inline void java_lang_VirtualThread::set_jfr_epoch(oop ref, u2 epoch) {
+  ref->short_field_put(_jfr_epoch_offset, epoch);
+}
+#endif // INCLUDE_JFR
 
 inline oop jdk_internal_vm_ContinuationScope::name(oop ref) {
   return ref->obj_field(_name_offset);

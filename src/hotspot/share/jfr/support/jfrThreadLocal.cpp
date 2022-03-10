@@ -32,6 +32,7 @@
 #include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.inline.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
+#include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/support/jfrThreadId.inline.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
@@ -66,6 +67,7 @@ JfrThreadLocal::JfrThreadLocal() :
   _stackdepth(0),
   _entering_suspend_flag(0),
   _critical_section(0),
+  _vthread_epoch(0),
   _vthread(false),
   _excluded(false),
   _dead(false) {
@@ -100,25 +102,40 @@ static void send_java_thread_start_event(JavaThread* jt) {
   }
   if (JfrRecorder::is_recording()) {
     EventThreadStart event;
-    event.set_thread(JfrThreadLocal::thread_id(jt));
+    traceid thread_id = JfrThreadLocal::vm_thread_id(jt);
+    assert(thread_id != 0, "invariant");
+    event.set_thread(thread_id);
     event.set_parentThread(jt->jfr_thread_local()->parent_thread_id());
     event.commit();
   }
 }
 
 void JfrThreadLocal::on_start(Thread* t) {
-  const bool is_java_thread = t->is_Java_thread();
-  if (is_java_thread) {
-    assign_java_thread_id(t);
-  }
+  assign_thread_id(t, t->jfr_thread_local());
   if (JfrRecorder::is_recording()) {
     JfrCheckpointManager::write_checkpoint(t);
-    if (is_java_thread) {
+    if (t->is_Java_thread()) {
       send_java_thread_start_event(JavaThread::cast(t));
     }
   }
   if (t->jfr_thread_local()->has_cached_stack_trace()) {
     t->jfr_thread_local()->clear_cached_stack_trace();
+  }
+}
+
+// The starter thread ensures that the startee has a valid _vm_thread_id and _contextual_id.
+// This is to avoid recursion in thread assignment since accessing the java threadObj can lead
+// to events being fired, a situation the starter thread can handle but not the startee.
+void JfrThreadLocal::on_java_thread_start(JavaThread* starter, JavaThread* startee) {
+  assert(starter != nullptr, "invariant");
+  assert(startee != nullptr, "invariant");
+  JfrThreadLocal* const tl = startee->jfr_thread_local();
+  assign_thread_id(startee, tl);
+  assert(Atomic::load(&tl->_contextual_thread_id) != 0, "invariant");
+  assert(Atomic::load(&tl->_vm_thread_id) == Atomic::load(&tl->_contextual_thread_id), "invariant");
+  if (JfrRecorder::is_recording() && EventThreadStart::is_enabled() && EventThreadStart::is_stacktrace_enabled()) {
+    // skip level 2 to skip frames Thread.start() and Thread.start0()
+    startee->jfr_thread_local()->set_cached_stack_trace_id(JfrStackTraceRepository::record(starter, 2));
   }
 }
 
@@ -231,6 +248,10 @@ ByteSize JfrThreadLocal::vthread_offset() {
   return in_ByteSize(offset_of(JfrThreadLocal, _vthread));
 }
 
+ByteSize JfrThreadLocal::vthread_epoch_offset() {
+  return in_ByteSize(offset_of(JfrThreadLocal, _vthread_epoch));
+}
+
 void JfrThreadLocal::exclude(Thread* t) {
   assert(t != NULL, "invariant");
   t->jfr_thread_local()->_excluded = true;
@@ -267,13 +288,41 @@ void JfrThreadLocal::stop_impersonating(const Thread* t) {
   assert(!is_impersonating(t), "invariant");
 }
 
-typedef JfrOopTraceId<ThreadIdAccess> AccessThreadTraceId;
-
-static void write_checkpoint(const JavaThread* jt, traceid epoch_identity) {
+void JfrThreadLocal::set_vthread_epoch(const JavaThread* jt, traceid tid, u2 epoch) {
   assert(jt != nullptr, "invariant");
+  assert(is_vthread(jt), "invariant");
+  // To support event recursion, we update the native side first,
+  // this provides the terminating case.
+  Atomic::store(&jt->jfr_thread_local()->_vthread_epoch, epoch);
+  /*
+  * The java side, i.e. the vthread object, can now be updated.
+  * Accessing the vthread object itself is a recursive case,
+  * because it can trigger additional events, e.g.
+  * loading the oop through load barriers.
+  * Note there is a potential problem with this solution:
+  * The recursive write hitting the terminating case will
+  * use the thread id _before_ the checkpoint is committed.
+  * Hence, the periodic thread can possibly flush that event
+  * to a segment that does not include an associated checkpoint.
+  * Considered rare and quite benign for now. The worst case is
+  * that thread information for that event is not resolvable,
+  * i.e. will be null.
+  */
+  typedef JfrOopTraceId<VThreadIdAccess> AccessThreadTraceId;
   oop vthread = jt->vthread();
-  AccessThreadTraceId::store(vthread, epoch_identity);
-  JfrCheckpointManager::write_checkpoint(const_cast<JavaThread*>(jt), AccessThreadTraceId::id(epoch_identity), vthread);
+  assert(vthread != nullptr, "invariant");
+  AccessThreadTraceId::set_epoch(vthread, epoch);
+  JfrCheckpointManager::write_checkpoint(const_cast<JavaThread*>(jt), tid, vthread);
+}
+
+traceid JfrThreadLocal::contextual_id(const Thread* t) {
+  assert(t != nullptr, "invariant");
+  return Atomic::load(&t->jfr_thread_local()->_contextual_thread_id);
+}
+
+u2 JfrThreadLocal::vthread_epoch(const JavaThread* jt) {
+  assert(jt != nullptr, "invariant");
+  return Atomic::load(&jt->jfr_thread_local()->_vthread_epoch);
 }
 
 traceid JfrThreadLocal::thread_id(const Thread* t) {
@@ -282,38 +331,18 @@ traceid JfrThreadLocal::thread_id(const Thread* t) {
     return t->jfr_thread_local()->_thread_id_alias;
   }
   JfrThreadLocal* const tl = t->jfr_thread_local();
-  if (!t->is_Java_thread()) {
+  if (!t->is_Java_thread() || !Atomic::load_acquire(&tl->_vthread)) {
     return vm_thread_id(t, tl);
   }
-  const bool vthread = Atomic::load_acquire(&tl->_vthread);
-  if (!vthread) {
-    return vm_thread_id(t, tl);
+  // virtual thread
+  const JavaThread* jt = JavaThread::cast(t);
+  const traceid tid = contextual_id(jt);
+  assert(tid != 0, "invariant");
+  const u2 current_epoch = JfrTraceIdEpoch::epoch_generation();
+  if (vthread_epoch(jt) != current_epoch) {
+    set_vthread_epoch(jt, tid, current_epoch);
   }
-  const traceid value = Atomic::load(&tl->_contextual_thread_id);
-  assert(value != 0, "invariant");
-  // For a vthread, map its epoch relative identity.
-  const traceid epoch_identity = AccessThreadTraceId::epoch_identity(value);
-  if (epoch_identity != value) {
-    // To support event recursion, we update the native side first,
-    // this provides the terminating case.
-    Atomic::store(&tl->_contextual_thread_id, epoch_identity);
-    /*
-     * The java side, i.e. the vthread object, can now be updated.
-     * Accessing the vthread object itself is a recursive case,
-     * because it can trigger additional events, e.g.
-     * loading the oop through load barriers that fire events.
-     * Note there is a potential problem with this solution:
-     * The recursive write hitting the terminating case will
-     * use the thread id _before_ the checkpoint is committed.
-     * Hence, the periodic thread can possibly flush that event
-     * to a segment that does not include an associated checkpoint.
-     * Considered rare and quite benign for now. The worst case is
-     * that thread information for that event is not resolvable,
-     * i.e. will be null.
-     */
-    write_checkpoint(JavaThread::cast(t), epoch_identity);
-  }
-  return AccessThreadTraceId::id(epoch_identity);
+  return tid;
 }
 
 inline traceid load_java_thread_id(const Thread* t) {
@@ -323,20 +352,18 @@ inline traceid load_java_thread_id(const Thread* t) {
   return threadObj != nullptr ? java_lang_Thread::thread_id(threadObj) : 0;
 }
 
-void JfrThreadLocal::assign_java_thread_id(const Thread* t) {
-  JfrThreadLocal* const tl = t->jfr_thread_local();
-  assert(Atomic::load(&tl->_contextual_thread_id) == 0, "invariant");
-  assert(!Atomic::load_acquire(&tl->_vthread), "invariant");
-  Atomic::store(&tl->_contextual_thread_id, load_java_thread_id(t));
-}
-
 traceid JfrThreadLocal::assign_thread_id(const Thread* t, JfrThreadLocal* tl) {
   assert(t != nullptr, "invariant");
   assert(tl != nullptr, "invariant");
   JfrSpinlockHelper spinlock(&tl->_critical_section);
   traceid tid = tl->_vm_thread_id;
   if (tid == 0) {
-    tid = t->is_Java_thread() ? load_java_thread_id(t) : static_cast<traceid>(ThreadIdentifiers::next());
+    if (t->is_Java_thread()) {
+      tid = load_java_thread_id(t);
+      tl->_vm_thread_id = tl->_contextual_thread_id = tid;
+      return tid;
+    }
+    tid = static_cast<traceid>(ThreadIdentifiers::next());
     tl->_vm_thread_id = tid;
   }
   return tid;
@@ -353,7 +380,7 @@ traceid JfrThreadLocal::vm_thread_id(const Thread* t) {
   return vm_thread_id(t, t->jfr_thread_local());
 }
 
-bool JfrThreadLocal::is_vthread(JavaThread* jt) {
+bool JfrThreadLocal::is_vthread(const JavaThread* jt) {
   assert(jt != nullptr, "invariant");
   return Atomic::load_acquire(&jt->jfr_thread_local()->_vthread);
 }
@@ -367,6 +394,11 @@ void JfrThreadLocal::on_set_current_thread(JavaThread* jt, oop thread) {
   assert(jt != nullptr, "invariant");
   assert(thread != nullptr, "invariant");
   JfrThreadLocal* const tl = jt->jfr_thread_local();
-  Atomic::store(&tl->_contextual_thread_id, static_cast<traceid>(java_lang_Thread::thread_id_raw(thread)));
-  Atomic::release_store(&tl->_vthread, is_virtual(jt, thread));
+  if (is_virtual(jt, thread)) {
+    Atomic::store(&tl->_vthread_epoch, java_lang_VirtualThread::jfr_epoch(thread));
+    Atomic::store(&tl->_contextual_thread_id, static_cast<traceid>(java_lang_Thread::thread_id(thread)));
+    Atomic::release_store(&tl->_vthread, true);
+    return;
+  }
+  Atomic::release_store(&tl->_vthread, false);
 }

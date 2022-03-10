@@ -29,13 +29,16 @@
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.inline.hpp"
 
-class ThreadIdAccess : AllStatic {
+class VThreadIdAccess : AllStatic {
  public:
-  static traceid load(oop ref) {
-    return static_cast<traceid>(java_lang_Thread::thread_id_raw(ref));
+  static traceid id(oop ref) {
+    return static_cast<traceid>(java_lang_Thread::thread_id(ref));
   }
-  static void store(oop ref, traceid value) {
-    java_lang_VirtualThread::set_jfr_traceid(ref, static_cast<jlong>(value));
+  static u2 epoch(oop ref) {
+    return java_lang_VirtualThread::jfr_epoch(ref);
+  }
+  static void set_epoch(oop ref, u2 epoch) {
+    java_lang_VirtualThread::set_jfr_epoch(ref, epoch);
   }
 };
 

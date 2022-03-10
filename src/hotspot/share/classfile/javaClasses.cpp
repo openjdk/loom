@@ -2196,17 +2196,6 @@ JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
   }
 }
 
-jlong java_lang_Thread::thread_id_raw(oop java_thread) {
-  return Atomic::load(java_thread->field_addr<jlong>(_tid_offset));
-}
-
-jlong java_lang_Thread::thread_id(oop java_thread) {
-  // The 16 most significant bits can be used for tracing
-  // so these bits are excluded using a mask.
-  static const jlong tid_mask = (((jlong)1) << 48) - 1;
-  return thread_id_raw(java_thread) & tid_mask;
-}
-
 ByteSize java_lang_Thread::thread_id_offset() {
   return in_ByteSize(_tid_offset);
 }
@@ -2436,6 +2425,7 @@ int java_lang_VirtualThread::static_vthread_scope_offset;
 int java_lang_VirtualThread::_carrierThread_offset;
 int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
+JFR_ONLY(int java_lang_VirtualThread::_jfr_epoch_offset;)
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
@@ -2449,6 +2439,7 @@ static bool vthread_notify_jvmti_events = JNI_FALSE;
 void java_lang_VirtualThread::compute_offsets() {
   InstanceKlass* k = vmClasses::VirtualThread_klass();
   VTHREAD_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+  VTHREAD_INJECTED_FIELDS(INJECTED_FIELD_COMPUTE_OFFSET);
 }
 
 void java_lang_VirtualThread::init_static_notify_jvmti_events() {
@@ -2508,6 +2499,7 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
 #if INCLUDE_CDS
 void java_lang_VirtualThread::serialize_offsets(SerializeClosure* f) {
    VTHREAD_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+   VTHREAD_INJECTED_FIELDS(INJECTED_FIELD_SERIALIZE_OFFSET);
 }
 #endif
 

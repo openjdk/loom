@@ -271,9 +271,14 @@ public class Thread implements Runnable {
      * identifier for the primordial thread.
      */
     private static class ThreadIdentifiers {
-        private static final Unsafe U = Unsafe.getUnsafe();
-        private static final long NEXT_TID_OFFSET = getNextThreadIdOffset();
-        private static final long TID_MASK = (1L << 48) - 1;
+        private static final Unsafe U;
+        private static final long NEXT_TID_OFFSET;
+
+        static {
+            U = Unsafe.getUnsafe();
+            NEXT_TID_OFFSET = getNextThreadIdOffset();
+        }
+
         static long next() {
             return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
         }
@@ -2603,9 +2608,7 @@ public class Thread implements Runnable {
      * @since 19
      */
     public final long threadId() {
-        // The 16 most significant bits are reserved for exclusive use
-        // by the JVM so these bits are excluded using TID_MASK.
-        return tid & ThreadIdentifiers.TID_MASK;
+        return tid;
     }
 
     /**

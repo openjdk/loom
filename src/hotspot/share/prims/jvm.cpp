@@ -2954,14 +2954,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
               os::native_thread_creation_failed_msg());
   }
 
-#if INCLUDE_JFR
-  if (Jfr::is_recording() && EventThreadStart::is_enabled() &&
-      EventThreadStart::is_stacktrace_enabled()) {
-    JfrThreadLocal* tl = native_thread->jfr_thread_local();
-    // skip Thread.start() and Thread.start0()
-    tl->set_cached_stack_trace_id(JfrStackTraceRepository::record(thread, 2));
-  }
-#endif
+  JFR_ONLY(Jfr::on_java_thread_start(thread, native_thread);)
 
   Thread::start(native_thread);
 

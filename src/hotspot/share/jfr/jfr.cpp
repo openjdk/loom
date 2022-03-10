@@ -73,6 +73,10 @@ void Jfr::on_unloading_classes() {
   }
 }
 
+void Jfr::on_java_thread_start(JavaThread* starter, JavaThread* startee) {
+  JfrThreadLocal::on_java_thread_start(starter, startee);
+}
+
 void Jfr::on_thread_start(Thread* t) {
   JfrThreadLocal::on_start(t);
 }

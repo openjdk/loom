@@ -2960,12 +2960,11 @@ bool LibraryCallKit::inline_native_classID() {
   oop vthread = java_lang_Thread::vthread(threadObj);
   traceid tid;
   if (vthread != threadObj) {  // i.e. current thread is virtual
-    traceid value = java_lang_VirtualThread::tid(vthread);
-    tid = value & tid_mask;
-    traceid epoch = value >> epoch_shift;
+    tid = java_lang_VirtualThread::tid(vthread);
+    u2 vthread_epoch = java_lang_VirtualThread::jfr_epoch();
     traceid current_epoch = JfrTraceIdEpoch::current_generation();
-    if (epoch != current_epoch) {
-      write_checkpoint(tid);
+    if (vthread_epoch != current_epoch) {
+      write_checkpoint();
     }
   } else {
     tid = java_lang_Thread::tid(threadObj);
@@ -2988,16 +2987,6 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // TLS
   Node* tls_ptr = _gvn.transform(new ThreadLocalNode());
 
-  // Load the threadObj for the CarrierThread.
-  Node* const threadObj = generate_current_thread(tls_ptr);
-  // Load the tid field from the thread object.
-  Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J");
-
-  // Load the vthread field.
-  Node* const vthread = generate_virtual_thread(tls_ptr);
-  // Load the tid field from the vthread object.
-  Node* vthread_tid_value = load_field_from_object(vthread, "tid", "J");
-
   // Load the address of java event writer jobject handle from the jfr_thread_local structure.
   Node* jobj_ptr = basic_plus_adr(top(), tls_ptr, in_bytes(THREAD_LOCAL_WRITER_OFFSET_JFR));
 
@@ -3015,6 +3004,14 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // True path, jobj is not null.
   Node* jobj_is_not_null = _gvn.transform(new IfTrueNode(iff_jobj_not_equal_null));
 
+  set_control(jobj_is_not_null);
+
+  // Load the threadObj for the CarrierThread.
+  Node* const threadObj = generate_current_thread(tls_ptr);
+
+  // Load the vthread.
+  Node* const vthread = generate_virtual_thread(tls_ptr);
+
   // If vthread != threadObj, this is a virtual thread.
   Node* vthread_cmp_threadObj = _gvn.transform(new CmpPNode(vthread, threadObj));
   Node* test_vthread_not_equal_threadObj = _gvn.transform(new BoolNode(vthread_cmp_threadObj, BoolTest::ne));
@@ -3023,25 +3020,27 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 
   // False branch, fallback to threadObj.
   Node* vthread_equal_threadObj = _gvn.transform(new IfFalseNode(iff_vthread_not_equal_threadObj));
+  set_control(vthread_equal_threadObj);
+  // Load the tid field from the vthread object.
+  Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J");
+
   // True branch, this is a virtual thread.
   Node* vthread_not_equal_threadObj = _gvn.transform(new IfTrueNode(iff_vthread_not_equal_threadObj));
+  set_control(vthread_not_equal_threadObj);
+  // Load the tid field from the vthread object.
+  Node* vthread_tid = load_field_from_object(vthread, "tid", "J");
 
-  // Bit shift and mask.
-  Node* const epoch_shift = _gvn.intcon(jfr_epoch_shift);
-  Node* const tid_mask = _gvn.longcon(jfr_id_mask);
-
-  // Mask off the epoch information from the thread id.
-  Node* const vthread_tid = _gvn.transform(new AndLNode(vthread_tid_value, tid_mask));
-  // Shift down the thread id value for last epoch information.
-  Node* const vthread_epoch_shifted = _gvn.transform(new URShiftLNode(vthread_tid_value, epoch_shift));
-  Node* const vthread_epoch = _gvn.transform(new ConvL2INode(vthread_epoch_shifted));
+  // Load the epoch from the vthread.
+  Node* epoch_offset = basic_plus_adr(vthread, java_lang_VirtualThread::jfr_epoch_offset());
+  Node* epoch = access_load_at(vthread, epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
+                               IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
 
   // Load the current epoch generation. The value is unsigned 16-bit, so we type it as T_CHAR.
   Node* epoch_generation_address = makecon(TypeRawPtr::make(Jfr::epoch_generation_address()));
-  Node* current_epoch_generation = make_load(vthread_not_equal_threadObj, epoch_generation_address, TypeInt::CHAR, T_CHAR, MemNode::unordered);
+  Node* current_epoch_generation = make_load(control(), epoch_generation_address, TypeInt::CHAR, T_CHAR, MemNode::unordered);
 
   // Compare the epoch in the vthread to the current epoch generation.
-  Node* const epoch_cmp = _gvn.transform(new CmpUNode(current_epoch_generation, vthread_epoch));
+  Node* const epoch_cmp = _gvn.transform(new CmpUNode(current_epoch_generation, epoch));
   Node* test_epoch_not_equal = _gvn.transform(new BoolNode(epoch_cmp, BoolTest::ne));
   IfNode* iff_epoch_not_equal = create_and_map_if(vthread_not_equal_threadObj, test_epoch_not_equal, PROB_FAIR, COUNT_UNKNOWN);
 
@@ -3182,17 +3181,20 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 }
 
 /*
- * Thread::jfr_thread_local()->_thread_id = java_lang_Thread::tid(thread);
+ * if (carrierThread != thread) {
+ *   Thread::jfr_thread_local()->_vthread_epoch = java_lang_VirtualThread::jfr_epoch(thread)
+ *   Thread::jfr_thread_local()->_contextual_tid = java_lang_Thread::tid(thread);
+ *   OrderAccess::storestore();
+ *   Thread::jfr_thread_local()->_vthread = true;
+ * }
  * OrderAccess::storestore();
- * Thread::jfr_thread_local()->_vthread = carrierThread != thread;
+ * Thread::jfr_thread_local()->_vthread = false;
  */
 void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
-  // Load the tid field from the thread.
-  Node* tid = load_field_from_object(thread, "tid", "J");
-  // Store the tid to the jfr thread local.
-  Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + THREAD_ID_OFFSET_JFR));
-  store_to_memory(control(), thread_id_offset, tid, T_LONG, TypeRawPtr::BOTTOM, MemNode::unordered, true);
+
+  Node* input_memory_state = reset_memory();
+  set_all_memory(input_memory_state);
 
   Node* const carrierThread = generate_current_thread(jt);
   // If thread != carrierThread, this is a virtual thread.
@@ -3205,10 +3207,32 @@ void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
 
   // False branch, carrierThread, set _vthread field to false.
   Node* thread_equal_carrierThread = _gvn.transform(new IfFalseNode(iff_thread_not_equal_carrierThread));
-  Node* vthread_false = store_to_memory(control(), vthread_offset, _gvn.intcon(0), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+  Node* vthread_false = store_to_memory(thread_equal_carrierThread, vthread_offset, _gvn.intcon(0), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+
+  set_all_memory(input_memory_state);
 
   // True branch, virtual thread, set _vthread field to true;
   Node* thread_not_equal_carrierThread = _gvn.transform(new IfTrueNode(iff_thread_not_equal_carrierThread));
+
+  set_control(thread_not_equal_carrierThread);
+
+  // Load the tid field from the thread.
+  Node* tid = load_field_from_object(thread, "tid", "J");
+
+  // Load the epoch from the vthread.
+  Node* epoch_offset = basic_plus_adr(thread, java_lang_VirtualThread::jfr_epoch_offset());
+  Node* epoch = access_load_at(thread, epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
+                               IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+
+  // Store the vthread epoch to the jfr thread local.
+  Node* vthread_epoch_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_EPOCH_OFFSET_JFR));
+  store_to_memory(control(), vthread_epoch_offset, epoch, T_CHAR, Compile::AliasIdxRaw, MemNode::unordered, true);
+
+  // Store the tid to the jfr thread local.
+  Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + THREAD_ID_OFFSET_JFR));
+  store_to_memory(control(), thread_id_offset, tid, T_LONG, Compile::AliasIdxRaw, MemNode::unordered, true);
+
+  // Store release
   Node* vthread_true = store_to_memory(control(), vthread_offset, _gvn.intcon(1), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
 
   RegionNode* thread_compare_rgn = new RegionNode(PATH_LIMIT);
@@ -3218,9 +3242,9 @@ void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
 
   // Merge the thread_compare memory.
   thread_compare_rgn->init_req(_true_path, thread_not_equal_carrierThread);
-  thread_compare_mem->init_req(_true_path, _gvn.transform(vthread_true));
+  thread_compare_mem->init_req(_true_path, vthread_true);
   thread_compare_rgn->init_req(_false_path, thread_equal_carrierThread);
-  thread_compare_mem->init_req(_false_path, _gvn.transform(vthread_false));
+  thread_compare_mem->init_req(_false_path, vthread_false);
 
   // Set output state.
   set_control(_gvn.transform(thread_compare_rgn));

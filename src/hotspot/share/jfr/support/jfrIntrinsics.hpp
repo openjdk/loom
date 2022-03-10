@@ -33,8 +33,8 @@
 
 class JfrIntrinsicSupport {
  public:
-  static void* get_event_writer(JavaThread* t);
-  static void write_checkpoint(JavaThread* t);
+  static void* get_event_writer(JavaThread* jt);
+  static void write_checkpoint(JavaThread* jt);
 };
 
 #define JFR_HAVE_INTRINSICS

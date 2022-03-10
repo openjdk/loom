@@ -32,11 +32,10 @@
 template <typename T>
 class JfrOopTraceId : AllStatic {
  public:
-  static traceid load(oop ref);
-  static traceid id(traceid value);
-  static traceid epoch(traceid value);
-  static traceid epoch_identity(traceid value);
-  static void store(oop ref, traceid value);
+  static traceid id(oop ref);
+  static traceid epoch(oop ref);
+  static void set_epoch(oop ref);
+  static void set_epoch(oop ref, u2 epoch);
 };
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_HPP

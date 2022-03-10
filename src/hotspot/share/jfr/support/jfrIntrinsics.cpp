@@ -24,27 +24,32 @@
 
 #include "precompiled.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
-#include "jfr/recorder/checkpoint/types/jfrTypeManager.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 #include "jfr/support/jfrIntrinsics.hpp"
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
-#include "utilities/macros.hpp"
 
-static jobject event_writer(JavaThread* t) {
-  assert(t != NULL, "invariant");
-  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_java(t);)
-  assert(t->has_last_Java_frame(), "invariant");
-  // can safepoint here
-  ThreadInVMfromJava transition(t);
-  return JfrJavaEventWriter::event_writer(t);
+#ifdef ASSERT
+static void assert_precondition(JavaThread* jt) {
+  assert(jt != NULL, "invariant");
+  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_java(jt);)
+  assert(jt->has_last_Java_frame(), "invariant");
+}
+#endif
+
+void* JfrIntrinsicSupport::get_event_writer(JavaThread* jt) {
+  DEBUG_ONLY(assert_precondition(jt);)
+  // Can safepoint here.
+  ThreadInVMfromJava transition(jt);
+  return JfrJavaEventWriter::event_writer(jt);
 }
 
-void* JfrIntrinsicSupport::get_event_writer(JavaThread* t) {
-  return event_writer(t);
-}
-
-void JfrIntrinsicSupport::write_checkpoint(JavaThread* t) {
-  assert(t != nullptr, "invariant");
-  assert(JfrThreadLocal::is_vthread(t), "invariant");
-  event_writer(t);
+void JfrIntrinsicSupport::write_checkpoint(JavaThread* jt) {
+  DEBUG_ONLY(assert_precondition(jt);)
+  assert(JfrThreadLocal::is_vthread(jt), "invariant");
+  const traceid vthread_tid = JfrThreadLocal::contextual_id(jt);
+  // Transition to read correct epoch, can safepoint here.
+  ThreadInVMfromJava transition(jt);
+  JfrThreadLocal::set_vthread_epoch(jt, vthread_tid, JfrTraceIdEpoch::epoch_generation());
 }

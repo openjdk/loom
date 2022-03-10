@@ -45,6 +45,8 @@
 
 #define VTHREAD_OFFSET_JFR JfrThreadLocal::vthread_offset()
 
+#define VTHREAD_EPOCH_OFFSET_JFR JfrThreadLocal::vthread_epoch_offset()
+
 #define THREAD_LOCAL_WRITER_OFFSET_JFR \
   JfrThreadLocal::java_event_writer_offset() + THREAD_LOCAL_OFFSET_JFR
 
