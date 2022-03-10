@@ -108,6 +108,8 @@ applications/jcstress/copy.java 8229852 linux-all
 
 containers/docker/TestJcmd.java 8278102 linux-aarch64
 
+runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0 8272791 generic-all
+
 #############################################################################
 
 # :hotspot_serviceability
@@ -189,7 +191,5 @@ vmTestbase/nsk/stress/strace/strace002.java                                   82
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
-
-runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0          8272791 generic-all
 
 gc/metaspace/TestPerfCountersAndMemoryPools.java                              8278109 generic-all
