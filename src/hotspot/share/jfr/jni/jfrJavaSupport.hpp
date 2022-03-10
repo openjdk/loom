@@ -99,7 +99,7 @@ class JfrJavaSupport : public AllStatic {
   static bool is_jdk_jfr_module_available();
   static bool is_jdk_jfr_module_available(outputStream* stream, TRAPS);
 
-  static jlong jfr_thread_id(jobject thread);
+  static jlong jfr_thread_id(JavaThread* jt, jobject thread);
   static void exclude(jobject thread);
   static void include(jobject thread);
   static bool is_excluded(jobject thread);

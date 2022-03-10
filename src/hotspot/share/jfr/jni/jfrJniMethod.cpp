@@ -289,7 +289,7 @@ JVM_END
 
 // trace thread id for a thread object
 JVM_ENTRY_NO_ENV(jlong, jfr_id_for_thread(JNIEnv* env, jobject jvm, jobject t))
-  return JfrJavaSupport::jfr_thread_id(t);
+  return JfrJavaSupport::jfr_thread_id(thread, t);
 JVM_END
 
 JVM_ENTRY_NO_ENV(jobject, jfr_get_event_writer(JNIEnv* env, jclass cls))

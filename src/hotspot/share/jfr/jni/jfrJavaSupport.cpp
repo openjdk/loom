@@ -30,7 +30,10 @@
 #include "classfile/vmSymbols.hpp"
 #include "jfr/jni/jfrJavaCall.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
-#include "jfr/support/jfrThreadId.hpp"
+#include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.inline.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
+#include "jfr/support/jfrThreadId.inline.hpp"
 #include "logging/log.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/instanceOop.hpp"
@@ -758,9 +761,24 @@ static JavaThread* get_native(jobject thread) {
   return native_thread;
 }
 
-jlong JfrJavaSupport::jfr_thread_id(jobject thread) {
-  JavaThread* native_thread = get_native(thread);
-  return native_thread != NULL ? JFR_THREAD_ID(native_thread) : 0;
+jlong JfrJavaSupport::jfr_thread_id(JavaThread* jt, jobject thread) {
+  assert(jt != nullptr, "invariant");
+  oop ref = resolve(thread);
+  if (ref == nullptr) {
+    return 0;
+  }
+  typedef JfrOopTraceId<ThreadIdAccess> AccessThreadTraceId;
+  const traceid tid = AccessThreadTraceId::id(ref);
+  const Klass* const k = ref->klass();
+  assert(k != nullptr, "invariant");
+  if (k->is_subclass_of(vmClasses::VirtualThread_klass())) {
+    const u2 epoch = JfrTraceIdEpoch::epoch_generation();
+    if (AccessThreadTraceId::epoch(ref) != epoch) {
+      AccessThreadTraceId::set_epoch(ref, epoch);
+      JfrCheckpointManager::write_checkpoint(jt, tid, ref);
+    }
+  }
+  return static_cast<jlong>(tid);
 }
 
 void JfrJavaSupport::exclude(jobject thread) {

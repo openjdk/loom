@@ -308,7 +308,7 @@ void JfrThreadLocal::set_vthread_epoch(const JavaThread* jt, traceid tid, u2 epo
   * that thread information for that event is not resolvable,
   * i.e. will be null.
   */
-  typedef JfrOopTraceId<VThreadIdAccess> AccessThreadTraceId;
+  typedef JfrOopTraceId<ThreadIdAccess> AccessThreadTraceId;
   oop vthread = jt->vthread();
   assert(vthread != nullptr, "invariant");
   AccessThreadTraceId::set_epoch(vthread, epoch);

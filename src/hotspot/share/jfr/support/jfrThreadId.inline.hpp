@@ -29,7 +29,7 @@
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.inline.hpp"
 
-class VThreadIdAccess : AllStatic {
+class ThreadIdAccess : AllStatic {
  public:
   static traceid id(oop ref) {
     return static_cast<traceid>(java_lang_Thread::thread_id(ref));

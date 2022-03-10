@@ -12,14 +12,12 @@ java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 ge
 # JFR is not completely fixed to support vthreads
 jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
 jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
-jdk/jfr/api/consumer/streaming/TestFilledChunks.java
-jdk/jfr/jcmd/TestJcmdStartWithOptions.java
-jdk/jfr/event/runtime/TestDirectBufferStatisticsEvent.java
-jdk/jfr/threading/TestManyVirtualThreads.java
 jdk/jfr/tool/TestPrintXML.java
 
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
+
+
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
