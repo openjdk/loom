@@ -236,11 +236,17 @@ JvmtiVTMTDisabler::print_info() {
 #endif
 
 JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
+  if (Thread::current_or_null() == NULL) {
+    return; // detached thread, can be a call from Agent_OnLoad
+  }
   _is_SR = is_SR;
   disable_VTMT();
 }
 
 JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  if (Thread::current_or_null() == NULL) {
+    return; // detached thread, can be a call from Agent_OnLoad
+  }
   enable_VTMT();
 }
 
@@ -536,7 +542,6 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 
 void JvmtiThreadState::enter_interp_only_mode() {
   if (_thread == NULL) {
-    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
     ++_saved_interp_only_mode;
     // TBD: It seems, invalidate_cur_stack_depth() has to be called at VTMT?
   } else {
@@ -552,7 +557,6 @@ void JvmtiThreadState::enter_interp_only_mode() {
            virt, (void*)this, _thread->get_interp_only_mode(), _saved_interp_only_mode, name_str); fflush(0);
   }
 #endif
-    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
     _thread->increment_interp_only_mode();
     invalidate_cur_stack_depth();
   }

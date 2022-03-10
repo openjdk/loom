@@ -572,6 +572,7 @@ JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, j
   if (event_type == JVMTI_EVENT_CLASS_FILE_LOAD_HOOK && enabled) {
     record_class_file_load_hook_enabled();
   }
+  JvmtiVTMTDisabler vtmt_disabler;
 
   if (event_thread == NULL) {
     // Can be called at Agent_OnLoad() time with event_thread == NULL
@@ -584,7 +585,6 @@ JvmtiEnv::SetEventNotificationMode(jvmtiEventMode mode, jvmtiEvent event_type, j
     // We have a specified event_thread.
     JavaThread* java_thread = NULL;
     oop thread_obj = NULL;
-    JvmtiVTMTDisabler vtmt_disabler;
     ThreadsListHandle tlh;
 
     jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), event_thread, &java_thread, &thread_obj);
