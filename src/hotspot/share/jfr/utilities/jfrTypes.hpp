@@ -39,10 +39,6 @@ const u4 STACK_DEPTH_DEFAULT = 64;
 const u4 MIN_STACK_DEPTH = 1;
 const u4 MAX_STACK_DEPTH = 2048;
 
-const int jfr_epoch_shift = 48;
-const traceid jfr_id_mask = ((((traceid)1) << jfr_epoch_shift) - 1);
-const traceid jfr_epoch_mask = ~jfr_id_mask;
-
 enum ReservedEvent {
   EVENT_METADATA = 0,
   EVENT_CHECKPOINT = 1
