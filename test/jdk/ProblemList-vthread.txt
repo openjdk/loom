@@ -21,9 +21,6 @@ jdk/jfr/tool/TestPrintXML.java
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
 
-jdk/jfr/event/runtime/TestVMOperation.java                       8282877 generic-all
-jdk/jfr/event/runtime/TestJavaMonitorWaitEvent.java              8282877 generic-all
-
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
 java/foreign/handles/Driver.java
