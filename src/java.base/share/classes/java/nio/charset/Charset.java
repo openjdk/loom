@@ -25,6 +25,7 @@
 
 package java.nio.charset;
 
+import jdk.internal.misc.ThreadTracker;
 import jdk.internal.misc.VM;
 import sun.nio.cs.ThreadLocalCoders;
 import sun.security.action.GetPropertyAction;
@@ -47,7 +48,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.jar.JarFile;
 
 
 /**
@@ -371,23 +372,16 @@ public abstract class Charset
             };
     }
 
-    private static class ThreadTracker {
-        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
+    private static class ThreadTrackHolder {
+        static final ThreadTracker TRACKER = new ThreadTracker();
+    }
 
-        /**
-         * Adds the current thread to thread set. Returns true if
-         * added, false if already in the set.
-         */
-        static boolean tryBegin() {
-            return THREADS.add(Thread.currentThread());
-        }
+    private static Object tryBeginLookup() {
+        return ThreadTrackHolder.TRACKER.tryBegin();
+    }
 
-        /**
-         * Removes the current thread from the thread set.
-         */
-        static void end() {
-            THREADS.remove(Thread.currentThread());
-        }
+    private static void endLookup(Object key) {
+        ThreadTrackHolder.TRACKER.end(key);
     }
 
     @SuppressWarnings("removal")
@@ -403,7 +397,9 @@ public abstract class Charset
         //
         if (!VM.isBooted())
             return null;
-        if (!ThreadTracker.tryBegin()) {
+
+        Object key = tryBeginLookup();
+        if (key == null) {
             // Avoid recursive provider lookups
             return null;
         }
@@ -423,7 +419,7 @@ public abstract class Charset
                 });
 
         } finally {
-            ThreadTracker.end();
+            endLookup(key);
         }
     }
 

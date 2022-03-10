@@ -42,11 +42,10 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.ThreadTracker;
 import jdk.internal.misc.VM;
 import sun.net.util.IPAddressUtil;
 import sun.security.util.SecurityConstants;
@@ -1344,28 +1343,22 @@ public final class URL implements java.io.Serializable {
         };
     }
 
-    private static class ThreadTracker {
-        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
+    private static class ThreadTrackHolder {
+        static final ThreadTracker TRACKER = new ThreadTracker();
+    }
 
-        /**
-         * Adds the current thread to thread set. Returns true if
-         * added, false if already in the set.
-         */
-        static boolean tryBegin() {
-            return THREADS.add(Thread.currentThread());
-        }
+    private static Object tryBeginLookup() {
+        return ThreadTrackHolder.TRACKER.tryBegin();
+    }
 
-        /**
-         * Removes the current thread from the thread set.
-         */
-        static void end() {
-            THREADS.remove(Thread.currentThread());
-        }
+    private static void endLookup(Object key) {
+        ThreadTrackHolder.TRACKER.end(key);
     }
 
     @SuppressWarnings("removal")
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (!ThreadTracker.tryBegin()) {
+        Object key = tryBeginLookup();
+        if (key == null) {
             throw new Error("Circular loading of URL stream handler providers detected");
         }
         try {
@@ -1383,7 +1376,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            ThreadTracker.end();
+            endLookup(key);
         }
     }
 

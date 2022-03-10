@@ -27,6 +27,7 @@ package java.util.jar;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaUtilZipFileAccess;
+import jdk.internal.misc.ThreadTracker;
 import sun.security.action.GetPropertyAction;
 import sun.security.util.ManifestEntryVerifier;
 
@@ -46,8 +47,6 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
@@ -1035,29 +1034,16 @@ public class JarFile extends ZipFile {
         }
     }
 
-    private static class ThreadTracker {
-        static final Set<Thread> THREADS = ConcurrentHashMap.newKeySet();
+    private static class ThreadTrackHolder {
+        static final ThreadTracker TRACKER = new ThreadTracker();
+    }
 
-        /**
-         * Adds the current thread to thread set.
-         */
-        static void begin() {
-            THREADS.add(Thread.currentThread());
-        }
+    private static Object beginInit() {
+        return ThreadTrackHolder.TRACKER.begin();
+    }
 
-        /**
-         * Removes the current thread from the thread set.
-         */
-        static void end() {
-            THREADS.remove(Thread.currentThread());
-        }
-
-        /**
-         * Returns true if the given thread is in the thread set.
-         */
-        static boolean contains(Thread thread) {
-            return THREADS.contains(thread);
-        }
+    private static void endInit(Object key) {
+        ThreadTrackHolder.TRACKER.end(key);
     }
 
     synchronized void ensureInitialization() {
@@ -1067,18 +1053,18 @@ public class JarFile extends ZipFile {
             throw new RuntimeException(e);
         }
         if (jv != null && !jvInitialized) {
-            ThreadTracker.begin();
+            Object key = beginInit();
             try {
                 initializeVerifier();
                 jvInitialized = true;
             } finally {
-                ThreadTracker.end();
+                endInit(key);
             }
         }
     }
 
     static boolean isInitializing() {
-        return ThreadTracker.contains(Thread.currentThread());
+        return ThreadTrackHolder.TRACKER.contains(Thread.currentThread());
     }
 
     /*
