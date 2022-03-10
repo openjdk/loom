@@ -190,26 +190,28 @@ class JfrEvent {
     DEBUG_ONLY(assert_precondition();)
     Thread* const event_thread = Thread::current();
     JfrThreadLocal* const tl = event_thread->jfr_thread_local();
+    // Load the tid before the buffer and the writer (can recurse).
+    const traceid tid = T::hasThread ? JfrThreadLocal::thread_id(event_thread) : 0;
     JfrBuffer* const buffer = tl->native_buffer();
     if (buffer == NULL) {
       // most likely a pending OOM
       return;
     }
     bool large = is_large();
-    if (write_sized_event(buffer, event_thread, tl, large)) {
+    if (write_sized_event(buffer, event_thread, tid, tl, large)) {
       // Event written succesfully
       return;
     }
     if (!large) {
       // Try large size
-      if (write_sized_event(buffer, event_thread, tl, true)) {
+      if (write_sized_event(buffer, event_thread, tid, tl, true)) {
         // Event written succesfully, use large size from now on
         set_large();
       }
     }
   }
 
-  bool write_sized_event(JfrBuffer* const buffer, Thread* const event_thread, JfrThreadLocal* const tl, bool large_size) {
+  bool write_sized_event(JfrBuffer* const buffer, Thread* const event_thread, traceid tid, JfrThreadLocal* const tl, bool large_size) {
     JfrNativeEventWriter writer(buffer, event_thread);
     writer.begin_event_write(large_size);
     writer.write<u8>(T::eventId);
@@ -220,7 +222,7 @@ class JfrEvent {
       writer.write(_end_time - _start_time);
     }
     if (T::hasThread) {
-      writer.write(JfrThreadLocal::thread_id(event_thread));
+      writer.write(tid);
     }
     if (T::hasStackTrace) {
       if (is_stacktrace_enabled()) {
