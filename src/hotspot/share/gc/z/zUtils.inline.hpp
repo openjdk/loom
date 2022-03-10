@@ -46,10 +46,6 @@ inline size_t ZUtils::object_size(uintptr_t addr) {
   return words_to_bytes(ZOop::from_address(addr)->size());
 }
 
-inline size_t ZUtils::object_compact_size(uintptr_t addr) {
-  return words_to_bytes(ZOop::from_address(addr)->compact_size());
-}
-
 inline void ZUtils::object_copy_disjoint(uintptr_t from, uintptr_t to, size_t size) {
   ZOop::from_address(from)->copy_disjoint((HeapWord*)to, bytes_to_words(size));
 }
@@ -57,16 +53,6 @@ inline void ZUtils::object_copy_disjoint(uintptr_t from, uintptr_t to, size_t si
 inline void ZUtils::object_copy_conjoint(uintptr_t from, uintptr_t to, size_t size) {
   if (from != to) {
     ZOop::from_address(from)->copy_conjoint((HeapWord*)to, bytes_to_words(size));
-  }
-}
-
-inline void ZUtils::object_copy_disjoint_compact(uintptr_t from, uintptr_t to, size_t size) {
-  ZOop::from_address(from)->copy_disjoint_compact((HeapWord*)to, bytes_to_words(size));
-}
-
-inline void ZUtils::object_copy_conjoint_compact(uintptr_t from, uintptr_t to, size_t size) {
-  if (from != to) {
-    ZOop::from_address(from)->copy_conjoint_compact((HeapWord*)to, bytes_to_words(size));
   }
 }
 

@@ -143,13 +143,10 @@ public:
 
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;
-  virtual size_t compact_oop_size(oop obj) const override;
 
-  virtual size_t copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<copy_type::DISJOINT> (obj, to, word_size); }
-  virtual size_t copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { return copy<copy_type::CONJOINT>(obj, to, word_size); }
+  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { copy<copy_type::DISJOINT> (obj, to, word_size); }
+  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { copy<copy_type::CONJOINT>(obj, to, word_size); }
 
-  virtual size_t copy_disjoint_compact(oop obj, HeapWord* to) override { return copy_compact<copy_type::DISJOINT> (obj, to); }
-  virtual size_t copy_conjoint_compact(oop obj, HeapWord* to) override { return copy_compact<copy_type::CONJOINT>(obj, to); }
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -215,7 +212,6 @@ private:
   void build_bitmap(stackChunkOop chunk);
 
   template<copy_type disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
-  template<copy_type disjoint> size_t copy_compact(oop obj, HeapWord* to);
 
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);

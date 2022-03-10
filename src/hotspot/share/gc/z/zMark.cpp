@@ -338,7 +338,7 @@ void ZMark::mark_and_follow(ZMarkContext* context, ZMarkStackEntry entry) {
     // Update live objects/bytes for page. We use the aligned object
     // size since that is the actual number of bytes used on the page
     // and alignment paddings can never be reclaimed.
-    const size_t size = ZUtils::object_compact_size(addr);
+    const size_t size = ZUtils::object_size(addr);
     const size_t aligned_size = align_up(size, page->object_alignment());
     context->cache()->inc_live(page, aligned_size);
   }

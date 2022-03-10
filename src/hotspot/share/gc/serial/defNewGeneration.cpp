@@ -712,7 +712,7 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
 oop DefNewGeneration::copy_to_survivor_space(oop old) {
   assert(is_in_reserved(old) && !old->is_forwarded(),
          "shouldn't be scavenging this oop");
-  size_t s = old->compact_size();
+  size_t s = old->size();
   oop obj = NULL;
 
   // Try allocating obj in to-space (unless too old)
@@ -735,7 +735,7 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
     Prefetch::write(obj, interval);
 
     // Copy obj
-    old->copy_disjoint_compact(cast_from_oop<HeapWord*>(obj), s);
+    old->copy_disjoint(cast_from_oop<HeapWord*>(obj), s);
 
     // Increment age if obj still in new generation
     obj->incr_age();

@@ -452,7 +452,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // Get the klass once.  We'll need it again later, and this avoids
   // re-decoding when it's compressed.
   Klass* klass = old->klass();
-  const size_t word_sz = old->compact_size_given_klass(klass);
+  const size_t word_sz = old->size_given_klass(klass);
 
   uint age = 0;
   G1HeapRegionAttr dest_attr = next_region_attr(region_attr, old_mark, age);
@@ -485,7 +485,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // We're going to allocate linearly, so might as well prefetch ahead.
   Prefetch::write(obj_ptr, PrefetchCopyIntervalInBytes);
-  old->copy_disjoint_compact(obj_ptr, word_sz);
+  old->copy_disjoint(obj_ptr, word_sz);
 
   const oop obj = cast_to_oop(obj_ptr);
   // Because the forwarding is done with memory_order_relaxed there is no

@@ -2013,9 +2013,6 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
                                                                             \
-  product(bool, TrimContinuationChunksInGC, false,                          \
-         "Trim stack chunks when copying objects in GC (PREVIEW)")          \
-                                                                            \
   product(bool, UseChunkBitmaps, false,                                     \
          "Generate oop bitmaps for continuation chunks (PREVIEW)")          \
                                                                             \
