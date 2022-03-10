@@ -39,11 +39,7 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 # Loom specific
 
-# -Xcomp causes SA failures due to full GC during codecache sweeping
-serviceability/sa/ClhsdbScanOops.java#id0                                    8279662 generic-all
-serviceability/sa/ClhsdbScanOops.java#id1                                    8279662 generic-all
-
-serviceability/dcmd/vm/ClassLoaderStatsTest.java                8278123 generic-all
+serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
 
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all
