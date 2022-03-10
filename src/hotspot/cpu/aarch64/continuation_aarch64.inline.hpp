@@ -128,6 +128,11 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
     || (f.unextended_sp() == f.sp()), "");
   assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
 
+  // on AARCH64, we may insert padding between the locals and the rest of the frame
+  // (see TemplateInterpreterGenerator::generate_normal_entry, and AbstractInterpreter::layout_activation)
+  // so we compute locals "from scratch" rather than relativizing the value in the stack frame, which might include padding,
+  // since we don't freeze the padding word (see recurse_freeze_interpreted_frame).
+
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;

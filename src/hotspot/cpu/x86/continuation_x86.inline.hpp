@@ -128,6 +128,9 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
     || (f.unextended_sp() == f.sp()), "");
   assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
 
+  // We compute the locals as below rather than relativize the value in the frame because then we can use the same
+  // code on AArch64, which has an added complication (see this method in continuation_aarch64.inline.hpp)
+
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;

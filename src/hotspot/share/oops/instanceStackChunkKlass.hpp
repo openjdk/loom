@@ -48,7 +48,7 @@ template <chunk_frames = chunk_frames::MIXED> class StackChunkFrameStream;
 // must contain only compiled Java frames.
 //
 // Interpreter frames in chunks have their internal pointers converted to
-// relative offsets from sp. Derived pointers in compiled frames might also
+// relative offsets from fp. Derived pointers in compiled frames might also
 // be converted to relative offsets from their base.
 
 /************************************************
