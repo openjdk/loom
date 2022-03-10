@@ -382,7 +382,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                           GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   static jvmtiError check_top_frame(Thread* current_thread, JavaThread* java_thread,
                                     jvalue value, TosState tos, Handle* ret_ob_h);
-  jvmtiError force_early_return(JavaThread* java_thread, jvalue value, TosState tos);
+  jvmtiError force_early_return(jthread thread, jvalue value, TosState tos);
 };
 
 // This class is the only safe means of iterating through environments.

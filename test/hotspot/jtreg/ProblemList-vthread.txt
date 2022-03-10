@@ -512,7 +512,7 @@ vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage006/TestDescription.java
 ## NSK JDB Tests failing with wrapper
 
 ####
-## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
+## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_OPAQUE_FRAME)
 
 vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
 vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
@@ -547,7 +547,7 @@ vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
 
 ####
-## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
+## JVMTI PopFrame() is returning OPAQUE_FRAME because vthreads are not supported.
 
 vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc01x002/TestDescription.java

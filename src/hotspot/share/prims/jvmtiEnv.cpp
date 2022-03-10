@@ -1830,10 +1830,30 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
 } /* end GetFrameCount */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::PopFrame(JavaThread* java_thread) {
+JvmtiEnv::PopFrame(jthread thread) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = NULL;
+
+  if (thread == NULL) {
+    return JVMTI_ERROR_INVALID_THREAD;
+  }
   JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    return JVMTI_ERROR_OPAQUE_FRAME;
+  }
   // retrieve or create the state
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
@@ -1841,7 +1861,6 @@ JvmtiEnv::PopFrame(JavaThread* java_thread) {
   }
 
   // Eagerly reallocate scalar replaced objects.
-  JavaThread* current_thread = JavaThread::current();
   EscapeBarrier eb(true, current_thread, java_thread);
   if (!eb.deoptimize_objects(1)) {
     // Reallocation of scalar replaced objects failed -> return with error
@@ -1960,57 +1979,57 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
   // Force Early Return functions
   //
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnObject(JavaThread* java_thread, jobject value) {
+JvmtiEnv::ForceEarlyReturnObject(jthread thread, jobject value) {
   jvalue val;
   val.l = value;
-  return force_early_return(java_thread, val, atos);
+  return force_early_return(thread, val, atos);
 } /* end ForceEarlyReturnObject */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnInt(JavaThread* java_thread, jint value) {
+JvmtiEnv::ForceEarlyReturnInt(jthread thread, jint value) {
   jvalue val;
   val.i = value;
-  return force_early_return(java_thread, val, itos);
+  return force_early_return(thread, val, itos);
 } /* end ForceEarlyReturnInt */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnLong(JavaThread* java_thread, jlong value) {
+JvmtiEnv::ForceEarlyReturnLong(jthread thread, jlong value) {
   jvalue val;
   val.j = value;
-  return force_early_return(java_thread, val, ltos);
+  return force_early_return(thread, val, ltos);
 } /* end ForceEarlyReturnLong */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnFloat(JavaThread* java_thread, jfloat value) {
+JvmtiEnv::ForceEarlyReturnFloat(jthread thread, jfloat value) {
   jvalue val;
   val.f = value;
-  return force_early_return(java_thread, val, ftos);
+  return force_early_return(thread, val, ftos);
 } /* end ForceEarlyReturnFloat */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnDouble(JavaThread* java_thread, jdouble value) {
+JvmtiEnv::ForceEarlyReturnDouble(jthread thread, jdouble value) {
   jvalue val;
   val.d = value;
-  return force_early_return(java_thread, val, dtos);
+  return force_early_return(thread, val, dtos);
 } /* end ForceEarlyReturnDouble */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
+// Threads_lock NOT held
 jvmtiError
-JvmtiEnv::ForceEarlyReturnVoid(JavaThread* java_thread) {
+JvmtiEnv::ForceEarlyReturnVoid(jthread thread) {
   jvalue val;
   val.j = 0L;
-  return force_early_return(java_thread, val, vtos);
+  return force_early_return(thread, val, vtos);
 } /* end ForceEarlyReturnVoid */
 
 

@@ -2961,7 +2961,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread/>
+          <jthread impl="noconvert"/>
             <description>
               The thread whose current frame is to be popped.
             </description>
@@ -3121,7 +3121,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>
@@ -3174,7 +3174,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>
@@ -3222,7 +3222,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>
@@ -3267,7 +3267,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>
@@ -3312,7 +3312,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>
@@ -3357,7 +3357,7 @@ err = (*jvmti)-&gt;Deallocate(jvmti, stack_info);
       </capabilities>
       <parameters>
         <param id="thread">
-          <jthread null="current"/>
+          <jthread null="current" impl="noconvert"/>
           <description>
             The thread whose current frame is to return early.
           </description>

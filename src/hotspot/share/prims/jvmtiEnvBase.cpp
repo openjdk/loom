@@ -1903,10 +1903,27 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
 // The ForceEarlyReturn forces return from method so the execution
 // continues at the bytecode following the method call.
 
-// java_thread - protected by ThreadsListHandle and pre-checked
-
 jvmtiError
-JvmtiEnvBase::force_early_return(JavaThread* java_thread, jvalue value, TosState tos) {
+JvmtiEnvBase::force_early_return(jthread thread, jvalue value, TosState tos) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = NULL;
+
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    return JVMTI_ERROR_OPAQUE_FRAME;
+  }
+
   // retrieve or create the state
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
@@ -1914,7 +1931,6 @@ JvmtiEnvBase::force_early_return(JavaThread* java_thread, jvalue value, TosState
   }
 
   // Eagerly reallocate scalar replaced objects.
-  JavaThread* current_thread = JavaThread::current();
   EscapeBarrier eb(true, current_thread, java_thread);
   if (!eb.deoptimize_objects(0)) {
     // Reallocation of scalar replaced objects failed -> return with error
