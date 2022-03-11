@@ -3254,10 +3254,6 @@ void java_lang_StackFrameInfo::to_stack_trace_element(Handle stackFrame, Handle 
   java_lang_StackTraceElement::fill_in(stack_trace_element, holder, methodHandle(THREAD, method), version, bci, name, CHECK);
 }
 
-void java_lang_StackTraceElement::set_contScopeName(oop element, oop value) {
-  element->obj_field_put(_contScopeName_offset, value);
-}
-
 void java_lang_StackFrameInfo::set_version(oop element, short value) {
   element->short_field_put(_version_offset, value);
 }
@@ -4892,7 +4888,6 @@ int java_lang_StackTraceElement::_moduleVersion_offset;
 int java_lang_StackTraceElement::_classLoaderName_offset;
 int java_lang_StackTraceElement::_declaringClass_offset;
 int java_lang_StackTraceElement::_declaringClassObject_offset;
-int java_lang_StackTraceElement::_contScopeName_offset;
 
 #define STACKTRACEELEMENT_FIELDS_DO(macro) \
   macro(_declaringClassObject_offset,  k, "declaringClassObject", class_signature, false); \
@@ -4902,8 +4897,7 @@ int java_lang_StackTraceElement::_contScopeName_offset;
   macro(_declaringClass_offset,  k, "declaringClass",  string_signature, false); \
   macro(_methodName_offset,      k, "methodName",      string_signature, false); \
   macro(_fileName_offset,        k, "fileName",        string_signature, false); \
-  macro(_lineNumber_offset,      k, "lineNumber",      int_signature,    false); \
-  macro(_contScopeName_offset,   k, "contScopeName",   string_signature, false)
+  macro(_lineNumber_offset,      k, "lineNumber",      int_signature,    false)
 
 // Support for java_lang_StackTraceElement
 void java_lang_StackTraceElement::compute_offsets() {

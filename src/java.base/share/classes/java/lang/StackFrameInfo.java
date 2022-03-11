@@ -26,12 +26,10 @@ package java.lang;
 
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
 
 import java.lang.StackWalker.StackFrame;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Method;
 
 class StackFrameInfo implements StackFrame {
     private static final JavaLangInvokeAccess JLIA =
