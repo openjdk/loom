@@ -59,9 +59,6 @@ class StackFrameInfo implements StackFrame {
         return JLIA.getDeclaringClass(memberName);
     }
 
-    protected void clear() {
-    }
-
     // ----- implementation of StackFrame methods
 
     @Override
