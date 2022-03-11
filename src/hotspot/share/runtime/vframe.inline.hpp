@@ -72,7 +72,7 @@ inline void vframeStreamCommon::next() {
       cont_entry = true;
 
       // TODO: handle ShowCarrierFrames
-      oop scope = jdk_internal_vm_Continuation::scope(_cont->cont_oop());
+      oop scope = _cont->scope();
       if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
         _mode = at_end_mode;
         break;
@@ -106,9 +106,6 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
   _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
   _cont = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (_cont != NULL && Continuation::is_continuation_enterSpecial(_frame)) {
-      _cont = _cont->parent();
-    }
     _frame = _frame.sender(&_reg_map);
   }
   // assert (_reg_map.stack_chunk()() == (stackChunkOop)NULL, "map.chunk: " INTPTR_FORMAT, p2i((stackChunkOopDesc*)_reg_map.stack_chunk()()));
@@ -260,6 +257,7 @@ inline bool vframeStreamCommon::fill_from_frame() {
     return true;
   }
 
+  assert (!Continuation::is_continuation_enterSpecial(_frame), "");
   return false;
 }
 

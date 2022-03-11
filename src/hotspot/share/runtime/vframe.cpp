@@ -568,10 +568,6 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   _frame = _thread->last_frame();
   _cont = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (Continuation::is_continuation_enterSpecial(_frame)) {
-      assert (_cont != NULL, "");
-      _cont = _cont->parent();
-    }
     _frame = _frame.sender(&_reg_map);
   }
 }
