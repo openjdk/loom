@@ -103,8 +103,7 @@ public:
   inline void set_gc_mode(bool value);
   inline bool has_bitmap() const;
   inline void set_has_bitmap(bool value);
-  template <typename OopT, gc_type gc> inline bool should_fix() const;
-  inline bool requires_barriers() const;
+  inline bool requires_barriers();
 
   inline BitMapView bitmap() const;
   inline BitMap::idx_t bit_offset() const;
@@ -161,13 +160,5 @@ private:
   inline void relativize_frame_pd(frame& fr) const;
   inline void derelativize_frame_pd(frame& fr) const;
 };
-
-#ifndef CHECK_UNHANDLED_OOPS
-typedef class stackChunkOopDesc* stackChunkOop;
-#else
-DEF_OOP(stackChunk);
-#endif // CHECK_UNHANDLED_OOPS
-
-DEF_HANDLE(stackChunk, is_stackChunk_noinline)
 
 #endif // SHARE_OOPS_STACKCHUNKOOP_HPP

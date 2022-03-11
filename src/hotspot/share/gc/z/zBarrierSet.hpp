@@ -37,7 +37,7 @@ public:
 
   // Loom support
   static constexpr bool is_concurrent_gc() { return true; }
-  static bool requires_barriers(oop obj);
+  static bool requires_barriers(stackChunkOop obj);
 
   virtual void on_thread_create(Thread* thread);
   virtual void on_thread_destroy(Thread* thread);

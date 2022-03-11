@@ -107,7 +107,7 @@ oop_store_not_in_heap(T* addr, oop new_value) {
   Raw::oop_store(addr, new_value);
 }
 
-inline bool G1BarrierSet::requires_barriers(oop obj) {
+inline bool G1BarrierSet::requires_barriers(stackChunkOop obj) {
   return G1CollectedHeap::heap()->G1CollectedHeap::requires_barriers(obj);
 }
 

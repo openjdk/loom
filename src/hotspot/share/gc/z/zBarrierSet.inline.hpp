@@ -240,7 +240,7 @@ inline oop ZBarrierSet::AccessBarrier<decorators, BarrierSetT>::oop_atomic_xchg_
   return Raw::oop_atomic_xchg_not_in_heap(addr, new_value);
 }
 
-inline bool ZBarrierSet::requires_barriers(oop obj) {
+inline bool ZBarrierSet::requires_barriers(stackChunkOop obj) {
   return ZCollectedHeap::heap()->ZCollectedHeap::requires_barriers(obj);
 }
 

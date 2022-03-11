@@ -60,7 +60,6 @@ inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_vm_StackChunk:
 template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_vm_StackChunk::set_cont_raw<P>(this, value); }
 inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
 template<typename P> inline oop stackChunkOopDesc::cont() const {
-  // this is a special field used to detect GC processing status (see should_fix) and so we don't want to invoke a barrier directly on it
   oop obj = jdk_internal_vm_StackChunk::cont_raw<P>(as_oop());
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
@@ -122,13 +121,9 @@ inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
 inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
-inline bool stackChunkOopDesc::requires_barriers() const {
-  return Universe::heap()->requires_barriers(as_oop());
-}
 
-template <typename OopT, gc_type gc>
-inline bool stackChunkOopDesc::should_fix() const {
-  return InstanceStackChunkKlass::should_fix<OopT, gc>(const_cast<stackChunkOopDesc*>(this));
+inline bool stackChunkOopDesc::requires_barriers() {
+  return Universe::heap()->requires_barriers(this);
 }
 
 inline bool stackChunkOopDesc::has_mixed_frames() const         { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }

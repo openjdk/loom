@@ -382,7 +382,7 @@ class CollectedHeap : public CHeapObj<mtGC> {
   // when stack chunks are stored into it.
   // StackChunk objects may be reused, the GC must not assume that a StackChunk object is always a freshly
   // allocated object.
-  virtual bool requires_barriers(oop obj) const = 0;
+  virtual bool requires_barriers(stackChunkOop obj) const = 0;
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
   // that it should answer "false" for the concurrent part of a concurrent

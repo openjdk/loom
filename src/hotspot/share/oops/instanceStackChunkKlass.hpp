@@ -197,9 +197,6 @@ public:
 public:
   static void relativize_chunk(stackChunkOop chunk);
 
-  template <typename OopT, gc_type>
-  static inline bool should_fix(const stackChunkOop chunk);
-
   template <barrier_type>
   static void do_barriers(stackChunkOop chunk);
 

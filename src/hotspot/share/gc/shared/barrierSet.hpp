@@ -92,7 +92,7 @@ public:
   bool is_a(BarrierSet::Name bsn) const { return _fake_rtti.has_tag(bsn); }
 
   // Loom support
-  static bool requires_barriers(oop obj);
+  static bool requires_barriers(stackChunkOop obj);
 
   // End of fake RTTI support.
 

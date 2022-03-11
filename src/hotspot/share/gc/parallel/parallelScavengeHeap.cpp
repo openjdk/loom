@@ -231,7 +231,7 @@ bool ParallelScavengeHeap::is_in_reserved(const void* p) const {
   return young_gen()->is_in_reserved(p) || old_gen()->is_in_reserved(p);
 }
 
-bool ParallelScavengeHeap::requires_barriers(oop p) const {
+bool ParallelScavengeHeap::requires_barriers(stackChunkOop p) const {
   return !is_in_young(p);
 }
 

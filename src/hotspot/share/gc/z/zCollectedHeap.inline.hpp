@@ -26,10 +26,28 @@
 
 #include "gc/z/zCollectedHeap.hpp"
 
+#include "gc/z/zAddress.inline.hpp"
 #include "gc/z/zHeap.inline.hpp"
 
-inline bool ZCollectedHeap::requires_barriers(oop obj) const {
-  return !_heap.is_allocating(cast_from_oop<uintptr_t>(obj));
+inline bool ZCollectedHeap::requires_barriers(stackChunkOop obj) const {
+  uintptr_t* cont_addr = obj->field_addr<uintptr_t>(jdk_internal_vm_StackChunk::cont_offset());
+
+  if (!_heap.is_allocating(cast_from_oop<uintptr_t>(obj))) {
+    // An object that isn't allocating, is visible from GC tracing. Such
+    // stack chunks require barriers.
+    return true;
+  }
+
+  if (!ZAddress::is_good_or_null(*cont_addr)) {
+    // If a chunk is allocated after a GC started, but before relocate start
+    // we can have an allocating chunk that isn't deeply good. That means that
+    // the contained oops might be bad and require GC barriers.
+    return true;
+  }
+
+  // The chunk is allocating and its pointers are good. This chunk needs no
+  // GC barriers
+  return false;
 }
 
 #endif // SHARE_GC_Z_ZCOLLECTEDHEAP_INLINE_HPP

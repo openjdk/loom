@@ -210,7 +210,7 @@ public:
   // Assumes the the young gen address range is less than that of the old gen.
   bool is_in_young(oop p) const;
 
-  virtual bool requires_barriers(oop obj) const { return !is_in_young(obj); }
+  virtual bool requires_barriers(stackChunkOop obj) const { return !is_in_young(obj); }
 
 #ifdef ASSERT
   bool is_in_partial_collection(const void* p);

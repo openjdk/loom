@@ -230,12 +230,8 @@ enum class oop_kind { NARROW, WIDE };
 template <oop_kind oops, typename BarrierSetT>
 class Config {
 public:
-
   typedef Config<oops, BarrierSetT> SelfT;
   typedef typename Conditional<oops == oop_kind::NARROW, narrowOop, oop>::type OopT;
-  static const oop_kind _oops = oops;
-  static const gc_type _gc = BarrierSetT::is_concurrent_gc() ? gc_type::CONCURRENT : gc_type::STW;
-  // static const bool _post_barrier = post_barrier;
 
   static int freeze(JavaThread* thread, intptr_t* const sp) {
     return freeze0<SelfT, false>(thread, sp);
@@ -250,14 +246,8 @@ public:
     return thaw0<SelfT>(thread, kind);
   }
 
-  static bool requires_barriers(oop obj) {
+  static bool requires_barriers(stackChunkOop obj) {
     return BarrierSetT::requires_barriers(obj);
-  }
-
-  static void print() {
-    tty->print_cr(">>> Config compressed_oops: %d concurrent_gc: %d", _oops, _gc);
-    // tty->print_cr(">>> Config UseAVX: %ld UnalignedLoadStores: %d Enhanced REP MOVSB: %d Fast Short REP MOVSB: %d rdtscp: %d rdpid: %d", UseAVX, UseUnalignedLoadStores, VM_Version::supports_erms(), VM_Version::supports_fsrm(), VM_Version::supports_rdtscp(), VM_Version::supports_rdpid());
-    // tty->print_cr(">>> Config avx512bw (not legacy bw): %d avx512dq (not legacy dq): %d avx512vl (not legacy vl): %d avx512vlbw (not legacy vlbw): %d", VM_Version::supports_avx512bw(), VM_Version::supports_avx512dq(), VM_Version::supports_avx512vl(), VM_Version::supports_avx512vlbw());
   }
 };
 
@@ -1810,18 +1800,16 @@ public:
     HeapWord* start = current->tlab().allocate(size_in_words);
     if (start != nullptr) {
       chunk = (stackChunkOop)allocator.initialize(start);
-
-      assert (chunk != nullptr, "");
-      // requires_barriers can be expensive
-      assert (!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
     } else {
       //HandleMark hm(current);
       Handle conth(current, _cont.mirror());
       chunk = (stackChunkOop)allocator.allocate(); // can safepoint
       _cont.post_safepoint(conth);
 
-      if (chunk == nullptr)  // OOME
+      if (chunk == nullptr) {
+        // OOME
         return nullptr;
+      }
 
       _barriers = ConfigT::requires_barriers(chunk);
     }
@@ -1854,6 +1842,12 @@ public:
     chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
     chunk->set_cont_raw<typename ConfigT::OopT>(_cont.mirror());
     assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
+
+    if (start != nullptr) {
+      assert(!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
+    } else {
+      _barriers = ConfigT::requires_barriers(chunk);
+    }
 
     _cont.set_tail(chunk);
     return chunk;
@@ -2249,8 +2243,7 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-    _barriers =   (chunk->should_fix<typename ConfigT::OopT, ConfigT::_gc>()
-               || ConfigT::requires_barriers(chunk));
+    _barriers = ConfigT::requires_barriers(chunk);
     return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                           : thaw_slow(chunk, kind != thaw_top);
   }
@@ -3112,8 +3105,6 @@ private:
 
     // if we want, we could templatize by king and have three different that entries
     thaw_entry   = (address)thaw<SelectedConfigT>;
-
-    // SelectedConfigT::print();
   }
 };
 

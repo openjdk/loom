@@ -186,7 +186,7 @@ class ParallelScavengeHeap : public CollectedHeap {
 
   bool is_in_young(const oop p) const;
 
-  virtual bool requires_barriers(oop obj) const;
+  virtual bool requires_barriers(stackChunkOop obj) const;
 
   MemRegion reserved_region() const { return _reserved; }
   HeapWord* base() const { return _reserved.start(); }

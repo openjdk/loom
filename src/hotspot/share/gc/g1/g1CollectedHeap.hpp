@@ -1180,7 +1180,7 @@ public:
   size_t unsafe_max_tlab_alloc(Thread* ignored) const override;
 
   inline bool is_in_young(const oop obj) const;
-  inline bool requires_barriers(oop obj) const override;
+  inline bool requires_barriers(stackChunkOop obj) const override;
 
   // Returns "true" iff the given word_size is "very large".
   static bool is_humongous(size_t word_size) {

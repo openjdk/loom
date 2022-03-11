@@ -56,7 +56,7 @@ class G1BarrierSet: public CardTableBarrierSet {
   }
 
   // Loom support
-  static bool requires_barriers(oop obj);
+  static bool requires_barriers(stackChunkOop obj);
 
   // Add "pre_val" to a set of objects that may have been disconnected from the
   // pre-marking object graph.

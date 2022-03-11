@@ -59,7 +59,7 @@ inline bool BarrierSet::AccessBarrier<decorators, BarrierSetT>::oop_arraycopy_in
   return true;
 }
 
-inline bool BarrierSet::requires_barriers(oop obj) {
+inline bool BarrierSet::requires_barriers(stackChunkOop obj) {
   return Universe::heap()->requires_barriers(obj);
 }
 
