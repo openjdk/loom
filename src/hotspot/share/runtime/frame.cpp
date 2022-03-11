@@ -1186,8 +1186,8 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   }
 #endif
   if (is_interpreted_frame()) {
-    map->thread() != NULL ? oops_interpreted_do<addressing::ABSOLUTE>(f, map, use_interpreter_oop_map_cache)
-                          : oops_interpreted_do<addressing::RELATIVE>(f, map, use_interpreter_oop_map_cache);
+    !map->in_cont() ? oops_interpreted_do<addressing::ABSOLUTE>(f, map, use_interpreter_oop_map_cache)
+                    : oops_interpreted_do<addressing::RELATIVE>(f, map, use_interpreter_oop_map_cache);
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
   } else if (is_optimized_entry_frame()) {
