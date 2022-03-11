@@ -428,9 +428,7 @@ void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) 
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
-  (UseZGC || UseShenandoahGC)
-    ? oop_oop_iterate_stack<gc_type::CONCURRENT, OopClosureType>(chunk, closure)
-    : oop_oop_iterate_stack<gc_type::STW,        OopClosureType>(chunk, closure);
+  oop_oop_iterate_stack<OopClosureType>(chunk, closure);
   oop_oop_iterate_header<T>(chunk, closure);
 }
 
@@ -439,9 +437,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* c
   assert (obj->is_stackChunk(), "");
   assert(!Devirtualizer::do_metadata(closure), "Code to handle metadata is not implemented");
   stackChunkOop chunk = (stackChunkOop)obj;
-  (UseZGC || UseShenandoahGC)
-    ? oop_oop_iterate_stack<gc_type::CONCURRENT, OopClosureType>(chunk, closure)
-    : oop_oop_iterate_stack<gc_type::STW,        OopClosureType>(chunk, closure);
+  oop_oop_iterate_stack<OopClosureType>(chunk, closure);
   oop_oop_iterate_header<T>(chunk, closure);
 }
 
@@ -454,7 +450,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
       Devirtualizer::do_klass(closure, this);
     }
   }
-  oop_oop_iterate_stack_bounded<gc_type::STW>(chunk, closure, mr);
+  oop_oop_iterate_stack_bounded(chunk, closure, mr);
   oop_oop_iterate_header_bounded<T>(chunk, closure, mr);
 }
 
@@ -482,7 +478,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
   }
 }
 
-template <gc_type gc, class OopClosureType>
+template <class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
   if (LIKELY(chunk->has_bitmap())) {
     intptr_t* start = chunk->sp_address() - metadata_words();
@@ -492,16 +488,16 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
     if ((intptr_t*)mr.end()   < end)   end   = (intptr_t*)mr.end();
     oop_oop_iterate_stack_helper(chunk, closure, start, end);
   } else {
-    oop_oop_iterate_stack_slow<gc>(chunk, closure, mr);
+    oop_oop_iterate_stack_slow(chunk, closure, mr);
   }
 }
 
-template <gc_type gc, class OopClosureType>
+template <class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
   if (LIKELY(chunk->has_bitmap())) {
     oop_oop_iterate_stack_helper(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
   } else {
-    oop_oop_iterate_stack_slow<gc>(chunk, closure, chunk->range());
+    oop_oop_iterate_stack_slow(chunk, closure, chunk->range());
   }
 }
 

@@ -39,7 +39,6 @@ typedef VMRegImpl* VMReg;
 
 
 enum chunk_frames { COMPILED_ONLY, MIXED };
-enum gc_type { STW, CONCURRENT }; // GC moving
 enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
 
 // A continuation stack-chunk oop.

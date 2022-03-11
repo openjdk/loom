@@ -108,7 +108,6 @@ void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
 
 
 // We replace derived pointers with offsets; the converse is done in DerelativizeDerivedPointers
-template <gc_type gc>
 class RelativizeDerivedPointers : public DerivedOopClosure {
 public:
   RelativizeDerivedPointers() {}
@@ -124,14 +123,14 @@ public:
     assert (!CompressedOops::is_base(base), "");
 
 #if INCLUDE_ZGC
-    if (gc == gc_type::CONCURRENT && UseZGC) {
+    if (UseZGC) {
       if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
         return;
       }
     }
 #endif
 #if INCLUDE_SHENANDOAHGC
-    if (gc == gc_type::CONCURRENT && UseShenandoahGC) {
+    if (UseShenandoahGC) {
       if (!ShenandoahHeap::heap()->in_collection_set(base)) {
         return;
       }
@@ -220,7 +219,6 @@ public:
   }
 };
 
-template <gc_type gc>
 class OopOopIterateStackClosure {
   stackChunkOop _chunk;
   OopIterateClosure* const _closure;
@@ -260,11 +258,10 @@ public:
   }
 };
 
-template <gc_type gc>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   assert (chunk->is_stackChunk(), "");
 
-  OopOopIterateStackClosure<gc> frame_closure(chunk, closure, mr);
+  OopOopIterateStackClosure frame_closure(chunk, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
   assert (frame_closure._num_frames >= 0, "");
@@ -274,9 +271,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
     Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
   }
 }
-
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<gc_type::STW>        (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
-template void InstanceStackChunkKlass::oop_oop_iterate_stack_slow<gc_type::CONCURRENT> (stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
 class MarkMethodsStackClosure {
   OopIterateClosure* _closure;
@@ -304,20 +298,16 @@ void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosur
   chunk->iterate_stack(&closure);
 }
 
-template <gc_type gc, chunk_frames frame_kind, typename RegisterMapT>
+template <chunk_frames frame_kind, typename RegisterMapT>
 void InstanceStackChunkKlass::relativize_derived_pointers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-  RelativizeDerivedPointers<gc> derived_closure;
+  RelativizeDerivedPointers derived_closure;
   f.iterate_derived_pointers(&derived_closure, map);
 }
 
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::STW>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
-template void InstanceStackChunkKlass::relativize_derived_pointers<gc_type::CONCURRENT> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
 
 template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
@@ -338,9 +328,7 @@ void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunk
   assert (!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
   bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
   if (has_derived) {
-    if (UseZGC || UseShenandoahGC) {
-      relativize_derived_pointers<gc_type::CONCURRENT>(f, map);
-    }
+    relativize_derived_pointers(f, map);
   }
 
   if (chunk->has_bitmap() && UseCompressedOops) {
@@ -390,7 +378,7 @@ public:
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
     if (has_derived) {
-      RelativizeDerivedPointers<gc_type::CONCURRENT> derived_closure;
+      RelativizeDerivedPointers derived_closure;
       f.iterate_derived_pointers(&derived_closure, map);
     }
     return true;
@@ -483,7 +471,7 @@ public:
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (!_chunk->is_gc_mode() && f.is_compiled() && f.oopmap()->has_derived_oops()) {
-      RelativizeDerivedPointers<gc_type::STW> derived_oops_closure;
+      RelativizeDerivedPointers derived_oops_closure;
       f.iterate_derived_pointers(&derived_oops_closure, map);
     }
 

@@ -112,7 +112,7 @@ private:
   template <chunk_frames frames> friend class StackChunkFrameStream;
   friend class FixChunkIterateStackClosure;
   friend class MarkMethodsStackClosure;
-  template <gc_type gc> friend class OopOopIterateStackClosure;
+  friend class OopOopIterateStackClosure;
   template <barrier_type barrier> friend class DoBarriersStackClosure;
 
 public:
@@ -217,10 +217,10 @@ private:
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
-  template <gc_type, class OopClosureType>
+  template <class OopClosureType>
   inline void oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure);
 
-  template <gc_type, class OopClosureType>
+  template <class OopClosureType>
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
   template <class OopClosureType>
@@ -231,10 +231,9 @@ private:
   template <chunk_frames frames, class StackChunkFrameClosureType>
   static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
 
-  template <gc_type>
   void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
 
-  template <gc_type, chunk_frames frames, typename RegisterMapT>
+  template <chunk_frames frames, typename RegisterMapT>
   static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
