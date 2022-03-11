@@ -541,13 +541,12 @@ vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
 
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
 
-####
-## JVMTI SetLocalXXX() is returning OPAQUE_FRAME because vthreads are not except with topmost farme.
-
-vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
 
 ####
 ## JVMTI PopFrame() is returning OPAQUE_FRAME because vthreads are not supported.
+## Note: vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001 was converted
+## to support vthreads and expect the OPAQUE_FRAME error. The others were
+## not because they don't add any additional value.
 
 vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc01x002/TestDescription.java
@@ -559,15 +558,15 @@ vmTestbase/nsk/jdi/BScenarios/hotswap/tc06x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc08x001/TestDescription.java
 vmTestbase/nsk/jdi/BScenarios/hotswap/tc10x002/TestDescription.java
 
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
 vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
 
 ####
-## JVMTI ForceEarlyReturn not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
+## JVMTI ForceEarlyReturn not supported for vthreads (JVMTI_ERROR_OPAQUE_FRAME)
+## Note forceEarlyReturn002 was converted to support vthreads. The rest were not
+## since there is no added value (JVMTI_ERROR_OPAQUE_FRAME is expected).
 
-vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn002/forceEarlyReturn002.java
 vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEarlyReturn014.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
 vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java

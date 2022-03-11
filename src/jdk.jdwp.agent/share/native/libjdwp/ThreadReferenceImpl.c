@@ -595,13 +595,6 @@ forceEarlyReturn(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* "forceEarlyReturn" is not supported on a vthread. Although JVMTI will produce INVALID_THREAD,
-       we check here and force the error to make it obvious to the reader. */
-    if (isVThread(thread)) {
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
     typeKey = inStream_readByte(in);
     if (inStream_error(in)) {
         return JNI_TRUE;

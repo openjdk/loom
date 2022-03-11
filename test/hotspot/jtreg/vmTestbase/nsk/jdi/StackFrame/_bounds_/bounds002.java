@@ -184,12 +184,24 @@ public class bounds002 {
             complain("Unexpected " + e);
             exitStatus = Consts.TEST_FAILED;
         }
+        boolean vthreadMode = "Virtual".equals(System.getProperty("main.wrapper"));
         try {
             stackFrame.setValue(var, null);
-            display("OK");
+            if (vthreadMode) {
+                // should have failed because stackFrame is not the topmost frame
+                complain("Expected OpaqueFrameException");
+                exitStatus = Consts.TEST_FAILED;
+            } else {
+                display("OK");
+            }
         } catch(Exception e) {
-            complain("Unexpected " + e);
-            exitStatus = Consts.TEST_FAILED;
+            if (vthreadMode && e instanceof OpaqueFrameException) {
+                // pass
+                display("OK");
+            } else {
+                complain("Unexpected " + e);
+                exitStatus = Consts.TEST_FAILED;
+            }
         }
         display("");
 
