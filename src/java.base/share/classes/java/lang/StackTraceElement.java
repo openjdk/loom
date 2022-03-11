@@ -396,7 +396,7 @@ public final class StackTraceElement implements java.io.Serializable {
      * where {@code equals} has the semantics of {@link
      * java.util.Objects#equals(Object, Object) Objects.equals}.
      *
-     * @param  objStac the object to be compared with this stack trace element.
+     * @param  obj the object to be compared with this stack trace element.
      * @return true if the specified object is another
      *         {@code StackTraceElement} instance representing the same
      *         execution point as this instance.
