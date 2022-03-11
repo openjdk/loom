@@ -68,7 +68,7 @@ public class Continuation {
     public enum PreemptStatus {
         /** Success */                                                      SUCCESS(null),
         /** Permanent failure */                                            PERM_FAIL_UNSUPPORTED(null),
-        /** Permanent failure: continuation alreay yielding */              PERM_FAIL_YIELDING(null),
+        /** Permanent failure: continuation already yielding */             PERM_FAIL_YIELDING(null),
         /** Permanent failure: continuation not mounted on the thread */    PERM_FAIL_NOT_MOUNTED(null),
         /** Transient failure: continuation pinned due to a held CS */      TRANSIENT_FAIL_PINNED_CRITICAL_SECTION(Pinned.CRITICAL_SECTION),
         /** Transient failure: continuation pinned due to native frame */   TRANSIENT_FAIL_PINNED_NATIVE(Pinned.NATIVE),
@@ -204,18 +204,6 @@ public class Continuation {
      * @return a new StackWalker
      */
     public StackWalker stackWalker(Set<StackWalker.Option> options, ContinuationScope scope) {
-        // if (scope != null) {
-        //     // verify the given scope exists in this continuation
-        //     Continuation c;
-        //     for (c = innermost(); c != null; c = c.parent) {
-        //         if (c.scope == scope)
-        //             break;
-        //     }
-        //     if (c.scope != scope)
-        //         scope = this.scope; // throw new IllegalArgumentException("Continuation " + this + " not in scope " + scope); -- don't throw exception to have the same behavior as no continuation
-        // } else {
-        //     scope = this.scope;
-        // }
         return JLA.newStackWalkerInstance(options, scope, innermost());
     }
 
@@ -235,10 +223,6 @@ public class Continuation {
         try {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
                 c.mount();
-
-            // if (!inner.isStarted())
-            //     throw new IllegalStateException("Continuation not started");
-
             return walk.get();
         } finally {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
@@ -256,16 +240,9 @@ public class Continuation {
     private void mount() {
         if (!compareAndSetMounted(false, true))
             throw new IllegalStateException("Mounted!!!!");
-        JLA.setScopeLocalCache(scopeLocalCache);
     }
 
     private void unmount() {
-        if (PRESERVE_SCOPE_LOCAL_CACHE) {
-            scopeLocalCache = JLA.scopeLocalCache();
-        } else {
-            scopeLocalCache = null;
-        }
-        JLA.setScopeLocalCache(null);
         setMounted(false);
     }
 
@@ -275,6 +252,7 @@ public class Continuation {
     public final void run() {
         while (true) {
             mount();
+            JLA.setScopeLocalCache(scopeLocalCache);
 
             if (done)
                 throw new IllegalStateException("Continuation terminated");
@@ -307,6 +285,12 @@ public class Continuation {
                     postYieldCleanup();
 
                     unmount();
+                    if (PRESERVE_SCOPE_LOCAL_CACHE) {
+                        scopeLocalCache = JLA.scopeLocalCache();
+                    } else {
+                        scopeLocalCache = null;
+                    }
+                    JLA.setScopeLocalCache(null);
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
             }
             // we're now in the parent continuation
@@ -345,13 +329,13 @@ public class Continuation {
     @DontInline
     @IntrinsicCandidate
     private static void enter(Continuation c, boolean isContinue) {
-      // This method runs in the "entry frame".
-      // A yield jumps to this method's caller as if returning from this method.
-      try {
-        c.enter0();
-      } finally {
-        c.finish();
-      }
+        // This method runs in the "entry frame".
+        // A yield jumps to this method's caller as if returning from this method.
+        try {
+            c.enter0();
+        } finally {
+            c.finish();
+        }
     }
 
     private void enter0() {
@@ -389,8 +373,6 @@ public class Continuation {
     }
 
     private boolean yield0(ContinuationScope scope, Continuation child) {
-        // System.out.println(this + " yielding on scope " + scope + ". child: " + child);
-
         preempted = false;
 
         if (scope != this.scope)
@@ -398,9 +380,6 @@ public class Continuation {
         int res = doYield();
         U.storeFence(); // needed to prevent certain transformations by the compiler
 
-        // System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
-
-        try {
         assert scope != this.scope || yieldInfo == null : "scope: " + scope + " this.scope: " + this.scope + " yieldInfo: " + yieldInfo + " res: " + res;
         assert yieldInfo == null || scope == this.scope || yieldInfo instanceof Integer : "scope: " + scope + " this.scope: " + this.scope + " yieldInfo: " + yieldInfo + " res: " + res;
 
@@ -414,8 +393,6 @@ public class Continuation {
                 child.yieldInfo = res;
             }
             this.yieldInfo = null;
-
-            // System.out.println(this + " child.yieldInfo = " + child.yieldInfo);
         } else {
             if (res == 0 && yieldInfo != null) {
                 res = (Integer)yieldInfo;
@@ -426,16 +403,10 @@ public class Continuation {
                 onContinue();
             else
                 onPinned0(res);
-
-            // System.out.println(this + " res: " + res);
         }
         assert yieldInfo == null;
 
         return res == 0;
-        } catch (Throwable t) {
-            t.printStackTrace();
-            throw t;
-        }
     }
 
     private void onPinned0(int reason) {
@@ -457,8 +428,8 @@ public class Continuation {
     }
 
     /**
-     * Tests whether this contiuation is completed
-     * @return whether this contiuation is completed
+     * Tests whether this continuation is completed
+     * @return whether this continuation is completed
      */
     public boolean isDone() {
         return done;
@@ -553,7 +524,7 @@ public class Continuation {
      * Subclasses may throw an {@link UnsupportedOperationException}, but this does not prevent
      * the continuation from being preempted on a parent scope.
      *
-     * @param thread the thread on which to forecefully preempt this continuation
+     * @param thread the thread on which to forcefully preempt this continuation
      * @return the result of the attempt
      * @throws UnsupportedOperationException if this continuation does not support preemption
      */
