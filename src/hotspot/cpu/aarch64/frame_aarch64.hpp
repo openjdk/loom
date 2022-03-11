@@ -169,7 +169,6 @@
   inline address  sender_pc_maybe_signed() const;
 
   // expression stack tos if we are nested in a java call
-  template <addressing pointers = addressing::ABSOLUTE>
   intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

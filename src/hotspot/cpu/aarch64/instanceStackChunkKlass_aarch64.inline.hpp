@@ -135,7 +135,7 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const
   return  mask.num_oops()
         + 1 // for the mirror oop
         + ((intptr_t*)f.interpreter_frame_monitor_begin()
-            - (intptr_t*)f.interpreter_frame_monitor_end<frame::addressing::RELATIVE>())/BasicObjectLock::size();
+            - (intptr_t*)f.interpreter_frame_monitor_end())/BasicObjectLock::size();
 }
 
 inline void stackChunkOopDesc::relativize_frame_pd(frame& fr) const {
