@@ -319,7 +319,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * The minimum priority that a platform thread can have.
+     * The minimum priority that a thread can have.
      */
     public static final int MIN_PRIORITY = 1;
 
@@ -329,7 +329,7 @@ public class Thread implements Runnable {
     public static final int NORM_PRIORITY = 5;
 
     /**
-     * The maximum priority that a platform thread can have.
+     * The maximum priority that a thread can have.
      */
     public static final int MAX_PRIORITY = 10;
 
@@ -407,13 +407,13 @@ public class Thread implements Runnable {
      * {@link java.util.concurrent.locks} package.
      */
     public static void yield() {
-        Thread thread = currentThread();
-        if (thread instanceof VirtualThread vthread) {
+        if (currentThread() instanceof VirtualThread vthread) {
             vthread.tryYield();
         } else {
             yield0();
         }
     }
+
     private static native void yield0();
 
     /**
@@ -925,8 +925,12 @@ public class Thread implements Runnable {
                 permits ThreadBuilders.PlatformThreadBuilder {
 
             @Override OfPlatform name(String name);
-            /** @throws IllegalArgumentException {@inheritDoc} */
+
+            /**
+             * @throws IllegalArgumentException {@inheritDoc}
+             */
             @Override OfPlatform name(String prefix, long start);
+
             @Override OfPlatform allowSetThreadLocals(boolean allow);
             @Override OfPlatform inheritInheritableThreadLocals(boolean inherit);
             @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
@@ -1009,12 +1013,19 @@ public class Thread implements Runnable {
                 permits ThreadBuilders.VirtualThreadBuilder {
 
             @Override OfVirtual name(String name);
-            /** @throws IllegalArgumentException {@inheritDoc} */
+
+            /**
+             * @throws IllegalArgumentException {@inheritDoc}
+             */
             @Override OfVirtual name(String prefix, long start);
+
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
-            /** @throws RejectedExecutionException if the scheduler cannot accept a task */
+
+            /**
+             * @throws RejectedExecutionException if the scheduler cannot accept a task
+             */
             @Override Thread start(Runnable task);
         }
     }
@@ -1032,7 +1043,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1048,7 +1059,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1078,7 +1089,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, task, gname)}, where {@code gname} is a newly generated
      * name. Automatically generated names are of the form
@@ -1111,7 +1122,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, name)}.
      *
@@ -1128,7 +1139,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (group, null, name)}.
      *
@@ -1157,7 +1168,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread}. This constructor has the same
+     * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, task, name)}.
      *
@@ -1179,7 +1190,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread} so that it has {@code task}
+     * Initializes a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}.
      *
@@ -1203,7 +1214,7 @@ public class Thread implements Runnable {
      * as a daemon thread. The method {@linkplain #setDaemon setDaemon}
      * may be used to change whether or not a thread is a daemon.
      *
-     * <p> For a non-null group, task, and name, invoking this constructor directly
+     * <p>For a non-null group, task, and name, invoking this constructor directly
      * is equivalent to:
      * <pre>{@code Thread.ofPlatform().group(group).name(name).unstarted(task); }</pre>
      *
@@ -1233,7 +1244,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread} so that it has {@code task}
+     * Initializes a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * and belongs to the thread group referred to by {@code group}, and has
      * the specified <i>stack size</i>.
@@ -1280,7 +1291,7 @@ public class Thread implements Runnable {
      * document their implementation's behavior with respect to the
      * {@code stackSize} parameter.
      *
-     * <p> For a non-null group, task, and name, invoking this constructor directly
+     * <p>For a non-null group, task, and name, invoking this constructor directly
      * is equivalent to:
      * <pre>{@code Thread.ofPlatform().group(group).name(name).stackSize(stackSize).unstarted(task); }</pre>
      *
@@ -1315,7 +1326,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Allocates a new platform {@code Thread} so that it has {@code task}
+     * Initializes a new platform {@code Thread} so that it has {@code task}
      * as its run object, has the specified {@code name} as its name,
      * belongs to the thread group referred to by {@code group}, has
      * the specified {@code stackSize}, and inherits initial values for
