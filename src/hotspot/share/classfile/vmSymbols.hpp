@@ -493,8 +493,6 @@
   template(source_file_name,                          "source_file")                              \
   template(loader_data_name,                          "loader_data")                              \
   template(cont_name,                                 "cont")                                     \
-  template(gcSP_name,                                 "gcSP")                                     \
-  template(markCycle_name,                            "markCycle")                                \
   template(vmdependencies_name,                       "vmdependencies")                           \
   template(last_cleanup_name,                         "last_cleanup")                             \
   template(loader_name,                               "loader")                                   \

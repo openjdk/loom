@@ -1130,9 +1130,7 @@ class jdk_internal_vm_Continuation: AllStatic {
   macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)   \
   macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)   \
   macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false) \
-  macro(jdk_internal_vm_StackChunk, gcSP,      int_signature, false)    \
   macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)    \
-  macro(jdk_internal_vm_StackChunk, markCycle, long_signature, false)
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
@@ -1143,8 +1141,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _gcSP_offset;
-  static int _markCycle_offset;
   static int _maxSize_offset;
   static int _cont_offset;
 
@@ -1175,11 +1171,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void set_argsize(oop ref, int value);
   static inline uint8_t flags(oop ref);
   static inline void set_flags(oop ref, uint8_t value);
-
-  static inline int gc_sp(oop ref);
-  static inline void set_gc_sp(oop ref, int value);
-  static inline uint64_t mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, uint64_t value);
 
   static inline int maxSize(oop ref);
   static inline void set_maxSize(oop ref, int value);

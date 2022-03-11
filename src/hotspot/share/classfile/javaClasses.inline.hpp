@@ -296,48 +296,47 @@ inline void jdk_internal_vm_StackChunk::set_cont_raw(oop ref, oop value) {
 inline int jdk_internal_vm_StackChunk::size(oop ref) {
   return ref->int_field(_size_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_size(HeapWord* ref, int value) {
   *(cast_to_oop(ref))->field_addr<jint>(_size_offset) = value; // ref->int_field_put(_size_offset, value);
 }
+
 inline int jdk_internal_vm_StackChunk::sp(oop ref) {
   return ref->int_field(_sp_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
 }
+
 inline intptr_t jdk_internal_vm_StackChunk::pc(oop ref) {
   return ref->long_field(_pc_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_pc(oop ref, intptr_t value) {
   ref->long_field_put(_pc_offset, value);
 }
+
 inline int jdk_internal_vm_StackChunk::argsize(oop ref) {
   return ref->int_field(_argsize_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_argsize(oop ref, int value) {
   ref->int_field_put(_argsize_offset, value);
 }
+
 inline uint8_t jdk_internal_vm_StackChunk::flags(oop ref) {
   return Atomic::load(ref->field_addr<uint8_t>(_flags_offset));
 }
+
 inline void jdk_internal_vm_StackChunk::set_flags(oop ref, uint8_t value) {
   Atomic::store(ref->field_addr<uint8_t>(_flags_offset), value);
 }
-inline int jdk_internal_vm_StackChunk::gc_sp(oop ref) {
-  return ref->int_field(_gcSP_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_gc_sp(oop ref, int value) {
-  ref->int_field_put(_gcSP_offset, value);
-}
-inline uint64_t jdk_internal_vm_StackChunk::mark_cycle(oop ref) {
-  return (uint64_t)ref->long_field(_markCycle_offset);
-}
-inline void jdk_internal_vm_StackChunk::set_mark_cycle(oop ref, uint64_t value) {
-  ref->long_field_put(_markCycle_offset, (jlong)value);
-}
+
 inline int jdk_internal_vm_StackChunk::maxSize(oop ref) {
   return ref->int_field(_maxSize_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, int value) {
 #ifdef ASSERT
   jint old = maxSize(ref);

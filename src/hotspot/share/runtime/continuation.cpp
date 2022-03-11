@@ -1272,7 +1272,6 @@ public:
     // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
     OrderAccess::storestore();
     chunk->set_sp(sp_after);
-    chunk->set_gc_sp(sp_after);
     assert (chunk->sp_address() == chunk_top, "");
     chunk->set_pc(*(address*)(stack_top - frame::sender_sp_ret_address_offset()));
 
@@ -1506,7 +1505,6 @@ public:
 
       int sp = chunk->stack_size() - argsize;
       chunk->set_sp(sp);
-      chunk->set_gc_sp(sp);
       chunk->set_argsize(argsize);
       assert (chunk->is_empty(), "");
 
@@ -1516,7 +1514,6 @@ public:
       if (chunk->is_empty()) {
         int sp = chunk->stack_size() - argsize;
         chunk->set_sp(sp);
-        chunk->set_gc_sp(sp);
         chunk->set_argsize(argsize);
         _size += overlap;
         assert (chunk->max_size() == 0, "");
@@ -1822,13 +1819,11 @@ public:
     chunk->clear_flags();
     chunk->set_gc_mode(false);
     chunk->set_max_size(0);
-    chunk->set_mark_cycle(0);
     // chunk->set_pc(nullptr);
     // chunk->set_argsize(0);
 
     assert (chunk->flags() == 0, "");
     assert (chunk->is_gc_mode() == false, "");
-    assert (chunk->mark_cycle() == 0, "");
     assert (chunk->max_size() == 0, "");
 
     chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
@@ -2273,10 +2268,6 @@ public:
     int argsize;
 
     intptr_t* const chunk_sp = chunk->start_address() + sp;
-
-    // TODO: explain it's not currently used
-    // Instead of invoking barriers on oops in thawed frames, we use the gcSP; see StackChunkFrameStream::get_initial_sp
-    chunk->set_mark_cycle(CodeCache::marking_cycle());
 
     bool partial, empty;
     if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (size < threshold))) {

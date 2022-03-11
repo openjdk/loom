@@ -72,10 +72,6 @@ public:
   inline void set_flags(uint8_t value);
   inline int max_size() const;
   inline void set_max_size(int value);
-  inline int gc_sp() const;
-  inline void set_gc_sp(int value);
-  inline uint64_t mark_cycle() const;
-  inline void set_mark_cycle(uint64_t value);
 
   inline oop cont() const;
   template<typename P> inline oop cont() const;

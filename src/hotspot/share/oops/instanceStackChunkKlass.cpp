@@ -47,8 +47,6 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
-#define FIX_DERIVED_POINTERS true
-
 int InstanceStackChunkKlass::_offset_of_stack = 0;
 
 #if INCLUDE_CDS

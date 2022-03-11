@@ -5050,8 +5050,6 @@ int jdk_internal_vm_StackChunk::_sp_offset;
 int jdk_internal_vm_StackChunk::_pc_offset;
 int jdk_internal_vm_StackChunk::_argsize_offset;
 int jdk_internal_vm_StackChunk::_flags_offset;
-int jdk_internal_vm_StackChunk::_gcSP_offset;
-int jdk_internal_vm_StackChunk::_markCycle_offset;
 int jdk_internal_vm_StackChunk::_maxSize_offset;
 int jdk_internal_vm_StackChunk::_cont_offset;
 

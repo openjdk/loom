@@ -88,8 +88,6 @@ Chunk layout:
          |     \   |                   |   |
                  - |===================|   |
                    | int maxSize       |   |
-                   | long markCycle    |   |
-                   | int gcSP          |   |
                    | long pc           |   |
             header | byte flags        |   |
                    | int argsize       |   |
