@@ -103,8 +103,12 @@ class ServerSocketChannelImpl
     // Our socket adaptor, if any
     private ServerSocket socket;
 
-    // lazily set to true when the socket is configured non-blocking
-    private volatile boolean nonBlocking;
+    // True if the channel's socket has been forced into non-blocking mode
+    // by a virtual thread. It cannot be reset. When the channel is in
+    // blocking mode and the channel's socket is in non-blocking mode then
+    // operations that don't complete immediately will poll the socket and
+    // preserve the semantics of blocking operations.
+    private volatile boolean forcedNonBlockingByVirtualThread;
 
     // -- End of fields protected by stateLock
 
@@ -391,7 +395,7 @@ class ServerSocketChannelImpl
             boolean blocking = isBlocking();
             try {
                 begin(blocking);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = implAccept(this.fd, newfd, saa);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -525,7 +529,7 @@ class ServerSocketChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!nonBlocking) {
+            if (!forcedNonBlockingByVirtualThread) {
                 IOUtil.configureBlocking(fd, block);
             }
         }
@@ -539,7 +543,7 @@ class ServerSocketChannelImpl
         assert acceptLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!nonBlocking && isOpen()) {
+            if (!forcedNonBlockingByVirtualThread && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
@@ -549,16 +553,15 @@ class ServerSocketChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when on a virtual
-     * thread.
+     * Ensures that the socket is configured non-blocking when on a virtual thread.
      */
-    private void lockedConfigureNonBlockingIfNeeded() throws IOException {
+    private void configureSocketNonBlockingIfVirtualThread() throws IOException {
         assert acceptLock.isHeldByCurrentThread();
-        if (!nonBlocking && (Thread.currentThread().isVirtual())) {
+        if (!forcedNonBlockingByVirtualThread && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
-                nonBlocking = true;
+                forcedNonBlockingByVirtualThread = true;
             }
         }
     }

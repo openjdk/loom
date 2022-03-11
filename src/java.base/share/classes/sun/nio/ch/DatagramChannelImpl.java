@@ -162,8 +162,12 @@ class DatagramChannelImpl
     // set true/false when socket is already bound and SO_REUSEADDR is emulated
     private boolean isReuseAddress;
 
-    // lazily set to true when the socket is configured non-blocking
-    private volatile boolean nonBlocking;
+    // True if the channel's socket has been forced into non-blocking mode
+    // by a virtual thread. It cannot be reset. When the channel is in
+    // blocking mode and the channel's socket is in non-blocking mode then
+    // operations that don't complete immediately will poll the socket and
+    // preserve the semantics of blocking operations.
+    private volatile boolean forcedNonBlockingByVirtualThread;
 
     // -- End of fields protected by stateLock
 
@@ -561,7 +565,7 @@ class DatagramChannelImpl
             SocketAddress sender = null;
             try {
                 SocketAddress remote = beginRead(blocking, false);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 boolean connected = (remote != null);
                 @SuppressWarnings("removal")
                 SecurityManager sm = System.getSecurityManager();
@@ -729,7 +733,7 @@ class DatagramChannelImpl
 
             try {
                 SocketAddress remote = beginRead(true, false);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 boolean connected = (remote != null);
                 if (nanos > 0) {
                     // timed receive, change socket to non-blocking
@@ -841,7 +845,7 @@ class DatagramChannelImpl
             boolean completed = false;
             try {
                 SocketAddress remote = beginWrite(blocking, false);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 if (remote != null) {
                     // connected
                     if (!target.equals(remote)) {
@@ -943,7 +947,7 @@ class DatagramChannelImpl
             boolean completed = false;
             try {
                 SocketAddress remote = beginWrite(true, false);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 if (remote != null) {
                     // connected
                     if (!target.equals(remote)) {
@@ -1067,7 +1071,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginRead(blocking, true);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.read(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -1097,7 +1101,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginRead(blocking, true);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.read(fd, dsts, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n)  && isOpen()) {
@@ -1180,7 +1184,7 @@ class DatagramChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.write(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -1210,7 +1214,7 @@ class DatagramChannelImpl
             long n = 0;
             try {
                 beginWrite(blocking, true);
-                lockedConfigureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.write(fd, srcs, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -1251,7 +1255,7 @@ class DatagramChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!nonBlocking) {
+            if (!forcedNonBlockingByVirtualThread) {
                 IOUtil.configureBlocking(fd, block);
             }
         }
@@ -1264,7 +1268,7 @@ class DatagramChannelImpl
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
-            if (!nonBlocking && isOpen()) {
+            if (!forcedNonBlockingByVirtualThread && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
@@ -1274,17 +1278,16 @@ class DatagramChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when on a virtual
-     * thread or a timeout is specified.
+     * Ensures that the socket is configured non-blocking when on a virtual thread.
      * @throws IOException if there is an I/O error changing the blocking mode
      */
-    private void lockedConfigureNonBlockingIfNeeded() throws IOException {
+    private void configureSocketNonBlockingIfVirtualThread() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && Thread.currentThread().isVirtual()) {
+        if (!forcedNonBlockingByVirtualThread && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
-                nonBlocking = true;
+                forcedNonBlockingByVirtualThread = true;
             }
         }
     }
@@ -1525,7 +1528,7 @@ class DatagramChannelImpl
             }
 
             // copy the blocking mode
-            if (!isBlocking() || nonBlocking) {
+            if (!isBlocking() || forcedNonBlockingByVirtualThread) {
                 IOUtil.configureBlocking(newfd, false);
             }
 
