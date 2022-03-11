@@ -477,7 +477,6 @@ void LIR_Assembler::emit_call(LIR_OpJavaCall* op) {
     fatal("unexpected op code: %s", op->name());
     break;
   }
-  // oopmap_metadata(-1); // TODO: maybe here instead of in call and ic_call ?
 
   // JSR 292
   // Record if this method has MethodHandle invokes.

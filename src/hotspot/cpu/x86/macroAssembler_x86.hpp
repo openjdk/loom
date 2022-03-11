@@ -321,8 +321,6 @@ class MacroAssembler: public Assembler {
   // thread in the default location (r15_thread on 64bit)
   void reset_last_Java_frame(bool clear_fp);
 
-  void oopmap_metadata(int index);
-
   // jobjects
   void clear_jweak_tag(Register possibly_jweak);
   void resolve_jobject(Register value, Register thread, Register tmp);

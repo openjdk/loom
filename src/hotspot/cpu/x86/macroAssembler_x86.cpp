@@ -518,18 +518,12 @@ void MacroAssembler::call_VM_leaf_base(address entry_point, int num_args) {
   jcc(Assembler::zero, L);
 
   subq(rsp, 8);
-  {
-    call(RuntimeAddress(entry_point));
-    oopmap_metadata(-1);
-  }
+  call(RuntimeAddress(entry_point));
   addq(rsp, 8);
   jmp(E);
 
   bind(L);
-  {
-    call(RuntimeAddress(entry_point));
-    oopmap_metadata(-1);
-  }
+  call(RuntimeAddress(entry_point));
 
   bind(E);
 
@@ -1141,11 +1135,6 @@ void MacroAssembler::object_move(OopMap* map,
 #endif // _LP64
 
 // Now versions that are common to 32/64 bit
-
-void MacroAssembler::oopmap_metadata(int index) {
-  // if (index != -1) tty->print_cr("oopmap_metadata %d", index);
-  // mov64(r10, 1234); // TODO: Add a new relocInfo with external semantics. see relocInfo::metadata_type
-}
 
 void MacroAssembler::addptr(Register dst, int32_t imm32) {
   LP64_ONLY(addq(dst, imm32)) NOT_LP64(addl(dst, imm32));

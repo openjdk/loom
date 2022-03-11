@@ -2632,7 +2632,6 @@ encode %{
       __ int3();
       __ bind(L);
     }
-    __ oopmap_metadata(-1);
   %}
 
 %}
