@@ -41,8 +41,6 @@ class NativeThreadSet {
     /**
      * Adds the current native thread to this set, returning its index so that
      * it can efficiently be removed later.
-     *
-     * The current continuation will be pinned until the thread is removed.
      */
     int add() {
         long th = NativeThread.currentNativeThread();
