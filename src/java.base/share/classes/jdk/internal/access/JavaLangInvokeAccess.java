@@ -46,11 +46,6 @@ public interface JavaLangInvokeAccess {
     Object newMemberName();
 
     /**
-     * Create a new MemberName instance. Used by {@code StackFrameInfo}.
-     */
-    Object newMemberName(Method method);
-
-    /**
      * Returns the name for the given MemberName. Used by {@code StackFrameInfo}.
      */
     String getName(Object mname);

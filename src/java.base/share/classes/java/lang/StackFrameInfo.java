@@ -61,18 +61,6 @@ class StackFrameInfo implements StackFrame {
         return JLIA.getDeclaringClass(memberName);
     }
 
-    void setMemberName(Method method) {
-        this.memberName = JLIA.newMemberName(method);
-    }
-
-    void setBCI(short bci) {
-        this.bci = bci;
-    }
-
-    void setContinuationScope(ContinuationScope contScope) {
-        this.contScope = contScope;
-    }
-
     protected void clear() {
     }
 

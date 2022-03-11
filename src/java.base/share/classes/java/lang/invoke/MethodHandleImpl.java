@@ -1548,11 +1548,6 @@ abstract class MethodHandleImpl {
             }
 
             @Override
-            public Object newMemberName(Method method) {
-                return new MemberName(method);
-            }
-
-            @Override
             public String getName(Object mname) {
                 MemberName memberName = (MemberName)mname;
                 return memberName.getName();
