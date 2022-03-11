@@ -1053,12 +1053,12 @@ class SocketChannelImpl
                         || NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal);
                 }
-                if (NativeThread.isKernelThread(reader)
-                        || NativeThread.isKernelThread(writer)) {
+                if (NativeThread.isNativeThread(reader)
+                        || NativeThread.isNativeThread(writer)) {
                     nd.preClose(fd);
-                    if (NativeThread.isKernelThread(reader))
+                    if (NativeThread.isNativeThread(reader))
                         NativeThread.signal(reader);
-                    if (NativeThread.isKernelThread(writer))
+                    if (NativeThread.isNativeThread(writer))
                         NativeThread.signal(writer);
                 }
             }
@@ -1142,7 +1142,7 @@ class SocketChannelImpl
                 long reader = readerThread;
                 if (NativeThread.isVirtualThread(reader)) {
                     Poller.stopPoll(fdVal, Net.POLLIN);
-                } else if (NativeThread.isKernelThread(reader)) {
+                } else if (NativeThread.isNativeThread(reader)) {
                     NativeThread.signal(reader);
                 }
                 isInputClosed = true;
@@ -1162,7 +1162,7 @@ class SocketChannelImpl
                 long writer = writerThread;
                 if (NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal, Net.POLLOUT);
-                } else if (NativeThread.isKernelThread(writer)) {
+                } else if (NativeThread.isNativeThread(writer)) {
                     NativeThread.signal(writer);
                 }
                 isOutputClosed = true;

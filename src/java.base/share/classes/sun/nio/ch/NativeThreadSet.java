@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2012, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ class NativeThreadSet {
      * The current continuation will be pinned until the thread is removed.
      */
     int add() {
-        long th = NativeThread.currentKernelThread();
+        long th = NativeThread.currentNativeThread();
         // 0 and -1 are treated as placeholders, not real thread handles
         if (th == 0)
             th = -1;
@@ -77,7 +77,7 @@ class NativeThreadSet {
      */
     void remove(int i) {
         synchronized (this) {
-            assert (elts[i] == NativeThread.currentKernelThread()) || (elts[i] == -1);
+            assert (elts[i] == NativeThread.currentNativeThread()) || (elts[i] == -1);
             elts[i] = 0;
             used--;
             if (used == 0 && waitingToEmpty)

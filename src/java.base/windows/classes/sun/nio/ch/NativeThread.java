@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,33 +32,48 @@ public class NativeThread {
     private static final long VIRTUAL_THREAD_ID = -1L;
 
     /**
-     * Returns a token representing the current thread or -1 if called in the
-     * context of a virtual thread
+     * Returns the id of the current native thread if the platform can signal
+     * native threads, 0 if the platform can not signal native threads, or
+     * -1L if the current thread is a virtual thread.
      */
     public static long current() {
         if (Thread.currentThread().isVirtual()) {
             return VIRTUAL_THREAD_ID;
         } else {
+            // no support for signalling threads on Windows
             return 0;
         }
     }
 
-    static long currentKernelThread() {
+    /**
+     * Returns the id of the current native thread if the platform can signal
+     * native threads, 0 if the platform can not signal native threads.
+     */
+    static long currentNativeThread() {
         return 0;
     }
 
+    /**
+     * Signals the given native thread.
+     *
+     * @throws IllegalArgumentException if tid is not a token to a native thread
+     */
     static void signal(long tid) {
         throw new UnsupportedOperationException();
     }
 
     /**
-     * Returns true if the token presents a virtual thread
+     * Returns true the tid is the id of a native thread.
+     */
+    static boolean isNativeThread(long tid) {
+        return false;
+    }
+
+    /**
+     * Returns true if tid is -1L.
+     * @see #current()
      */
     static boolean isVirtualThread(long tid) {
         return (tid == VIRTUAL_THREAD_ID);
-    }
-
-    static boolean isKernelThread(long tid) {
-        return false;
     }
 }
