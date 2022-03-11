@@ -544,9 +544,6 @@ static int num_java_frames(ContMirror& cont) {
 // Entry point to freeze. Transitions are handled manually
 template<typename ConfigT>
 static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
-  // current->frame_anchor()->set_last_Java_sp(sp);
-  // current->frame_anchor()->make_walkable(current);
-
   assert (sp == current->frame_anchor()->last_Java_sp(), "");
 
   if (current->raw_cont_fastpath() > current->last_continuation()->entry_sp() || current->raw_cont_fastpath() < sp) {
@@ -581,7 +578,6 @@ int Continuation::try_force_yield(JavaThread* target, const oop cont) {
   }
 
   assert (target->has_last_Java_frame(), "");
-  // if (Interpreter::contains(thread->last_Java_pc())) { thread->push_cont_fastpath(thread->last_Java_sp()); }
   assert (!Interpreter::contains(target->last_Java_pc()) || !target->cont_fastpath(),
           "fast_path at codelet %s",
           Interpreter::codelet_containing(target->last_Java_pc())->description());
@@ -1508,7 +1504,6 @@ public:
       assert (chunk->is_empty(), "");
 
       if (_barriers) { log_develop_trace(jvmcont)("allocation requires barriers"); }
-      // jdk_internal_vm_Continuation::set_tail(_cont.mirror(), _cont.tail()); -- doesn't seem to help
     } else {
       log_develop_trace(jvmcont)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
       if (chunk->is_empty()) {
@@ -1619,8 +1614,6 @@ public:
     f.interpreted_frame_oop_map(&mask);
     assert (vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
       p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
-    // Seen to fail on serviceability/jvmti/vthread/SuspendResume[1/2] on AArch64
-    // assert (fsize+1 >= Interpreted::size(f, &mask), ""); // +1 for possible alignment padding
   }
 #endif
 
@@ -1833,7 +1826,6 @@ public:
 
     stackChunkOop chunk0 = _cont.tail();
     if (chunk0 != (oop)nullptr && chunk0->is_empty()) {
-      // chunk0 = chunk0->is_parent_null<typename ConfigT::OopT>() ? (oop)nullptr : chunk0->parent();
       chunk0 = chunk0->parent();
       assert (chunk0 == (oop)nullptr || !chunk0->is_empty(), "");
     }
@@ -1918,8 +1910,6 @@ static inline bool can_freeze_fast(JavaThread* thread) {
   bool fast = thread->cont_fastpath() && UseContinuationFastPath;
   assert (!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "");
   fast = fast && thread->held_monitor_count() == 0;
-  // if (!fast) tty->print_cr(">>> freeze fast: %d thread.cont_fastpath: %d held_monitor_count: %d",
-  //                                  fast, thread->cont_fastpath(), thread->held_monitor_count());
   return fast;
 }
 
@@ -2433,7 +2423,6 @@ public:
     if (last_interpreted && _cont.is_preempted()) {
       assert (f.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
       assert (Interpreter::contains(f.pc()), "");
-      // if (Interpreter::codelet_containing(f.pc()) != nullptr)
       sp = push_interpreter_return_frame(sp);
     }
 
