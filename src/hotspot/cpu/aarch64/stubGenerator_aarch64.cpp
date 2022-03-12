@@ -6571,17 +6571,7 @@ RuntimeStub* generate_cont_doYield() {
 
     address start = __ pc();
 
-#ifdef ASSERT
-    { // verify that threads correspond
-      Label L;
-      __ get_thread(rscratch1);
-      __ cmp(rthread, rscratch1);
-      __ br(Assembler::EQ, L);
-      __ stop("StubRoutines::cont_jump_from_safepoint: threads must correspond");
-      __ BIND(L);
-    }
-#endif
-
+    __ get_thread(rthread); // we're called directly from C++
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
 
