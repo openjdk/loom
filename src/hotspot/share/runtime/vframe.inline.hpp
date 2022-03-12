@@ -108,7 +108,6 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);
   }
-  // assert (_reg_map.stack_chunk()() == (stackChunkOop)NULL, "map.chunk: " INTPTR_FORMAT, p2i((stackChunkOopDesc*)_reg_map.stack_chunk()()));
 }
 
 inline bool vframeStreamCommon::fill_in_compiled_inlined_sender() {

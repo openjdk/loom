@@ -329,6 +329,7 @@ class vframeStreamCommon : StackObj {
   }
 
   const RegisterMap* reg_map() { return &_reg_map; }
+  void dont_walk_cont() { _reg_map.set_walk_cont(false); }
 
   javaVFrame* asJavaVFrame();
 

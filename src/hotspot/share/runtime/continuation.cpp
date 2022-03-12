@@ -69,6 +69,7 @@
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackWatermarkSet.inline.hpp"
 #include "runtime/stackOverflow.hpp"
+#include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
@@ -1637,6 +1638,8 @@ public:
 
     log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
       frame_method->name_and_sig_as_C_string(), _size, fsize, argsize);
+    // we'd rather not yield inside methods annotated with @JvmtiMountTransition
+    assert (!Frame::frame_method(f)->jvmti_mount_transition(), "");
 
     freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, argsize);
     if (UNLIKELY(result > freeze_ok_bottom)) return result;
@@ -1676,6 +1679,8 @@ public:
 
     log_develop_trace(jvmcont)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
       Frame::frame_method(f) != nullptr ? Frame::frame_method(f)->name_and_sig_as_C_string():"", _size,fsize,argsize);
+    // we'd rather not yield inside methods annotated with @JvmtiMountTransition
+    assert (!Frame::frame_method(f)->jvmti_mount_transition(), "");
 
     freeze_result result = recurse_freeze_java_frame<Compiled>(f, caller, fsize, argsize);
     if (UNLIKELY(result > freeze_ok_bottom)) return result;
@@ -2075,21 +2080,22 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   return freeze_ok;
 }
 
-static bool is_safe_to_preempt(JavaThread* thread) {
-  if (!thread->has_last_Java_frame()) {
-    return false;
-  }
+static bool is_safe_frame_to_preempt(JavaThread* thread) {
+  assert (thread->has_last_Java_frame(), "");
+  vframeStream st(thread);
+  st.dont_walk_cont();
 
-  LogTarget(Trace, jvmcont, preempt) lt;
-  if (lt.is_enabled()) {
-    ResourceMark rm;
-    LogStream ls(lt);
-    frame f = thread->last_frame();
-    ls.print("is_safe_to_preempt %sSAFEPOINT ", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
-    f.print_on(&ls);
+  // We don't want to preempt inside methods annotated with @JvmtiMountTransition
+  int i = 0;
+  for (;!st.at_end(); st.next()) {
+    if (++i > 5) break; // annotations are never deep
+    if (st.method()->jvmti_mount_transition())
+      return false;
   }
+  return true;
+}
 
-  address pc = thread->last_Java_pc();
+static bool is_safe_pc_to_preempt(address pc) {
   if (Interpreter::contains(pc)) {
     // We don't want to preempt when returning from some useful VM function, and certainly not when inside one.
     InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
@@ -2121,6 +2127,24 @@ static bool is_safe_to_preempt(JavaThread* thread) {
       return false;
     }
   }
+}
+static bool is_safe_to_preempt(JavaThread* thread) {
+  if (!thread->has_last_Java_frame()) {
+    return false;
+  }
+
+  LogTarget(Trace, jvmcont, preempt) lt;
+  if (lt.is_enabled()) {
+    ResourceMark rm;
+    LogStream ls(lt);
+    frame f = thread->last_frame();
+    ls.print("is_safe_to_preempt %sSAFEPOINT ", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
+    f.print_on(&ls);
+  }
+
+  if (!is_safe_pc_to_preempt(thread->last_Java_pc())) return false;
+  if (!is_safe_frame_to_preempt(thread)) return false;
+  return true;
 }
 
 /////////////// THAW ////

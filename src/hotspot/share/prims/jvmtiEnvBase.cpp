@@ -635,7 +635,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
   assert (jvf != NULL && jvf->method() != NULL, "");
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
-    if (jvf->method()->jvmti_mount_transition()) {
+    if (jvf->method()->jvmti_mount_transition()) { // cannot actually appear in an unmounted continuation; they're never frozen.
       jvf = jvf->java_sender(); // skip annotated method
       break;
     }
