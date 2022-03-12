@@ -253,9 +253,6 @@ inline void jdk_internal_vm_Continuation::set_critical_section(oop ref, jshort v
 inline bool jdk_internal_vm_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
 }
-inline bool jdk_internal_vm_Continuation::is_mounted(oop ref) {
-  return ref->bool_field(_mounted_offset) != 0;
-}
 inline bool jdk_internal_vm_Continuation::is_preempted(oop ref) {
   return ref->bool_field(_preempted_offset);
 }

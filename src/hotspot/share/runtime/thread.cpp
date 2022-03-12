@@ -1579,7 +1579,7 @@ bool JavaThread::is_lock_owned(address adr) const {
 
 bool JavaThread::is_lock_owned_current(address adr) const {
   address stack_end = _stack_base - _stack_size;
-  ContinuationEntry* cont = vthread_continuation();
+  const ContinuationEntry* cont = vthread_continuation();
   address stack_base = cont != nullptr ? (address)cont->entry_sp() : _stack_base;
   if (stack_base > adr && adr >= stack_end)
     return true;
@@ -2514,7 +2514,7 @@ void JavaThread::trace_stack() {
 #endif // PRODUCT
 
 frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
-  ContinuationEntry* cont = vthread_continuation();
+  const ContinuationEntry* cont = vthread_continuation();
   guarantee (cont != NULL, "Not a carrier thread");
   frame f = cont->to_frame();
   if (reg_map->process_frames()) {

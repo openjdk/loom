@@ -93,9 +93,6 @@ class vframe: public ResourceObj {
   // Is the current frame the entry to a virtual thread's stack
   bool is_vthread_entry() const;
 
-  // Call when resuming a walk (calling [java_]sender) on a frame we'e already walked past
-  void restore_register_map() const;
-
   // Answers if the this is the top vframe in the frame, i.e., if the sender vframe
   // is in the caller frame
   virtual bool is_top() const { return true; }

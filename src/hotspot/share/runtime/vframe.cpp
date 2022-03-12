@@ -139,19 +139,6 @@ javaVFrame* vframe::java_sender() const {
   return NULL;
 }
 
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-
-void vframe::restore_register_map() const {
-  assert (this != NULL, "");
-  assert (dbg_is_safe(this, -1), "");
-  assert (register_map() != NULL, "");
-  assert (dbg_is_safe(register_map(), -1), "");
-
-  if (_reg_map.stack_chunk()() != stack_chunk()) {
-    const_cast<vframe*>(this)->_reg_map.set_stack_chunk(stack_chunk());
-  }
-}
-
 // ------------- javaVFrame --------------
 
 GrowableArray<MonitorInfo*>* javaVFrame::locked_monitors() {

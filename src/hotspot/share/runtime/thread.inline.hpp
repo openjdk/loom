@@ -189,14 +189,14 @@ bool JavaThread::is_vthread_mounted() const {
   return vthread_continuation() != nullptr;
 }
 
-ContinuationEntry* JavaThread::vthread_continuation() const {
+const ContinuationEntry* JavaThread::vthread_continuation() const {
   return last_continuation(java_lang_VirtualThread::vthread_scope());
 };
 
 JavaThread::CarrierOrVirtual JavaThread::which_stack(address adr) const {
   address stack_end = _stack_base - _stack_size;
   if (adr >= stack_end) {
-    ContinuationEntry* cont = vthread_continuation();
+    const ContinuationEntry* cont = vthread_continuation();
     if (cont != nullptr && (address)cont->entry_sp() > adr)
       return CarrierOrVirtual::VIRTUAL;
     if (_stack_base > adr)

@@ -281,7 +281,7 @@ public:
 
   static inline void push_pd(const frame& f);
 
-  static inline void maybe_flush_stack_processing(JavaThread* thread, ContinuationEntry* entry);
+  static inline void maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry);
   static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
   static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
 
@@ -332,7 +332,7 @@ void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEnt
   assert(thread->last_frame().cb() != nullptr, "");
 }
 
-inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, ContinuationEntry* entry) {
+inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry) {
   maybe_flush_stack_processing(thread, (intptr_t*)((uintptr_t)entry->entry_sp() + ContinuationEntry::size()));
 }
 
@@ -662,7 +662,7 @@ JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)
 }
 JVM_END
 
-ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
+const ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
   // guarantee (thread->has_last_Java_frame(), "");
   for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
     if (cont_scope == jdk_internal_vm_Continuation::scope(entry->continuation()))
@@ -683,6 +683,22 @@ ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThr
 ContinuationEntry* Continuation::get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
   assert (is_continuation_enterSpecial(f), "");
   return (ContinuationEntry*)f.unextended_sp();
+}
+
+static bool is_on_stack(JavaThread* thread, const ContinuationEntry* cont) {
+  if (cont == nullptr) return false;
+  assert (thread->is_in_full_stack((address)cont), "");
+  return true;
+  // return false if called when transitioning to Java on return from freeze
+  // return !thread->has_last_Java_frame() || thread->last_Java_sp() < cont->entry_sp();
+}
+
+bool Continuation::is_continuation_mounted(JavaThread* thread, oop cont) {
+  return is_on_stack(thread, get_continuation_entry_for_continuation(thread, cont));
+}
+
+bool Continuation::is_continuation_scope_mounted(JavaThread* thread, oop cont_scope) {
+  return is_on_stack(thread, last_continuation(thread, cont_scope));
 }
 
 // When walking the virtual stack, this method returns true
@@ -712,11 +728,11 @@ bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap
   return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
 }
 
-static inline bool is_sp_in_continuation(ContinuationEntry* cont, intptr_t* const sp) {
+static inline bool is_sp_in_continuation(const ContinuationEntry* cont, intptr_t* const sp) {
   return cont->entry_sp() > sp;
 }
 
-bool Continuation::is_frame_in_continuation(ContinuationEntry* cont, const frame& f) {
+bool Continuation::is_frame_in_continuation(const ContinuationEntry* cont, const frame& f) {
   return is_sp_in_continuation(cont, f.unextended_sp());
 }
 
@@ -2935,7 +2951,7 @@ ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
   return (ContinuationEntry*)f.unextended_sp();
 }
 
-void ContinuationEntry::flush_stack_processing(JavaThread* thread) {
+void ContinuationEntry::flush_stack_processing(JavaThread* thread) const {
   ContinuationHelper::maybe_flush_stack_processing(thread, this);
 }
 

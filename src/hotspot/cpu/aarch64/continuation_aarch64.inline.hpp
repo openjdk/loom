@@ -81,12 +81,12 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
-frame ContinuationEntry::to_frame() {
+frame ContinuationEntry::to_frame() const {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
 }
 
-void ContinuationEntry::update_register_map(RegisterMap* map) {
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
   intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
   frame::update_map_with_saved_link(map, fp);
 }

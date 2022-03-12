@@ -1120,7 +1120,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static inline jshort critical_section(oop ref);
   static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
-  static inline bool is_mounted(oop ref);
   static inline bool done(oop ref);
   static inline bool is_preempted(oop ref);
   static inline void set_preempted(oop ref, bool value);

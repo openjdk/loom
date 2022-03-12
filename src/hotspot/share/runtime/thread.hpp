@@ -1183,7 +1183,7 @@ private:
 
   // Continuation support
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
+  const ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
@@ -1200,7 +1200,7 @@ private:
   void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
 
   inline bool is_vthread_mounted() const;
-  inline ContinuationEntry* vthread_continuation() const;
+  inline const ContinuationEntry* vthread_continuation() const;
 
   enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
   inline CarrierOrVirtual which_stack(address adr) const;
