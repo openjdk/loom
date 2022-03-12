@@ -2722,7 +2722,6 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error INVALID_FRAMEID)
             (Error THREAD_NOT_SUSPENDED)
             (Error NO_MORE_FRAMES)
-            (Error INVALID_FRAMEID)
             (Error OPAQUE_FRAME      "If one or more of the frames to pop is a native "
                                      "method or its caller is a native method, or the "
                                      "thread is a virtual thread and the implementation "
