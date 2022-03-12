@@ -879,5 +879,6 @@ com/sun/jdi/EATests.java#id0                                    8264699 generic-
 
 jdk/jfr/event/runtime/TestClassLoaderStatsEvent.java            8247965 generic-all
 jdk/jfr/tool/TestPrintXML.java                                  8278262 generic-all
+jdk/jfr/threading/TestDeepVirtualStackTrace.java                8283068 macosx-aarch64
 
 jdk/incubator/concurrent/ScopeLocal/Stress.java                 0000000 generic-all
