@@ -169,16 +169,32 @@ public class Thread implements Runnable {
         registerNatives();
     }
 
-    /* Reserved for exclusive use by the JVM, TBD: move to FieldHolder */
+    /* Reserved for exclusive use by the JVM, maybe move to FieldHolder */
     private long eetop;
 
-    // holds fields for platform threads
+    // thread id
+    private final long tid;
+
+    // thread name
+    private volatile String name;
+
+    // interrupt status (read/written by VM)
+    volatile boolean interrupted;
+
+    // context ClassLoader
+    private volatile ClassLoader contextClassLoader;
+
+    // inherited AccessControlContext, this could be moved to FieldHolder
+    @SuppressWarnings("removal")
+    private AccessControlContext inheritedAccessControlContext;
+
+    // Additional fields for platform threads
     private static class FieldHolder {
         final ThreadGroup group;
         final Runnable task;
         final long stackSize;
         volatile int priority;
-        boolean daemon;
+        volatile boolean daemon;
         volatile int threadStatus;
         boolean stillborn;
 
@@ -191,42 +207,56 @@ public class Thread implements Runnable {
             this.task = task;
             this.stackSize = stackSize;
             this.priority = priority;
-            this.daemon = daemon;
+            if (daemon)
+                this.daemon = true;
         }
     }
     private final FieldHolder holder;
 
-    // interrupt status (read/written by VM)
-    volatile boolean interrupted;
+    /**
+     * Helper class to generate thread identifiers. The identifiers start at
+     * 2 as this class cannot be used during early startup to generate the
+     * identifier for the primordial thread. The counter is off-heap and
+     * shared with the VM to allow it assign thread identifiers to non-Java
+     * threads.
+     */
+    private static class ThreadIdentifiers {
+        private static final Unsafe U;
+        private static final long NEXT_TID_OFFSET;
+        static {
+            U = Unsafe.getUnsafe();
+            NEXT_TID_OFFSET = Thread.getNextThreadIdOffset();
+        }
+        static long next() {
+            return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
+        }
+    }
 
-    // thread name
-    private volatile String name;
-
-    // thread id
-    private final long tid;
-
-    // context ClassLoader
-    private volatile ClassLoader contextClassLoader;
-
-    // inherited AccessControlContext, TBD: move this to FieldHolder
-    @SuppressWarnings("removal")
-    private AccessControlContext inheritedAccessControlContext;
-
-    /* For auto-numbering anonymous threads. */
+    /**
+     * Helper class for auto-numbering anonymous threads.
+     */
     private static class ThreadNumbering {
-        private static final Unsafe U = Unsafe.getUnsafe();
-        private static final long NEXT_NUMBER =
-            U.objectFieldOffset(ThreadNumbering.class, "nextNumber");
+        private static final Unsafe U;
+        private static final long NEXT_NUMBER;
+        static {
+            U = Unsafe.getUnsafe();
+            NEXT_NUMBER = U.objectFieldOffset(ThreadNumbering.class, "nextNumber");
+        }
         private static volatile int nextNumber;
         static int next() {
             return U.getAndAddInt(ThreadNumbering.class, NEXT_NUMBER, 1);
         }
     }
+
+    /**
+     * Generates a thread name of the form {@code Thread-<n>}.
+     */
     static String nextThreadName() {
         return "Thread-" + ThreadNumbering.next();
     }
 
-    /* ThreadLocal values pertaining to this thread. This map is maintained
+    /*
+     * ThreadLocal values pertaining to this thread. This map is maintained
      * by the ThreadLocal class. */
     ThreadLocal.ThreadLocalMap threadLocals;
 
@@ -236,7 +266,9 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
-    // scope-local bindings
+    /*
+     * Scope locals binding are maintained by the ScopeLocal class.
+     */
     private Object scopeLocalBindings;
 
     static Object scopeLocalBindings() {
@@ -264,30 +296,6 @@ public class Thread implements Runnable {
             this.scopeLocalBindings = bindings;
         }
     }
-
-    /**
-     * Helper class to generate unique thread identifiers. The identifiers start
-     * at 2 as this class cannot be used during early startup to generate the
-     * identifier for the primordial thread.
-     */
-    private static class ThreadIdentifiers {
-        private static final Unsafe U;
-        private static final long NEXT_TID_OFFSET;
-
-        static {
-            U = Unsafe.getUnsafe();
-            NEXT_TID_OFFSET = getNextThreadIdOffset();
-        }
-
-        static long next() {
-            return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
-        }
-    }
-
-    /*
-     * The address of the next thread id. For Unsafe use in ThreadIdentifiers.
-     */
-    private static native long getNextThreadIdOffset();
 
     /*
      * Lock object for thread interrupt.
@@ -332,19 +340,6 @@ public class Thread implements Runnable {
      * The maximum priority that a thread can have.
      */
     public static final int MAX_PRIORITY = 10;
-
-    /**
-     * Characteristic value signifying that the thread cannot set values for its
-     * copy of {@link ThreadLocal thread-locals}
-     */
-    static final int NO_THREAD_LOCALS = 1 << 1;
-
-    /**
-     * Characteristic value signifying that initial values for {@link
-     * InheritableThreadLocal inheritable-thread-locals} are not inherited from
-     * the constructing thread.
-     */
-    static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     // current inner-most continuation
     private Continuation cont;
@@ -579,7 +574,23 @@ public class Thread implements Runnable {
     public static void onSpinWait() {}
 
     /**
-     * Returns the context class loader to inherit from the given parent thread.
+     * Characteristic value signifying that the thread cannot set values for its
+     * copy of {@link ThreadLocal thread-locals}.
+     * See Thread initialization.
+     */
+    static final int NO_THREAD_LOCALS = 1 << 1;
+
+    /**
+     * Characteristic value signifying that initial values for {@link
+     * InheritableThreadLocal inheritable-thread-locals} are not inherited from
+     * the constructing thread.
+     * See Thread initialization.
+     */
+    static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
+
+    /**
+     * Returns the context class loader to inherit from the parent thread.
+     * See Thread initialization.
      */
     private static ClassLoader contextClassLoader(Thread parent) {
         @SuppressWarnings("removal")
@@ -2981,4 +2992,7 @@ public class Thread implements Runnable {
     private native void interrupt0();
     private static native void clearInterruptEvent();
     private native void setNativeName(String name);
+
+    // The address of the next thread identifier, see ThreadIdentifiers.
+    private static native long getNextThreadIdOffset();
 }
