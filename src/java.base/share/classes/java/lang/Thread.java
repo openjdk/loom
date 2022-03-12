@@ -615,6 +615,9 @@ public class Thread implements Runnable {
 
         Thread parent = currentThread();
         boolean attached = (parent == this);   // primordial or JNI attached
+        if (attached && g == null) {
+            throw new InternalError("group cannot be null when attaching");
+        }
 
         SecurityManager security = System.getSecurityManager();
         if (g == null) {
@@ -625,8 +628,7 @@ public class Thread implements Runnable {
 
             // default to current thread's group
             if (g == null) {
-                // avoid parent.getThreadGroup() during early startup
-                g = getCurrentThreadGroup();
+                g = parent.getThreadGroup();
             }
         }
 
@@ -1932,18 +1934,6 @@ public class Thread implements Runnable {
             return isVirtual() ? Constants.VTHREAD_GROUP : holder.group;
         } else {
             return null;   // terminated
-        }
-    }
-
-    /**
-     * Returns the thread group for the current thread.
-     */
-    static ThreadGroup getCurrentThreadGroup() {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            return Constants.VTHREAD_GROUP;
-        } else {
-            return thread.holder.group;
         }
     }
 
