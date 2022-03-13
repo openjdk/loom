@@ -2635,7 +2635,6 @@ public class Thread implements Runnable {
      * Returns the identifier of this Thread.  The thread ID is a positive
      * {@code long} number generated when this thread was created.
      * The thread ID is unique and remains unchanged during its lifetime.
-     * When this thread terminates, the thread ID may be reused.
      *
      * @return this thread's ID
      * @since 19
