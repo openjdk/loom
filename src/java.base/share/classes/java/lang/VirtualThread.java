@@ -1003,9 +1003,9 @@ class VirtualThread extends Thread {
         };
         PrivilegedAction<ForkJoinPool> pa = () -> {
             int parallelism, maxPoolSize, minRunnable;
-            String parallelismValue = System.getProperty("jdk.defaultScheduler.parallelism");
-            String maxPoolSizeValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
-            String minRunnableValue = System.getProperty("jdk.defaultScheduler.minRunnable");
+            String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
+            String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
+            String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
             if (parallelismValue != null) {
                 parallelism = Integer.parseInt(parallelismValue);
             } else {
