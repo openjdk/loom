@@ -154,8 +154,11 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
  * Creating a {@code Thread} will inherit, by default, the initial values of
- * {@linkplain InheritableThreadLocal inheritable-thread-local} variables.
- * Platform threads also inherit the daemon status, priority, and thread-group.
+ * {@linkplain InheritableThreadLocal inheritable-thread-local} variables
+ * (including the context class loader) from the parent thread. Platform threads
+ * inherit the daemon status and thread priority. Platform threads also inherit
+ * the thread group when a thread group is not provided (or not selected by a
+ * security manager).
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -213,48 +216,6 @@ public class Thread implements Runnable {
     }
     private final FieldHolder holder;
 
-    /**
-     * Helper class to generate thread identifiers. The identifiers start at
-     * 2 as this class cannot be used during early startup to generate the
-     * identifier for the primordial thread. The counter is off-heap and
-     * shared with the VM to allow it assign thread identifiers to non-Java
-     * threads.
-     */
-    private static class ThreadIdentifiers {
-        private static final Unsafe U;
-        private static final long NEXT_TID_OFFSET;
-        static {
-            U = Unsafe.getUnsafe();
-            NEXT_TID_OFFSET = Thread.getNextThreadIdOffset();
-        }
-        static long next() {
-            return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
-        }
-    }
-
-    /**
-     * Helper class for auto-numbering anonymous threads.
-     */
-    private static class ThreadNumbering {
-        private static final Unsafe U;
-        private static final long NEXT_NUMBER;
-        static {
-            U = Unsafe.getUnsafe();
-            NEXT_NUMBER = U.objectFieldOffset(ThreadNumbering.class, "nextNumber");
-        }
-        private static volatile int nextNumber;
-        static int next() {
-            return U.getAndAddInt(ThreadNumbering.class, NEXT_NUMBER, 1);
-        }
-    }
-
-    /**
-     * Generates a thread name of the form {@code Thread-<n>}.
-     */
-    static String nextThreadName() {
-        return "Thread-" + ThreadNumbering.next();
-    }
-
     /*
      * ThreadLocal values pertaining to this thread. This map is maintained
      * by the ThreadLocal class. */
@@ -281,6 +242,7 @@ public class Thread implements Runnable {
 
     /**
      * Inherit the scope-local bindings from the given container.
+     * Invoked when starting a thread.
      */
     void inheritScopeLocalBindings(ThreadContainer container) {
         ScopeLocalContainer.BindingsSnapshot snapshot;
@@ -341,7 +303,9 @@ public class Thread implements Runnable {
      */
     public static final int MAX_PRIORITY = 10;
 
-    // current inner-most continuation
+    /*
+     * Current inner-most continuation.
+     */
     private Continuation cont;
 
     /**
@@ -504,7 +468,7 @@ public class Thread implements Runnable {
      * Causes the currently executing thread to sleep (temporarily cease
      * execution) for the specified duration, subject to the precision and
      * accuracy of system timers and schedulers. This method is a no-op if
-     * the duration is less than zero.
+     * the duration is {@linkplain Duration#isNegative() negative}.
      *
      * @param  duration
      *         the duration to sleep
@@ -589,6 +553,26 @@ public class Thread implements Runnable {
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
+     * Helper class to generate thread identifiers. The identifiers start at
+     * 2 as this class cannot be used during early startup to generate the
+     * identifier for the primordial thread. The counter is off-heap and
+     * shared with the VM to allow it assign thread identifiers to non-Java
+     * threads.
+     * See Thread initialization.
+     */
+    private static class ThreadIdentifiers {
+        private static final Unsafe U;
+        private static final long NEXT_TID_OFFSET;
+        static {
+            U = Unsafe.getUnsafe();
+            NEXT_TID_OFFSET = Thread.getNextThreadIdOffset();
+        }
+        static long next() {
+            return U.getAndAddLong(null, NEXT_TID_OFFSET, 1);
+        }
+    }
+
+    /**
      * Returns the context class loader to inherit from the parent thread.
      * See Thread initialization.
      */
@@ -607,21 +591,20 @@ public class Thread implements Runnable {
     /**
      * Initializes a platform Thread.
      *
-     * @param g the Thread group
+     * @param g the Thread group, can be null
      * @param name the name of the new Thread
      * @param characteristics thread characteristics
      * @param task the object whose run() method gets called
-
      * @param stackSize the desired stack size for the new thread, or
      *        zero to indicate that this parameter is to be ignored.
      * @param acc the AccessControlContext to inherit, or
-     *            AccessController.getContext() if null
+     *        AccessController.getContext() if null
      */
     @SuppressWarnings("removal")
     Thread(ThreadGroup g, String name, int characteristics, Runnable task,
            long stackSize, AccessControlContext acc) {
         if (name == null) {
-            throw new NullPointerException("name cannot be null");
+            throw new InternalError("name cannot be null");
         }
 
         Thread parent = currentThread();
@@ -651,13 +634,17 @@ public class Thread implements Runnable {
             }
         }
 
-        this.name = name;
         if (attached && VM.initLevel() < 1) {
             this.tid = 1;  // primordial thread
         } else {
             this.tid = ThreadIdentifiers.next();
         }
-        this.inheritedAccessControlContext = (acc != null) ? acc : AccessController.getContext();
+        this.name = name;
+        if (acc != null) {
+            this.inheritedAccessControlContext = acc;
+        } else {
+            this.inheritedAccessControlContext = AccessController.getContext();
+        }
 
         // thread locals
         if (!attached) {
@@ -707,8 +694,8 @@ public class Thread implements Runnable {
     Thread(String name, int characteristics) {
         Thread parent = currentThread();
 
-        this.name = (name != null) ? name : "<unnamed>";
         this.tid = ThreadIdentifiers.next();
+        this.name = (name != null) ? name : "<unnamed>";
         this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
 
         // thread locals
@@ -1056,6 +1043,40 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Helper class for auto-numbering platform threads. The numbers start at
+     * 0 and are separate from the thread identifier for historical reasons.
+     */
+    private static class ThreadNumbering {
+        private static final Unsafe U;
+        private static final long NEXT;
+        static {
+            U = Unsafe.getUnsafe();
+            NEXT = U.objectFieldOffset(ThreadNumbering.class, "next");
+        }
+        private static volatile int next;
+        static int next() {
+            return U.getAndAddInt(ThreadNumbering.class, NEXT, 1);
+        }
+    }
+
+    /**
+     * Generates a thread name of the form {@code Thread-<n>}.
+     */
+    static String genThreadName() {
+        return "Thread-" + ThreadNumbering.next();
+    }
+
+    /**
+     * Throws NullPointerException if the name is null. Avoids use of
+     * Objects.requireNonNull in early startup.
+     */
+    private static String checkName(String name) {
+        if (name == null)
+            throw new NullPointerException("'name' is null");
+        return name;
+    }
+
+    /**
      * Initializes a new platform {@code Thread}. This constructor has the same
      * effect as {@linkplain #Thread(ThreadGroup,Runnable,String) Thread}
      * {@code (null, null, gname)}, where {@code gname} is a newly generated
@@ -1068,7 +1089,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread() {
-        this(null, null, nextThreadName(), 0);
+        this(null, genThreadName(), 0, null, 0, null);
     }
 
     /**
@@ -1089,7 +1110,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(Runnable task) {
-        this(null, task, nextThreadName(), 0);
+        this(null, genThreadName(), 0, task, 0, null);
     }
 
     /**
@@ -1098,7 +1119,7 @@ public class Thread implements Runnable {
      * This is not a public constructor.
      */
     Thread(Runnable task, @SuppressWarnings("removal") AccessControlContext acc) {
-        this(null, nextThreadName(), 0, task, 0, acc);
+        this(null, genThreadName(), 0, task, 0, acc);
     }
 
     /**
@@ -1131,7 +1152,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task) {
-        this(group, task, nextThreadName(), 0);
+        this(group, genThreadName(), 0, task, 0, null);
     }
 
     /**
@@ -1148,7 +1169,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(String name) {
-        this(null, null, name, 0);
+        this(null, checkName(name), 0, null, 0, null);
     }
 
     /**
@@ -1177,7 +1198,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, String name) {
-        this(group, null, name, 0);
+        this(group, checkName(name), 0, null, 0, null);
     }
 
     /**
@@ -1199,7 +1220,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(Runnable task, String name) {
-        this(null, task, name, 0);
+        this(null, checkName(name), 0, task, 0, null);
     }
 
     /**
@@ -1253,7 +1274,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name) {
-        this(group, task, name, 0);
+        this(group, checkName(name), 0, task, 0, null);
     }
 
     /**
@@ -1335,7 +1356,7 @@ public class Thread implements Runnable {
      * @see <a href="#inheritance">Inheritance</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
-        this(group, name, 0, task, stackSize, null);
+        this(group, checkName(name), 0, task, stackSize, null);
     }
 
     /**
@@ -1401,7 +1422,7 @@ public class Thread implements Runnable {
      */
     public Thread(ThreadGroup group, Runnable task, String name,
                   long stackSize, boolean inheritInheritableThreadLocals) {
-        this(group, name,
+        this(group, checkName(name),
                 (inheritInheritableThreadLocals ? 0 : NO_INHERIT_THREAD_LOCALS),
                 task, stackSize, null);
     }
