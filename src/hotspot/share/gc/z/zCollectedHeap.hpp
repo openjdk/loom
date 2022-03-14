@@ -72,7 +72,7 @@ public:
 
   virtual bool is_maximal_no_gc() const;
   virtual bool is_in(const void* p) const;
-  virtual inline bool requires_barriers(stackChunkOop obj) const;
+  virtual bool requires_barriers(stackChunkOop obj) const;
 
   // Continuation support
   virtual void collect_for_codecache();
