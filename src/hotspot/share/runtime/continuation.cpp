@@ -1243,7 +1243,7 @@ public:
     assert (sp_before <= chunk->stack_size(), "");
     assert (sp_before >= size, "");
 
-    int sp_after = sp_before - size; // the chunk's new sp, after freeze
+    const int sp_after = sp_before - size; // the chunk's new sp, after freeze
     assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + sp_after) == is_chunk_available_size, "");
 
     intptr_t* chunk_top = chunk->start_address() + sp_after;
