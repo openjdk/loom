@@ -221,10 +221,10 @@ extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
 extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
 
 enum class oop_kind { NARROW, WIDE };
-template <oop_kind oops, typename BarrierSetT>
+template <oop_kind oops>
 class Config {
 public:
-  typedef Config<oops, BarrierSetT> SelfT;
+  typedef Config<oops> SelfT;
   typedef typename Conditional<oops == oop_kind::NARROW, narrowOop, oop>::type OopT;
 
   static int freeze(JavaThread* thread, intptr_t* const sp) {
@@ -3139,32 +3139,14 @@ public:
   static void resolve() { resolve_compressed(); }
 
   static void resolve_compressed() {
-    UseCompressedOops ? resolve_gc<true>()
-                      : resolve_gc<false>();
+    UseCompressedOops ? resolve<true>()
+                      : resolve<false>();
   }
 
 private:
   template <bool use_compressed>
-  static void resolve_gc() {
-    BarrierSet* bs = BarrierSet::barrier_set();
-    assert(bs != NULL, "freeze/thaw invoked before BarrierSet is set");
-    switch (bs->kind()) {
-#define BARRIER_SET_RESOLVE_BARRIER_CLOSURE(bs_name)                    \
-      case BarrierSet::bs_name: {                                       \
-        resolve<use_compressed, typename BarrierSet::GetType<BarrierSet::bs_name>::type>(); \
-      }                                                                 \
-        break;
-      FOR_EACH_CONCRETE_BARRIER_SET_DO(BARRIER_SET_RESOLVE_BARRIER_CLOSURE)
-#undef BARRIER_SET_RESOLVE_BARRIER_CLOSURE
-
-    default:
-      fatal("BarrierSet resolving not implemented");
-    };
-  }
-
-  template <bool use_compressed, typename BarrierSetT>
   static void resolve() {
-    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
+    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE> SelectedConfigT;
 
     freeze_entry = (address)freeze<SelectedConfigT>;
     preempt_freeze = SelectedConfigT::freeze_preempt;
