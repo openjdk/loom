@@ -79,70 +79,70 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   Unimplemented();
 }
 
-inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
+inline void Freeze::set_top_frame_metadata_pd(const frame& hf) {
   Unimplemented();
 }
 
 template<typename FKind>
-inline frame FreezeBase::sender(const frame& f) {
+inline frame Freeze::sender(const frame& f) {
   Unimplemented();
   return frame();
 }
 
-template<typename FKind> frame FreezeBase::new_hframe(frame& f, frame& caller) {
+template<typename FKind> frame Freeze::new_hframe(frame& f, frame& caller) {
   Unimplemented();
   return frame();
 }
 
-inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+inline void Freeze::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   Unimplemented();
 }
 
-inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
+inline void Freeze::patch_pd(frame& hf, const frame& caller) {
   Unimplemented();
 }
 
-inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+inline void Freeze::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
   Unimplemented();
 }
 
-inline frame ThawBase::new_entry_frame() {
-  Unimplemented();
-  return frame();
-}
-
-template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
+inline frame Thaw::new_entry_frame() {
   Unimplemented();
   return frame();
 }
 
-inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+template<typename FKind> frame Thaw::new_frame(const frame& hf, frame& caller, bool bottom) {
+  Unimplemented();
+  return frame();
+}
+
+inline void Thaw::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
   Unimplemented();
 }
 
-inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+inline void Thaw::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   Unimplemented();
 }
 
-inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
+inline intptr_t* Thaw::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
   Unimplemented();
   return NULL;
 }
 
-inline void ThawBase::patch_pd(frame& f, const frame& caller) {
+inline void Thaw::patch_pd(frame& f, const frame& caller) {
   Unimplemented();
 }
 
-intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
+intptr_t* Thaw::push_interpreter_return_frame(intptr_t* sp) {
   Unimplemented();
   return NULL;
 }
 
-void ThawBase::patch_chunk_pd(intptr_t* sp) {
+void Thaw::patch_chunk_pd(intptr_t* sp) {
   Unimplemented();
 }
 
-inline void ThawBase::prefetch_chunk_pd(void* start, int size) {
+inline void Thaw::prefetch_chunk_pd(void* start, int size) {
   Unimplemented();
 }
 

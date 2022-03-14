@@ -103,14 +103,14 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
 
 // Fast path
 
-inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+inline void Freeze::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
   *(vsp - frame::sender_sp_offset) = *(hsp - frame::sender_sp_offset);
 }
 
 // Slow path
 
 template<typename FKind>
-inline frame FreezeBase::sender(const frame& f) {
+inline frame Freeze::sender(const frame& f) {
   assert(FKind::is_instance(f), "");
   if (FKind::interpreted) {
     return frame(f.sender_sp(), f.interpreter_frame_sender_sp(), f.link(), f.sender_pc());
@@ -130,7 +130,7 @@ inline frame FreezeBase::sender(const frame& f) {
 }
 
 template<typename FKind>
-frame FreezeBase::new_hframe(frame& f, frame& caller) {
+frame Freeze::new_hframe(frame& f, frame& caller) {
   assert(FKind::is_instance(f), "");
   assert(!caller.is_interpreted_frame()
     || caller.unextended_sp() == (intptr_t*)caller.at(frame::interpreter_frame_last_sp_offset), "");
@@ -174,7 +174,7 @@ static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int 
   *addr = value;
 }
 
-inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+inline void Freeze::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert(hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
@@ -198,7 +198,7 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
   assert(hf.fp()            <= (intptr_t*)hf.at(frame::interpreter_frame_locals_offset), "");
 }
 
-inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
+inline void Freeze::set_top_frame_metadata_pd(const frame& hf) {
   stackChunkOop chunk = _cont.tail();
   assert(chunk->is_in_chunk(hf.sp() - 1), "");
   assert(chunk->is_in_chunk(hf.sp() - frame::sender_sp_offset), "");
@@ -213,7 +213,7 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
   assert(frame_pc == Frame::real_pc(hf), "");
 }
 
-inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
+inline void Freeze::patch_pd(frame& hf, const frame& caller) {
   if (caller.is_interpreted_frame()) {
     assert(!caller.is_empty(), "");
     patch_callee_link_relative(caller, caller.fp());
@@ -226,25 +226,25 @@ inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
 
 // Fast path
 
-inline void ThawBase::prefetch_chunk_pd(void* start, int size) {
+inline void Thaw::prefetch_chunk_pd(void* start, int size) {
   size <<= LogBytesPerWord;
   Prefetch::read(start, size);
   Prefetch::read(start, size - 64);
 }
 
-void ThawBase::patch_chunk_pd(intptr_t* sp) {
+void Thaw::patch_chunk_pd(intptr_t* sp) {
   intptr_t* fp = _cont.entryFP();
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
 }
 
 // Slow path
 
-inline frame ThawBase::new_entry_frame() {
+inline frame Thaw::new_entry_frame() {
   intptr_t* sp = _cont.entrySP();
   return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
 }
 
-template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
+template<typename FKind> frame Thaw::new_frame(const frame& hf, frame& caller, bool bottom) {
   assert(FKind::is_instance(hf), "");
 
   if (FKind::interpreted) {
@@ -282,7 +282,7 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
   }
 }
 
-inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
+inline intptr_t* Thaw::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
 #ifdef _LP64
   if (((intptr_t)vsp & 0xf) != 0) {
     assert(caller.is_interpreted_frame() || (bottom && hf.compiled_frame_stack_argsize() % 2 != 0), "");
@@ -295,11 +295,11 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, 
   return vsp;
 }
 
-inline void ThawBase::patch_pd(frame& f, const frame& caller) {
+inline void Thaw::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
-intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
+intptr_t* Thaw::push_interpreter_return_frame(intptr_t* sp) {
   address pc = StubRoutines::cont_interpreter_forced_preempt_return();
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
 
@@ -317,14 +317,14 @@ static inline void derelativize_one(intptr_t* const fp, int offset) {
   *addr = (intptr_t)(fp + *addr);
 }
 
-inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+inline void Thaw::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   intptr_t* vfp = f.fp();
 
   derelativize_one(vfp, frame::interpreter_frame_last_sp_offset);
   derelativize_one(vfp, frame::interpreter_frame_initial_sp_offset);
 }
 
-inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+inline void Thaw::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
   *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = bottom - 1;
 }
 #endif // CPU_X86_CONTINUATION_X86_INLINE_HPP

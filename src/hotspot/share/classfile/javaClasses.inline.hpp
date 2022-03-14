@@ -31,6 +31,7 @@
 #include "oops/instanceKlass.inline.hpp"
 #include "logging/log.hpp"
 #include "oops/method.hpp"
+#include "logging/log.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/stackChunkOop.inline.hpp"
@@ -272,14 +273,12 @@ inline void jdk_internal_vm_StackChunk::set_parent(oop ref, oop value) {
   ref->obj_field_put(_parent_offset, value);
 }
 
-template<typename P>
 inline bool jdk_internal_vm_StackChunk::is_parent_null(oop ref) {
-  return (oop)RawAccess<>::oop_load(ref->field_addr<P>(_parent_offset)) == NULL;
+  return (oop)RawAccess<>::oop_load_at(ref, _parent_offset) == NULL;
 }
 
-template<typename P>
 inline void jdk_internal_vm_StackChunk::set_parent_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_parent_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store_at(ref, _parent_offset, value);
 }
 
 inline oop jdk_internal_vm_StackChunk::cont(oop ref) {
@@ -290,14 +289,12 @@ inline void jdk_internal_vm_StackChunk::set_cont(oop ref, oop value) {
   ref->obj_field_put(_cont_offset, value);
 }
 
-template<typename P>
 inline oop jdk_internal_vm_StackChunk::cont_raw(oop ref) {
-  return (oop)RawAccess<>::oop_load(ref->field_addr<P>(_cont_offset));
+  return (oop)RawAccess<>::oop_load_at(ref, _cont_offset);
 }
 
-template<typename P>
 inline void jdk_internal_vm_StackChunk::set_cont_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_cont_offset), value);
+  RawAccess<IS_DEST_UNINITIALIZED>::oop_store_at(ref, _cont_offset, value);
 }
 
 inline int jdk_internal_vm_StackChunk::size(oop ref) {

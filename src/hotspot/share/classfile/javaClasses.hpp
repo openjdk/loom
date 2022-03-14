@@ -1154,9 +1154,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
   // Accessors
   static inline oop parent(oop ref);
   static inline void set_parent(oop ref, oop value);
-  template<typename P>
   static inline bool is_parent_null(oop ref); // bypasses barriers for a faster test
-  template<typename P>
   static inline void set_parent_raw(oop ref, oop value);
 
   static inline int size(oop ref);
@@ -1177,9 +1175,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
  // cont oop's processing is essential for the chunk's GC protocol
   static inline oop cont(oop ref);
   static inline void set_cont(oop ref, oop value);
-  template<typename P>
   static inline oop cont_raw(oop ref);
-  template<typename P>
   static inline void set_cont_raw(oop ref, oop value);
 };
 

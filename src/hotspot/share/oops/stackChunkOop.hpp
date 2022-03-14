@@ -58,11 +58,9 @@ private:
 public:
   static inline stackChunkOop cast(oop obj);
 
-  inline stackChunkOop parent() const;
-  inline void set_parent(stackChunkOop value);
-  template<typename P>
+  inline stackChunkOopDesc* parent() const;
+  inline void set_parent(stackChunkOopDesc* value);
   inline bool is_parent_null() const;
-  template<typename P>
   inline void set_parent_raw(oop value);
 
   inline int stack_size() const;
@@ -83,9 +81,7 @@ public:
   inline void set_max_size(int value);
 
   inline oop cont() const;
-  template<typename P> inline oop cont() const;
   inline void set_cont(oop value);
-  template<typename P>
   inline void set_cont_raw(oop value);
 
   inline int bottom() const;
@@ -96,7 +92,6 @@ public:
   inline intptr_t* end_address() const;
   inline intptr_t* bottom_address() const; // = end_address - argsize
   inline intptr_t* sp_address() const;
-
 
   inline int to_offset(intptr_t* p) const;
   inline intptr_t* from_offset(int offset) const;
