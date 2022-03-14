@@ -29,6 +29,7 @@
 
 #include "oops/access.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
+#include "logging/log.hpp"
 #include "oops/method.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"

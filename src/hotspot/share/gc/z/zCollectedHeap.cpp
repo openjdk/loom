@@ -122,6 +122,27 @@ bool ZCollectedHeap::is_in(const void* p) const {
   return _heap.is_in((uintptr_t)p);
 }
 
+bool ZCollectedHeap::requires_barriers(stackChunkOop obj) const {
+  uintptr_t* cont_addr = obj->field_addr<uintptr_t>(jdk_internal_vm_StackChunk::cont_offset());
+
+  if (!_heap.is_allocating(cast_from_oop<uintptr_t>(obj))) {
+    // An object that isn't allocating, is visible from GC tracing. Such
+    // stack chunks require barriers.
+    return true;
+  }
+
+  if (!ZAddress::is_good_or_null(*cont_addr)) {
+    // If a chunk is allocated after a GC started, but before relocate start
+    // we can have an allocating chunk that isn't deeply good. That means that
+    // the contained oops might be bad and require GC barriers.
+    return true;
+  }
+
+  // The chunk is allocating and its pointers are good. This chunk needs no
+  // GC barriers
+  return false;
+}
+
 uint32_t ZCollectedHeap::hash_oop(oop obj) const {
   return _heap.hash_oop(ZOop::to_address(obj));
 }

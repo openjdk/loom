@@ -91,9 +91,6 @@ public:
   // Test whether this object is of the type corresponding to bsn.
   bool is_a(BarrierSet::Name bsn) const { return _fake_rtti.has_tag(bsn); }
 
-  // Loom support
-  static bool requires_barriers(stackChunkOop obj);
-
   // End of fake RTTI support.
 
 protected:

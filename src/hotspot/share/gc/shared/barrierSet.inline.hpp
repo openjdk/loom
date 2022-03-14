@@ -26,7 +26,6 @@
 
 #include "gc/shared/barrierSet.hpp"
 
-#include "gc/shared/collectedHeap.hpp"
 #include "oops/accessDecorators.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/compressedOops.inline.hpp"
@@ -57,10 +56,6 @@ inline bool BarrierSet::AccessBarrier<decorators, BarrierSetT>::oop_arraycopy_in
   }
 
   return true;
-}
-
-inline bool BarrierSet::requires_barriers(stackChunkOop obj) {
-  return Universe::heap()->requires_barriers(obj);
 }
 
 #endif // SHARE_GC_SHARED_BARRIERSET_INLINE_HPP
