@@ -1416,7 +1416,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       DEBUG_ONLY(hf.print_value_on(&ls, nullptr);)
-      assert(hf.is_heap_frame(), "should be heap frame");
+      assert(hf.is_interpreted_heap_frame(), "should be");
       DEBUG_ONLY(print_frame_layout(hf, &ls);)
       if (bottom) {
         ls.print_cr("bottom h-frame:");
@@ -1544,7 +1544,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe before (freeze):");
-      assert(caller.is_heap_frame(), "should be heap frame");
+      assert(caller.is_interpreted_heap_frame(), "should be");
       caller.print_on(&ls);
     }
 
@@ -1573,7 +1573,7 @@ public:
       patch_pd<FKind, false>(hf, caller);
     }
     if (FKind::interpreted) {
-      assert(hf.is_heap_frame(), "should be heap frame");
+      assert(hf.is_interpreted_heap_frame(), "should be");
       Interpreted::patch_sender_sp(hf, caller.unextended_sp());
     }
 
@@ -1734,7 +1734,7 @@ public:
     LogTarget(Trace, jvmcont) lt;
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
-      assert(top.is_heap_frame(), "should be heap frame");
+      assert(top.is_interpreted_heap_frame(), "should be");
       top.print_on(&ls);
     }
 
@@ -1757,7 +1757,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe after (freeze):");
-      assert(_cont.last_frame().is_heap_frame(), "should be heap frame");
+      assert(_cont.last_frame().is_interpreted_heap_frame(), "should be");
       _cont.last_frame().print_on(&ls);
     }
 
@@ -2408,7 +2408,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe before (thaw):");
-      assert(hf.is_heap_frame(), "should have created a relative frame");
+      assert(hf.is_interpreted_heap_frame(), "should have created a relative frame");
       hf.print_on(&ls);
     }
 
@@ -2524,7 +2524,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("======== THAWING FRAME: %d", num_frame);
-      assert(hf.is_heap_frame(), "should be heap frame");
+      assert(hf.is_interpreted_heap_frame(), "should be");
       hf.print_on(&ls);
     }
     assert (bottom == _cont.is_entry_frame(caller), "bottom: %d is_entry_frame: %d", bottom, _cont.is_entry_frame(hf));
@@ -2576,7 +2576,7 @@ public:
     intptr_t* const hsp = hf.unextended_sp();
     intptr_t* const frame_bottom = Interpreted::frame_bottom(f);
 
-    assert(hf.is_heap_frame(), "should be heap frame");
+    assert(hf.is_interpreted_heap_frame(), "should be");
     const int fsize = Interpreted::frame_bottom(hf) - hsp;
 
     assert (!bottom || vsp + fsize >= _cont.entrySP() - 2, "");
@@ -2586,8 +2586,8 @@ public:
 
     // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
     const int locals = hf.interpreter_frame_method()->max_locals();
-    assert(hf.is_heap_frame(), "should be heap frame");
-    assert(!f.is_heap_frame(), "should be heap frame");
+    assert(hf.is_interpreted_heap_frame(), "should be");
+    assert(!f.is_interpreted_heap_frame(), "should not be");
 
     copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(hf) - locals,
                                           Interpreted::frame_bottom(f) - locals, locals); // copy locals
@@ -2616,7 +2616,7 @@ public:
       // can only fix caller once this frame is thawed (due to callee saved regs)
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
     } else if (_cont.tail()->has_bitmap() && locals > 0) {
-      assert(hf.is_heap_frame(), "should be heap frame");
+      assert(hf.is_interpreted_heap_frame(), "should be");
       clear_bitmap_bits(Interpreted::frame_bottom(hf) - locals, locals);
     }
 
@@ -2761,7 +2761,7 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe after (thaw):");
-      assert(_cont.last_frame().is_heap_frame(), "should be heap frame");
+      assert(_cont.last_frame().is_interpreted_heap_frame(), "should be");
       _cont.last_frame().print_on(&ls);
     }
   }

@@ -188,9 +188,8 @@ class frame {
   bool is_compiled_frame()       const;
   bool is_safepoint_blob_frame() const;
   bool is_deoptimized_frame()    const;
-  bool is_optimized_entry_frame()         const;
-  // only interpreted frames ?  wonder if this is true
-  bool is_heap_frame()           const { return is_interpreted_frame() && _pointers == addressing::RELATIVE; }
+  bool is_optimized_entry_frame()  const;
+  bool is_interpreted_heap_frame() const { return is_interpreted_frame() && _pointers == addressing::RELATIVE; }
 
   // testers
   bool is_first_frame() const; // oldest frame? (has no sender)
