@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -120,13 +120,20 @@ inline frame FreezeBase::sender(const frame& f) {
     : frame(sender_sp, sender_sp, *link_addr, sender_pc);
 }
 
-inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int offset) {
+  assert (*(hfp + offset) == *(vfp + offset), "");
+  intptr_t* addr = hfp + offset;
+  intptr_t value = *(intptr_t**)addr - vfp;
+  *addr = value;
+}
+
+inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, frame& hf) {
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0)
+  assert ((f.at(frame::interpreter_frame_last_sp_offset) != 0)
     || (f.unextended_sp() == f.sp()), "");
-  assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (f.fp() > (intptr_t*)f.at(frame::interpreter_frame_initial_sp_offset), "");
 
   // We compute the locals as below rather than relativize the value in the frame because then we can use the same
   // code on AArch64, which has an added complication (see this method in continuation_aarch64.inline.hpp)
@@ -135,13 +142,13 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
 
-  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
+  relativize_one(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
 
   assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
-  assert (hf.unextended_sp() == (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            >  (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_locals_offset), "");
+  assert (hf.unextended_sp() == (intptr_t*)hf.at(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at(frame::interpreter_frame_locals_offset), "");
 }
 
 template <typename ConfigT>
@@ -162,12 +169,12 @@ template<typename FKind>
 frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
   assert (!caller.is_interpreted_frame()
-    || caller.unextended_sp() == (intptr_t*)caller.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
+    || caller.unextended_sp() == (intptr_t*)caller.at(frame::interpreter_frame_last_sp_offset), "");
 
   intptr_t *sp, *fp; // sp is really our unextended_sp
   if (FKind::interpreted) {
-    assert ((intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) == nullptr
-      || f.unextended_sp() == (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset), "");
+    assert ((intptr_t*)f.at(frame::interpreter_frame_last_sp_offset) == nullptr
+      || f.unextended_sp() == (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset), "");
     int locals = f.interpreter_frame_method()->max_locals();
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
     fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
@@ -177,7 +184,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, true /* relative */);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
@@ -213,11 +220,16 @@ inline void Freeze<ConfigT>::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
 }
 
 ////////
-inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+static inline void derelativize_one(intptr_t* const fp, int offset) {
+  intptr_t* addr = fp + offset;
+  *addr = (intptr_t)(fp + *addr);
+}
+
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, frame& f) {
   intptr_t* vfp = f.fp();
 
-  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
-  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
+  derelativize_one(vfp, frame::interpreter_frame_last_sp_offset);
+  derelativize_one(vfp, frame::interpreter_frame_initial_sp_offset);
 }
 
 inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
@@ -236,7 +248,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
 
   if (FKind::interpreted) {
     intptr_t* hsp = hf.unextended_sp();
-    const int fsize = Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - hf.unextended_sp();
+    const int fsize = Interpreted::frame_bottom(hf) - hf.unextended_sp();
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);

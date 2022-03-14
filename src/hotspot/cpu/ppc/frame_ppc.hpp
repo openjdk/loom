@@ -401,7 +401,6 @@
   inline void interpreter_frame_set_top_frame_sp(intptr_t* top_frame_sp);
   inline void interpreter_frame_set_sender_sp(intptr_t* sender_sp);
 
-  template <addressing pointers = addressing::ABSOLUTE>
   inline intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

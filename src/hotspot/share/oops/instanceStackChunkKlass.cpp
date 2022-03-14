@@ -791,7 +791,7 @@ public:
     HandleMark hm(Thread::current());
 
     frame fr = f.to_frame();
-    fr.template describe<frame::addressing::RELATIVE>(_values, _frame_no++, get_map(map, f.sp()));
+    fr.describe(_values, _frame_no++, get_map(map, f.sp()));
     return true;
   }
 
@@ -826,7 +826,7 @@ public:
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",
       p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
-    f.print_on<frame::addressing::RELATIVE>(_st);
+    f.print_on(_st);
     const ImmutableOopMap* oopmap = fs.oopmap();
     if (oopmap != nullptr) {
       oopmap->print_on(_st);
@@ -878,6 +878,6 @@ template <chunk_frames frames>
 void StackChunkFrameStream<frames>::print_on(outputStream* st) const {
   st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d",
     p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
-  to_frame().template print_on<frame::addressing::RELATIVE>(st);
+  to_frame().print_on(st);
 }
 #endif

@@ -199,11 +199,15 @@ inline address stackChunkOopDesc::interpreter_frame_bcp(const frame& fr) {
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_expression_stack_at(const frame& fr, int index) const {
-  return derelativize(fr).interpreter_frame_expression_stack_at<frame::addressing::RELATIVE>(index);
+  frame heap_frame = derelativize(fr);
+  assert(heap_frame.is_interpreted_heap_frame(), "must be");
+  return heap_frame.interpreter_frame_expression_stack_at(index);
 }
 
 inline intptr_t* stackChunkOopDesc::interpreter_frame_local_at(const frame& fr, int index) const {
-  return derelativize(fr).interpreter_frame_local_at<frame::addressing::RELATIVE>(index);
+  frame heap_frame = derelativize(fr);
+  assert(heap_frame.is_interpreted_heap_frame(), "must be");
+  return heap_frame.interpreter_frame_local_at(index);
 }
 
 template <copy_alignment alignment>

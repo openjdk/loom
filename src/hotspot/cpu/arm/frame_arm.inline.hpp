@@ -39,6 +39,7 @@ inline frame::frame() {
   _fp = NULL;
   _cb = NULL;
   _deopt_state = unknown;
+  _pointers = addressing::ABSOLUTE;
 }
 
 inline frame::frame(intptr_t* sp) {
@@ -61,6 +62,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   } else {
     _deopt_state = not_deoptimized;
   }
+  _pointers = addressing::ABSOLUTE;
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -85,6 +87,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   } else {
     _deopt_state = not_deoptimized;
   }
+  _pointers = addressing::ABSOLUTE;
 }
 
 
@@ -105,6 +108,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   } else {
     _deopt_state = not_deoptimized;
   }
+  _pointers = addressing::ABSOLUTE;
 }
 
 
@@ -174,7 +178,6 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   intptr_t* last_sp = interpreter_frame_last_sp();
   if (last_sp == NULL ) {
@@ -200,7 +203,6 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end-1;
@@ -244,12 +246,6 @@ inline int frame::compiled_frame_stack_argsize() const {
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
-}
-
-template <frame::addressing pointers>
-inline intptr_t* frame::interpreter_frame_last_sp() const {
-  Unimplemented();
-  return NULL;
 }
 
 inline int frame::sender_sp_ret_address_offset() {

@@ -185,7 +185,6 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
 #endif
 
 #ifndef PRODUCT
-template <frame::addressing pointers>
 static void print_frame_layout(const frame& f, outputStream* st = tty);
 static void print_frames(JavaThread* thread, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
@@ -1003,15 +1002,8 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
 class FreezeBase { // avoids the template of the Freeze class
 protected:
-  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
+  static inline void relativize_interpreted_frame_metadata(const frame& f, frame& hf);
   template<typename FKind> static inline frame sender(const frame& f);
-
-  static inline void relativize(intptr_t* const vfp, intptr_t* const hfp, int offset) {
-    assert (*(hfp + offset) == *(vfp + offset), "");
-    intptr_t* addr = hfp + offset;
-    intptr_t value = *(intptr_t**)addr - vfp;
-    *addr = value;
-  }
 };
 
 template <typename ConfigT>
@@ -1424,10 +1416,11 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       DEBUG_ONLY(hf.print_value_on(&ls, nullptr);)
-      DEBUG_ONLY(print_frame_layout<frame::addressing::RELATIVE>(hf, &ls);)
+      assert(hf.is_interpreted_heap_frame(), "should be");
+      DEBUG_ONLY(print_frame_layout(hf, &ls);)
       if (bottom) {
         ls.print_cr("bottom h-frame:");
-        hf.print_on<frame::addressing::RELATIVE>(&ls);
+        hf.print_on(&ls);
       }
     }
   }
@@ -1551,7 +1544,8 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe before (freeze):");
-      caller.print_on<frame::addressing::RELATIVE>(&ls);
+      assert(caller.is_interpreted_heap_frame(), "should be");
+      caller.print_on(&ls);
     }
 
     assert (!empty || Continuation::is_continuation_entry_frame(callee, nullptr), "");
@@ -1579,7 +1573,8 @@ public:
       patch_pd<FKind, false>(hf, caller);
     }
     if (FKind::interpreted) {
-      Interpreted::patch_sender_sp<frame::addressing::RELATIVE>(hf, caller.unextended_sp());
+      assert(hf.is_interpreted_heap_frame(), "should be");
+      Interpreted::patch_sender_sp(hf, caller.unextended_sp());
     }
 
 #ifdef ASSERT
@@ -1597,8 +1592,8 @@ public:
   NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
 #if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
     { // TODO PD
-      assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-      intptr_t* real_unextended_sp = (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset);
+      assert ((f.at(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+      intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
       if (real_unextended_sp != nullptr) f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
     }
 #else
@@ -1608,7 +1603,7 @@ public:
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
     const int argsize = Interpreted::stack_argsize(f);
     const int locals = f.interpreter_frame_method()->max_locals();
-    assert (Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
+    assert (Interpreted::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
     const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
 
 #ifdef ASSERT
@@ -1637,11 +1632,11 @@ public:
     frame hf = new_hframe<Interpreted>(f, caller);
 
     intptr_t* hsp = Interpreted::frame_top(hf, callee_argsize, callee_interpreted);
-    assert (Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) == hsp + fsize, "");
+    assert (Interpreted::frame_bottom(hf) == hsp + fsize, "");
 
     // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-    copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) - locals,
-                                             Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals, locals); // copy locals
+    copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(f) - locals,
+                                             Interpreted::frame_bottom(hf) - locals, locals); // copy locals
     copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
     assert (!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
@@ -1739,7 +1734,8 @@ public:
     LogTarget(Trace, jvmcont) lt;
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
-      top.print_on<frame::addressing::RELATIVE>(&ls);
+      assert(top.is_interpreted_heap_frame(), "should be");
+      top.print_on(&ls);
     }
 
     set_top_frame_metadata_pd(top);
@@ -1761,7 +1757,8 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe after (freeze):");
-      _cont.last_frame().template print_on<frame::addressing::RELATIVE>(&ls);
+      assert(_cont.last_frame().is_interpreted_heap_frame(), "should be");
+      _cont.last_frame().print_on(&ls);
     }
 
     assert(_cont.chunk_invariant(tty), "");
@@ -2178,13 +2175,8 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
 class ThawBase { // avoids the template of the Thaw class
 protected:
-  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
+  static inline void derelativize_interpreted_frame_metadata(const frame& hf, frame& f);
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
-
-  static inline void derelativize(intptr_t* const fp, int offset) {
-    intptr_t* addr = fp + offset;
-    *addr = (intptr_t)(fp + *addr);
-  }
 };
 
 template <typename ConfigT>
@@ -2416,7 +2408,8 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe before (thaw):");
-      hf.print_on<frame::addressing::RELATIVE>(&ls);
+      assert(hf.is_interpreted_heap_frame(), "should have created a relative frame");
+      hf.print_on(&ls);
     }
 
     frame f;
@@ -2531,7 +2524,8 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("======== THAWING FRAME: %d", num_frame);
-      hf.print_on<frame::addressing::RELATIVE>(&ls);
+      assert(hf.is_interpreted_heap_frame(), "should be");
+      hf.print_on(&ls);
     }
     assert (bottom == _cont.is_entry_frame(caller), "bottom: %d is_entry_frame: %d", bottom, _cont.is_entry_frame(hf));
   }
@@ -2554,7 +2548,7 @@ public:
     patch_pd<FKind, bottom>(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
 
     if (FKind::interpreted) {
-      Interpreted::patch_sender_sp<frame::addressing::ABSOLUTE>(f, caller.unextended_sp());
+      Interpreted::patch_sender_sp(f, caller.unextended_sp());
     }
 
     assert (!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");
@@ -2577,21 +2571,26 @@ public:
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
 
     frame f = new_frame<Interpreted>(hf, caller, bottom);
+
     intptr_t* const vsp = f.sp();
     intptr_t* const hsp = hf.unextended_sp();
-    intptr_t* const frame_bottom = Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f);
+    intptr_t* const frame_bottom = Interpreted::frame_bottom(f);
 
-    const int fsize = Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - hsp;
+    assert(hf.is_interpreted_heap_frame(), "should be");
+    const int fsize = Interpreted::frame_bottom(hf) - hsp;
 
     assert (!bottom || vsp + fsize >= _cont.entrySP() - 2, "");
     assert (!bottom || vsp + fsize <= _cont.entrySP(), "");
 
-    assert (Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) == vsp + fsize, "");
+    assert (Interpreted::frame_bottom(f) == vsp + fsize, "");
 
     // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
     const int locals = hf.interpreter_frame_method()->max_locals();
-    copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals,
-                                          Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) - locals, locals); // copy locals
+    assert(hf.is_interpreted_heap_frame(), "should be");
+    assert(!f.is_interpreted_heap_frame(), "should not be");
+
+    copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(hf) - locals,
+                                          Interpreted::frame_bottom(f) - locals, locals); // copy locals
     copy_from_chunk<copy_alignment::WORD_ALIGNED>(hsp, vsp, fsize - locals); // copy rest
 
     set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
@@ -2602,12 +2601,12 @@ public:
     LogTarget(Trace, jvmcont) lt;
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
-      print_frame_layout<frame::addressing::ABSOLUTE>(f, &ls);
+      print_frame_layout(f, &ls);
     }
   #endif
 
     assert(f.is_interpreted_frame_valid(_cont.thread()), "invalid thawed frame");
-    assert(Interpreted::frame_bottom<frame::addressing::ABSOLUTE>(f) <= Frame::frame_top(caller), "");
+    assert(Interpreted::frame_bottom(f) <= Frame::frame_top(caller), "");
 
     CONT_JFR_ONLY(_cont.record_interpreted_frame();)
 
@@ -2617,7 +2616,8 @@ public:
       // can only fix caller once this frame is thawed (due to callee saved regs)
       InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
     } else if (_cont.tail()->has_bitmap() && locals > 0) {
-      clear_bitmap_bits(Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - locals, locals);
+      assert(hf.is_interpreted_heap_frame(), "should be");
+      clear_bitmap_bits(Interpreted::frame_bottom(hf) - locals, locals);
     }
 
     DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2761,7 +2761,8 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe after (thaw):");
-      _cont.last_frame().template print_on<frame::addressing::RELATIVE>(&ls);
+      assert(_cont.last_frame().is_interpreted_heap_frame(), "should be");
+      _cont.last_frame().print_on(&ls);
     }
   }
 
@@ -3008,16 +3009,17 @@ static jlong java_tid(JavaThread* thread) {
   return java_lang_Thread::thread_id(thread->threadObj());
 }
 
-template <frame::addressing pointers>
 static void print_frame_layout(const frame& f, outputStream* st) {
   ResourceMark rm;
   FrameValues values;
   assert (f.get_cb() != nullptr, "");
-  RegisterMap map(pointers == frame::addressing::RELATIVE ? (JavaThread*)nullptr : JavaThread::current(), true, false, false);
+  RegisterMap map(f._pointers == frame::addressing::RELATIVE ?
+                     (JavaThread*)nullptr :
+                     JavaThread::current(), true, false, false);
   map.set_include_argument_oops(false);
   map.set_skip_missing(true);
   frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
-  const_cast<frame&>(f).describe<pointers>(values, 0, &map);
+  const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
 }
 

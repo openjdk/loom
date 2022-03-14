@@ -49,11 +49,10 @@ inline address* Interpreted::return_pc_address(const frame& f) {
   return (address*)(f.fp() + frame::return_addr_offset);
 }
 
-template <frame::addressing pointers>
 void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
   assert (f.is_interpreted_frame(), "");
   intptr_t* la = f.addr_at(frame::interpreter_frame_sender_sp_offset);
-  *la = pointers == frame::addressing::RELATIVE ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
+  *la = f._pointers == frame::addressing::RELATIVE ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
 }
 
 // inline address* Frame::pc_address(const frame& f) {
@@ -84,9 +83,8 @@ inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask)
   // assert (res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
 }
 
-template <frame::addressing pointers>
 inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
-  return (intptr_t*)f.at<pointers>(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
+  return (intptr_t*)f.at(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
 }
 
 inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {

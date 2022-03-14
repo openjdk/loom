@@ -45,6 +45,7 @@ inline frame::frame() {
   _cb = NULL;
   _deopt_state = unknown;
   _sp_is_trusted = false;
+  _pointers = addressing::ABSOLUTE;
 }
 
 static int spin;
@@ -59,6 +60,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
+  _pointers = addressing::ABSOLUTE;
 
   setup(pc);
 
@@ -100,6 +102,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+  _pointers = addressing::ABSOLUTE;
 
   setup(pc);
 }
@@ -113,11 +116,12 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = oop_map;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+  _pointers = addressing::ABSOLUTE;
 
   setup(pc);
 }
 
-inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool dummy) {
+inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool relative) {
   _sp = sp;
   _unextended_sp = unextended_sp;
   _fp = fp;
@@ -126,6 +130,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
   _sp_is_trusted = false;
+  _pointers = relative ? addressing::RELATIVE : addressing::ABSOLUTE;
+  assert(relative || !is_interpreted_frame(), "these interpreter frames are heap frames");
 #ifdef ASSERT
   // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
   // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
@@ -146,6 +152,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
+  _pointers = addressing::ABSOLUTE;
 
   setup(pc);
 }
@@ -182,6 +189,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
     _deopt_state = not_deoptimized;
   }
   _sp_is_trusted = false;
+  _pointers = addressing::ABSOLUTE;
 }
 
 // Accessors
@@ -266,9 +274,8 @@ inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
-  return (intptr_t*)at<pointers>(interpreter_frame_last_sp_offset);
+  return (intptr_t*)at(interpreter_frame_last_sp_offset);
 }
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
@@ -299,16 +306,15 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-  intptr_t* last_sp = interpreter_frame_last_sp<pointers>();
+  intptr_t* last_sp = interpreter_frame_last_sp();
   if (last_sp == NULL) {
     return sp();
   } else {
     // sp() may have been extended or shrunk by an adapter.  At least
     // check that we don't fall behind the legal region.
     // For top deoptimized frame last_sp == interpreter_frame_monitor_end.
-    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<pointers>(), "bad tos");
+    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end(), "bad tos");
     return last_sp;
   }
 }
@@ -325,9 +331,8 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
-  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<pointers>();
+  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end-1;
 }
 
