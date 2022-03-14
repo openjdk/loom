@@ -2206,7 +2206,6 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     int _depth;
     GrowableArray<Method*>* _methods;
     GrowableArray<int>*     _bcis;
-    GrowableArray<oop>*     _continuations;
 
     GetStackTraceClosure(Handle java_thread) :
       HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
@@ -2214,7 +2213,6 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       int init_length = MaxJavaStackTraceDepth/2;
       _methods = new GrowableArray<Method*>(init_length);
       _bcis = new GrowableArray<int>(init_length);
-      _continuations = new GrowableArray<oop>(init_length);
     }
 
     bool can_be_processed_by(Thread* thread) {
@@ -2251,15 +2249,10 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
                             vfst.method()->is_continuation_enter_intrinsic())) continue;
         _methods->push(vfst.method());
         _bcis->push(vfst.bci());
-        _continuations->push(contScopeName(vfst.continuation()));
         total_count++;
       }
 
       _depth = total_count;
-    }
-
-    oop contScopeName(oop cont) {
-      return cont == NULL ? NULL : jdk_internal_vm_ContinuationScope::name(Continuation::continuation_scope(cont));
     }
   };
 
@@ -2272,13 +2265,6 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   // Stop if no stack trace is found.
   if (gstc._depth == 0) {
     return NULL;
-  }
-
-  // Convert the continuations into handles before allocation.
-  assert(gstc._depth == gstc._continuations->length(), "should be the same");
-  GrowableArray<Handle>* cont_handles = new GrowableArray<Handle>(gstc._depth);
-  for (int i = 0; i < gstc._depth; i++) {
-    cont_handles->push(Handle(THREAD, gstc._continuations->at(i)));
   }
 
   // Convert to StackTraceElement array
