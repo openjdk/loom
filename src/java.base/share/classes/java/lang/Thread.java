@@ -692,8 +692,6 @@ public class Thread implements Runnable {
      * @param characteristics thread characteristics
      */
     Thread(String name, int characteristics) {
-        Thread parent = currentThread();
-
         this.tid = ThreadIdentifiers.next();
         this.name = (name != null) ? name : "<unnamed>";
         this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
@@ -704,6 +702,7 @@ public class Thread implements Runnable {
             this.inheritableThreadLocals = ThreadLocal.ThreadLocalMap.NOT_SUPPORTED;
             this.contextClassLoader = Constants.NOT_SUPPORTED_CLASSLOADER;
         } else if ((characteristics & NO_INHERIT_THREAD_LOCALS) == 0) {
+            Thread parent = currentThread();
             ThreadLocal.ThreadLocalMap parentMap = parent.inheritableThreadLocals;
             if (parentMap != null
                     && parentMap != ThreadLocal.ThreadLocalMap.NOT_SUPPORTED
