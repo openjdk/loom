@@ -2021,12 +2021,13 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD "The thread is null, not a valid thread, the thread "
-                                  "has terminated, or the thread is a virtual thread "
-                                  "and the target VM does not support stopping it with "
-                                  "an asynchronous exception at this time.")
+            (Error INVALID_THREAD "The thread is null, not a valid thread, or the "
+                                  "thread is a virtual thread and the target VM does "
+                                  "not support stopping it with an asynchronous "
+                                  "exception at this time.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
                                   "exception has been garbage collected.")
+            (Error THREAD_NOT_ALIVE)
             (Error VM_DEAD)
         )
     )
@@ -3161,15 +3162,13 @@ JDWP "Java(tm) Debug Wire Protocol"
 )
 (ConstantSet Error
     (Constant NONE                   =0   "No error has occurred.")
-    (Constant INVALID_THREAD         =10  "The thread is null, not a valid thread, "
-                                          "or the thread has terminated.")
+    (Constant INVALID_THREAD         =10  "The thread is null or not a valid thread")
     (Constant INVALID_THREAD_GROUP   =11  "Thread group invalid.")
     (Constant INVALID_PRIORITY       =12  "Invalid priority.")
     (Constant THREAD_NOT_SUSPENDED   =13  "If the specified thread has not been "
                                           "suspended by an event.")
     (Constant THREAD_SUSPENDED       =14  "Thread already suspended.")
-    (Constant THREAD_NOT_ALIVE       =15  "Thread has not been started or is now dead.")
-
+    (Constant THREAD_NOT_ALIVE       =15  "Thread has not been started or has terminated.")
     (Constant INVALID_OBJECT         =20  "If this reference type has been unloaded "
                                           "and garbage collected.")
     (Constant INVALID_CLASS          =21  "Invalid class.")
