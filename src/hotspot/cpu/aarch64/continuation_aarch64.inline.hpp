@@ -186,7 +186,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, true /* relative */);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
