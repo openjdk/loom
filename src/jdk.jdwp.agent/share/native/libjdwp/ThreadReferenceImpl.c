@@ -459,13 +459,6 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* "stop" is not supported on a vthread. Although JVMTI will produce INVALID_THREAD, we
-       check here and force the error to make it obvious to the reader. */
-    if (isVThread(thread)) {
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
     error = threadControl_stop(thread, throwable);
     if (error != JVMTI_ERROR_NONE) {
         outStream_setError(out, map2jdwpError(error));

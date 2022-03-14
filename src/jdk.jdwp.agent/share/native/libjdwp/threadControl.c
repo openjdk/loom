@@ -2663,12 +2663,6 @@ threadControl_stop(jthread thread, jobject throwable)
     ThreadNode *node;
     jvmtiError  error;
 
-    /*
-     * Since ThreadReference.Stop is not supported for vthreads, we should never
-     * get here with a vthread.
-     */
-    JDI_ASSERT(!isVThread(thread));
-
     error = JVMTI_ERROR_NONE;
 
     log_debugee_location("threadControl_stop()", thread, NULL, 0);
