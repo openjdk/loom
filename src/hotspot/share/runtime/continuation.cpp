@@ -206,7 +206,7 @@ const char* freeze_result_names[6] = {
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
 static bool is_safe_to_preempt(JavaThread* thread);
-template<typename ConfigT> static inline int freeze0(JavaThread* current, intptr_t* const sp);
+template<typename OopT> static inline int freeze0(JavaThread* current, intptr_t* const sp);
 
 enum thaw_kind {
   thaw_top = 0,
@@ -215,32 +215,10 @@ enum thaw_kind {
 };
 
 static inline int prepare_thaw0(JavaThread* thread, bool return_barrier);
-template<typename ConfigT> static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind);
+template<typename OopT> static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind);
 
 extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
 extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
-
-enum class oop_kind { NARROW, WIDE };
-template <oop_kind oops>
-class Config {
-public:
-  typedef Config<oops> SelfT;
-  typedef typename Conditional<oops == oop_kind::NARROW, narrowOop, oop>::type OopT;
-
-  static int freeze(JavaThread* thread, intptr_t* const sp) {
-    return freeze0<SelfT, false>(thread, sp);
-  }
-
-  __COLD
-  static int freeze_preempt(JavaThread* thread, intptr_t* const sp) {
-    return freeze0<SelfT, true>(thread, sp);
-  }
-
-  static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
-    return thaw0<SelfT>(thread, kind);
-  }
-
-};
 
 class SmallRegisterMap;
 
@@ -527,7 +505,7 @@ static int num_java_frames(ContMirror& cont) {
 /////////////////////////////////////////////////////////////////
 
 // Entry point to freeze. Transitions are handled manually
-template<typename ConfigT>
+template<typename OopT>
 static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
   assert (sp == current->frame_anchor()->last_Java_sp(), "");
 
@@ -535,7 +513,7 @@ static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
     current->set_cont_fastpath(nullptr);
   }
 
-  return ConfigT::freeze(current, sp);
+  return freeze0<OopT, false>(current, sp);
 JRT_END
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
@@ -595,14 +573,14 @@ JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier
   return prepare_thaw0(thread, return_barrier);
 JRT_END
 
-template<typename ConfigT>
+template<typename OopT>
 static JRT_LEAF(intptr_t*, thaw(JavaThread* thread, int kind))
   // TODO: JRT_LEAF and NoHandleMark is problematic for JFR events.
   // vFrameStreamCommon allocates Handles in RegisterMap for continuations.
   // JRT_ENTRY instead?
   ResetNoHandleMark rnhm;
 
-  return ConfigT::thaw(thread, (thaw_kind)kind);
+  return thaw0<OopT>(thread, (thaw_kind)kind);
 JRT_END
 
 typedef void (*cont_jump_from_sp_t)();
@@ -1013,7 +991,7 @@ protected:
   template<typename FKind> static inline frame sender(const frame& f);
 };
 
-template <typename ConfigT>
+template <typename OopT>
 class Freeze : public FreezeBase {
 private:
   JavaThread* const _thread;
@@ -1863,8 +1841,8 @@ public:
       assert (chunk0 == (oop)nullptr || !chunk0->is_empty(), "");
     }
     // fields are uninitialized
-    chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
-    chunk->set_cont_raw<typename ConfigT::OopT>(_cont.mirror());
+    chunk->set_parent_raw<OopT>(chunk0);
+    chunk->set_cont_raw<OopT>(_cont.mirror());
     assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
 
     if (start != nullptr) {
@@ -1980,7 +1958,7 @@ static int freeze_epilog(JavaThread* thread, ContMirror& cont, freeze_result res
   return freeze_epilog(thread, cont);
 }
 
-template<typename ConfigT, bool preempt>
+template<typename OopT, bool preempt>
 static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert (!current->cont_yield(), "");
   assert (!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
@@ -2023,7 +2001,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert (!fast || current->held_monitor_count() == 0, "");
 
   // no need to templatize on preempt, as it's currently only used on the slow path
-  Freeze<ConfigT> fr(current, cont, preempt);
+  Freeze<OopT> fr(current, cont, preempt);
 
   if (preempt) { // UNLIKELY
     freeze_result res = fr.freeze_slow();
@@ -2230,7 +2208,7 @@ protected:
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
 };
 
-template <typename ConfigT>
+template <typename OopT>
 class Thaw : public ThawBase {
 private:
   JavaThread* _thread;
@@ -2356,7 +2334,7 @@ public:
       size += argsize;
     }
 
-    const bool is_last = empty && chunk->is_parent_null<typename ConfigT::OopT>();
+    const bool is_last = empty && chunk->is_parent_null<OopT>();
 
     log_develop_trace(jvmcont)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
                                 partial, is_last, empty, size, argsize);
@@ -2606,8 +2584,8 @@ public:
     // we need to clear the bits that correspond to arguments as they reside in the caller frame
     log_develop_trace(jvmcont)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
     stackChunkOop chunk = _cont.tail();
-    chunk->bitmap().clear_range(chunk->bit_index_for((typename ConfigT::OopT*)start),
-                                chunk->bit_index_for((typename ConfigT::OopT*)(start+range)));
+    chunk->bitmap().clear_range(chunk->bit_index_for((OopT*)start),
+                                chunk->bit_index_for((OopT*)(start+range)));
   }
 
   NOINLINE void recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
@@ -2852,7 +2830,7 @@ public:
 
 // returns new top sp
 // called after preparations (stack overflow check and making room)
-template<typename ConfigT>
+template<typename OopT>
 static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   LogTarget(Trace, jvmcont) lt;
 #ifdef ASSERT
@@ -2887,7 +2865,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   }
 #endif
 
-  Thaw<ConfigT> thw(thread, cont);
+  Thaw<OopT> thw(thread, cont);
   intptr_t* const sp = thw.thaw(kind);
   assert ((intptr_t)sp % 16 == 0, "");
 
@@ -3139,20 +3117,16 @@ public:
   static void resolve() { resolve_compressed(); }
 
   static void resolve_compressed() {
-    UseCompressedOops ? resolve<true>()
-                      : resolve<false>();
+    UseCompressedOops ? resolve<narrowOop>()
+                      : resolve<oop>();
   }
 
 private:
-  template <bool use_compressed>
+  template <typename OopT>
   static void resolve() {
-    typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE> SelectedConfigT;
-
-    freeze_entry = (address)freeze<SelectedConfigT>;
-    preempt_freeze = SelectedConfigT::freeze_preempt;
-
-    // if we want, we could templatize by king and have three different that entries
-    thaw_entry   = (address)thaw<SelectedConfigT>;
+    freeze_entry = (address)freeze<OopT>;
+    preempt_freeze = freeze0<OopT, true>;
+    thaw_entry   = (address)thaw<OopT>;
   }
 };
 
