@@ -146,7 +146,11 @@ public:
     // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
     // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
     intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-    assert (offset >= 0, "");
+    if (offset < 0) {
+      // It looks as if a derived pointer appears live in the oopMap but isn't pointing into the object.
+      // This might be the result of address computation floating above corresponding range check for array access.
+      offset = -1;
+    }
     Atomic::store((intptr_t*)derived_loc, -offset);
   }
 };
