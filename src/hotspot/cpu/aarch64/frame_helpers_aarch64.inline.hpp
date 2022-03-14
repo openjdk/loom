@@ -52,7 +52,7 @@ inline address* Interpreted::return_pc_address(const frame& f) {
 void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
   assert (f.is_interpreted_frame(), "");
   intptr_t* la = f.addr_at(frame::interpreter_frame_sender_sp_offset);
-  *la = _pointers == frame::addressing::RELATIVE ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
+  *la = f._pointers == frame::addressing::RELATIVE ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
 }
 
 // inline address* Frame::pc_address(const frame& f) {
