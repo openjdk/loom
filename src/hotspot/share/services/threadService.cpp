@@ -663,7 +663,7 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHasht
   assert(SafepointSynchronize::is_at_safepoint(), "all threads are stopped");
 
   if (_thread->has_last_Java_frame()) {
-    RegisterMap reg_map(_thread, true, false);
+    RegisterMap reg_map(_thread);
 
     vframe* start_vf = !full && _thread->is_vthread_mounted()
       ? _thread->vthread_carrier_last_java_vframe(&reg_map)

@@ -2241,7 +2241,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       const bool skip_hidden = !ShowHiddenFrames;
 
       int total_count = 0;
-      for (vframeStream vfst(thread, false, false, carrier);
+      for (vframeStream vfst(thread, false, false, carrier); // we don't process frames as we don't care about oops
            !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
            vfst.next()) {
 
