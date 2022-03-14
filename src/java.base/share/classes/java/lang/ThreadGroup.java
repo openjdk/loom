@@ -301,7 +301,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Tests if this thread group is either the thread group
      * argument or one of its ancestor thread groups.
      *
-     * @param   g   a thread group.
+     * @param   g   a thread group, can be {@code null}
      * @return  {@code true} if this thread group is the thread group
      *          argument or one of its ancestor thread groups;
      *          {@code false} otherwise.
