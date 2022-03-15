@@ -127,7 +127,7 @@ static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int 
   *addr = value;
 }
 
-inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, frame& hf) {
+inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
@@ -225,7 +225,7 @@ static inline void derelativize_one(intptr_t* const fp, int offset) {
   *addr = (intptr_t)(fp + *addr);
 }
 
-inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, frame& f) {
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   intptr_t* vfp = f.fp();
 
   derelativize_one(vfp, frame::interpreter_frame_last_sp_offset);

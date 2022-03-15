@@ -1002,7 +1002,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
 
 class FreezeBase { // avoids the template of the Freeze class
 protected:
-  static inline void relativize_interpreted_frame_metadata(const frame& f, frame& hf);
+  static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
   template<typename FKind> static inline frame sender(const frame& f);
 };
 
@@ -2175,7 +2175,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
 class ThawBase { // avoids the template of the Thaw class
 protected:
-  static inline void derelativize_interpreted_frame_metadata(const frame& hf, frame& f);
+  static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
 };
 
