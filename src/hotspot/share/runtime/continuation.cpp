@@ -76,7 +76,7 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
 
-#define CONT_JFR false
+#define CONT_JFR false // emit low-level JFR events that count slow/fast path for continuation peformance debugging only
 #if CONT_JFR
   #define CONT_JFR_ONLY(code) code
 #else
