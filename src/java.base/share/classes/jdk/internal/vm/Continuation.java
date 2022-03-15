@@ -266,11 +266,12 @@ public class Continuation {
             JLA.setContinuation(t, this);
 
             try {
+                boolean isVirtualThread = (scope == JLA.virtualThreadContinuationScope());
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
-                    enterSpecial(this, false);
+                    enterSpecial(this, false, isVirtualThread);
                 } else {
                     assert !isEmpty();
-                    enterSpecial(this, true);
+                    enterSpecial(this, true, isVirtualThread);
                 }
             } finally {
                 fence();
@@ -323,7 +324,7 @@ public class Continuation {
     private static int doYield() { throw new Error("Intrinsic not installed"); };
 
     @IntrinsicCandidate
-    private native static void enterSpecial(Continuation c, boolean isContinue);
+    private native static void enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread);
 
 
     @DontInline

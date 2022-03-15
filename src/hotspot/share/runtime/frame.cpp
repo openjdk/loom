@@ -274,9 +274,8 @@ bool frame::is_first_java_frame() const {
 
 bool frame::is_first_vthread_frame(JavaThread* thread) const {
   return Continuation::is_continuation_enterSpecial(*this)
-    // the enterSpecial frame is considered out of the continuation, so we subtract 1 from sp
-    && Continuation::continuation_scope(Continuation::get_continuation_for_sp(thread, sp()-2))
-          == java_lang_VirtualThread::vthread_scope();
+    // the enterSpecial frame is considered out of the continuation, so we subtract from sp
+    && Continuation::get_continuation_entry_for_sp(thread, sp()-2)->is_virtual_thread();
 }
 
 bool frame::entry_frame_is_first() const {
@@ -1503,6 +1502,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
       address usp = (address)unextended_sp();
       values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_offset())), "parent");
       values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::cont_offset())),   "continuation");
+      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::flags_offset())),   "flags");
       values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::chunk_offset())),   "chunk");
       values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::argsize_offset())), "argsize");
       // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_cont_fastpath_offset())),      "parent fastpath");

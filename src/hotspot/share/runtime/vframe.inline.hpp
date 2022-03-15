@@ -72,15 +72,14 @@ inline void vframeStreamCommon::next() {
       cont_entry = true;
 
       // TODO: handle ShowCarrierFrames
-      oop scope = _cont->scope();
-      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
+      if (_cont->is_virtual_thread() || (_continuation_scope.not_null() && _cont->scope() == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }
     } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       assert (_reg_map.cont() != NULL, "");
       oop scope = jdk_internal_vm_Continuation::scope(_reg_map.cont());
-      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
+      if (scope == java_lang_VirtualThread::vthread_scope() || (_continuation_scope.not_null() && scope == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }

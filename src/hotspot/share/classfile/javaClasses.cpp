@@ -2784,7 +2784,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
 
       if (Continuation::is_continuation_enterSpecial(fr)) {
         assert (cont == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
-        if (!show_carrier && cont->scope() == java_lang_VirtualThread::vthread_scope()) break;
+        if (!show_carrier && cont->is_virtual_thread()) break;
         cont = cont->parent();
       }
 

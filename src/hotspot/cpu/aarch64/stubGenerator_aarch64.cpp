@@ -8054,15 +8054,17 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation
 //          sp points to ContinuationEntry
+//          c_rarg3 -- isVirtualThread
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
   __ movw(rscratch1, 0x1234);
   __ strw(rscratch1, Address(sp, ContinuationEntry::cookie_offset()));
 #endif
 
-  __ str(c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
-  __ str(zr, Address(sp, ContinuationEntry::chunk_offset()));
-  __ strw(zr, Address(sp, ContinuationEntry::argsize_offset()));
+  __ str (c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
+  __ strw(c_rarg3, Address(sp, ContinuationEntry::flags_offset()));
+  __ str (zr,      Address(sp, ContinuationEntry::chunk_offset()));
+  __ strw(zr,      Address(sp, ContinuationEntry::argsize_offset()));
 
   __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));

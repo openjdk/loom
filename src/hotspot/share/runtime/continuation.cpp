@@ -726,7 +726,7 @@ bool Continuation::is_frame_in_continuation(const ContinuationEntry* cont, const
   return is_sp_in_continuation(cont, f.unextended_sp());
 }
 
-static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, intptr_t* const sp) {
+ContinuationEntry* Continuation::get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp) {
   assert (thread != nullptr, "");
   ContinuationEntry* cont = thread->last_continuation();
   while (cont != nullptr && !is_sp_in_continuation(cont, sp)) {
@@ -735,14 +735,8 @@ static ContinuationEntry* get_continuation_entry_for_frame(JavaThread* thread, i
   return cont;
 }
 
-oop Continuation::get_continuation_for_sp(JavaThread* thread, intptr_t* const sp) {
-  assert (thread != nullptr, "");
-  ContinuationEntry* cont = get_continuation_entry_for_frame(thread, sp);
-  return cont != nullptr ? cont->continuation() : (oop)nullptr;
-}
-
 bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
-  return get_continuation_entry_for_frame(thread, f.unextended_sp()) != nullptr;
+  return get_continuation_entry_for_sp(thread, f.unextended_sp()) != nullptr;
 }
 
 bool Continuation::has_last_Java_frame(oop continuation) {
@@ -762,7 +756,7 @@ frame Continuation::last_frame(oop continuation, RegisterMap *map) {
 
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
   assert (map != nullptr, "");
-  return continuation_top_frame(get_continuation_for_sp(map->thread(), callee.sp()), map);
+  return continuation_top_frame(get_continuation_entry_for_sp(map->thread(), callee.sp())->cont_oop(), map);
 }
 
 javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map) {
@@ -822,7 +816,7 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
   if (cont_scope == nullptr || !is_continuation_entry_frame(f, map))
     return false;
 
-  oop cont = get_continuation_for_sp(map->thread(), f.sp());
+  oop cont = get_continuation_entry_for_sp(map->thread(), f.sp())->cont_oop();
   if (cont == nullptr)
     return false;
 
@@ -874,7 +868,7 @@ bool Continuation::unpin(JavaThread* current) {
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee,
                                                   address* sender_pc, intptr_t** sender_sp) {
   if (thread != nullptr && is_return_barrier_entry(*sender_pc)) {
-    ContinuationEntry* cont = get_continuation_entry_for_frame(thread,
+    ContinuationEntry* cont = get_continuation_entry_for_sp(thread,
           callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert (cont != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
@@ -1967,6 +1961,8 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 
   current->set_cont_yield(true);
 
+  ContinuationEntry* entry = current->last_continuation();
+
   oop oopCont = ContinuationHelper::get_continuation(current);
   assert (oopCont == current->last_continuation()->cont_oop(), "");
   assert (ContinuationEntry::assert_entry_frame_laid_out(current), "");
@@ -1974,6 +1970,8 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert (VERIFY_CONTINUATION(oopCont), "");
   ContMirror cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+
+  assert (entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
   if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
@@ -2815,11 +2813,14 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert (thread == JavaThread::current(), "");
 
-  oop oopCont = thread->last_continuation()->cont_oop();
+  ContinuationEntry* entry = thread->last_continuation();
+  oop oopCont = entry->cont_oop();
 
   assert (!jdk_internal_vm_Continuation::done(oopCont), "");
   assert (oopCont == ContinuationHelper::get_continuation(thread), "");
   assert (VERIFY_CONTINUATION(oopCont), "");
+
+  assert (entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
   ContMirror cont(thread, oopCont);
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));

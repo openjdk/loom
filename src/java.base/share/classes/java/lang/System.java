@@ -2571,6 +2571,10 @@ public final class System {
                 thread.setContinuation(continuation);
             }
 
+            public ContinuationScope virtualThreadContinuationScope() {
+                return VirtualThread.continuationScope();
+            }
+
             public void parkVirtualThread() {
                 VirtualThread.park();
             }

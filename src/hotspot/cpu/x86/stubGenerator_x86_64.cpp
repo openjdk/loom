@@ -8302,11 +8302,13 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation
 //          rsp points to ContinuationEntry
+//          c_rarg3 -- isVirtualThread
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
   DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
 
   __ movptr(Address(rsp, ContinuationEntry::cont_offset()), c_rarg1);
+  __ movl  (Address(rsp, ContinuationEntry::flags_offset()), c_rarg3);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movl(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
 

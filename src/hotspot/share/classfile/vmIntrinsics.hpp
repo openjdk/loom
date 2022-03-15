@@ -520,7 +520,8 @@ class methodHandle;
   do_class(jdk_internal_vm_Continuation, "jdk/internal/vm/Continuation")                                                \
   do_intrinsic(_Continuation_enter,  jdk_internal_vm_Continuation, enter_name,    continuationEnter_signature, F_S)     \
     do_signature(continuationEnter_signature,   "(Ljdk/internal/vm/Continuation;Z)V")                                   \
-  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnter_signature, F_SN) \
+  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnterSpecial_signature, F_SN) \
+    do_signature(continuationEnterSpecial_signature,   "(Ljdk/internal/vm/Continuation;ZZ)V")                           \
   do_signature(continuationGetStacks_signature, "(III)V")                                                               \
   do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
   do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \

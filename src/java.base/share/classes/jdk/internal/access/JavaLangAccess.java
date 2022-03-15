@@ -494,6 +494,11 @@ public interface JavaLangAccess {
     void setContinuation(Thread thread, Continuation continuation);
 
     /**
+     * The ContinuationScope of virtual thread continuations
+     */
+    ContinuationScope virtualThreadContinuationScope();
+
+    /**
      * Parks the current virtual thread.
      * @throws WrongThreadException if the current thread is not a virtual thread
      */
