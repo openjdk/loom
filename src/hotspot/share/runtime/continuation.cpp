@@ -2455,7 +2455,7 @@ public:
       assert (Frame::is_stub(hf.cb()), "cb: %s", hf.cb()->name());
       recurse_thaw_stub_frame(hf, caller, num_frames);
     } else if (!hf.is_interpreted_frame()) {
-      recurse_thaw_compiled_frame(hf, caller, num_frames);
+      recurse_thaw_compiled_frame(hf, caller, num_frames, false);
     } else {
       recurse_thaw_interpreted_frame(hf, caller, num_frames);
     }
@@ -2466,10 +2466,6 @@ public:
     assert (num_frames > 0, "");
 
     DEBUG_ONLY(_frames++;)
-
-    if (UNLIKELY(_barriers)) {
-      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
-    }
 
     int argsize = _stream.stack_argsize();
 
@@ -2566,6 +2562,10 @@ public:
   NOINLINE void recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
     assert (hf.is_interpreted_frame(), "");
 
+    if (UNLIKELY(_barriers)) {
+      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
+    }
+
     const bool bottom = recurse_thaw_java_frame<Interpreted>(caller, num_frames);
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
@@ -2624,8 +2624,13 @@ public:
     caller = f;
   }
 
-  void recurse_thaw_compiled_frame(const frame& hf, frame& caller, int num_frames) {
+  void recurse_thaw_compiled_frame(const frame& hf, frame& caller, int num_frames, bool stub_caller) {
     assert (!hf.is_interpreted_frame(), "");
+    assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
+
+    if (!stub_caller && UNLIKELY(_barriers)) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
+      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
+    }
 
     const bool bottom = recurse_thaw_java_frame<Compiled>(caller, num_frames);
 
@@ -2667,6 +2672,7 @@ public:
                 || (_cont.is_preempted() && f.cb()->as_compiled_method()->is_marked_for_deoptimization())) {
       // The caller of the safepoint stub when the continuation is preempted is not at a call instruction, and so
       // cannot rely on nmethod patching for deopt.
+      assert(_thread->is_interp_only_mode() || stub_caller, "expected a stub-caller");
 
       log_develop_trace(jvmcont)("Deoptimizing thawed frame");
       DEBUG_ONLY(Frame::patch_pc(f, nullptr));
@@ -2701,7 +2707,7 @@ public:
       assert (!_stream.is_done(), "");
     }
 
-    recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames); // this could be deoptimized
+    recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames, true); // this could be deoptimized
 
     DEBUG_ONLY(before_thaw_java_frame(hf, caller, false, num_frames);)
 
