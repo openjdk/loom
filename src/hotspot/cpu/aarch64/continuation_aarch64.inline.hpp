@@ -227,7 +227,7 @@ static inline void derelativize_one(intptr_t* const fp, int offset) {
   *addr = (intptr_t)(fp + *addr);
 }
 
-inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, frame& f) {
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   intptr_t* vfp = f.fp();
 
   derelativize_one(vfp, frame::interpreter_frame_last_sp_offset);
