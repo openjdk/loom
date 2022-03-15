@@ -3445,3 +3445,15 @@ void G1CollectedHeap::fill_with_dummy_object(HeapWord* start, HeapWord* end, boo
   HeapRegion* region = heap_region_containing(start);
   region->fill_with_dummy_object(start, pointer_delta(end, start), zap);
 }
+
+void G1CollectedHeap::start_codecache_marking_cycle_if_inactive() {
+  if (!CodeCache::is_marking_cycle_active()) {
+    // This is the normal case when we do not call collect when a
+    // concurrent mark is ongoing. We then start a new code marking
+    // cycle. If, on the other hand, a concurrent mark is ongoing, we
+    // will be conservative and use the last code marking cycle. Code
+    // caches marked between the two concurrent marks will live a bit
+    // longer than needed.
+    CodeCache::start_marking_cycle();
+  }
+}
