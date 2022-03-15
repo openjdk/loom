@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -44,17 +44,11 @@ public final class VirtualThreads {
     private VirtualThreads() { }
 
     /**
-     * Returns the current carrier thread.
-     */
-    public static Thread currentCarrierThread() {
-        return JLA.currentCarrierThread();
-    }
-
-    /**
      * Parks the current virtual thread until it is unparked or interrupted.
      * If already unparked then the parking permit is consumed and this method
      * completes immediately (meaning it doesn't yield). It also completes
      * immediately if the interrupt status is set.
+     * @throws WrongThreadException if the current thread is not a virtual thread
      */
     public static void park() {
         JLA.parkVirtualThread();
@@ -66,8 +60,8 @@ public final class VirtualThreads {
      * consumed and this method completes immediately (meaning it doesn't yield).
      * It also completes immediately if the interrupt status is set or the waiting
      * time is {@code <= 0}.
-     *
-     * @param nanos the maximum number of nanoseconds to wait.
+     * @param nanos the maximum number of nanoseconds to wait
+     * @throws WrongThreadException if the current thread is not a virtual thread
      */
     public static void park(long nanos) {
         JLA.parkVirtualThread(nanos);
@@ -79,8 +73,8 @@ public final class VirtualThreads {
      * consumed and this method completes immediately (meaning it doesn't yield).
      * It also completes immediately if the interrupt status is set or the
      * deadline has past.
-     *
      * @param deadline absolute time, in milliseconds, from the epoch
+     * @throws WrongThreadException if the current thread is not a virtual thread
      */
     public static void parkUntil(long deadline) {
         long millis = deadline - System.currentTimeMillis();
@@ -89,8 +83,10 @@ public final class VirtualThreads {
     }
 
     /**
-     * Unparks a virtual thread. The thread's task is pushed to the current carrier
-     * thread's work queue when invoked from a virtual thread.
+     * Re-enables a virtual thread for scheduling. If the thread was parked then
+     * it will be unblocked, otherwise its next attempt to park will not block
+     * @param thread the virtual thread to unpark
+     * @throws IllegalArgumentException if the thread is not a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     public static void unpark(Thread thread) {
