@@ -112,9 +112,6 @@ private:
   void symbol_at_put(int which, Symbol* contents);
 
   // Sizing
-  static size_t object_size(TypeArrayKlass* kls, int length) {
-    return object_size(kls->layout_helper(), length);
-  }
 
   // Returns the number of words necessary to hold an array of "len"
   // elements each of the given "byte_size".

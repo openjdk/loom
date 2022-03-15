@@ -25,10 +25,10 @@
 #ifndef SHARE_PRIMS_JVMTITHREADSTATE_INLINE_HPP
 #define SHARE_PRIMS_JVMTITHREADSTATE_INLINE_HPP
 
+#include "prims/jvmtiThreadState.hpp"
+
 #include "classfile/javaClasses.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
-
-#include "prims/jvmtiThreadState.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/thread.inline.hpp"

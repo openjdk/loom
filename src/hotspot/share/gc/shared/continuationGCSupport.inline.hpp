@@ -26,8 +26,10 @@
 #define SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_INLINE_HPP
 
 #include "gc/shared/continuationGCSupport.hpp"
+
 #include "oops/instanceStackChunkKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 
 inline void ContinuationGCSupport::relativize_chunk(oop obj) {
   if (!obj->is_stackChunk()) {

@@ -225,27 +225,35 @@ inline oop jdk_internal_vm_ContinuationScope::name(oop ref) {
 inline oop jdk_internal_vm_Continuation::scope(oop ref) {
   return ref->obj_field(_scope_offset);
 }
+
 inline oop jdk_internal_vm_Continuation::target(oop ref) {
   return ref->obj_field(_target_offset);
 }
+
 inline oop jdk_internal_vm_Continuation::parent(oop ref) {
   return ref->obj_field(_parent_offset);
 }
+
 inline oop jdk_internal_vm_Continuation::yieldInfo(oop ref) {
   return ref->obj_field(_yieldInfo_offset);
 }
+
 inline void jdk_internal_vm_Continuation::set_yieldInfo(oop ref, oop value) {
   ref->obj_field_put(_yieldInfo_offset, value);
 }
+
 inline stackChunkOop jdk_internal_vm_Continuation::tail(oop ref) {
   return (stackChunkOop)ref->obj_field(_tail_offset);
 }
+
 inline void jdk_internal_vm_Continuation::set_tail(oop ref, stackChunkOop value) {
   ref->obj_field_put(_tail_offset, value);
 }
+
 inline jshort jdk_internal_vm_Continuation::critical_section(oop ref) {
   return ref->short_field(_cs_offset);
 }
+
 inline void jdk_internal_vm_Continuation::set_critical_section(oop ref, jshort value) {
   ref->short_field_put(_cs_offset, value);
 }
@@ -253,9 +261,11 @@ inline void jdk_internal_vm_Continuation::set_critical_section(oop ref, jshort v
 inline bool jdk_internal_vm_Continuation::done(oop ref) {
   return ref->bool_field(_done_offset);
 }
+
 inline bool jdk_internal_vm_Continuation::is_preempted(oop ref) {
   return ref->bool_field(_preempted_offset);
 }
+
 inline void jdk_internal_vm_Continuation::set_preempted(oop ref, bool value) {
   ref->bool_field_put(_preempted_offset, (jboolean)value);
 }
@@ -263,6 +273,7 @@ inline void jdk_internal_vm_Continuation::set_preempted(oop ref, bool value) {
 inline oop jdk_internal_vm_StackChunk::parent(oop ref) {
   return ref->obj_field(_parent_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_parent(oop ref, oop value) {
   ref->obj_field_put(_parent_offset, value);
 }
@@ -276,9 +287,11 @@ template<typename P>
 inline void jdk_internal_vm_StackChunk::set_parent_raw(oop ref, oop value) {
   RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_parent_offset), value);
 }
+
 inline oop jdk_internal_vm_StackChunk::cont(oop ref) {
   return ref->obj_field(_cont_offset);
 }
+
 inline void jdk_internal_vm_StackChunk::set_cont(oop ref, oop value) {
   ref->obj_field_put(_cont_offset, value);
 }

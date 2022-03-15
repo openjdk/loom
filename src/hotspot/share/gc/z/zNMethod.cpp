@@ -22,7 +22,6 @@
  */
 
 #include "precompiled.hpp"
-#include "code/compiledMethod.inline.hpp"
 #include "code/relocInfo.hpp"
 #include "code/nmethod.hpp"
 #include "code/icBuffer.hpp"

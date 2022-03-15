@@ -26,6 +26,7 @@
 #ifndef CPU_AARCH64_FRAME_AARCH64_INLINE_HPP
 #define CPU_AARCH64_FRAME_AARCH64_INLINE_HPP
 
+#include "code/codeBlob.inline.hpp"
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "interpreter/interpreter.hpp"

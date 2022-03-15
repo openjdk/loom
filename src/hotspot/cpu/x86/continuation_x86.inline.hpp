@@ -25,6 +25,7 @@
 #ifndef CPU_X86_CONTINUATION_X86_INLINE_HPP
 #define CPU_X86_CONTINUATION_X86_INLINE_HPP
 
+#include "code/codeBlob.inline.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"

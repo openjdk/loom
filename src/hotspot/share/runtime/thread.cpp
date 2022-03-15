@@ -1095,12 +1095,14 @@ JavaThread::JavaThread() :
   _SleepEvent(ParkEvent::Allocate(this))
 {
   set_jni_functions(jni_functions());
+
 #if INCLUDE_JVMCI
   assert(_jvmci._implicit_exception_pc == nullptr, "must be");
   if (JVMCICounterSize > 0) {
     resize_counters(0, (int) JVMCICounterSize);
   }
 #endif // INCLUDE_JVMCI
+
   // Setup safepoint state info for this thread
   ThreadSafepointState::create(this);
 
@@ -1581,8 +1583,9 @@ bool JavaThread::is_lock_owned_current(address adr) const {
   address stack_end = _stack_base - _stack_size;
   const ContinuationEntry* cont = vthread_continuation();
   address stack_base = cont != nullptr ? (address)cont->entry_sp() : _stack_base;
-  if (stack_base > adr && adr >= stack_end)
+  if (stack_base > adr && adr >= stack_end) {
     return true;
+  }
 
   for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
     if (chunk->contains(adr)) return true;
@@ -2220,6 +2223,7 @@ void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
   st->print(", stack(" PTR_FORMAT "," PTR_FORMAT ")",
             p2i(stack_end()), p2i(stack_base()));
   st->print("]");
+
   ThreadsSMRSupport::print_info_on(this, st);
   return;
 }

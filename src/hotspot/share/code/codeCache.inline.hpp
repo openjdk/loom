@@ -26,6 +26,7 @@
 #define SHARE_VM_COMPILER_CODECACHE_INLINE_HPP
 
 #include "code/codeCache.hpp"
+
 #include "code/nativeInst.hpp"
 
 inline CodeBlob* CodeCache::find_blob_fast(void* pc) {
@@ -60,4 +61,4 @@ inline int CodeCache::find_oopmap_slot_fast(void* pc) {
       : -1;
 }
 
-#endif
+#endif // SHARE_VM_COMPILER_CODECACHE_INLINE_HPP

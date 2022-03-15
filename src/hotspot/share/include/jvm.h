@@ -1141,7 +1141,8 @@ JVM_GetTemporaryDirectory(JNIEnv *env);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
 
-/* Virtual thread support.
+/*
+ * Virtual thread support.
  */
 JNIEXPORT void JNICALL
 JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount);

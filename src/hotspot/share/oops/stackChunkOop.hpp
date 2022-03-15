@@ -37,7 +37,6 @@ class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
-
 enum chunk_frames { COMPILED_ONLY, MIXED };
 enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
 

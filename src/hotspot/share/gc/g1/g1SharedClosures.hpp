@@ -54,7 +54,5 @@ public:
     _oops_in_nmethod(g1h, pss),
     _clds(&_oops_in_cld, process_only_dirty),
     _strong_codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark, true),
-    _weak_codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark, false)
-
-    {}
+    _weak_codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark, false) {}
 };

@@ -27,6 +27,7 @@
 
 #include "runtime/frame.hpp"
 
+#include "code/codeBlob.inline.hpp"
 #include "code/compiledMethod.inline.hpp"
 #include "interpreter/interpreter.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"

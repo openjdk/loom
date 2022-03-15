@@ -228,8 +228,6 @@ class nmethod : public CompiledMethod {
   int _compile_id;                           // which compilation made this nmethod
   int _comp_level;                           // compilation level
 
- private:
-
   // protected by CodeCache_lock
   bool _has_flushed_dependencies;            // Used for maintenance of dependencies (CodeCache_lock)
 

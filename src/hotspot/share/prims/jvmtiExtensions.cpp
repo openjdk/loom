@@ -27,8 +27,8 @@
 #include "prims/jvmtiExport.hpp"
 #include "prims/jvmtiExtensions.hpp"
 #include "prims/jvmtiThreadState.inline.hpp"
-#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 
 // the list of extension functions

@@ -69,6 +69,7 @@ class G1CodeBlobClosure : public CodeBlobClosure {
 
   HeapRegionGatheringOopClosure _oc;
   MarkingOopClosure _marking_oc;
+
   bool _strong;
   bool _keepalive_is_strong;
 

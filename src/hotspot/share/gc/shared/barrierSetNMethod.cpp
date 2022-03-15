@@ -28,7 +28,9 @@
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "logging/log.hpp"
+#include "memory/iterator.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/method.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadWXSetters.inline.hpp"
@@ -85,7 +87,7 @@ private:
 
 public:
   BarrierSetNMethodArmClosure(int disarm_value) :
-    _disarm_value(disarm_value) { }
+    _disarm_value(disarm_value) {}
 
   virtual void do_thread(Thread* thread) {
     thread->set_nmethod_disarm_value(_disarm_value);

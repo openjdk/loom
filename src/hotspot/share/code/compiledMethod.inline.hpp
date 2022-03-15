@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -67,6 +67,7 @@ inline address CompiledMethod::get_deopt_original_pc(const frame* fr) {
   return NULL;
 }
 
+
 // class ExceptionCache methods
 
 inline int ExceptionCache::count() { return Atomic::load_acquire(&_count); }
@@ -83,5 +84,6 @@ address ExceptionCache::handler_at(int index) {
 
 // increment_count is only called under lock, but there may be concurrent readers.
 inline void ExceptionCache::increment_count() { Atomic::release_store(&_count, _count + 1); }
+
 
 #endif // SHARE_CODE_COMPILEDMETHOD_INLINE_HPP

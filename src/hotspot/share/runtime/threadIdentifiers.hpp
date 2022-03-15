@@ -25,7 +25,7 @@
 #ifndef SHARE_RUNTIME_THREADIDENTIFIERS_HPP
 #define SHARE_RUNTIME_THREADIDENTIFIERS_HPP
 
-#include "memory/allocation.hpp"
+#include "memory/allStatic.hpp"
 
 /*
  * Provides unique monotonic identifiers for threads.
