@@ -39,7 +39,7 @@ inline frame::frame() {
   _fp = NULL;
   _cb = NULL;
   _deopt_state = unknown;
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 inline frame::frame(intptr_t* sp) {
@@ -62,7 +62,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   } else {
     _deopt_state = not_deoptimized;
   }
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 inline frame::frame(intptr_t* sp, intptr_t* fp, address pc) {
@@ -87,7 +87,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   } else {
     _deopt_state = not_deoptimized;
   }
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 
@@ -108,7 +108,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   } else {
     _deopt_state = not_deoptimized;
   }
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 

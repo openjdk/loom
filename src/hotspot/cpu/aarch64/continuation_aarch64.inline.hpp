@@ -116,7 +116,9 @@ inline frame FreezeBase::sender(const frame& f) {
   int slot = 0;
   CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(sender_pc, slot);
   return sender_cb != nullptr
-    ? frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb, slot == -1 ? nullptr : sender_cb->oop_map_for_slot(slot, sender_pc))
+    ? frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb,
+            slot == -1 ? nullptr : sender_cb->oop_map_for_slot(slot, sender_pc),
+            false /* on_heap ? */)
     : frame(sender_sp, sender_sp, *link_addr, sender_pc);
 }
 
@@ -186,7 +188,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, true /* relative */);
+    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, true /* on_heap */);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
@@ -201,7 +203,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    return frame(sp, sp, fp, f.pc(), nullptr, nullptr, true /* on_heap */);
   }
 }
 

@@ -464,8 +464,7 @@ BasicObjectLock* frame::previous_monitor_in_interpreter_frame(BasicObjectLock* c
 
 intptr_t* frame::interpreter_frame_local_at(int index) const {
   const int n = Interpreter::local_offset_in_bytes(index)/wordSize;
-  intptr_t* first = _pointers == addressing::RELATIVE
-                             ? fp() + (intptr_t)*interpreter_frame_locals_addr()
+  intptr_t* first = _on_heap ? fp() + (intptr_t)*interpreter_frame_locals_addr()
                              : *interpreter_frame_locals_addr();
   return &(first[n]);
 }
@@ -1610,10 +1609,10 @@ void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
   while (!(start <= v0 && v0 <= end)) v0 = _values.at(++min_index).location;
   while (!(start <= v1 && v1 <= end)) v1 = _values.at(--max_index).location;
 
-  print_on(st, min_index, max_index, v0, v1, frame::addressing::RELATIVE);
+  print_on(st, min_index, max_index, v0, v1, true /* on_heap */);
 }
 
-void FrameValues::print_on(outputStream* st, int min_index, int max_index, intptr_t* v0, intptr_t* v1, frame::addressing pointers) {
+void FrameValues::print_on(outputStream* st, int min_index, int max_index, intptr_t* v0, intptr_t* v1, bool on_heap) {
   intptr_t* min = MIN2(v0, v1);
   intptr_t* max = MAX2(v0, v1);
   intptr_t* cur = max;
@@ -1628,7 +1627,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       const char* spacer = "          " LP64_ONLY("        ");
       st->print_cr(" %s  %s %s", spacer, spacer, fv.description);
     } else {
-      if (pointers == frame::addressing::RELATIVE
+      if (on_heap
           && *fv.location != 0 && *fv.location > -100 && *fv.location < 100
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
         st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);

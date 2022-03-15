@@ -45,10 +45,11 @@ inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
 
 template <chunk_frames frame_kind>
 inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
-  if (is_done()) return frame(_sp, _sp, nullptr, nullptr, nullptr, nullptr, true);
-  return frame_kind == chunk_frames::MIXED && !is_interpreted()
-    ? frame(sp(), unextended_sp(), fp(), pc(), cb(), _oopmap) // we might freeze deoptimized frame in slow mode
-    : frame(sp(), unextended_sp(), fp(), pc(), cb(), _oopmap, true);
+  if (is_done()) {
+    return frame(_sp, _sp, nullptr, nullptr, nullptr, nullptr, true);
+  } else {
+    return frame(sp(), unextended_sp(), fp(), pc(), cb(), _oopmap, true);
+  }
 }
 
 template <chunk_frames frame_kind>
