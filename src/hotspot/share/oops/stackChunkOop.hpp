@@ -94,6 +94,7 @@ public:
   inline void clear_flags();
   inline bool has_mixed_frames() const;
   inline void set_has_mixed_frames(bool value);
+  inline bool has_thaw_slowpath_condition() const;
   inline bool is_gc_mode() const;
   inline void set_gc_mode(bool value);
   inline bool has_bitmap() const;
