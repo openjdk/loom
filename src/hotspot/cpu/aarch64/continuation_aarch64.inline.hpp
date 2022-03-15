@@ -288,7 +288,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     intptr_t* fp = FKind::stub
       ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
       : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
-    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
+    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
 }
 
