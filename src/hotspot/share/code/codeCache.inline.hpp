@@ -37,15 +37,10 @@ inline CodeBlob* CodeCache::find_blob_fast(void* pc) {
 inline CodeBlob* CodeCache::find_blob_and_oopmap(void* pc, int& slot) {
   NativePostCallNop* nop = nativePostCallNop_at((address) pc);
   CodeBlob* cb;
-  if (nop != NULL) {
-    if (nop->displacement() != 0) { // common fast-path
-      int offset = (nop->displacement() & 0xffffff);
-      cb = (CodeBlob*) ((address) pc - offset);
-      slot = ((nop->displacement() >> 24) & 0xff);
-    } else {
-      cb = CodeCache::patch_nop(nop, pc, slot);
-    }
-    // assert(cb == CodeCache::find_blob(pc), "");
+  if (nop != NULL && nop->displacement() != 0) {
+    int offset = (nop->displacement() & 0xffffff);
+    cb = (CodeBlob*) ((address) pc - offset);
+    slot = ((nop->displacement() >> 24) & 0xff);
   } else {
     cb = CodeCache::find_blob(pc);
     slot = -1;

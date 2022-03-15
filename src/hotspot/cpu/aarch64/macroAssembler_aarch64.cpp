@@ -801,6 +801,11 @@ void MacroAssembler::align(int modulus) {
   while (offset() % modulus != 0) nop();
 }
 
+void MacroAssembler::post_call_nop() {
+  relocate(post_call_nop_Relocation::spec());
+  nop();
+}
+
 // these are no-ops overridden by InterpreterMacroAssembler
 
 void MacroAssembler::check_and_handle_earlyret(Register java_thread) { }

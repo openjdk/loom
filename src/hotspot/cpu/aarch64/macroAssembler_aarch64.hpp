@@ -688,7 +688,7 @@ public:
   void align(int modulus);
 
   // nop
-  void post_call_nop() { nop(); }
+  void post_call_nop();
 
   // Stack frame creation/removal
   void enter(bool strip_ret_addr = false);
