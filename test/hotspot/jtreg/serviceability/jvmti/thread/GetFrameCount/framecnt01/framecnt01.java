@@ -82,7 +82,8 @@ public class framecnt01 {
         // Let vthread1 to park
         Thread.sleep(100); // 10 is not enough as it intermittently fails with smaller frames count
 
-        checkFrames(vThread1, false, 14);
+        // this is too fragile, implementation can change at any time.
+        checkFrames(vThread1, false, 15);
         LockSupport.unpark(vThread1);
         vThread1.join();
 
