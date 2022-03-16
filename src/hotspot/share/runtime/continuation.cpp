@@ -1226,7 +1226,6 @@ public:
       chunk = allocate_chunk(size + ContinuationHelper::frame_metadata);
       if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
         log_develop_trace(jvmcont)("Retrying slow. Barriers: %d", _barriers);
-        init_empty_chunk(chunk);
         return false;
       }
 
@@ -1817,7 +1816,10 @@ public:
     return false;
   }
 
-  void init_empty_chunk(stackChunkOop chunk) {
+  void init_chunk(stackChunkOop chunk) {
+    chunk->clear_flags();
+    chunk->set_gc_mode(false);
+    chunk->set_max_size(0);
     chunk->set_sp(chunk->stack_size());
     chunk->set_pc(nullptr);
     chunk->set_argsize(0);
@@ -1855,12 +1857,7 @@ public:
     assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
     assert((intptr_t)chunk->start_address() % 8 == 0, "");
 
-    // TODO PERF: maybe just memset 0, and only set non-zero fields.
-    chunk->clear_flags();
-    chunk->set_gc_mode(false);
-    chunk->set_max_size(0);
-    // chunk->set_pc(nullptr);
-    // chunk->set_argsize(0);
+    init_chunk(chunk);
 
     assert(chunk->flags() == 0, "");
     assert(chunk->is_gc_mode() == false, "");
