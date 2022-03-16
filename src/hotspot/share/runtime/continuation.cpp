@@ -772,7 +772,9 @@ javaVFrame* Continuation::last_java_vframe(Handle continuation, RegisterMap *map
   if (!ContMirror(continuation()).is_empty()) {
     frame f = last_frame(continuation(), map);
     for (vframe* vf = vframe::new_vframe(&f, map, nullptr); vf; vf = vf->sender()) {
-      if (vf->is_java_frame()) return javaVFrame::cast(vf);
+      if (vf->is_java_frame()) {
+        return javaVFrame::cast(vf);
+      }
     }
   }
   return nullptr;
@@ -930,7 +932,9 @@ void Continuation::notify_deopt(JavaThread* thread, intptr_t* sp) {
     cont = cont->parent();
   } while (cont != nullptr && !is_sp_in_continuation(cont, sp));
 
-  if (cont == nullptr) return;
+  if (cont == nullptr) {
+    return;
+  }
   assert(is_sp_in_continuation(cont, sp), "");
   if (sp > prev->parent_cont_fastpath()) {
     prev->set_parent_cont_fastpath(sp);
