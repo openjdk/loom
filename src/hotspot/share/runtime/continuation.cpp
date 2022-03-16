@@ -241,7 +241,7 @@ public:
   }
 
   static bool requires_barriers(stackChunkOop obj) {
-    return BarrierSetT::requires_barriers(obj);
+    return obj->requires_barriers();
   }
 };
 
