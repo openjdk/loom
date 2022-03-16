@@ -249,8 +249,6 @@ public:
   }
 };
 
-class SmallRegisterMap;
-
 class ContinuationHelper {
 public:
   static const int frame_metadata; // size, in words, of frame metadata (e.g. pc and link)
