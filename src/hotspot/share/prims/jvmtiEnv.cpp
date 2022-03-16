@@ -549,6 +549,7 @@ JvmtiEnv::SetNativeMethodPrefixes(jint prefix_count, char** prefixes) {
 // size_of_callbacks - pre-checked to be greater than or equal to 0
 jvmtiError
 JvmtiEnv::SetEventCallbacks(const jvmtiEventCallbacks* callbacks, jint size_of_callbacks) {
+  JvmtiVTMTDisabler vtmt_disabler;
   JvmtiEventController::set_event_callbacks(this, callbacks, size_of_callbacks);
   return JVMTI_ERROR_NONE;
 } /* end SetEventCallbacks */
@@ -1217,6 +1218,7 @@ JvmtiEnv::GetThreadInfo(jthread thread, jvmtiThreadInfo* info_ptr) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
 
+  JvmtiVTMTDisabler vtmt_disabler;
   ThreadsListHandle tlh(current_thread);
 
   // if thread is NULL the current thread is used

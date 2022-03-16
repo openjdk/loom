@@ -3937,6 +3937,13 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
 
   thread->rebind_to_jvmti_thread_state_of(vt);
 
+  {
+    MutexLocker mu(JvmtiThreadState_lock);
+    JvmtiThreadState* state = thread->jvmti_thread_state();
+    if (state != NULL && state->is_pending_interp_only_mode()) {
+      JvmtiEventController::enter_interp_only_mode();
+    }
+  }
   assert(thread->is_in_VTMT(), "VTMT sanity check");
   JvmtiVTMTDisabler::finish_VTMT(vthread, 0);
   if (first_mount) {
