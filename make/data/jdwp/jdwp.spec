@@ -2021,13 +2021,12 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD "The thread is null, not a valid thread, or the "
-                                  "thread is a virtual thread and the target VM does "
-                                  "not support stopping it with an asynchronous "
-                                  "exception at this time.")
+            (Error INVALID_THREAD "The thread is null, not a valid thread, the thread "
+                                  "is not alive, or the thread is a virtual thread "
+                                  "and the target VM does not support stopping it "
+                                  "with an asynchronous exception at this time.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
                                   "exception has been garbage collected.")
-            (Error THREAD_NOT_ALIVE)
             (Error VM_DEAD)
         )
     )
@@ -2039,7 +2038,8 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD)
+            (Error INVALID_THREAD    "The thread is null, not a valid thread, or "
+                                     "the thread is not alive.")
             (Error INVALID_OBJECT    "thread is not a known ID.")
             (Error VM_DEAD)
         )
@@ -2143,10 +2143,10 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD)
+            (Error INVALID_THREAD    "The thread is null, not a valid thread, or "
+                                     "the thread is not alive.")
             (Error INVALID_OBJECT    "Thread or value is not a known ID.")
             (Error THREAD_NOT_SUSPENDED)
-            (Error THREAD_NOT_ALIVE)
             (Error OPAQUE_FRAME      "Attempted to return early from "
                                      "a frame corresponding to a native "
                                      "method. "
@@ -3162,7 +3162,7 @@ JDWP "Java(tm) Debug Wire Protocol"
 )
 (ConstantSet Error
     (Constant NONE                   =0   "No error has occurred.")
-    (Constant INVALID_THREAD         =10  "The thread is null or not a valid thread")
+    (Constant INVALID_THREAD         =10  "The thread is null or not a valid thread.")
     (Constant INVALID_THREAD_GROUP   =11  "Thread group invalid.")
     (Constant INVALID_PRIORITY       =12  "Invalid priority.")
     (Constant THREAD_NOT_SUSPENDED   =13  "If the specified thread has not been "
