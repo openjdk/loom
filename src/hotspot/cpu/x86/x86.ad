@@ -6329,7 +6329,7 @@ instruct vshiftS(vec dst, vec src, vec shift) %{
         __ movdbl($dst$$XMMRegister, $src$$XMMRegister);
         __ vshiftw(opcode, $dst$$XMMRegister, $shift$$XMMRegister);
       } else {
-        assert (vlen == 8, "sanity");
+        assert(vlen == 8, "sanity");
         __ movdqu($dst$$XMMRegister, $src$$XMMRegister);
         __ vshiftw(opcode, $dst$$XMMRegister, $shift$$XMMRegister);
       }

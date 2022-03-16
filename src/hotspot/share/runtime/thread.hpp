@@ -1197,7 +1197,7 @@ private:
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() { _held_monitor_count++; }
-  void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
+  void dec_held_monitor_count() { assert(_held_monitor_count > 0, ""); _held_monitor_count--; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;

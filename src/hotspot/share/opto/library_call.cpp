@@ -6199,7 +6199,7 @@ Node* LibraryCallKit::load_field_from_object(Node* fromObj, const char* fieldNam
                                               ciSymbol::make(fieldTypeString),
                                               is_static);
 
-  assert (field != NULL, "undefined field %s %s %s", fieldTypeString, fromKls->name()->as_utf8(), fieldName);
+  assert(field != NULL, "undefined field %s %s %s", fieldTypeString, fromKls->name()->as_utf8(), fieldName);
   if (field == NULL) return (Node *) NULL;
 
   if (is_static) {

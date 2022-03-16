@@ -3096,7 +3096,7 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
   oop theThread = thread->vthread();
-  assert (theThread != (oop)NULL, "no current thread!");
+  assert(theThread != (oop)NULL, "no current thread!");
   return JNIHandles::make_local(THREAD, theThread);
 JVM_END
 

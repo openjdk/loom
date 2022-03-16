@@ -901,7 +901,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   if (thread->is_vthread_mounted() && thread->vthread() != threadObj) { // ThreadSnapshot only captures platform threads
     _thread_status = JavaThreadStatus::IN_OBJECT_WAIT;
     oop vthread = thread->vthread();
-    assert (vthread != NULL, "");
+    assert(vthread != NULL, "");
     blocker_object = vthread;
     blocker_object_owner = vthread;
   } else if (_thread_status == JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER ||

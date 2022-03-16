@@ -101,7 +101,7 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, c
       // Long   value in an aligned adjacent pair
       return new StackValue(*(intptr_t*)value_addr);
     case Location::narrowoop: {
-      assert (UseCompressedOops, "");
+      assert(UseCompressedOops, "");
       union { intptr_t p; narrowOop noop;} value;
       value.p = (intptr_t) CONST64(0xDEADDEAFDEADDEAF);
       if (loc.is_register()) {

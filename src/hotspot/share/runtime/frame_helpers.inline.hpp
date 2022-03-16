@@ -210,12 +210,12 @@ inline int Interpreted::stack_argsize(const frame& f) {
 
 inline int Interpreted::expression_stack_size(const frame &f, InterpreterOopMap* mask) {
   int size = mask->expression_stack_size();
-  assert (size <= f.interpreter_frame_expression_stack_size(), "size1: %d size2: %d", size, f.interpreter_frame_expression_stack_size());
+  assert(size <= f.interpreter_frame_expression_stack_size(), "size1: %d size2: %d", size, f.interpreter_frame_expression_stack_size());
   return size;
 }
 
 bool Interpreted::is_owning_locks(const frame& f) {
-  assert (f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
+  assert(f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
   if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin()) {
     return false;
   }
@@ -257,7 +257,7 @@ inline intptr_t* NonInterpreted<Self>::frame_bottom(const frame& f) { // exclusi
 
 template<typename Self>
 inline int NonInterpreted<Self>::size(const frame& f) {
-  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
+  assert(!f.is_interpreted_frame() && Self::is_instance(f), "");
   return f.cb()->frame_size();
 }
 
@@ -268,16 +268,16 @@ inline int NonInterpreted<Self>::stack_argsize(const frame& f) {
 
 template<typename Self>
 inline int NonInterpreted<Self>::num_oops(const frame& f) {
-  assert (!f.is_interpreted_frame() && Self::is_instance(f), "");
+  assert(!f.is_interpreted_frame() && Self::is_instance(f), "");
   return f.num_oops() + Self::extra_oops;
 }
 
 template<typename RegisterMapT>
 bool Compiled::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
-  assert (!f.is_interpreted_frame() && Compiled::is_instance(f), "");
+  assert(!f.is_interpreted_frame() && Compiled::is_instance(f), "");
 
   CompiledMethod* cm = f.cb()->as_compiled_method();
-  assert (!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
+  assert(!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
 
   if (!cm->has_monitors()) {
     return false;
