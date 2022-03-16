@@ -140,11 +140,11 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
-  int _nmethod_disarm_value;
+  int64_t _nmethod_disarm_value;
 
  public:
   int nmethod_disarm_value() {
-    return _nmethod_disarm_value;
+    return (int)_nmethod_disarm_value;
   }
 
   void set_nmethod_disarm_value(int value) {
