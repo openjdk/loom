@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -242,16 +242,6 @@ class VM_CollectForMetadataAllocation: public VM_GC_Operation {
   virtual VMOp_Type type() const { return VMOp_CollectForMetadataAllocation; }
   virtual void doit();
   MetaWord* result() const       { return _result; }
-};
-
-class VM_CollectForCodeCacheAllocation: public VM_GC_Operation {
-public:
-  VM_CollectForCodeCacheAllocation(uint gc_count_before,
-                                   uint full_gc_count_before,
-                                   GCCause::Cause gc_cause);
-
-  virtual VMOp_Type type() const { return VMOp_CollectForCodeCacheAllocation; }
-  virtual void doit();
 };
 
 class SvcGCMarker : public StackObj {

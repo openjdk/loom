@@ -187,16 +187,7 @@ void G1FullCollector::prepare_collection() {
 }
 
 void G1FullCollector::collect() {
-  if (CodeCache::is_marking_cycle_active()) {
-    // It's possible that a preceding concurrent cycle is not yet
-    // finished, and has aborted. That marking cycle might have had
-    // incomplete marking information, but we can still finish that
-    // cycle, as we will do a full STW cycle before releasing the
-    // safepoint.
-    CodeCache::finish_marking_cycle();
-  }
-  CodeCache::start_marking_cycle();
-
+  G1CollectedHeap::start_codecache_marking_cycle_if_inactive();
   phase1_mark_live_objects();
   verify_after_marking();
 
