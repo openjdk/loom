@@ -1048,7 +1048,8 @@ public:
   Freeze(JavaThread* thread, ContMirror& mirror, bool preempt) :
       _thread(thread), _cont(mirror), _barriers(false), _preempt(preempt) {
 
-    assert(thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
+    assert(_thread != nullptr, "");
+    assert(_thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
 
     int argsize = _cont.argsize();
     _bottom_address = _cont.entrySP() - argsize;
@@ -1093,10 +1094,9 @@ public:
 
   // Called _after_ the last possible sfepoint during the freeze operation (chunk allocation)
   void unwind_frames() {
-    JavaThread* thread = _thread;
     ContinuationEntry* entry = _cont.entry();
-    ContinuationHelper::maybe_flush_stack_processing(thread, entry);
-    ContinuationHelper::set_anchor_to_entry(thread, entry);
+    ContinuationHelper::maybe_flush_stack_processing(_thread, entry);
+    ContinuationHelper::set_anchor_to_entry(_thread, entry);
   }
 
   template <bool chunk_available>
@@ -1104,7 +1104,7 @@ public:
     if (freeze_fast<chunk_available>(sp)) {
       return freeze_ok;
     }
-    if (_thread != nullptr && _thread->has_pending_exception()) {
+    if (_thread->has_pending_exception()) {
       return freeze_exception;
     }
 
@@ -1155,10 +1155,16 @@ public:
 
   template <bool chunk_available>
   bool freeze_fast(intptr_t* top_sp) {
+<<<<<<< HEAD
     assert(_thread != nullptr, "");
     assert(_cont.chunk_invariant(tty), "");
     assert(!Interpreter::contains(_cont.entryPC()), "");
     assert(StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
+=======
+    assert (_cont.chunk_invariant(tty), "");
+    assert (!Interpreter::contains(_cont.entryPC()), "");
+    assert (StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
+>>>>>>> 157d5a80961 (Freeze::_thread fixes)
 
     // properties of the continuation on the stack; all sizes are in words
     intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
