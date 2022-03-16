@@ -240,6 +240,9 @@ public:
     return thaw0<SelfT>(thread, kind);
   }
 
+  static bool requires_barriers(stackChunkOop obj) {
+    return obj->requires_barriers();
+  }
 };
 
 class SmallRegisterMap;
@@ -1119,7 +1122,7 @@ public:
 #endif
   ) {
     stackChunkOop chunk = _cont.tail();
-    if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
+    if (chunk == nullptr || chunk->is_gc_mode() || ConfigT::requires_barriers(chunk) || chunk->has_mixed_frames()) {
       log_develop_trace(jvmcont)("is_chunk_available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
       return false;
     }
@@ -1494,7 +1497,7 @@ public:
       "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _size, chunk->is_empty());
 
     DEBUG_ONLY(bool empty_chunk = true);
-    if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && chunk->requires_barriers())) {
+    if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && ConfigT::requires_barriers(chunk))) {
       // ALLOCATION
 
       if (lt.develop_is_enabled()) {
@@ -1837,7 +1840,7 @@ public:
         return nullptr;
       }
 
-      _barriers = chunk->requires_barriers();
+      _barriers = ConfigT::requires_barriers(chunk);
     }
 
     assert (chunk->stack_size() == (int)stack_size, "");
@@ -1868,9 +1871,9 @@ public:
     assert (chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
 
     if (start != nullptr) {
-      assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
+      assert(!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
     } else {
-      _barriers = chunk->requires_barriers();
+      _barriers = ConfigT::requires_barriers(chunk);
     }
 
     _cont.set_tail(chunk);
@@ -2281,7 +2284,7 @@ public:
     stackChunkOop chunk = _cont.tail();
     assert (chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-    _barriers = chunk->requires_barriers();
+    _barriers = ConfigT::requires_barriers(chunk);
     return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                           : thaw_slow(chunk, kind != thaw_top);
   }
