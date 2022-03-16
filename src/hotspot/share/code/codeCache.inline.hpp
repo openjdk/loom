@@ -45,12 +45,12 @@ inline CodeBlob* CodeCache::find_blob_and_oopmap(void* pc, int& slot) {
     } else {
       cb = CodeCache::patch_nop(nop, pc, slot);
     }
-    // assert (cb == CodeCache::find_blob(pc), "");
+    // assert(cb == CodeCache::find_blob(pc), "");
   } else {
     cb = CodeCache::find_blob(pc);
     slot = -1;
   }
-  assert (cb != NULL, "must be");
+  assert(cb != NULL, "must be");
   return cb;
 }
 

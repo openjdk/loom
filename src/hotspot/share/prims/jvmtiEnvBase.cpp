@@ -622,7 +622,7 @@ JavaThread* JvmtiEnvBase::is_virtual_thread_mounted(oop vthread) {
   JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
   oop cont = java_lang_VirtualThread::continuation(vthread);
   assert(cont != NULL, "virtual thread continuation must not be NULL");
-  assert (Continuation::continuation_scope(cont) == java_lang_VirtualThread::vthread_scope(), "must be");
+  assert(Continuation::continuation_scope(cont) == java_lang_VirtualThread::vthread_scope(), "must be");
   return Continuation::is_continuation_mounted(java_thread, cont) ? java_thread : NULL;
 }
 
@@ -632,7 +632,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
   if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf; // no frames to skip
   }
-  assert (jvf != NULL && jvf->method() != NULL, "");
+  assert(jvf != NULL && jvf->method() != NULL, "");
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
     if (jvf->method()->jvmti_mount_transition()) { // cannot actually appear in an unmounted continuation; they're never frozen.

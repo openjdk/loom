@@ -1969,7 +1969,7 @@ void MacroAssembler::decrementl(Address dst, int value) {
 }
 
 void MacroAssembler::division_with_shift (Register reg, int shift_value) {
-  assert (shift_value > 0, "illegal shift value");
+  assert(shift_value > 0, "illegal shift value");
   Label _is_positive;
   testl (reg, reg);
   jcc (Assembler::positive, _is_positive);

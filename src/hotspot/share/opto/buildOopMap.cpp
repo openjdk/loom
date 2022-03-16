@@ -397,7 +397,7 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
       num_oops++;
     }
   }
-  assert (num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
+  assert(num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
 #endif
 
   return omap;

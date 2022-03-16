@@ -118,7 +118,7 @@ const char* CompiledMethod::state() const {
 
 //-----------------------------------------------------------------------------
 void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
-  // assert (can_be_deoptimized(), ""); // in some places we check before marking, in others not.
+  // assert(can_be_deoptimized(), ""); // in some places we check before marking, in others not.
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock,
                  Mutex::_no_safepoint_check_flag);
   if (_mark_for_deoptimization_status != deoptimize_done) { // can't go backwards
@@ -372,7 +372,7 @@ void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *
   JavaThread* thread = reg_map->thread();
   if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp()) {
     // if (!method()->is_native()) fr.print_on(tty);
-    // assert (method()->is_native(), "");
+    // assert(method()->is_native(), "");
     return;
   }
 

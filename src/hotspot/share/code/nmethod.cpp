@@ -1099,8 +1099,8 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
 
 
 void nmethod::make_deoptimized() {
-  assert (method() == NULL || can_be_deoptimized(), "");
-  assert (!is_zombie(), "");
+  assert(method() == NULL || can_be_deoptimized(), "");
+  assert(!is_zombie(), "");
 
   CompiledICLocker ml(this);
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");

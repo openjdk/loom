@@ -52,7 +52,7 @@ template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
 template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
   NOT_PRODUCT(if (TraceCodeBlobStacks) OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());)
-  assert (fr != NULL, "");
+  assert(fr != NULL, "");
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)

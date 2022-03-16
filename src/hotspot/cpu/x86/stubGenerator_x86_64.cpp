@@ -7531,7 +7531,7 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw(bool return_barrier, bool exception) {
-    assert (return_barrier || !exception, "must be");
+    assert(return_barrier || !exception, "must be");
 
     address start = __ pc();
 
@@ -8283,9 +8283,9 @@ void StubGenerator_generate(CodeBuffer* code, int phase) {
 // on exit, rsp points to the ContinuationEntry
 // kills rax
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
-  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+  assert(ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
   stack_slots += (int)ContinuationEntry::size()/wordSize;
   __ subptr(rsp, (int32_t)ContinuationEntry::size()); // place Continuation metadata

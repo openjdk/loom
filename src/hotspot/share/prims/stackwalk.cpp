@@ -48,7 +48,7 @@
 // setup and cleanup actions
 BaseFrameStream::BaseFrameStream(JavaThread* thread, Handle continuation)
   : _thread(thread), _continuation(continuation), _anchor(0L) {
-    assert (thread != NULL, "");
+    assert(thread != NULL, "");
 }
 
 void BaseFrameStream::setup_magic_on_entry(objArrayHandle frames_array) {
@@ -89,7 +89,7 @@ void BaseFrameStream::set_continuation(Handle cont) {
 // static inline Handle continuationScope_of(JavaThread* thread, Handle cont_or_scope) {
 //   if (cont_or_scope.is_null() || cont_or_scope()->is_a(SystemDictionary::ContinuationScope_klass()))
 //     return cont_or_scope;
-//   assert (cont_or_scope()->is_a(SystemDictionary::Continuation_klass()), "must be");
+//   assert(cont_or_scope()->is_a(SystemDictionary::Continuation_klass()), "must be");
 //   return Handle(thread, Continuation::continuation_scope(cont_or_scope()));
 // }
 
@@ -121,7 +121,7 @@ void JavaFrameStream::next() {
 }
 
 void LiveFrameStream::next() {
-  assert (_cont_scope.is_null() || cont() != (oop)NULL, "must be");
+  assert(_cont_scope.is_null() || cont() != (oop)NULL, "must be");
 
   oop cont = this->cont();
   if (cont != (oop)NULL && Continuation::is_continuation_entry_frame(_jvf->fr(), _jvf->register_map())) {
@@ -132,7 +132,7 @@ void LiveFrameStream::next() {
     }
     _cont = _cont->parent();
   }
-  assert (!Continuation::is_scope_bottom(_cont_scope(), _jvf->fr(), _jvf->register_map()), "");
+  assert(!Continuation::is_scope_bottom(_cont_scope(), _jvf->fr(), _jvf->register_map()), "");
 
   _jvf = _jvf->java_sender();
 }
@@ -186,7 +186,7 @@ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream& stream,
 
   int frames_decoded = 0;
   for (; !stream.at_end(); stream.next()) {
-    assert (stream.continuation() == NULL || stream.continuation() == stream.reg_map()->cont(), "");
+    assert(stream.continuation() == NULL || stream.continuation() == stream.reg_map()->cont(), "");
     Method* method = stream.method();
 
     if (method == NULL) continue;
@@ -440,7 +440,7 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
 
   // Setup traversal onto my stack.
   if (live_frame_info(mode)) {
-    assert (use_frames_array(mode), "Bad mode for get live frame");
+    assert(use_frames_array(mode), "Bad mode for get live frame");
     RegisterMap regMap = cont.is_null() ? RegisterMap(jt, true, true, true)
                                         : RegisterMap(cont(), true);
     LiveFrameStream stream(jt, &regMap, cont_scope, cont);

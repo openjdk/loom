@@ -1595,7 +1595,7 @@ bool JavaThread::is_lock_owned_current(address adr) const {
 }
 
 bool JavaThread::is_lock_owned_carrier(address adr) const {
-  assert (is_vthread_mounted(), "");
+  assert(is_vthread_mounted(), "");
   address stack_end = _stack_base - _stack_size;
   address stack_base = (address)vthread_continuation()->entry_sp();
   return stack_base > adr && adr >= stack_end;
@@ -2153,7 +2153,7 @@ const char* _get_thread_state_name(JavaThreadState _thread_state) {
 void JavaThread::print_thread_state_on(outputStream *st) const {
   if (is_vthread_mounted()) {
     oop vt = vthread();
-    assert (vt != NULL, "");
+    assert(vt != NULL, "");
     st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
   }
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
@@ -2180,7 +2180,7 @@ void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
   if (thread_oop != NULL) {
     if (is_vthread_mounted()) {
       oop vt = vthread();
-      assert (vt != NULL, "");
+      assert(vt != NULL, "");
       st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
     } else {
       st->print_cr("   java.lang.Thread.State: %s", java_lang_Thread::thread_status_name(thread_oop));

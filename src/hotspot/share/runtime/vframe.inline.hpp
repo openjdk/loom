@@ -66,9 +66,9 @@ inline void vframeStreamCommon::next() {
   do {
     bool cont_entry = false;
     if (Continuation::is_continuation_enterSpecial(_frame)) {
-      assert (!_reg_map.in_cont(), "");
-      assert (_cont != NULL, "");
-      assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
+      assert(!_reg_map.in_cont(), "");
+      assert(_cont != NULL, "");
+      assert(_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
 
       // TODO: handle ShowCarrierFrames
@@ -77,7 +77,7 @@ inline void vframeStreamCommon::next() {
         break;
       }
     } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
-      assert (_reg_map.cont() != NULL, "");
+      assert(_reg_map.cont() != NULL, "");
       oop scope = jdk_internal_vm_Continuation::scope(_reg_map.cont());
       if (scope == java_lang_VirtualThread::vthread_scope() || (_continuation_scope.not_null() && scope == _continuation_scope())) {
         _mode = at_end_mode;
@@ -187,7 +187,7 @@ inline bool vframeStreamCommon::fill_from_frame() {
   // Compiled frame
 
   if (cb() != NULL && cb()->is_compiled()) {
-    assert (nm()->method() != NULL, "must be");
+    assert(nm()->method() != NULL, "must be");
     if (nm()->is_native_method()) {
       // Do not rely on scopeDesc since the pc might be unprecise due to the _last_native_pc trick.
       fill_from_compiled_native_frame();
@@ -255,7 +255,7 @@ inline bool vframeStreamCommon::fill_from_frame() {
     return true;
   }
 
-  assert (!Continuation::is_continuation_enterSpecial(_frame), "");
+  assert(!Continuation::is_continuation_enterSpecial(_frame), "");
   return false;
 }
 

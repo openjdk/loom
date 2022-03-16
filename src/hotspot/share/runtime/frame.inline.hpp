@@ -106,8 +106,8 @@ inline CodeBlob* frame::get_cb() const {
 
 // inline void frame::set_cb(CodeBlob* cb) {
 //   if (_cb == NULL) _cb = cb;
-//   assert (_cb == cb, "");
-//   assert (_cb->contains(_pc), "");
+//   assert(_cb == cb, "");
+//   assert(_cb->contains(_pc), "");
 // }
 
 

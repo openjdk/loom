@@ -179,7 +179,7 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   _stack_arg_slots = align_up(_stack_arg_slots, 2);
 #ifdef ASSERT
   int dbg_stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
-  assert (_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
+  assert(_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
 #endif
 
   // Detect overflow.  (We counted _param_size correctly.)

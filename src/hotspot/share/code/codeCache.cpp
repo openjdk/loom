@@ -671,7 +671,7 @@ CodeBlob* CodeCache::find_blob_unsafe(void* start) {
 
 CodeBlob* CodeCache::patch_nop(NativePostCallNop* nop, void* pc, int& slot) {
   CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
-  assert (cb != NULL, "must be");
+  assert(cb != NULL, "must be");
 
   if (cb->is_zombie()) {
     // might be called during GC traversal

@@ -299,7 +299,7 @@ public:
 
   void handle_deopted() const;
 
-  inline int to_offset(stackChunkOop chunk) const { assert (!is_done(), ""); return _sp - chunk->start_address(); }
+  inline int to_offset(stackChunkOop chunk) const { assert(!is_done(), ""); return _sp - chunk->start_address(); }
 
   inline frame to_frame() const;
 

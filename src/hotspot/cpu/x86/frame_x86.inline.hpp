@@ -233,18 +233,18 @@ inline int frame::frame_size() const {
 }
 
 inline int frame::num_oops() const {
-  assert (!is_interpreted_frame(), "interpreted");
-  assert (oop_map() != NULL, "");
+  assert(!is_interpreted_frame(), "interpreted");
+  assert(oop_map() != NULL, "");
   return oop_map()->num_oops() ;
 }
 
 inline int frame::compiled_frame_stack_argsize() const {
-  assert (cb()->is_compiled(), "");
+  assert(cb()->is_compiled(), "");
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
-  assert (mask != NULL, "");
+  assert(mask != NULL, "");
   Method* m = interpreter_frame_method();
   int   bci = interpreter_frame_bci();
   m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
@@ -412,7 +412,7 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // frame owned by optimizing compiler
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
   intptr_t* sender_sp = unextended_sp() + _cb->frame_size();
-  assert (sender_sp == real_fp(), "");
+  assert(sender_sp == real_fp(), "");
 
   // On Intel the return_address is always the word on the stack
   address sender_pc = (address) *(sender_sp-1);
@@ -432,9 +432,9 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
         _oop_map->update_register_map(this, map);
       }
     } else {
-      assert (!_cb->caller_must_gc_arguments(map->thread()), "");
-      assert (!map->include_argument_oops(), "");
-      assert (oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
+      assert(!_cb->caller_must_gc_arguments(map->thread()), "");
+      assert(!map->include_argument_oops(), "");
+      assert(oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
     }
 
     // Since the prolog does the save and restore of EBP there is no oopmap

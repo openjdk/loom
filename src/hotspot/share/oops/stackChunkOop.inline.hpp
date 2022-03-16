@@ -80,19 +80,19 @@ inline intptr_t* stackChunkOopDesc::from_offset(int offset) const {
 }
 
 inline bool stackChunkOopDesc::is_empty() const {
-  assert (is_stackChunk(), "");
+  assert(is_stackChunk(), "");
   return sp() >= stack_size() - argsize();
 }
 
 inline bool stackChunkOopDesc::is_in_chunk(void* p) const {
-  assert (is_stackChunk(), "");
+  assert(is_stackChunk(), "");
   HeapWord* start = (HeapWord*)start_address();
   HeapWord* end = start + stack_size();
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
 
 bool stackChunkOopDesc::is_usable_in_chunk(void* p) const {
-  assert (is_stackChunk(), "");
+  assert(is_stackChunk(), "");
 #if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   HeapWord* start = (HeapWord*)start_address() + sp() - frame::sender_sp_offset;
 #else
@@ -126,7 +126,7 @@ inline void stackChunkOopDesc::set_has_mixed_frames(bool value)    { set_flag(FL
 inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_flag(FLAG_GC_MODE); }
 inline void stackChunkOopDesc::set_gc_mode(bool value)             { set_flag(FLAG_GC_MODE, value); }
 inline bool stackChunkOopDesc::has_bitmap() const                  { return is_flag(FLAG_HAS_BITMAP); }
-inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); assert (!value || UseChunkBitmaps, ""); }
+inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); assert(!value || UseChunkBitmaps, ""); }
 inline bool stackChunkOopDesc::has_thaw_slowpath_condition() const { return flags() != 0; }
 
 inline intptr_t* stackChunkOopDesc::relative_base() const {
@@ -138,7 +138,7 @@ inline intptr_t* stackChunkOopDesc::derelativize_address(int offset) const {
   intptr_t* base = relative_base();
   intptr_t* p = base - offset;
   // tty->print_cr(">>> derelativize_address: %d -> %p (base: %p)", offset, p, base);
-  assert (start_address() <= p && p <= base, "");
+  assert(start_address() <= p && p <= base, "");
   return p;
 }
 
@@ -146,8 +146,8 @@ inline int stackChunkOopDesc::relativize_address(intptr_t* p) const {
   intptr_t* base = relative_base();
   intptr_t offset = base - p;
   // tty->print_cr(">>> relativize_address: %p -> %ld (base: %p)", p, offset, base);
-  assert (start_address() <= p && p <= base, "");
-  assert (0 <= offset && offset <= std::numeric_limits<int>::max(), "");
+  assert(start_address() <= p && p <= base, "");
+  assert(0 <= offset && offset <= std::numeric_limits<int>::max(), "");
   return offset;
 }
 
@@ -167,18 +167,18 @@ inline frame stackChunkOopDesc::relativize(frame fr)   const { relativize_frame(
 inline frame stackChunkOopDesc::derelativize(frame fr) const { derelativize_frame(fr); return fr; }
 
 inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int usp_offset_in_bytes) const {
-  assert (fr.is_compiled_frame() || fr.cb()->is_safepoint_stub(), "");
-  assert (is_in_chunk(fr.unextended_sp()), "");
+  assert(fr.is_compiled_frame() || fr.cb()->is_safepoint_stub(), "");
+  assert(is_in_chunk(fr.unextended_sp()), "");
 
   intptr_t* base = fr.real_fp(); // equal to the caller's sp
   intptr_t* loc = (intptr_t*)((address)fr.unextended_sp() + usp_offset_in_bytes);
-  assert (base > loc, "");
+  assert(base > loc, "");
   return (int)(base - loc);
 }
 
 inline address stackChunkOopDesc::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) const {
-  assert (fr.is_compiled_frame(), "");
-  assert (map != nullptr && map->stack_chunk() == as_oop(), "");
+  assert(fr.is_compiled_frame(), "");
+  assert(map != nullptr && map->stack_chunk() == as_oop(), "");
 
   // the offsets are saved in the map after going through relativize_usp_offset, so they are sp - loc, in words
   intptr_t offset = (intptr_t)map->location(reg, nullptr); // see usp_offset_to_index for the chunk case
@@ -187,7 +187,7 @@ inline address stackChunkOopDesc::reg_to_location(const frame& fr, const Registe
 }
 
 inline address stackChunkOopDesc::usp_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const {
-  assert (fr.is_compiled_frame(), "");
+  assert(fr.is_compiled_frame(), "");
   return (address)derelativize_address(fr.offset_unextended_sp()) + usp_offset_in_bytes;
 }
 
@@ -219,8 +219,8 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
     p2i(to), to - start_address(), relative_base() - to, p2i(to + size), to + size - start_address(),
     relative_base() - (to + size), size, size << LogBytesPerWord);
 
-  assert (to >= start_address(), "");
-  assert (to + size <= end_address(), "");
+  assert(to >= start_address(), "");
+  assert(to + size <= end_address(), "");
 
   InstanceStackChunkKlass::copy_from_stack_to_chunk<alignment>(from, to, size);
 }
@@ -233,19 +233,19 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
   log_develop_trace(jvmcont)("Copying to v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)", p2i(to),
     p2i(to + size), size, size << LogBytesPerWord);
 
-  assert (from >= start_address(), "");
-  assert (from + size <= end_address(), "");
+  assert(from >= start_address(), "");
+  assert(from + size <= end_address(), "");
 
   InstanceStackChunkKlass::copy_from_chunk_to_stack<alignment>(from, to, size);
 }
 
 inline BitMapView stackChunkOopDesc::bitmap() const {
-  assert (has_bitmap(), "");
+  assert(has_bitmap(), "");
   size_t size_in_bits = InstanceStackChunkKlass::bitmap_size(stack_size()) << LogBitsPerWord;
 #ifdef ASSERT
   BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
-  assert (bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
-  assert (bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "");
+  assert(bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
+  assert(bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "");
   bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
 #endif
   return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);

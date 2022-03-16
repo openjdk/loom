@@ -134,9 +134,9 @@ oop RegisterMap::cont() const {
 }
 
 void RegisterMap::set_stack_chunk(stackChunkOop chunk) {
-  assert (chunk == NULL || _walk_cont, "");
-  assert (chunk == NULL || chunk->is_stackChunk(), "");
-  assert (chunk == NULL || _chunk.not_null(), "");
+  assert(chunk == NULL || _walk_cont, "");
+  assert(chunk == NULL || chunk->is_stackChunk(), "");
+  assert(chunk == NULL || _chunk.not_null(), "");
   if (_chunk.is_null()) return;
   log_trace(jvmcont)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
   *(_chunk.raw_value()) = chunk; // reuse handle. see comment above in the constructor
@@ -487,7 +487,7 @@ jint frame::interpreter_frame_expression_stack_size() const {
     stack_size = (interpreter_frame_tos_address() -
                   interpreter_frame_expression_stack() + 1)/element_size;
   }
-  assert (stack_size <= (size_t)max_jint, "stack size too big");
+  assert(stack_size <= (size_t)max_jint, "stack size too big");
   return (jint)stack_size;
 }
 
@@ -1276,7 +1276,7 @@ public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // oop base = *base_loc;
     // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
-    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
+    // assert(offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
 
     _base->push(base_loc);
     _derived->push(derived_loc);
@@ -1446,7 +1446,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         assert(sig_index == sizeargs, "");
       }
       int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
-      assert (out_preserve ==  m->num_stack_arg_slots(), "");
+      assert(out_preserve ==  m->num_stack_arg_slots(), "");
       int sig_index = 0;
       int arg_index = (m->is_static() ? 0 : -1);
       for (SignatureStream ss(m->signature()); !ss.at_return_type(); ) {
@@ -1456,7 +1456,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         assert(t == sig_bt[sig_index], "sigs in sync");
         VMReg fst = regs[sig_index].first();
         if (fst->is_stack()) {
-          assert (((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
+          assert(((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
           int offset = fst->reg2stack() * VMRegImpl::stack_slot_size + stack_slot_offset;
           intptr_t* stack_address = (intptr_t*)((address)unextended_sp() + offset);
           if (at_this) {
@@ -1612,7 +1612,7 @@ void FrameValues::print_on(JavaThread* thread, outputStream* st) {
 }
 
 void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
-  assert (chunk->is_stackChunk(), "");
+  assert(chunk->is_stackChunk(), "");
 
   _values.sort(compare);
 
