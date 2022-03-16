@@ -64,7 +64,7 @@ public class JoinWithDuration {
             // test duration of join
             long start = millisTime();
             assertFalse(thread.join(Duration.ofMillis(2000)));
-            expectDuration(start, /*min*/1900, /*max*/4000);
+            expectDuration(start, /*min*/1900, /*max*/20_000);
 
         } finally {
             LockSupport.unpark(thread);
@@ -86,7 +86,7 @@ public class JoinWithDuration {
         // test duration of join
         long start = millisTime();
         assertFalse(thread.join(Duration.ofMillis(2000)));
-        expectDuration(start, /*min*/1900, /*max*/4000);
+        expectDuration(start, /*min*/1900, /*max*/20_000);
     }
 
     /**
