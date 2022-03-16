@@ -1051,8 +1051,7 @@ public:
     assert(_thread != nullptr, "");
     assert(_thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
 
-    int argsize = _cont.argsize();
-    _bottom_address = _cont.entrySP() - argsize;
+    _bottom_address = _cont.entrySP() - _cont.argsize();
     DEBUG_ONLY(_cont.entry()->verify_cookie();)
 
     assert(!Interpreter::contains(_cont.entryPC()), "");
@@ -1135,46 +1134,37 @@ public:
     // assert(CodeCache::find_blob(*(address*)(top_sp - SENDER_SP_RET_ADDRESS_OFFSET)) == StubRoutines::cont_doYield_stub(), ""); -- fails on Windows
     assert(StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
     intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
-    const int       stack_argsize = _cont.argsize();
-    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(stack_argsize);
+    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize());
 
     int size = stack_bottom - stack_top; // in words
 
     const int chunk_sp = chunk->sp();
     if (chunk_sp < chunk->stack_size()) {
-      size -= stack_argsize;
+      size -= _cont.argsize();
     }
     assert(size > 0, "");
 
     bool available = chunk_sp - ContinuationHelper::frame_metadata >= size;
     log_develop_trace(jvmcont)("is_chunk_available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
-      available, stack_argsize, size, p2i(stack_top), p2i(stack_bottom));
+      available, _cont.argsize(), size, p2i(stack_top), p2i(stack_bottom));
     DEBUG_ONLY(if (out_size != nullptr) *out_size = size;)
     return available;
   }
 
   template <bool chunk_available>
   bool freeze_fast(intptr_t* top_sp) {
-<<<<<<< HEAD
-    assert(_thread != nullptr, "");
     assert(_cont.chunk_invariant(tty), "");
     assert(!Interpreter::contains(_cont.entryPC()), "");
     assert(StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
-=======
-    assert (_cont.chunk_invariant(tty), "");
-    assert (!Interpreter::contains(_cont.entryPC()), "");
-    assert (StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
->>>>>>> 157d5a80961 (Freeze::_thread fixes)
 
     // properties of the continuation on the stack; all sizes are in words
     intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
-    const int       stack_argsize = _cont.argsize();
-    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(stack_argsize); // see alignment in thaw
+    intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize()); // see alignment in thaw
 
     const int size = stack_bottom - stack_top;
 
     log_develop_trace(jvmcont)("freeze_fast size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
-      size, stack_argsize, p2i(stack_top), p2i(stack_bottom));
+      size, _cont.argsize(), p2i(stack_top), p2i(stack_bottom));
     assert(size > 0, "");
 
   #ifdef ASSERT
@@ -1199,12 +1189,12 @@ public:
         assert(sp_before < (chunk->stack_size() - chunk->argsize()), "");
         assert(*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
-        sp_before += stack_argsize; // we overlap; we'll overwrite the chunk's top frame's callee arguments
+        sp_before += _cont.argsize(); // we overlap; we'll overwrite the chunk's top frame's callee arguments
         assert(sp_before <= chunk->stack_size(), "");
 
-        chunk->set_max_size(chunk->max_size() + size - stack_argsize);
+        chunk->set_max_size(chunk->max_size() + size - _cont.argsize());
 
-        intptr_t* const bottom_sp = stack_bottom - stack_argsize;
+        intptr_t* const bottom_sp = stack_bottom - _cont.argsize();
         assert(bottom_sp == _bottom_address, "");
         assert(*(address*)(bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
         patch_chunk_pd(bottom_sp, chunk->sp_address());
@@ -1214,7 +1204,7 @@ public:
         assert(sp_before == chunk->stack_size(), "");
 
         chunk->set_max_size(size);
-        chunk->set_argsize(stack_argsize);
+        chunk->set_argsize(_cont.argsize());
       }
     } else { // no chunk; allocate
       DEBUG_ONLY(empty = true; allocated = true;)
@@ -1230,7 +1220,7 @@ public:
       }
 
       chunk->set_max_size(size);
-      chunk->set_argsize(stack_argsize);
+      chunk->set_argsize(_cont.argsize());
 
       // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
       // They'll then be stored twice: in the chunk and in the parent chunk's top frame
@@ -1257,7 +1247,7 @@ public:
     NoSafepointVerifier nsv;
 
     log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
-      p2i((oopDesc*)chunk), chunk->stack_size(), sp_before, stack_argsize);
+      p2i((oopDesc*)chunk), chunk->stack_size(), sp_before, _cont.argsize());
     assert(sp_before <= chunk->stack_size(), "");
     assert(sp_before >= size, "");
 
@@ -1275,7 +1265,7 @@ public:
     // Because we're not patched yet, the chunk is now in a bad state
 
     // patch pc
-    intptr_t* chunk_bottom_sp = chunk_top + size - stack_argsize;
+    intptr_t* chunk_bottom_sp = chunk_top + size - _cont.argsize();
     assert(empty || *(address*)(chunk_bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
     *(address*)(chunk_bottom_sp - frame::sender_sp_ret_address_offset()) = chunk->pc();
 
@@ -1632,7 +1622,6 @@ public:
 #endif
 
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
-    const int argsize = Interpreted::stack_argsize(f);
     const int locals = f.interpreter_frame_method()->max_locals();
     assert(Interpreted::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
     const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
@@ -1650,11 +1639,11 @@ public:
     Method* frame_method = Frame::frame_method(f);
 
     log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
-      frame_method->name_and_sig_as_C_string(), _size, fsize, argsize);
+      frame_method->name_and_sig_as_C_string(), _size, fsize, _cont.argsize());
     // we'd rather not yield inside methods annotated with @JvmtiMountTransition
     assert(!Frame::frame_method(f)->jvmti_mount_transition(), "");
 
-    freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, argsize);
+    freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, _cont.argsize());
     if (UNLIKELY(result > freeze_ok_bottom)) {
       return result;
     }
@@ -1672,7 +1661,7 @@ public:
     copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(f) - locals,
                                              Interpreted::frame_bottom(hf) - locals, locals); // copy locals
     copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
-    assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
+    assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + _cont.argsize()), "");
 
     relativize_interpreted_frame_metadata(f, hf);
 
