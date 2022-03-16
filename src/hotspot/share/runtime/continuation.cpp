@@ -1224,9 +1224,7 @@ public:
       assert(_thread->cont_fastpath(), "");
 
       chunk = allocate_chunk(size + ContinuationHelper::frame_metadata);
-      if (UNLIKELY(chunk == nullptr)) return false; // OOME
-      if (UNLIKELY(!_thread->cont_fastpath()
-                  || _barriers)) { // probably humongous
+      if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
         log_develop_trace(jvmcont)("Retrying slow. Barriers: %d", _barriers);
         init_empty_chunk(chunk);
         return false;
