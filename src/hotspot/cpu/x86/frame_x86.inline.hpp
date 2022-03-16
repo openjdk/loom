@@ -25,6 +25,7 @@
 #ifndef CPU_X86_FRAME_X86_INLINE_HPP
 #define CPU_X86_FRAME_X86_INLINE_HPP
 
+#include "code/codeBlob.inline.hpp"
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"

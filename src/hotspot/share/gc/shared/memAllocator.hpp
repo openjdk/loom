@@ -106,6 +106,7 @@ public:
 
 class StackChunkAllocator : public MemAllocator {
   const size_t _stack_size;
+
 public:
   StackChunkAllocator(Klass* klass, size_t word_size, size_t stack_size, Thread* thread = Thread::current())
     : MemAllocator(klass, word_size, thread),

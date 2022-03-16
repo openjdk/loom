@@ -46,6 +46,7 @@ class frame;
 class RegisterMap;
 class OopClosure;
 class CodeBlob;
+class ImmutableOopMap;
 
 enum class derived_pointer : intptr_t {};
 
@@ -173,7 +174,6 @@ class OopMap: public ResourceObj {
   CompressedWriteStream* write_stream() const { return _write_stream; }
   void set_write_stream(CompressedWriteStream* value) { _write_stream = value; }
 
- private:
   enum DeepCopyToken { _deep_copy_token };
   OopMap(DeepCopyToken, OopMap* source);  // used only by deep_copy
 
@@ -215,8 +215,6 @@ class OopMap: public ResourceObj {
   bool equals(const OopMap* other) const;
 };
 
-class ImmutableOopMap;
-
 class OopMapSet : public ResourceObj {
   friend class VMStructs;
  private:
@@ -243,10 +241,14 @@ class OopMapSet : public ResourceObj {
   static const ImmutableOopMap* find_map(const frame *fr);
 
   // Iterates through frame for a compiled method
-  static void oops_do            (const frame* fr, const RegisterMap* reg_map,
-                                  OopClosure* f, DerivedOopClosure* df);
-  static void oops_do            (const frame* fr, const RegisterMap* reg_map,
-                                  OopClosure* f, DerivedPointerIterationMode mode);
+  static void oops_do            (const frame* fr,
+                                  const RegisterMap* reg_map,
+                                  OopClosure* f,
+                                  DerivedOopClosure* df);
+  static void oops_do            (const frame* fr,
+                                  const RegisterMap* reg_map,
+                                  OopClosure* f,
+                                  DerivedPointerIterationMode mode);
   static void update_register_map(const frame* fr, RegisterMap *reg_map);
 
 #ifndef PRODUCT
@@ -384,7 +386,6 @@ class OopMapStream : public StackObj {
   int stream_position() const           { return _stream.position(); }
 #endif
 };
-
 
 class ImmutableOopMapBuilder {
 private:

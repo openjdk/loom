@@ -22,9 +22,9 @@
  *
  */
 
-#include "oops/access.hpp"
 #include "precompiled.hpp"
 #include "code/debugInfo.hpp"
+#include "oops/access.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/oop.hpp"
 #include "runtime/frame.inline.hpp"

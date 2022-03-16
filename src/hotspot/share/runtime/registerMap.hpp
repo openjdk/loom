@@ -71,16 +71,16 @@ class RegisterMap : public StackObj {
     location_valid_size = (reg_count+location_valid_type_size-1)/location_valid_type_size
   };
  private:
-  intptr_t*    _location[reg_count];    // Location of registers (intptr_t* looks better than address in the debugger)
+  intptr_t*         _location[reg_count];     // Location of registers (intptr_t* looks better than address in the debugger)
   LocationValidType _location_valid[location_valid_size];
-  bool        _include_argument_oops;   // Should include argument_oop marked locations for compiler
-  JavaThread* _thread;                  // Reference to current thread
-  stackChunkHandle _chunk;              // The current continuation stack chunk, if any
+  bool              _include_argument_oops;   // Should include argument_oop marked locations for compiler
+  JavaThread*       _thread;                  // Reference to current thread
+  stackChunkHandle  _chunk;                   // The current continuation stack chunk, if any
 
-  bool        _update_map;              // Tells if the register map need to be
-                                        // updated when traversing the stack
-  bool        _process_frames;          // Should frames be processed by stack watermark barriers?
-  bool        _walk_cont;               // whether to walk frames on a continuation stack
+  bool              _update_map;              // Tells if the register map need to be
+                                              // updated when traversing the stack
+  bool              _process_frames;          // Should frames be processed by stack watermark barriers?
+  bool              _walk_cont;               // whether to walk frames on a continuation stack
 
   NOT_PRODUCT(bool  _skip_missing;) // ignore missing registers
   NOT_PRODUCT(bool  _async;)        // walking frames asynchronously, at arbitrary points

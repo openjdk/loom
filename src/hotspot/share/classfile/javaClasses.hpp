@@ -399,7 +399,7 @@ class java_lang_Class : AllStatic {
 
 // Interface to java.lang.Thread objects
 
-#define THREAD_INJECTED_FIELDS(macro)                            \
+#define THREAD_INJECTED_FIELDS(macro)                                   \
   macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false)
 
 class java_lang_Thread : AllStatic {
@@ -497,6 +497,7 @@ class java_lang_Thread_FieldHolder : AllStatic {
   static int _thread_status_offset;
 
   static void compute_offsets();
+
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -528,6 +529,7 @@ class java_lang_Thread_Constants : AllStatic {
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
  public:
   static oop get_VTHREAD_GROUP();
   static oop get_NOT_SUPPORTED_CLASSLOADER();
@@ -579,7 +581,7 @@ class java_lang_ThreadGroup : AllStatic {
 
 // Interface to java.lang.VirtualThread objects
 
-#define VTHREAD_INJECTED_FIELDS(macro)                             \
+#define VTHREAD_INJECTED_FIELDS(macro)                                       \
 JFR_ONLY(macro(java_lang_VirtualThread, jfr_epoch, short_signature, false))
 
 class java_lang_VirtualThread : AllStatic {
@@ -1126,11 +1128,11 @@ class jdk_internal_vm_Continuation: AllStatic {
 };
 
 // Interface to jdk.internal.vm.StackChunk objects
-#define STACKCHUNK_INJECTED_FIELDS(macro)                               \
-  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)   \
-  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)   \
-  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false) \
-  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)    \
+#define STACKCHUNK_INJECTED_FIELDS(macro)                                      \
+  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)  \
+  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)          \
+  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false)        \
+  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)           \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;

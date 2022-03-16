@@ -393,8 +393,9 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
   int num_oops = 0;
   for (OopMapStream oms2(omap); !oms2.is_done(); oms2.next()) {
     OopMapValue omv = oms2.current();
-    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value)
+    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value) {
       num_oops++;
+    }
   }
   assert (num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
 #endif

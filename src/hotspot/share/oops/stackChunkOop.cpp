@@ -105,8 +105,9 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
 
 static int num_java_frames(CompiledMethod* cm, address pc) {
   int count = 0;
-  for (ScopeDesc* scope = cm->scope_desc_at(pc); scope != nullptr; scope = scope->sender())
+  for (ScopeDesc* scope = cm->scope_desc_at(pc); scope != nullptr; scope = scope->sender()) {
     count++;
+  }
   return count;
 }
 
@@ -120,7 +121,9 @@ int stackChunkOopDesc::num_java_frames() const {
   int n = 0;
   for (StackChunkFrameStream<chunk_frames::MIXED> f(const_cast<stackChunkOopDesc*>(this)); !f.is_done();
        f.next(SmallRegisterMap::instance)) {
-    if (!f.is_stub()) n += ::num_java_frames(f);
+    if (!f.is_stub()) {
+      n += ::num_java_frames(f);
+    }
   }
   return n;
 }

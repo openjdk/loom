@@ -45,12 +45,12 @@ typedef class BytecodeInterpreter* interpreterState;
 class CodeBlob;
 class CompiledMethod;
 class FrameValues;
-class vframeArray;
+class InterpreterOopMap;
 class JavaCallWrapper;
 class Method;
 class methodHandle;
 class RegisterMap;
-class InterpreterOopMap;
+class vframeArray;
 
 enum class DerivedPointerIterationMode {
   _with_table,

@@ -27,7 +27,6 @@
 #include "code/codeCache.hpp"
 #include "code/nmethod.hpp"
 #include "code/scopeDesc.hpp"
-#include "compiler/oopMap.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "gc/shared/collectedHeap.hpp"
 #include "logging/log.hpp"
@@ -411,6 +410,7 @@ class AddDerivedOop : public DerivedOopClosure {
 
 class ProcessDerivedOop : public DerivedOopClosure {
   OopClosure* _oop_cl;
+
 public:
   ProcessDerivedOop(OopClosure* oop_cl) :
       _oop_cl(oop_cl) {}
@@ -433,9 +433,10 @@ public:
 
 class IgnoreDerivedOop : public DerivedOopClosure {
   OopClosure* _oop_cl;
+
 public:
   enum {
-        SkipNull = true, NeedsLock = true
+    SkipNull = true, NeedsLock = true
   };
 
   virtual void do_derived_oop(oop* base, derived_pointer* derived) {}
@@ -765,7 +766,6 @@ int ImmutableOopMap::nr_of_bytes() const {
   }
   return sizeof(ImmutableOopMap) + oms.stream_position();
 }
-
 #endif
 
 ImmutableOopMapBuilder::ImmutableOopMapBuilder(const OopMapSet* set) : _set(set), _empty(NULL), _last(NULL), _empty_offset(-1), _last_offset(-1), _offset(0), _required(-1), _new_set(NULL) {

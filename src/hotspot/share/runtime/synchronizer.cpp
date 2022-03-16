@@ -50,7 +50,6 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/timer.hpp"
-#include "runtime/vframe.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"

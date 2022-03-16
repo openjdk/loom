@@ -201,10 +201,12 @@ JavaThread::CarrierOrVirtual JavaThread::which_stack(address adr) const {
   address stack_end = _stack_base - _stack_size;
   if (adr >= stack_end) {
     const ContinuationEntry* cont = vthread_continuation();
-    if (cont != nullptr && (address)cont->entry_sp() > adr)
+    if (cont != nullptr && (address)cont->entry_sp() > adr) {
       return CarrierOrVirtual::VIRTUAL;
-    if (_stack_base > adr)
+    }
+    if (_stack_base > adr) {
       return CarrierOrVirtual::CARRIER;
+    }
   }
   return CarrierOrVirtual::NONE;
 }

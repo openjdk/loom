@@ -424,7 +424,6 @@ class SharedRuntime: AllStatic {
                               const BasicType *sig_bt,
                               const VMRegPair *regs);
 
-
   // OSR support
 
   // OSR_migration_begin will extract the jvm state from an interpreter

@@ -25,6 +25,8 @@
 #ifndef SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
 #define SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
 
+#include "jfr/support/jfrThreadId.hpp"
+
 #include "classfile/javaClasses.inline.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.inline.hpp"

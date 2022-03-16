@@ -26,6 +26,7 @@
 #define SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP
 
 #include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.hpp"
+
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 
 template <typename T>

@@ -49,6 +49,7 @@ class InterpreterCodelet: public Stub {
   enum Kind {
     codelet_other, codelet_bytecode, codelet_method_entry, codelet_safepoint_entry
   };
+
  private:
   int         _size;                      // the size in bytes
   Kind        _kind;

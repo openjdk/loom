@@ -22,16 +22,18 @@
  *
  */
 
-#ifndef SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_HPP
-#define SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_HPP
+#ifndef SHARE_CODE_CODEBLOB_INLINE_HPP
+#define SHARE_CODE_CODEBLOB_INLINE_HPP
 
-#include "memory/allStatic.hpp"
-#include "oops/oopsHierarchy.hpp"
+#include "code/codeBlob.hpp"
 
-class ContinuationGCSupport : public AllStatic {
-public:
-  static void relativize_chunk(oop obj);
-  static void transform_stack_chunk(oop obj);
-};
+#include "compiler/oopMap.inline.hpp"
+#include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
 
-#endif // SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_HPP
+inline const ImmutableOopMap* CodeBlob::oop_map_for_slot(int slot, address return_address) const {
+  assert(_oop_maps != NULL, "nope");
+  return _oop_maps->find_map_at_slot(slot, (intptr_t) return_address - (intptr_t) code_begin());
+}
+
+#endif // SHARE_CODE_CODEBLOB_INLINE_HPP

@@ -22,7 +22,6 @@
  *
  */
 
-#include "oops/stackChunkOop.hpp"
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/javaThreadStatus.hpp"
@@ -38,6 +37,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/globals.hpp"

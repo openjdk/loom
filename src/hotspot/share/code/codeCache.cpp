@@ -673,7 +673,10 @@ CodeBlob* CodeCache::patch_nop(NativePostCallNop* nop, void* pc, int& slot) {
   CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
   assert (cb != NULL, "must be");
 
-  if (cb->is_zombie()) return cb; // might be called during GC traversal
+  if (cb->is_zombie()) {
+    // might be called during GC traversal
+    return cb;
+  }
 
   intptr_t cbaddr = (intptr_t) cb;
   intptr_t offset = ((intptr_t) pc) - cbaddr;

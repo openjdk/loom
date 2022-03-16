@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "asm/assembler.hpp"
 #include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmSymbols.hpp"
@@ -37,6 +38,7 @@
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/safepointVerifiers.hpp"
+#include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 
 // Implementation of SignatureIterator
@@ -120,12 +122,16 @@ static int compute_num_stack_arg_slots(Symbol* signature, int sizeargs, bool is_
   VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
 
   int sig_index = 0;
-  if (!is_static) sig_bt[sig_index++] = T_OBJECT; // 'this'
+  if (!is_static) {
+    sig_bt[sig_index++] = T_OBJECT; // 'this'
+  }
   for (SignatureStream ss(signature); !ss.at_return_type(); ss.next()) {
     BasicType t = ss.type();
     assert(type2size[t] == 1 || type2size[t] == 2, "size is 1 or 2");
     sig_bt[sig_index++] = t;
-    if (type2size[t] == 2) sig_bt[sig_index++] = T_VOID;
+    if (type2size[t] == 2) {
+      sig_bt[sig_index++] = T_VOID;
+    }
   }
   assert(sig_index == sizeargs, "sig_index: %d sizeargs: %d", sig_index, sizeargs);
 

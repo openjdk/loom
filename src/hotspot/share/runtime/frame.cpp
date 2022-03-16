@@ -1020,8 +1020,9 @@ class CompiledArgumentOopFinder: public SignatureIterator {
     oop *loc = _fr.oopmapreg_to_oop_location(reg, _reg_map);
   #ifdef ASSERT
     if (loc == NULL) {
-      if (_reg_map->should_skip_missing())
+      if (_reg_map->should_skip_missing()) {
         return;
+      }
       tty->print_cr("Error walking frame oops:");
       _fr.print_on(tty);
       assert(loc != NULL, "missing register map entry reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
@@ -1255,6 +1256,7 @@ private:
   GrowableArray<oop*>* _base;
   GrowableArray<derived_pointer*>* _derived;
   NoSafepointVerifier nsv;
+
 public:
   FrameValuesOopClosure() {
     _oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<oop*>(100, mtThread);
@@ -1268,6 +1270,18 @@ public:
     delete _base;
     delete _derived;
   }
+
+  virtual void do_oop(oop* p) override { _oops->push(p); }
+  virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+    // oop base = *base_loc;
+    // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
+    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
+
+    _base->push(base_loc);
+    _derived->push(derived_loc);
+  }
+
   bool is_good(oop* p) {
     return *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
   }
@@ -1288,16 +1302,6 @@ public:
       values.describe(frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), frame_no));
     }
   }
-  virtual void do_oop(oop* p) override { _oops->push(p); }
-  virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // oop base = *base_loc;
-    // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
-    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
-
-    _base->push(base_loc);
-    _derived->push(derived_loc);
-  }
 };
 
 class FrameValuesOopMapClosure: public OopMapClosure {
@@ -1306,6 +1310,7 @@ private:
   const RegisterMap* _reg_map;
   FrameValues& _values;
   int _frame_no;
+
 public:
   FrameValuesOopMapClosure(const frame* fr, const RegisterMap* reg_map, FrameValues& values, int frame_no)
    : _fr(fr), _reg_map(reg_map), _values(values), _frame_no(frame_no) {}
@@ -1322,8 +1327,9 @@ public:
         // case OopMapValue::live_value:         type_name = "live";         break;
         default: break;
       }
-      if (type_name != NULL)
+      if (type_name != NULL) {
         _values.describe(_frame_no, p, err_msg("%s for #%d", type_name, _frame_no));
+      }
     }
   }
 };
@@ -1426,12 +1432,16 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
       VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
       {
         int sig_index = 0;
-        if (!m->is_static()) sig_bt[sig_index++] = T_OBJECT; // 'this'
+        if (!m->is_static()) {
+          sig_bt[sig_index++] = T_OBJECT; // 'this'
+        }
         for (SignatureStream ss(m->signature()); !ss.at_return_type(); ss.next()) {
           BasicType t = ss.type();
           assert(type2size[t] == 1 || type2size[t] == 2, "size is 1 or 2");
           sig_bt[sig_index++] = t;
-          if (type2size[t] == 2) sig_bt[sig_index++] = T_VOID;
+          if (type2size[t] == 2) {
+            sig_bt[sig_index++] = T_VOID;
+          }
         }
         assert(sig_index == sizeargs, "");
       }
@@ -1449,14 +1459,17 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
           assert (((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
           int offset = fst->reg2stack() * VMRegImpl::stack_slot_size + stack_slot_offset;
           intptr_t* stack_address = (intptr_t*)((address)unextended_sp() + offset);
-          if (at_this)
+          if (at_this) {
             values.describe(frame_no, stack_address, err_msg("this for #%d", frame_no), 1);
-          else
+          } else {
             values.describe(frame_no, stack_address, err_msg("param %d %s for #%d", arg_index, type2name(t), frame_no), 1);
+          }
         }
         sig_index += type2size[t];
         arg_index += 1;
-        if (!at_this) ss.next();
+        if (!at_this) {
+          ss.next();
+        }
       }
     }
 
@@ -1472,8 +1485,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
           int scvs_length = scvs != NULL ? scvs->length() : 0;
           for (int i = 0; i < scvs_length; i++) {
             intptr_t* stack_address = (intptr_t*)StackValue::stack_value_address(this, reg_map, scvs->at(i));
-            if (stack_address != NULL)
+            if (stack_address != NULL) {
               values.describe(frame_no, stack_address, err_msg("local %d for #%d (scope %d)", i, frame_no, scope_no), 1);
+            }
           }
         }
         { // mark expression stack
@@ -1481,8 +1495,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
           int scvs_length = scvs != NULL ? scvs->length() : 0;
           for (int i = 0; i < scvs_length; i++) {
             intptr_t* stack_address = (intptr_t*)StackValue::stack_value_address(this, reg_map, scvs->at(i));
-            if (stack_address != NULL)
+            if (stack_address != NULL) {
               values.describe(frame_no, stack_address, err_msg("stack %d for #%d (scope %d)", i, frame_no, scope_no), 1);
+            }
           }
         }
       }
@@ -1527,6 +1542,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   // platform dependent additional data
   describe_pd(values, frame_no);
 }
+
 #endif
 
 #ifndef PRODUCT

@@ -669,7 +669,6 @@ void LIR_Assembler::emit_op0(LIR_Op0* op) {
       on_spin_wait();
       break;
 
-
     default:
       ShouldNotReachHere();
       break;

@@ -3339,8 +3339,9 @@ frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* curren
 
   RegisterMap map(JavaThread::current(), false, false); // don't walk continuations
   for (; !fr.is_first_frame(); fr = fr.sender(&map)) {
-    if (!fr.is_java_frame())
+    if (!fr.is_java_frame()) {
       continue;
+    }
 
     Method* method = NULL;
     bool found = false;
