@@ -274,8 +274,7 @@ bool frame::is_first_java_frame() const {
 
 bool frame::is_first_vthread_frame(JavaThread* thread) const {
   return Continuation::is_continuation_enterSpecial(*this)
-    // the enterSpecial frame is considered out of the continuation, so we subtract from sp
-    && Continuation::get_continuation_entry_for_sp(thread, sp()-2)->is_virtual_thread();
+    && Continuation::get_continuation_entry_for_entry_frame(thread, *this)->is_virtual_thread();
 }
 
 bool frame::entry_frame_is_first() const {

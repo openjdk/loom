@@ -62,8 +62,14 @@ public:
 
   static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
-  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
+
+  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
+    assert(is_continuation_enterSpecial(f), "");
+    ContinuationEntry* cont = (ContinuationEntry*)f.unextended_sp();
+    assert(cont == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
+    return cont;
+  }
 
   static bool is_continuation_mounted(JavaThread* thread, oop cont);
   static bool is_continuation_scope_mounted(JavaThread* thread, oop cont_scope);
@@ -186,9 +192,11 @@ public:
     return NativeAccess<>::oop_load(&snapshot);
   }
 
-  oop cont_oop() const { return this != NULL ? continuation() : (oop)NULL; }
-  oop scope()    const { return Continuation::continuation_scope(cont_oop()); }
-  oop chunk()    const { return _chunk; }
+  oop cont_oop()  const { return this != NULL ? continuation() : (oop)NULL; }
+  oop scope()     const { return Continuation::continuation_scope(cont_oop()); }
+
+  oop cont_raw()  const { return _cont; }
+  oop chunk_raw() const { return _chunk; }
 
   bool is_virtual_thread() const { return _flags != 0; }
 

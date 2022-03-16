@@ -671,11 +671,6 @@ ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThr
   return nullptr;
 }
 
-ContinuationEntry* Continuation::get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
-  assert(is_continuation_enterSpecial(f), "");
-  return (ContinuationEntry*)f.unextended_sp();
-}
-
 static bool is_on_stack(JavaThread* thread, const ContinuationEntry* cont) {
   if (cont == nullptr) {
     return false;
