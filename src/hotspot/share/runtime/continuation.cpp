@@ -174,10 +174,10 @@ Address |   |                            |    |   Caller is still in the chunk.
 #ifdef ASSERT
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // address p is readable and *(intptr_t*)p != errvalue
 
-template<int x> NOINLINE static bool verify_continuation(oop cont) { return Continuation::debug_verify_continuation(cont); }
-#define VERIFY_CONTINUATION(cont) verify_continuation<__LINE__>((cont))
-template<int x> NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
-#define VERIFY_STACK_CHUNK(chunk) verify_stack_chunk<__LINE__>((chunk))
+NOINLINE static bool verify_continuation(oop cont) { return Continuation::debug_verify_continuation(cont); }
+#define VERIFY_CONTINUATION(cont) verify_continuation((cont))
+NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
+#define VERIFY_STACK_CHUNK(chunk) verify_stack_chunk((chunk))
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
