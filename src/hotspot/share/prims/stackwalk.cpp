@@ -76,22 +76,8 @@ void BaseFrameStream::set_continuation(Handle cont) {
   // This actually also sets a copy of the handle in the RegisterMap,
   // but that's OK, because we want them to be the same, anyway.
   // (although we don't rely on this sharing, and set the other copy again)
-  // tty->print_cr("-- BaseFrameStream::set_continuation: %p", (oopDesc*)cont());
   *(_continuation.raw_value()) = cont();
 }
-
-// static inline Handle continuation_of(Handle cont_or_scope) {
-//   return (cont_or_scope.not_null() && cont_or_scope()->is_a(SystemDictionary::Continuation_klass()))
-//             ? cont_or_scope
-//             : Handle();
-// }
-
-// static inline Handle continuationScope_of(JavaThread* thread, Handle cont_or_scope) {
-//   if (cont_or_scope.is_null() || cont_or_scope()->is_a(SystemDictionary::ContinuationScope_klass()))
-//     return cont_or_scope;
-//   assert(cont_or_scope()->is_a(SystemDictionary::Continuation_klass()), "must be");
-//   return Handle(thread, Continuation::continuation_scope(cont_or_scope()));
-// }
 
 JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope, Handle cont)
   : BaseFrameStream(thread, cont),

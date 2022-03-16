@@ -34,6 +34,8 @@
 #include "runtime/stackValue.hpp"
 #include "utilities/macros.hpp"
 
+// Helper, all-static, classes for working with frames
+
 class Frame {
 public:
   static inline intptr_t** callee_link_address(const frame& f);
