@@ -459,7 +459,9 @@ inline void ContMirror::post_safepoint(Handle conth) {
 
 const frame ContMirror::last_frame() {
   stackChunkOop chunk = last_nonempty_chunk();
-  if (chunk == nullptr) return frame();
+  if (chunk == nullptr) {
+    return frame();
+  }
   return StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
 }
 
@@ -669,7 +671,9 @@ ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThr
   }
 
   for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
-    if (cont == entry->continuation()) return entry;
+    if (cont == entry->continuation()) {
+      return entry;
+    }
   }
   return nullptr;
 }
