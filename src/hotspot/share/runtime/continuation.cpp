@@ -1031,7 +1031,6 @@ private:
   const bool _preempt; // used only on the slow path
 
   intptr_t *_bottom_address;
-  intptr_t *_top_address;
 
   int _size; // total size of all frames plus metadata in words.
   int _align_size;
@@ -1328,7 +1327,6 @@ public:
       f.print_on(&ls);
     }
 
-    _top_address = f.sp();
     frame caller;
     freeze_result res = freeze(f, caller, 0, false, true);
 
