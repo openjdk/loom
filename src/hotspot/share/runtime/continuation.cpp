@@ -1182,7 +1182,7 @@ public:
 
       assert(is_chunk_available0, "");
 
-      if (chunk_start_sp < chunk->stack_size()) { // we are copying into a non-empty chunk
+      if (chunk->sp() < chunk->stack_size()) { // we are copying into a non-empty chunk
         DEBUG_ONLY(empty = false;)
         assert(chunk_start_sp < (chunk->stack_size() - chunk->argsize()), "");
         assert(*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
