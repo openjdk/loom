@@ -46,7 +46,7 @@ inline frame::frame() {
   _cb = NULL;
   _deopt_state = unknown;
   _sp_is_trusted = false;
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 static int spin;
@@ -61,7 +61,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _pc = pc;
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 
   setup(pc);
 
@@ -103,26 +103,12 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 
   setup(pc);
 }
 
-inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map) {
-  _sp = sp;
-  _unextended_sp = unextended_sp;
-  _fp = fp;
-  _pc = pc;
-  assert(pc != NULL, "no pc?");
-  _cb = cb;
-  _oop_map = oop_map;
-  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
-  _pointers = addressing::ABSOLUTE;
-
-  setup(pc);
-}
-
-inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool relative) {
+inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool on_heap) {
   _sp = sp;
   _unextended_sp = unextended_sp;
   _fp = fp;
@@ -131,15 +117,18 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
   _sp_is_trusted = false;
-  _pointers = relative ? addressing::RELATIVE : addressing::ABSOLUTE;
-  assert(relative || !is_interpreted_frame(), "these interpreter frames are heap frames");
-#ifdef ASSERT
-  // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
-  // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
+  _on_heap = on_heap;
+  // In thaw, non-heap frames use this constructor to pass oop_map.  I don't know why.
+  assert(_on_heap || _cb != nullptr, "these frames are always heap frames");
   if (cb != NULL) {
     setup(pc);
-    assert(_pc == pc && _deopt_state == not_deoptimized, "");
   }
+#ifdef ASSERT
+  // The following assertion has been disabled because it would sometime trap for Continuation.run,
+  // which is not *in* a continuation and therefore does not clear the _cont_fastpath flag, but this
+  // is benign even in fast mode (see Freeze::setup_jump)
+  // We might freeze deoptimized frame in slow mode
+  // assert(_pc == pc && _deopt_state == not_deoptimized, "");
 #endif
 }
 
@@ -153,7 +142,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 
   setup(pc);
 }
@@ -190,7 +179,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
     _deopt_state = not_deoptimized;
   }
   _sp_is_trusted = false;
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 // Accessors

@@ -36,7 +36,7 @@ inline frame::frame() {
   _pc = NULL;
   _cb = NULL;
   _deopt_state = unknown;
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
 }
 
 inline address  frame::sender_pc()           const { ShouldNotCallThis(); return NULL; }
@@ -48,7 +48,7 @@ inline frame::frame(intptr_t* sp) {
 inline frame::frame(ZeroFrame* zf, intptr_t* sp) {
   _zeroframe = zf;
   _sp = sp;
-  _pointers = addressing::ABSOLUTE;
+  _on_heap = false;
   switch (zeroframe()->type()) {
   case ZeroFrame::ENTRY_FRAME:
     _pc = StubRoutines::call_stub_return_pc();

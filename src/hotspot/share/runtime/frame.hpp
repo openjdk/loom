@@ -36,10 +36,6 @@
 # include "stack_zero.hpp"
 #endif
 
-// defined in wingdi.h
-#undef ABSOLUTE
-#undef RELATIVE
-
 typedef class BytecodeInterpreter* interpreterState;
 
 class CodeBlob;
@@ -85,13 +81,12 @@ class frame {
 
   deopt_state _deopt_state;
 
+  // Do internal pointers in interpreter frames use absolute adddresses or relative (to fp)?
+  // Frames in stack chunks are on the Java heap and use relative addressing; on the stack
+  // they use absolute addressing
+  bool        _on_heap;  // This frame represents a frame on the heap.
+
  public:
-  // Do internal pointers in interpreter frames use absolute adddresses or relative (to fp)
-  // Interpreter frames in stack chunks use relative addressing; on the stack they use absolute addressing
-  enum class addressing { ABSOLUTE, RELATIVE };
-
-  addressing _pointers;
-
   // Constructors
   frame();
 
@@ -120,8 +115,6 @@ class frame {
   // hardware would want to see in the native frame. The only user (at this point)
   // is deoptimization. It likely no one else should ever use it.
   address raw_pc() const;
-
-  bool has_relative_pointers() const { return _pointers == addressing::RELATIVE; }
 
   void set_pc( address   newpc );
   void set_pc_preserve_deopt( address   newpc );
@@ -189,7 +182,7 @@ class frame {
   bool is_safepoint_blob_frame() const;
   bool is_deoptimized_frame()    const;
   bool is_optimized_entry_frame()  const;
-  bool is_interpreted_heap_frame() const { return is_interpreted_frame() && _pointers == addressing::RELATIVE; }
+  bool is_heap_frame()             const { return _on_heap; }
 
   // testers
   bool is_first_frame() const; // oldest frame? (has no sender)
@@ -250,11 +243,11 @@ class frame {
 
   intptr_t* addr_at(int index) const             { return &fp()[index];    }
   intptr_t  at_absolute(int index) const         { return *addr_at(index); }
-  // in interpreter frames in continuation stacks, internal addresses are relative to fp.
+  // Interpreter frames in continuation stacks are on the heap, and internal addresses are relative to fp.
   intptr_t  at_relative(int index) const         { return (intptr_t)(fp() + fp()[index]); }
 
   intptr_t at(int index) const                   {
-    return _pointers == addressing::RELATIVE ? at_relative(index) : at_absolute(index);
+    return _on_heap ? at_relative(index) : at_absolute(index);
   }
 
   // accessors for locals
@@ -525,7 +518,7 @@ class FrameValues {
   }
 
   void print_on(outputStream* out, int min_index, int max_index, intptr_t* v0, intptr_t* v1,
-                frame::addressing pointers = frame::addressing::ABSOLUTE);
+                bool on_heap = false);
 
  public:
   // Used by frame functions to describe locations.

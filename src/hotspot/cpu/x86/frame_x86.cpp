@@ -662,7 +662,7 @@ void frame::print_raw() const {
   tty->print_cr("interpreter_frame_initial_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_initial_sp_offset));
   tty->print_cr("interpreter_frame_monitor_block_top " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_top_offset));
   tty->print_cr("interpreter_frame_monitor_block_bottom " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_bottom_offset));
-  tty->print_cr("address::%s", _pointers == addressing::RELATIVE ? "relative" : "absolute");
+  tty->print_cr("address::%s", is_heap_frame() ? "heap_frame" : "stack_frame");
 }
 
 void JavaFrameAnchor::make_walkable(JavaThread* thread) {
