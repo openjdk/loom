@@ -140,15 +140,18 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
-  int64_t _nmethod_disarm_value;
+  // On AArch64, the high order 32 bits are used by a "patching epoch" number
+  // which reflects if this thread has executed the required fences, after
+  // an nmethod gets disarmed. The low order 32 bit denote the disarm value.
+  uint64_t _nmethod_disarm_value;
 
  public:
   int nmethod_disarm_value() {
-    return (int)_nmethod_disarm_value;
+    return (int)(uint32_t)_nmethod_disarm_value;
   }
 
   void set_nmethod_disarm_value(int value) {
-    _nmethod_disarm_value = value;
+    _nmethod_disarm_value = (uint64_t)(uint32_t)value;
   }
 
   static ByteSize nmethod_disarmed_offset() {

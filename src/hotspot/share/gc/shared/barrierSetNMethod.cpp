@@ -26,6 +26,7 @@
 #include "code/codeCache.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetAssembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "logging/log.hpp"
 #include "memory/iterator.hpp"
@@ -101,6 +102,10 @@ void BarrierSetNMethod::arm_all_nmethods() {
   }
   BarrierSetNMethodArmClosure cl(_current_phase);
   Threads::threads_do(&cl);
+
+  // We clear the patching epoch when disarming nmethods, so that
+  // the counter won't overflow.
+  AARCH64_PORT_ONLY(BarrierSetAssembler::clear_patching_epoch());
 }
 
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
