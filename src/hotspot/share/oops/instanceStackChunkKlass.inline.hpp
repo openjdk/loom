@@ -53,19 +53,6 @@
 
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
 
-inline void copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size);
-inline void copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size);
-
-template <copy_alignment alignment>
-inline void InstanceStackChunkKlass::copy_from_stack_to_chunk(void* from, void* to, size_t size) {
-  memcpy(to, from, size << LogBytesPerWord);
-}
-
-template <copy_alignment alignment>
-inline void InstanceStackChunkKlass::copy_from_chunk_to_stack(void* from, void* to, size_t size) {
-  memcpy(to, from, size << LogBytesPerWord);
-}
-
 inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }

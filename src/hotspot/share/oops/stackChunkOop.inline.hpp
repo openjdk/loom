@@ -212,7 +212,6 @@ inline intptr_t* stackChunkOopDesc::interpreter_frame_local_at(const frame& fr, 
   return heap_frame.interpreter_frame_local_at(index);
 }
 
-template <copy_alignment alignment>
 inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t* to, int size) {
   log_develop_trace(jvmcont)("Copying from v: " INTPTR_FORMAT " - " INTPTR_FORMAT " (%d words, %d bytes)",
     p2i(from), p2i(from + size), size, size << LogBytesPerWord);
@@ -223,10 +222,9 @@ inline void stackChunkOopDesc::copy_from_stack_to_chunk(intptr_t* from, intptr_t
   assert(to >= start_address(), "");
   assert(to + size <= end_address(), "");
 
-  InstanceStackChunkKlass::copy_from_stack_to_chunk<alignment>(from, to, size);
+  memcpy(to, from, size << LogBytesPerWord);
 }
 
-template <copy_alignment alignment>
 inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t* to, int size) {
   log_develop_trace(jvmcont)("Copying from h: " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") - " INTPTR_FORMAT "(" INTPTR_FORMAT "," INTPTR_FORMAT ") (%d words, %d bytes)",
     p2i(from), from - start_address(), relative_base() - from, p2i(from + size), from + size - start_address(),
@@ -237,7 +235,7 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
   assert(from >= start_address(), "");
   assert(from + size <= end_address(), "");
 
-  InstanceStackChunkKlass::copy_from_chunk_to_stack<alignment>(from, to, size);
+  memcpy(to, from, size << LogBytesPerWord);
 }
 
 inline BitMapView stackChunkOopDesc::bitmap() const {
