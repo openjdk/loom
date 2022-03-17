@@ -82,10 +82,13 @@ public:
 
   inline int bottom() const;
 
+  inline HeapWord* start_of_stack() const;
+
   inline intptr_t* start_address() const;
   inline intptr_t* end_address() const;
   inline intptr_t* bottom_address() const; // = end_address - argsize
   inline intptr_t* sp_address() const;
+
 
   inline int to_offset(intptr_t* p) const;
   inline intptr_t* from_offset(int offset) const;

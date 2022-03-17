@@ -74,7 +74,11 @@ inline void stackChunkOopDesc::set_cont_raw(oop value)  {  jdk_internal_vm_Stack
 
 inline int stackChunkOopDesc::bottom() const { return stack_size() - argsize(); }
 
-inline intptr_t* stackChunkOopDesc::start_address() const { return (intptr_t*)InstanceStackChunkKlass::start_of_stack(as_oop()); }
+inline HeapWord* stackChunkOopDesc::start_of_stack() const {
+   return (HeapWord*)(cast_from_oop<intptr_t>(as_oop()) + InstanceStackChunkKlass::offset_of_stack());
+}
+
+inline intptr_t* stackChunkOopDesc::start_address() const { return (intptr_t*)start_of_stack(); }
 inline intptr_t* stackChunkOopDesc::end_address() const { return start_address() + stack_size(); }
 inline intptr_t* stackChunkOopDesc::bottom_address() const { return start_address() + bottom(); }
 inline intptr_t* stackChunkOopDesc::sp_address()  const { return start_address() + sp(); }
@@ -148,15 +152,18 @@ inline frame stackChunkOopDesc::relativize(frame fr)   const { relativize_frame(
 inline frame stackChunkOopDesc::derelativize(frame fr) const { derelativize_frame(fr); return fr; }
 
 inline BitMapView stackChunkOopDesc::bitmap() const {
-  assert(has_bitmap(), "");
-  size_t size_in_bits = InstanceStackChunkKlass::bitmap_size(stack_size()) << LogBitsPerWord;
-#ifdef ASSERT
-  BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
-  assert(bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
-  assert(bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "");
-  bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
-#endif
-  return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
+  int stack_sz = stack_size();
+
+  // The bitmap is located after the stack
+  HeapWord* bitmap_addr = start_of_stack() + stack_sz;
+  size_t bitmap_size = InstanceStackChunkKlass::bitmap_size(stack_sz);
+  size_t bitmap_size_in_bits = bitmap_size << LogBitsPerWord;
+
+  BitMapView bitmap((BitMap::bm_word_t*)bitmap_addr, bitmap_size_in_bits);
+
+  DEBUG_ONLY(bitmap.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));)
+
+  return bitmap;
 }
 
 inline BitMap::idx_t stackChunkOopDesc::bit_offset() const {
