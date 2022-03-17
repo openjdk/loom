@@ -531,14 +531,14 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClos
 }
 
 template <typename OopT, typename OopClosureType>
-class StackChunkOopIterateBitmapClosure : public BitMapClosure {
+class StackChunkOopIterateBitmapClosure {
   stackChunkOop _chunk;
   OopClosureType* const _closure;
 
 public:
   StackChunkOopIterateBitmapClosure(stackChunkOop chunk, OopClosureType* closure) : _chunk(chunk), _closure(closure) {}
 
-  bool do_bit(BitMap::idx_t index) override {
+  bool do_bit(BitMap::idx_t index) {
     Devirtualizer::do_oop(_closure, _chunk->address_for_bit<OopT>(index));
     return true;
   }
