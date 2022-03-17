@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -40,6 +40,7 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/sharedRuntime.hpp"
 
 // Implementation of SignatureIterator
 
@@ -215,6 +216,7 @@ void Fingerprinter::initialize_calling_convention(bool static_flag) {
 }
 
 void Fingerprinter::do_type_calling_convention(BasicType type) {
+#if (defined(AMD64) || defined(AARCH64)) && !defined(ZERO)
   switch (type) {
   case T_VOID:
     break;
@@ -245,6 +247,7 @@ void Fingerprinter::do_type_calling_convention(BasicType type) {
     ShouldNotReachHere();
     break;
   }
+#endif // x64 or aarch64
 }
 
 // Implementation of SignatureStream

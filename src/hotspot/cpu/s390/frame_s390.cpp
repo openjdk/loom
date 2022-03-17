@@ -632,10 +632,6 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     DESCRIBE_ADDRESS(fresult);
   }
 }
-
-void frame::describe_top_pd(FrameValues& values) {
-  Unimplemented();
-}
 #endif // !PRODUCT
 
 intptr_t *frame::initial_deoptimization_info() {
@@ -644,11 +640,11 @@ intptr_t *frame::initial_deoptimization_info() {
 }
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return interpreter_frame_monitors();
 }
 
-inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
+intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   return &interpreter_frame_tos_address()[offset];
 }
 

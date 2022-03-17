@@ -260,6 +260,10 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
   assert(from >= start_address(), "");
   assert(from + size <= end_address(), "");
 
+#if !defined(AMD64) || !defined(AARCH64) || defined(ZERO)
+  // Suppress compilation error from dummy function (somewhere).
+  if (to != nullptr)
+#endif
   memcpy(to, from, size << LogBytesPerWord);
 }
 
