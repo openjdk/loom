@@ -128,7 +128,7 @@ class SocketChannelImpl
     // blocking mode and the channel's socket is in non-blocking mode then
     // operations that don't complete immediately will poll the socket and
     // preserve the semantics of blocking operations.
-    private volatile boolean forcedNonBlockingByVirtualThread;
+    private volatile boolean forcedNonBlocking;
 
     // -- End of fields protected by stateLock
 
@@ -641,7 +641,7 @@ class SocketChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!forcedNonBlockingByVirtualThread) {
+            if (!forcedNonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
         }
@@ -655,7 +655,7 @@ class SocketChannelImpl
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!forcedNonBlockingByVirtualThread && isOpen()) {
+            if (!forcedNonBlocking && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
@@ -669,11 +669,11 @@ class SocketChannelImpl
      */
     private void configureSocketNonBlockingIfVirtualThread() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!forcedNonBlockingByVirtualThread && Thread.currentThread().isVirtual()) {
+        if (!forcedNonBlocking && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
-                forcedNonBlockingByVirtualThread = true;
+                forcedNonBlocking = true;
             }
         }
     }

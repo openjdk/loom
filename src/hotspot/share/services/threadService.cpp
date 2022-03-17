@@ -670,10 +670,13 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHasht
       : _thread->last_java_vframe(&reg_map);
     int count = 0;
     for (vframe* f = start_vf; f; f = f->sender() ) {
-      if (maxDepth >= 0 && count == maxDepth) // Skip frames if more than maxDepth
+      if (maxDepth >= 0 && count == maxDepth) {
+        // Skip frames if more than maxDepth
         break;
-      if (!full && f->is_vthread_entry())
+      }
+      if (!full && f->is_vthread_entry()) {
         break;
+      }
       if (f->is_java_frame()) {
         javaVFrame* jvf = javaVFrame::cast(f);
         add_stack_frame(jvf);
@@ -898,7 +901,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   if (thread->is_vthread_mounted() && thread->vthread() != threadObj) { // ThreadSnapshot only captures platform threads
     _thread_status = JavaThreadStatus::IN_OBJECT_WAIT;
     oop vthread = thread->vthread();
-    assert (vthread != NULL, "");
+    assert(vthread != NULL, "");
     blocker_object = vthread;
     blocker_object_owner = vthread;
   } else if (_thread_status == JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER ||

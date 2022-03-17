@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -202,21 +202,24 @@ JvmtiEnvEventEnable::~JvmtiEnvEventEnable() {
 //
 
 class EnterInterpOnlyModeClosure : public HandshakeClosure {
- private:
-  bool _completed;
  public:
-  EnterInterpOnlyModeClosure() : HandshakeClosure("EnterInterpOnlyMode"), _completed(false) { }
+  EnterInterpOnlyModeClosure() : HandshakeClosure("EnterInterpOnlyMode") { }
   void do_thread(Thread* th) {
     JavaThread* jt = JavaThread::cast(th);
     JvmtiThreadState* state = jt->jvmti_thread_state();
 
+    assert(state != NULL, "sanity check");
+    assert(state->get_thread() == jt, "handshake unsafe conditions");
+    if (!state->is_pending_interp_only_mode()) {
+      return;
+    }
+    state->set_pending_interp_only_mode(false);
+
     // invalidate_cur_stack_depth is called in enter_interp_only_mode
     state->enter_interp_only_mode();
 
-    if (state->get_thread() != NULL) {
-      // TODO LOOM: find out why the other place where this is called is insufficient
-      Continuation::set_cont_fastpath_thread_state(state->get_thread());
-    }
+    // TODO LOOM: find out why the other place where this is called is insufficient
+    Continuation::set_cont_fastpath_thread_state(jt);
 
     if (jt->has_last_Java_frame()) {
       // If running in fullspeed mode, single stepping is implemented
@@ -232,10 +235,6 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
         }
       }
     }
-    _completed = true;
-  }
-  bool completed() {
-    return _completed;
   }
 };
 
@@ -349,21 +348,23 @@ void VM_ChangeSingleStep::doit() {
 void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state) {
   EC_TRACE(("[%s] # Entering interpreter only mode",
             JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved())));
-  EnterInterpOnlyModeClosure hs;
   JavaThread *target = state->get_thread();
   Thread *current = Thread::current();
 
-  // TBD: This is TMP workaround. We need a proper synchronization here.
-  if (target == NULL) {
-    state->enter_interp_only_mode(); // increment _saved_interp_only_mode
-    return;
+  assert(state != NULL, "sanity check");
+  if (state->is_pending_interp_only_mode()) {
+    return; // EnterInterpOnlyModeClosure handshake is already waiting for execution
   }
-
+  state->set_pending_interp_only_mode(true);
+  if (target == NULL) { // an unmounted virtual thread
+    return; // enter_interp_only_mode will be done after mount
+  }
+  EnterInterpOnlyModeClosure hs;
   if (target->is_handshake_safe_for(current)) {
     hs.do_thread(target);
   } else {
+    assert(state->get_thread() != NULL, "sanity check");
     Handshake::execute(&hs, target);
-    guarantee(hs.completed(), "Handshake failed: Target thread is not alive?");
   }
 }
 
@@ -372,6 +373,11 @@ void
 JvmtiEventControllerPrivate::leave_interp_only_mode(JvmtiThreadState *state) {
   EC_TRACE(("[%s] # Leaving interpreter only mode",
             JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved())));
+  if (state->is_pending_interp_only_mode()) {
+    state->set_pending_interp_only_mode(false);
+    assert(!state->is_interp_only_mode(), "sanity check");
+    return;
+  }
   state->leave_interp_only_mode();
 }
 
@@ -1075,6 +1081,14 @@ JvmtiEventController::set_extension_event_callback(JvmtiEnvBase *env,
     MutexLocker mu(JvmtiThreadState_lock);
     JvmtiEventControllerPrivate::set_extension_event_callback(env, extension_event_index, callback);
   }
+}
+
+// Called by just mounted virtual thread if pending_interp_only_mode() is set.
+void
+JvmtiEventController::enter_interp_only_mode() {
+  Thread *current = Thread::current();
+  EnterInterpOnlyModeClosure hs;
+  hs.do_thread(current);
 }
 
 void

@@ -26,9 +26,12 @@
 #include "code/codeCache.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetAssembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "logging/log.hpp"
+#include "memory/iterator.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/method.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadWXSetters.inline.hpp"
@@ -85,7 +88,7 @@ private:
 
 public:
   BarrierSetNMethodArmClosure(int disarm_value) :
-    _disarm_value(disarm_value) { }
+    _disarm_value(disarm_value) {}
 
   virtual void do_thread(Thread* thread) {
     thread->set_nmethod_disarm_value(_disarm_value);
@@ -99,6 +102,10 @@ void BarrierSetNMethod::arm_all_nmethods() {
   }
   BarrierSetNMethodArmClosure cl(_current_phase);
   Threads::threads_do(&cl);
+
+  // We clear the patching epoch when disarming nmethods, so that
+  // the counter won't overflow.
+  AARCH64_PORT_ONLY(BarrierSetAssembler::clear_patching_epoch());
 }
 
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {

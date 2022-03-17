@@ -231,12 +231,12 @@ class InstanceKlass: public Klass {
 
   // This can be used to quickly discriminate among the four kinds of
   // InstanceKlass. This should be an enum (?)
-  static const unsigned _kind_other        = 0; // concrete InstanceKlass
-  static const unsigned _kind_reference    = 1; // InstanceRefKlass
-  static const unsigned _kind_class_loader = 2; // InstanceClassLoaderKlass
-  static const unsigned _kind_mirror       = 3; // InstanceMirrorKlass
+  static const unsigned _kind_other             = 0; // concrete InstanceKlass
+  static const unsigned _kind_reference         = 1; // InstanceRefKlass
+  static const unsigned _kind_class_loader      = 2; // InstanceClassLoaderKlass
+  static const unsigned _kind_mirror            = 3; // InstanceMirrorKlass
   static const unsigned _misc_kind_stack_chunk  = 4; // InstanceStackChunk
-  static const unsigned _misc_kind_last  = _misc_kind_stack_chunk;
+  static const unsigned _misc_kind_last         = _misc_kind_stack_chunk;
 
   u1              _reference_type;                // reference type
   u1              _kind;                          // kind of InstanceKlass

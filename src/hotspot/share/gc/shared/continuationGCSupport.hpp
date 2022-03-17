@@ -25,8 +25,8 @@
 #ifndef SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_HPP
 #define SHARE_GC_SHARED_CONTINUATIONGCSUPPORT_HPP
 
+#include "memory/allStatic.hpp"
 #include "oops/oopsHierarchy.hpp"
-#include "memory/allocation.hpp"
 
 class ContinuationGCSupport : public AllStatic {
 public:

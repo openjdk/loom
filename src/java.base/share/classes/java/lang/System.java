@@ -2571,16 +2571,24 @@ public final class System {
                 thread.setContinuation(continuation);
             }
 
+            public ContinuationScope virtualThreadContinuationScope() {
+                return VirtualThread.continuationScope();
+            }
+
             public void parkVirtualThread() {
-                ((VirtualThread) Thread.currentThread()).park();
+                VirtualThread.park();
             }
 
             public void parkVirtualThread(long nanos) {
-                ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
+                VirtualThread.parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {
-                ((VirtualThread) thread).unpark();
+                if (thread instanceof VirtualThread vthread) {
+                    vthread.unpark();
+                } else {
+                    throw new IllegalArgumentException("Not a virtual thread");
+                }
             }
 
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,

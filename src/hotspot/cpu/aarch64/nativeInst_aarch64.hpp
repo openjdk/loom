@@ -684,7 +684,7 @@ inline NativePostCallNop* nativePostCallNop_at(address address) {
 
 inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
   NativePostCallNop* nop = (NativePostCallNop*) address;
-  assert (nop->check(), "");
+  assert(nop->check(), "");
   return nop;
 }
 
@@ -701,7 +701,7 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    assert (instr != NULL, "");
+    assert(instr != NULL, "");
     uint32_t value = *(uint32_t *) instr;
     return value == 0xd4ade001;
   }

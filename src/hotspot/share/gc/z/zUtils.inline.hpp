@@ -29,7 +29,6 @@
 #include "gc/z/zOop.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/align.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 

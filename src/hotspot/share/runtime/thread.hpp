@@ -140,15 +140,18 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
-  int _nmethod_disarm_value;
+  // On AArch64, the high order 32 bits are used by a "patching epoch" number
+  // which reflects if this thread has executed the required fences, after
+  // an nmethod gets disarmed. The low order 32 bit denote the disarm value.
+  uint64_t _nmethod_disarm_value;
 
  public:
   int nmethod_disarm_value() {
-    return _nmethod_disarm_value;
+    return (int)(uint32_t)_nmethod_disarm_value;
   }
 
   void set_nmethod_disarm_value(int value) {
-    _nmethod_disarm_value = value;
+    _nmethod_disarm_value = (uint64_t)(uint32_t)value;
   }
 
   static ByteSize nmethod_disarmed_offset() {
@@ -1197,7 +1200,7 @@ private:
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() { _held_monitor_count++; }
-  void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
+  void dec_held_monitor_count() { assert(_held_monitor_count > 0, ""); _held_monitor_count--; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;

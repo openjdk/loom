@@ -494,17 +494,28 @@ public interface JavaLangAccess {
     void setContinuation(Thread thread, Continuation continuation);
 
     /**
+     * The ContinuationScope of virtual thread continuations
+     */
+    ContinuationScope virtualThreadContinuationScope();
+
+    /**
      * Parks the current virtual thread.
+     * @throws WrongThreadException if the current thread is not a virtual thread
      */
     void parkVirtualThread();
 
     /**
      * Parks the current virtual thread for up to the given waiting time.
+     * @param nanos the maximum number of nanoseconds to wait
+     * @throws WrongThreadException if the current thread is not a virtual thread
      */
     void parkVirtualThread(long nanos);
 
     /**
-     * Unparks a virtual thread.
+     * Re-enables a virtual thread for scheduling. If the thread was parked then
+     * it will be unblocked, otherwise its next attempt to park will not block
+     * @param thread the virtual thread to unpark
+     * @throws IllegalArgumentException if the thread is not a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unparkVirtualThread(Thread thread);

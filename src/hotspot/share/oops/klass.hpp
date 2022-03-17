@@ -573,9 +573,6 @@ protected:
   // actual oop size of obj in memory in word size.
   virtual size_t oop_size(oop obj) const = 0;
 
-  // the size of the object in memory after possible compression during GC promotion/compaction
-  virtual size_t compact_oop_size(oop obj) const { return oop_size(obj); }
-
   // Size of klass in word size.
   virtual int size() const = 0;
 

@@ -167,7 +167,7 @@ class DatagramChannelImpl
     // blocking mode and the channel's socket is in non-blocking mode then
     // operations that don't complete immediately will poll the socket and
     // preserve the semantics of blocking operations.
-    private volatile boolean forcedNonBlockingByVirtualThread;
+    private volatile boolean forcedNonBlocking;
 
     // -- End of fields protected by stateLock
 
@@ -1255,7 +1255,7 @@ class DatagramChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!forcedNonBlockingByVirtualThread) {
+            if (!forcedNonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
         }
@@ -1268,7 +1268,7 @@ class DatagramChannelImpl
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
-            if (!forcedNonBlockingByVirtualThread && isOpen()) {
+            if (!forcedNonBlocking && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
@@ -1283,11 +1283,11 @@ class DatagramChannelImpl
      */
     private void configureSocketNonBlockingIfVirtualThread() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!forcedNonBlockingByVirtualThread && Thread.currentThread().isVirtual()) {
+        if (!forcedNonBlocking && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
-                forcedNonBlockingByVirtualThread = true;
+                forcedNonBlocking = true;
             }
         }
     }
@@ -1528,7 +1528,7 @@ class DatagramChannelImpl
             }
 
             // copy the blocking mode
-            if (!isBlocking() || forcedNonBlockingByVirtualThread) {
+            if (!isBlocking() || forcedNonBlocking) {
                 IOUtil.configureBlocking(newfd, false);
             }
 

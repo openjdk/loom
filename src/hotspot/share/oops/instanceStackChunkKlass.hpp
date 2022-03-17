@@ -101,6 +101,7 @@ Chunk layout:
 class InstanceStackChunkKlass: public InstanceKlass {
 private:
   enum class copy_type { CONJOINT, DISJOINT };
+
 public:
   enum class barrier_type { LOAD, STORE };
 
@@ -245,7 +246,7 @@ private:
 
 template <chunk_frames frame_kind>
 class StackChunkFrameStream : public StackObj {
- private:
+private:
   intptr_t* _end;
   intptr_t* _sp;
   intptr_t* _unextended_sp; // used only when mixed
@@ -298,7 +299,7 @@ public:
 
   void handle_deopted() const;
 
-  inline int to_offset(stackChunkOop chunk) const { assert (!is_done(), ""); return _sp - chunk->start_address(); }
+  inline int to_offset(stackChunkOop chunk) const { assert(!is_done(), ""); return _sp - chunk->start_address(); }
 
   inline frame to_frame() const;
 

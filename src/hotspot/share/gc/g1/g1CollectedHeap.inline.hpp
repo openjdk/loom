@@ -28,7 +28,6 @@
 #include "gc/g1/g1CollectedHeap.hpp"
 
 #include "gc/g1/g1BarrierSet.hpp"
-#include "gc/g1/g1CardSetContainers.hpp"
 #include "gc/g1/g1CollectorState.hpp"
 #include "gc/g1/g1ConcurrentMark.inline.hpp"
 #include "gc/g1/g1EvacFailureRegions.hpp"
@@ -271,7 +270,7 @@ inline void G1CollectedHeap::set_humongous_is_live(oop obj) {
 }
 
 inline bool G1CollectedHeap::requires_barriers(stackChunkOop obj) const {
-  assert (obj != NULL, "");
+  assert(obj != NULL, "");
   return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
 }
 

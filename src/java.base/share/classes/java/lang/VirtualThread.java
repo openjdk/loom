@@ -520,14 +520,22 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks the current virtual thread until it is unparked or interrupted.
-     * If already unparked then the parking permit is consumed and this method
-     * completes immediately (meaning it doesn't yield). It also completes
-     * immediately if the interrupt status is set.
+     * Parks the current virtual thread until unparked or interrupted.
      */
-    void park() {
-        assert Thread.currentThread() == this;
+    static void park() {
+        if (currentThread() instanceof VirtualThread vthread) {
+            vthread.doPark();
+        } else {
+            throw new WrongThreadException();
+        }
+    }
 
+    /**
+     * Parks until unparked or interrupted. If already unparked then the parking
+     * permit is consumed and this method completes immediately (meaning it doesn't
+     * yield). It also completes immediately if the interrupt status is set.
+     */
+    private void doPark() {
         // complete immediately if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted)
             return;
@@ -545,15 +553,28 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks the current virtual thread up to the given waiting time or until it
-     * is unparked or interrupted. If already unparked then the parking permit is
-     * consumed and this method completes immediately (meaning it doesn't yield).
-     * It also completes immediately if the interrupt status is set or the waiting
-     * time is {@code <= 0}.
+     * Parks the current virtual thread up to the given waiting time or until
+     * unparked or interrupted.
+     *
+     * @param nanos the maximum number of nanoseconds to wait
+     */
+    static void parkNanos(long nanos) {
+        if (currentThread() instanceof VirtualThread vthread) {
+            vthread.doParkNanos(nanos);
+        } else {
+            throw new WrongThreadException();
+        }
+    }
+
+    /**
+     * Parks up to the given waiting time or until unparked or interrupted.
+     * If already unparked then the parking permit is consumed and this method
+     * completes immediately (meaning it doesn't yield). It also completes immediately
+     * if the interrupt status is set or the waiting time is {@code <= 0}.
      *
      * @param nanos the maximum number of nanoseconds to wait.
      */
-    void parkNanos(long nanos) {
+    private void doParkNanos(long nanos) {
         assert Thread.currentThread() == this;
 
         // complete immediately if parking permit available or interrupted
@@ -656,7 +677,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Attempts to yield (Thread.yield).
+     * Attempts to yield the current virtual thread (Thread.yield).
      */
     void tryYield() {
         assert Thread.currentThread() == this;
@@ -743,8 +764,9 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Sleep the current thread for the given sleep time (in nanoseconds).
+     * Sleep the current virtual thread for the given sleep time.
      *
+     * @param nanos the maximum number of nanoseconds to sleep
      * @throws InterruptedException if interrupted while sleeping
      */
     void sleepNanos(long nanos) throws InterruptedException {
@@ -774,8 +796,6 @@ class VirtualThread extends Thread {
      * will consume the parking permit so this method makes available the parking
      * permit after the sleep. This may be observed as a spurious, but benign,
      * wakeup when the thread subsequently attempts to park.
-     *
-     * @throws InterruptedException if interrupted while sleeping
      */
     private void doSleepNanos(long nanos) throws InterruptedException {
         assert nanos >= 0;

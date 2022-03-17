@@ -65,6 +65,7 @@
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/handshake.hpp"
 #include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/java.hpp"
@@ -74,9 +75,11 @@
 #include "runtime/safepoint.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/thread.inline.hpp"
+#include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vm_version.hpp"
 #include "utilities/align.hpp"
+#include "utilities/growableArray.hpp"
 #include "utilities/preserveException.hpp"
 #include "utilities/utf8.hpp"
 #if INCLUDE_JVMCI
@@ -2132,6 +2135,7 @@ bool java_lang_Thread::is_daemon(oop java_thread) {
   return java_lang_Thread_FieldHolder::is_daemon(holder);
 }
 
+
 void java_lang_Thread::set_daemon(oop java_thread) {
   oop holder = java_lang_Thread::holder(java_thread);
   assert(holder != NULL, "Java Thread not initialized");
@@ -2208,7 +2212,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     GrowableArray<int>*     _bcis;
 
     GetStackTraceClosure(Handle java_thread) :
-      HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
+        HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
       // Pick some initial length
       int init_length = MaxJavaStackTraceDepth/2;
       _methods = new GrowableArray<Method*>(init_length);
@@ -2783,8 +2787,10 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       if (fr.is_first_frame()) break;
 
       if (Continuation::is_continuation_enterSpecial(fr)) {
-        assert (cont == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
-        if (!show_carrier && cont->scope() == java_lang_VirtualThread::vthread_scope()) break;
+        assert(cont == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
+        if (!show_carrier && cont->is_virtual_thread()) {
+          break;
+        }
         cont = cont->parent();
       }
 
@@ -2809,7 +2815,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
           continue;
         }
         nm = cb->as_compiled_method();
-        assert (nm->method() != NULL, "must be");
+        assert(nm->method() != NULL, "must be");
         if (nm->method()->is_native()) {
           method = nm->method();
           bci = 0;

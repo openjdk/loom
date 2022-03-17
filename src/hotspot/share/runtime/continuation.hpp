@@ -62,7 +62,14 @@ public:
 
   static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
-  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f);
+  static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
+
+  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
+    assert(is_continuation_enterSpecial(f), "");
+    ContinuationEntry* cont = (ContinuationEntry*)f.unextended_sp();
+    assert(cont == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
+    return cont;
+  }
 
   static bool is_continuation_mounted(JavaThread* thread, oop cont);
   static bool is_continuation_scope_mounted(JavaThread* thread, oop cont_scope);
@@ -71,8 +78,6 @@ public:
   static bool is_return_barrier_entry(const address pc);
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
-
-  static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp);
 
   static bool is_frame_in_continuation(const ContinuationEntry* cont, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
@@ -135,6 +140,7 @@ private:
   ContinuationEntry* _parent;
   oopDesc* _cont;
   oopDesc* _chunk;
+  int _flags;
   int _argsize;
   intptr_t* _parent_cont_fastpath;
   int _parent_held_monitor_count;
@@ -143,6 +149,7 @@ public:
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
+  static ByteSize flags_offset()    { return byte_offset_of(ContinuationEntry, _flags); }
   static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
@@ -185,9 +192,13 @@ public:
     return NativeAccess<>::oop_load(&snapshot);
   }
 
-  oop cont_oop() const { return this != NULL ? continuation() : (oop)NULL; }
-  oop scope()    const { return Continuation::continuation_scope(cont_oop()); }
-  oop chunk()    const { return _chunk; }
+  oop cont_oop()  const { return this != NULL ? continuation() : (oop)NULL; }
+  oop scope()     const { return Continuation::continuation_scope(cont_oop()); }
+
+  oop cont_raw()  const { return _cont; }
+  oop chunk_raw() const { return _chunk; }
+
+  bool is_virtual_thread() const { return _flags != 0; }
 
 #ifdef ASSERT
   static bool assert_entry_frame_laid_out(JavaThread* thread);

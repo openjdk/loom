@@ -1167,7 +1167,7 @@ Handle SharedRuntime::find_callee_info_helper(vframeStream& vfst, Bytecodes::Cod
 
     // Retrieve from a compiled argument list
     receiver = Handle(current, callerFrame.retrieve_receiver(&reg_map2));
-    assert (oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); //
+    assert(oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); //
 
     if (receiver.is_null()) {
       THROW_(vmSymbols::java_lang_NullPointerException(), nullHandle);
@@ -3339,8 +3339,9 @@ frame SharedRuntime::look_for_reserved_stack_annotated_method(JavaThread* curren
 
   RegisterMap map(JavaThread::current(), false, false); // don't walk continuations
   for (; !fr.is_first_frame(); fr = fr.sender(&map)) {
-    if (!fr.is_java_frame())
+    if (!fr.is_java_frame()) {
       continue;
+    }
 
     Method* method = NULL;
     bool found = false;

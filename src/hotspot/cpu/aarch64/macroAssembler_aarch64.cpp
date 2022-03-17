@@ -801,6 +801,11 @@ void MacroAssembler::align(int modulus) {
   while (offset() % modulus != 0) nop();
 }
 
+void MacroAssembler::post_call_nop() {
+  relocate(post_call_nop_Relocation::spec());
+  nop();
+}
+
 // these are no-ops overridden by InterpreterMacroAssembler
 
 void MacroAssembler::check_and_handle_earlyret(Register java_thread) { }
@@ -4173,7 +4178,8 @@ void MacroAssembler::movoop(Register dst, jobject obj, bool immediate) {
   // nmethod entry barrier necessitate using the constant pool. They have to be
   // ordered with respected to oop accesses.
   // Using immediate literals would necessitate ISBs.
-  if (BarrierSet::barrier_set()->barrier_set_nmethod() != NULL || !immediate) {
+  BarrierSet* bs = BarrierSet::barrier_set();
+  if ((bs->barrier_set_nmethod() != NULL && bs->barrier_set_assembler()->nmethod_code_patching()) || !immediate) {
     address dummy = address(uintptr_t(pc()) & -wordSize); // A nearby aligned address
     ldr_constant(dst, Address(dummy, rspec));
   } else

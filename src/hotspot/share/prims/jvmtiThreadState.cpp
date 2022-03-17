@@ -26,6 +26,7 @@
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopHandle.inline.hpp"
+#include "prims/jvmtiEnvBase.hpp"
 #include "prims/jvmtiEventController.inline.hpp"
 #include "prims/jvmtiImpl.hpp"
 #include "prims/jvmtiThreadState.inline.hpp"
@@ -35,7 +36,6 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/vframe.hpp"
-#include "prims/jvmtiEnvBase.hpp"
 
 // marker for when the stack depth has been reset and is now unknown.
 // any negative number would work but small ones might obscure an
@@ -60,6 +60,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   _exception_state      = ES_CLEARED;
   _debuggable           = true;
   _hide_single_stepping = false;
+  _pending_interp_only_mode = false;
   _hide_level           = 0;
   _pending_step_for_popframe = false;
   _class_being_redefined = NULL;
@@ -541,6 +542,7 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 }
 
 void JvmtiThreadState::enter_interp_only_mode() {
+  assert(_thread != NULL, "sanity check");
   if (_thread == NULL) {
     ++_saved_interp_only_mode;
     // TBD: It seems, invalidate_cur_stack_depth() has to be called at VTMT?
@@ -564,11 +566,10 @@ void JvmtiThreadState::enter_interp_only_mode() {
 
 
 void JvmtiThreadState::leave_interp_only_mode() {
+  assert(is_interp_only_mode(), "leaving interp only when mode not one");
   if (_thread == NULL) {
-    assert(is_interp_only_mode(), "leaving interp only when mode not one");
     --_saved_interp_only_mode;
   } else {
-    assert(is_interp_only_mode(), "leaving interp only when mode not one");
     _thread->decrement_interp_only_mode();
   }
 }

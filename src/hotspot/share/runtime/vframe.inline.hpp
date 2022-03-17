@@ -28,8 +28,8 @@
 #include "runtime/vframe.hpp"
 
 #include "oops/instanceStackChunkKlass.inline.hpp"
-#include "runtime/handles.inline.hpp"
 #include "runtime/frame.inline.hpp"
+#include "runtime/handles.inline.hpp"
 #include "runtime/thread.inline.hpp"
 
 inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map), _cont(NULL) {
@@ -66,21 +66,20 @@ inline void vframeStreamCommon::next() {
   do {
     bool cont_entry = false;
     if (Continuation::is_continuation_enterSpecial(_frame)) {
-      assert (!_reg_map.in_cont(), "");
-      assert (_cont != NULL, "");
-      assert (_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
+      assert(!_reg_map.in_cont(), "");
+      assert(_cont != NULL, "");
+      assert(_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
       cont_entry = true;
 
       // TODO: handle ShowCarrierFrames
-      oop scope = _cont->scope();
-      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
+      if (_cont->is_virtual_thread() || (_continuation_scope.not_null() && _cont->scope() == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }
     } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
-      assert (_reg_map.cont() != NULL, "");
+      assert(_reg_map.cont() != NULL, "");
       oop scope = jdk_internal_vm_Continuation::scope(_reg_map.cont());
-      if ((_continuation_scope.not_null() && scope == _continuation_scope()) || scope == java_lang_VirtualThread::vthread_scope()) {
+      if (scope == java_lang_VirtualThread::vthread_scope() || (_continuation_scope.not_null() && scope == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }
@@ -188,7 +187,7 @@ inline bool vframeStreamCommon::fill_from_frame() {
   // Compiled frame
 
   if (cb() != NULL && cb()->is_compiled()) {
-    assert (nm()->method() != NULL, "must be");
+    assert(nm()->method() != NULL, "must be");
     if (nm()->is_native_method()) {
       // Do not rely on scopeDesc since the pc might be unprecise due to the _last_native_pc trick.
       fill_from_compiled_native_frame();
@@ -256,7 +255,7 @@ inline bool vframeStreamCommon::fill_from_frame() {
     return true;
   }
 
-  assert (!Continuation::is_continuation_enterSpecial(_frame), "");
+  assert(!Continuation::is_continuation_enterSpecial(_frame), "");
   return false;
 }
 

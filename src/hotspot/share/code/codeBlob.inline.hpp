@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,21 +19,21 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
-/**
- * This interface is implemented by classes that wish to handle incoming HTTP
- * requests and generate responses. This could be a general purpose HTTP server
- * or a test case that expects specific requests from a client.
- * <p>
- * The incoming request fields can be examined via the {@link HttpTransaction}
- * object, and a response can also be generated and sent via the request object.
- */
-public interface HttpCallback {
-    /**
-     * handle the given request and generate an appropriate response.
-     * @param msg the transaction containing the request from the
-     *        client and used to send the response
-     */
-    void request (HttpTransaction msg);
+#ifndef SHARE_CODE_CODEBLOB_INLINE_HPP
+#define SHARE_CODE_CODEBLOB_INLINE_HPP
+
+#include "code/codeBlob.hpp"
+
+#include "compiler/oopMap.inline.hpp"
+#include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
+
+inline const ImmutableOopMap* CodeBlob::oop_map_for_slot(int slot, address return_address) const {
+  assert(_oop_maps != NULL, "nope");
+  return _oop_maps->find_map_at_slot(slot, (intptr_t) return_address - (intptr_t) code_begin());
 }
+
+#endif // SHARE_CODE_CODEBLOB_INLINE_HPP

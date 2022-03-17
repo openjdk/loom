@@ -43,7 +43,7 @@ public class SleepWithDuration {
         // sleep for 2 seconds
         long start = millisTime();
         Thread.sleep(Duration.ofMillis(2000));
-        expectDuration(start, /*min*/1900, /*max*/4000);
+        expectDuration(start, /*min*/1900, /*max*/20_000);
 
         Thread.sleep(Duration.ofNanos(-1));
         Thread.sleep(Duration.ofNanos(0));
