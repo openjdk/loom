@@ -164,9 +164,6 @@ public:
     _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
   }
 
-  template<chunk_frames frames = chunk_frames::MIXED>
-  static int count_frames(stackChunkOop chunk);
-
   // Oop fields (and metadata) iterators
   //
   // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
