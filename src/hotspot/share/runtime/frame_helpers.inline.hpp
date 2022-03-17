@@ -31,7 +31,7 @@
 #include "compiler/oopMap.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "runtime/frame.inline.hpp"
-#include "runtime/stackValue.hpp"
+#include "runtime/stackValue.inline.hpp"
 #include "utilities/macros.hpp"
 
 // Helper, all-static, classes for working with frames

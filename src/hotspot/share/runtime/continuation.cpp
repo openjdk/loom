@@ -46,7 +46,7 @@
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/objArrayOop.inline.hpp"
-#include "oops/stackChunkOop.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "oops/weakHandle.inline.hpp"
 #include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
