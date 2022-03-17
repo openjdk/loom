@@ -993,6 +993,8 @@ public class TTY implements EventNotifier {
                    token.startsWith("-ss") || token.startsWith("-oss") ) {
 
                 javaArgs = addArgument(javaArgs, token);
+            } else if (token.startsWith("-R")) {
+                javaArgs = addArgument(javaArgs, token.substring(2));
             } else if (token.equals("-tclassic")) {
                 usageError("Classic VM no longer supported.");
                 return;

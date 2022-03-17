@@ -418,6 +418,11 @@ size_t CollectedHeap::filler_array_min_size() {
   return align_object_size(filler_array_hdr_size()); // align to MinObjAlignment
 }
 
+void CollectedHeap::zap_filler_array_with(HeapWord* start, size_t words, juint value) {
+  Copy::fill_to_words(start + filler_array_hdr_size(),
+                      words - filler_array_hdr_size(), value);
+}
+
 #ifdef ASSERT
 void CollectedHeap::fill_args_check(HeapWord* start, size_t words)
 {
@@ -428,8 +433,7 @@ void CollectedHeap::fill_args_check(HeapWord* start, size_t words)
 void CollectedHeap::zap_filler_array(HeapWord* start, size_t words, bool zap)
 {
   if (ZapFillerObjects && zap) {
-    Copy::fill_to_words(start + filler_array_hdr_size(),
-                        words - filler_array_hdr_size(), 0XDEAFBABE);
+    zap_filler_array_with(start, words, 0XDEAFBABE);
   }
 }
 #endif // ASSERT
@@ -446,7 +450,13 @@ CollectedHeap::fill_with_array(HeapWord* start, size_t words, bool zap)
 
   ObjArrayAllocator allocator(Universe::intArrayKlassObj(), words, (int)len, /* do_zero */ false);
   allocator.initialize(start);
-  DEBUG_ONLY(zap_filler_array(start, words, zap);)
+  if (DumpSharedSpaces) {
+    // This array is written into the CDS archive. Make sure it
+    // has deterministic contents.
+    zap_filler_array_with(start, words, 0);
+  } else {
+    DEBUG_ONLY(zap_filler_array(start, words, zap);)
+  }
 }
 
 void
