@@ -274,12 +274,6 @@ inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
   return (OopT*)start_address() + (index - bit_offset());
 }
 
-template <class StackChunkFrameClosureType>
-inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
-  has_mixed_frames() ? InstanceStackChunkKlass::iterate_stack<chunk_frames::MIXED>(this, closure)
-                     : InstanceStackChunkKlass::iterate_stack<chunk_frames::COMPILED_ONLY>(this, closure);
-}
-
 inline MemRegion stackChunkOopDesc::range() {
   return MemRegion((HeapWord*)this, size());
 }

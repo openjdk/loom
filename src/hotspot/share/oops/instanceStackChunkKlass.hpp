@@ -148,7 +148,6 @@ public:
 
   static void print_chunk(const stackChunkOop chunk, bool verbose, outputStream* st = tty);
 
-  static inline void assert_mixed_correct(stackChunkOop chunk, chunk_frames frame_kind) PRODUCT_RETURN;
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st) override;
 #endif
@@ -166,7 +165,6 @@ public:
     assert(_offset_of_stack == 0, "once");
     _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
   }
-
 
   template<chunk_frames frames = chunk_frames::MIXED>
   static int count_frames(stackChunkOop chunk);
@@ -225,6 +223,9 @@ private:
   inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
   void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
+
+  template <class StackChunkFrameClosureType>
+  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
 
   template <chunk_frames frames, class StackChunkFrameClosureType>
   static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);

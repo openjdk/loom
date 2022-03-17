@@ -37,7 +37,6 @@ class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
-enum chunk_frames { COMPILED_ONLY, MIXED };
 enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
 
 // A continuation stack-chunk oop.
@@ -110,9 +109,6 @@ public:
   bool verify(size_t* out_size = NULL, int* out_oops = NULL,
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
-  template <class StackChunkFrameClosureType>
-  inline void iterate_stack(StackChunkFrameClosureType* closure);
-
   MemRegion range();
 
   // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held during safepoints.
@@ -143,8 +139,6 @@ public:
   inline frame derelativize(frame fr) const;
 
 private:
-  template <chunk_frames frames, class StackChunkFrameClosureType>
-  inline void iterate_stack(StackChunkFrameClosureType* closure);
   inline intptr_t* relative_base() const;
 
   inline void relativize_frame(frame& fr) const;

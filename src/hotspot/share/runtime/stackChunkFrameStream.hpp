@@ -27,7 +27,6 @@
 
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
-#include "oops/stackChunkOop.hpp" // TODO: For enums
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
@@ -35,6 +34,8 @@ class CodeBlob;
 class ImmutableOopMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
+
+enum chunk_frames { COMPILED_ONLY, MIXED };
 
 template <chunk_frames frame_kind>
 class StackChunkFrameStream : public StackObj {
