@@ -2001,6 +2001,9 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
+  product(bool, LoomVM, true,                                               \
+          "Enable Loom Mechanisms in the VM")                               \
+                                                                            \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
                                                                             \
