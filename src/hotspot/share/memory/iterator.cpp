@@ -65,7 +65,9 @@ void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
     if (_keepalive_nmethods) {
       nm->mark_as_maybe_on_continuation();
       BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
-      bs_nm->disarm(nm);
+      if (bs_nm != NULL) {
+        bs_nm->disarm(nm);
+      }
     }
   }
 }

@@ -806,7 +806,9 @@ void CodeCache::increment_unloading_cycle() {
 void CodeCache::increment_marking_cycle() {
   ++_marking_cycle;
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
-  bs_nm->arm_all_nmethods();
+  if (bs_nm != NULL) {
+    bs_nm->arm_all_nmethods();
+  }
 }
 
 bool CodeCache::is_marking_cycle_active() {
