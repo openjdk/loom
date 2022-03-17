@@ -435,17 +435,14 @@ static inline oop safe_load(P *addr) {
 
 // Returns true iff the address p is readable and *(intptr_t*)p != errvalue
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-static bool is_good_oop(oop o) { return    dbg_is_safe(o, -1)
-                                        && dbg_is_safe(o->klass(), -1)
-                                        && oopDesc::is_oop(o)
-                                        && o->klass()->is_klass(); }
+extern "C" bool dbg_is_good_oop(oop o);
 #endif
 
 class FixCompressedOopClosure : public OopClosure {
   void do_oop(oop* p) override {
     assert(UseCompressedOops, "");
     oop obj = CompressedOops::decode(*(narrowOop*)p);
-    assert(obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+    assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     *p = obj;
   }
 
@@ -570,7 +567,7 @@ public:
 
     if (!SafepointSynchronize::is_at_safepoint()) {
       oop obj = safe_load(p);
-      assert(obj == nullptr || is_good_oop(obj),
+      assert(obj == nullptr || dbg_is_good_oop(obj),
               "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
               p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
     }
@@ -596,7 +593,7 @@ public:
     if (SafepointSynchronize::is_at_safepoint()) return;
 
     oop obj = safe_load(p);
-    assert(obj == nullptr || is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+    assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     if (_chunk->has_bitmap()) {
       BitMap::idx_t index = (p - (T*)_chunk->start_address()) + _chunk->bit_offset();
       assert(_chunk->bitmap().at(index), "Bit not set at index " SIZE_FORMAT " corresponding to " INTPTR_FORMAT, index, p2i(p));
