@@ -31,6 +31,8 @@
 #include "oops/stackChunkOop.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/registerMap.hpp"
+#include "runtime/smallRegisterMap.inline.hpp"
+#include "runtime/stackChunkFrameStream.inline.hpp"
 
 #ifdef ASSERT
 bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {

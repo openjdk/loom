@@ -48,6 +48,8 @@
 #include "runtime/continuation.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/orderAccess.hpp"
+#include "runtime/smallRegisterMap.inline.hpp"
+#include "runtime/stackChunkFrameStream.inline.hpp"
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/globalDefinitions.hpp"

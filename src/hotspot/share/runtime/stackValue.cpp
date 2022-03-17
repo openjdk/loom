@@ -38,6 +38,8 @@
 #include "gc/shenandoah/shenandoahBarrierSet.inline.hpp"
 #endif
 
+class RegisterMap;
+class SmallRegisterMap;
 
 template StackValue* StackValue::create_stack_value(ScopeValue*, address, const RegisterMap*);
 template StackValue* StackValue::create_stack_value(ScopeValue*, address, const SmallRegisterMap*);
