@@ -291,7 +291,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   assert(chunk->is_stackChunk(), "");
 
   OopOopIterateStackClosure frame_closure(chunk, closure, mr);
-  chunk->iterate_stack(&frame_closure);
+  iterate_stack(chunk, &frame_closure);
 
   assert(frame_closure._num_frames >= 0, "");
   assert(frame_closure._num_oops >= 0, "");
@@ -324,7 +324,7 @@ public:
 
 void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosure* cl) {
   MarkMethodsStackClosure closure(cl);
-  chunk->iterate_stack(&closure);
+  iterate_stack(chunk, &closure);
 }
 
 template <chunk_frames frame_kind, typename RegisterMapT>
@@ -398,7 +398,7 @@ public:
 template <InstanceStackChunkKlass::barrier_type barrier>
 void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
   DoBarriersStackClosure<barrier> closure(chunk);
-  chunk->iterate_stack(&closure);
+  iterate_stack(chunk, &closure);
 }
 
 class RelativizeStackClosure {
@@ -426,7 +426,7 @@ void InstanceStackChunkKlass::relativize_chunk(stackChunkOop chunk) {
   chunk->set_gc_mode(true);
   OrderAccess::storestore();
   RelativizeStackClosure closure(chunk);
-  chunk->iterate_stack(&closure);
+  iterate_stack(chunk, &closure);
 }
 
 template void InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::LOAD> (stackChunkOop chunk);
@@ -522,10 +522,10 @@ void InstanceStackChunkKlass::build_bitmap(stackChunkOop chunk) {
 
   if (UseCompressedOops) {
     BuildBitmapStackClosure<oop_kind::NARROW> closure(chunk);
-    chunk->iterate_stack(&closure);
+    iterate_stack(chunk, &closure);
   } else {
     BuildBitmapStackClosure<oop_kind::WIDE> closure(chunk);
-    chunk->iterate_stack(&closure);
+    iterate_stack(chunk, &closure);
   }
 
   chunk->set_gc_mode(true); // must be set *after* the above closure
@@ -752,7 +752,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   VerifyStackClosure closure(chunk,
     has_safepoint_stub_frame ? 1 : 0, // iterate_stack skips the safepoint stub
     has_safepoint_stub_frame ? first.frame_size() : 0);
-  chunk->iterate_stack(&closure);
+  iterate_stack(chunk, &closure);
 
   assert(!chunk->is_empty() || closure._cb == nullptr, "");
   if (closure._cb != nullptr && closure._cb->is_compiled()) {
@@ -899,13 +899,13 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
     st->cr();
     st->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(c->bottom_address()));
     PrintStackChunkClosure closure(c, st);
-    c->iterate_stack(&closure);
+    iterate_stack(c, &closure);
     st->print_cr("------");
 
   #ifdef ASSERT
     ResourceMark rm;
     DescribeStackChunkClosure describe(c);
-    c->iterate_stack(&describe);
+    iterate_stack(c, &describe);
     describe.print_on(st);
     st->print_cr("======");
   #endif

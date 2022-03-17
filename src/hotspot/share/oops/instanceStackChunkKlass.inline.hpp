@@ -66,12 +66,6 @@ inline void InstanceStackChunkKlass::copy_from_chunk_to_stack(void* from, void* 
   memcpy(to, from, size << LogBytesPerWord);
 }
 
-#ifdef ASSERT
-void InstanceStackChunkKlass::assert_mixed_correct(stackChunkOop chunk, chunk_frames frame_kind) {
-  assert (!chunk->has_mixed_frames() || frame_kind == chunk_frames::MIXED, "");
-}
-#endif
-
 inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }
@@ -221,6 +215,12 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
     }
   }
+}
+
+template <class StackChunkFrameClosureType>
+inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure) {
+  obj->has_mixed_frames() ? iterate_stack<chunk_frames::MIXED>(obj, closure)
+                          : iterate_stack<chunk_frames::COMPILED_ONLY>(obj, closure);
 }
 
 template <chunk_frames frame_kind, class StackChunkFrameClosureType>
