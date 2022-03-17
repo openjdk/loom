@@ -34,12 +34,6 @@
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "runtime/stackChunkFrameStream.inline.hpp"
 
-#ifdef ASSERT
-bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {
-  return InstanceStackChunkKlass::verify(this, out_size, out_oops, out_frames, out_interpreted_frames);
-}
-#endif
-
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   assert(!is_empty(), "");
   StackChunkFrameStream<chunk_frames::MIXED> fs(this);
@@ -141,3 +135,9 @@ void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
     InstanceStackChunkKlass::print_chunk(const_cast<stackChunkOopDesc*>(this), verbose, st);
   }
 }
+
+#ifdef ASSERT
+bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {
+  return InstanceStackChunkKlass::verify(this, out_size, out_oops, out_frames, out_interpreted_frames);
+}
+#endif

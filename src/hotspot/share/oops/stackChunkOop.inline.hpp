@@ -38,28 +38,39 @@
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)
 
 inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (stackChunkOopDesc*)(oopDesc*)jdk_internal_vm_StackChunk::parent(as_oop()); }
+template<typename P>
+inline bool stackChunkOopDesc::is_parent_null() const               { return jdk_internal_vm_StackChunk::is_parent_null<P>(as_oop()); }
 inline void stackChunkOopDesc::set_parent(stackChunkOopDesc* value) { jdk_internal_vm_StackChunk::set_parent(this, (oop)value); }
-template<typename P> inline void stackChunkOopDesc::set_parent_raw(oop value) { jdk_internal_vm_StackChunk::set_parent_raw<P>(this, value); }
-template<typename P> inline bool stackChunkOopDesc::is_parent_null() const    { return jdk_internal_vm_StackChunk::is_parent_null<P>(as_oop()); }
-inline int stackChunkOopDesc::stack_size() const         { return jdk_internal_vm_StackChunk::size(as_oop()); }
-inline int stackChunkOopDesc::sp() const                 { return jdk_internal_vm_StackChunk::sp(as_oop()); }
-inline void stackChunkOopDesc::set_sp(int value)         { jdk_internal_vm_StackChunk::set_sp(this, value); }
-inline address stackChunkOopDesc::pc() const             { return (address)jdk_internal_vm_StackChunk::pc(as_oop()); }
-inline void stackChunkOopDesc::set_pc(address value)     { jdk_internal_vm_StackChunk::set_pc(this, (intptr_t)value); }
-inline int stackChunkOopDesc::argsize() const            { return jdk_internal_vm_StackChunk::argsize(as_oop()); }
-inline void stackChunkOopDesc::set_argsize(int value)    { jdk_internal_vm_StackChunk::set_argsize(as_oop(), value); }
-inline uint8_t stackChunkOopDesc::flags() const          { return jdk_internal_vm_StackChunk::flags(as_oop()); }
-inline void stackChunkOopDesc::set_flags(uint8_t value)  { jdk_internal_vm_StackChunk::set_flags(this, value); }
-inline int stackChunkOopDesc::max_size() const           { return jdk_internal_vm_StackChunk::maxSize(as_oop()); }
-inline void stackChunkOopDesc::set_max_size(int value)   { jdk_internal_vm_StackChunk::set_maxSize(this, (jint)value); }
-inline void stackChunkOopDesc::set_cont(oop value) { jdk_internal_vm_StackChunk::set_cont(this, value); }
-template<typename P> inline void stackChunkOopDesc::set_cont_raw(oop value)   { jdk_internal_vm_StackChunk::set_cont_raw<P>(this, value); }
-inline oop stackChunkOopDesc::cont() const  { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
-template<typename P> inline oop stackChunkOopDesc::cont() const {
+template<typename P>
+inline void stackChunkOopDesc::set_parent_raw(oop value)            { jdk_internal_vm_StackChunk::set_parent_raw<P>(this, value); }
+
+inline int stackChunkOopDesc::stack_size() const        { return jdk_internal_vm_StackChunk::size(as_oop()); }
+
+inline int stackChunkOopDesc::sp() const                { return jdk_internal_vm_StackChunk::sp(as_oop()); }
+inline void stackChunkOopDesc::set_sp(int value)        { jdk_internal_vm_StackChunk::set_sp(this, value); }
+
+inline address stackChunkOopDesc::pc() const            { return (address)jdk_internal_vm_StackChunk::pc(as_oop()); }
+inline void stackChunkOopDesc::set_pc(address value)    { jdk_internal_vm_StackChunk::set_pc(this, (intptr_t)value); }
+
+inline int stackChunkOopDesc::argsize() const           { return jdk_internal_vm_StackChunk::argsize(as_oop()); }
+inline void stackChunkOopDesc::set_argsize(int value)   { jdk_internal_vm_StackChunk::set_argsize(as_oop(), value); }
+
+inline uint8_t stackChunkOopDesc::flags() const         { return jdk_internal_vm_StackChunk::flags(as_oop()); }
+inline void stackChunkOopDesc::set_flags(uint8_t value) { jdk_internal_vm_StackChunk::set_flags(this, value); }
+
+inline int stackChunkOopDesc::max_size() const          { return jdk_internal_vm_StackChunk::maxSize(as_oop()); }
+inline void stackChunkOopDesc::set_max_size(int value)  { jdk_internal_vm_StackChunk::set_maxSize(this, (jint)value); }
+
+inline oop stackChunkOopDesc::cont() const              { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
+template<typename P>
+inline oop stackChunkOopDesc::cont() const              {
   oop obj = jdk_internal_vm_StackChunk::cont_raw<P>(as_oop());
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
 }
+inline void stackChunkOopDesc::set_cont(oop value)      { jdk_internal_vm_StackChunk::set_cont(this, value); }
+template<typename P>
+inline void stackChunkOopDesc::set_cont_raw(oop value)  {  jdk_internal_vm_StackChunk::set_cont_raw<P>(this, value); }
 
 inline int stackChunkOopDesc::bottom() const { return stack_size() - argsize(); }
 
@@ -118,54 +129,61 @@ inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
 
+inline bool stackChunkOopDesc::has_mixed_frames() const            { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
+inline void stackChunkOopDesc::set_has_mixed_frames(bool value)    { set_flag(FLAG_HAS_INTERPRETED_FRAMES, value); }
+
+inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_flag(FLAG_GC_MODE); }
+inline void stackChunkOopDesc::set_gc_mode(bool value)             { set_flag(FLAG_GC_MODE, value); }
+
+inline bool stackChunkOopDesc::has_bitmap() const                  { return is_flag(FLAG_HAS_BITMAP); }
+inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); assert(!value || UseChunkBitmaps, ""); }
+
+inline bool stackChunkOopDesc::has_thaw_slowpath_condition() const { return flags() != 0; }
+
 inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
 }
 
-inline bool stackChunkOopDesc::has_mixed_frames() const            { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
-inline void stackChunkOopDesc::set_has_mixed_frames(bool value)    { set_flag(FLAG_HAS_INTERPRETED_FRAMES, value); }
-inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_flag(FLAG_GC_MODE); }
-inline void stackChunkOopDesc::set_gc_mode(bool value)             { set_flag(FLAG_GC_MODE, value); }
-inline bool stackChunkOopDesc::has_bitmap() const                  { return is_flag(FLAG_HAS_BITMAP); }
-inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); assert(!value || UseChunkBitmaps, ""); }
-inline bool stackChunkOopDesc::has_thaw_slowpath_condition() const { return flags() != 0; }
-
-inline intptr_t* stackChunkOopDesc::relative_base() const {
-  // we relativize with respect to end rather than start because GC might compact the chunk
-  return end_address() + InstanceStackChunkKlass::metadata_words();
-}
-
-inline intptr_t* stackChunkOopDesc::derelativize_address(int offset) const {
-  intptr_t* base = relative_base();
-  intptr_t* p = base - offset;
-  // tty->print_cr(">>> derelativize_address: %d -> %p (base: %p)", offset, p, base);
-  assert(start_address() <= p && p <= base, "");
-  return p;
-}
-
-inline int stackChunkOopDesc::relativize_address(intptr_t* p) const {
-  intptr_t* base = relative_base();
-  intptr_t offset = base - p;
-  // tty->print_cr(">>> relativize_address: %p -> %ld (base: %p)", p, offset, base);
-  assert(start_address() <= p && p <= base, "");
-  assert(0 <= offset && offset <= std::numeric_limits<int>::max(), "");
-  return offset;
-}
-
-inline void stackChunkOopDesc::relativize_frame(frame& fr) const {
-  fr.set_offset_sp(relativize_address(fr.sp()));
-  fr.set_offset_unextended_sp(relativize_address(fr.unextended_sp()));
-  relativize_frame_pd(fr);
-}
-
-inline void stackChunkOopDesc::derelativize_frame(frame& fr) const {
-  fr.set_sp(derelativize_address(fr.offset_sp()));
-  fr.set_unextended_sp(derelativize_address(fr.offset_unextended_sp()));
-  derelativize_frame_pd(fr);
-}
-
 inline frame stackChunkOopDesc::relativize(frame fr)   const { relativize_frame(fr);   return fr; }
 inline frame stackChunkOopDesc::derelativize(frame fr) const { derelativize_frame(fr); return fr; }
+
+inline BitMapView stackChunkOopDesc::bitmap() const {
+  assert(has_bitmap(), "");
+  size_t size_in_bits = InstanceStackChunkKlass::bitmap_size(stack_size()) << LogBitsPerWord;
+#ifdef ASSERT
+  BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
+  assert(bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
+  assert(bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "");
+  bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
+#endif
+  return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
+}
+
+inline BitMap::idx_t stackChunkOopDesc::bit_offset() const {
+  return InstanceStackChunkKlass::bit_offset(stack_size());
+}
+
+inline BitMap::idx_t stackChunkOopDesc::bit_index_for(intptr_t* p) const {
+  return UseCompressedOops ? bit_index_for((narrowOop*)p) : bit_index_for((oop*)p);
+}
+
+template <typename OopT>
+inline BitMap::idx_t stackChunkOopDesc::bit_index_for(OopT* p) const {
+  return bit_offset() + (p - (OopT*)start_address());
+}
+
+inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
+  return UseCompressedOops ? (intptr_t*)address_for_bit<narrowOop>(index) : (intptr_t*)address_for_bit<oop>(index);
+}
+
+template <typename OopT>
+inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
+  return (OopT*)start_address() + (index - bit_offset());
+}
+
+inline MemRegion stackChunkOopDesc::range() {
+  return MemRegion((HeapWord*)this, size());
+}
 
 inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int usp_offset_in_bytes) const {
   assert(fr.is_compiled_frame() || fr.cb()->is_safepoint_stub(), "");
@@ -177,6 +195,11 @@ inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int u
   return (int)(base - loc);
 }
 
+inline address stackChunkOopDesc::usp_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const {
+  assert(fr.is_compiled_frame(), "");
+  return (address)derelativize_address(fr.offset_unextended_sp()) + usp_offset_in_bytes;
+}
+
 inline address stackChunkOopDesc::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) const {
   assert(fr.is_compiled_frame(), "");
   assert(map != nullptr && map->stack_chunk() == as_oop(), "");
@@ -185,11 +208,6 @@ inline address stackChunkOopDesc::reg_to_location(const frame& fr, const Registe
   intptr_t offset = (intptr_t)map->location(reg, nullptr); // see usp_offset_to_index for the chunk case
   intptr_t* base = derelativize_address(fr.offset_sp());
   return (address)(base - offset);
-}
-
-inline address stackChunkOopDesc::usp_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const {
-  assert(fr.is_compiled_frame(), "");
-  return (address)derelativize_address(fr.offset_unextended_sp()) + usp_offset_in_bytes;
 }
 
 inline Method* stackChunkOopDesc::interpreter_frame_method(const frame& fr) {
@@ -238,42 +256,38 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
   memcpy(to, from, size << LogBytesPerWord);
 }
 
-inline BitMapView stackChunkOopDesc::bitmap() const {
-  assert(has_bitmap(), "");
-  size_t size_in_bits = InstanceStackChunkKlass::bitmap_size(stack_size()) << LogBitsPerWord;
-#ifdef ASSERT
-  BitMapView bm((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
-  assert(bm.size() == size_in_bits, "bm.size(): %zu size_in_bits: %zu", bm.size(), size_in_bits);
-  assert(bm.size_in_words() == (size_t)InstanceStackChunkKlass::bitmap_size(stack_size()), "");
-  bm.verify_range(bit_index_for(start_address()), bit_index_for(end_address()));
-#endif
-  return BitMapView((BitMap::bm_word_t*)InstanceStackChunkKlass::start_of_bitmap(as_oop()), size_in_bits);
+inline intptr_t* stackChunkOopDesc::relative_base() const {
+  // we relativize with respect to end rather than start because GC might compact the chunk
+  return end_address() + InstanceStackChunkKlass::metadata_words();
 }
 
-inline BitMap::idx_t stackChunkOopDesc::bit_offset() const {
-  return InstanceStackChunkKlass::bit_offset(stack_size());
+inline intptr_t* stackChunkOopDesc::derelativize_address(int offset) const {
+  intptr_t* base = relative_base();
+  intptr_t* p = base - offset;
+  // tty->print_cr(">>> derelativize_address: %d -> %p (base: %p)", offset, p, base);
+  assert(start_address() <= p && p <= base, "");
+  return p;
 }
 
-inline BitMap::idx_t stackChunkOopDesc::bit_index_for(intptr_t* p) const {
-  return UseCompressedOops ? bit_index_for((narrowOop*)p) : bit_index_for((oop*)p);
+inline int stackChunkOopDesc::relativize_address(intptr_t* p) const {
+  intptr_t* base = relative_base();
+  intptr_t offset = base - p;
+  // tty->print_cr(">>> relativize_address: %p -> %ld (base: %p)", p, offset, base);
+  assert(start_address() <= p && p <= base, "");
+  assert(0 <= offset && offset <= std::numeric_limits<int>::max(), "");
+  return offset;
 }
 
-template <typename OopT>
-inline BitMap::idx_t stackChunkOopDesc::bit_index_for(OopT* p) const {
-  return bit_offset() + (p - (OopT*)start_address());
+inline void stackChunkOopDesc::relativize_frame(frame& fr) const {
+  fr.set_offset_sp(relativize_address(fr.sp()));
+  fr.set_offset_unextended_sp(relativize_address(fr.unextended_sp()));
+  relativize_frame_pd(fr);
 }
 
-inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
-  return UseCompressedOops ? (intptr_t*)address_for_bit<narrowOop>(index) : (intptr_t*)address_for_bit<oop>(index);
-}
-
-template <typename OopT>
-inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
-  return (OopT*)start_address() + (index - bit_offset());
-}
-
-inline MemRegion stackChunkOopDesc::range() {
-  return MemRegion((HeapWord*)this, size());
+inline void stackChunkOopDesc::derelativize_frame(frame& fr) const {
+  fr.set_sp(derelativize_address(fr.offset_sp()));
+  fr.set_unextended_sp(derelativize_address(fr.offset_unextended_sp()));
+  derelativize_frame_pd(fr);
 }
 
 #endif // SHARE_OOPS_STACKCHUNKOOP_INLINE_HPP

@@ -55,18 +55,24 @@ public:
   inline stackChunkOopDesc* parent() const;
   inline void set_parent(stackChunkOopDesc* value);
   template<typename P>
-  inline void set_parent_raw(oop value);
-  template<typename P>
   inline bool is_parent_null() const;
+  template<typename P>
+  inline void set_parent_raw(oop value);
+
   inline int stack_size() const;
+
   inline int sp() const;
   inline void set_sp(int value);
+
   inline address pc() const;
   inline void set_pc(address value);
+
   inline int argsize() const;
   inline void set_argsize(int value);
+
   inline uint8_t flags() const;
   inline void set_flags(uint8_t value);
+
   inline int max_size() const;
   inline void set_max_size(int value);
 
@@ -76,28 +82,40 @@ public:
   template<typename P>
   inline void set_cont_raw(oop value);
 
-  inline bool is_empty() const;
   inline int bottom() const;
+
   inline intptr_t* start_address() const;
   inline intptr_t* end_address() const;
   inline intptr_t* bottom_address() const; // = end_address - argsize
   inline intptr_t* sp_address() const;
+
   inline int to_offset(intptr_t* p) const;
   inline intptr_t* from_offset(int offset) const;
+
+  inline bool is_empty() const;
   inline bool is_in_chunk(void* p) const;
   inline bool is_usable_in_chunk(void* p) const;
+
   inline bool is_flag(uint8_t flag) const;
   inline bool is_non_null_and_flag(uint8_t flag) const;
   inline void set_flag(uint8_t flag, bool value);
   inline void clear_flags();
+
   inline bool has_mixed_frames() const;
   inline void set_has_mixed_frames(bool value);
-  inline bool has_thaw_slowpath_condition() const;
+
   inline bool is_gc_mode() const;
   inline void set_gc_mode(bool value);
+
   inline bool has_bitmap() const;
   inline void set_has_bitmap(bool value);
+
+  inline bool has_thaw_slowpath_condition() const;
+
   inline bool requires_barriers();
+
+  inline frame relativize(frame fr) const;
+  inline frame derelativize(frame fr) const;
 
   inline BitMapView bitmap() const;
   inline BitMap::idx_t bit_offset() const;
@@ -105,9 +123,6 @@ public:
   inline intptr_t* address_for_bit(BitMap::idx_t index) const;
   template <typename OopT> inline BitMap::idx_t bit_index_for(OopT* p) const;
   template <typename OopT> inline OopT* address_for_bit(BitMap::idx_t index) const;
-
-  bool verify(size_t* out_size = NULL, int* out_oops = NULL,
-              int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
   MemRegion range();
 
@@ -135,16 +150,17 @@ public:
   using oopDesc::print_on;
   void print_on(bool verbose, outputStream* st) const;
 
-  inline frame relativize(frame fr) const;
-  inline frame derelativize(frame fr) const;
+  bool verify(size_t* out_size = NULL, int* out_oops = NULL,
+              int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
 private:
   inline intptr_t* relative_base() const;
 
-  inline void relativize_frame(frame& fr) const;
-  inline void derelativize_frame(frame& fr) const;
   inline intptr_t* derelativize_address(int offset) const;
   int relativize_address(intptr_t* p) const;
+
+  inline void relativize_frame(frame& fr) const;
+  inline void derelativize_frame(frame& fr) const;
 
   inline void relativize_frame_pd(frame& fr) const;
   inline void derelativize_frame_pd(frame& fr) const;
