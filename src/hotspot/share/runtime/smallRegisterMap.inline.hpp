@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,10 +22,11 @@
  *
  */
 
-#ifndef CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
-#define CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
+#ifndef SHARE_RUNTIME_SMALLREGISTERMAP_HPP
+#define SHARE_RUNTIME_SMALLREGISTERMAP_HPP
 
-int InstanceStackChunkKlass::metadata_words() { return frame::sender_sp_offset; }
-int InstanceStackChunkKlass::align_wiggle()   { return 1; }
+#include "utilities/macros.hpp"
 
-#endif // CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
+#include CPU_HEADER_INLINE(smallRegisterMap)
+
+#endif // SHARE_RUNTIME_SMALLREGISTERMAP_HPP

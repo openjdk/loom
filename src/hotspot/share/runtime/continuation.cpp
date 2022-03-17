@@ -61,6 +61,8 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/smallRegisterMap.inline.hpp"
+#include "runtime/stackChunkFrameStream.inline.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackOverflow.hpp"
 #include "runtime/stackWatermarkSet.inline.hpp"

@@ -22,10 +22,15 @@
  *
  */
 
-#ifndef CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
-#define CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
+#ifndef CPU_PPC_STACKCHUNKOOP_PPC_INLINE_HPP
+#define CPU_PPC_STACKCHUNKOOP_PPC_INLINE_HPP
 
-int InstanceStackChunkKlass::metadata_words() { return frame::sender_sp_offset; }
-int InstanceStackChunkKlass::align_wiggle()   { return 1; }
+inline void stackChunkOopDesc::relativize_frame_pd(frame& fr) const {
+  Unimplemented();
+}
 
-#endif // CPU_AARCH64_INSTANCESTACKCHUNKKLASS_AARCH64_INLINE_HPP
+inline void stackChunkOopDesc::derelativize_frame_pd(frame& fr) const {
+  Unimplemented();
+}
+
+#endif // CPU_PPC_STACKCHUNKOOP_PPC_INLINE_HPP

@@ -33,6 +33,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/registerMap.hpp"
 #include "utilities/macros.hpp"
+#include CPU_HEADER_INLINE(stackChunkOop)
 
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)
 
