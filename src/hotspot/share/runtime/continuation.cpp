@@ -1070,7 +1070,7 @@ public:
   template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
     stackChunkOop chunk = _cont.tail();
-    chunk->copy_from_stack_to_chunk<aligned>(from, to, size);
+    chunk->copy_from_stack_to_chunk(from, to, size);
     CONT_JFR_ONLY(_cont.record_size_copied(size);)
 
   #ifdef ASSERT
@@ -2415,7 +2415,7 @@ public:
   template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
     assert(to + size <= _cont.entrySP(), "");
-    _cont.tail()->template copy_from_chunk_to_stack<aligned>(from, to, size);
+    _cont.tail()->copy_from_chunk_to_stack(from, to, size);
     CONT_JFR_ONLY(_cont.record_size_copied(size);)
   }
 

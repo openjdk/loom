@@ -104,11 +104,9 @@ public:
 private:
   friend class VMStructs;
   friend class InstanceKlass;
-  friend class stackChunkOopDesc;
+  //friend class stackChunkOopDesc;
   friend class Continuations;
-  friend class FixChunkIterateStackClosure;
-  friend class MarkMethodsStackClosure;
-  friend class OopOopIterateStackClosure;
+  //friend class OopOopIterateStackClosure;
   template <barrier_type barrier> friend class DoBarriersStackClosure;
 
 public:
@@ -237,9 +235,6 @@ private:
 
   template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
   static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
-  template <copy_alignment alignment> inline static void copy_from_stack_to_chunk(void* from, void* to, size_t size);
-  template <copy_alignment alignment> inline static void copy_from_chunk_to_stack(void* from, void* to, size_t size);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
