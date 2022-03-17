@@ -37,8 +37,6 @@ class RegisterMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
-enum copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
-
 // A continuation stack-chunk oop.
 // See InstanceStackChunkKlass for a description of continuation stack-chunks.
 //
