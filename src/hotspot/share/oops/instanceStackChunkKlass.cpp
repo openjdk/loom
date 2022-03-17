@@ -48,7 +48,7 @@
 #include "runtime/continuation.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/orderAccess.hpp"
-#include "utilities/bitMap.hpp"
+#include "utilities/bitMap.inline.hpp"
 #include "utilities/copy.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
