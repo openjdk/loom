@@ -82,6 +82,8 @@
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing
 
+enum class copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
+
 /*
  * This file contains the implementation of continuation freezing (yield) and thawing (run).
  *
