@@ -73,10 +73,10 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
   : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
   // see oopDesc::size_given_klass
-   const jint lh = Klass::instance_layout_helper(size_helper(), true);
-   set_layout_helper(lh);
-   assert(layout_helper_is_instance(layout_helper()), "");
-   assert(layout_helper_needs_slow_path(layout_helper()), "");
+  const jint lh = Klass::instance_layout_helper(size_helper(), true);
+  set_layout_helper(lh);
+  assert(layout_helper_is_instance(layout_helper()), "");
+  assert(layout_helper_needs_slow_path(layout_helper()), "");
 }
 
 size_t InstanceStackChunkKlass::oop_size(oop obj) const {
@@ -111,23 +111,11 @@ void InstanceStackChunkKlass::copy_conjoint(oop obj, HeapWord* to, size_t word_s
   copy(obj, to, word_size, false /* disjoint */);
 }
 
-template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
-
-template <chunk_frames frame_kind>
-int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {
-  int frames = 0;
-  for (StackChunkFrameStream<frame_kind> f(chunk); !f.is_done(); f.next(SmallRegisterMap::instance)) {
-    frames++;
-  }
-  return frames;
-}
-
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
   print_chunk((stackChunkOop)obj, false, st);
 }
 #endif
-
 
 // We replace derived pointers with offsets; the converse is done in DerelativizeDerivedPointers
 class RelativizeDerivedPointers : public DerivedOopClosure {
@@ -215,7 +203,6 @@ public:
     }
   }
 };
-
 
 template<typename OopClosureType>
 class StackChunkOopIterateFilterClosure: public OopClosure {
@@ -337,7 +324,6 @@ template void InstanceStackChunkKlass::relativize_derived_pointers<>(const Stack
 template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
 template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
 template void InstanceStackChunkKlass::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
-
 
 template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
 void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
