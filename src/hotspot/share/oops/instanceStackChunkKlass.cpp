@@ -82,29 +82,34 @@ size_t InstanceStackChunkKlass::oop_size(oop obj) const {
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
 
-template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
-
-template <InstanceStackChunkKlass::copy_type overlap>
-size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_size) {
-  assert(obj->is_stackChunk(), "");
-  stackChunkOop chunk = (stackChunkOop)obj;
+size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_size, bool disjoint) {
+  assert(obj->is_stackChunk(), "Wrong object type");
 
   HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
-  overlap == copy_type::DISJOINT ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
-                                 : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
 
+  disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
+           : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
+
+  // Build bitmap
   stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
-  assert(!to_chunk->has_bitmap() || to_chunk->is_gc_mode(), "");
-
   if (!to_chunk->has_bitmap()) {
     build_bitmap(to_chunk);
+  } else {
+    assert(to_chunk->is_gc_mode(), "Should be set when bitmaps were built");
   }
 
   return word_size;
 }
 
-template size_t InstanceStackChunkKlass::copy<InstanceStackChunkKlass::copy_type::CONJOINT>(oop obj, HeapWord* to_addr, size_t word_size);
-template size_t InstanceStackChunkKlass::copy<InstanceStackChunkKlass::copy_type::DISJOINT>(oop obj, HeapWord* to_addr, size_t word_size);
+void InstanceStackChunkKlass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) {
+  copy(obj, to, word_size, true /* disjoint */);
+}
+
+void InstanceStackChunkKlass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) {
+  copy(obj, to, word_size, false /* disjoint */);
+}
+
+template <int x> NOINLINE static bool verify_chunk(stackChunkOop c) { return c->verify(); }
 
 template <chunk_frames frame_kind>
 int InstanceStackChunkKlass::count_frames(stackChunkOop chunk) {

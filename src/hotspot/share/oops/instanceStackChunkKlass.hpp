@@ -31,8 +31,8 @@
 #include "runtime/handles.hpp"
 #include "utilities/macros.hpp"
 
-class frame;
 class ClassFileParser;
+class frame;
 class ImmutableOopMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
@@ -99,9 +99,6 @@ Chunk layout:
 
 
 class InstanceStackChunkKlass: public InstanceKlass {
-private:
-  enum class copy_type { CONJOINT, DISJOINT };
-
 public:
   enum class barrier_type { LOAD, STORE };
 
@@ -143,9 +140,8 @@ public:
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;
 
-  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size) override { copy<copy_type::DISJOINT> (obj, to, word_size); }
-  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size) override { copy<copy_type::CONJOINT>(obj, to, word_size); }
-
+  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size) override;
+  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size) override;
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -210,7 +206,7 @@ public:
 private:
   static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
 
-  template<copy_type disjoint> size_t copy(oop obj, HeapWord* to, size_t word_size);
+  size_t copy(oop obj, HeapWord* to, size_t word_size, bool disjoint);
 
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
