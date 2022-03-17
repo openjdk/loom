@@ -57,10 +57,6 @@ inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words)
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }
 
-inline HeapWord* InstanceStackChunkKlass::start_of_bitmap(oop obj) {
-  return start_of_stack(obj) + jdk_internal_vm_StackChunk::size(obj);
-}
-
 inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   if (!UseChunkBitmaps) {
     return 0;

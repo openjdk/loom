@@ -127,6 +127,7 @@ public:
   }
 
   inline size_t instance_size(size_t stack_size_in_words) const;
+
   static inline size_t bitmap_size(size_t stack_size_in_words); // in words
   // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
   static inline BitMap::idx_t bit_offset(size_t stack_size_in_words);
@@ -154,9 +155,6 @@ public:
                      int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
   // Stack offset is an offset into the Heap
-  static HeapWord* start_of_stack(oop obj) { return (HeapWord*)(cast_from_oop<intptr_t>(obj) + offset_of_stack()); }
-  static inline HeapWord* start_of_bitmap(oop obj);
-
   static int offset_of_stack() { return _offset_of_stack; }
   static void init_offset_of_stack() {
     // Cache the offset of the static fields in the Class instance
