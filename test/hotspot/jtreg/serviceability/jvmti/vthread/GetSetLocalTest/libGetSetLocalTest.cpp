@@ -424,7 +424,7 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
   LOG("testSuspendedVirtualThreads: started for virtual thread: %s\n", tname);
 
   // Test each of these cases only once: unmounted, positive depth, frame count 0.
-  while (iter++ < 100 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
+  while (iter++ < 50 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
     jmethodID method = NULL;
     jlocation location = 0;
 
