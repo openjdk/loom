@@ -432,10 +432,6 @@ static inline oop safe_load(P *addr) {
   obj = (oop)NativeAccess<>::oop_load(&obj);
   return obj;
 }
-
-// Returns true iff the address p is readable and *(intptr_t*)p != errvalue
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-extern "C" bool dbg_is_good_oop(oop o);
 #endif
 
 class FixCompressedOopClosure : public OopClosure {
