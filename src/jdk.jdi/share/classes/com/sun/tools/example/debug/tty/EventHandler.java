@@ -48,12 +48,12 @@ public class EventHandler implements Runnable {
     boolean completed = false;
     String shutdownMessageKey;
     boolean stopOnVMStart;
-    boolean trackAllVthreads;
+    boolean trackVthreads;
 
-    EventHandler(EventNotifier notifier, boolean stopOnVMStart, boolean trackAllVthreads) {
+    EventHandler(EventNotifier notifier, boolean stopOnVMStart, boolean trackVthreads) {
         this.notifier = notifier;
         this.stopOnVMStart = stopOnVMStart;
-        this.trackAllVthreads = trackAllVthreads;
+        this.trackVthreads = trackVthreads;
         this.thread = new Thread(this, "event-handler");
         this.thread.start();
     }
@@ -118,10 +118,10 @@ public class EventHandler implements Runnable {
                 assert eventThread.isVirtual();
             }
             // If we added it, we need to make sure it eventually gets removed. Usually
-            // this happens when the ThreadDeathEvent comes in, but if !trackAllVthreads,
+            // this happens when the ThreadDeathEvent comes in, but if !trackVthreads,
             // then the ThreadDeathReqest was setup to filter out vthreads. So we'll need
             // to create a special ThreadDeathReqest just to detect when this vthread dies.
-            if (added && !trackAllVthreads) {
+            if (added && !trackVthreads) {
                 EventRequestManager erm = Env.vm().eventRequestManager();
                 ThreadDeathRequest tdr = erm.createThreadDeathRequest();
                 tdr.addThreadFilter(eventThread);
@@ -301,7 +301,7 @@ public class EventHandler implements Runnable {
         ThreadReference thread = tde.thread();
         ThreadInfo.removeThread(thread);
 
-        if (!trackAllVthreads && thread.isVirtual()) {
+        if (!trackVthreads && thread.isVirtual()) {
             // Remove the ThreadDeathRequest used for this event since it was created
             // just to remove this one vthread.
             EventRequestManager erm = Env.vm().eventRequestManager();

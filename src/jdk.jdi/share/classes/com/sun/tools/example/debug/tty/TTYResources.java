@@ -476,7 +476,7 @@ public class TTYResources extends java.util.ListResourceBundle {
              "    -connect <connector-name>:<name1>=<value1>,...\n" +
              "                      connect to target VM using named connector with listed argument values\n" +
              "    -dbgtrace [flags] print info for debugging {0}\n" +
-             "    -trackallvthreads attempt to keep track of all virtual threads\n" +
+             "    -trackvthreads    track virtual threads as they are created\n" +
              "    -tclient          run the application in the HotSpot(TM) Client Compiler\n" +
              "    -tserver          run the application in the HotSpot(TM) Server Compiler\n" +
              "\n" +

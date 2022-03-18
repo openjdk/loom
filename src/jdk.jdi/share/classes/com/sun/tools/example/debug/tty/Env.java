@@ -57,8 +57,8 @@ class Env {
     private static HashMap<String, Value> savedValues = new HashMap<String, Value>();
     private static Method atExitMethod;
 
-    static void init(String connectSpec, boolean openNow, int flags, boolean trackAllVthreads, String extraOptions) {
-        connection = new VMConnection(connectSpec, flags, trackAllVthreads, extraOptions);
+    static void init(String connectSpec, boolean openNow, int flags, boolean trackVthreads, String extraOptions) {
+        connection = new VMConnection(connectSpec, flags, trackVthreads, extraOptions);
         if (!connection.isLaunch() || openNow) {
             connection.open();
         }

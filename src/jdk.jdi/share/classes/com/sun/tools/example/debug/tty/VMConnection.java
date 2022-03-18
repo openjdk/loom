@@ -53,7 +53,7 @@ class VMConnection {
     private final Connector connector;
     private final Map<String, com.sun.jdi.connect.Connector.Argument> connectorArgs;
     private int traceFlags;
-    private boolean trackAllVthreads;
+    private boolean trackVthreads;
 
     synchronized void notifyOutputComplete() {
         outputCompleteCount++;
@@ -328,7 +328,7 @@ class VMConnection {
         return (pos + 1 == arr.length);
     }
 
-    VMConnection(String connectSpec, int traceFlags, boolean trackAllVthreads, String extraOptions) {
+    VMConnection(String connectSpec, int traceFlags, boolean trackVthreads, String extraOptions) {
         String nameString;
         String argString;
         int index = connectSpec.indexOf(':');
@@ -348,7 +348,7 @@ class VMConnection {
 
         connectorArgs = parseConnectorArgs(connector, argString, extraOptions);
         this.traceFlags = traceFlags;
-        this.trackAllVthreads = trackAllVthreads;
+        this.trackVthreads = trackVthreads;
     }
 
     public void setTraceFlags(int flags) {
@@ -469,7 +469,7 @@ class VMConnection {
 
         ThreadStartRequest tsr = erm.createThreadStartRequest();
         ThreadDeathRequest tdr = erm.createThreadDeathRequest();
-        if (!trackAllVthreads) {
+        if (!trackVthreads) {
             tsr.addPlatformThreadsOnlyFilter();
             tdr.addPlatformThreadsOnlyFilter();
         }
