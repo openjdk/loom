@@ -21,7 +21,7 @@
  * questions.
  */
 
-package nsk.jdb.threads.threads002;
+package nsk.jdb.threads.threads003;
 
 import nsk.share.*;
 import nsk.share.jpda.*;
@@ -31,16 +31,16 @@ import nsk.share.jdi.JDIThreadFactory;
 import java.io.*;
 
 /* This is debuggee aplication */
-public class threads002a {
+public class threads003a {
     public static void main(String args[]) {
-        threads002a _threads002a = new threads002a();
-        System.exit(threads002.JCK_STATUS_BASE + _threads002a.runIt(args, System.out));
+        threads003a _threads003a = new threads003a();
+        System.exit(threads003.JCK_STATUS_BASE + _threads003a.runIt(args, System.out));
     }
 
-    static void lastBreak () {}
+    static void breakpoint () {}
 
-    static final String THREAD_NAME = threads002.THREAD_NAME;
-    static int numThreads           = 5;   // number of threads
+    static final String THREAD_NAME = nsk.jdb.threads.threads003.threads003.THREAD_NAME;
+    static int numThreads           = nsk.jdb.threads.threads003.threads003.NUM_THREADS;
     static Object waitnotify        = new Object();
 
     public int runIt(String args[], PrintStream out) {
@@ -53,8 +53,9 @@ public class threads002a {
         try {
             lock.setLock();
             for (int i = 0; i < numThreads ; i++) {
+                boolean doBreakpoint = i % 2 == 1;  // breakpoint on odd threads only
                 String name = THREAD_NAME + "-" + i;
-                holder[i] = JDIThreadFactory.newThread(new MyThread(lock), name);
+                holder[i] = JDIThreadFactory.newThread(new MyThread(lock, doBreakpoint), name);
                 synchronized (waitnotify) {
                     holder[i].start();
                     waitnotify.wait();
@@ -63,10 +64,10 @@ public class threads002a {
         } catch (Exception e) {
             System.err.println("TEST ERROR: Caught unexpected Exception while waiting in main thread: " +
                 e.getMessage());
-            System.exit(threads002.FAILED);
+            System.exit(threads003.FAILED);
         }
 
-        lastBreak();   // When jdb stops here, there should be 5 running MyThreads.
+        breakpoint();   // When jdb stops here, there should be 5 running MyThreads.
         lock.releaseLock();
 
         for (int i = 0; i < numThreads ; i++) {
@@ -80,7 +81,7 @@ public class threads002a {
         }
 
         log.display("Debuggee PASSED");
-        return threads002.PASSED;
+        return threads003.PASSED;
     }
 
 }
@@ -105,20 +106,25 @@ class Lock {
 class MyThread implements Runnable {
 
     Lock lock;
-    MyThread (Lock l) {
+    boolean doBreakpoint;
+    MyThread (Lock l, boolean doBreakpoint) {
         this.lock = l;
+        this.doBreakpoint = doBreakpoint;
     }
 
     public void run() {
-        synchronized (threads002a.waitnotify) {
-            threads002a.waitnotify.notifyAll();
+        if (doBreakpoint) {
+            threads003a.breakpoint();
+        }
+        synchronized (threads003a.waitnotify) {
+            threads003a.waitnotify.notifyAll();
         }
         try {
             lock.setLock();
         } catch(Exception e) {
             System.err.println("TEST ERROR: Caught unexpected Exception while waiting in MyThread: " +
                 e.getMessage());
-            System.exit(threads002.FAILED);
+            System.exit(threads003.FAILED);
         }
         lock.releaseLock();
     }
