@@ -2149,11 +2149,6 @@ const char* _get_thread_state_name(JavaThreadState _thread_state) {
 }
 
 void JavaThread::print_thread_state_on(outputStream *st) const {
-  if (is_vthread_mounted()) {
-    oop vt = vthread();
-    assert(vt != NULL, "");
-    st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
-  }
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
 }
 
