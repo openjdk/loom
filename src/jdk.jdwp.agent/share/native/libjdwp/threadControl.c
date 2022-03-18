@@ -1590,7 +1590,7 @@ threadControl_suspendCount(jthread thread, jint *count)
     } else {
       /*
        * If the node is in neither list, the debugger never suspended
-       * this thread, so the suspend count is 0.
+       * this thread, so the suspend count is 0, unless it is a vthread.
        */
       if (isVThread(thread)) {
           jint vthread_state = 0;
