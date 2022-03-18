@@ -745,3 +745,8 @@ void JavaFrameAnchor::capture_last_Java_pc() {
   vmassert(_last_Java_pc == NULL, "already walkable");
   _last_Java_pc = (address)_last_Java_sp[-1];
 }
+
+void JavaFrameAnchor::patch_last_Java_pc(address pc) {
+  vmassert(_last_Java_sp != NULL, "no last frame set");
+  *(address*)(_last_Java_sp - 1) = pc;
+}

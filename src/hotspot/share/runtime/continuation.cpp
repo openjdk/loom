@@ -586,6 +586,7 @@ int Continuation::try_force_yield(JavaThread* target, const oop cont) {
   log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
   if (res == 0) { // success
     target->set_cont_preempt(true);
+    // target->frame_anchor()->patch_last_Java_pc(StubRoutines::cont_jump_from_sp());
 
     // The target thread calls
     // Continuation::jump_from_safepoint from JavaThread::handle_special_runtime_exit_condition
