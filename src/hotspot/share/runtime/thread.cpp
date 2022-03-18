@@ -785,10 +785,11 @@ void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
+  _mounted_vthread =  OopHandle(_thread_oop_storage, NULL);
   _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
-oop JavaThread::threadObj() const    {
+oop JavaThread::threadObj() const {
   return _threadObj.resolve();
 }
 
@@ -799,6 +800,15 @@ oop JavaThread::vthread() const {
 void JavaThread::set_vthread(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _vthread.replace(p);
+}
+
+oop JavaThread::mounted_vthread() const {
+  return _mounted_vthread.resolve();
+}
+
+void JavaThread::set_mounted_vthread(oop p) {
+  assert(_thread_oop_storage != NULL, "not yet initialized");
+  _mounted_vthread.replace(p);
 }
 
 oop JavaThread::scopeLocalCache() const {
@@ -1074,7 +1084,6 @@ JavaThread::JavaThread() :
   _cont_fastpath_thread_state(1),
   _cont_fastpath(0),
   _held_monitor_count(0),
-  _mounted_vthread(oop()),
 
   _handshake(this),
 
@@ -1217,6 +1226,7 @@ JavaThread::~JavaThread() {
   // Ask ServiceThread to release the threadObj OopHandle
   ServiceThread::add_oop_handle_release(_threadObj);
   ServiceThread::add_oop_handle_release(_vthread);
+  ServiceThread::add_oop_handle_release(_mounted_vthread);
 
   // Return the sleep event to the free list
   ParkEvent::Release(_SleepEvent);
@@ -2072,8 +2082,6 @@ void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   if (jvmti_thread_state() != NULL) {
     jvmti_thread_state()->oops_do(f, cf);
   }
-
-  f->do_oop(&_mounted_vthread);
 }
 
 void JavaThread::oops_do_frames(OopClosure* f, CodeBlobClosure* cf) {
