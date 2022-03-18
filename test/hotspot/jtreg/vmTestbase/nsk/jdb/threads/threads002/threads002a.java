@@ -102,7 +102,7 @@ class Lock {
     }
 }
 
-class MyThread extends Thread {
+class MyThread implements Runnable {
 
     Lock lock;
     MyThread (Lock l) {
