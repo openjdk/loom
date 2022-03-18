@@ -7571,10 +7571,6 @@ RuntimeStub* generate_cont_doYield() {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #ifdef ASSERT
-  //   __ lea(rcx, Address(rsp, wordSize));
-  //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #endif
 
     Label thaw_success;
     __ testq(rbx, rbx);           // rbx contains the size of the frames to thaw, 0 if overflow or no more frames
