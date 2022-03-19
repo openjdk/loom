@@ -210,11 +210,11 @@ inline oop java_lang_VirtualThread::vthread_scope() {
 }
 
 #if INCLUDE_JFR
-inline u2 java_lang_VirtualThread::jfr_epoch(oop ref) {
+inline u2 java_lang_Thread::jfr_epoch(oop ref) {
   return ref->short_field(_jfr_epoch_offset);
 }
 
-inline void java_lang_VirtualThread::set_jfr_epoch(oop ref, u2 epoch) {
+inline void java_lang_Thread::set_jfr_epoch(oop ref, u2 epoch) {
   ref->short_field_put(_jfr_epoch_offset, epoch);
 }
 #endif // INCLUDE_JFR

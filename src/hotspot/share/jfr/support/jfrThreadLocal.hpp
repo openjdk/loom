@@ -34,7 +34,9 @@ class JfrStackFrame;
 class Thread;
 
 class JfrThreadLocal {
+  friend class Jfr;
   friend class JfrIntrinsicSupport;
+  friend class JfrJavaSupport;
   friend class JfrRecorder;
  private:
   jobject _java_event_writer;
@@ -47,11 +49,12 @@ class JfrThreadLocal {
   JfrBuffer* _checkpoint_buffer_epoch_1;
   mutable JfrStackFrame* _stackframes;
   JfrBlobHandle _thread;
-  mutable traceid _contextual_thread_id;
-  mutable traceid _vm_thread_id;
+  mutable traceid _vthread_id;
+  mutable traceid _jvm_thread_id;
   mutable traceid _thread_id_alias;
   u8 _data_lost;
   traceid _stack_trace_id;
+  traceid _parent_trace_id;
   jlong _user_time;
   jlong _cpu_time;
   jlong _wallclock_time;
@@ -60,20 +63,27 @@ class JfrThreadLocal {
   volatile jint _entering_suspend_flag;
   mutable volatile int _critical_section;
   u2 _vthread_epoch;
+  bool _vthread_excluded;
+  bool _jvm_thread_excluded;
   bool _vthread;
-  bool _excluded;
   bool _dead;
-  traceid _parent_trace_id;
 
   JfrBuffer* install_native_buffer() const;
   JfrBuffer* install_java_buffer() const;
   JfrStackFrame* install_stackframes() const;
   void release(Thread* t);
   static void release(JfrThreadLocal* tl, Thread* t);
+
+  static void set(bool* excluded_field, bool state);
   static traceid assign_thread_id(const Thread* t, JfrThreadLocal* tl);
-  static traceid contextual_id(const Thread* t);
+  static traceid vthread_id(const Thread* t);
   static void set_vthread_epoch(const JavaThread* jt, traceid id, u2 epoch);
-  static u2 vthread_epoch(const JavaThread* jt);
+  bool is_vthread_excluded() const;
+  static void exclude_vthread(const JavaThread* jt);
+  static void include_vthread(const JavaThread* jt);
+  static bool is_jvm_thread_excluded(const Thread* t);
+  static void exclude_jvm_thread(const Thread* t);
+  static void include_jvm_thread(const Thread* t);
 
  public:
   JfrThreadLocal();
@@ -140,10 +150,15 @@ class JfrThreadLocal {
   // a function of Java carrier thread mounts / unmounts.
   static traceid thread_id(const Thread* t);
   static bool is_vthread(const JavaThread* jt);
+  static u2 vthread_epoch(const JavaThread* jt);
+
+  // Exposed to external code that use a thread id unconditionally.
+  // Jfr might not even be running.
+  static traceid external_thread_id(const Thread* t);
 
   // Non-volatile thread id, for Java carrier threads and non-java threads.
-  static traceid vm_thread_id(const Thread* t);
-  static traceid vm_thread_id(const Thread* t, JfrThreadLocal* tl);
+  static traceid jvm_thread_id(const Thread* t);
+  static traceid jvm_thread_id(const Thread* t, JfrThreadLocal* tl);
 
   // To impersonate is to temporarily masquerade as another thread.
   // For example, when writing an event that should be attributed to some other thread.
@@ -219,20 +234,18 @@ class JfrThreadLocal {
     _wallclock_time = wallclock_time;
   }
 
-  bool is_excluded() const {
-    return _excluded;
-  }
-
   bool is_dead() const {
     return _dead;
   }
 
+  bool is_excluded() const;
+  bool is_included() const;
+  static bool is_excluded(const Thread* thread);
+  static bool is_included(const Thread* thread);
+
   bool has_thread_blob() const;
   void set_thread_blob(const JfrBlobHandle& handle);
   const JfrBlobHandle& thread_blob() const;
-
-  static void exclude(Thread* t);
-  static void include(Thread* t);
 
   // Hooks
   static void on_start(Thread* t);
@@ -242,9 +255,10 @@ class JfrThreadLocal {
 
   // Code generation
   static ByteSize java_event_writer_offset();
-  static ByteSize trace_id_offset();
+  static ByteSize vthread_id_offset();
   static ByteSize vthread_offset();
   static ByteSize vthread_epoch_offset();
+  static ByteSize vthread_excluded_offset();
 
   friend class JfrJavaThread;
   friend class JfrCheckpointManager;

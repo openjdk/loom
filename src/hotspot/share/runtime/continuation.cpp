@@ -486,7 +486,7 @@ stackChunkOop ContMirror::find_chunk_by_address(void* p) const {
 template<typename Event> void ContMirror::post_jfr_event(Event* e, JavaThread* jt) {
   if (e->should_commit()) {
     log_develop_trace(jvmcont)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
-    e->set_carrierThread(JFR_VM_THREAD_ID(jt));
+    e->set_carrierThread(JFR_JVM_THREAD_ID(jt));
     e->set_contClass(_cont->klass());
     e->set_numIFrames(_e_num_interpreted_frames);
     e->set_size(_e_size);

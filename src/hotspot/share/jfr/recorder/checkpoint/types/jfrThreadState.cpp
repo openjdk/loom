@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -104,7 +104,7 @@ traceid JfrThreadId::os_id(const Thread* t) {
 
 traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
   assert(t != NULL, "invariant");
-  return tid != 0 ? tid : JfrThreadLocal::vm_thread_id(t);
+  return tid != 0 ? tid : JfrThreadLocal::jvm_thread_id(t);
 }
 
 // caller needs ResourceMark
@@ -126,7 +126,14 @@ const char* get_java_thread_name(const JavaThread* jt, oop vthread) {
   return name_str;
 }
 
+static constexpr const char* const default_vthread_name = "<unnamed>";
+
 const char* JfrThreadName::name(const Thread* t, oop vthread) {
   assert(t != NULL, "invariant");
-  return t->is_Java_thread() ? get_java_thread_name(JavaThread::cast(t), vthread) : t->name();
+  if (!t->is_Java_thread()) {
+    return t->name();
+  }
+  const char* const java_name = get_java_thread_name(JavaThread::cast(t), vthread);
+  // The vthread default name is represented as a nullptr for space savings.
+  return java_name == nullptr ? nullptr : strncmp(java_name, default_vthread_name, 9) == 0 ? nullptr : java_name;
 }

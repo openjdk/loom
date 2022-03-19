@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -76,7 +76,7 @@ class JfrEvent {
   , _verifier()
 #endif
   {
-    if (T::is_enabled()) {
+    if (T::is_enabled() && JfrThreadLocal::is_included(Thread::current())) {
       _started = true;
       if (TIMED == timing && !T::isInstant) {
         set_starttime(JfrTicks::now());

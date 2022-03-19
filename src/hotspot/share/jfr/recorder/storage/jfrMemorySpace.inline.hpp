@@ -560,7 +560,6 @@ inline bool ScavengingReleaseOp<Mspace, List>::excise_with_release(typename List
   assert(node->identity() != NULL, "invariant");
   assert(node->empty(), "invariant");
   assert(!node->lease(), "invariant");
-  assert(!node->excluded(), "invariant");
   ++_count;
   _amount += node->total_size();
   node->clear_retired();

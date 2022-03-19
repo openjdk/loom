@@ -2951,29 +2951,38 @@ bool LibraryCallKit::inline_native_classID() {
 }
 
 /*
-  jobject h_event_writer = Thread::jfr_thread_local()->java_event_writer();
-  if (h_event_writer == NULL) {
-    return NULL;
-  }
-  oop threadObj = Thread::threadObj();
-  oop vthread = java_lang_Thread::vthread(threadObj);
-  traceid tid;
-  if (vthread != threadObj) {  // i.e. current thread is virtual
-    tid = java_lang_VirtualThread::tid(vthread);
-    u2 vthread_epoch = java_lang_VirtualThread::jfr_epoch();
-    traceid current_epoch = JfrTraceIdEpoch::current_generation();
-    if (vthread_epoch != current_epoch) {
-      write_checkpoint();
-    }
-  } else {
-    tid = java_lang_Thread::tid(threadObj);
-  }
-  oop event_writer = JNIHandles::resolve_non_null(h_event_writer);
-  traceid tid_in_event_writer = getField(event_writer, "threadID");
-  if (tid_in_event_writer != tid) {
-    setField(event_writer, "threadID", tid);
-  }
-  return event_writer
+ * JfrThreadLocal* const tl = Thread::jfr_thread_local()
+ * jobject h_event_writer = tl->java_event_writer();
+ * if (h_event_writer == NULL) {
+ *   return NULL;
+ * }
+ * oop threadObj = Thread::threadObj();
+ * oop vthread = java_lang_Thread::vthread(threadObj);
+ * traceid tid;
+ * bool excluded;
+ * if (vthread != threadObj) {  // i.e. current thread is virtual
+ *   tid = java_lang_Thread::tid(vthread);
+ *   u2 vthread_epoch_raw = java_lang_Thread::jfr_epoch(vthread);
+ *   excluded = vthread_epoch & excluded_mask;
+ *   if (!excluded) {
+ *     traceid current_epoch = JfrTraceIdEpoch::current_generation();
+ *     u2 vthread_epoch = vthread_epoch_raw & epoch_mask;
+ *     if (vthread_epoch != current_epoch) {
+ *       write_checkpoint();
+ *     }
+ *   }
+ * } else {
+ *   tid = java_lang_Thread::tid(threadObj);
+ *   u2 thread_epoch_raw = java_lang_Thread::jfr_epoch(threadObj);
+ *   excluded = thread_epoch_raw & excluded_mask;
+ * }
+ * oop event_writer = JNIHandles::resolve_non_null(h_event_writer);
+ * traceid tid_in_event_writer = getField(event_writer, "threadID");
+ * if (tid_in_event_writer != tid) {
+ *   setField(event_writer, "threadID", tid);
+ *   setField(event_writer, "excluded", excluded);
+ * }
+ * return event_writer
  */
 bool LibraryCallKit::inline_native_getEventWriter() {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
@@ -2982,6 +2991,9 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   Node* input_memory_state = reset_memory();
   set_all_memory(input_memory_state);
   Node* input_io_state = i_o();
+
+  Node* excluded_mask = _gvn.intcon(32768);
+  Node* epoch_mask = _gvn.intcon(32767);
 
   // TLS
   Node* tls_ptr = _gvn.transform(new ThreadLocalNode());
@@ -3006,10 +3018,10 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   set_control(jobj_is_not_null);
 
   // Load the threadObj for the CarrierThread.
-  Node* const threadObj = generate_current_thread(tls_ptr);
+  Node* threadObj = generate_current_thread(tls_ptr);
 
   // Load the vthread.
-  Node* const vthread = generate_virtual_thread(tls_ptr);
+  Node* vthread = generate_virtual_thread(tls_ptr);
 
   // If vthread != threadObj, this is a virtual thread.
   Node* vthread_cmp_threadObj = _gvn.transform(new CmpPNode(vthread, threadObj));
@@ -3020,19 +3032,47 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // False branch, fallback to threadObj.
   Node* vthread_equal_threadObj = _gvn.transform(new IfFalseNode(iff_vthread_not_equal_threadObj));
   set_control(vthread_equal_threadObj);
+
   // Load the tid field from the vthread object.
   Node* thread_obj_tid = load_field_from_object(threadObj, "tid", "J");
+
+  // Load the raw epoch value from the threadObj.
+  Node* threadObj_epoch_offset = basic_plus_adr(threadObj, java_lang_Thread::jfr_epoch_offset());
+  Node* threadObj_epoch_raw = access_load_at(threadObj, threadObj_epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
+                                             IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+
+  // Mask off the excluded information from the epoch.
+  Node * threadObj_is_excluded = _gvn.transform(new AndINode(threadObj_epoch_raw, excluded_mask));
 
   // True branch, this is a virtual thread.
   Node* vthread_not_equal_threadObj = _gvn.transform(new IfTrueNode(iff_vthread_not_equal_threadObj));
   set_control(vthread_not_equal_threadObj);
+
   // Load the tid field from the vthread object.
   Node* vthread_tid = load_field_from_object(vthread, "tid", "J");
 
-  // Load the epoch from the vthread.
-  Node* epoch_offset = basic_plus_adr(vthread, java_lang_VirtualThread::jfr_epoch_offset());
-  Node* epoch = access_load_at(vthread, epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
-                               IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+  // Load the raw epoch value from the vthread.
+  Node* vthread_epoch_offset = basic_plus_adr(vthread, java_lang_Thread::jfr_epoch_offset());
+  Node* vthread_epoch_raw = access_load_at(vthread, vthread_epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
+                                           IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+
+  // Mask off the excluded information from the epoch.
+  Node * vthread_is_excluded = _gvn.transform(new AndINode(vthread_epoch_raw, _gvn.transform(excluded_mask)));
+
+  // Branch on excluded to conditionalize updating the epoch for the virtual thread.
+  Node* is_excluded_cmp = _gvn.transform(new CmpINode(vthread_is_excluded, _gvn.transform(excluded_mask)));
+  Node* test_not_excluded = _gvn.transform(new BoolNode(is_excluded_cmp, BoolTest::ne));
+  IfNode* iff_not_excluded = create_and_map_if(control(), test_not_excluded, PROB_MAX, COUNT_UNKNOWN);
+
+  // False branch, vthread is excluded, no need to write epoch info.
+  Node* excluded = _gvn.transform(new IfFalseNode(iff_not_excluded));
+
+  // True branch, vthread is included, update epoch info.
+  Node* included = _gvn.transform(new IfTrueNode(iff_not_excluded));
+  set_control(included);
+
+  // Get epoch value.
+  Node* epoch = _gvn.transform(new AndINode(vthread_epoch_raw, _gvn.transform(epoch_mask)));
 
   // Load the current epoch generation. The value is unsigned 16-bit, so we type it as T_CHAR.
   Node* epoch_generation_address = makecon(TypeRawPtr::make(Jfr::epoch_generation_address()));
@@ -3041,7 +3081,10 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // Compare the epoch in the vthread to the current epoch generation.
   Node* const epoch_cmp = _gvn.transform(new CmpUNode(current_epoch_generation, epoch));
   Node* test_epoch_not_equal = _gvn.transform(new BoolNode(epoch_cmp, BoolTest::ne));
-  IfNode* iff_epoch_not_equal = create_and_map_if(vthread_not_equal_threadObj, test_epoch_not_equal, PROB_FAIR, COUNT_UNKNOWN);
+  IfNode* iff_epoch_not_equal = create_and_map_if(control(), test_epoch_not_equal, PROB_FAIR, COUNT_UNKNOWN);
+
+  // False path, epoch is equal, checkpoint information is valid.
+  Node* epoch_is_equal = _gvn.transform(new IfFalseNode(iff_epoch_not_equal));
 
   // True path, epoch is not equal, write a checkpoint for the vthread.
   Node* epoch_is_not_equal = _gvn.transform(new IfTrueNode(iff_epoch_not_equal));
@@ -3056,9 +3099,6 @@ bool LibraryCallKit::inline_native_getEventWriter() {
                                                   "write_checkpoint", TypePtr::BOTTOM);
   Node* call_write_checkpoint_control = _gvn.transform(new ProjNode(call_write_checkpoint, TypeFunc::Control));
 
-  // False path, epoch is equal, checkpoint information is valid.
-  Node* epoch_is_equal = _gvn.transform(new IfFalseNode(iff_epoch_not_equal));
-
   // vthread epoch != current epoch
   RegionNode* epoch_compare_rgn = new RegionNode(PATH_LIMIT);
   record_for_igvn(epoch_compare_rgn);
@@ -3067,13 +3107,29 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   PhiNode* epoch_compare_io = new PhiNode(epoch_compare_rgn, Type::ABIO);
   record_for_igvn(epoch_compare_io);
 
-  // Need memory and IO.
+  // Update control and phi nodes.
   epoch_compare_rgn->init_req(_true_path, call_write_checkpoint_control);
-  epoch_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
-  epoch_compare_io->init_req(_true_path, i_o());
   epoch_compare_rgn->init_req(_false_path, epoch_is_equal);
+  epoch_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
   epoch_compare_mem->init_req(_false_path, input_memory_state);
+  epoch_compare_io->init_req(_true_path, i_o());
   epoch_compare_io->init_req(_false_path, input_io_state);
+
+  // excluded != true
+  RegionNode* exclude_compare_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(exclude_compare_rgn);
+  PhiNode* exclude_compare_mem = new PhiNode(exclude_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  record_for_igvn(exclude_compare_mem);
+  PhiNode* exclude_compare_io = new PhiNode(exclude_compare_rgn, Type::ABIO);
+  record_for_igvn(exclude_compare_io);
+
+  // Update control and phi nodes.
+  exclude_compare_rgn->init_req(_true_path, _gvn.transform(epoch_compare_rgn));
+  exclude_compare_rgn->init_req(_false_path, excluded);
+  exclude_compare_mem->init_req(_true_path, _gvn.transform(epoch_compare_mem));
+  exclude_compare_mem->init_req(_false_path, input_memory_state);
+  exclude_compare_io->init_req(_true_path, _gvn.transform(epoch_compare_io));
+  exclude_compare_io->init_req(_false_path, input_io_state);
 
   // vthread != threadObj
   RegionNode* vthread_compare_rgn = new RegionNode(PATH_LIMIT);
@@ -3083,16 +3139,20 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   record_for_igvn(vthread_compare_io);
   PhiNode* tid = new PhiNode(vthread_compare_rgn, TypeLong::LONG);
   record_for_igvn(tid);
+  PhiNode* exclusion = new PhiNode(vthread_compare_rgn, TypeInt::BOOL);
+  record_for_igvn(exclusion);
 
-  // Merge the vthread_compare and the epoch compare regions.
-  vthread_compare_rgn->init_req(_true_path, _gvn.transform(epoch_compare_rgn));
+  // Update control and phi nodes.
+  vthread_compare_rgn->init_req(_true_path, _gvn.transform(exclude_compare_rgn));
   vthread_compare_rgn->init_req(_false_path, vthread_equal_threadObj);
-  vthread_compare_mem->init_req(_true_path, _gvn.transform(epoch_compare_mem));
+  vthread_compare_mem->init_req(_true_path, _gvn.transform(exclude_compare_mem));
   vthread_compare_mem->init_req(_false_path, input_memory_state);
-  vthread_compare_io->init_req(_true_path, _gvn.transform(epoch_compare_io));
+  vthread_compare_io->init_req(_true_path, _gvn.transform(exclude_compare_io));
   vthread_compare_io->init_req(_false_path, input_io_state);
   tid->init_req(_true_path, _gvn.transform(vthread_tid));
   tid->init_req(_false_path, _gvn.transform(thread_obj_tid));
+  exclusion->init_req(_true_path, _gvn.transform(vthread_is_excluded));
+  exclusion->init_req(_false_path, _gvn.transform(threadObj_is_excluded));
 
   // Update branch state.
   set_control(_gvn.transform(vthread_compare_rgn));
@@ -3112,6 +3172,9 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   // Get the field offset to, conditionally, store an updated tid value later.
   Node* const event_writer_tid_field = field_address_from_object(event_writer, "threadID", "J", false);
   const TypePtr* event_writer_tid_field_type = _gvn.type(event_writer_tid_field)->isa_ptr();
+  // Get the field offset to, conditionally, store an updated exclusion value later.
+  Node* const event_writer_excluded_field = field_address_from_object(event_writer, "excluded", "Z", false);
+  const TypePtr* event_writer_excluded_field_type = _gvn.type(event_writer_excluded_field)->isa_ptr();
 
   RegionNode* event_writer_tid_compare_rgn = new RegionNode(PATH_LIMIT);
   record_for_igvn(event_writer_tid_compare_rgn);
@@ -3125,25 +3188,22 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   Node* test_tid_not_equal = _gvn.transform(new BoolNode(tid_cmp, BoolTest::ne));
   IfNode* iff_tid_not_equal = create_and_map_if(_gvn.transform(vthread_compare_rgn), test_tid_not_equal, PROB_FAIR, COUNT_UNKNOWN);
 
-  // True path, tid is not equal, need to update the tid in the event writer.
-  Node* tid_is_not_equal = _gvn.transform(new IfTrueNode(iff_tid_not_equal));
-  record_for_igvn(tid_is_not_equal);
-  // Store the tid to the eventwriter.
-  Node* event_writer_tid_memory_store = store_to_memory(tid_is_not_equal,
-                                                        event_writer_tid_field,
-                                                        tid,
-                                                        T_LONG,
-                                                        event_writer_tid_field_type,
-                                                        MemNode::unordered);
-
   // False path, tids are the same.
   Node* tid_is_equal = _gvn.transform(new IfFalseNode(iff_tid_not_equal));
 
-  // Update controls.
+  // True path, tid is not equal, need to update the tid in the event writer.
+  Node* tid_is_not_equal = _gvn.transform(new IfTrueNode(iff_tid_not_equal));
+  record_for_igvn(tid_is_not_equal);
+
+  // Store the exclusion state to the event writer.
+  store_to_memory(tid_is_not_equal, event_writer_excluded_field, _gvn.transform(exclusion), T_BOOLEAN, event_writer_excluded_field_type, MemNode::unordered);
+
+  // Store the tid to the event writer.
+  store_to_memory(tid_is_not_equal, event_writer_tid_field, tid, T_LONG, event_writer_tid_field_type, MemNode::unordered);
+
+  // Update control and phi nodes.
   event_writer_tid_compare_rgn->init_req(_true_path, tid_is_not_equal);
   event_writer_tid_compare_rgn->init_req(_false_path, tid_is_equal);
-
-  // Update memory phi nodes.
   event_writer_tid_compare_mem->init_req(_true_path, _gvn.transform(reset_memory()));
   event_writer_tid_compare_mem->init_req(_false_path, _gvn.transform(vthread_compare_mem));
   event_writer_tid_compare_io->init_req(_true_path, _gvn.transform(i_o()));
@@ -3180,20 +3240,31 @@ bool LibraryCallKit::inline_native_getEventWriter() {
 }
 
 /*
- * if (carrierThread != thread) {
- *   Thread::jfr_thread_local()->_vthread_epoch = java_lang_VirtualThread::jfr_epoch(thread)
- *   Thread::jfr_thread_local()->_contextual_tid = java_lang_Thread::tid(thread);
+ * JfrThreadLocal* const tl = thread->jfr_thread_local();
+ * if (carrierThread != thread) { // is virtual thread
+ *   const u2 vthread_epoch_raw = java_lang_Thread::jfr_epoch(thread);
+ *   bool excluded = vthread_epoch_raw & excluded_mask;
+ *   Atomic::store(&tl->_contextual_tid, java_lang_Thread::tid(thread));
+ *   Atomic::store(&tl->_contextual_thread_excluded, is_excluded);
+ *   if (!excluded) {
+ *     const u2 vthread_epoch = vthread_epoch_raw & epoch_mask;
+ *     Atomic::store(&tl->_vthread_epoch, vthread_epoch);
+ *   }
  *   OrderAccess::storestore();
- *   Thread::jfr_thread_local()->_vthread = true;
+ *   Atomic::store(&tl->_vthread, true);
+ *   return;
  * }
  * OrderAccess::storestore();
- * Thread::jfr_thread_local()->_vthread = false;
+ * Atomic::store(&tl->_vthread, false);
  */
 void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
 
   Node* input_memory_state = reset_memory();
   set_all_memory(input_memory_state);
+
+  Node* excluded_mask = _gvn.intcon(32768);
+  Node* epoch_mask = _gvn.intcon(32767);
 
   Node* const carrierThread = generate_current_thread(jt);
   // If thread != carrierThread, this is a virtual thread.
@@ -3204,46 +3275,92 @@ void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
 
   Node* vthread_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_OFFSET_JFR));
 
-  // False branch, carrierThread, set _vthread field to false.
+  // False branch, is carrierThread.
   Node* thread_equal_carrierThread = _gvn.transform(new IfFalseNode(iff_thread_not_equal_carrierThread));
-  Node* vthread_false = store_to_memory(thread_equal_carrierThread, vthread_offset, _gvn.intcon(0), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+  // Store release
+  Node* vthread_false_memory = store_to_memory(thread_equal_carrierThread, vthread_offset, _gvn.intcon(0), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
 
   set_all_memory(input_memory_state);
 
-  // True branch, virtual thread, set _vthread field to true;
+  // True branch, is virtual thread.
   Node* thread_not_equal_carrierThread = _gvn.transform(new IfTrueNode(iff_thread_not_equal_carrierThread));
-
   set_control(thread_not_equal_carrierThread);
+
+  // Load the raw epoch value from the vthread.
+  Node* epoch_offset = basic_plus_adr(thread, java_lang_Thread::jfr_epoch_offset());
+  Node* epoch_raw = access_load_at(thread, epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
+                                   IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+
+  // Mask off the excluded information from the epoch.
+  Node * const is_excluded = _gvn.transform(new AndINode(epoch_raw, _gvn.transform(excluded_mask)));
 
   // Load the tid field from the thread.
   Node* tid = load_field_from_object(thread, "tid", "J");
 
-  // Load the epoch from the vthread.
-  Node* epoch_offset = basic_plus_adr(thread, java_lang_VirtualThread::jfr_epoch_offset());
-  Node* epoch = access_load_at(thread, epoch_offset, TypeRawPtr::BOTTOM, TypeInt::CHAR, T_CHAR,
-                               IN_HEAP | MO_UNORDERED | C2_MISMATCHED | C2_CONTROL_DEPENDENT_LOAD);
+  // Store the vthread tid to the jfr thread local.
+  Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_ID_OFFSET_JFR));
+  Node* tid_memory = store_to_memory(control(), thread_id_offset, tid, T_LONG, Compile::AliasIdxRaw, MemNode::unordered, true);
+
+  // Branch is_excluded to conditionalize updating the epoch .
+  Node* excluded_cmp = _gvn.transform(new CmpINode(is_excluded, _gvn.transform(excluded_mask)));
+  Node* test_excluded = _gvn.transform(new BoolNode(excluded_cmp, BoolTest::eq));
+  IfNode* iff_excluded = create_and_map_if(control(), test_excluded, PROB_MIN, COUNT_UNKNOWN);
+
+  // True branch, vthread is excluded, no need to write epoch info.
+  Node* excluded = _gvn.transform(new IfTrueNode(iff_excluded));
+  set_control(excluded);
+  Node* vthread_is_excluded = _gvn.intcon(1);
+
+  // False branch, vthread is included, update epoch info.
+  Node* included = _gvn.transform(new IfFalseNode(iff_excluded));
+  set_control(included);
+  Node* vthread_is_included = _gvn.intcon(0);
+
+  // Get epoch value.
+  Node* epoch = _gvn.transform(new AndINode(epoch_raw, _gvn.transform(epoch_mask)));
 
   // Store the vthread epoch to the jfr thread local.
   Node* vthread_epoch_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_EPOCH_OFFSET_JFR));
-  store_to_memory(control(), vthread_epoch_offset, epoch, T_CHAR, Compile::AliasIdxRaw, MemNode::unordered, true);
+  Node* included_memory = store_to_memory(control(), vthread_epoch_offset, epoch, T_CHAR, Compile::AliasIdxRaw, MemNode::unordered, true);
 
-  // Store the tid to the jfr thread local.
-  Node* thread_id_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + THREAD_ID_OFFSET_JFR));
-  store_to_memory(control(), thread_id_offset, tid, T_LONG, Compile::AliasIdxRaw, MemNode::unordered, true);
+  RegionNode* excluded_rgn = new RegionNode(PATH_LIMIT);
+  record_for_igvn(excluded_rgn);
+  PhiNode* excluded_mem = new PhiNode(excluded_rgn, Type::MEMORY, TypePtr::BOTTOM);
+  record_for_igvn(excluded_mem);
+  PhiNode* exclusion = new PhiNode(excluded_rgn, TypeInt::BOOL);
+  record_for_igvn(exclusion);
+
+  // Merge the excluded control and memory.
+  excluded_rgn->init_req(_true_path, excluded);
+  excluded_rgn->init_req(_false_path, included);
+  excluded_mem->init_req(_true_path, tid_memory);
+  excluded_mem->init_req(_false_path, included_memory);
+  exclusion->init_req(_true_path, _gvn.transform(vthread_is_excluded));
+  exclusion->init_req(_false_path, _gvn.transform(vthread_is_included));
+
+  // Set intermediate state.
+  set_control(_gvn.transform(excluded_rgn));
+  set_all_memory(excluded_mem);
+
+  // Store the vthread exclusion state to the jfr thread local.
+  Node* thread_local_excluded_offset = basic_plus_adr(jt, in_bytes(THREAD_LOCAL_OFFSET_JFR + VTHREAD_EXCLUDED_OFFSET_JFR));
+  store_to_memory(control(), thread_local_excluded_offset, _gvn.transform(exclusion), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::unordered, true);
 
   // Store release
-  Node* vthread_true = store_to_memory(control(), vthread_offset, _gvn.intcon(1), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
+  Node * vthread_true_memory = store_to_memory(control(), vthread_offset, _gvn.intcon(1), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
 
   RegionNode* thread_compare_rgn = new RegionNode(PATH_LIMIT);
   record_for_igvn(thread_compare_rgn);
   PhiNode* thread_compare_mem = new PhiNode(thread_compare_rgn, Type::MEMORY, TypePtr::BOTTOM);
   record_for_igvn(thread_compare_mem);
+  PhiNode* vthread = new PhiNode(thread_compare_rgn, TypeInt::BOOL);
+  record_for_igvn(vthread);
 
-  // Merge the thread_compare memory.
-  thread_compare_rgn->init_req(_true_path, thread_not_equal_carrierThread);
-  thread_compare_mem->init_req(_true_path, vthread_true);
+  // Merge the thread_compare control and memory.
+  thread_compare_rgn->init_req(_true_path, control());
   thread_compare_rgn->init_req(_false_path, thread_equal_carrierThread);
-  thread_compare_mem->init_req(_false_path, vthread_false);
+  thread_compare_mem->init_req(_true_path, vthread_true_memory);
+  thread_compare_mem->init_req(_false_path, vthread_false_memory);
 
   // Set output state.
   set_control(_gvn.transform(thread_compare_rgn));

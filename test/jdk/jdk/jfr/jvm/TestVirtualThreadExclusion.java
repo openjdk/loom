@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,25 +42,25 @@ import static jdk.test.lib.Asserts.assertTrue;
  * @requires vm.hasJFR
  * @library /test/lib
  * @modules jdk.jfr/jdk.jfr.internal
- * @compile --enable-preview -source ${jdk.version} TestThreadExclusion.java LatchedThread.java
- * @run main/othervm --enable-preview jdk.jfr.jvm.TestThreadExclusion
+ * @compile --enable-preview -source ${jdk.version} TestVirtualThreadExclusion.java LatchedThread.java
+ * @run main/othervm --enable-preview jdk.jfr.jvm.TestVirtualThreadExclusion
  */
 
 /**
  * Starts and stops a number of threads in order.
  * Verifies that events are in the same order.
  */
-public class TestThreadExclusion {
-    private final static String EVENT_NAME_THREAD_START = EventNames.ThreadStart;
-    private final static String EVENT_NAME_THREAD_END = EventNames.ThreadEnd;
-    private static final String THREAD_NAME_PREFIX = "TestThread-";
+public class TestVirtualThreadExclusion {
+    private final static String EVENT_NAME_VIRTUAL_THREAD_START = EventNames.VirtualThreadStart;
+    private final static String EVENT_NAME_VIRTUAL_THREAD_END = EventNames.VirtualThreadEnd;
+    private static final String THREAD_NAME_PREFIX = "TestVirtualThread-";
     private static JVM jvm;
 
     public static void main(String[] args) throws Throwable {
         // Test Java Thread Start event
         Recording recording = new Recording();
-        recording.enable(EVENT_NAME_THREAD_START).withThreshold(Duration.ofMillis(0));
-        recording.enable(EVENT_NAME_THREAD_END).withThreshold(Duration.ofMillis(0));
+        recording.enable(EVENT_NAME_VIRTUAL_THREAD_START).withThreshold(Duration.ofMillis(0));
+        recording.enable(EVENT_NAME_VIRTUAL_THREAD_END).withThreshold(Duration.ofMillis(0));
         recording.start();
         LatchedThread[] threads = startThreads();
         long[] javaThreadIds = getJavaThreadIds(threads);
@@ -86,10 +86,10 @@ public class TestThreadExclusion {
         LatchedThread threads[] = new LatchedThread[10];
         jvm = JVM.getJVM();
         for (int i = 0; i < threads.length; i++) {
-            threads[i] = new LatchedThread(THREAD_NAME_PREFIX + i, false);
+            threads[i] = new LatchedThread(THREAD_NAME_PREFIX + i, true);
             jvm.exclude(threads[i].getThread());
             threads[i].start();
-            System.out.println("Started thread id=" + threads[i].getId());
+            System.out.println("Started virtual thread id=" + threads[i].getId());
         }
         return threads;
     }
@@ -104,7 +104,7 @@ public class TestThreadExclusion {
 
     private static void stopThreads(LatchedThread[] threads) {
         for (LatchedThread t : threads) {
-            assertTrue(jvm.isExcluded(t.getThread()), "Thread " + t.getThread() + "should be excluded");
+            assertTrue(jvm.isExcluded(t.getThread()), "Virtual Thread " + t.getThread() + "should be excluded");
             try {
                 t.stopAndJoin();
             } catch (InterruptedException e) {

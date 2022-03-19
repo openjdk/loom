@@ -86,15 +86,15 @@ void Jfr::on_thread_exit(Thread* t) {
 }
 
 void Jfr::exclude_thread(Thread* t) {
-  JfrThreadLocal::exclude(t);
+  JfrJavaSupport::exclude(t);
 }
 
 void Jfr::include_thread(Thread* t) {
-  JfrThreadLocal::include(t);
+  JfrJavaSupport::include(t);
 }
 
 bool Jfr::is_excluded(Thread* t) {
-  return t != NULL && t->jfr_thread_local()->is_excluded();
+  return JfrJavaSupport::is_excluded(t);
 }
 
 void Jfr::on_set_current_thread(JavaThread* jt, oop thread) {

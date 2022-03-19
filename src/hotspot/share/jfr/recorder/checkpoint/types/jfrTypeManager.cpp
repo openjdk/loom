@@ -101,23 +101,32 @@ void JfrTypeManager::write_threads(JfrCheckpointWriter& writer) {
   serialize_thread_groups(writer);
 }
 
-JfrBlobHandle JfrTypeManager::create_thread_blob(JavaThread* jt, traceid tid, oop vthread) {
+JfrBlobHandle JfrTypeManager::create_thread_blob(JavaThread* jt, traceid tid /* 0 */, oop vthread /* nullptr */) {
   assert(jt != NULL, "invariant");
   ResourceMark rm(jt);
-  JfrCheckpointWriter writer(jt, true, THREADS, false); // thread local lease
+  JfrCheckpointWriter writer(jt, true, THREADS, false); // Thread local lease for blob creation.
+  // TYPE_THREAD and count is written unconditionally for blobs, also for vthreads.
   writer.write_type(TYPE_THREAD);
+  writer.write_count(1);
   JfrThreadConstant type_thread(jt, tid, vthread);
   type_thread.serialize(writer);
   return writer.move();
 }
 
-void JfrTypeManager::write_checkpoint(Thread* t, traceid tid, oop vthread) {
+void JfrTypeManager::write_checkpoint(Thread* t, traceid tid /* 0 */, oop vthread /* nullptr */) {
   assert(t != NULL, "invariant");
   Thread* const current = Thread::current(); // not necessarily the same as t
   assert(current != NULL, "invariant");
+  const bool is_vthread = vthread != nullptr;
   ResourceMark rm(current);
-  JfrCheckpointWriter writer(current, true, THREADS, false); // thread local lease
-  writer.write_type(TYPE_THREAD);
+  JfrCheckpointWriter writer(current, true, THREADS, !is_vthread); // Virtual Threads use thread local lease.
+  if (is_vthread) {
+    // TYPE_THREAD and count is written later as part of vthread bulk serialization.
+    writer.set_count(1); // Only a logical marker for the checkpoint header.
+  } else {
+    writer.write_type(TYPE_THREAD);
+    writer.write_count(1);
+  }
   JfrThreadConstant type_thread(t, tid, vthread);
   type_thread.serialize(writer);
 }

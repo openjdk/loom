@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 #ifndef SHARE_GC_SHARED_COPYFAILEDINFO_HPP
 #define SHARE_GC_SHARED_COPYFAILEDINFO_HPP
 
-#include "jfr/support/jfrThreadId.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/globalDefinitions.hpp"
 
@@ -71,7 +70,7 @@ class PromotionFailedInfo : public CopyFailedInfo {
 
   void register_copy_failure(size_t size) {
     CopyFailedInfo::register_copy_failure(size);
-    _thread_trace_id = JFR_VM_THREAD_ID(Thread::current());
+    _thread_trace_id = JFR_JVM_THREAD_ID(Thread::current());
   }
 
   void reset() {

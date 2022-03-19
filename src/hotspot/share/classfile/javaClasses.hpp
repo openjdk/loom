@@ -399,8 +399,9 @@ class java_lang_Class : AllStatic {
 
 // Interface to java.lang.Thread objects
 
-#define THREAD_INJECTED_FIELDS(macro)                                   \
-  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false)
+#define THREAD_INJECTED_FIELDS(macro)                                  \
+  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false) \
+  JFR_ONLY(macro(java_lang_Thread, jfr_epoch, short_signature, false))
 
 class java_lang_Thread : AllStatic {
   friend class java_lang_VirtualThread;
@@ -418,6 +419,7 @@ class java_lang_Thread : AllStatic {
   static int _continuation_offset;
   static int _park_blocker_offset;
   static int _scopeLocalBindings_offset;
+  JFR_ONLY(static int _jfr_epoch_offset;)
 
   static void compute_offsets();
 
@@ -480,6 +482,10 @@ class java_lang_Thread : AllStatic {
 
   // Fill in current stack trace, can cause GC
   static oop async_get_stack_trace(oop java_thread, TRAPS);
+
+  JFR_ONLY(static u2 jfr_epoch(oop java_thread);)
+  JFR_ONLY(static void set_jfr_epoch(oop java_thread, u2 epoch);)
+  JFR_ONLY(static int jfr_epoch_offset() { CHECK_INIT(_jfr_epoch_offset); })
 
   // Debugging
   friend class JavaClasses;
@@ -581,9 +587,6 @@ class java_lang_ThreadGroup : AllStatic {
 
 // Interface to java.lang.VirtualThread objects
 
-#define VTHREAD_INJECTED_FIELDS(macro)                                       \
-JFR_ONLY(macro(java_lang_VirtualThread, jfr_epoch, short_signature, false))
-
 class java_lang_VirtualThread : AllStatic {
  private:
   static int static_notify_jvmti_events_offset;
@@ -627,9 +630,6 @@ class java_lang_VirtualThread : AllStatic {
   static bool notify_jvmti_events();
   static void set_notify_jvmti_events(bool enable);
   static void init_static_notify_jvmti_events();
-  JFR_ONLY(static u2 jfr_epoch(oop vthread);)
-  JFR_ONLY(static void set_jfr_epoch(oop vthread, u2 epoch);)
-  JFR_ONLY(static int jfr_epoch_offset() { CHECK_INIT(_jfr_epoch_offset); })
 };
 
 
@@ -2004,7 +2004,6 @@ class InjectedField {
   STACKFRAMEINFO_INJECTED_FIELDS(macro)     \
   MODULE_INJECTED_FIELDS(macro)             \
   THREAD_INJECTED_FIELDS(macro)             \
-  VTHREAD_INJECTED_FIELDS(macro)            \
   INTERNALERROR_INJECTED_FIELDS(macro)      \
   STACKCHUNK_INJECTED_FIELDS(macro)
 

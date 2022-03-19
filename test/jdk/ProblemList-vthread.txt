@@ -8,14 +8,10 @@ java/foreign/TestSegmentCopy.java                                     8281222 ge
 java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 generic-all
 
 # JFR is not completely fixed to support vthreads
-jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
-jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
-
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
-
-jdk/jfr/event/gc/detailed/TestZPageAllocationEvent.java               8283069 generic-all
-
+jdk/jfr/jcmd/TestJcmdDumpPathToGCRoots.java
+jdk/jfr/tool/TestPrintXML.java
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.

@@ -36,9 +36,14 @@ inline traceid JfrOopTraceId<T>::id(oop ref) {
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::epoch(oop ref) {
+inline u2 JfrOopTraceId<T>::epoch(oop ref) {
   assert(ref != nullptr, "invariant");
   return T::epoch(ref);
+}
+
+template <typename T>
+inline u2 JfrOopTraceId<T>::current_epoch() {
+  return JfrTraceIdEpoch::epoch_generation();
 }
 
 template <typename T>
@@ -50,6 +55,21 @@ inline void JfrOopTraceId<T>::set_epoch(oop ref, u2 epoch) {
 template <typename T>
 inline void JfrOopTraceId<T>::set_epoch(oop ref) {
   set_epoch(ref, JfrTraceIdEpoch::epoch_generation());
+}
+
+template <typename T>
+inline bool JfrOopTraceId<T>::is_excluded(oop ref) {
+  return T::is_excluded(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::exclude(oop ref) {
+  T::exclude(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::include(oop ref) {
+  T::include(ref);
 }
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP
