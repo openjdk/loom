@@ -41,7 +41,6 @@ public class SystemDictionary {
   private static AddressField systemKlassField;
   private static AddressField threadKlassField;
   private static AddressField threadFieldHolderKlassField;
-  private static AddressField threadGroupKlassField;
   private static AddressField methodHandleKlassField;
 
   static {
@@ -62,7 +61,6 @@ public class SystemDictionary {
     systemKlassField = type.getAddressField(VM_CLASS_AT("System_klass"));
     threadKlassField = type.getAddressField(VM_CLASS_AT("Thread_klass"));
     threadFieldHolderKlassField = type.getAddressField(VM_CLASS_AT("Thread_FieldHolder_klass"));
-    threadGroupKlassField = type.getAddressField(VM_CLASS_AT("ThreadGroup_klass"));
     methodHandleKlassField = type.getAddressField(VM_CLASS_AT("MethodHandle_klass"));
   }
 
@@ -90,10 +88,6 @@ public class SystemDictionary {
 
   public static InstanceKlass getThreadFieldHolderKlass() {
     return (InstanceKlass)Metadata.instantiateWrapperFor(threadFieldHolderKlassField.getValue());
-  }
-
-  public static InstanceKlass getThreadGroupKlass() {
-    return (InstanceKlass)Metadata.instantiateWrapperFor(threadGroupKlassField.getValue());
   }
 
   public static InstanceKlass getObjectKlass() {

@@ -43,13 +43,6 @@ public class OopUtilities {
   // String fields
   private static ByteField coderField;
   private static OopField valueField;
-  // ThreadGroup fields
-  private static OopField threadGroupParentField;
-  private static OopField threadGroupNameField;
-  private static IntField threadGroupNThreadsField;
-  private static OopField threadGroupThreadsField;
-  private static IntField threadGroupNGroupsField;
-  private static OopField threadGroupGroupsField;
   // Thread fields
   private static OopField threadHolderField;
   private static OopField threadNameField;
@@ -65,7 +58,6 @@ public class OopUtilities {
 
   // possible values of JavaThreadStatus
   public static int THREAD_STATUS_NEW;
-
   public static int THREAD_STATUS_RUNNABLE;
   public static int THREAD_STATUS_SLEEPING;
   public static int THREAD_STATUS_IN_OBJECT_WAIT;
@@ -164,59 +156,6 @@ public class OopUtilities {
 
   public static String stringOopToEscapedString(Oop stringOop) {
     return escapeString(stringOopToString(stringOop));
-  }
-
-  private static void initThreadGroupFields() {
-    if (threadGroupParentField == null) {
-      SystemDictionary sysDict = VM.getVM().getSystemDictionary();
-      InstanceKlass k = sysDict.getThreadGroupKlass();
-      threadGroupParentField   = (OopField) k.findField("parent",   "Ljava/lang/ThreadGroup;");
-      threadGroupNameField     = (OopField) k.findField("name",     "Ljava/lang/String;");
-      threadGroupNThreadsField = (IntField) k.findField("nthreads", "I");
-      threadGroupThreadsField  = (OopField) k.findField("threads",  "[Ljava/lang/Thread;");
-      threadGroupNGroupsField  = (IntField) k.findField("ngroups",  "I");
-      threadGroupGroupsField   = (OopField) k.findField("groups",   "[Ljava/lang/ThreadGroup;");
-      if (Assert.ASSERTS_ENABLED) {
-        Assert.that(threadGroupParentField   != null &&
-                    threadGroupNameField     != null &&
-                    threadGroupNThreadsField != null &&
-                    threadGroupThreadsField  != null &&
-                    threadGroupNGroupsField  != null &&
-                    threadGroupGroupsField   != null, "must find all java.lang.ThreadGroup fields");
-      }
-    }
-  }
-
-  public static Oop threadGroupOopGetParent(Oop threadGroupOop) {
-    initThreadGroupFields();
-    return threadGroupParentField.getValue(threadGroupOop);
-  }
-
-  public static String threadGroupOopGetName(Oop threadGroupOop) {
-    initThreadGroupFields();
-    return stringOopToString(threadGroupNameField.getValue(threadGroupOop));
-  }
-
-  public static Oop[] threadGroupOopGetThreads(Oop threadGroupOop) {
-    initThreadGroupFields();
-    int nthreads = threadGroupNThreadsField.getValue(threadGroupOop);
-    Oop[] result = new Oop[nthreads];
-    ObjArray threads = (ObjArray) threadGroupThreadsField.getValue(threadGroupOop);
-    for (int i = 0; i < nthreads; i++) {
-      result[i] = threads.getObjAt(i);
-    }
-    return result;
-  }
-
-  public static Oop[] threadGroupOopGetGroups(Oop threadGroupOop) {
-    initThreadGroupFields();
-    int ngroups = threadGroupNGroupsField.getValue(threadGroupOop);
-    Oop[] result = new Oop[ngroups];
-    ObjArray groups = (ObjArray) threadGroupGroupsField.getValue(threadGroupOop);
-    for (int i = 0; i < ngroups; i++) {
-      result[i] = groups.getObjAt(i);
-    }
-    return result;
   }
 
   private static void initThreadFields() {
