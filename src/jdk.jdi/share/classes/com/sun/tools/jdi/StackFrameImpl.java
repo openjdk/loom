@@ -389,18 +389,16 @@ public class StackFrameImpl extends MirrorImpl
                                  thread, id);
                 }
         };
-        boolean isNative = location().method().isNative(); // need to compute before popping the frame
         try {
             PacketStream stream = thread.sendResumingCommand(sender);
             JDWP.StackFrame.PopFrames.waitForReply(vm, stream);
         } catch (JDWPException exc) {
             switch (exc.errorCode()) {
             case JDWP.Error.OPAQUE_FRAME:
-                if (isNative) {
-                    throw new NativeMethodException();
+                if (thread.isVirtual()) {
+                    throw new OpaqueFrameException();  // can only happen with virtual threads
                 } else {
-                    assert thread.isVirtual(); // can only happen with virtual threads
-                    throw new OpaqueFrameException();
+                    throw new NativeMethodException(); // can only happen with platform threads
                 }
             case JDWP.Error.THREAD_NOT_SUSPENDED:
                 throw new IncompatibleThreadStateException(
