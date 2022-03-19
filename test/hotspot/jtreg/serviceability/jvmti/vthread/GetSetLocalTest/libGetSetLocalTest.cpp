@@ -349,7 +349,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread,
   const char* virt = jni->IsVirtualThread(vthread) ? "virtual" : "carrier";
   const jint depth = 0; // the depth is always 0 in case of breakpoint
 
-  LOG("Breakpoint: %s on %s thread: %s\n", mname, virt, tname);
+  LOG("Breakpoint: %s on %s thread: %s - Started\n", mname, virt, tname);
 
   // disable BREAKPOINT events
   jvmtiError err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_BREAKPOINT, vthread);
@@ -363,6 +363,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread,
   }
   deallocate(jvmti, jni, (void*)mname);
   deallocate(jvmti, jni, (void*)tname);
+  LOG("Breakpoint: %s on %s thread: %s - Finished\n", mname, virt, tname);
 }
 
 JNIEXPORT jint JNICALL
