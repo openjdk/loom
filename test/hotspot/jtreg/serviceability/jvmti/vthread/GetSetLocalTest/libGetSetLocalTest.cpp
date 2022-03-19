@@ -337,6 +337,7 @@ test_GetSetLocal(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, int depth, int f
     test_SetLocal(jvmti, jni, cthread, vthread, depth, frame_count, &values0);
   }
  End:
+  LOG("test_GetSetLocal: finished\n\n");
   if (cthread != 0) jni->DeleteLocalRef(cthread);
 }
 
