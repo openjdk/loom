@@ -180,10 +180,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	          8264699 generic-all
 
-# SA needs update
-serviceability/sa/ClhsdbThreadContext.java                                    8243016 generic-all
-serviceability/sa/JhsdbThreadInfoTest.java                                    8243016 generic-all
-
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all

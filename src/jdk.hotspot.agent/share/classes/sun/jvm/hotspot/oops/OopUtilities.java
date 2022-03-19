@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -51,16 +51,15 @@ public class OopUtilities {
   private static IntField threadGroupNGroupsField;
   private static OopField threadGroupGroupsField;
   // Thread fields
+  private static OopField threadHolderField;
   private static OopField threadNameField;
-  private static OopField threadGroupField;
   private static LongField threadEETopField;
   //tid field is new since 1.5
   private static LongField threadTIDField;
-  // threadStatus field is new since 1.5
-  private static IntField threadStatusField;
   // parkBlocker field is new since 1.6
   private static OopField threadParkBlockerField;
-
+  // Thread$FieldHolder fields
+  private static IntField threadStatusField;
   private static IntField threadPriorityField;
   private static BooleanField threadDaemonField;
 
@@ -224,14 +223,17 @@ public class OopUtilities {
     if (threadNameField == null) {
       SystemDictionary sysDict = VM.getVM().getSystemDictionary();
       InstanceKlass k = sysDict.getThreadKlass();
+      threadHolderField  = (OopField) k.findField("holder", "Ljava/lang/Thread$FieldHolder;");
       threadNameField  = (OopField) k.findField("name", "Ljava/lang/String;");
       threadEETopField = (LongField) k.findField("eetop", "J");
       threadTIDField = (LongField) k.findField("tid", "J");
-      threadStatusField = (IntField) k.findField("threadStatus", "I");
       threadParkBlockerField = (OopField) k.findField("parkBlocker",
                                      "Ljava/lang/Object;");
+      k = sysDict.getThreadFieldHolderKlass();
       threadPriorityField = (IntField) k.findField("priority", "I");
+      threadStatusField = (IntField) k.findField("threadStatus", "I");
       threadDaemonField = (BooleanField) k.findField("daemon", "Z");
+
       TypeDataBase db = VM.getVM().getTypeDataBase();
       THREAD_STATUS_NEW = db.lookupIntConstant("JavaThreadStatus::NEW").intValue();
 
@@ -282,7 +284,8 @@ public class OopUtilities {
     initThreadFields();
     // The threadStatus is only present starting in 1.5
     if (threadStatusField != null) {
-      return (int) threadStatusField.getValue(threadOop);
+      Oop holderOop = threadHolderField.getValue(threadOop);
+      return (int) threadStatusField.getValue(holderOop);
     } else {
       // All we can easily figure out is if it is alive, but that is
       // enough info for a valid unknown status.
@@ -329,7 +332,8 @@ public class OopUtilities {
   public static int threadOopGetPriority(Oop threadOop) {
     initThreadFields();
     if (threadPriorityField != null) {
-      return threadPriorityField.getValue(threadOop);
+      Oop holderOop = threadHolderField.getValue(threadOop);
+      return threadPriorityField.getValue(holderOop);
     } else {
       return 0;
     }
@@ -338,7 +342,8 @@ public class OopUtilities {
   public static boolean threadOopGetDaemon(Oop threadOop) {
     initThreadFields();
     if (threadDaemonField != null) {
-      return threadDaemonField.getValue(threadOop);
+      Oop holderOop = threadHolderField.getValue(threadOop);
+      return threadDaemonField.getValue(holderOop);
     } else {
       return false;
     }
