@@ -40,7 +40,10 @@ import com.sun.jdi.InvalidStackFrameException;
 import com.sun.jdi.InvalidTypeException;
 import com.sun.jdi.LocalVariable;
 import com.sun.jdi.Location;
+import com.sun.jdi.Method;
+import com.sun.jdi.NativeMethodException;
 import com.sun.jdi.ObjectReference;
+import com.sun.jdi.OpaqueFrameException;
 import com.sun.jdi.StackFrame;
 import com.sun.jdi.ThreadReference;
 import com.sun.jdi.Value;
@@ -386,11 +389,19 @@ public class StackFrameImpl extends MirrorImpl
                                  thread, id);
                 }
         };
+        boolean isNative = location().method().isNative(); // need to compute before popping the frame
         try {
             PacketStream stream = thread.sendResumingCommand(sender);
             JDWP.StackFrame.PopFrames.waitForReply(vm, stream);
         } catch (JDWPException exc) {
             switch (exc.errorCode()) {
+            case JDWP.Error.OPAQUE_FRAME:
+                if (isNative) {
+                    throw new NativeMethodException();
+                } else {
+                    assert thread.isVirtual(); // can only happen with virtual threads
+                    throw new OpaqueFrameException();
+                }
             case JDWP.Error.THREAD_NOT_SUSPENDED:
                 throw new IncompatibleThreadStateException(
                          "Thread not current or suspended");
