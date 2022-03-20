@@ -7465,7 +7465,9 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-RuntimeStub* generate_cont_doYield() {
+  RuntimeStub* generate_cont_doYield() {
+    if (!Continuations::enabled()) return nullptr;
+
     const char *name = "cont_doYield";
 
     enum layout {
@@ -7529,6 +7531,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_jump_from_safepoint() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
     address start = __ pc();
@@ -7621,6 +7625,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "Cont thaw");
     address start = __ pc();
     generate_cont_thaw(false, false);
@@ -7628,6 +7634,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier() {
+    if (!Continuations::enabled()) return nullptr;
+
     // TODO: will probably need multiple return barriers depending on return type
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
@@ -7638,6 +7646,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier_exception() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
 
@@ -7647,25 +7657,26 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_interpreter_forced_preempt_return() {
-      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-      address start = __ pc();
+    if (!Continuations::enabled()) return nullptr;
+    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+    address start = __ pc();
 
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
-      // see InterpreterMacroAssembler::restore_bcp/restore_locals
-      // TODO: use InterpreterMacroAssembler
-      static const Register _locals_register = r14;
-      static const Register _bcp_register    = r13;
+    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+    // see InterpreterMacroAssembler::restore_bcp/restore_locals
+    // TODO: use InterpreterMacroAssembler
+    static const Register _locals_register = r14;
+    static const Register _bcp_register    = r13;
 
-      __ pop(rbp);
+    __ pop(rbp);
 
-      __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
-      __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
-      // __ reinit_heapbase();
+    __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
+    __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
+    // __ reinit_heapbase();
 
-      __ ret(0);
+    __ ret(0);
 
-      return start;
-    }
+    return start;
+  }
 
 #if INCLUDE_JFR
 

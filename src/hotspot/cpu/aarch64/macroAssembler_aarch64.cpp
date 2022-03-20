@@ -314,6 +314,7 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -324,6 +325,7 @@ void MacroAssembler::push_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -333,10 +335,12 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   incrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   decrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 

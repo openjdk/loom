@@ -2899,6 +2899,7 @@ void MacroAssembler::push_IU_state() {
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
   jccb(Assembler::belowEqual, done);
@@ -2907,6 +2908,7 @@ void MacroAssembler::push_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
   jccb(Assembler::below, done);
@@ -2915,10 +2917,12 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   incrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   decrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 

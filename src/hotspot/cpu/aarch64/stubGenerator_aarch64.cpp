@@ -6518,7 +6518,9 @@ class StubGenerator: public StubCodeGenerator {
   }
 #endif // LINUX
 
-RuntimeStub* generate_cont_doYield() {
+  RuntimeStub* generate_cont_doYield() {
+    if (!Continuations::enabled()) return nullptr;
+
     const char *name = "cont_doYield";
 
     enum layout {
@@ -6580,6 +6582,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_jump_from_safepoint() {
+    if (!Continuations::enabled()) return nullptr;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
@@ -6694,6 +6698,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "Cont thaw");
     address start = __ pc();
     generate_cont_thaw(false, false);
@@ -6701,6 +6707,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier() {
+    if (!Continuations::enabled()) return nullptr;
+
     // TODO: will probably need multiple return barriers depending on return type
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
@@ -6711,6 +6719,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier_exception() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
 
@@ -6720,28 +6730,30 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_interpreter_forced_preempt_return() {
-      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-      address start = __ pc();
+    if (!Continuations::enabled()) return nullptr;
 
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+    address start = __ pc();
 
-      assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
-      __ leave(); // we're now on the last thawed frame
+    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
 
-      __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
-      __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
-      __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
-      __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
-      // __ reinit_heapbase();
+    assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
+    __ leave(); // we're now on the last thawed frame
 
-      // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
-      __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-      __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
+    __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
+    __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
+    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
+    // __ reinit_heapbase();
 
-      __ ret(lr);
+    // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
+    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
 
-      return start;
-    }
+    __ ret(lr);
+
+    return start;
+  }
 
 #if INCLUDE_JFR
 
