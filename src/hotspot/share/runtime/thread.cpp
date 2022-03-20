@@ -785,7 +785,7 @@ void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
-  _mounted_vthread =  OopHandle(_thread_oop_storage, NULL);
+  _mounted_vthread = OopHandle(_thread_oop_storage, NULL);
   _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
