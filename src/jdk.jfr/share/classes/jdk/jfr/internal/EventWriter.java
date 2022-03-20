@@ -239,7 +239,7 @@ public final class EventWriter {
 
     public boolean beginEvent(PlatformEventType eventType) {
         if (excluded) {
-            // thread is excluded from writing events.
+            // thread is excluded from writing events
             return false;
         }
         this.eventType = eventType;

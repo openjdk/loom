@@ -43,7 +43,7 @@ static void assert_epoch_identity(JavaThread* jt, u2 current_epoch) {
   const u2 epoch_raw = ThreadIdAccess::epoch(jt->vthread());
   const bool excluded = epoch_raw & excluded_bit;
   assert(!excluded, "invariant");
-  assert(!JfrThreadLocal::is_excluded(jt), "Invariant");
+  assert(!JfrThreadLocal::is_excluded(jt), "invariant");
   const u2 vthread_epoch = epoch_raw & epoch_mask;
   assert(vthread_epoch == current_epoch, "invariant");
 }

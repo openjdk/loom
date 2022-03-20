@@ -2963,7 +2963,7 @@ bool LibraryCallKit::inline_native_classID() {
  * if (vthread != threadObj) {  // i.e. current thread is virtual
  *   tid = java_lang_Thread::tid(vthread);
  *   u2 vthread_epoch_raw = java_lang_Thread::jfr_epoch(vthread);
- *   excluded = vthread_epoch & excluded_mask;
+ *   excluded = vthread_epoch_raw & excluded_mask;
  *   if (!excluded) {
  *     traceid current_epoch = JfrTraceIdEpoch::current_generation();
  *     u2 vthread_epoch = vthread_epoch_raw & epoch_mask;

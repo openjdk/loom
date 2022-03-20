@@ -85,15 +85,15 @@ void JfrThreadState::serialize(JfrCheckpointWriter& writer) {
 }
 
 traceid JfrThreadId::id(const Thread* t, oop vthread) {
-  assert(t != NULL, "invariant");
+  assert(t != nullptr, "invariant");
   if (!t->is_Java_thread()) {
     return os_id(t);
   }
-  if (vthread != NULL) {
+  if (vthread != nullptr) {
     return java_lang_Thread::thread_id(vthread);
   }
   const oop thread_obj = JavaThread::cast(t)->threadObj();
-  return thread_obj != NULL ? java_lang_Thread::thread_id(thread_obj) : 0;
+  return thread_obj != nullptr ? java_lang_Thread::thread_id(thread_obj) : 0;
 }
 
 traceid JfrThreadId::os_id(const Thread* t) {
@@ -108,8 +108,8 @@ traceid JfrThreadId::jfr_id(const Thread* t, traceid tid) {
 }
 
 // caller needs ResourceMark
-const char* get_java_thread_name(const JavaThread* jt, oop vthread) {
-  assert(jt != NULL, "invariant");
+const char* get_java_thread_name(const JavaThread* jt, int& length, oop vthread) {
+  assert(jt != nullptr, "invariant");
   const char* name_str = "<no-name - thread name unresolved>";
   oop thread_obj = vthread != NULL ? vthread : jt->threadObj();
   if (thread_obj == NULL) {
@@ -118,22 +118,28 @@ const char* get_java_thread_name(const JavaThread* jt, oop vthread) {
     }
   } else {
     const oop name = java_lang_Thread::name(thread_obj);
-    if (name != NULL) {
-      name_str = java_lang_String::as_utf8_string(name);
+    if (name != nullptr) {
+      name_str = java_lang_String::as_utf8_string(name, length);
     }
   }
-  assert(name_str != NULL, "unexpected NULL thread name");
+  assert(name_str != nullptr, "unexpected nullptr thread name");
   return name_str;
 }
 
-static constexpr const char* const default_vthread_name = "<unnamed>";
+static constexpr const char* const vthread_default_name = "<unnamed>";
 
-const char* JfrThreadName::name(const Thread* t, oop vthread) {
-  assert(t != NULL, "invariant");
+const char* JfrThreadName::name(const Thread* t, int& length, oop vthread) {
+  assert(t != nullptr, "invariant");
   if (!t->is_Java_thread()) {
     return t->name();
   }
-  const char* const java_name = get_java_thread_name(JavaThread::cast(t), vthread);
-  // The vthread default name is represented as a nullptr for space savings.
-  return java_name == nullptr ? nullptr : strncmp(java_name, default_vthread_name, 9) == 0 ? nullptr : java_name;
+  const char* const java_name = get_java_thread_name(JavaThread::cast(t), length, vthread);
+  if (java_name == nullptr) {
+    return nullptr;
+  }
+  // The vthread default name is represented as the EMPTY_STRING for space savings.
+  if (strncmp(java_name, vthread_default_name, 9) == 0) {
+    length = 0; // denotes the writer should write the EMPTY_STRING constant.
+  }
+  return java_name;
 }

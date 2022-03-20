@@ -395,8 +395,8 @@ traceid JfrThreadLocal::thread_id(const Thread* t) {
   return tid;
 }
 
-// If we are not recording, then there is no checkpoint system
-// to handle writing vthread information.
+// When not recording, there is no checkpoint system
+// in place for writing vthread information.
 traceid JfrThreadLocal::external_thread_id(const Thread* t) {
   assert(t != NULL, "invariant");
   return JfrRecorder::is_recording() ? thread_id(t) : jvm_thread_id(t);
