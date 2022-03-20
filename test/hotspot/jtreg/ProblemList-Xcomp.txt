@@ -39,6 +39,16 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 # Loom specific
 
+gc/g1/plab/TestPLABPromotion.java                                       8278126 generic-all
+gc/g1/plab/TestPLABResize.java                                          8278126 generic-all
+
+gc/stringdedup/TestStringDeduplicationInterned.java#G1                  8278127 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#Parallel            8278127 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#Serial              8278127 generic-all
+gc/stringdedup/TestStringDeduplicationInterned.java#Z                   8278127 generic-all
+
+gc/z/TestGarbageCollectorMXBean.java                                    8278129 generic-all
+
 serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
 
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
