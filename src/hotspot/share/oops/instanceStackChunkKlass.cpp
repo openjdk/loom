@@ -233,6 +233,32 @@ public:
   }
 };
 
+class MarkMethodsStackClosure {
+  OopIterateClosure* _closure;
+
+public:
+  MarkMethodsStackClosure(OopIterateClosure* cl) : _closure(cl) {}
+
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+    if (f.is_interpreted()) {
+      Method* m = f.to_frame().interpreter_frame_method();
+      _closure->do_method(m);
+    } else if (f.is_compiled()) {
+      nmethod* nm = f.cb()->as_nmethod();
+      // The do_nmethod function takes care of having the right synchronization
+      // when keeping the nmethod alive during concurrent execution.
+      _closure->do_nmethod(nm);
+    }
+    return true;
+  }
+};
+
+void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosure* cl) {
+  MarkMethodsStackClosure closure(cl);
+  iterate_stack(chunk, &closure);
+}
+
 class OopOopIterateStackClosure {
   stackChunkOop _chunk;
   OopIterateClosure* const _closure;
@@ -255,15 +281,7 @@ public:
     assert(_closure != nullptr, "");
 
     if (_closure->do_metadata()) {
-      if (f.is_interpreted()) {
-        Method* im = f.to_frame().interpreter_frame_method();
-        _closure->do_method(im);
-      } else if (f.is_compiled()) {
-        nmethod* nm = f.cb()->as_nmethod();
-        // The do_nmethod function takes care of having the right synchronization
-        // when keeping the nmethod alive during concurrent execution.
-        _closure->do_nmethod(nm);
-      }
+      MarkMethodsStackClosure(_closure).do_frame(f, map);
     }
 
     StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _chunk, _bound);
@@ -286,32 +304,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
   if (closure != nullptr) {
     Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
   }
-}
-
-class MarkMethodsStackClosure {
-  OopIterateClosure* _closure;
-
-public:
-  MarkMethodsStackClosure(OopIterateClosure* cl) : _closure(cl) {}
-
-  template <chunk_frames frame_kind, typename RegisterMapT>
-  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    if (f.is_interpreted()) {
-      Method* im = f.to_frame().interpreter_frame_method();
-      _closure->do_method(im);
-    } else if (f.is_compiled()) {
-      nmethod* nm = f.cb()->as_nmethod();
-      // The do_nmethod function takes care of having the right synchronization
-      // when keeping the nmethod alive during concurrent execution.
-      _closure->do_nmethod(nm);
-    }
-    return true;
-  }
-};
-
-void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosure* cl) {
-  MarkMethodsStackClosure closure(cl);
-  iterate_stack(chunk, &closure);
 }
 
 template <chunk_frames frame_kind, typename RegisterMapT>
