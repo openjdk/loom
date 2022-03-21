@@ -134,9 +134,8 @@ inline int StackChunkFrameStream<frame_kind>::stack_argsize() const {
   if (is_stub()) {
     return 0;
   }
-  guarantee(cb() != nullptr, "");
-  guarantee(cb()->is_compiled(), "");
-  guarantee(cb()->as_compiled_method()->method() != nullptr, "");
+  assert(cb() != nullptr && cb()->is_compiled(), "");
+  assert(cb()->as_compiled_method()->method() != nullptr, "");
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
 
@@ -199,6 +198,8 @@ inline void StackChunkFrameStream<frame_kind>::get_cb() {
 
   assert(_cb != nullptr, "");
   assert(is_interpreted() || ((is_stub() || is_compiled()) && _cb->frame_size() > 0), "");
+  assert(is_interpreted() || cb()->is_alive(),
+    "not alive - not_entrant: %d zombie: %d unloaded: %d", _cb->is_not_entrant(), _cb->is_zombie(), _cb->is_unloaded());
 }
 
 template <chunk_frames frame_kind>
