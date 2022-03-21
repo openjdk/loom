@@ -249,6 +249,7 @@ public:
       // The do_nmethod function takes care of having the right synchronization
       // when keeping the nmethod alive during concurrent execution.
       _closure->do_nmethod(nm);
+      // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
     }
     return true;
   }
@@ -332,6 +333,7 @@ void InstanceStackChunkKlass::do_barriers0(stackChunkOop chunk, const StackChunk
     // The entry barrier takes care of having the right synchronization
     // when keeping the nmethod alive during concurrent execution.
     nm->run_nmethod_entry_barrier();
+    // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
   }
 
   assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
