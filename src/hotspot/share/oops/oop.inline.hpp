@@ -38,7 +38,6 @@
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
 #include "utilities/align.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -381,26 +380,6 @@ bool oopDesc::mark_must_be_preserved() const {
 
 bool oopDesc::mark_must_be_preserved(markWord m) const {
   return m.must_be_preserved(this);
-}
-
-void oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
-    klass()->copy_disjoint(this, to, word_size);
-  } else {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  }
-}
-
-void oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
-    klass()->copy_conjoint(this, to, word_size);
-  } else {
-    Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  }
 }
 
 #endif // SHARE_OOPS_OOP_INLINE_HPP

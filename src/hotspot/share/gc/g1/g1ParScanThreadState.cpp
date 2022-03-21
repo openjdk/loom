@@ -486,7 +486,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // We're going to allocate linearly, so might as well prefetch ahead.
   Prefetch::write(obj_ptr, PrefetchCopyIntervalInBytes);
-  old->copy_disjoint(obj_ptr, word_sz);
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), obj_ptr, word_sz);
 
   const oop obj = cast_to_oop(obj_ptr);
   // Because the forwarding is done with memory_order_relaxed there is no
@@ -526,6 +526,8 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
       }
       return obj;
     }
+
+    ContinuationGCSupport::transform_stack_chunk(obj);
 
     // Check for deduplicating young Strings.
     if (G1StringDedup::is_candidate_from_evacuation(klass,

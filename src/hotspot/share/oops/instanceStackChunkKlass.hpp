@@ -140,9 +140,6 @@ public:
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;
 
-  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size) override;
-  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size) override;
-
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 
   static void print_chunk(const stackChunkOop chunk, bool verbose, outputStream* st = tty);

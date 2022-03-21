@@ -1240,7 +1240,7 @@ oop GenCollectedHeap::handle_failed_promotion(Generation* old_gen,
   result = old_gen->expand_and_allocate(obj_size, false);
 
   if (result != NULL) {
-    obj->copy_disjoint(result, obj_size);
+    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), result, obj_size);
   }
   return cast_to_oop(result);
 }

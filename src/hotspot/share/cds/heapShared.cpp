@@ -40,6 +40,7 @@
 #include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "gc/shared/collectedHeap.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gcLocker.hpp"
 #include "gc/shared/gcVMOperations.hpp"
 #include "logging/log.hpp"
@@ -300,7 +301,8 @@ oop HeapShared::archive_object(oop obj) {
 
   oop archived_oop = cast_to_oop(G1CollectedHeap::heap()->archive_mem_allocate(len));
   if (archived_oop != NULL) {
-    obj->copy_disjoint(cast_from_oop<HeapWord*>(archived_oop), len);
+    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(archived_oop), len);
+    ContinuationGCSupport::transform_stack_chunk(archived_oop);
     // Reinitialize markword to remove age/marking/locking/etc.
     //
     // We need to retain the identity_hash, because it may have been used by some hashtables

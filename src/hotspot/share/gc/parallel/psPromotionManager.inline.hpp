@@ -33,6 +33,7 @@
 #include "gc/parallel/psPromotionLAB.inline.hpp"
 #include "gc/parallel/psScavenge.inline.hpp"
 #include "gc/parallel/psStringDedup.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
 #include "gc/shared/tlab_globals.hpp"
 #include "logging/log.hpp"
@@ -41,6 +42,7 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/orderAccess.hpp"
 #include "runtime/prefetch.inline.hpp"
+#include "utilities/copy.hpp"
 
 inline PSPromotionManager* PSPromotionManager::manager_array(uint index) {
   assert(_manager_array != NULL, "access of NULL manager_array");
@@ -243,7 +245,7 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
   assert(new_obj != NULL, "allocation should have succeeded");
 
   // Copy obj
-  o->copy_disjoint(cast_from_oop<HeapWord*>(new_obj), new_obj_size);
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(o), cast_from_oop<HeapWord*>(new_obj), new_obj_size);
 
   // Now we have to CAS in the header.
   // Make copy visible to threads reading the forwardee.
@@ -271,6 +273,7 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
       push_depth(ScannerTask(PartialArrayScanTask(o)));
       TASKQUEUE_STATS_ONLY(++_arrays_chunked; ++_array_chunk_pushes);
     } else {
+      ContinuationGCSupport::transform_stack_chunk(new_obj);
       // we'll just push its contents
       push_contents(new_obj);
 

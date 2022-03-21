@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 
 #include "compiler/oopMap.hpp"
+#include "gc/shared/continuationGCSupport.hpp"
 #include "gc/shared/gcTraceTime.inline.hpp"
 #include "gc/shared/preservedMarks.inline.hpp"
 #include "gc/shared/tlab_globals.hpp"
@@ -840,8 +841,11 @@ public:
     if (p->is_forwarded()) {
       HeapWord* compact_from = cast_from_oop<HeapWord*>(p);
       HeapWord* compact_to = cast_from_oop<HeapWord*>(p->forwardee());
-      p->copy_conjoint(compact_to, size);
+      Copy::aligned_conjoint_words(compact_from, compact_to, size);
+
       oop new_obj = cast_to_oop(compact_to);
+      ContinuationGCSupport::transform_stack_chunk(new_obj);
+
       new_obj->init_mark();
     }
   }
@@ -953,10 +957,10 @@ void ShenandoahFullGC::compact_humongous_objects() {
       assert(old_start != new_start, "must be real move");
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
-      old_obj->copy_conjoint(heap->get_region(new_start)->bottom(),
-                             words_size);
+      Copy::aligned_conjoint_words(r->bottom(), heap->get_region(new_start)->bottom(), words_size);
 
       oop new_obj = cast_to_oop(heap->get_region(new_start)->bottom());
+      ContinuationGCSupport::transform_stack_chunk(new_obj);
       new_obj->init_mark();
 
       {

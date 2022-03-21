@@ -554,7 +554,9 @@ void CompactibleSpace::compact() {
 
       // copy object and reinit its mark
       assert(cur_obj != compaction_top, "everything in this pass should be moving");
-      cast_to_oop(cur_obj)->copy_conjoint(compaction_top, size);
+      Copy::aligned_conjoint_words(cur_obj, compaction_top, size);
+
+      ContinuationGCSupport::transform_stack_chunk(cast_to_oop(compaction_top));
       cast_to_oop(compaction_top)->init_mark();
       assert(cast_to_oop(compaction_top)->klass() != NULL, "should have a class");
 
