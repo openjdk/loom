@@ -76,7 +76,7 @@ void G1CodeBlobClosure::MarkingOopClosure::do_oop(narrowOop* o) {
 
 void G1CodeBlobClosure::do_evacuation_and_fixup(nmethod* nm) {
   _oc.set_nm(nm);
-  if (_keepalive_is_strong) {
+  if (_strong) {
     nm->mark_as_maybe_on_continuation();
     BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
     if (bs_nm != NULL) {
