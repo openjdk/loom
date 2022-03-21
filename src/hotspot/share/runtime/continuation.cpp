@@ -2299,11 +2299,11 @@ public:
 
     static const int threshold = 500; // words
 
-    int sp = chunk->sp();
-    int size = chunk->stack_size() - sp; // this initial size could be reduced if it's a partial thaw
+    int chunk_start_sp = chunk->sp();
+    int size = chunk->stack_size() - chunk_start_sp; // this initial size could be reduced if it's a partial thaw
     int argsize;
 
-    intptr_t* const chunk_sp = chunk->start_address() + sp;
+    intptr_t* const chunk_sp = chunk->start_address() + chunk_start_sp;
 
     bool partial, empty;
     if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (size < threshold))) {
@@ -2390,16 +2390,16 @@ public:
   #endif
 
 #ifdef ASSERT
-  intptr_t* sp0 = stack_sp;
-  ContinuationHelper::set_anchor(_thread, sp0);
-  if (lt.develop_is_enabled()) {
-    LogStream ls(lt);
-    print_frames(_thread, &ls);
-  }
-  if (LoomDeoptAfterThaw) {
-    do_deopt_after_thaw(_thread);
-  }
-  ContinuationHelper::clear_anchor(_thread);
+    intptr_t* sp0 = stack_sp;
+    ContinuationHelper::set_anchor(_thread, sp0);
+    if (lt.develop_is_enabled()) {
+      LogStream ls(lt);
+      print_frames(_thread, &ls);
+    }
+    if (LoomDeoptAfterThaw) {
+      do_deopt_after_thaw(_thread);
+    }
+    ContinuationHelper::clear_anchor(_thread);
 #endif
 
     return stack_sp;
@@ -2463,7 +2463,9 @@ public:
 
     assert(_cont.chunk_invariant(tty), "");
 
-    if (!return_barrier) JVMTI_continue_cleanup(_thread);
+    if (!return_barrier) {
+      JVMTI_continue_cleanup(_thread);
+    }
 
     _thread->set_cont_fastpath(_fastpath);
 
@@ -2690,9 +2692,8 @@ public:
     intptr_t* const vsp = f.sp();
     intptr_t* const hsp = hf.unextended_sp();
 
-    int fsize = Compiled::size(hf);
     const int added_argsize = (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-    fsize += added_argsize;
+    int fsize = Compiled::size(hf) + added_argsize;
     assert(fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "");
 
     intptr_t* from = hsp - ContinuationHelper::frame_metadata;
