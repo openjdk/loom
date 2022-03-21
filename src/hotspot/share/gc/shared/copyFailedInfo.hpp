@@ -25,6 +25,7 @@
 #ifndef SHARE_GC_SHARED_COPYFAILEDINFO_HPP
 #define SHARE_GC_SHARED_COPYFAILEDINFO_HPP
 
+#include "jfr/support/jfrThreadId.hpp"
 #include "runtime/thread.hpp"
 #include "utilities/globalDefinitions.hpp"
 
