@@ -832,6 +832,10 @@ class VirtualMachineImpl extends MirrorImpl
         return versionInfo().jdwpMajor >= 9;
     }
 
+    boolean mayCreateVirtualThreads() {
+        return versionInfo().jdwpMajor >= 19;
+    }
+
     @Override
     public boolean supportsVirtualThreads() {
         validateVM();
