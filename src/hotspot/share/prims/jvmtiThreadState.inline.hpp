@@ -72,6 +72,8 @@ void JvmtiThreadState::set_head_env_thread_state(JvmtiEnvThreadState* ets) {
   _head_env_thread_state = ets;
 }
 
+PRAGMA_DIAG_PUSH
+PRAGMA_NONNULL_IGNORED
 inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *thread, oop thread_oop) {
   assert(JvmtiThreadState_lock->is_locked(), "sanity check");
   assert(thread != NULL || thread_oop != NULL, "sanity check");
@@ -100,6 +102,7 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   }
   return state;
 }
+PRAGMA_DIAG_POP
 
 inline JvmtiThreadState* JvmtiThreadState::state_for(JavaThread *thread, Handle thread_handle) {
   // in a case of unmounted virtual thread the thread can be NULL
