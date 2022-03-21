@@ -612,20 +612,17 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
         if (isVirtualCached) {
             return isVirtual;
         }
+        boolean result = false;
         if (vm.mayCreateVirtualThreads()) {
-            boolean result;
             try {
                 result = JDWP.ThreadReference.IsVirtual.process(vm, this).isVirtual;
             } catch (JDWPException exc) {
                 throw exc.toJDIException();
             }
-            isVirtual = result;
-            return result;
-        } else {
-            isVirtual = false;
-            isVirtualCached = true;
-            return false;
         }
+        isVirtual = result;
+        isVirtualCached = true;
+        return result;
     }
 
     public String toString() {
