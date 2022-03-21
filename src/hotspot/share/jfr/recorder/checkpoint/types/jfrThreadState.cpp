@@ -128,12 +128,5 @@ const char* get_java_thread_name(const JavaThread* jt, int& length, oop vthread)
 
 const char* JfrThreadName::name(const Thread* t, int& length, oop vthread) {
   assert(t != nullptr, "invariant");
-  if (!t->is_Java_thread()) {
-    return t->name();
-  }
-  const char* const java_name = get_java_thread_name(JavaThread::cast(t), length, vthread);
-  if (java_name == nullptr) {
-    return nullptr;
-  }
-  return java_name;
+  return t->is_Java_thread() ? get_java_thread_name(JavaThread::cast(t), length, vthread) : t->name();
 }
