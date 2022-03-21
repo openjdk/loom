@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -259,30 +259,6 @@ void VM_CollectForMetadataAllocation::doit() {
   }
 
   log_debug(gc)("After Metaspace GC failed to allocate size " SIZE_FORMAT, _size);
-
-  if (GCLocker::is_active_and_needs_gc()) {
-    set_gc_locked();
-  }
-}
-
-VM_CollectForCodeCacheAllocation::VM_CollectForCodeCacheAllocation(uint gc_count_before,
-                                                                   uint full_gc_count_before,
-                                                                   GCCause::Cause gc_cause)
-    : VM_GC_Operation(gc_count_before, gc_cause, full_gc_count_before, true) {
-}
-
-void VM_CollectForCodeCacheAllocation::doit() {
-  SvcGCMarker sgcm(SvcGCMarker::FULL);
-
-  CollectedHeap* heap = Universe::heap();
-  GCCauseSetter gccs(heap, _gc_cause);
-
-  log_debug(gc)("Full GC for CodeCache");
-
-  // Don't clear the soft refs yet.
-  heap->collect_as_vm_thread(GCCause::_codecache_GC_threshold);
-
-  log_debug(gc)("After GC for CodeCache");
 
   if (GCLocker::is_active_and_needs_gc()) {
     set_gc_locked();

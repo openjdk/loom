@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +37,14 @@ static void
 check_jvmti_error_invalid_thread(JNIEnv* jni, const char* msg, jvmtiError err) {
   if (err != JVMTI_ERROR_INVALID_THREAD) {
     LOG("%s failed: expected JVMTI_ERROR_INVALID_THREAD instead of: %d\n", msg, err);
+    fatal(jni, msg);
+  }
+}
+
+static void
+check_jvmti_error_opaque_frame(JNIEnv* jni, const char* msg, jvmtiError err) {
+  if (err != JVMTI_ERROR_OPAQUE_FRAME) {
+    LOG("%s failed: expected JVMTI_ERROR_OPAQUE_FRAME instead of: %d\n", msg, err);
     fatal(jni, msg);
   }
 }
@@ -85,11 +93,11 @@ test_unsupported_jvmti_functions(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) 
 
   LOG("Testing PopFrame\n");
   err = jvmti->PopFrame(vthread);
-  check_jvmti_error_invalid_thread(jni, "PopFrame", err);
+  check_jvmti_error_opaque_frame(jni, "PopFrame", err);
 
   LOG("Testing ForceEarlyReturnVoid\n");
   err = jvmti->ForceEarlyReturnVoid(vthread);
-  check_jvmti_error_invalid_thread(jni, "ForceEarlyReturnVoid", err);
+  check_jvmti_error_opaque_frame(jni, "ForceEarlyReturnVoid", err);
 
   LOG("Testing GetThreadCpuTime\n");
   err = jvmti->GetThreadCpuTime(vthread, &nanos);

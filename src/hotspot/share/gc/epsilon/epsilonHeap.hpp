@@ -82,7 +82,7 @@ public:
     return _space->is_in(p);
   }
 
-  virtual bool requires_barriers(oop obj) const { return false; }
+  virtual bool requires_barriers(stackChunkOop obj) const { return false; }
 
   virtual bool is_maximal_no_gc() const {
     // No GC is going to happen. Return "we are at max", when we are about to fail.

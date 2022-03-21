@@ -26,6 +26,7 @@
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/oopHandle.inline.hpp"
+#include "prims/jvmtiEnvBase.hpp"
 #include "prims/jvmtiEventController.inline.hpp"
 #include "prims/jvmtiImpl.hpp"
 #include "prims/jvmtiThreadState.inline.hpp"
@@ -35,7 +36,6 @@
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/vframe.hpp"
-#include "prims/jvmtiEnvBase.hpp"
 
 // marker for when the stack depth has been reset and is now unknown.
 // any negative number would work but small ones might obscure an
@@ -60,6 +60,7 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
   _exception_state      = ES_CLEARED;
   _debuggable           = true;
   _hide_single_stepping = false;
+  _pending_interp_only_mode = false;
   _hide_level           = 0;
   _pending_step_for_popframe = false;
   _class_being_redefined = NULL;
@@ -236,11 +237,17 @@ JvmtiVTMTDisabler::print_info() {
 #endif
 
 JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
+  if (Thread::current_or_null() == NULL) {
+    return; // detached thread, can be a call from Agent_OnLoad
+  }
   _is_SR = is_SR;
   disable_VTMT();
 }
 
 JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  if (Thread::current_or_null() == NULL) {
+    return; // detached thread, can be a call from Agent_OnLoad
+  }
   enable_VTMT();
 }
 
@@ -535,8 +542,8 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 }
 
 void JvmtiThreadState::enter_interp_only_mode() {
+  assert(_thread != NULL, "sanity check");
   if (_thread == NULL) {
-    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
     ++_saved_interp_only_mode;
     // TBD: It seems, invalidate_cur_stack_depth() has to be called at VTMT?
   } else {
@@ -552,7 +559,6 @@ void JvmtiThreadState::enter_interp_only_mode() {
            virt, (void*)this, _thread->get_interp_only_mode(), _saved_interp_only_mode, name_str); fflush(0);
   }
 #endif
-    assert(!is_interp_only_mode(), "entering interp only when mode not zero");
     _thread->increment_interp_only_mode();
     invalidate_cur_stack_depth();
   }
@@ -560,11 +566,10 @@ void JvmtiThreadState::enter_interp_only_mode() {
 
 
 void JvmtiThreadState::leave_interp_only_mode() {
+  assert(is_interp_only_mode(), "leaving interp only when mode not one");
   if (_thread == NULL) {
-    assert(is_interp_only_mode(), "leaving interp only when mode not one");
     --_saved_interp_only_mode;
   } else {
-    assert(is_interp_only_mode(), "leaving interp only when mode not one");
     _thread->decrement_interp_only_mode();
   }
 }

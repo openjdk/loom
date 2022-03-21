@@ -31,6 +31,7 @@
 #include "oops/stackChunkOop.hpp"
 #include "oops/symbol.hpp"
 #include "runtime/os.hpp"
+#include "utilities/macros.hpp"
 #include "utilities/vmEnums.hpp"
 
 class JvmtiThreadState;
@@ -50,8 +51,7 @@ class RecordComponent;
   f(java_lang_Throwable) \
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
-  f(java_lang_Thread_VirtualThreads) \
-  f(java_lang_Thread_ContextClassLoaders) \
+  f(java_lang_Thread_Constants) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
@@ -399,8 +399,9 @@ class java_lang_Class : AllStatic {
 
 // Interface to java.lang.Thread objects
 
-#define THREAD_INJECTED_FIELDS(macro)                            \
-  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false)
+#define THREAD_INJECTED_FIELDS(macro)                                  \
+  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false) \
+  JFR_ONLY(macro(java_lang_Thread, jfr_epoch, short_signature, false))
 
 class java_lang_Thread : AllStatic {
   friend class java_lang_VirtualThread;
@@ -418,6 +419,7 @@ class java_lang_Thread : AllStatic {
   static int _continuation_offset;
   static int _park_blocker_offset;
   static int _scopeLocalBindings_offset;
+  JFR_ONLY(static int _jfr_epoch_offset;)
 
   static void compute_offsets();
 
@@ -457,8 +459,7 @@ class java_lang_Thread : AllStatic {
   // Stack size hint
   static jlong stackSize(oop java_thread);
   // Thread ID
-  static jlong thread_id(oop java_thread);
-  static jlong thread_id_raw(oop java_thread);
+  static int64_t thread_id(oop java_thread);
   static ByteSize thread_id_offset();
   // Continuation
   static inline oop continuation(oop java_thread);
@@ -482,6 +483,10 @@ class java_lang_Thread : AllStatic {
   // Fill in current stack trace, can cause GC
   static oop async_get_stack_trace(oop java_thread, TRAPS);
 
+  JFR_ONLY(static u2 jfr_epoch(oop java_thread);)
+  JFR_ONLY(static void set_jfr_epoch(oop java_thread, u2 epoch);)
+  JFR_ONLY(static int jfr_epoch_offset() { CHECK_INIT(_jfr_epoch_offset); })
+
   // Debugging
   friend class JavaClasses;
 };
@@ -498,6 +503,7 @@ class java_lang_Thread_FieldHolder : AllStatic {
   static int _thread_status_offset;
 
   static void compute_offsets();
+
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -520,35 +526,22 @@ class java_lang_Thread_FieldHolder : AllStatic {
   friend class JavaClasses;
 };
 
-// Interface to java.lang.Thread$VirtualThreads objects
+// Interface to java.lang.Thread$Constants objects
 
-class java_lang_Thread_VirtualThreads : AllStatic {
+class java_lang_Thread_Constants : AllStatic {
  private:
-  static int _static_THREAD_GROUP_offset;
+  static int _static_VTHREAD_GROUP_offset;
+  static int _static_NOT_SUPPORTED_CLASSLOADER_offset;
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
  public:
-  static oop get_THREAD_GROUP();
+  static oop get_VTHREAD_GROUP();
+  static oop get_NOT_SUPPORTED_CLASSLOADER();
 
   friend class JavaClasses;
 };
-
-
-// Interface to java.lang.Thread$ContextClassLoaders objects
-
-class java_lang_Thread_ContextClassLoaders : AllStatic {
- private:
-  static int _static_NOT_SUPPORTED_offset;
-
-  static void compute_offsets();
-  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
- public:
-  static oop get_NOT_SUPPORTED();
-
-  friend class JavaClasses;
-};
-
 
 // Interface to java.lang.ThreadGroup objects
 
@@ -601,7 +594,7 @@ class java_lang_VirtualThread : AllStatic {
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
-
+  JFR_ONLY(static int _jfr_epoch_offset;)
  public:
   enum {
     NEW          = 0,
@@ -637,7 +630,6 @@ class java_lang_VirtualThread : AllStatic {
   static bool notify_jvmti_events();
   static void set_notify_jvmti_events(bool enable);
   static void init_static_notify_jvmti_events();
-  static void set_jfr_traceid(oop vthread, jlong id);
 };
 
 
@@ -1130,20 +1122,17 @@ class jdk_internal_vm_Continuation: AllStatic {
   static inline jshort critical_section(oop ref);
   static inline void set_critical_section(oop ref, jshort value);
   static inline bool on_local_stack(oop ref, address adr);
-  static inline bool is_mounted(oop ref);
   static inline bool done(oop ref);
   static inline bool is_preempted(oop ref);
   static inline void set_preempted(oop ref, bool value);
 };
 
 // Interface to jdk.internal.vm.StackChunk objects
-#define STACKCHUNK_INJECTED_FIELDS(macro)                               \
-  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)   \
-  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)   \
-  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false) \
-  macro(jdk_internal_vm_StackChunk, gcSP,      int_signature, false)    \
-  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)    \
-  macro(jdk_internal_vm_StackChunk, markCycle, long_signature, false)
+#define STACKCHUNK_INJECTED_FIELDS(macro)                                      \
+  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)  \
+  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)          \
+  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false)        \
+  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)           \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
@@ -1154,8 +1143,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _gcSP_offset;
-  static int _markCycle_offset;
   static int _maxSize_offset;
   static int _cont_offset;
 
@@ -1186,11 +1173,6 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void set_argsize(oop ref, int value);
   static inline uint8_t flags(oop ref);
   static inline void set_flags(oop ref, uint8_t value);
-
-  static inline int gc_sp(oop ref);
-  static inline void set_gc_sp(oop ref, int value);
-  static inline uint64_t mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, uint64_t value);
 
   static inline int maxSize(oop ref);
   static inline void set_maxSize(oop ref, int value);
@@ -1680,7 +1662,6 @@ class java_lang_StackTraceElement: AllStatic {
   static int _methodName_offset;
   static int _fileName_offset;
   static int _lineNumber_offset;
-  static int _contScopeName_offset;
 
   // Setters
   static void set_classLoaderName(oop element, oop value);
@@ -1691,7 +1672,6 @@ class java_lang_StackTraceElement: AllStatic {
   static void set_fileName(oop element, oop value);
   static void set_lineNumber(oop element, int value);
   static void set_declaringClassObject(oop element, oop value);
-  static void set_contScopeName(oop element, oop value);
 
   static void decode_file_and_line(Handle java_mirror, InstanceKlass* holder, int version,
                                    const methodHandle& method, int bci,
@@ -1699,10 +1679,10 @@ class java_lang_StackTraceElement: AllStatic {
 
  public:
   // Create an instance of StackTraceElement
-  static oop create(const methodHandle& method, int bci, Handle contScopeName, TRAPS);
+  static oop create(const methodHandle& method, int bci, TRAPS);
 
   static void fill_in(Handle element, InstanceKlass* holder, const methodHandle& method,
-                      int version, int bci, Symbol* name, Handle contScopeName, TRAPS);
+                      int version, int bci, Symbol* name, TRAPS);
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;

@@ -27,7 +27,7 @@
 
 #include "asm/codeBuffer.hpp"
 #include "compiler/compilerDefinitions.hpp"
-#include "compiler/oopMap.inline.hpp"
+#include "compiler/oopMap.hpp"
 #include "runtime/javaFrameAnchor.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/handles.hpp"
@@ -149,9 +149,9 @@ public:
   virtual bool is_adapter_blob() const                { return false; }
   virtual bool is_vtable_blob() const                 { return false; }
   virtual bool is_method_handles_adapter_blob() const { return false; }
+  virtual bool is_optimized_entry_blob() const        { return false; }
   bool is_compiled() const                            { return _is_compiled; }
   const bool* is_compiled_addr() const                { return &_is_compiled; }
-  virtual bool is_optimized_entry_blob() const                  { return false; }
 
   inline bool is_compiled_by_c1() const    { return _type == compiler_c1; };
   inline bool is_compiled_by_c2() const    { return _type == compiler_c2; };
@@ -221,12 +221,7 @@ public:
   ImmutableOopMapSet* oop_maps() const           { return _oop_maps; }
   void set_oop_maps(OopMapSet* p);
 
-  const ImmutableOopMap* oop_map_for_slot(int slot, address return_address) const {
-    assert(_oop_maps != NULL, "nope");
-    return _oop_maps->find_map_at_slot(slot, (intptr_t) return_address - (intptr_t) code_begin());
-  }
-
-  //const ImmutableOopMap* oop_map_for_slot(int slot, address return_address) const;
+  const ImmutableOopMap* oop_map_for_slot(int slot, address return_address) const;
   const ImmutableOopMap* oop_map_for_return_address(address return_address) const;
   virtual void preserve_callee_argument_oops(frame fr, const RegisterMap* reg_map, OopClosure* f) = 0;
 

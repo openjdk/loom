@@ -29,7 +29,7 @@
 #include "classfile/vmSymbols.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
 #include "jfr/recorder/storage/jfrStorage.hpp"
-#include "jfr/support/jfrThreadId.hpp"
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "memory/iterator.hpp"
@@ -45,6 +45,7 @@ static int start_pos_address_offset = invalid_offset;
 static int current_pos_offset = invalid_offset;
 static int max_pos_offset = invalid_offset;
 static int notified_offset = invalid_offset;
+static int excluded_offset = invalid_offset;
 static int thread_id_offset = invalid_offset;
 static int valid_offset = invalid_offset;
 
@@ -89,6 +90,13 @@ static bool setup_event_writer_offsets(TRAPS) {
   assert(invalid_offset == notified_offset, "invariant");
   JfrJavaSupport::compute_field_offset(notified_offset, klass, notified_sym, vmSymbols::bool_signature());
   assert(notified_offset != invalid_offset, "invariant");
+
+  const char excluded_name[] = "excluded";
+  Symbol* const excluded_sym = SymbolTable::new_symbol(excluded_name);
+  assert(excluded_sym != NULL, "invariant");
+  assert(invalid_offset == excluded_offset, "invariant");
+  JfrJavaSupport::compute_field_offset(excluded_offset, klass, excluded_sym, vmSymbols::bool_signature());
+  assert(excluded_offset != invalid_offset, "invariant");
 
   const char threadID_name[] = "threadID";
   Symbol * const threadID_sym = SymbolTable::new_symbol(threadID_name);
@@ -163,6 +171,28 @@ void JfrJavaEventWriter::notify() {
   Threads::threads_do(&closure);
 }
 
+static void set_excluded_field(traceid tid, const JavaThread* jt, bool state) {
+  assert(jt != nullptr, "invariant");
+  jobject event_writer_handle = jt->jfr_thread_local()->java_event_writer();
+  if (event_writer_handle == nullptr) {
+    return;
+  }
+  oop event_writer = JNIHandles::resolve_non_null(event_writer_handle);
+  assert(event_writer != nullptr, "invariant");
+  const jlong event_writer_tid = event_writer->long_field(thread_id_offset);
+  if (event_writer_tid == static_cast<jlong>(tid)) {
+    event_writer->bool_field_put(excluded_offset, state);
+  }
+}
+
+void JfrJavaEventWriter::exclude(traceid tid, const JavaThread* jt) {
+  set_excluded_field(tid, jt, true);
+}
+
+void JfrJavaEventWriter::include(traceid tid, const JavaThread* jt) {
+  set_excluded_field(tid, jt, false);
+}
+
 void JfrJavaEventWriter::notify(JavaThread* jt) {
   assert(jt != NULL, "invariant");
   assert(SafepointSynchronize::is_at_safepoint(), "invariant");
@@ -173,13 +203,13 @@ void JfrJavaEventWriter::notify(JavaThread* jt) {
   }
 }
 
-static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
+static jobject create_new_event_writer(JfrBuffer* buffer, JfrThreadLocal* tl, TRAPS) {
   assert(buffer != NULL, "invariant");
   DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
   HandleMark hm(THREAD);
   static const char klass[] = "jdk/jfr/internal/EventWriter";
   static const char method[] = "<init>";
-  static const char signature[] = "(JJJJZ)V";
+  static const char signature[] = "(JJJJZZ)V";
   JavaValue result(T_OBJECT);
   JfrJavaArguments args(&result, klass, method, signature, CHECK_NULL);
 
@@ -187,23 +217,26 @@ static jobject create_new_event_writer(JfrBuffer* buffer, TRAPS) {
   args.push_long((jlong)buffer->pos());
   args.push_long((jlong)buffer->end());
   args.push_long((jlong)buffer->pos_address());
-  args.push_long((jlong)JFR_THREAD_ID(THREAD));
-  args.push_int((int)JNI_TRUE);
+  args.push_long((jlong)JfrThreadLocal::thread_id(THREAD));
+  args.push_int((jint)JNI_TRUE); // valid
+  args.push_int(tl->is_excluded() ? (jint)JNI_TRUE : (jint)JNI_FALSE); // excluded
   JfrJavaSupport::new_object_global_ref(&args, CHECK_NULL);
   return result.get_jobject();
 }
 
-jobject JfrJavaEventWriter::event_writer(JavaThread* t) {
-  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(t));
-  JfrThreadLocal* const tl = t->jfr_thread_local();
+jobject JfrJavaEventWriter::event_writer(JavaThread* jt) {
+  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(jt));
+  JfrThreadLocal* const tl = jt->jfr_thread_local();
   assert(tl->shelved_buffer() == NULL, "invariant");
   jobject h_writer = tl->java_event_writer();
   if (h_writer != NULL) {
     oop writer = JNIHandles::resolve_non_null(h_writer);
     assert(writer != NULL, "invariant");
     const jlong event_writer_tid = writer->long_field(thread_id_offset);
-    const jlong current_tid = static_cast<jlong>(JFR_THREAD_ID(t));
+    const jlong current_tid = static_cast<jlong>(JfrThreadLocal::thread_id(jt));
     if (event_writer_tid != current_tid) {
+      const bool excluded = tl->is_excluded();
+      writer->bool_field_put(excluded_offset, excluded);
       writer->long_field_put(thread_id_offset, current_tid);
     }
   }
@@ -220,7 +253,7 @@ jobject JfrJavaEventWriter::new_event_writer(TRAPS) {
     JfrJavaSupport::throw_out_of_memory_error("OOME for thread local buffer", THREAD);
     return NULL;
   }
-  jobject h_writer = create_new_event_writer(buffer, CHECK_NULL);
+  jobject h_writer = create_new_event_writer(buffer, tl, CHECK_NULL);
   tl->set_java_event_writer(h_writer);
   assert(tl->has_java_event_writer(), "invariant");
   return h_writer;

@@ -609,7 +609,22 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
   return found;
 }
 
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
+bool
+JvmtiEnvBase::is_vthread_alive(oop vt) {
+  assert(java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW, "sanity check");
+  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
+}
+
+JavaThread* JvmtiEnvBase::is_virtual_thread_mounted(oop vthread) {
+  oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
+  if (carrier_thread == NULL) return NULL; // can be NULL
+
+  JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
+  oop cont = java_lang_VirtualThread::continuation(vthread);
+  assert(cont != NULL, "virtual thread continuation must not be NULL");
+  assert(Continuation::continuation_scope(cont) == java_lang_VirtualThread::vthread_scope(), "must be");
+  return Continuation::is_continuation_mounted(java_thread, cont) ? java_thread : NULL;
+}
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
@@ -617,10 +632,9 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
   if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf; // no frames to skip
   }
-  javaVFrame* jvf_saved = jvf;
   // find jvf with a method annotated with @JvmtiMountTransition
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
-    if (jvf->method()->jvmti_mount_transition()) {
+    if (jvf->method()->jvmti_mount_transition()) { // cannot actually appear in an unmounted continuation; they're never frozen.
       jvf = jvf->java_sender(); // skip annotated method
       break;
     }
@@ -628,14 +642,6 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
       break;
     }
     // skip frame above annotated method
-  }
-  if (jvf == NULL) { // TMP workaround for stability until the root cause is fixed
-    jvf = jvf_saved;
-    assert (jvf != NULL, "");
-    assert (dbg_is_safe(jvf, -1), "");
-    assert (jvf->register_map() != NULL, "");
-    assert (dbg_is_safe(jvf->register_map(), -1), "");
-    jvf->restore_register_map(); // we're returning to a frame we've walked past and might walk from again
   }
   return jvf;
 }
@@ -656,12 +662,6 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   return jvf;
 }
 
-bool
-JvmtiEnvBase::is_vthread_alive(oop vt) {
-  assert(java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW, "sanity check");
-  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
-}
-
 javaVFrame*
 JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   assert(java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::NEW, "sanity check");
@@ -671,21 +671,15 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
 
-  assert(cont != NULL, "virtual thread continuation must not be NULL");
-
-  oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
-  // Returned carrier_thread can be NULL for a mounted continuation.
-  // Then treat it as an unmounted case.
-  if (jdk_internal_vm_Continuation::is_mounted(cont) && carrier_thread != NULL) {
-    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-
+  JavaThread* java_thread = is_virtual_thread_mounted(vthread);
+  if (java_thread != NULL) {
     if (!java_thread->has_last_Java_frame()) {
       // TBD: This is a temporary work around to avoid a guarantee caused by
       // the native enterSpecial frame on the top. No frames will be found
       // by the JVMTI functions such as GetStackTrace.
       return NULL;
     }
-    vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
+    vframeStream vfs(java_thread);
     jvf = vfs.at_end() ? NULL : vfs.asJavaVFrame();
     jvf = check_and_skip_hidden_frames(java_thread, jvf);
   } else {
@@ -1289,7 +1283,7 @@ JvmtiEnvBase::cthread_with_mounted_vthread(JavaThread* jt) {
 
 bool
 JvmtiEnvBase::cthread_with_continuation(JavaThread* jt) {
-  ContinuationEntry* cont = NULL;
+  const ContinuationEntry* cont = NULL;
   if (jt->has_last_Java_frame()) {
     cont = jt->vthread_continuation();
   }
@@ -1322,14 +1316,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       }
     }
     if (java_thread == NULL && java_lang_VirtualThread::is_instance(thread_oop)) {
-      oop cont = java_lang_VirtualThread::continuation(thread_oop);
-      if (jdk_internal_vm_Continuation::is_mounted(cont)) {
-        oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_oop);
-        // Returned carrier_thread can be NULL for a mounted continuation.
-        if (carrier_thread != NULL) {
-          java_thread = java_lang_Thread::thread(carrier_thread);
-        }
-      }
+      java_thread = is_virtual_thread_mounted(thread_oop);
     }
   }
   *jt_pp = java_thread;
@@ -1903,10 +1890,27 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
 // The ForceEarlyReturn forces return from method so the execution
 // continues at the bytecode following the method call.
 
-// java_thread - protected by ThreadsListHandle and pre-checked
-
 jvmtiError
-JvmtiEnvBase::force_early_return(JavaThread* java_thread, jvalue value, TosState tos) {
+JvmtiEnvBase::force_early_return(jthread thread, jvalue value, TosState tos) {
+  jvmtiError err = JVMTI_ERROR_NONE;
+  JavaThread* java_thread = NULL;
+  JavaThread* current_thread = JavaThread::current();
+  HandleMark hm(current_thread);
+  oop thread_obj = NULL;
+
+  JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current_thread);
+
+  err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+    return JVMTI_ERROR_OPAQUE_FRAME;
+  }
+
   // retrieve or create the state
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
@@ -1914,7 +1918,6 @@ JvmtiEnvBase::force_early_return(JavaThread* java_thread, jvalue value, TosState
   }
 
   // Eagerly reallocate scalar replaced objects.
-  JavaThread* current_thread = JavaThread::current();
   EscapeBarrier eb(true, current_thread, java_thread);
   if (!eb.deoptimize_objects(0)) {
     // Reallocation of scalar replaced objects failed -> return with error

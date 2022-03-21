@@ -372,6 +372,7 @@ public class ThreadLocal<T> {
             }
         }
 
+        // Placeholder when thread locals not supported
         static final ThreadLocalMap NOT_SUPPORTED = new ThreadLocalMap();
 
         /**

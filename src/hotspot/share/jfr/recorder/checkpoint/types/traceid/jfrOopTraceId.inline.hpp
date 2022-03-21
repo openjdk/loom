@@ -26,39 +26,50 @@
 #define SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP
 
 #include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.hpp"
+
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 
 template <typename T>
-inline void JfrOopTraceId<T>::store(oop ref, traceid value) {
+inline traceid JfrOopTraceId<T>::id(oop ref) {
   assert(ref != nullptr, "invariant");
-  assert(value != 0, "invariant");
-  T::store(ref, value);
+  return T::id(ref);
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::load(oop ref) {
+inline u2 JfrOopTraceId<T>::epoch(oop ref) {
   assert(ref != nullptr, "invariant");
-  return T::load(ref);
+  return T::epoch(ref);
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::epoch(traceid value) {
-  return value >> jfr_epoch_shift;
+inline u2 JfrOopTraceId<T>::current_epoch() {
+  return JfrTraceIdEpoch::epoch_generation();
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::id(traceid value) {
-  return value & jfr_id_mask;
-}
-
-inline traceid map(traceid current_epoch_gen, traceid tid) {
-  return (current_epoch_gen << jfr_epoch_shift) | tid;
+inline void JfrOopTraceId<T>::set_epoch(oop ref, u2 epoch) {
+  assert(ref != nullptr, "invariant");
+  T::set_epoch(ref, epoch);
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::epoch_identity(traceid value) {
-  const traceid current_epoch_gen = JfrTraceIdEpoch::epoch_generation();
-  return epoch(value) != current_epoch_gen ? map(current_epoch_gen, id(value)) : value;
+inline void JfrOopTraceId<T>::set_epoch(oop ref) {
+  set_epoch(ref, JfrTraceIdEpoch::epoch_generation());
+}
+
+template <typename T>
+inline bool JfrOopTraceId<T>::is_excluded(oop ref) {
+  return T::is_excluded(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::exclude(oop ref) {
+  T::exclude(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::include(oop ref) {
+  T::include(ref);
 }
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP

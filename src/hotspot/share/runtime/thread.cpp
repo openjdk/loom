@@ -269,8 +269,6 @@ Thread::Thread() {
   BarrierSet* const barrier_set = BarrierSet::barrier_set();
   if (barrier_set != NULL) {
     barrier_set->on_thread_create(this);
-    BarrierSetNMethod* bs_nm = barrier_set->barrier_set_nmethod();
-    _nmethod_disarm_value = bs_nm->disarmed_value();
   } else {
     // Only the main thread should be created before the barrier set
     // and that happens just before Thread::current is set. No other thread
@@ -787,10 +785,11 @@ void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
+  _mounted_vthread = OopHandle(_thread_oop_storage, NULL);
   _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
-oop JavaThread::threadObj() const    {
+oop JavaThread::threadObj() const {
   return _threadObj.resolve();
 }
 
@@ -801,6 +800,15 @@ oop JavaThread::vthread() const {
 void JavaThread::set_vthread(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _vthread.replace(p);
+}
+
+oop JavaThread::mounted_vthread() const {
+  return _mounted_vthread.resolve();
+}
+
+void JavaThread::set_mounted_vthread(oop p) {
+  assert(_thread_oop_storage != NULL, "not yet initialized");
+  _mounted_vthread.replace(p);
 }
 
 oop JavaThread::scopeLocalCache() const {
@@ -1076,7 +1084,6 @@ JavaThread::JavaThread() :
   _cont_fastpath_thread_state(1),
   _cont_fastpath(0),
   _held_monitor_count(0),
-  _mounted_vthread(oop()),
 
   _handshake(this),
 
@@ -1095,12 +1102,14 @@ JavaThread::JavaThread() :
   _SleepEvent(ParkEvent::Allocate(this))
 {
   set_jni_functions(jni_functions());
+
 #if INCLUDE_JVMCI
   assert(_jvmci._implicit_exception_pc == nullptr, "must be");
   if (JVMCICounterSize > 0) {
     resize_counters(0, (int) JVMCICounterSize);
   }
 #endif // INCLUDE_JVMCI
+
   // Setup safepoint state info for this thread
   ThreadSafepointState::create(this);
 
@@ -1217,6 +1226,7 @@ JavaThread::~JavaThread() {
   // Ask ServiceThread to release the threadObj OopHandle
   ServiceThread::add_oop_handle_release(_threadObj);
   ServiceThread::add_oop_handle_release(_vthread);
+  ServiceThread::add_oop_handle_release(_mounted_vthread);
 
   // Return the sleep event to the free list
   ParkEvent::Release(_SleepEvent);
@@ -1579,10 +1589,11 @@ bool JavaThread::is_lock_owned(address adr) const {
 
 bool JavaThread::is_lock_owned_current(address adr) const {
   address stack_end = _stack_base - _stack_size;
-  ContinuationEntry* cont = vthread_continuation();
+  const ContinuationEntry* cont = vthread_continuation();
   address stack_base = cont != nullptr ? (address)cont->entry_sp() : _stack_base;
-  if (stack_base > adr && adr >= stack_end)
+  if (stack_base > adr && adr >= stack_end) {
     return true;
+  }
 
   for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
     if (chunk->contains(adr)) return true;
@@ -1592,7 +1603,7 @@ bool JavaThread::is_lock_owned_current(address adr) const {
 }
 
 bool JavaThread::is_lock_owned_carrier(address adr) const {
-  assert (is_vthread_mounted(), "");
+  assert(is_vthread_mounted(), "");
   address stack_end = _stack_base - _stack_size;
   address stack_base = (address)vthread_continuation()->entry_sp();
   return stack_base > adr && adr >= stack_end;
@@ -2071,8 +2082,6 @@ void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
   if (jvmti_thread_state() != NULL) {
     jvmti_thread_state()->oops_do(f, cf);
   }
-
-  f->do_oop(&_mounted_vthread);
 }
 
 void JavaThread::oops_do_frames(OopClosure* f, CodeBlobClosure* cf) {
@@ -2148,13 +2157,8 @@ const char* _get_thread_state_name(JavaThreadState _thread_state) {
 }
 
 void JavaThread::print_thread_state_on(outputStream *st) const {
-  if (is_vthread_mounted()) {
-    oop vt = vthread();
-    assert (vt != NULL, "");
-    st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
-  }
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
-};
+}
 
 const char* JavaThread::thread_state_name() const {
   return _get_thread_state_name(_thread_state);
@@ -2177,7 +2181,7 @@ void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
   if (thread_oop != NULL) {
     if (is_vthread_mounted()) {
       oop vt = vthread();
-      assert (vt != NULL, "");
+      assert(vt != NULL, "");
       st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
     } else {
       st->print_cr("   java.lang.Thread.State: %s", java_lang_Thread::thread_status_name(thread_oop));
@@ -2220,6 +2224,7 @@ void JavaThread::print_on_error(outputStream* st, char *buf, int buflen) const {
   st->print(", stack(" PTR_FORMAT "," PTR_FORMAT ")",
             p2i(stack_end()), p2i(stack_base()));
   st->print("]");
+
   ThreadsSMRSupport::print_info_on(this, st);
   return;
 }
@@ -2514,7 +2519,7 @@ void JavaThread::trace_stack() {
 #endif // PRODUCT
 
 frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
-  ContinuationEntry* cont = vthread_continuation();
+  const ContinuationEntry* cont = vthread_continuation();
   guarantee (cont != NULL, "Not a carrier thread");
   frame f = cont->to_frame();
   if (reg_map->process_frames()) {
@@ -2681,8 +2686,9 @@ static void call_initPhase1(TRAPS) {
                                          vmSymbols::void_method_signature(), CHECK);
 }
 
-// Phase 2. Module system initialization and start reference handler threads.
-//     Only java.base classes can be loaded until phase 2 completes.
+// Phase 2. Module system initialization
+//     This will initialize the module system.  Only java.base classes
+//     can be loaded until phase 2 completes.
 //
 //     Call System.initPhase2 after the compiler initialization and jsr292
 //     classes get initialized because module initialization runs a lot of java

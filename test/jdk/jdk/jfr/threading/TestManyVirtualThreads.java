@@ -90,11 +90,11 @@ public class TestManyVirtualThreads {
                 RecordedThread t = e.getThread();
                 Asserts.assertNotNull(t);
                 Asserts.assertTrue(t.isVirtual());
-                Asserts.assertEquals(t.getJavaName(), "<unnamed>");
-                Asserts.assertEquals(t.getOSName(), "<unnamed>");
+                Asserts.assertEquals(t.getJavaName(), ""); // vthreads default name is the empty string.
+                Asserts.assertEquals(t.getOSName(), "");
                 Asserts.assertEquals(t.getThreadGroup().getName(), "VirtualThreads");
                 Asserts.assertGreaterThan(t.getJavaThreadId(), 0L);
-                Asserts.assertGreaterThan(t.getOSThreadId(), 0L);
+                Asserts.assertEquals(t.getOSThreadId(), 0L);
             }
         }
     }

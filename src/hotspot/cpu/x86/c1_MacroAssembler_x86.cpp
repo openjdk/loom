@@ -359,10 +359,6 @@ void C1_MacroAssembler::load_parameter(int offset_in_words, Register reg) {
   movptr(reg, Address(rbp, (offset_in_words + 2) * BytesPerWord));
 }
 
-void C1_MacroAssembler::oopmap_metadata(CodeEmitInfo* info) {
-  MacroAssembler::oopmap_metadata(info != NULL ? info->oop_map()->index() : -1);
-}
-
 #ifndef PRODUCT
 
 void C1_MacroAssembler::verify_stack_oop(int stack_offset) {

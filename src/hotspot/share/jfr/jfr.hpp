@@ -49,6 +49,7 @@ class Jfr : AllStatic {
   static void on_create_vm_2();
   static void on_create_vm_3();
   static void on_unloading_classes();
+  static void on_java_thread_start(JavaThread* starter, JavaThread* startee);
   static void on_thread_start(Thread* thread);
   static void on_thread_exit(Thread* thread);
   static void on_vm_shutdown(bool exception_handler = false);

@@ -231,12 +231,12 @@ class InstanceKlass: public Klass {
 
   // This can be used to quickly discriminate among the four kinds of
   // InstanceKlass. This should be an enum (?)
-  static const unsigned _kind_other        = 0; // concrete InstanceKlass
-  static const unsigned _kind_reference    = 1; // InstanceRefKlass
-  static const unsigned _kind_class_loader = 2; // InstanceClassLoaderKlass
-  static const unsigned _kind_mirror       = 3; // InstanceMirrorKlass
+  static const unsigned _kind_other             = 0; // concrete InstanceKlass
+  static const unsigned _kind_reference         = 1; // InstanceRefKlass
+  static const unsigned _kind_class_loader      = 2; // InstanceClassLoaderKlass
+  static const unsigned _kind_mirror            = 3; // InstanceMirrorKlass
   static const unsigned _misc_kind_stack_chunk  = 4; // InstanceStackChunk
-  static const unsigned _misc_kind_last  = _misc_kind_stack_chunk;
+  static const unsigned _misc_kind_last         = _misc_kind_stack_chunk;
 
   u1              _reference_type;                // reference type
   u1              _kind;                          // kind of InstanceKlass
@@ -549,6 +549,7 @@ public:
   bool is_in_error_state() const           { return _init_state == initialization_error; }
   bool is_reentrant_initialization(Thread *thread)  { return thread == _init_thread; }
   ClassState  init_state()                 { return (ClassState)_init_state; }
+  const char* init_state_name() const;
   bool is_rewritten() const                { return (_misc_flags & _misc_rewritten) != 0; }
 
   // is this a sealed class
@@ -1281,6 +1282,15 @@ inline u2 InstanceKlass::next_method_idnum() {
   }
 }
 
+class PrintClassClosure : public KlassClosure {
+private:
+  outputStream* _st;
+  bool _verbose;
+public:
+  PrintClassClosure(outputStream* st, bool verbose);
+
+  void do_klass(Klass* k);
+};
 
 /* JNIid class for jfieldIDs only */
 class JNIid: public CHeapObj<mtClass> {

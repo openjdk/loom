@@ -31,13 +31,13 @@
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
-#define JFR_THREAD_ID(thread) (JfrThreadLocal::thread_id(thread))
-#define JFR_VM_THREAD_ID(thread) (JfrThreadLocal::vm_thread_id(thread))
+#define JFR_THREAD_ID(thread) (JfrThreadLocal::external_thread_id(thread))
+#define JFR_JVM_THREAD_ID(thread) (JfrThreadLocal::jvm_thread_id(thread))
 #else
 #include "runtime/osThread.hpp"
 typedef u8 traceid;
 #define JFR_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
-#define JFR_VM_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
+#define JFR_JVM_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())
 #endif
 
 #endif // SHARE_JFR_SUPPORT_JFRTHREADID_HPP

@@ -1229,7 +1229,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
-        // TODO - vthread node: If this is a vthread, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread, we should delete the node.
         return JVMTI_ERROR_NONE;
     }
 
@@ -1380,7 +1380,7 @@ commonResumeList(JNIEnv *env)
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
 
-        // TODO - vthread node: If this is a vthread, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread, we should delete the node.
     }
     deleteArray(results);
     deleteArray(reqList);
@@ -1590,7 +1590,7 @@ threadControl_suspendCount(jthread thread, jint *count)
     } else {
       /*
        * If the node is in neither list, the debugger never suspended
-       * this thread, so the suspend count is 0.
+       * this thread, so the suspend count is 0, unless it is a vthread.
        */
       if (isVThread(thread)) {
           jint vthread_state = 0;
@@ -2662,12 +2662,6 @@ threadControl_stop(jthread thread, jobject throwable)
 {
     ThreadNode *node;
     jvmtiError  error;
-
-    /*
-     * Since ThreadReference.Stop is not supported for vthreads, we should never
-     * get here with a vthread.
-     */
-    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 

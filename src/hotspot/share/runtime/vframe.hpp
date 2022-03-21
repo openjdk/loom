@@ -82,7 +82,6 @@ class vframe: public ResourceObj {
   const RegisterMap* register_map() const { return &_reg_map; }
   JavaThread*        thread()       const { return _thread;   }
   stackChunkOop      stack_chunk()  const { return _chunk(); /*_reg_map.stack_chunk();*/ }
-  oop                continuation() const { return stack_chunk() != NULL ? stack_chunk()->cont() : (oop)NULL; }
 
   // Returns the sender vframe
   virtual vframe* sender() const;
@@ -92,9 +91,6 @@ class vframe: public ResourceObj {
 
   // Is the current frame the entry to a virtual thread's stack
   bool is_vthread_entry() const;
-
-  // Call when resuming a walk (calling [java_]sender) on a frame we'e already walked past
-  void restore_register_map() const;
 
   // Answers if the this is the top vframe in the frame, i.e., if the sender vframe
   // is in the caller frame
@@ -332,6 +328,7 @@ class vframeStreamCommon : StackObj {
   }
 
   const RegisterMap* reg_map() { return &_reg_map; }
+  void dont_walk_cont() { _reg_map.set_walk_cont(false); }
 
   javaVFrame* asJavaVFrame();
 

@@ -104,16 +104,6 @@ class Retired {
   }
 };
 
-template <typename T, bool negation>
-class Excluded {
- public:
-  typedef T Type;
-  bool process(Type* t) {
-    assert(t != NULL, "invariant");
-    return negation ? !t->excluded() : t->excluded();
-  }
-};
-
 template <typename Operation>
 class MutexedWriteOp {
  private:

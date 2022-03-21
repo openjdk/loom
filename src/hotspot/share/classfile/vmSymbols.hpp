@@ -63,8 +63,7 @@
   template(java_lang_StringUTF16,                     "java/lang/StringUTF16")                    \
   template(java_lang_Thread,                          "java/lang/Thread")                         \
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
-  template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
-  template(java_lang_Thread_ContextClassLoaders,      "java/lang/Thread$ContextClassLoaders")     \
+  template(java_lang_Thread_Constants,                "java/lang/Thread$Constants")               \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
@@ -494,8 +493,6 @@
   template(source_file_name,                          "source_file")                              \
   template(loader_data_name,                          "loader_data")                              \
   template(cont_name,                                 "cont")                                     \
-  template(gcSP_name,                                 "gcSP")                                     \
-  template(markCycle_name,                            "markCycle")                                \
   template(vmdependencies_name,                       "vmdependencies")                           \
   template(last_cleanup_name,                         "last_cleanup")                             \
   template(loader_name,                               "loader")                                   \
@@ -529,6 +526,7 @@
   template(during_unsafe_access_name,                 "during_unsafe_access")                     \
   template(checkIndex_name,                           "checkIndex")                               \
   template(scoped_cache_shift_name,                   "SCOPED_CACHE_SHIFT")                       \
+  template(jfr_epoch_name,                            "jfr_epoch")                                \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \

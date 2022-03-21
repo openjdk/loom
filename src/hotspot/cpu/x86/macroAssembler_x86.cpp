@@ -332,21 +332,6 @@ void MacroAssembler::movptr(Address dst, intptr_t src) {
   movl(dst, src);
 }
 
-
-void MacroAssembler::pop_callee_saved_registers() {
-  pop(rcx);
-  pop(rdx);
-  pop(rdi);
-  pop(rsi);
-}
-
-void MacroAssembler::push_callee_saved_registers() {
-  push(rsi);
-  push(rdi);
-  push(rdx);
-  push(rcx);
-}
-
 void MacroAssembler::pushoop(jobject obj) {
   push_literal32((int32_t)obj, oop_Relocation::spec_for_immediate());
 }
@@ -518,18 +503,12 @@ void MacroAssembler::call_VM_leaf_base(address entry_point, int num_args) {
   jcc(Assembler::zero, L);
 
   subq(rsp, 8);
-  {
-    call(RuntimeAddress(entry_point));
-    oopmap_metadata(-1);
-  }
+  call(RuntimeAddress(entry_point));
   addq(rsp, 8);
   jmp(E);
 
   bind(L);
-  {
-    call(RuntimeAddress(entry_point));
-    oopmap_metadata(-1);
-  }
+  call(RuntimeAddress(entry_point));
 
   bind(E);
 
@@ -1141,11 +1120,6 @@ void MacroAssembler::object_move(OopMap* map,
 #endif // _LP64
 
 // Now versions that are common to 32/64 bit
-
-void MacroAssembler::oopmap_metadata(int index) {
-  // if (index != -1) tty->print_cr("oopmap_metadata %d", index);
-  // mov64(r10, 1234); // TODO: Add a new relocInfo with external semantics. see relocInfo::metadata_type
-}
 
 void MacroAssembler::addptr(Register dst, int32_t imm32) {
   LP64_ONLY(addq(dst, imm32)) NOT_LP64(addl(dst, imm32));
@@ -1980,7 +1954,7 @@ void MacroAssembler::decrementl(Address dst, int value) {
 }
 
 void MacroAssembler::division_with_shift (Register reg, int shift_value) {
-  assert (shift_value > 0, "illegal shift value");
+  assert(shift_value > 0, "illegal shift value");
   Label _is_positive;
   testl (reg, reg);
   jcc (Assembler::positive, _is_positive);
@@ -2020,6 +1994,7 @@ void MacroAssembler::enter() {
 }
 
 void MacroAssembler::post_call_nop() {
+  relocate(post_call_nop_Relocation::spec());
   emit_int8((int8_t)0x0f);
   emit_int8((int8_t)0x1f);
   emit_int8((int8_t)0x84);
@@ -2924,6 +2899,7 @@ void MacroAssembler::push_IU_state() {
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
   jccb(Assembler::belowEqual, done);
@@ -2932,6 +2908,7 @@ void MacroAssembler::push_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   cmpptr(rsp, Address(java_thread, JavaThread::cont_fastpath_offset()));
   jccb(Assembler::below, done);
@@ -2940,10 +2917,12 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   incrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   decrementl(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 

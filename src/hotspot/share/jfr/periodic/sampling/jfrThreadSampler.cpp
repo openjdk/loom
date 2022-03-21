@@ -31,7 +31,6 @@
 #include "jfr/recorder/service/jfrOptionSet.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/storage/jfrBuffer.hpp"
-#include "jfr/support/jfrThreadId.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfrfiles/jfrEventClasses.hpp"
@@ -194,7 +193,7 @@ void OSThreadSampler::protected_task(const os::SuspendedThreadTaskContext& conte
       EventExecutionSample *ev = _closure.next_event();
       ev->set_starttime(_suspend_time);
       ev->set_endtime(_suspend_time); // fake to not take an end time
-      ev->set_sampledThread(JFR_THREAD_ID(jt));
+      ev->set_sampledThread(JfrThreadLocal::thread_id(jt));
       ev->set_state(static_cast<u8>(java_lang_Thread::get_thread_status(_thread_oop)));
     }
   }
@@ -224,7 +223,7 @@ class JfrNativeSamplerCallback : public os::CrashProtectionCallback {
 static void write_native_event(JfrThreadSampleClosure& closure, JavaThread* jt, oop thread_oop) {
   EventNativeMethodSample *ev = closure.next_event_native();
   ev->set_starttime(JfrTicks::now());
-  ev->set_sampledThread(JFR_THREAD_ID(jt));
+  ev->set_sampledThread(JfrThreadLocal::thread_id(jt));
   ev->set_state(static_cast<u8>(java_lang_Thread::get_thread_status(thread_oop)));
 }
 

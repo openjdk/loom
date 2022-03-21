@@ -369,7 +369,7 @@ bool CodeCache::heap_available(int code_blob_type) {
   if (!SegmentedCodeCache) {
     // No segmentation: use a single code heap
     return (code_blob_type == CodeBlobType::All);
-  } else if (Arguments::is_interpreter_only()) {
+  } else if (CompilerConfig::is_interpreter_only()) {
     // Interpreter only: we don't need any method code heaps
     return (code_blob_type == CodeBlobType::NonNMethod);
   } else if (CompilerConfig::is_c1_profiling()) {
@@ -669,29 +669,6 @@ CodeBlob* CodeCache::find_blob_unsafe(void* start) {
   return NULL;
 }
 
-CodeBlob* CodeCache::patch_nop(NativePostCallNop* nop, void* pc, int& slot) {
-  CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
-  if (cb->is_zombie()) return cb; // might be called during GC traversal
-
-  intptr_t cbaddr = (intptr_t) cb;
-  intptr_t offset = ((intptr_t) pc) - cbaddr;
-
-  int oopmap_slot = cb->oop_maps()->find_slot_for_offset((intptr_t) pc - (intptr_t) cb->code_begin());
-  if (oopmap_slot < 0) { // this can happen at asynchronous (non-safepoint) stackwalks
-    slot = -1;
-    log_debug(codecache)("failed to find oopmap for cb: " INTPTR_FORMAT " offset: %d", cbaddr, (int) offset);
-    // tty->print_cr("deopt: %d", cb->as_compiled_method()->is_deopt_pc((address)pc)); os::print_location(tty, (intptr_t)pc);
-  } else if (((oopmap_slot & 0xff) == oopmap_slot) && ((offset & 0xffffff) == offset)) {
-    jint value = (oopmap_slot << 24) | (jint) offset;
-    nop->patch(value);
-    slot = oopmap_slot;
-  } else {
-    slot = -1;
-    log_debug(codecache)("failed to encode %d %d", oopmap_slot, (int) offset);
-  }
-  return cb;
-}
-
 nmethod* CodeCache::find_nmethod(void* start) {
   CodeBlob* cb = find_blob(start);
   assert(cb->is_nmethod(), "did not find an nmethod");
@@ -829,7 +806,9 @@ void CodeCache::increment_unloading_cycle() {
 void CodeCache::increment_marking_cycle() {
   ++_marking_cycle;
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
-  bs_nm->arm_all_nmethods();
+  if (bs_nm != NULL) {
+    bs_nm->arm_all_nmethods();
+  }
 }
 
 bool CodeCache::is_marking_cycle_active() {

@@ -44,6 +44,8 @@ class JfrJavaEventWriter : AllStatic {
 
  public:
   static void notify();
+  static void exclude(traceid tid, const JavaThread* jt);
+  static void include(traceid tid, const JavaThread* jt);
   static jobject event_writer(JavaThread* t);
   static jobject new_event_writer(TRAPS);
   static jboolean flush(jobject writer, jint used, jint requested, JavaThread* jt);

@@ -38,7 +38,7 @@
 #include "compiler/compilerDirectives.hpp"
 #include "compiler/directivesParser.hpp"
 #include "compiler/disassembler.hpp"
-#include "compiler/oopMap.hpp"
+#include "compiler/oopMap.inline.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
@@ -673,6 +673,8 @@ nmethod::nmethod(
     debug_only(Universe::heap()->verify_nmethod(this));
 
     CodeCache::commit(this);
+
+    finalize_relocations();
   }
 
   if (PrintNativeNMethods || PrintDebugInfo || PrintRelocations || PrintDependencies) {
@@ -850,6 +852,8 @@ nmethod::nmethod(
     debug_only(Universe::heap()->verify_nmethod(this));
 
     CodeCache::commit(this);
+
+    finalize_relocations();
 
     // Copy contents of ExceptionHandlerTable to nmethod
     handler_table->copy_to(this);
@@ -1097,10 +1101,40 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
   }
 }
 
+static void install_post_call_nop_displacement(nmethod* nm, address pc) {
+  NativePostCallNop* nop = nativePostCallNop_at((address) pc);
+  intptr_t cbaddr = (intptr_t) nm;
+  intptr_t offset = ((intptr_t) pc) - cbaddr;
+
+  int oopmap_slot = nm->oop_maps()->find_slot_for_offset((intptr_t) pc - (intptr_t) nm->code_begin());
+  if (oopmap_slot < 0) { // this can happen at asynchronous (non-safepoint) stackwalks
+    log_debug(codecache)("failed to find oopmap for cb: " INTPTR_FORMAT " offset: %d", cbaddr, (int) offset);
+  } else if (((oopmap_slot & 0xff) == oopmap_slot) && ((offset & 0xffffff) == offset)) {
+    jint value = (oopmap_slot << 24) | (jint) offset;
+    nop->patch(value);
+  } else {
+    log_debug(codecache)("failed to encode %d %d", oopmap_slot, (int) offset);
+  }
+}
+
+void nmethod::finalize_relocations() {
+  NoSafepointVerifier nsv;
+
+  // Make sure that post call nops fill in nmethod offsets eagerly so
+  // we don't have to race with deoptimization
+  RelocIterator iter(this);
+  while (iter.next()) {
+    if (iter.type() == relocInfo::post_call_nop_type) {
+      post_call_nop_Relocation* const reloc = iter.post_call_nop_reloc();
+      address pc = reloc->addr();
+      install_post_call_nop_displacement(this, pc);
+    }
+  }
+}
 
 void nmethod::make_deoptimized() {
-  assert (method() == NULL || can_be_deoptimized(), "");
-  assert (!is_zombie(), "");
+  assert(method() == NULL || can_be_deoptimized(), "");
+  assert(!is_zombie(), "");
 
   CompiledICLocker ml(this);
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");

@@ -5182,6 +5182,20 @@ class StubGenerator: public StubCodeGenerator {
 
     address start = __ pc();
 
+    BarrierSetAssembler* bs_asm = BarrierSet::barrier_set()->barrier_set_assembler();
+
+    if (bs_asm->nmethod_code_patching()) {
+      BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+      // We can get here despite the nmethod being good, if we have not
+      // yet applied our cross modification fence.
+      Address thread_epoch_addr(rthread, in_bytes(bs_nm->thread_disarmed_offset()) + 4);
+      __ lea(rscratch2, ExternalAddress(bs_asm->patching_epoch_addr()));
+      __ ldrw(rscratch2, rscratch2);
+      __ strw(rscratch2, thread_epoch_addr);
+      __ isb();
+      __ membar(__ LoadLoad);
+    }
+
     __ set_last_Java_frame(sp, rfp, lr, rscratch1);
 
     __ enter();
@@ -6504,7 +6518,9 @@ class StubGenerator: public StubCodeGenerator {
   }
 #endif // LINUX
 
-RuntimeStub* generate_cont_doYield() {
+  RuntimeStub* generate_cont_doYield() {
+    if (!Continuations::enabled()) return nullptr;
+
     const char *name = "cont_doYield";
 
     enum layout {
@@ -6566,22 +6582,14 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_jump_from_safepoint() {
+    if (!Continuations::enabled()) return nullptr;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
     address start = __ pc();
 
-#ifdef ASSERT
-    { // verify that threads correspond
-      Label L;
-      __ get_thread(rscratch1);
-      __ cmp(rthread, rscratch1);
-      __ br(Assembler::EQ, L);
-      __ stop("StubRoutines::cont_jump_from_safepoint: threads must correspond");
-      __ BIND(L);
-    }
-#endif
-
+    __ get_thread(rthread); // we're called directly from C++
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
 
@@ -6595,7 +6603,7 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw(bool return_barrier, bool exception) {
-    assert (return_barrier || !exception, "must be");
+    assert(return_barrier || !exception, "must be");
 
     address start = __ pc();
 
@@ -6690,6 +6698,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "Cont thaw");
     address start = __ pc();
     generate_cont_thaw(false, false);
@@ -6697,6 +6707,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier() {
+    if (!Continuations::enabled()) return nullptr;
+
     // TODO: will probably need multiple return barriers depending on return type
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
@@ -6707,6 +6719,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier_exception() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
 
@@ -6716,28 +6730,30 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_interpreter_forced_preempt_return() {
-      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-      address start = __ pc();
+    if (!Continuations::enabled()) return nullptr;
 
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+    address start = __ pc();
 
-      assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
-      __ leave(); // we're now on the last thawed frame
+    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
 
-      __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
-      __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
-      __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
-      __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
-      // __ reinit_heapbase();
+    assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
+    __ leave(); // we're now on the last thawed frame
 
-      // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
-      __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-      __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
+    __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
+    __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
+    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
+    // __ reinit_heapbase();
 
-      __ ret(lr);
+    // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
+    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
 
-      return start;
-    }
+    __ ret(lr);
+
+    return start;
+  }
 
 #if INCLUDE_JFR
 
@@ -8044,9 +8060,9 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _seq_cst)
 
 // on exit, sp points to the ContinuationEntry
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
-  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+  assert(ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
   stack_slots += (int)ContinuationEntry::size()/wordSize;
   __ sub(sp, sp, (int)ContinuationEntry::size()); // place Continuation metadata
@@ -8064,15 +8080,17 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation
 //          sp points to ContinuationEntry
+//          c_rarg3 -- isVirtualThread
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
   __ movw(rscratch1, 0x1234);
   __ strw(rscratch1, Address(sp, ContinuationEntry::cookie_offset()));
 #endif
 
-  __ str(c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
-  __ str(zr, Address(sp, ContinuationEntry::chunk_offset()));
-  __ strw(zr, Address(sp, ContinuationEntry::argsize_offset()));
+  __ str (c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
+  __ strw(c_rarg3, Address(sp, ContinuationEntry::flags_offset()));
+  __ str (zr,      Address(sp, ContinuationEntry::chunk_offset()));
+  __ strw(zr,      Address(sp, ContinuationEntry::argsize_offset()));
 
   __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));

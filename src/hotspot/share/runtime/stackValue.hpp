@@ -25,13 +25,12 @@
 #ifndef SHARE_RUNTIME_STACKVALUE_HPP
 #define SHARE_RUNTIME_STACKVALUE_HPP
 
-#include "code/debugInfo.hpp"
 #include "code/location.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/handles.hpp"
 
 class BasicLock;
 class RegisterMap;
+class ScopeValue;
 
 class StackValue : public ResourceObj {
  private:
@@ -111,37 +110,10 @@ class StackValue : public ResourceObj {
   static BasicLock*  resolve_monitor_lock(const frame* fr, Location location);
 
   template<typename RegisterMapT>
-  static StackValue* create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
-    return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map);
-  }
+  static StackValue* create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv);
 
   template<typename RegisterMapT>
-  static address stack_value_address(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
-    if (!sv->is_location())
-      return NULL;
-    Location loc = ((LocationValue *)sv)->location();
-    if (loc.type() == Location::invalid)
-      return NULL;
-
-    address value_addr;
-    if (!reg_map->in_cont()) {
-      value_addr = loc.is_register()
-          // Value was in a callee-save register
-          ? reg_map->location(VMRegImpl::as_VMReg(loc.register_number()), fr->sp())
-          // Else value was directly saved on the stack. The frame's original stack pointer,
-          // before any extension by its callee (due to Compiler1 linkage on SPARC), must be used.
-          : ((address)fr->unextended_sp()) + loc.stack_offset();
-
-      assert(value_addr == NULL || reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(value_addr), INTPTR_FORMAT, p2i(value_addr));
-    } else {
-      value_addr = loc.is_register()
-          ? reg_map->as_RegisterMap()->stack_chunk()->reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()))
-          : reg_map->as_RegisterMap()->stack_chunk()->usp_offset_to_location(*fr, loc.stack_offset());
-
-      assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || (reg_map->thread() != NULL && reg_map->thread()->is_in_usable_stack(value_addr)), INTPTR_FORMAT, p2i(value_addr));
-    }
-    return value_addr;
-  }
+  static address stack_value_address(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv);
 
 #ifndef PRODUCT
  public:
@@ -149,9 +121,9 @@ class StackValue : public ResourceObj {
   void print_on(outputStream* st) const;
 #endif
 
-private:
-  template<typename RegisterMapT>
-  static StackValue* create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map);
+ private:
+   template<typename RegisterMapT>
+   static StackValue* create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map);
 };
 
 #endif // SHARE_RUNTIME_STACKVALUE_HPP

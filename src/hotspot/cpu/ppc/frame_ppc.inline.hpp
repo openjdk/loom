@@ -55,17 +55,19 @@ inline void frame::find_codeblob_and_set_pc_and_deopt_state(address pc) {
 // Constructors
 
 // Initialize all fields, _unextended_sp will be adjusted in find_codeblob_and_set_pc_and_deopt_state.
-inline frame::frame() : _sp(NULL), _pc(NULL), _cb(NULL),  _deopt_state(unknown), _unextended_sp(NULL), _fp(NULL) {}
+inline frame::frame() : _sp(NULL), _pc(NULL), _cb(NULL),  _deopt_state(unknown), _on_heap(false),
+                        _unextended_sp(NULL), _fp(NULL) {}
 
-inline frame::frame(intptr_t* sp) : _sp(sp), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp) : _sp(sp), _on_heap(false), _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)own_abi()->lr); // also sets _fp and adjusts _unextended_sp
 }
 
-inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _on_heap(false), _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // also sets _fp and adjusts _unextended_sp
 }
 
-inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp), _unextended_sp(unextended_sp) {
+inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp), _on_heap(false),
+                    _unextended_sp(unextended_sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // also sets _fp and adjusts _unextended_sp
 }
 
@@ -171,13 +173,11 @@ inline void frame::interpreter_frame_set_esp(intptr_t* esp)                   { 
 inline void frame::interpreter_frame_set_top_frame_sp(intptr_t* top_frame_sp) { get_ijava_state()->top_frame_sp = (intptr_t) top_frame_sp; }
 inline void frame::interpreter_frame_set_sender_sp(intptr_t* sender_sp)       { get_ijava_state()->sender_sp = (intptr_t) sender_sp; }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   return (intptr_t*)interpreter_frame_monitor_end() - 1;
 }
 
 // top of expression stack
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return ((intptr_t*) get_ijava_state()->esp) + Interpreter::stackElementWords;
 }
@@ -228,7 +228,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   Unimplemented();
   return NULL;

@@ -509,22 +509,11 @@ public class PrintStream extends FilterOutputStream
     }
 
     /**
-     * Flushes the stream and checks its error state. The internal error state
-     * is set to {@code true} when the underlying output stream throws an
-     * {@code IOException} other than {@code InterruptedIOException},
-     * and when the {@code setError} method is invoked.  If an operation
-     * on the underlying output stream throws an
-     * {@code InterruptedIOException}, then the {@code PrintStream}
-     * converts the exception back into an interrupt by doing:
-     * <pre>{@code
-     *     Thread.currentThread().interrupt();
-     * }</pre>
-     * or the equivalent.
+     * Flushes the stream if it's not closed and checks its error state.
      *
      * @return {@code true} if and only if this stream has encountered an
-     *         {@code IOException} other than
-     *         {@code InterruptedIOException}, or the
-     *         {@code setError} method has been invoked
+     *         {@code IOException}, or the {@code setError} method has been
+     *         invoked
      */
     public boolean checkError() {
         if (out != null)
@@ -549,7 +538,7 @@ public class PrintStream extends FilterOutputStream
     }
 
     /**
-     * Clears the internal error state of this stream.
+     * Clears the error state of this stream.
      *
      * <p> This method will cause subsequent invocations of {@link
      * #checkError()} to return {@code false} until another write

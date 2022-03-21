@@ -149,9 +149,7 @@
 
   frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb);
 
-  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map);
-
-  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool dummy); // used for fast frame construction by continuations
+  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool on_heap); // used for fast frame construction by continuations
 
   frame(intptr_t* sp, intptr_t* fp);
 
@@ -169,7 +167,6 @@
   inline address  sender_pc_maybe_signed() const;
 
   // expression stack tos if we are nested in a java call
-  template <addressing pointers = addressing::ABSOLUTE>
   intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

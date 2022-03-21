@@ -124,7 +124,6 @@ class CodeCache : AllStatic {
 
   // Make private to prevent unsafe calls.  Not all CodeBlob*'s are embedded in a CodeHeap.
   static bool contains(CodeBlob *p) { fatal("don't call me!"); return false; }
-  static CodeBlob* patch_nop(NativePostCallNop* nop, void* pc, int& slot);
 
  public:
   // Initialization

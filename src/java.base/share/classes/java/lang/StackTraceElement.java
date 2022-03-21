@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,6 @@ import jdk.internal.loader.BuiltinClassLoader;
 import jdk.internal.misc.VM;
 import jdk.internal.module.ModuleHashes;
 import jdk.internal.module.ModuleReferenceImpl;
-import jdk.internal.vm.Continuation;
 
 import java.lang.module.ModuleDescriptor.Version;
 import java.lang.module.ModuleReference;
@@ -85,10 +84,6 @@ public final class StackTraceElement implements java.io.Serializable {
      * The source file name.
      */
     private String fileName;
-    /**
-     * The continuation name.
-     */
-    private String contScopeName;
     /**
      * The source line number.
      */
@@ -376,23 +371,11 @@ public final class StackTraceElement implements java.io.Serializable {
         }
         s = s.isEmpty() ? declaringClass : s + "/" + declaringClass;
 
-        s = s + "." + methodName + "(" +
+        return s + "." + methodName + "(" +
              (isNativeMethod() ? "Native Method)" :
               (fileName != null && lineNumber >= 0 ?
                fileName + ":" + lineNumber + ")" :
                 (fileName != null ?  ""+fileName+")" : "Unknown Source)")));
-
-        if (contScopeName != null
-                && !contScopeName.equals(VirtualThread.continuationScope().getName())
-                && isContinuationEntry()) {
-            s = s + " " + contScopeName;
-        }
-
-        return s;
-    }
-
-    private boolean isContinuationEntry() {
-        return declaringClass.equals(Continuation.class.getName()) && methodName.equals("enter");
     }
 
     /**
@@ -430,8 +413,7 @@ public final class StackTraceElement implements java.io.Serializable {
                 && Objects.equals(moduleName, e.moduleName)
                 && Objects.equals(moduleVersion, e.moduleVersion)
                 && Objects.equals(methodName, e.methodName)
-                && Objects.equals(fileName, e.fileName)
-                && Objects.equals(contScopeName, e.contScopeName);
+                && Objects.equals(fileName, e.fileName);
     }
 
     /**
@@ -443,7 +425,6 @@ public final class StackTraceElement implements java.io.Serializable {
         result = 31*result + Objects.hashCode(moduleName);
         result = 31*result + Objects.hashCode(moduleVersion);
         result = 31*result + Objects.hashCode(fileName);
-        result = 31*result + Objects.hashCode(contScopeName);
         result = 31*result + lineNumber;
         return result;
     }

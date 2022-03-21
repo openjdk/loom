@@ -41,6 +41,7 @@ import com.sun.jdi.Location;
 import com.sun.jdi.MonitorInfo;
 import com.sun.jdi.NativeMethodException;
 import com.sun.jdi.ObjectReference;
+import com.sun.jdi.OpaqueFrameException;
 import com.sun.jdi.ReferenceType;
 import com.sun.jdi.StackFrame;
 import com.sun.jdi.ThreadGroupReference;
@@ -585,7 +586,12 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
         } catch (JDWPException exc) {
             switch (exc.errorCode()) {
             case JDWP.Error.OPAQUE_FRAME:
-                throw new NativeMethodException();
+                if (meth.isNative()) {
+                    throw new NativeMethodException();
+                } else {
+                    assert isVirtual(); // can only happen with virtual threads
+                    throw new OpaqueFrameException();
+                }
             case JDWP.Error.THREAD_NOT_SUSPENDED:
                 throw new IncompatibleThreadStateException(
                          "Thread not suspended");

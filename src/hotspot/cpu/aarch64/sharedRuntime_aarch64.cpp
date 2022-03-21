@@ -1192,9 +1192,10 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
 void fill_continuation_entry(MacroAssembler* masm);
 void continuation_enter_cleanup(MacroAssembler* masm);
 
-// enterSpecial(Continuation c, boolean isContinue)
+// enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread)
 // On entry: c_rarg1 -- the continuation object
 //           c_rarg2 -- isContinue
+//           c_rarg3 -- isVirtualThread
 static void gen_continuation_enter(MacroAssembler* masm,
                                  const methodHandle& method,
                                  const BasicType* sig_bt,

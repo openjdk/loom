@@ -1538,7 +1538,7 @@ public class SecurityManager {
      * @see     java.lang.ThreadGroup
      */
     public ThreadGroup getThreadGroup() {
-        return Thread.getCurrentThreadGroup();
+        return Thread.currentThread().getThreadGroup();
     }
 
 }

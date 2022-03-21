@@ -337,6 +337,7 @@ test_GetSetLocal(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread, int depth, int f
     test_SetLocal(jvmti, jni, cthread, vthread, depth, frame_count, &values0);
   }
  End:
+  LOG("test_GetSetLocal: finished\n\n");
   if (cthread != 0) jni->DeleteLocalRef(cthread);
 }
 
@@ -348,7 +349,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread,
   const char* virt = jni->IsVirtualThread(vthread) ? "virtual" : "carrier";
   const jint depth = 0; // the depth is always 0 in case of breakpoint
 
-  LOG("Breakpoint: %s on %s thread: %s\n", mname, virt, tname);
+  LOG("Breakpoint: %s on %s thread: %s - Started\n", mname, virt, tname);
 
   // disable BREAKPOINT events
   jvmtiError err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_BREAKPOINT, vthread);
@@ -362,6 +363,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread,
   }
   deallocate(jvmti, jni, (void*)mname);
   deallocate(jvmti, jni, (void*)tname);
+  LOG("Breakpoint: %s on %s thread: %s - Finished\n", mname, virt, tname);
 }
 
 JNIEXPORT jint JNICALL
@@ -424,7 +426,7 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
   LOG("testSuspendedVirtualThreads: started for virtual thread: %s\n", tname);
 
   // Test each of these cases only once: unmounted, positive depth, frame count 0.
-  while (iter++ < 100 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
+  while (iter++ < 50 && (!seen_depth_0 || !seen_depth_positive || !seen_unmounted)) {
     jmethodID method = NULL;
     jlocation location = 0;
 

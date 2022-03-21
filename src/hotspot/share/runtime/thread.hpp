@@ -140,15 +140,18 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
-  int _nmethod_disarm_value;
+  // On AArch64, the high order 32 bits are used by a "patching epoch" number
+  // which reflects if this thread has executed the required fences, after
+  // an nmethod gets disarmed. The low order 32 bit denote the disarm value.
+  uint64_t _nmethod_disarm_value;
 
  public:
   int nmethod_disarm_value() {
-    return _nmethod_disarm_value;
+    return (int)(uint32_t)_nmethod_disarm_value;
   }
 
   void set_nmethod_disarm_value(int value) {
-    _nmethod_disarm_value = value;
+    _nmethod_disarm_value = (uint64_t)(uint32_t)value;
   }
 
   static ByteSize nmethod_disarmed_offset() {
@@ -700,6 +703,7 @@ class JavaThread: public Thread {
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
+  OopHandle      _mounted_vthread;
   OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
@@ -1058,7 +1062,6 @@ private:
   inline StackWatermarks* stack_watermarks() { return &_stack_watermarks; }
 
  public:
-  oop _mounted_vthread;
   jlong _scopeLocal_hash_table_shift;
 
   void allocate_scopeLocal_hash_table(int count);
@@ -1117,8 +1120,8 @@ private:
   void set_vthread(oop p);
   oop scopeLocalCache() const;
   void set_scopeLocalCache(oop p);
-  oop mounted_vthread() const                    { return _mounted_vthread; }
-  void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
+  oop mounted_vthread() const;
+  void set_mounted_vthread(oop p);
 
   // Prepare thread and add to priority queue.  If a priority is
   // not specified, use the priority of the thread object. Threads_lock
@@ -1183,7 +1186,7 @@ private:
 
   // Continuation support
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
+  const ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
@@ -1197,10 +1200,10 @@ private:
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() { _held_monitor_count++; }
-  void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
+  void dec_held_monitor_count() { assert(_held_monitor_count > 0, ""); _held_monitor_count--; }
 
   inline bool is_vthread_mounted() const;
-  inline ContinuationEntry* vthread_continuation() const;
+  inline const ContinuationEntry* vthread_continuation() const;
 
   enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
   inline CarrierOrVirtual which_stack(address adr) const;

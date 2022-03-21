@@ -38,6 +38,10 @@ jdk/javadoc/doclet/testLinkOption/TestRedirectLinks.java
 
 jdk/jshell/ToolTabSnippetTest.java
 
+###
+# NoClassDefFoundError/ExceptionInInitializerError due to use of Thread.stop
+jdk/jshell/PasteAndMeasurementsUITest.java
+
 ####
 # Uninvestigated timeouts
 jdk/jshell/ToolSimpleTest.java

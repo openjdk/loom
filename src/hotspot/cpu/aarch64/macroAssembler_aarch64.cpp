@@ -314,6 +314,7 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -324,6 +325,7 @@ void MacroAssembler::push_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -333,10 +335,12 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   incrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   decrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
@@ -799,6 +803,11 @@ void MacroAssembler::get_vm_result_2(Register metadata_result, Register java_thr
 
 void MacroAssembler::align(int modulus) {
   while (offset() % modulus != 0) nop();
+}
+
+void MacroAssembler::post_call_nop() {
+  relocate(post_call_nop_Relocation::spec());
+  nop();
 }
 
 // these are no-ops overridden by InterpreterMacroAssembler
@@ -4173,7 +4182,8 @@ void MacroAssembler::movoop(Register dst, jobject obj, bool immediate) {
   // nmethod entry barrier necessitate using the constant pool. They have to be
   // ordered with respected to oop accesses.
   // Using immediate literals would necessitate ISBs.
-  if (BarrierSet::barrier_set()->barrier_set_nmethod() != NULL || !immediate) {
+  BarrierSet* bs = BarrierSet::barrier_set();
+  if ((bs->barrier_set_nmethod() != NULL && bs->barrier_set_assembler()->nmethod_code_patching()) || !immediate) {
     address dummy = address(uintptr_t(pc()) & -wordSize); // A nearby aligned address
     ldr_constant(dst, Address(dummy, rspec));
   } else

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,7 @@
  * @test
  * @summary Test Thread::getStackTrace on a virtual thread that is runnable-unmounted
  * @compile --enable-preview -source ${jdk.version} StackTraceWhenRunnable.java
- * @run main/othervm --enable-preview -Djdk.defaultScheduler.maxPoolSize=1 StackTraceWhenRunnable
+ * @run main/othervm --enable-preview -Djdk.virtualThreadScheduler.maxPoolSize=1 StackTraceWhenRunnable
  */
 
 import java.io.IOException;

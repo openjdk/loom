@@ -104,8 +104,7 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
   return frame();
 }
 
-template <typename ConfigT>
-inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   Unimplemented();
 }
 
@@ -137,8 +136,7 @@ inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   Unimplemented();
 }
 

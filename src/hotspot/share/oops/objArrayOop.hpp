@@ -45,11 +45,6 @@ class objArrayOopDesc : public arrayOopDesc {
 
   template <class T> T* obj_at_addr(int index) const;
 
-public:
-  template <class T> T* obj_at_address(int index) const {
-    return obj_at_addr<T>(index);
-  }
-
   template <class T>
   static ptrdiff_t obj_at_offset(int index) {
     return base_offset_in_bytes() + sizeof(T) * index;
@@ -94,8 +89,6 @@ private:
   oop obj_at(int index) const;
 
   void obj_at_put(int index, oop value);
-  template <DecoratorSet ds>
-  void obj_at_put_access(int index, oop value);
 
   oop atomic_compare_exchange_oop(int index, oop exchange_value, oop compare_value);
 

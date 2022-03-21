@@ -30,6 +30,7 @@
 #include "classfile/classLoaderData.inline.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "code/nmethod.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/serial/serialStringDedup.hpp"
 #include "memory/universe.hpp"
 #include "oops/markWord.hpp"
@@ -51,6 +52,8 @@ inline void MarkSweep::mark_object(oop obj) {
   // and overwrite the mark.  We'll restore it at the end of markSweep.
   markWord mark = obj->mark();
   obj->set_mark(markWord::prototype().set_marked());
+
+  ContinuationGCSupport::transform_stack_chunk(obj);
 
   if (obj->mark_must_be_preserved(mark)) {
     preserve_mark(obj, mark);

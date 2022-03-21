@@ -239,9 +239,7 @@ public class DatagramSocketAdaptor
             }
             throw e;
         } catch (ClosedChannelException e) {
-            var exc = new SocketException("Socket closed");
-            exc.initCause(e);
-            throw exc;
+            throw new SocketException("Socket closed", e);
         }
     }
 
@@ -469,7 +467,7 @@ public class DatagramSocketAdaptor
             joinGroup(new InetSocketAddress(group, 0), null);
         } catch (IllegalArgumentException iae) {
             // 1-arg joinGroup does not specify IllegalArgumentException
-            throw (SocketException) new SocketException("joinGroup failed").initCause(iae);
+            throw new SocketException("joinGroup failed", iae);
         }
     }
 
@@ -481,7 +479,7 @@ public class DatagramSocketAdaptor
             leaveGroup(new InetSocketAddress(group, 0), null);
         } catch (IllegalArgumentException iae) {
             // 1-arg leaveGroup does not specify IllegalArgumentException
-            throw (SocketException) new SocketException("leaveGroup failed").initCause(iae);
+            throw new SocketException("leaveGroup failed", iae);
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -70,7 +70,7 @@ public interface SelChImpl extends Channel {
     void kill() throws IOException;
 
     /**
-     * Disables the current thread  for scheduling purposes until this
+     * Disables the current thread for scheduling purposes until this
      * channel is ready for I/O, or asynchronously closed, for up to the
      * specified waiting time.
      *

@@ -118,8 +118,6 @@ class Method : public Metadata {
   CompiledMethod* volatile _code;                       // Points to the corresponding piece of native code
   volatile address           _from_interpreted_entry; // Cache of _code ? _adapter->i2c_entry() : _i2i_entry
 
-  int _num_stack_arg_slots;
-
   // Constructor
   Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name);
  public:
@@ -475,7 +473,7 @@ public:
   void unlink_method() NOT_CDS_RETURN;
 
   // the number of argument reg slots that the compiled method uses on the stack.
-  int num_stack_arg_slots() const { return _num_stack_arg_slots;  };
+  int num_stack_arg_slots() const { return constMethod()->num_stack_arg_slots(); }
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
   virtual MetaspaceObj::Type type() const { return MethodType; }
@@ -1029,7 +1027,7 @@ public:
   address* native_function_addr() const          { assert(is_native(), "must be native"); return (address*) (this+1); }
   address* signature_handler_addr() const        { return native_function_addr() + 1; }
 
-  void set_num_stack_arg_slots();
+  void set_num_stack_arg_slots(int n) { constMethod()->set_num_stack_arg_slots(n); }
 };
 
 

@@ -486,7 +486,6 @@
   address* sender_pc_addr(void) const;
 
  public:
-  template <addressing pointers = addressing::ABSOLUTE>
   inline intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>
