@@ -1168,7 +1168,7 @@ public:
     assert(cont_size > 0, "");
 
   #ifdef ASSERT
-    bool allocated, empty;
+    bool empty = true;
     int is_chunk_available_size;
     bool is_chunk_available0 = is_chunk_available(top_sp, &is_chunk_available_size);
     intptr_t* orig_chunk_sp = nullptr;
@@ -1177,7 +1177,6 @@ public:
     stackChunkOop chunk = _cont.tail();
     int chunk_start_sp; // the chunk's sp before the freeze, adjusted to point beyond the stack-passed arguments in the topmost frame
     if (chunk_available) { // LIKELY
-      DEBUG_ONLY(allocated = false;)
       DEBUG_ONLY(orig_chunk_sp = chunk->sp_address();)
 
       assert(is_chunk_available0, "");
@@ -1200,15 +1199,12 @@ public:
       } else { // the chunk is empty
         chunk_start_sp = chunk->sp();
 
-        DEBUG_ONLY(empty = true;)
         assert(chunk_start_sp == chunk->stack_size(), "");
 
         chunk->set_max_size(cont_size);
         chunk->set_argsize(_cont.argsize());
       }
     } else { // no chunk; allocate
-      DEBUG_ONLY(empty = true; allocated = true;)
-
       assert(_thread->thread_state() == _thread_in_vm, "");
       assert(!is_chunk_available(top_sp), "");
       assert(_thread->cont_fastpath(), "");
