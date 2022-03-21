@@ -909,7 +909,7 @@ class VirtualThread extends Thread {
         StringBuilder sb = new StringBuilder("VirtualThread[#");
         sb.append(threadId());
         String name = getName();
-        if (!name.isEmpty() && !name.equals("<unnamed>")) {
+        if (!name.isEmpty()) {
             sb.append(",");
             sb.append(name);
         }

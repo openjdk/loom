@@ -97,7 +97,7 @@ public class BuilderTest {
         Thread thread1 = builder.unstarted(() -> done1.set(true));
         assertTrue(thread1.isVirtual());
         assertTrue(thread1.getState() == Thread.State.NEW);
-        assertEquals(thread1.getName(), "<unnamed>");
+        assertTrue(thread1.getName().isEmpty());
         assertTrue(thread1.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread1.isDaemon());
         assertTrue(thread1.getPriority() == Thread.NORM_PRIORITY);
@@ -110,7 +110,7 @@ public class BuilderTest {
         Thread thread2 = builder.start(() -> done2.set(true));
         assertTrue(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
-        assertEquals(thread2.getName(), "<unnamed>");
+        assertTrue(thread2.getName().isEmpty());
         assertTrue(thread2.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread2.isDaemon());
         assertTrue(thread2.getPriority() == Thread.NORM_PRIORITY);
@@ -122,7 +122,7 @@ public class BuilderTest {
         Thread thread3 = builder.factory().newThread(() -> done3.set(true));
         assertTrue(thread3.isVirtual());
         assertTrue(thread3.getState() == Thread.State.NEW);
-        assertEquals(thread3.getName(), "<unnamed>");
+        assertTrue(thread3.getName().isEmpty());
         assertTrue(thread3.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread3.isDaemon());
         assertTrue(thread3.getPriority() == Thread.NORM_PRIORITY);

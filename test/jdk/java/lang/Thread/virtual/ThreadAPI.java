@@ -920,7 +920,7 @@ public class ThreadAPI {
     public void testSetName1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Thread me = Thread.currentThread();
-            assertEquals(me.getName(), "<unnamed>");
+            assertTrue(me.getName().isEmpty());
             me.setName("fred");
             assertEquals(me.getName(), "fred");
         });
@@ -945,7 +945,7 @@ public class ThreadAPI {
     @Test
     public void testSetName3() throws Exception {
         var thread = Thread.ofVirtual().unstarted(LockSupport::park);
-        assertEquals(thread.getName(), "<unnamed>");
+        assertTrue(thread.getName().isEmpty());
 
         // not started
         thread.setName("fred1");

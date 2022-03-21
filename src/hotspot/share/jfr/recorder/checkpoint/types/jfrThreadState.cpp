@@ -126,8 +126,6 @@ const char* get_java_thread_name(const JavaThread* jt, int& length, oop vthread)
   return name_str;
 }
 
-static constexpr const char* const vthread_default_name = "<unnamed>";
-
 const char* JfrThreadName::name(const Thread* t, int& length, oop vthread) {
   assert(t != nullptr, "invariant");
   if (!t->is_Java_thread()) {
@@ -136,10 +134,6 @@ const char* JfrThreadName::name(const Thread* t, int& length, oop vthread) {
   const char* const java_name = get_java_thread_name(JavaThread::cast(t), length, vthread);
   if (java_name == nullptr) {
     return nullptr;
-  }
-  // The vthread default name is represented as the EMPTY_STRING for space savings.
-  if (strncmp(java_name, vthread_default_name, 9) == 0) {
-    length = 0; // denotes the writer should write the EMPTY_STRING constant.
   }
   return java_name;
 }

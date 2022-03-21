@@ -121,7 +121,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * method, to obtain a reference to the <i>current thread</i>, will return the {@code
  * Thread} object for the virtual thread, not the underlying carrier thread.
  *
- * <p> Virtual threads gets a fixed name by default.
+ * <p> Virtual threads get an empty thread name by default.
  *
  * <h2>Creating and starting threads</h2>
  *
@@ -693,7 +693,7 @@ public class Thread implements Runnable {
      */
     Thread(String name, int characteristics) {
         this.tid = ThreadIdentifiers.next();
-        this.name = (name != null) ? name : "<unnamed>";
+        this.name = (name != null) ? name : "";
         this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
 
         // thread locals
@@ -1937,7 +1937,6 @@ public class Thread implements Runnable {
         if (name == null) {
             throw new NullPointerException("name cannot be null");
         }
-
         this.name = name;
         if (!isVirtual() && Thread.currentThread() == this) {
             setNativeName(name);
