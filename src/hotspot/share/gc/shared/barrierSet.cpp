@@ -77,8 +77,10 @@ BarrierSet::BarrierSet(BarrierSetAssembler* barrier_set_assembler,
 }
 
 void BarrierSet::on_thread_attach(Thread* thread) {
-  BarrierSetNMethod* bs_nm = barrier_set_nmethod();
-  thread->set_nmethod_disarm_value(bs_nm->disarmed_value());
+  if (Continuations::enabled()) {
+    BarrierSetNMethod* bs_nm = barrier_set_nmethod();
+    thread->set_nmethod_disarm_value(bs_nm->disarmed_value());
+  }
 }
 
 // Called from init.cpp

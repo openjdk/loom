@@ -7861,7 +7861,8 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
-    StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
+    StubRoutines::_cont_doYield      = StubRoutines::_cont_doYield_stub != nullptr
+                                        ? StubRoutines::_cont_doYield_stub->entry_point() : nullptr;
     StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
     StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
 
