@@ -795,7 +795,10 @@ void GenCollectedHeap::full_process_roots(bool is_adjust_phase,
                                           bool only_strong_roots,
                                           OopClosure* root_closure,
                                           CLDClosure* cld_closure) {
-  MarkingCodeBlobClosure mark_code_closure(root_closure, CodeBlobToOopClosure::FixRelocations, !is_adjust_phase);
+  // Called from either the marking phase or the adjust phase.
+  const bool is_marking_phase = !is_adjust_phase;
+
+  MarkingCodeBlobClosure mark_code_closure(root_closure, is_adjust_phase, is_marking_phase);
   CLDClosure* weak_cld_closure = only_strong_roots ? NULL : cld_closure;
 
   process_roots(so, root_closure, cld_closure, weak_cld_closure, &mark_code_closure);
