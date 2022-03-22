@@ -3839,7 +3839,7 @@ encode %{
     if (call == NULL) {
       ciEnv::current()->record_failure("CodeCache is full");
       return;
-    } 
+    }
     __ post_call_nop();
     if (Compile::current()->max_vector_size() > 0) {
       __ reinitialize_ptrue();
@@ -3878,7 +3878,7 @@ encode %{
       __ stp(zr, rscratch2, Address(__ pre(sp, -2 * wordSize)));
       __ blr(rscratch1);
       __ bind(retaddr);
-      // __ post_call_nop(); -- can we have one here? do we need one?
+      __ post_call_nop();
       __ add(sp, sp, 2 * wordSize);
     }
     if (Compile::current()->max_vector_size() > 0) {
