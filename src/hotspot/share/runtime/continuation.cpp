@@ -1183,7 +1183,7 @@ public:
 
       if (chunk->sp() < chunk->stack_size()) { // we are copying into a non-empty chunk
         DEBUG_ONLY(empty = false;)
-        assert(chunk_start_sp < (chunk->stack_size() - chunk->argsize()), "");
+        assert(chunk->sp() < (chunk->stack_size() - chunk->argsize()), "");
         assert(*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
         chunk_start_sp = chunk->sp() + _cont.argsize(); // we overlap; we'll overwrite the chunk's top frame's callee arguments
