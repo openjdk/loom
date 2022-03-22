@@ -122,7 +122,7 @@ public class Jdb implements AutoCloseable {
         #
         # 1) ^main[89] @
         # or
-        # 1) ^<unnamed>[89] @
+        # 1) ^[89] @
         # for virtual threads
         #
         # where ^ means start of line, and @ means end of file with no end of line
@@ -153,7 +153,7 @@ public class Jdb implements AutoCloseable {
         # i.e., the > prompt comes out AFTER the prompt we we need to wait for.
     */
     // compile regexp once
-    private final static String promptPattern = "<?[a-zA-Z0-9_-][a-zA-Z0-9_-]*>?\\[[1-9][0-9]*\\] [ >]*$";
+    private final static String promptPattern = "<?[a-zA-Z0-9_-]*>?\\[[1-9][0-9]*\\] [ >]*$";
     final static Pattern PROMPT_REGEXP = Pattern.compile(promptPattern);
 
     public List<String> waitForPrompt(int lines, boolean allowExit) {
