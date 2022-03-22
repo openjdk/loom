@@ -52,8 +52,8 @@ class StreamWriterHost : public MemoryWriterHost<Adapter, AP> {
   int64_t current_offset() const;
   void seek(int64_t offset);
   void flush();
-  void write_unbuffered(const void* src, intptr_t len);
   void write_buffered(const void* src, intptr_t len);
+  void write_unbuffered(const void* src, intptr_t len);
   bool is_valid() const;
   void close_fd();
   void reset(fio_fd fd);

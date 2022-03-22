@@ -57,5 +57,4 @@ enum JfrCheckpointType {
   THREADS = 8
 };
 
-
 #endif // SHARE_JFR_UTILITIES_JFRTYPES_HPP

@@ -140,6 +140,7 @@ public final class JVM {
      *
      * @return a unique class identifier
      */
+    @IntrinsicCandidate
     public static native long getClassId(Class<?> clazz);
 
     /**

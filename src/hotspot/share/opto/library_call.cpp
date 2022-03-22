@@ -57,11 +57,6 @@
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
 
-#if INCLUDE_JFR
-#include "jfr/jfr.hpp"
-#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdMacros.hpp" // FIXME
-#endif
-
 //---------------------------make_vm_intrinsic----------------------------
 CallGenerator* Compile::make_vm_intrinsic(ciMethod* m, bool is_virtual) {
   vmIntrinsicID id = m->intrinsic_id();
@@ -479,7 +474,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_setScopeLocalCache:       return inline_native_setScopeLocalCache();
 
 #ifdef JFR_HAVE_INTRINSICS
-  case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), "counterTime");
+  case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JfrTime::time_function), "counterTime");
   case vmIntrinsics::_getEventWriter:           return inline_native_getEventWriter();
 #endif
   case vmIntrinsics::_currentTimeMillis:        return inline_native_time_funcs(CAST_FROM_FN_PTR(address, os::javaTimeMillis), "currentTimeMillis");
@@ -2903,7 +2898,7 @@ bool LibraryCallKit::inline_native_classID() {
     Node* kls_trace_id_addr = basic_plus_adr(kls, in_bytes(KLASS_TRACE_ID_OFFSET));
     Node* kls_trace_id_raw = ideal.load(ideal.ctrl(), kls_trace_id_addr,TypeLong::LONG, T_LONG, Compile::AliasIdxRaw);
 
-    Node* epoch_address = makecon(TypeRawPtr::make(Jfr::epoch_address()));
+    Node* epoch_address = makecon(TypeRawPtr::make(JfrIntrinsicSupport::epoch_address()));
     Node* epoch = ideal.load(ideal.ctrl(), epoch_address, TypeInt::BOOL, T_BOOLEAN, Compile::AliasIdxRaw);
     epoch = _gvn.transform(new LShiftLNode(longcon(1), epoch));
     Node* mask = _gvn.transform(new LShiftLNode(epoch, intcon(META_SHIFT)));
@@ -2914,9 +2909,9 @@ bool LibraryCallKit::inline_native_classID() {
     __ if_then(kls_trace_id_raw_and_mask, BoolTest::ne, epoch, unlikely); {
       sync_kit(ideal);
       make_runtime_call(RC_LEAF,
-                        OptoRuntime::get_class_id_intrinsic_Type(),
-                        CAST_FROM_FN_PTR(address, Jfr::get_class_id_intrinsic),
-                        "get_class_id_intrinsic",
+                        OptoRuntime::class_id_load_barrier_Type(),
+                        CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::load_barrier),
+                        "class id load barrier",
                         TypePtr::BOTTOM,
                         kls);
       ideal.sync_kit(this);
@@ -2937,7 +2932,7 @@ bool LibraryCallKit::inline_native_classID() {
       ideal.set(result, _gvn.transform(longcon(LAST_TYPE_ID + 1)));
     } __ end_if();
 
-    Node* signaled_flag_address = makecon(TypeRawPtr::make(Jfr::signal_address()));
+    Node* signaled_flag_address = makecon(TypeRawPtr::make(JfrIntrinsicSupport::signal_address()));
     Node* signaled = ideal.load(ideal.ctrl(), signaled_flag_address, TypeInt::BOOL, T_BOOLEAN, Compile::AliasIdxRaw, true, MemNode::acquire);
     __ if_then(signaled, BoolTest::ne, ideal.ConI(1)); {
       ideal.store(ideal.ctrl(), signaled_flag_address, ideal.ConI(1), T_BOOLEAN, Compile::AliasIdxRaw, MemNode::release, true);
@@ -3075,7 +3070,7 @@ bool LibraryCallKit::inline_native_getEventWriter() {
   Node* epoch = _gvn.transform(new AndINode(vthread_epoch_raw, _gvn.transform(epoch_mask)));
 
   // Load the current epoch generation. The value is unsigned 16-bit, so we type it as T_CHAR.
-  Node* epoch_generation_address = makecon(TypeRawPtr::make(Jfr::epoch_generation_address()));
+  Node* epoch_generation_address = makecon(TypeRawPtr::make(JfrIntrinsicSupport::epoch_generation_address()));
   Node* current_epoch_generation = make_load(control(), epoch_generation_address, TypeInt::CHAR, T_CHAR, MemNode::unordered);
 
   // Compare the epoch in the vthread to the current epoch generation.
@@ -3250,12 +3245,10 @@ bool LibraryCallKit::inline_native_getEventWriter() {
  *     const u2 vthread_epoch = vthread_epoch_raw & epoch_mask;
  *     Atomic::store(&tl->_vthread_epoch, vthread_epoch);
  *   }
- *   OrderAccess::storestore();
- *   Atomic::store(&tl->_vthread, true);
+ *   Atomic::release_store(&tl->_vthread, true);
  *   return;
  * }
- * OrderAccess::storestore();
- * Atomic::store(&tl->_vthread, false);
+ * Atomic::release_store(&tl->_vthread, false);
  */
 void LibraryCallKit::extend_setCurrentThread(Node* jt, Node* thread) {
   enum { _true_path = 1, _false_path = 2, PATH_LIMIT };
@@ -6350,8 +6343,8 @@ Node* LibraryCallKit::load_field_from_object(Node* fromObj, const char* fieldNam
 }
 
 Node * LibraryCallKit::field_address_from_object(Node * fromObj, const char * fieldName, const char * fieldTypeString,
-                                                 bool is_exact, bool is_static,
-                                                 ciInstanceKlass * fromKls) {
+                                                 bool is_exact /* true */, bool is_static /* false */,
+                                                 ciInstanceKlass * fromKls /* NULL */) {
   if (fromKls == NULL) {
     const TypeInstPtr* tinst = _gvn.type(fromObj)->isa_instptr();
     assert(tinst != NULL, "obj is null");

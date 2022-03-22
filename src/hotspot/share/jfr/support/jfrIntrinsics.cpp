@@ -24,6 +24,8 @@
 
 #include "precompiled.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdLoadBarrier.inline.hpp"
 #include "jfr/support/jfrIntrinsics.hpp"
 #include "jfr/support/jfrThreadId.inline.hpp"
 #include "jfr/support/jfrThreadLocal.hpp"
@@ -49,7 +51,7 @@ static void assert_epoch_identity(JavaThread* jt, u2 current_epoch) {
 }
 #endif
 
-void* JfrIntrinsicSupport::get_event_writer(JavaThread* jt) {
+void* JfrIntrinsicSupport::event_writer(JavaThread* jt) {
   DEBUG_ONLY(assert_precondition(jt);)
   // Can safepoint here.
   ThreadInVMfromJava transition(jt);
@@ -72,4 +74,21 @@ void JfrIntrinsicSupport::write_checkpoint(JavaThread* jt) {
   // Transition before reading the epoch generation anew, now as _thread_in_vm. Can safepoint here.
   ThreadInVMfromJava transition(jt);
   JfrThreadLocal::set_vthread_epoch(jt, vthread_tid, ThreadIdAccess::current_epoch());
+}
+
+void JfrIntrinsicSupport::load_barrier(const Klass* klass) {
+  assert(klass != NULL, "sanity");
+  JfrTraceIdLoadBarrier::load_barrier(klass);
+}
+
+address JfrIntrinsicSupport::epoch_address() {
+  return JfrTraceIdEpoch::epoch_address();
+}
+
+address JfrIntrinsicSupport::epoch_generation_address() {
+  return JfrTraceIdEpoch::epoch_generation_address();
+}
+
+address JfrIntrinsicSupport::signal_address() {
+  return JfrTraceIdEpoch::signal_address();
 }

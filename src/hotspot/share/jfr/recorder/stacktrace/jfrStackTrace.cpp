@@ -141,10 +141,10 @@ class JfrVframeStream : public vframeStreamCommon {
   bool _async_mode;
   bool _vthread;
   bool step_to_sender();
-  void next_vframe();
+  void next_frame();
  public:
   JfrVframeStream(JavaThread* jt, const frame& fr, bool stop_at_java_call_stub, bool async_mode);
-  void next_frame();
+  void next_vframe();
 };
 
 JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool stop_at_java_call_stub, bool async_mode) :
@@ -168,7 +168,7 @@ inline bool JfrVframeStream::step_to_sender() {
   return true;
 }
 
-inline void JfrVframeStream::next_vframe() {
+inline void JfrVframeStream::next_frame() {
   do {
     if (_vthread && Continuation::is_continuation_enterSpecial(_frame)) {
       if (_cont->is_virtual_thread()) {
@@ -189,12 +189,12 @@ inline void JfrVframeStream::next_vframe() {
 // interpreted and the current sender is compiled, we verify that the
 // current sender is also walkable. If it is not walkable, then we mark
 // the current vframeStream as at the end.
-void JfrVframeStream::next_frame() {
+void JfrVframeStream::next_vframe() {
   // handle frames with inlining
   if (_mode == compiled_mode && fill_in_compiled_inlined_sender()) {
     return;
   }
-  next_vframe();
+  next_frame();
 }
 
 static const size_t min_valid_free_size_bytes = 16;
@@ -238,7 +238,7 @@ bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame) {
     }
 
     intptr_t* frame_id = vfs.frame_id();
-    vfs.next_frame();
+    vfs.next_vframe();
     if (type == JfrStackFrame::FRAME_JIT && !vfs.at_end() && frame_id == vfs.frame_id()) {
       // This frame and the caller frame are both the same physical
       // frame, so this frame is inlined into the caller.
@@ -266,7 +266,7 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
     if (vfs.at_end()) {
       break;
     }
-    vfs.next_frame();
+    vfs.next_vframe();
   }
   _hash = 1;
   while (!vfs.at_end()) {
@@ -285,7 +285,7 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
     }
 
     intptr_t* frame_id = vfs.frame_id();
-    vfs.next_frame();
+    vfs.next_vframe();
     if (type == JfrStackFrame::FRAME_JIT && !vfs.at_end() && frame_id == vfs.frame_id()) {
       // This frame and the caller frame are both the same physical
       // frame, so this frame is inlined into the caller.

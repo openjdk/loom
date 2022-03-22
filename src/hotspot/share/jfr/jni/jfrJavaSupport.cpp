@@ -672,9 +672,7 @@ jlong JfrJavaSupport::jfr_thread_id(JavaThread* jt, jobject thread) {
     return 0;
   }
   const traceid tid = AccessThreadTraceId::id(ref);
-  const Klass* const k = ref->klass();
-  assert(k != nullptr, "invariant");
-  if (k->is_subclass_of(vmClasses::VirtualThread_klass())) {
+  if (is_virtual_thread(ref)) {
     const u2 epoch = JfrTraceIdEpoch::epoch_generation();
     if (AccessThreadTraceId::epoch(ref) != epoch) {
       AccessThreadTraceId::set_epoch(ref, epoch);

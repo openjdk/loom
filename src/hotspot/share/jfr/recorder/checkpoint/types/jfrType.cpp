@@ -103,13 +103,13 @@ void JfrCheckpointThreadClosure::do_thread(Thread* t) {
   const traceid tid = JfrThreadId::jfr_id(t);
   assert(tid != 0, "invariant");
   _writer.write_key(tid);
-  int length = -1;
+  int length;
   const char* const name = JfrThreadName::name(t, length);
   assert(name != NULL, "invariant");
   write_name(name, length);
   _writer.write<traceid>(JfrThreadId::os_id(t));
   if (!t->is_Java_thread()) {
-    _writer.write((const char*)NULL); // java name
+    _writer.write((const char*)nullptr); // java name
     _writer.write((traceid)0); // java thread id
     _writer.write((traceid)0); // java thread group
   } else {

@@ -31,6 +31,5 @@
  */
 #include "jfrfiles/jfrEventClasses.hpp"
 #include "jfrfiles/jfrEventIds.hpp"
-#include "jfr/support/jfrThreadId.hpp"
 
 #endif // SHARE_JFR_JFREVENTS_HPP

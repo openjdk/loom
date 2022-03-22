@@ -564,7 +564,7 @@ size_t JfrCheckpointManager::flush_type_set() {
     WriteOperation wo(_chunkwriter);
     MutexedWriteOperation mwo(wo);
     process_live_list(mwo, _global_mspace); // current epoch list
-  // Do thread local list after global. Careful, the tlwo destructor writes to chunk.
+    // Do thread local list after global. Careful, the tlwo destructor writes to chunk.
     ThreadLocalWriteOperation tlwo(_chunkwriter);
     ThreadLocalMutexedWriteOperation tlmwo(tlwo);
     _thread_local_mspace->iterate(tlmwo); // current epoch list

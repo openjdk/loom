@@ -23,7 +23,6 @@
  */
 
 #include "precompiled.hpp"
-#include "classfile/javaClasses.inline.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "jfr/jni/jfrJavaSupport.hpp"
 #include "jfr/leakprofiler/checkpoint/objectSampleCheckpoint.hpp"
@@ -104,14 +103,12 @@ static void send_java_thread_start_event(JavaThread* jt) {
     // thread is excluded
     return;
   }
-  if (JfrRecorder::is_recording()) {
-    EventThreadStart event;
-    traceid thread_id = JfrThreadLocal::jvm_thread_id(jt);
-    assert(thread_id != 0, "invariant");
-    event.set_thread(thread_id);
-    event.set_parentThread(jt->jfr_thread_local()->parent_thread_id());
-    event.commit();
-  }
+  EventThreadStart event;
+  traceid thread_id = JfrThreadLocal::jvm_thread_id(jt);
+  assert(thread_id != 0, "invariant");
+  event.set_thread(thread_id);
+  event.set_parentThread(jt->jfr_thread_local()->parent_thread_id());
+  event.commit();
 }
 
 void JfrThreadLocal::on_start(Thread* t) {
@@ -135,8 +132,8 @@ void JfrThreadLocal::on_java_thread_start(JavaThread* starter, JavaThread* start
   assert(startee != nullptr, "invariant");
   JfrThreadLocal* const tl = startee->jfr_thread_local();
   assign_thread_id(startee, tl);
-  assert(Atomic::load(&tl->_vthread_id) != 0, "invariant");
-  assert(Atomic::load(&tl->_jvm_thread_id) == Atomic::load(&tl->_vthread_id), "invariant");
+  assert(vthread_id(startee) != 0, "invariant");
+  assert(jvm_thread_id(startee) == vthread_id(startee), "invariant");
   if (JfrRecorder::is_recording() && EventThreadStart::is_enabled() && EventThreadStart::is_stacktrace_enabled()) {
     // skip level 2 to skip frames Thread.start() and Thread.start0()
     startee->jfr_thread_local()->set_cached_stack_trace_id(JfrStackTraceRepository::record(starter, 2));
@@ -207,8 +204,8 @@ void JfrThreadLocal::on_exit(Thread* t) {
   assert(!tl->is_dead(), "invariant");
   if (t->is_Java_thread()) {
     JavaThread* const jt = JavaThread::cast(t);
-    send_java_thread_end_event(jt, JfrThreadLocal::jvm_thread_id(jt));
     JfrThreadCPULoadEvent::send_event_for_thread(jt);
+    send_java_thread_end_event(jt, JfrThreadLocal::jvm_thread_id(jt));
   }
   release(tl, Thread::current()); // because it could be that Thread::current() != t
 }
@@ -262,7 +259,7 @@ void JfrThreadLocal::set(bool* exclusion_field, bool state) {
 }
 
 bool JfrThreadLocal::is_vthread_excluded() const {
-  return _vthread_excluded;
+  return Atomic::load(&_vthread_excluded);
 }
 
 bool JfrThreadLocal::is_jvm_thread_excluded(const Thread* t) {
@@ -272,12 +269,12 @@ bool JfrThreadLocal::is_jvm_thread_excluded(const Thread* t) {
 
 void JfrThreadLocal::exclude_vthread(const JavaThread* jt) {
   set(&jt->jfr_thread_local()->_vthread_excluded, true);
-  JfrJavaEventWriter::exclude(jt->jfr_thread_local()->_vthread_id, jt);
+  JfrJavaEventWriter::exclude(vthread_id(jt), jt);
 }
 
 void JfrThreadLocal::include_vthread(const JavaThread* jt) {
   set(&jt->jfr_thread_local()->_vthread_excluded, false);
-  JfrJavaEventWriter::include(jt->jfr_thread_local()->_vthread_id, jt);
+  JfrJavaEventWriter::include(vthread_id(jt), jt);
 }
 
 void JfrThreadLocal::exclude_jvm_thread(const Thread* t) {
@@ -295,7 +292,7 @@ void JfrThreadLocal::include_jvm_thread(const Thread* t) {
 }
 
 bool JfrThreadLocal::is_excluded() const {
-  return Atomic::load_acquire(&_vthread) ? _vthread_excluded : _jvm_thread_excluded;
+  return Atomic::load_acquire(&_vthread) ? is_vthread_excluded(): _jvm_thread_excluded;
 }
 
 bool JfrThreadLocal::is_included() const {
@@ -336,6 +333,8 @@ void JfrThreadLocal::stop_impersonating(const Thread* t) {
   assert(!is_impersonating(t), "invariant");
 }
 
+typedef JfrOopTraceId<ThreadIdAccess> AccessThreadTraceId;
+
 void JfrThreadLocal::set_vthread_epoch(const JavaThread* jt, traceid tid, u2 epoch) {
   assert(jt != nullptr, "invariant");
   assert(is_vthread(jt), "invariant");
@@ -356,7 +355,6 @@ void JfrThreadLocal::set_vthread_epoch(const JavaThread* jt, traceid tid, u2 epo
   * that thread information for that event is not resolvable,
   * i.e. be null.
   */
-  typedef JfrOopTraceId<ThreadIdAccess> AccessThreadTraceId;
   oop vthread = jt->vthread();
   assert(vthread != nullptr, "invariant");
   AccessThreadTraceId::set_epoch(vthread, epoch);
@@ -387,7 +385,7 @@ traceid JfrThreadLocal::thread_id(const Thread* t) {
   const traceid tid = vthread_id(jt);
   assert(tid != 0, "invariant");
   if (!tl->is_vthread_excluded()) {
-    const u2 current_epoch = ThreadIdAccess::current_epoch();
+    const u2 current_epoch = AccessThreadTraceId::current_epoch();
     if (vthread_epoch(jt) != current_epoch) {
       set_vthread_epoch(jt, tid, current_epoch);
     }
@@ -406,7 +404,7 @@ inline traceid load_java_thread_id(const Thread* t) {
   assert(t != nullptr, "invariant");
   assert(t->is_Java_thread(), "invariant");
   oop threadObj = JavaThread::cast(t)->threadObj();
-  return threadObj != nullptr ? java_lang_Thread::thread_id(threadObj) : 0;
+  return threadObj != nullptr ? AccessThreadTraceId::id(threadObj) : 0;
 }
 
 traceid JfrThreadLocal::assign_thread_id(const Thread* t, JfrThreadLocal* tl) {
@@ -451,16 +449,16 @@ void JfrThreadLocal::on_set_current_thread(JavaThread* jt, oop thread) {
   assert(jt != nullptr, "invariant");
   assert(thread != nullptr, "invariant");
   JfrThreadLocal* const tl = jt->jfr_thread_local();
-  if (is_virtual(jt, thread)) {
-    Atomic::store(&tl->_vthread_id, static_cast<traceid>(java_lang_Thread::thread_id(thread)));
-    const u2 epoch_raw = java_lang_Thread::jfr_epoch(thread);
-    const bool excluded = epoch_raw & excluded_bit;
-    Atomic::store(&tl->_vthread_excluded, excluded);
-    if (!excluded) {
-      Atomic::store(&tl->_vthread_epoch, static_cast<u2>(epoch_raw & epoch_mask));
-    }
-    Atomic::release_store(&tl->_vthread, true);
+  if (!is_virtual(jt, thread)) {
+    Atomic::release_store(&tl->_vthread, false);
     return;
   }
-  Atomic::release_store(&tl->_vthread, false);
+  Atomic::store(&tl->_vthread_id, AccessThreadTraceId::id(thread));
+  const u2 epoch_raw = AccessThreadTraceId::epoch(thread);
+  const bool excluded = epoch_raw & excluded_bit;
+  Atomic::store(&tl->_vthread_excluded, excluded);
+  if (!excluded) {
+    Atomic::store(&tl->_vthread_epoch, static_cast<u2>(epoch_raw & epoch_mask));
+  }
+  Atomic::release_store(&tl->_vthread, true);
 }
