@@ -204,8 +204,8 @@ void JfrThreadLocal::on_exit(Thread* t) {
   assert(!tl->is_dead(), "invariant");
   if (t->is_Java_thread()) {
     JavaThread* const jt = JavaThread::cast(t);
-    JfrThreadCPULoadEvent::send_event_for_thread(jt);
     send_java_thread_end_event(jt, JfrThreadLocal::jvm_thread_id(jt));
+    JfrThreadCPULoadEvent::send_event_for_thread(jt);
   }
   release(tl, Thread::current()); // because it could be that Thread::current() != t
 }
