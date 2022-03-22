@@ -209,7 +209,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 }
 
 template <typename ConfigT>
-template <typename FKind, bool bottom>
+template <typename FKind>
 inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
   if (caller.is_interpreted_frame()) {
     assert (!caller.is_empty(), "");
@@ -308,9 +308,8 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
 }
 
 template <typename ConfigT>
-template<typename FKind, bool bottom>
+template<typename FKind>
 inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
-  assert (!bottom || caller.fp() == _cont.entryFP(), "");
   patch_callee_link(caller, caller.fp());
 }
 

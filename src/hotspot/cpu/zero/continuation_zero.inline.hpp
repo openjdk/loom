@@ -102,7 +102,7 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
 }
 
 template <typename ConfigT>
-template <typename FKind, bool bottom>
+template <typename FKind>
 inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
   Unimplemented();
 }
@@ -139,7 +139,7 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
 }
 
 template <typename ConfigT>
-template<typename FKind, bool bottom>
+template<typename FKind>
 inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
   Unimplemented();
 }
