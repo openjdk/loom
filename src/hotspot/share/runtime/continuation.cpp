@@ -1619,6 +1619,7 @@ public:
 #endif
 
     intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
+    const int argsize = Interpreted::stack_argsize(f);
     const int locals = f.interpreter_frame_method()->max_locals();
     assert(Interpreted::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
     const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
@@ -1636,11 +1637,11 @@ public:
     Method* frame_method = Frame::frame_method(f);
 
     log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
-      frame_method->name_and_sig_as_C_string(), _size, fsize, _cont.argsize());
+      frame_method->name_and_sig_as_C_string(), _size, fsize, argsize);
     // we'd rather not yield inside methods annotated with @JvmtiMountTransition
     assert(!Frame::frame_method(f)->jvmti_mount_transition(), "");
 
-    freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, _cont.argsize());
+    freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, argsize);
     if (UNLIKELY(result > freeze_ok_bottom)) {
       return result;
     }
@@ -1658,7 +1659,7 @@ public:
     copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(f) - locals,
                                              Interpreted::frame_bottom(hf) - locals, locals); // copy locals
     copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
-    assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + _cont.argsize()), "");
+    assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
     relativize_interpreted_frame_metadata(f, hf);
 
