@@ -35,6 +35,7 @@ public class GetSetLocalTest {
 
     static final int MSG_COUNT = 600*1000;
     static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
+    static native boolean completed();
     static native void enableEvents(Thread thread);
     static native void testSuspendedVirtualThreads(Thread thread);
 
@@ -51,7 +52,7 @@ public class GetSetLocalTest {
 
     static final Runnable PRODUCER = () -> {
         try {
-            for (int i = 0; i < MSG_COUNT; i++) {
+            for (int i = 0; i < MSG_COUNT && !completed(); i++) {
                 producer("msg: ");
             }
         } catch (InterruptedException e) { }
@@ -59,7 +60,7 @@ public class GetSetLocalTest {
 
     static final Runnable CONSUMER = () -> {
         try {
-            for (int i = 0; i < MSG_COUNT; i++) {
+            for (int i = 0; i < MSG_COUNT && !completed(); i++) {
                 String s = QUEUE.take();
             }
         } catch (InterruptedException e) { }

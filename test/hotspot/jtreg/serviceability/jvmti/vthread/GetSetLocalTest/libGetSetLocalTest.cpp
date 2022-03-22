@@ -52,6 +52,7 @@ typedef struct Values {
 
 static const int MAX_EVENTS_TO_PROCESS = 20;
 static jvmtiEnv *jvmti = NULL;
+static volatile jboolean completed = JNI_FALSE;
 
 static void
 set_breakpoint(JNIEnv *jni, jclass klass, const char *mname, jlocation location) {
@@ -363,6 +364,8 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv* jni, jthread vthread,
   }
   deallocate(jvmti, jni, (void*)mname);
   deallocate(jvmti, jni, (void*)tname);
+
+  completed = JNI_TRUE; // done with testing in the agent
   LOG("Breakpoint: %s on %s thread: %s - Finished\n", mname, virt, tname);
 }
 
@@ -480,6 +483,11 @@ Java_GetSetLocalTest_testSuspendedVirtualThreads(JNIEnv *jni, jclass klass, jthr
   }
   deallocate(jvmti, jni, (void*)tname);
   LOG("testSuspendedVirtualThreads: finished\n");
+}
+
+JNIEXPORT jboolean JNICALL
+Java_GetSetLocalTest_completed(JNIEnv *jni, jclass klass) {
+  return completed;
 }
 
 } // extern "C"
