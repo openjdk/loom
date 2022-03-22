@@ -2815,7 +2815,6 @@ public:
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       ls.print_cr("top hframe after (thaw):");
-      assert(_cont.last_frame().is_heap_frame(), "should be");
       _cont.last_frame().print_on(&ls);
     }
   }
