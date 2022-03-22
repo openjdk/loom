@@ -957,7 +957,7 @@ void ShenandoahFullGC::compact_humongous_objects() {
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
       Copy::aligned_conjoint_words(r->bottom(), heap->get_region(new_start)->bottom(), words_size);
-      assert(!old_obj->is_stackChunk(), "We assume that stack chunks are not humongous.");
+      ContinuationGCSupport::transform_stack_chunk(cast_to_oop<HeapWord*>(r->bottom()));
 
       oop new_obj = cast_to_oop(heap->get_region(new_start)->bottom());
       new_obj->init_mark();
