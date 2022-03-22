@@ -474,7 +474,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_setScopeLocalCache:       return inline_native_setScopeLocalCache();
 
 #ifdef JFR_HAVE_INTRINSICS
-  case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JfrTime::time_function), "counterTime");
+  case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JfrTime::time_function()), "counterTime");
   case vmIntrinsics::_getEventWriter:           return inline_native_getEventWriter();
 #endif
   case vmIntrinsics::_currentTimeMillis:        return inline_native_time_funcs(CAST_FROM_FN_PTR(address, os::javaTimeMillis), "currentTimeMillis");
