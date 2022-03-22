@@ -164,7 +164,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClos
   if (LIKELY(chunk->has_bitmap())) {
     oop_oop_iterate_stack_helper(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
   } else {
-    guarantee(!UseG1GC && !UseParallelGC && !UseSerialGC, "Scavenging collectors should always use bitmap");
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());
   }
 }

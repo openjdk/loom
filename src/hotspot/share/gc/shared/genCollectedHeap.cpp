@@ -1229,18 +1229,3 @@ void GenCollectedHeap::ensure_parsability(bool retire_tlabs) {
   GenEnsureParsabilityClosure ep_cl;
   generation_iterate(&ep_cl, false);
 }
-
-oop GenCollectedHeap::handle_failed_promotion(Generation* old_gen,
-                                              oop obj,
-                                              size_t obj_size) {
-  guarantee(old_gen == _old_gen, "We only get here with an old generation");
-  assert(obj_size == obj->size(), "bad obj_size passed in");
-  HeapWord* result = NULL;
-
-  result = old_gen->expand_and_allocate(obj_size, false);
-
-  if (result != NULL) {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), result, obj_size);
-  }
-  return cast_to_oop(result);
-}

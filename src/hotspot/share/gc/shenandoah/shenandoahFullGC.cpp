@@ -842,10 +842,9 @@ public:
       HeapWord* compact_from = cast_from_oop<HeapWord*>(p);
       HeapWord* compact_to = cast_from_oop<HeapWord*>(p->forwardee());
       Copy::aligned_conjoint_words(compact_from, compact_to, size);
-
       oop new_obj = cast_to_oop(compact_to);
-      ContinuationGCSupport::transform_stack_chunk(new_obj);
 
+      ContinuationGCSupport::transform_stack_chunk(new_obj);
       new_obj->init_mark();
     }
   }

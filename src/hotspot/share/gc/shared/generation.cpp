@@ -165,17 +165,17 @@ oop Generation::promote(oop old, size_t obj_size) {
 #endif  // #ifndef PRODUCT
 
   HeapWord* result = allocate(obj_size, false);
-  oop obj;
-  if (result != NULL) {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), result, obj_size);
-    obj = cast_to_oop<HeapWord*>(result);
-  } else {
-    GenCollectedHeap* gch = GenCollectedHeap::heap();
-    obj = gch->handle_failed_promotion(this, old, obj_size);
-    if (obj == nullptr) {
-      return obj;
+  if (result == NULL) {
+    // Promotion of obj into gen failed.  Try to expand and allocate.
+    result = expand_and_allocate(obj_size, false);
+    if (result == NULL) {
+      return NULL;
     }
   }
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), result, obj_size);
+  oop obj = cast_to_oop<HeapWord*>(result);
+
+  // Transform object.
   ContinuationGCSupport::transform_stack_chunk(obj);
   return obj;
 }

@@ -46,7 +46,7 @@ inline size_t ZUtils::object_size(uintptr_t addr) {
 }
 
 inline void ZUtils::object_copy_disjoint(uintptr_t from, uintptr_t to, size_t size) {
-  Copy::aligned_disjoint_words((HeapWord*)from, (HeapWord*) to, bytes_to_words(size));
+  Copy::aligned_disjoint_words((HeapWord*)from, (HeapWord*)to, bytes_to_words(size));
 }
 
 inline void ZUtils::object_copy_conjoint(uintptr_t from, uintptr_t to, size_t size) {
