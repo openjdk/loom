@@ -32,11 +32,8 @@
 #include "runtime/globals.hpp"
 #include "jni.h"
 
-// The order of this struct matters as it's directly manipulated by assembly code (push/pop)
-
 class ContinuationEntry;
 
-// TODO: remove
 class Continuations : public AllStatic {
 public:
   static void init();
