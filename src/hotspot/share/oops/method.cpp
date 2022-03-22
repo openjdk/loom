@@ -1075,7 +1075,7 @@ void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report,
 
 bool Method::is_always_compilable() const {
   // Generated adapters must be compiled
-  if (is_method_handle_intrinsic() && is_synthetic()) {
+  if (is_special_native_intrinsic() && is_synthetic()) {
     assert(!is_not_c1_compilable(), "sanity check");
     assert(!is_not_c2_compilable(), "sanity check");
     return true;
