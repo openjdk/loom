@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -174,11 +174,6 @@ inline void vframeStreamCommon::fill_from_compiled_native_frame() {
 }
 
 inline bool vframeStreamCommon::fill_from_frame() {
-  if (_frame.is_empty()) {
-    _mode = at_end_mode;
-    return true;
-  }
-
   // Interpreted frame
   if (_frame.is_interpreted_frame()) {
     fill_from_interpreter_frame();

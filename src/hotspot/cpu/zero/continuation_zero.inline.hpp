@@ -63,18 +63,12 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   Unimplemented();
 }
 
-// creates the yield stub frame faster than JavaThread::last_frame
-inline frame ContinuationHelper::last_frame(JavaThread* thread) {
+frame ContinuationEntry::to_frame() const {
   Unimplemented();
   return frame();
 }
 
-frame ContinuationEntry::to_frame() {
-  Unimplemented();
-  return frame();
-}
-
-void ContinuationEntry::update_register_map(RegisterMap* map) {
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
   Unimplemented();
 }
 
@@ -91,9 +85,8 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   Unimplemented();
 }
 
-template <typename ConfigT>
 template<typename FKind>
-inline frame Freeze<ConfigT>::sender(const frame& f) {
+inline frame FreezeBase::sender(const frame& f) {
   Unimplemented();
   return frame();
 }
@@ -131,8 +124,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
   return frame();
 }
 
-template <typename ConfigT>
-inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
   Unimplemented();
 }
 

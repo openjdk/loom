@@ -83,7 +83,7 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
 }
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return (BasicObjectLock*) get_interpreterState()->stack_base();
 }
 
@@ -414,11 +414,6 @@ void ZeroFrame::identify_vp_word(int       frame_index,
 void frame::describe_pd(FrameValues& values, int frame_no) {
 
 }
-
-void frame::describe_top_pd(FrameValues& values) {
-
-}
-
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {
