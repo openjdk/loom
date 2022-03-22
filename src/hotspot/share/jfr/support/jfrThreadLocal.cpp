@@ -352,8 +352,7 @@ void JfrThreadLocal::set_vthread_epoch(const JavaThread* jt, traceid tid, u2 epo
   * Hence, the periodic thread can possibly flush that event
   * to a segment that does not include an associated checkpoint.
   * Considered rare and quite benign for now. The worst case is
-  * that thread information for that event is not resolvable,
-  * i.e. be null.
+  * that thread information for that event is not resolvable, i.e. null.
   */
   oop vthread = jt->vthread();
   assert(vthread != nullptr, "invariant");

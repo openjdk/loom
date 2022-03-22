@@ -75,15 +75,6 @@
 
   <!-- Ordinary and experimental events !-->
 
-  <Type name="Thread" label="Thread">
-    <Field type="string" name="osName" label="OS Thread Name" />
-    <Field type="long" name="osThreadId" label="OS Thread Id" />
-    <Field type="string" name="javaName" label="Java Thread Name" />
-    <Field type="long" name="javaThreadId" label="Java Thread Id" />
-    <Field type="ThreadGroup" name="group" label="Java Thread Group" />
-    <Field type="boolean" name="isVirtual" label="Virtual Thread" />
-  </Type>
-
   <Event name="ThreadStart" category="Java Application" label="Java Thread Start" thread="true" startTime="false" stackTrace="true">
     <Field type="Thread" name="thread" label="New Java Thread" />
     <Field type="Thread" name="parentThread" label="Parent Java Thread" />
@@ -1217,6 +1208,15 @@
 
   <Type name="NetworkInterfaceName" label="Network Interface">
     <Field type="string" name="networkInterface" label="Network Interface" description="Network Interface Name" />
+  </Type>
+
+  <Type name="Thread" label="Thread">
+    <Field type="string" name="osName" label="OS Thread Name" />
+    <Field type="long" name="osThreadId" label="OS Thread Id" />
+    <Field type="string" name="javaName" label="Java Thread Name" />
+    <Field type="long" name="javaThreadId" label="Java Thread Id" />
+    <Field type="ThreadGroup" name="group" label="Java Thread Group" />
+    <Field type="boolean" name="isVirtual" label="Virtual Thread" />
   </Type>
 
   <Type name="ThreadGroup" label="Thread Group">
