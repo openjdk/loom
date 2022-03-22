@@ -415,7 +415,8 @@ traceid JfrThreadLocal::assign_thread_id(const Thread* t, JfrThreadLocal* tl) {
   if (tid == 0) {
     if (t->is_Java_thread()) {
       tid = load_java_thread_id(t);
-      tl->_jvm_thread_id = tl->_vthread_id = tid;
+      tl->_jvm_thread_id = tid;
+      Atomic::store(&tl->_vthread_id, tid);
       return tid;
     }
     tid = static_cast<traceid>(ThreadIdentifier::next());
