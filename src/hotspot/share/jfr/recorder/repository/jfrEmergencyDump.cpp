@@ -45,11 +45,11 @@ static const char vm_error_filename_fmt[] = "hs_err_pid%p.jfr";
 static const char vm_oom_filename_fmt[] = "hs_oom_pid%p.jfr";
 static const char vm_soe_filename_fmt[] = "hs_soe_pid%p.jfr";
 static const char chunk_file_jfr_ext[] = ".jfr";
-static char dump_path[JVM_MAXPATHLEN] = { 0 };
 static const size_t iso8601_len = 19; // "YYYY-MM-DDTHH:MM:SS" (note: we just use a subset of the full timestamp)
 static fio_fd emergency_fd = invalid_fd;
 static const int64_t chunk_file_header_size = 68;
 static const size_t chunk_file_extension_length = sizeof chunk_file_jfr_ext - 1;
+static char _dump_path[JVM_MAXPATHLEN] = { 0 };
 
 /*
  * The emergency dump logic is restrictive when it comes to
@@ -138,10 +138,10 @@ static bool open_emergency_dump_file() {
   }
 
   bool result = open_emergency_dump_fd(create_emergency_dump_path());
-  if (!result && *dump_path != '\0') {
-    log_warning(jfr)("Unable to create an emergency dump file at the location set by dumppath=%s", dump_path);
+  if (!result && *_dump_path != '\0') {
+    log_warning(jfr)("Unable to create an emergency dump file at the location set by dumppath=%s", _dump_path);
     // Fallback. Try to create it in the current directory.
-    *dump_path = '\0';
+    *_dump_path = '\0';
     *_path_buffer = '\0';
     result = open_emergency_dump_fd(create_emergency_dump_path());
   }
@@ -167,17 +167,17 @@ static void report(outputStream* st, bool emergency_file_opened, const char* rep
 
 void JfrEmergencyDump::set_dump_path(const char* path) {
   if (path == NULL || *path == '\0') {
-    os::get_current_directory(const_cast<char*>(path), sizeof(dump_path));
+    os::get_current_directory(_dump_path, sizeof(_dump_path));
   } else {
     if (strlen(path) < JVM_MAXPATHLEN) {
-      strncpy(dump_path, path, JVM_MAXPATHLEN);
-      dump_path[JVM_MAXPATHLEN - 1] = '\0';
+      strncpy(_dump_path, path, JVM_MAXPATHLEN);
+      _dump_path[JVM_MAXPATHLEN - 1] = '\0';
     }
   }
 }
 
 const char* JfrEmergencyDump::get_dump_path() {
-  return dump_path;
+  return _dump_path;
 }
 
 void JfrEmergencyDump::on_vm_error_report(outputStream* st, const char* repository_path) {
