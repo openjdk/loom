@@ -41,7 +41,7 @@
 #include "memory/allocation.inline.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/os.hpp"
-#include "runtime/threadIdentifiers.hpp"
+#include "runtime/threadIdentifier.hpp"
 #include "runtime/thread.inline.hpp"
 #include "utilities/sizes.hpp"
 
@@ -418,7 +418,7 @@ traceid JfrThreadLocal::assign_thread_id(const Thread* t, JfrThreadLocal* tl) {
       tl->_jvm_thread_id = tl->_vthread_id = tid;
       return tid;
     }
-    tid = static_cast<traceid>(ThreadIdentifiers::next());
+    tid = static_cast<traceid>(ThreadIdentifier::next());
     tl->_jvm_thread_id = tid;
   }
   return tid;

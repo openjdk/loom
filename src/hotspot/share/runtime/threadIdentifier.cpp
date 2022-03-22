@@ -22,22 +22,20 @@
  *
  */
 
-#ifndef SHARE_RUNTIME_THREADIDENTIFIERS_HPP
-#define SHARE_RUNTIME_THREADIDENTIFIERS_HPP
+#include "precompiled.hpp"
+#include "runtime/atomic.hpp"
+#include "runtime/threadIdentifier.hpp"
 
-#include "memory/allStatic.hpp"
+static volatile int64_t next_thread_id = 2; // starting at 2, excluding the primordial thread id
 
-/*
- * Provides unique monotonic identifiers for threads.
- *
- * Java use Unsafe to assign the tid field for threadObj / vthread objects on construction.
- * JFR use next() to assign a unique, non-reusable id to non-java threads.
- *
- */
-class ThreadIdentifiers : AllStatic {
- public:
-  static int64_t unsafe_offset();
-  static int64_t next();
-};
+int64_t ThreadIdentifier::unsafe_offset() {
+  return reinterpret_cast<int64_t>(&next_thread_id);
+}
 
-#endif // SHARE_RUNTIME_THREADIDENTIFIERS_HPP
+int64_t ThreadIdentifier::next() {
+  int64_t next_tid;
+  do {
+    next_tid = Atomic::load(&next_thread_id);
+  } while (Atomic::cmpxchg(&next_thread_id, next_tid, next_tid + 1) != next_tid);
+  return next_tid;
+}

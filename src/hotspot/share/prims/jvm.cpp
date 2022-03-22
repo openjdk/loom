@@ -86,7 +86,7 @@
 #include "runtime/reflection.hpp"
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
-#include "runtime/threadIdentifiers.hpp"
+#include "runtime/threadIdentifier.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vmOperations.hpp"
@@ -3128,7 +3128,7 @@ JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
 JVM_END
 
 JVM_ENTRY(jlong, JVM_GetNextThreadIdOffset(JNIEnv* env, jclass threadClass))
-  return ThreadIdentifiers::unsafe_offset();
+  return ThreadIdentifier::unsafe_offset();
 JVM_END
 
 JVM_ENTRY(void, JVM_Interrupt(JNIEnv* env, jobject jthread))
