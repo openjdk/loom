@@ -88,7 +88,8 @@ size_t G1FullGCCompactTask::G1CompactRegionClosure::apply(oop obj) {
   assert(size <= INT_MAX, "sanity check");
   assert(obj_addr != destination, "everything in this pass should be moving or compressed in place");
   Copy::aligned_conjoint_words(obj_addr, destination, size);
-  // There is no need to transform potential stack chunks - marking already did that.
+
+  // There is no need to transform stack chunks - marking already did that.
   cast_to_oop(destination)->init_mark();
   assert(cast_to_oop(destination)->klass() != NULL, "should have a class");
 

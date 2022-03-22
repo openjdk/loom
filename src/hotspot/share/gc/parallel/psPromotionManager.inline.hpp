@@ -246,6 +246,9 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
 
   // Copy obj
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(o), cast_from_oop<HeapWord*>(new_obj), new_obj_size);
+  // Parallel GC claims with a release - so other threads might access this object
+  // after claiming and they should see the "completed" object.
+  ContinuationGCSupport::transform_stack_chunk(new_obj);
 
   // Now we have to CAS in the header.
   // Make copy visible to threads reading the forwardee.
@@ -273,7 +276,6 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
       push_depth(ScannerTask(PartialArrayScanTask(o)));
       TASKQUEUE_STATS_ONLY(++_arrays_chunked; ++_array_chunk_pushes);
     } else {
-      ContinuationGCSupport::transform_stack_chunk(new_obj);
       // we'll just push its contents
       push_contents(new_obj);
 

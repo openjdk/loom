@@ -40,7 +40,6 @@
 #include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "gc/shared/collectedHeap.hpp"
-#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gcLocker.hpp"
 #include "gc/shared/gcVMOperations.hpp"
 #include "logging/log.hpp"
@@ -286,6 +285,8 @@ void HeapShared::clear_root(int index) {
 oop HeapShared::archive_object(oop obj) {
   assert(DumpSharedSpaces, "dump-time only");
 
+  assert(!obj->is_stackChunk(), "do not archive stack chunks");
+
   oop ao = find_archived_heap_object(obj);
   if (ao != NULL) {
     // already archived
@@ -302,7 +303,6 @@ oop HeapShared::archive_object(oop obj) {
   oop archived_oop = cast_to_oop(G1CollectedHeap::heap()->archive_mem_allocate(len));
   if (archived_oop != NULL) {
     Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), cast_from_oop<HeapWord*>(archived_oop), len);
-    ContinuationGCSupport::transform_stack_chunk(archived_oop);
     // Reinitialize markword to remove age/marking/locking/etc.
     //
     // We need to retain the identity_hash, because it may have been used by some hashtables
