@@ -61,9 +61,6 @@
 #if INCLUDE_ZGC
 #include "gc/z/zAddress.inline.hpp"
 #endif
-#ifdef ASSERT
-#include "logging/logStream.hpp"
-#endif
 
 int InstanceStackChunkKlass::_offset_of_stack = 0;
 

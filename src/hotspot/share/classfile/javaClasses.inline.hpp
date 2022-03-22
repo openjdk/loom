@@ -34,9 +34,6 @@
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/typeArrayOop.inline.hpp"
-#ifdef ASSERT
-#include "logging/log.hpp"
-#endif
 
 void java_lang_String::set_coder(oop string, jbyte coder) {
   string->byte_field_put(_coder_offset, coder);
