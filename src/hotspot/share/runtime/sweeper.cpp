@@ -343,9 +343,9 @@ void NMethodSweeper::sweep_code_cache() {
   int freed_memory = 0;
   {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
-    CodeCache::Sweep::begin();
 
     while (!_current.end()) {
+      CodeCache::Sweep::begin();
       swept_count++;
       // Since we will give up the CodeCache_lock, always skip ahead
       // to the next nmethod.  Other blobs can be deleted by other
@@ -391,10 +391,9 @@ void NMethodSweeper::sweep_code_cache() {
       }
 
       _seen++;
+      CodeCache::Sweep::end();
       handle_safepoint_request();
-      CodeCache::Sweep::pause();
     }
-    CodeCache::Sweep::end();
   }
 
   assert(_current.end(), "must have scanned the whole cache");

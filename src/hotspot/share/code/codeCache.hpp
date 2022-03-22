@@ -125,11 +125,9 @@ class CodeCache : AllStatic {
   private:
     static int _compiled_method_iterators;
     static bool _pending_sweep;
-    static bool _pause_requested;
   public:
     static void begin();
     static void end();
-    static void pause();
   private:
     static void begin_compiled_method_iteration();
     static void end_compiled_method_iteration();

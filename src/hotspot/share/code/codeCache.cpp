@@ -170,7 +170,6 @@ ExceptionCache* volatile CodeCache::_exception_cache_purge_list = NULL;
 
 int CodeCache::Sweep::_compiled_method_iterators = 0;
 bool CodeCache::Sweep::_pending_sweep = false;
-bool CodeCache::Sweep::_pause_requested = false;
 
 // Initialize arrays of CodeHeap subsets
 GrowableArray<CodeHeap*>* CodeCache::_heaps = new(ResourceObj::C_HEAP, mtCode) GrowableArray<CodeHeap*> (CodeBlobType::All, mtCode);
@@ -479,25 +478,15 @@ CodeHeap* CodeCache::get_code_heap(int code_blob_type) {
 }
 
 void CodeCache::Sweep::begin_compiled_method_iteration() {
-  if (!SafepointSynchronize::is_at_safepoint()) {
-    // No concurrent sweeping in safepoints
-    return;
-  }
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   // Reach a state without concurrent sweeping
   while (_compiled_method_iterators < 0) {
-    _pause_requested = true;
     CodeCache_lock->wait_without_safepoint_check();
   }
-  _pause_requested = false;
   _compiled_method_iterators++;
 }
 
 void CodeCache::Sweep::end_compiled_method_iteration() {
-  if (!SafepointSynchronize::is_at_safepoint()) {
-    // No concurrent sweeping in safepoints
-    return;
-  }
   MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
   // Let the sweeper run again, if we stalled it
   _compiled_method_iterators--;
@@ -520,21 +509,6 @@ void CodeCache::Sweep::end() {
   assert_locked_or_safepoint(CodeCache_lock);
   _compiled_method_iterators = 0;
   CodeCache_lock->notify_all();
-}
-
-void CodeCache::Sweep::pause() {
-  assert_locked_or_safepoint(CodeCache_lock);
-  _compiled_method_iterators = 0;
-  _pending_sweep = true;
-
-  CodeCache_lock->notify_all();
-
-  while (_pause_requested == true) {
-    CodeCache_lock->wait_without_safepoint_check();
-  }
-  _pause_requested = false;
-
-  begin();
 }
 
 CodeBlob* CodeCache::first_blob(CodeHeap* heap) {
@@ -1274,9 +1248,8 @@ void CodeCache::make_marked_nmethods_deoptimized() {
 }
 
 void CodeCache::make_nmethod_deoptimized(CompiledMethod* nm) {
-  if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized() && !nm->is_zombie()) {
+  if (nm->is_marked_for_deoptimization() && nm->can_be_deoptimized()) {
     nm->make_deoptimized();
-    assert(nm->is_not_entrant(), "must be not entrant");
   }
 }
 
