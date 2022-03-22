@@ -1039,7 +1039,7 @@ private:
   DEBUG_ONLY(intptr_t* _last_write;)
 
   inline void set_top_frame_metadata_pd(const frame& hf);
-  template <typename FKind, bool bottom> inline void patch_pd(frame& callee, const frame& caller);
+  template <typename FKind> inline void patch_pd(frame& callee, const frame& caller);
   inline void patch_chunk_pd(intptr_t* vsp, intptr_t* hsp);
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
 
@@ -1584,11 +1584,12 @@ public:
       address last_pc = caller.pc();
       assert((last_pc == nullptr) == _cont.tail()->is_empty(), "");
       FKind::patch_pc(caller, last_pc);
-      patch_pd<FKind, true>(hf, caller);
     } else {
       assert(!caller.is_empty(), "");
-      patch_pd<FKind, false>(hf, caller);
     }
+
+    patch_pd<FKind>(hf, caller);
+
     if (FKind::interpreted) {
       assert(hf.is_heap_frame(), "should be");
       Interpreted::patch_sender_sp(hf, caller.unextended_sp());
@@ -2240,7 +2241,7 @@ private:
 
   inline frame new_entry_frame();
   template<typename FKind> frame new_frame(const frame& hf, frame& caller, bool bottom);
-  template<typename FKind, bool bottom> inline void patch_pd(frame& f, const frame& sender);
+  template<typename FKind> inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom);
   void patch_chunk_pd(intptr_t* sp);
   inline void prefetch_chunk_pd(void* start, int size_words);
@@ -2581,13 +2582,14 @@ public:
     }
   }
 
-  template<typename FKind, bool bottom>
-  inline void patch(frame& f, const frame& caller) {
+  template<typename FKind>
+  inline void patch(frame& f, const frame& caller, bool bottom) {
+    assert(!bottom || caller.fp() == _cont.entryFP(), "");
     if (bottom) {
       FKind::patch_pc(caller, _cont.is_empty() ? caller.raw_pc() : StubRoutines::cont_returnBarrier());
     }
 
-    patch_pd<FKind, bottom>(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
+    patch_pd<FKind>(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
 
     if (FKind::interpreted) {
       Interpreted::patch_sender_sp(f, caller.unextended_sp());
@@ -2641,7 +2643,7 @@ public:
 
     set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
     derelativize_interpreted_frame_metadata(hf, f);
-    bottom ? patch<Interpreted, true>(f, caller) : patch<Interpreted, false>(f, caller);
+    patch<Interpreted>(f, caller, bottom);
 
   #ifdef ASSERT
     LogTarget(Trace, jvmcont) lt;
@@ -2705,7 +2707,7 @@ public:
 
     copy_from_chunk(from, to, sz);
 
-    bottom ? patch<Compiled, true>(f, caller) : patch<Compiled, false>(f, caller);
+    patch<Compiled>(f, caller, bottom);
 
     if (f.cb()->is_nmethod()) {
       f.cb()->as_nmethod()->run_nmethod_entry_barrier();
