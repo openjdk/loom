@@ -111,18 +111,20 @@ class oopDesc {
   inline void copy_conjoint(HeapWord* to, size_t word_size);
 
   // type test operations (inlined in oop.inline.hpp)
-  inline bool is_instance()            const;
-  inline bool is_array()               const;
-  inline bool is_objArray()            const;
-  inline bool is_typeArray()           const;
-  inline bool is_stackChunk()          const;
+  inline bool is_instance()    const;
+  inline bool is_instanceRef() const;
+  inline bool is_stackChunk()  const;
+  inline bool is_array()       const;
+  inline bool is_objArray()    const;
+  inline bool is_typeArray()   const;
 
   // type test operations that don't require inclusion of oop.inline.hpp.
-  bool is_instance_noinline()          const;
-  bool is_array_noinline()             const;
-  bool is_objArray_noinline()          const;
-  bool is_typeArray_noinline()         const;
-  bool is_stackChunk_noinline()        const;
+  bool is_instance_noinline()    const;
+  bool is_instanceRef_noinline() const;
+  bool is_stackChunk_noinline()  const;
+  bool is_array_noinline()       const;
+  bool is_objArray_noinline()    const;
+  bool is_typeArray_noinline()   const;
 
  protected:
   inline oop        as_oop() const { return const_cast<oopDesc*>(this); }

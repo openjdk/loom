@@ -122,7 +122,7 @@ public:
 
   // Casting from Klass*
   static InstanceStackChunkKlass* cast(Klass* k) {
-    assert(InstanceKlass::cast(k)->is_stack_chunk_instance_klass(), "");
+    assert(k->is_stack_chunk_instance_klass(), "cast to InstanceStackChunkKlass");
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
