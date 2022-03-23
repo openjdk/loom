@@ -85,35 +85,27 @@ class JfrCheckpointThreadClosure : public ThreadClosure {
     _writer.write_count(_count, _count_position);
   }
 
-  void write_name(const char* name, int length) {
-    if (length == 0) {
-      _writer.write_empty_string();
-      return;
-    }
-    _writer.write(name);
-  }
-
   void do_thread(Thread* t);
 };
 
-// Only static thread ids, VirtualThread are handled dynamically.
+// Only static thread ids, virtual threads are handled dynamically.
 void JfrCheckpointThreadClosure::do_thread(Thread* t) {
   assert(t != NULL, "invariant");
   ++_count;
   const traceid tid = JfrThreadId::jfr_id(t);
   assert(tid != 0, "invariant");
   _writer.write_key(tid);
-  int length;
+  int length = -1;
   const char* const name = JfrThreadName::name(t, length);
   assert(name != NULL, "invariant");
-  write_name(name, length);
+  _writer.write(name);
   _writer.write<traceid>(JfrThreadId::os_id(t));
   if (!t->is_Java_thread()) {
     _writer.write((const char*)nullptr); // java name
     _writer.write((traceid)0); // java thread id
     _writer.write((traceid)0); // java thread group
   } else {
-    write_name(name, length);
+    _writer.write(name);
     _writer.write(tid);
     _writer.write(JfrThreadGroup::thread_group_id(JavaThread::cast(t), _curthread));
   }
