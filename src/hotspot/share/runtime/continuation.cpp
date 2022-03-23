@@ -443,7 +443,7 @@ ContMirror::ContMirror(const RegisterMap* map)
 }
 
 inline void ContMirror::read() {
-  _tail  = (stackChunkOop)jdk_internal_vm_Continuation::tail(_cont);
+  _tail = jdk_internal_vm_Continuation::tail(_cont);
 }
 
 inline void ContMirror::write() {
@@ -453,7 +453,7 @@ inline void ContMirror::write() {
 inline void ContMirror::post_safepoint(Handle conth) {
   _cont = conth(); // reload oop
   if (_tail != (oop)nullptr) {
-    _tail = (stackChunkOop)jdk_internal_vm_Continuation::tail(_cont);
+    _tail = jdk_internal_vm_Continuation::tail(_cont);
   }
 }
 
@@ -1884,11 +1884,11 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-    chunk = (stackChunkOop)allocator.initialize(start);
+      chunk = stackChunkOopDesc::cast(allocator.initialize(start));
   } else {
     //HandleMark hm(current);
     Handle conth(current, _cont.mirror());
-    chunk = (stackChunkOop)allocator.allocate(); // can safepoint
+      chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
     _cont.post_safepoint(conth);
 
     if (chunk == nullptr) {

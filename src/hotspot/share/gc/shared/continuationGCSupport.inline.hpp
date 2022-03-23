@@ -35,7 +35,7 @@ inline void ContinuationGCSupport::relativize_chunk(oop obj) {
   if (!obj->is_stackChunk()) {
     return;
   }
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   InstanceStackChunkKlass::relativize_chunk(chunk);
 }
 
@@ -43,7 +43,7 @@ inline void ContinuationGCSupport::transform_stack_chunk(oop obj) {
   if (!obj->is_stackChunk()) {
     return;
   }
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   if (!chunk->has_bitmap()) {
     InstanceStackChunkKlass::build_bitmap(chunk);
   }

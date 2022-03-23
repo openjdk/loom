@@ -33,6 +33,7 @@
 #include "oops/method.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
 
 void java_lang_String::set_coder(oop string, jbyte coder) {
@@ -244,7 +245,7 @@ inline void jdk_internal_vm_Continuation::set_yieldInfo(oop ref, oop value) {
 }
 
 inline stackChunkOop jdk_internal_vm_Continuation::tail(oop ref) {
-  return (stackChunkOop)ref->obj_field(_tail_offset);
+  return stackChunkOopDesc::cast(ref->obj_field(_tail_offset));
 }
 
 inline void jdk_internal_vm_Continuation::set_tail(oop ref, stackChunkOop value) {

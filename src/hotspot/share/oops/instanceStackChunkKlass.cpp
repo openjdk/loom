@@ -93,7 +93,7 @@ size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_siz
            : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
 
   // Build bitmap
-  stackChunkOop to_chunk = (stackChunkOop) cast_to_oop(to_addr);
+  stackChunkOop to_chunk = stackChunkOopDesc::cast(cast_to_oop(to_addr));
   if (!to_chunk->has_bitmap()) {
     build_bitmap(to_chunk);
   } else {
@@ -113,7 +113,7 @@ void InstanceStackChunkKlass::copy_conjoint(oop obj, HeapWord* to, size_t word_s
 
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
-  print_chunk((stackChunkOop)obj, false, st);
+  print_chunk(stackChunkOopDesc::cast(obj), false, st);
 }
 #endif
 
@@ -690,9 +690,8 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
 
   assert(oopDesc::is_oop(obj), "");
-  assert(obj->is_stackChunk(), "");
 
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
 
   assert(chunk->is_stackChunk(), "");
   assert(chunk->stack_size() >= 0, "");

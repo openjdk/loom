@@ -50,6 +50,8 @@ private:
   static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
 
 public:
+  static inline stackChunkOop cast(oop obj);
+
   inline stackChunkOopDesc* parent() const;
   inline void set_parent(stackChunkOopDesc* value);
   template<typename P>

@@ -27,7 +27,9 @@
 
 #include "oops/stackChunkOop.hpp"
 
+#include "gc/shared/collectedHeap.hpp"
 #include "memory/memRegion.hpp"
+#include "memory/universe.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
@@ -36,6 +38,11 @@
 #include CPU_HEADER_INLINE(stackChunkOop)
 
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)
+
+inline stackChunkOop stackChunkOopDesc::cast(oop obj) {
+  assert(obj->is_stackChunk(), "Wrong type");
+  return stackChunkOop(obj);
+}
 
 inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (stackChunkOopDesc*)(oopDesc*)jdk_internal_vm_StackChunk::parent(as_oop()); }
 template<typename P>

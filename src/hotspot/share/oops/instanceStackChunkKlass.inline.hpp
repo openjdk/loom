@@ -86,8 +86,7 @@ void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkF
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) {
-  assert (obj->is_stackChunk(), "");
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
@@ -97,17 +96,15 @@ void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) 
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
-  assert (obj->is_stackChunk(), "");
   assert(!Devirtualizer::do_metadata(closure), "Code to handle metadata is not implemented");
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   oop_oop_iterate_stack<OopClosureType>(chunk, closure);
   oop_oop_iterate_header<T>(chunk, closure);
 }
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr) {
-  assert (obj->is_stackChunk(), "");
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   if (Devirtualizer::do_metadata(closure)) {
     if (mr.contains(obj)) {
       Devirtualizer::do_klass(closure, this);
