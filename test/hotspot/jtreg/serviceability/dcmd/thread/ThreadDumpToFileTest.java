@@ -23,9 +23,9 @@
 
 /*
  * @test
- * @summary Basic test for jcmd JavaThread.dump
+ * @summary Basic test for jcmd Thread.dump_to_file
  * @library /test/lib
- * @run testng/othervm JavaThreadDumpTest
+ * @run testng/othervm ThreadDumpToFileTest
  */
 
 import java.io.IOException;
@@ -37,7 +37,7 @@ import jdk.test.lib.process.OutputAnalyzer;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class JavaThreadDumpTest {
+public class ThreadDumpToFileTest {
 
     private Path genThreadDumpPath(String suffix) throws IOException {
         Path dir = Path.of(".").toAbsolutePath();
@@ -47,7 +47,7 @@ public class JavaThreadDumpTest {
     }
 
     private OutputAnalyzer threadDump(Path file, String... options) {
-        String cmd = "JavaThread.dump";
+        String cmd = "Thread.dump_to_file";
         for (String option : options) {
             cmd += " " + option;
         }

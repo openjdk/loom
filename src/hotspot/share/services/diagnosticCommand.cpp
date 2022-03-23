@@ -116,6 +116,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JVMTIDataDumpDCmd>(full_export, true, false));
 #endif // INCLUDE_JVMTI
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpToFileDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderStatsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
@@ -141,8 +142,6 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStartLocalDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStopRemoteDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStatusDCmd>(jmx_agent_export_flags, true,false));
-
-  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
 
   // Debug on cmd (only makes sense with JVMTI since the agentlib needs it).
 #if INCLUDE_JVMTI
@@ -1089,7 +1088,7 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 }
 #endif // INCLUDE_JVMTI
 
-JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
+ThreadDumpToFileDCmd::ThreadDumpToFileDCmd(outputStream* output, bool heap) :
                                        DCmdWithParser(output, heap),
   _overwrite("-overwrite", "May overwrite existing file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
@@ -1099,9 +1098,9 @@ JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
   _dcmdparser.add_dcmd_argument(&_filepath);
 }
 
-int JavaThreadDumpDCmd::num_arguments() {
+int ThreadDumpToFileDCmd::num_arguments() {
   ResourceMark rm;
-  JavaThreadDumpDCmd* dcmd = new JavaThreadDumpDCmd(NULL, false);
+  ThreadDumpToFileDCmd* dcmd = new ThreadDumpToFileDCmd(NULL, false);
   if (dcmd != NULL) {
     DCmdMark mark(dcmd);
     return dcmd->_dcmdparser.num_arguments();
@@ -1110,7 +1109,7 @@ int JavaThreadDumpDCmd::num_arguments() {
   }
 }
 
-void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
+void ThreadDumpToFileDCmd::execute(DCmdSource source, TRAPS) {
   bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
   char* path = _filepath.value();
   bool overwrite = _overwrite.value();
@@ -1118,7 +1117,7 @@ void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
   dumpToFile(name, vmSymbols::string_bool_byte_array_signature(), path, overwrite, CHECK);
 }
 
-void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS) {
+void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 

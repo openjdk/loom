@@ -50,7 +50,7 @@ public class ThreadDumper {
     /**
      * Generate a thread dump in plain text format to the given file, UTF-8 encoded.
      *
-     * This method is invoked by the VM for the JavaThread.dump diagnostic command.
+     * This method is invoked by the VM for the Thread.dump_to_file diagnostic command.
      */
     public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
         return dumpThreads(file, okayToOverwrite, false);
@@ -59,7 +59,7 @@ public class ThreadDumper {
     /**
      * Generate a thread dump in JSON format to the given file, UTF-8 encoded.
      *
-     * This method is invoked by the VM for the JavaThread.dump diagnostic command.
+     * This method is invoked by the VM for the Thread.dump_to_file diagnostic command.
      */
     public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
         return dumpThreads(file, okayToOverwrite, true);
