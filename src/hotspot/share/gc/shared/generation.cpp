@@ -156,7 +156,7 @@ bool Generation::promotion_attempt_is_safe(size_t max_promotion_in_bytes) const 
 
 // Ignores "ref" and calls allocate().
 oop Generation::promote(oop obj, size_t obj_size) {
-  assert(obj_size == obj->compact_size(), "bad obj_size passed in");
+  assert(obj_size == obj->size(), "bad obj_size passed in");
 
 #ifndef PRODUCT
   if (GenCollectedHeap::heap()->promotion_should_fail()) {
@@ -166,7 +166,7 @@ oop Generation::promote(oop obj, size_t obj_size) {
 
   HeapWord* result = allocate(obj_size, false);
   if (result != NULL) {
-    obj->copy_disjoint_compact(result, obj_size);
+    obj->copy_disjoint(result, obj_size);
     return cast_to_oop(result);
   } else {
     GenCollectedHeap* gch = GenCollectedHeap::heap();

@@ -157,6 +157,7 @@ class CollectedHeap : public CHeapObj<mtGC> {
   static inline size_t filler_array_hdr_size();
   static inline size_t filler_array_min_size();
 
+  static inline void zap_filler_array_with(HeapWord* start, size_t words, juint value);
   DEBUG_ONLY(static void fill_args_check(HeapWord* start, size_t words);)
   DEBUG_ONLY(static void zap_filler_array(HeapWord* start, size_t words, bool zap = true);)
 
@@ -372,9 +373,6 @@ class CollectedHeap : public CHeapObj<mtGC> {
                                                        size_t size,
                                                        Metaspace::MetadataType mdtype);
 
-  // Continuation support
-  virtual void collect_for_codecache();
-
   // Return true, if accesses to the object would require barriers.
   // This is used by continuations to copy chunks of a thread stack into StackChunk object or out of a StackChunk
   // object back into the thread stack. These chunks may contain references to objects. It is crucial that
@@ -382,7 +380,7 @@ class CollectedHeap : public CHeapObj<mtGC> {
   // when stack chunks are stored into it.
   // StackChunk objects may be reused, the GC must not assume that a StackChunk object is always a freshly
   // allocated object.
-  virtual bool requires_barriers(oop obj) const = 0;
+  virtual bool requires_barriers(stackChunkOop obj) const = 0;
 
   // Returns "true" iff there is a stop-world GC in progress.  (I assume
   // that it should answer "false" for the concurrent part of a concurrent

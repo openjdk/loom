@@ -365,9 +365,9 @@ class methodHandle;
    do_signature(Preconditions_checkLongIndex_signature,          "(JJLjava/util/function/BiFunction;)J")                \
                                                                                                                         \
   do_class(java_lang_StringCoding,        "java/lang/StringCoding")                                                     \
-  do_intrinsic(_hasNegatives,             java_lang_StringCoding, hasNegatives_name, hasNegatives_signature,     F_S)   \
-   do_name(     hasNegatives_name,                               "hasNegatives")                                        \
-   do_signature(hasNegatives_signature,                          "([BII)Z")                                             \
+  do_intrinsic(_countPositives,     java_lang_StringCoding, countPositives_name, countPositives_signature, F_S)         \
+   do_name(     countPositives_name,                       "countPositives")                                            \
+   do_signature(countPositives_signature,                  "([BII)I")                                                   \
                                                                                                                         \
   do_class(sun_nio_cs_iso8859_1_Encoder,  "sun/nio/cs/ISO_8859_1$Encoder")                                              \
   do_intrinsic(_encodeISOArray,     sun_nio_cs_iso8859_1_Encoder, encodeISOArray_name, encodeISOArray_signature, F_S)   \
@@ -470,9 +470,8 @@ class methodHandle;
                                                                                                                         \
   /* support for sun.security.provider.DigestBase */                                                                    \
   do_class(sun_security_provider_digestbase,                       "sun/security/provider/DigestBase")                  \
-  do_intrinsic(_digestBase_implCompressMB, sun_security_provider_digestbase, implCompressMB_name, implCompressMB_signature, F_R)   \
+  do_intrinsic(_digestBase_implCompressMB, sun_security_provider_digestbase, implCompressMB_name, countPositives_signature, F_R)   \
    do_name(     implCompressMB_name,                               "implCompressMultiBlock0")                           \
-   do_signature(implCompressMB_signature,                          "([BII)I")                                           \
                                                                                                                         \
    /* support for java.util.Base64.Encoder*/                                                                            \
   do_class(java_util_Base64_Encoder, "java/util/Base64$Encoder")                                                        \
@@ -520,7 +519,8 @@ class methodHandle;
   do_class(jdk_internal_vm_Continuation, "jdk/internal/vm/Continuation")                                                \
   do_intrinsic(_Continuation_enter,  jdk_internal_vm_Continuation, enter_name,    continuationEnter_signature, F_S)     \
     do_signature(continuationEnter_signature,   "(Ljdk/internal/vm/Continuation;Z)V")                                   \
-  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnter_signature, F_SN) \
+  do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnterSpecial_signature, F_SN) \
+    do_signature(continuationEnterSpecial_signature,   "(Ljdk/internal/vm/Continuation;ZZ)V")                           \
   do_signature(continuationGetStacks_signature, "(III)V")                                                               \
   do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
   do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \

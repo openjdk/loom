@@ -2952,7 +2952,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
     do_getEventWriter(x);
     break;
   case vmIntrinsics::_counterTime:
-    do_RuntimeCall(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), x);
+    do_RuntimeCall(CAST_FROM_FN_PTR(address, JfrTime::time_function()), x);
     break;
 #endif
 

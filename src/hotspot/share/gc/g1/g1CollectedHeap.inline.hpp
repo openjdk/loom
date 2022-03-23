@@ -28,9 +28,7 @@
 #include "gc/g1/g1CollectedHeap.hpp"
 
 #include "gc/g1/g1BarrierSet.hpp"
-#include "gc/g1/g1CardSetContainers.hpp"
 #include "gc/g1/g1CollectorState.hpp"
-#include "gc/g1/g1ConcurrentMark.inline.hpp"
 #include "gc/g1/g1EvacFailureRegions.hpp"
 #include "gc/g1/g1Policy.hpp"
 #include "gc/g1/g1RemSet.hpp"
@@ -209,7 +207,6 @@ void G1CollectedHeap::register_optional_region_with_region_attr(HeapRegion* r) {
   _region_attr.set_optional(r->hrm_index(), r->rem_set()->is_tracked());
 }
 
-
 inline bool G1CollectedHeap::is_in_young(const oop obj) const {
   if (obj == NULL) {
     return false;
@@ -234,13 +231,6 @@ inline bool G1CollectedHeap::is_obj_dead_full(const oop obj, const HeapRegion* h
 
 inline bool G1CollectedHeap::is_obj_dead_full(const oop obj) const {
     return is_obj_dead_full(obj, heap_region_containing(obj));
-}
-
-inline void G1CollectedHeap::mark_evac_failure_object(const oop obj, uint worker_id) const {
-    // All objects failing evacuation are live. What we'll do is
-    // that we'll update the prev marking info so that they are
-    // all under PTAMS and explicitly marked.
-    _cm->par_mark_in_prev_bitmap(obj);
 }
 
 inline void G1CollectedHeap::set_humongous_reclaim_candidate(uint region, bool value) {
@@ -271,8 +261,8 @@ inline void G1CollectedHeap::set_humongous_is_live(oop obj) {
   }
 }
 
-inline bool G1CollectedHeap::requires_barriers(oop obj) const {
-  assert (obj != NULL, "");
+inline bool G1CollectedHeap::requires_barriers(stackChunkOop obj) const {
+  assert(obj != NULL, "");
   return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
 }
 

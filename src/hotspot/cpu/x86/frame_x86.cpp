@@ -287,7 +287,7 @@ void frame::patch_pc(Thread* thread, address pc) {
   } else {
     _deopt_state = not_deoptimized;
   }
-  assert (!is_compiled_frame() || !_cb->as_compiled_method()->is_deopt_entry(_pc), "must be");
+  assert(!is_compiled_frame() || !_cb->as_compiled_method()->is_deopt_entry(_pc), "must be");
 
 #ifdef ASSERT
   {
@@ -326,12 +326,8 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
-
-template <frame::addressing pointers>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) at<pointers>(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer: result: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(result), p2i(fp()));
@@ -593,13 +589,9 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
-
-template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address<pointers>()[index];
+  return &interpreter_frame_tos_address()[index];
 }
 
 #ifndef PRODUCT
@@ -652,6 +644,27 @@ frame::frame(void* sp, void* fp, void* pc) {
 
 #endif
 
+void frame::print_raw() const {
+  tty->print_cr("pc_return " INTPTR_FORMAT, *addr_at(pc_return_offset));
+  tty->print_cr("link " INTPTR_FORMAT, *addr_at(link_offset));
+  tty->print_cr("return_addr " INTPTR_FORMAT, *addr_at(return_addr_offset));
+  tty->print_cr("sender_sp " INTPTR_FORMAT, *addr_at(sender_sp_offset));
+  tty->print_cr("interpreter_frame_result_handler " INTPTR_FORMAT, *addr_at(interpreter_frame_result_handler_offset));
+  tty->print_cr("interpreter_frame_oop_temp " INTPTR_FORMAT, *addr_at(interpreter_frame_oop_temp_offset));
+  tty->print_cr("interpreter_frame_sender_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_sender_sp_offset));
+  tty->print_cr("interpreter_frame_last_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_last_sp_offset));
+  tty->print_cr("interpreter_frame_method " INTPTR_FORMAT, *addr_at(interpreter_frame_method_offset));
+  tty->print_cr("interpreter_frame_mirror " INTPTR_FORMAT, *addr_at(interpreter_frame_mirror_offset));
+  tty->print_cr("interpreter_frame_mdp " INTPTR_FORMAT, *addr_at(interpreter_frame_mdp_offset));
+  tty->print_cr("interpreter_frame_cache " INTPTR_FORMAT, *addr_at(interpreter_frame_cache_offset));
+  tty->print_cr("interpreter_frame_locals " INTPTR_FORMAT, *addr_at(interpreter_frame_locals_offset));
+  tty->print_cr("interpreter_frame_bcp " INTPTR_FORMAT, *addr_at(interpreter_frame_bcp_offset));
+  tty->print_cr("interpreter_frame_initial_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_initial_sp_offset));
+  tty->print_cr("interpreter_frame_monitor_block_top " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_top_offset));
+  tty->print_cr("interpreter_frame_monitor_block_bottom " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_bottom_offset));
+  tty->print_cr("address::%s", is_heap_frame() ? "heap_frame" : "stack_frame");
+}
+
 void JavaFrameAnchor::make_walkable(JavaThread* thread) {
   // last frame set?
   if (last_Java_sp() == NULL) return;
@@ -668,4 +681,9 @@ void JavaFrameAnchor::capture_last_Java_pc() {
   vmassert(_last_Java_sp != NULL, "no last frame set");
   vmassert(_last_Java_pc == NULL, "already walkable");
   _last_Java_pc = (address)_last_Java_sp[-1];
+}
+
+void JavaFrameAnchor::patch_last_Java_pc(address pc) {
+  vmassert(_last_Java_sp != NULL, "no last frame set");
+  *(address*)(_last_Java_sp - 1) = pc;
 }

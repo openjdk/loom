@@ -25,10 +25,12 @@
 #ifndef SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 #define SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 
-#include "gc/shared/collectedHeap.hpp"
-#include "gc/shared/gc_globals.hpp"
-#include "memory/universe.hpp"
+#include "compiler/oopMap.hpp"
+
 #include "oops/compressedOops.hpp"
+#include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
+#include "utilities/ostream.hpp"
 
 inline const ImmutableOopMap* ImmutableOopMapSet::find_map_at_slot(int slot, int pc_offset) const {
   assert(slot >= 0 && slot < _count, "bounds count: %d slot: %d", _count, slot);
@@ -50,7 +52,7 @@ template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
 template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
   NOT_PRODUCT(if (TraceCodeBlobStacks) OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());)
-  assert (fr != NULL, "");
+  assert(fr != NULL, "");
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)
@@ -151,5 +153,5 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::oops_do(const frame *fr, con
   iterate_oops_do(fr, reg_map, oopmap);
 }
 
-#endif
+#endif // SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 

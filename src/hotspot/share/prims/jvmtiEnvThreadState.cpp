@@ -27,10 +27,9 @@
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "memory/resourceArea.hpp"
 #include "prims/jvmtiEnvThreadState.hpp"
-#include "prims/jvmtiThreadState.inline.hpp"
 #include "prims/jvmtiEventController.inline.hpp"
 #include "prims/jvmtiImpl.hpp"
-#include "runtime/handles.hpp"
+#include "prims/jvmtiThreadState.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaCalls.hpp"
@@ -373,6 +372,7 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
     JavaThread* thread = get_thread_or_saved();
 
     oop thread_oop = jvmti_thread_state()->get_thread_oop();
+    assert(!jvmti_thread_state()->is_in_VTMT(), "sanity check");
 
     // Check for an unmounted virual thread case.
     if (thread == NULL && event_type == JVMTI_EVENT_SINGLE_STEP && is_virtual()) {

@@ -26,6 +26,7 @@
 #include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "code/nmethod.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "gc/shared/stringdedup/stringDedup.hpp"
 #include "gc/shared/suspendibleThreadSet.hpp"
@@ -279,6 +280,7 @@ void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {
 }
 
 void ZMark::follow_object(oop obj, bool finalizable) {
+  ContinuationGCSupport::relativize_chunk(obj);
   if (finalizable) {
     ZMarkBarrierOopClosure<true /* finalizable */> cl;
     obj->oop_iterate(&cl);
@@ -338,7 +340,7 @@ void ZMark::mark_and_follow(ZMarkContext* context, ZMarkStackEntry entry) {
     // Update live objects/bytes for page. We use the aligned object
     // size since that is the actual number of bytes used on the page
     // and alignment paddings can never be reclaimed.
-    const size_t size = ZUtils::object_compact_size(addr);
+    const size_t size = ZUtils::object_size(addr);
     const size_t aligned_size = align_up(size, page->object_alignment());
     context->cache()->inc_live(page, aligned_size);
   }

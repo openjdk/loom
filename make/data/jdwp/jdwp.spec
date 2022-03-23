@@ -2022,9 +2022,9 @@ JDWP "Java(tm) Debug Wire Protocol"
         )
         (ErrorSet
             (Error INVALID_THREAD "The thread is null, not a valid thread, the thread "
-                                  "has terminated, or the thread is a virtual thread "
-                                  "and the target VM does not support stopping it with "
-                                  "an asynchronous exception at this time.")
+                                  "is not alive, or the thread is a virtual thread "
+                                  "and the target VM does not support stopping it "
+                                  "with an asynchronous exception at this time.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
                                   "exception has been garbage collected.")
             (Error VM_DEAD)
@@ -2038,7 +2038,8 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD)
+            (Error INVALID_THREAD    "The thread is null, not a valid thread, or "
+                                     "the thread is not alive.")
             (Error INVALID_OBJECT    "thread is not a known ID.")
             (Error VM_DEAD)
         )
@@ -2142,10 +2143,10 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD)
+            (Error INVALID_THREAD    "The thread is null, not a valid thread, or "
+                                     "the thread is not alive.")
             (Error INVALID_OBJECT    "Thread or value is not a known ID.")
             (Error THREAD_NOT_SUSPENDED)
-            (Error THREAD_NOT_ALIVE)
             (Error OPAQUE_FRAME      "Attempted to return early from "
                                      "a frame corresponding to a native "
                                      "method. "
@@ -2722,7 +2723,6 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error INVALID_FRAMEID)
             (Error THREAD_NOT_SUSPENDED)
             (Error NO_MORE_FRAMES)
-            (Error INVALID_FRAMEID)
             (Error OPAQUE_FRAME      "If one or more of the frames to pop is a native "
                                      "method or its caller is a native method, or the "
                                      "thread is a virtual thread and the implementation "
@@ -3162,15 +3162,13 @@ JDWP "Java(tm) Debug Wire Protocol"
 )
 (ConstantSet Error
     (Constant NONE                   =0   "No error has occurred.")
-    (Constant INVALID_THREAD         =10  "The thread is null, not a valid thread, "
-                                          "or the thread has terminated.")
+    (Constant INVALID_THREAD         =10  "The thread is null or not a valid thread.")
     (Constant INVALID_THREAD_GROUP   =11  "Thread group invalid.")
     (Constant INVALID_PRIORITY       =12  "Invalid priority.")
     (Constant THREAD_NOT_SUSPENDED   =13  "If the specified thread has not been "
                                           "suspended by an event.")
     (Constant THREAD_SUSPENDED       =14  "Thread already suspended.")
-    (Constant THREAD_NOT_ALIVE       =15  "Thread has not been started or is now dead.")
-
+    (Constant THREAD_NOT_ALIVE       =15  "Thread has not been started or has terminated.")
     (Constant INVALID_OBJECT         =20  "If this reference type has been unloaded "
                                           "and garbage collected.")
     (Constant INVALID_CLASS          =21  "Invalid class.")
@@ -3181,7 +3179,9 @@ JDWP "Java(tm) Debug Wire Protocol"
     (Constant INVALID_FRAMEID        =30  "Invalid jframeID.")
     (Constant NO_MORE_FRAMES         =31  "There are no more Java or JNI frames on the "
                                           "call stack.")
-    (Constant OPAQUE_FRAME           =32  "Information about the frame is not available.")
+    (Constant OPAQUE_FRAME           =32  "Information about the frame is not available "
+                                          "(e.g. native frame) or the target VM is unable "
+                                          "to perform an operation on the frame.")
     (Constant NOT_CURRENT_FRAME      =33  "Operation can only be performed on current frame.")
     (Constant TYPE_MISMATCH          =34  "The variable is not an appropriate type for "
                                           "the function used.")

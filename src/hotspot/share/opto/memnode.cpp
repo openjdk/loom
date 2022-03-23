@@ -862,8 +862,9 @@ bool LoadNode::is_immutable_value(Node* adr) {
     };
 
     for (size_t i = 0; i < sizeof offsets / sizeof offsets[0]; i++) {
-      if (offset == offsets[i])
+      if (offset == offsets[i]) {
         return true;
+      }
     }
   }
 

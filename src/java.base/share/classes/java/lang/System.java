@@ -2173,14 +2173,16 @@ public final class System {
         // initialization has completed.
         // IMPORTANT: Ensure that this remains the last initialization action!
         VM.initLevel(1);
+
+        // start Finalizer and Reference Handler threads
+        SharedSecrets.getJavaLangRefAccess().startThreads();
     }
 
     // @see #initPhase2()
     static ModuleLayer bootLayer;
 
     /*
-     * Invoked by VM. Phase 2 starts the finalizer and reference handler
-     * threads, and initializes the module system.
+     * Invoked by VM.  Phase 2 module system initialization.
      *
      * Only classes in java.base can be loaded in this phase.
      *
@@ -2190,10 +2192,7 @@ public final class System {
      * @return JNI_OK for success, JNI_ERR for failure
      */
     private static int initPhase2(boolean printToStderr, boolean printStackTrace) {
-        // start Finalizer and Reference Handler threads
-        SharedSecrets.getJavaLangRefAccess().startThreads();
 
-        // initialize the module system
         try {
             bootLayer = ModuleBootstrap.boot();
         } catch (Exception | Error e) {
@@ -2572,16 +2571,24 @@ public final class System {
                 thread.setContinuation(continuation);
             }
 
+            public ContinuationScope virtualThreadContinuationScope() {
+                return VirtualThread.continuationScope();
+            }
+
             public void parkVirtualThread() {
-                ((VirtualThread) Thread.currentThread()).park();
+                VirtualThread.park();
             }
 
             public void parkVirtualThread(long nanos) {
-                ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
+                VirtualThread.parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {
-                ((VirtualThread) thread).unpark();
+                if (thread instanceof VirtualThread vthread) {
+                    vthread.unpark();
+                } else {
+                    throw new IllegalArgumentException("Not a virtual thread");
+                }
             }
 
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,

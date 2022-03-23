@@ -666,6 +666,8 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
 // End of helpers
 
 address TemplateInterpreterGenerator::generate_Continuation_doYield_entry(void) {
+  if (!Continuations::enabled()) return nullptr;
+
 #ifdef _LP64
   address entry = __ pc();
   assert(StubRoutines::cont_doYield() != NULL, "stub not yet generated");
@@ -789,8 +791,8 @@ void TemplateInterpreterGenerator::bang_stack_shadow_pages(bool native_call) {
     __ bang_stack_with_offset(p*page_size);
   }
 
-  // Record a new watermark, unless the update is above the safe limit.
-  // Otherwise, the next time around a check above would pass the safe limit.
+  // Record the new watermark, but only if update is above the safe limit.
+  // Otherwise, the next time around the check above would pass the safe limit.
   __ cmpptr(rsp, Address(thread, JavaThread::shadow_zone_safe_limit()));
   __ jccb(Assembler::belowEqual, L_done);
   __ movptr(Address(thread, JavaThread::shadow_zone_growth_watermark()), rsp);

@@ -88,7 +88,6 @@ int StubAssembler::call_RT(Register oop_result1, Register metadata_result, addre
   if (!align_stack) {
     call_offset = offset();
   }
-  oopmap_metadata(NULL);
 
   // verify callee-saved register
 #ifdef ASSERT

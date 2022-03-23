@@ -22,7 +22,6 @@
  *
  */
 
-#include "oops/stackChunkOop.hpp"
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/javaThreadStatus.hpp"
@@ -38,6 +37,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/globals.hpp"
@@ -65,7 +65,7 @@ vframe::vframe(const frame* fr, JavaThread* thread)
 : _reg_map(thread), _thread(thread), _chunk() {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
-  assert (!_reg_map.in_cont(), "");
+  assert(!_reg_map.in_cont(), "");
 }
 
 vframe* vframe::new_vframe(StackFrameStream& fst, JavaThread* thread) {
@@ -137,19 +137,6 @@ javaVFrame* vframe::java_sender() const {
     f = f->sender();
   }
   return NULL;
-}
-
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-
-void vframe::restore_register_map() const {
-  assert (this != NULL, "");
-  assert (dbg_is_safe(this, -1), "");
-  assert (register_map() != NULL, "");
-  assert (dbg_is_safe(register_map(), -1), "");
-
-  if (_reg_map.stack_chunk()() != stack_chunk()) {
-    const_cast<vframe*>(this)->_reg_map.set_stack_chunk(stack_chunk());
-  }
 }
 
 // ------------- javaVFrame --------------
@@ -305,12 +292,12 @@ u_char* interpretedVFrame::bcp() const {
 }
 
 void interpretedVFrame::set_bcp(u_char* bcp) {
-  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
+  assert(stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
   fr().interpreter_frame_set_bcp(bcp);
 }
 
 intptr_t* interpretedVFrame::locals_addr_at(int offset) const {
-  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
+  assert(stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
   assert(fr().is_interpreted_frame(), "frame should be an interpreted frame");
   return fr().interpreter_frame_local_at(offset);
 }
@@ -333,7 +320,7 @@ int interpretedVFrame::bci() const {
 }
 
 Method* interpretedVFrame::method() const {
-  // assert ((stack_chunk() != NULL) == register_map()->in_cont(), "_in_cont: %d register_map()->in_cont(): %d", stack_chunk() != NULL, register_map()->in_cont());
+  // assert((stack_chunk() != NULL) == register_map()->in_cont(), "_in_cont: %d register_map()->in_cont(): %d", stack_chunk() != NULL, register_map()->in_cont());
   return stack_chunk() == NULL ? fr().interpreter_frame_method() : stack_chunk()->interpreter_frame_method(fr());
 }
 
@@ -568,10 +555,6 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   _frame = _thread->last_frame();
   _cont = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (Continuation::is_continuation_enterSpecial(_frame)) {
-      assert (_cont != NULL, "");
-      _cont = _cont->parent();
-    }
     _frame = _frame.sender(&_reg_map);
   }
 }

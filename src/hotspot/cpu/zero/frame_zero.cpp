@@ -83,11 +83,7 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
 }
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
-
-template <frame::addressing pointers>
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return (BasicObjectLock*) get_interpreterState()->stack_base();
 }
 
@@ -224,10 +220,6 @@ BasicType frame::interpreter_frame_result(oop* oop_result,
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
-
-template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset) / wordSize);
   return &interpreter_frame_tos_address()[index];
@@ -422,11 +414,6 @@ void ZeroFrame::identify_vp_word(int       frame_index,
 void frame::describe_pd(FrameValues& values, int frame_no) {
 
 }
-
-void frame::describe_top_pd(FrameValues& values) {
-
-}
-
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {

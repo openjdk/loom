@@ -374,10 +374,6 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
       DESCRIBE_ADDRESS(fresult);
   }
 }
-
-void frame::describe_top_pd(FrameValues& values) {
-  Unimplemented();
-}
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {
@@ -387,25 +383,19 @@ intptr_t *frame::initial_deoptimization_info() {
 
 #ifndef PRODUCT
 // This is a generic constructor which is only used by pns() in debug.cpp.
-frame::frame(void* sp, void* fp, void* pc) : _sp((intptr_t*)sp), _unextended_sp((intptr_t*)sp) {
+frame::frame(void* sp, void* fp, void* pc) : _sp((intptr_t*)sp),
+                                             _on_heap(false),
+                                             _unextended_sp((intptr_t*)sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)pc); // also sets _fp and adjusts _unextended_sp
 }
 
 #endif
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
-
-template <frame::addressing pointers>
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return (BasicObjectLock*) get_ijava_state()->monitors;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
-
-template <frame::addressing pointers>
-inline intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
+intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   return &interpreter_frame_tos_address()[offset];
 }

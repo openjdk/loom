@@ -63,18 +63,12 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   Unimplemented();
 }
 
-// creates the yield stub frame faster than JavaThread::last_frame
-inline frame ContinuationHelper::last_frame(JavaThread* thread) {
+frame ContinuationEntry::to_frame() const {
   Unimplemented();
   return frame();
 }
 
-frame ContinuationEntry::to_frame() {
-  Unimplemented();
-  return frame();
-}
-
-void ContinuationEntry::update_register_map(RegisterMap* map) {
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
   Unimplemented();
 }
 
@@ -91,9 +85,8 @@ inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
   Unimplemented();
 }
 
-template <typename ConfigT>
 template<typename FKind>
-inline frame Freeze<ConfigT>::sender(const frame& f) {
+inline frame FreezeBase::sender(const frame& f) {
   Unimplemented();
   return frame();
 }
@@ -104,13 +97,12 @@ template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& call
   return frame();
 }
 
-template <typename ConfigT>
-inline void Freeze<ConfigT>::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
+inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   Unimplemented();
 }
 
 template <typename ConfigT>
-template <typename FKind, bool bottom>
+template <typename FKind>
 inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
   Unimplemented();
 }
@@ -132,13 +124,11 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
   return frame();
 }
 
-template <typename ConfigT>
-inline void Thaw<ConfigT>::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
+inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline void Thaw<ConfigT>::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
+inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   Unimplemented();
 }
 
@@ -149,7 +139,7 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
 }
 
 template <typename ConfigT>
-template<typename FKind, bool bottom>
+template<typename FKind>
 inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
   Unimplemented();
 }

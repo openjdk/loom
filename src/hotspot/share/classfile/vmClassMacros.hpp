@@ -88,8 +88,7 @@
                                                                                                                 \
   do_klass(Thread_klass,                                java_lang_Thread                                      ) \
   do_klass(Thread_FieldHolder_klass,                    java_lang_Thread_FieldHolder                          ) \
-  do_klass(Thread_VirtualThreads_klass,                 java_lang_Thread_VirtualThreads                       ) \
-  do_klass(Thread_ContextClassLoaders_klass,            java_lang_Thread_ContextClassLoaders                  ) \
+  do_klass(Thread_Constants_klass,                      java_lang_Thread_Constants                            ) \
   do_klass(ThreadGroup_klass,                           java_lang_ThreadGroup                                 ) \
   do_klass(VirtualThread_klass,                         java_lang_VirtualThread                               ) \
   do_klass(Properties_klass,                            java_util_Properties                                  ) \

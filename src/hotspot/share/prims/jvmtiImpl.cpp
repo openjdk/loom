@@ -53,7 +53,7 @@
 #include "runtime/signature.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
-#include "runtime/vframe.hpp"
+#include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
 #include "runtime/vmOperations.hpp"
 #include "utilities/exceptions.hpp"
@@ -823,15 +823,14 @@ VM_VirtualThreadGetOrSetLocal::VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Hand
 javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(_vthread_h());
-  javaVFrame* jvf = NULL;
-  bool is_cont_mounted = jdk_internal_vm_Continuation::is_mounted(cont);
-
   assert(cont != NULL, "vthread contintuation must not be NULL");
 
+  javaVFrame* jvf = NULL;
+  JavaThread* java_thread = JvmtiEnvBase::is_virtual_thread_mounted(_vthread_h());
+  bool is_cont_mounted = (java_thread != NULL);
+
   if (is_cont_mounted) {
-    oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-    vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
+    vframeStream vfs(java_thread);
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();

@@ -33,7 +33,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.JavaUtilThreadLocalRandomAccess;
+import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.DontInline;
@@ -641,8 +641,8 @@ public final class ScopeLocal<T> {
             objs[n * 2] = key;
         }
 
-        private static final JavaUtilThreadLocalRandomAccess THREAD_LOCAL_RANDOM_ACCESS
-                = SharedSecrets.getJavaUtilThreadLocalRandomAccess();
+        private static final JavaUtilConcurrentTLRAccess THREAD_LOCAL_RANDOM_ACCESS
+                = SharedSecrets.getJavaUtilConcurrentTLRAccess();
 
         // Return either true or false, at pseudo-random, with a bias towards true.
         // This chooses either the primary or secondary cache slot, but the

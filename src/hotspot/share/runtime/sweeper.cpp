@@ -199,7 +199,7 @@ void NMethodSweeper::do_stack_scanning() {
   assert(!CodeCache_lock->owned_by_self(), "just checking");
   if (Continuations::enabled()) {
     // There are continuation stacks in the heap that need to be scanned.
-    Universe::heap()->collect_for_codecache();
+    Universe::heap()->collect(GCCause::_codecache_GC_threshold);
   }
   if (wait_for_stack_scanning()) {
     CodeBlobClosure* code_cl;
@@ -345,6 +345,7 @@ void NMethodSweeper::sweep_code_cache() {
     MutexLocker mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
 
     while (!_current.end()) {
+      CodeCache::Sweep::begin();
       swept_count++;
       // Since we will give up the CodeCache_lock, always skip ahead
       // to the next nmethod.  Other blobs can be deleted by other
@@ -390,6 +391,7 @@ void NMethodSweeper::sweep_code_cache() {
       }
 
       _seen++;
+      CodeCache::Sweep::end();
       handle_safepoint_request();
     }
   }

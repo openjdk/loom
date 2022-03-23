@@ -45,7 +45,6 @@ Register LIR_Opr::as_register_hi() const {
   return FrameMap::cpu_rnr2reg(cpu_regnrHi());
 }
 
-
 LIR_Opr LIR_OprFact::illegalOpr = LIR_OprFact::illegal();
 LIR_Opr LIR_OprFact::nullOpr = LIR_Opr();
 
@@ -430,6 +429,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       if (op->_result->is_valid())     do_output(op->_result);
       break;
     }
+
 
 // LIR_OpLabel
     case lir_label:                    // result and info always invalid

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
 #ifndef CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 #define CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 
+#include "code/codeBlob.inline.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
@@ -81,12 +82,12 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
-frame ContinuationEntry::to_frame() {
+frame ContinuationEntry::to_frame() const {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
 }
 
-void ContinuationEntry::update_register_map(RegisterMap* map) {
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
   intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
   frame::update_map_with_saved_link(map, fp);
 }
@@ -116,29 +117,43 @@ inline frame FreezeBase::sender(const frame& f) {
   int slot = 0;
   CodeBlob* sender_cb = CodeCache::find_blob_and_oopmap(sender_pc, slot);
   return sender_cb != nullptr
-    ? frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb, slot == -1 ? nullptr : sender_cb->oop_map_for_slot(slot, sender_pc))
+    ? frame(sender_sp, sender_sp, *link_addr, sender_pc, sender_cb,
+            slot == -1 ? nullptr : sender_cb->oop_map_for_slot(slot, sender_pc),
+            false /* on_heap ? */)
     : frame(sender_sp, sender_sp, *link_addr, sender_pc);
+}
+
+static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int offset) {
+  assert (*(hfp + offset) == *(vfp + offset), "");
+  intptr_t* addr = hfp + offset;
+  intptr_t value = *(intptr_t**)addr - vfp;
+  *addr = value;
 }
 
 inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   intptr_t* vfp = f.fp();
   intptr_t* hfp = hf.fp();
   assert (hfp == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
-  assert ((f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) != 0)
+  assert ((f.at(frame::interpreter_frame_last_sp_offset) != 0)
     || (f.unextended_sp() == f.sp()), "");
-  assert (f.fp() > (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_initial_sp_offset), "");
+  assert (f.fp() > (intptr_t*)f.at(frame::interpreter_frame_initial_sp_offset), "");
+
+  // on AARCH64, we may insert padding between the locals and the rest of the frame
+  // (see TemplateInterpreterGenerator::generate_normal_entry, and AbstractInterpreter::layout_activation)
+  // so we compute locals "from scratch" rather than relativizing the value in the stack frame, which might include padding,
+  // since we don't freeze the padding word (see recurse_freeze_interpreted_frame).
 
   // at(frame::interpreter_frame_last_sp_offset) can be NULL at safepoint preempts
   *hf.addr_at(frame::interpreter_frame_last_sp_offset) = hf.unextended_sp() - hf.fp();
   *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1;
 
-  relativize(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
+  relativize_one(vfp, hfp, frame::interpreter_frame_initial_sp_offset); // == block_top == block_bottom
 
   assert ((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
-  assert (hf.unextended_sp() == (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
-  assert (hf.unextended_sp() <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            >  (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_initial_sp_offset), "");
-  assert (hf.fp()            <= (intptr_t*)hf.at<frame::addressing::RELATIVE>(frame::interpreter_frame_locals_offset), "");
+  assert (hf.unextended_sp() == (intptr_t*)hf.at(frame::interpreter_frame_last_sp_offset), "");
+  assert (hf.unextended_sp() <= (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            >  (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
+  assert (hf.fp()            <= (intptr_t*)hf.at(frame::interpreter_frame_locals_offset), "");
 }
 
 template <typename ConfigT>
@@ -159,12 +174,12 @@ template<typename FKind>
 frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
   assert (FKind::is_instance(f), "");
   assert (!caller.is_interpreted_frame()
-    || caller.unextended_sp() == (intptr_t*)caller.at<frame::addressing::RELATIVE>(frame::interpreter_frame_last_sp_offset), "");
+    || caller.unextended_sp() == (intptr_t*)caller.at(frame::interpreter_frame_last_sp_offset), "");
 
   intptr_t *sp, *fp; // sp is really our unextended_sp
   if (FKind::interpreted) {
-    assert ((intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset) == nullptr
-      || f.unextended_sp() == (intptr_t*)f.at<frame::addressing::ABSOLUTE>(frame::interpreter_frame_last_sp_offset), "");
+    assert ((intptr_t*)f.at(frame::interpreter_frame_last_sp_offset) == nullptr
+      || f.unextended_sp() == (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset), "");
     int locals = f.interpreter_frame_method()->max_locals();
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
     fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
@@ -174,7 +189,7 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    frame hf(sp, sp, fp, f.pc(), nullptr, nullptr, true /* on_heap */);
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
@@ -189,12 +204,12 @@ frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
 
     assert (_cont.tail()->is_in_chunk(sp), "");
 
-    return frame(sp, sp, fp, f.pc(), nullptr, nullptr, false);
+    return frame(sp, sp, fp, f.pc(), nullptr, nullptr, true /* on_heap */);
   }
 }
 
 template <typename ConfigT>
-template <typename FKind, bool bottom>
+template <typename FKind>
 inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
   if (caller.is_interpreted_frame()) {
     assert (!caller.is_empty(), "");
@@ -210,11 +225,16 @@ inline void Freeze<ConfigT>::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
 }
 
 ////////
+static inline void derelativize_one(intptr_t* const fp, int offset) {
+  intptr_t* addr = fp + offset;
+  *addr = (intptr_t)(fp + *addr);
+}
+
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   intptr_t* vfp = f.fp();
 
-  derelativize(vfp, frame::interpreter_frame_last_sp_offset);
-  derelativize(vfp, frame::interpreter_frame_initial_sp_offset);
+  derelativize_one(vfp, frame::interpreter_frame_last_sp_offset);
+  derelativize_one(vfp, frame::interpreter_frame_initial_sp_offset);
 }
 
 inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bottom) {
@@ -233,7 +253,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
 
   if (FKind::interpreted) {
     intptr_t* hsp = hf.unextended_sp();
-    const int fsize = Interpreted::frame_bottom<frame::addressing::RELATIVE>(hf) - hf.unextended_sp();
+    const int fsize = Interpreted::frame_bottom(hf) - hf.unextended_sp();
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);
@@ -269,7 +289,7 @@ template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& 
     intptr_t* fp = FKind::stub
       ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
       : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
-    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map()); // TODO PERF : this computes deopt state; is it necessary?
+    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
 }
 
@@ -288,9 +308,8 @@ inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& cal
 }
 
 template <typename ConfigT>
-template<typename FKind, bool bottom>
+template<typename FKind>
 inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
-  assert (!bottom || caller.fp() == _cont.entryFP(), "");
   patch_callee_link(caller, caller.fp());
 }
 

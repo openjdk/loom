@@ -32,6 +32,7 @@
 #include "gc/shared/ageTable.inline.hpp"
 #include "gc/shared/cardTableRS.hpp"
 #include "gc/shared/collectorCounters.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gcArguments.hpp"
 #include "gc/shared/gcHeapSummary.hpp"
 #include "gc/shared/gcLocker.hpp"
@@ -696,6 +697,7 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
   _promotion_failed = true;
   _promotion_failed_info.register_copy_failure(old->size());
   _preserved_marks_set.get()->push_if_necessary(old, old->mark());
+  ContinuationGCSupport::transform_stack_chunk(old);
   // forward to self
   old->forward_to(old);
 
@@ -712,7 +714,7 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
 oop DefNewGeneration::copy_to_survivor_space(oop old) {
   assert(is_in_reserved(old) && !old->is_forwarded(),
          "shouldn't be scavenging this oop");
-  size_t s = old->compact_size();
+  size_t s = old->size();
   oop obj = NULL;
 
   // Try allocating obj in to-space (unless too old)
@@ -735,7 +737,7 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
     Prefetch::write(obj, interval);
 
     // Copy obj
-    old->copy_disjoint_compact(cast_from_oop<HeapWord*>(obj), s);
+    old->copy_disjoint(cast_from_oop<HeapWord*>(obj), s);
 
     // Increment age if obj still in new generation
     obj->incr_age();

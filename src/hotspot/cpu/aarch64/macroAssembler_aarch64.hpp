@@ -468,7 +468,7 @@ public:
   void push_fp(FloatRegSet regs, Register stack) { if (regs.bits()) push_fp(regs.bits(), stack); }
   void pop_fp(FloatRegSet regs, Register stack) { if (regs.bits()) pop_fp(regs.bits(), stack); }
 
-  static RegSet call_clobbered_registers();
+  static RegSet call_clobbered_gp_registers();
 
   void push_p(PRegSet regs, Register stack) { if (regs.bits()) push_p(regs.bits(), stack); }
   void pop_p(PRegSet regs, Register stack) { if (regs.bits()) pop_p(regs.bits(), stack); }
@@ -688,7 +688,7 @@ public:
   void align(int modulus);
 
   // nop
-  void post_call_nop() { nop(); }
+  void post_call_nop();
 
   // Stack frame creation/removal
   void enter(bool strip_ret_addr = false);
@@ -1248,7 +1248,7 @@ public:
         Register table0, Register table1, Register table2, Register table3,
         bool upper = false);
 
-  address has_negatives(Register ary1, Register len, Register result);
+  address count_positives(Register ary1, Register len, Register result);
 
   address arrays_equals(Register a1, Register a2, Register result, Register cnt1,
                         Register tmp1, Register tmp2, Register tmp3, int elem_size);

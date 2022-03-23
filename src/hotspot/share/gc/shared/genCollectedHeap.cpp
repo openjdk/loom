@@ -36,6 +36,7 @@
 #include "gc/shared/cardTableRS.hpp"
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "gc/shared/collectorCounters.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gcId.hpp"
 #include "gc/shared/gcLocker.hpp"
 #include "gc/shared/gcPolicyCounters.hpp"
@@ -794,7 +795,10 @@ void GenCollectedHeap::full_process_roots(bool is_adjust_phase,
                                           bool only_strong_roots,
                                           OopClosure* root_closure,
                                           CLDClosure* cld_closure) {
-  MarkingCodeBlobClosure mark_code_closure(root_closure, CodeBlobToOopClosure::FixRelocations, !is_adjust_phase);
+  // Called from either the marking phase or the adjust phase.
+  const bool is_marking_phase = !is_adjust_phase;
+
+  MarkingCodeBlobClosure mark_code_closure(root_closure, is_adjust_phase, is_marking_phase);
   CLDClosure* weak_cld_closure = only_strong_roots ? NULL : cld_closure;
 
   process_roots(so, root_closure, cld_closure, weak_cld_closure, &mark_code_closure);
@@ -1233,13 +1237,13 @@ oop GenCollectedHeap::handle_failed_promotion(Generation* old_gen,
                                               oop obj,
                                               size_t obj_size) {
   guarantee(old_gen == _old_gen, "We only get here with an old generation");
-  assert(obj_size == obj->compact_size(), "bad obj_size passed in");
+  assert(obj_size == obj->size(), "bad obj_size passed in");
   HeapWord* result = NULL;
 
   result = old_gen->expand_and_allocate(obj_size, false);
 
   if (result != NULL) {
-    obj->copy_disjoint_compact(result, obj_size);
+    obj->copy_disjoint(result, obj_size);
   }
   return cast_to_oop(result);
 }

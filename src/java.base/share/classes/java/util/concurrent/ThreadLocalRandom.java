@@ -50,7 +50,7 @@ import java.util.random.RandomGenerator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
-import jdk.internal.access.JavaUtilThreadLocalRandomAccess;
+import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.util.random.RandomSupport;
 import jdk.internal.util.random.RandomSupport.*;
@@ -407,14 +407,16 @@ public class ThreadLocalRandom extends Random {
         = new AtomicLong(RandomSupport.mixMurmur64(System.currentTimeMillis()) ^
                          RandomSupport.mixMurmur64(System.nanoTime()));
 
-    static class Access {
+    // used by ScopeLocal
+    private static class Access {
         static {
-            SharedSecrets.setJavaUtilThreadLocalRandomAccess
-                    (new JavaUtilThreadLocalRandomAccess() {
-                        public int nextSecondaryThreadLocalRandomSeed() {
-                            return nextSecondarySeed();
-                        }
-                    });
+            SharedSecrets.setJavaUtilConcurrentTLRAccess(
+                new JavaUtilConcurrentTLRAccess() {
+                    public int nextSecondaryThreadLocalRandomSeed() {
+                        return nextSecondarySeed();
+                    }
+                }
+            );
         }
     }
 

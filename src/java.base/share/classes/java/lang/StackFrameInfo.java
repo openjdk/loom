@@ -26,12 +26,10 @@ package java.lang;
 
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
 
 import java.lang.StackWalker.StackFrame;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Method;
 
 class StackFrameInfo implements StackFrame {
     private static final JavaLangInvokeAccess JLIA =
@@ -59,21 +57,6 @@ class StackFrameInfo implements StackFrame {
     // the capability check
     Class<?> declaringClass() {
         return JLIA.getDeclaringClass(memberName);
-    }
-
-    void setMemberName(Method method) {
-        this.memberName = JLIA.newMemberName(method);
-    }
-
-    void setBCI(short bci) {
-        this.bci = bci;
-    }
-
-    void setContinuationScope(ContinuationScope contScope) {
-        this.contScope = contScope;
-    }
-
-    protected void clear() {
     }
 
     // ----- implementation of StackFrame methods

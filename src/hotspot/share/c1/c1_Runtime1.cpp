@@ -59,7 +59,6 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/atomic.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
@@ -324,7 +323,7 @@ const char* Runtime1::name_for_address(address entry) {
   FUNCTION_CASE(entry, is_instance_of);
   FUNCTION_CASE(entry, trace_block_entry);
 #ifdef JFR_HAVE_INTRINSICS
-  FUNCTION_CASE(entry, JFR_TIME_FUNCTION);
+  FUNCTION_CASE(entry, JfrTime::time_function());
   FUNCTION_CASE(entry, StubRoutines::jfr_get_event_writer());
 #endif
   FUNCTION_CASE(entry, StubRoutines::updateBytesCRC32());

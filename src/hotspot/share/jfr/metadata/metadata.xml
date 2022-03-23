@@ -74,7 +74,7 @@
   </Event>
 
   <!-- Ordinary and experimental events !-->
-  
+
   <Event name="ThreadStart" category="Java Application" label="Java Thread Start" thread="true" startTime="false" stackTrace="true">
     <Field type="Thread" name="thread" label="New Java Thread" />
     <Field type="Thread" name="parentThread" label="Parent Java Thread" />

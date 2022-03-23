@@ -37,8 +37,7 @@ import java.util.stream.Collectors;
 import static java.lang.StackWalker.Option.*;
 
 /**
- * Helper class to print the virtual thread stack trace when its carrier thread is
- * pinned.
+ * Helper class to print the virtual thread stack trace when pinned.
  *
  * The class maintains a mapping of Class object to the hashes of stack traces that are
  * pinned by code in that Class. This is used to avoid printing the same stack trace

@@ -60,17 +60,26 @@ public:
   static int try_force_yield(JavaThread* thread, oop cont);
   static void jump_from_safepoint(JavaThread* thread);
 
-  static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
+  static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+  static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
+
+  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
+    assert(is_continuation_enterSpecial(f), "");
+    ContinuationEntry* cont = (ContinuationEntry*)f.unextended_sp();
+    assert(cont == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
+    return cont;
+  }
+
+  static bool is_continuation_mounted(JavaThread* thread, oop cont);
+  static bool is_continuation_scope_mounted(JavaThread* thread, oop cont_scope);
 
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
 
-  static oop get_continuation_for_sp(JavaThread* thread, intptr_t* const sp);
-
-  static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
+  static bool is_frame_in_continuation(const ContinuationEntry* cont, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
 
   static bool has_last_Java_frame(oop continuation);
@@ -131,6 +140,7 @@ private:
   ContinuationEntry* _parent;
   oopDesc* _cont;
   oopDesc* _chunk;
+  int _flags;
   int _argsize;
   intptr_t* _parent_cont_fastpath;
   int _parent_held_monitor_count;
@@ -139,37 +149,37 @@ public:
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
   static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
+  static ByteSize flags_offset()    { return byte_offset_of(ContinuationEntry, _flags); }
   static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
+  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
+  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
 
   static void setup_oopmap(OopMap* map) {
     map->set_oop(VMRegImpl::stack2reg(in_bytes(cont_offset())  / VMRegImpl::stack_slot_size));
     map->set_oop(VMRegImpl::stack2reg(in_bytes(chunk_offset()) / VMRegImpl::stack_slot_size));
   }
 
-  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
-  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
-
 public:
   static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
 
-  ContinuationEntry* parent() { return _parent; }
+  ContinuationEntry* parent() const { return _parent; }
 
   static address entry_pc() { return return_pc; }
-  intptr_t* entry_sp() { return (intptr_t*)this; }
-  intptr_t* entry_fp() { return *(intptr_t**)((address)this + size()); } // TODO PD
+  intptr_t* entry_sp() const { return (intptr_t*)this; }
+  intptr_t* entry_fp() const { return *(intptr_t**)((address)this + size()); } // TODO PD
 
-  int argsize() { return _argsize; }
+  int argsize() const { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
 
-  intptr_t* parent_cont_fastpath() { return _parent_cont_fastpath; }
+  intptr_t* parent_cont_fastpath() const { return _parent_cont_fastpath; }
   void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }
 
   static ContinuationEntry* from_frame(const frame& f);
-  frame to_frame();
-  void update_register_map(RegisterMap* map);
-  void flush_stack_processing(JavaThread* thread);
+  frame to_frame() const;
+  void update_register_map(RegisterMap* map) const;
+  void flush_stack_processing(JavaThread* thread) const;
 
-  intptr_t* bottom_sender_sp() {
+  intptr_t* bottom_sender_sp() const {
     intptr_t* sp = entry_sp() - argsize();
 #ifdef _LP64
     sp = align_down(sp, 16);
@@ -177,13 +187,18 @@ public:
     return sp;
   }
 
-  oop continuation() {
+  oop continuation() const {
     oop snapshot = _cont;
     return NativeAccess<>::oop_load(&snapshot);
   }
 
-  oop cont_oop() { return this != NULL ? continuation() : (oop)NULL; }
-  oop chunk()    { return _chunk; }
+  oop cont_oop()  const { return this != NULL ? continuation() : (oop)NULL; }
+  oop scope()     const { return Continuation::continuation_scope(cont_oop()); }
+
+  oop cont_raw()  const { return _cont; }
+  oop chunk_raw() const { return _chunk; }
+
+  bool is_virtual_thread() const { return _flags != 0; }
 
 #ifdef ASSERT
   static bool assert_entry_frame_laid_out(JavaThread* thread);

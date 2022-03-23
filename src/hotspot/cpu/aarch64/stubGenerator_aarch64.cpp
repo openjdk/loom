@@ -26,6 +26,7 @@
 #include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "asm/macroAssembler.inline.hpp"
+#include "asm/register.hpp"
 #include "atomic_aarch64.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/shared/barrierSet.hpp"
@@ -1327,10 +1328,10 @@ class StubGenerator: public StubCodeGenerator {
   void clobber_registers() {
 #ifdef ASSERT
     RegSet clobbered
-      = MacroAssembler::call_clobbered_registers() - rscratch1;
+      = MacroAssembler::call_clobbered_gp_registers() - rscratch1;
     __ mov(rscratch1, (uint64_t)0xdeadbeef);
     __ orr(rscratch1, rscratch1, rscratch1, Assembler::LSL, 32);
-    for (RegSetIterator<> it = clobbered.begin(); *it != noreg; ++it) {
+    for (RegSetIterator<Register> it = clobbered.begin(); *it != noreg; ++it) {
       __ mov(*it, rscratch1);
     }
 #endif
@@ -4664,7 +4665,7 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_has_negatives(address &has_negatives_long) {
+  address generate_count_positives(address &count_positives_long) {
     const u1 large_loop_size = 64;
     const uint64_t UPPER_BIT_MASK=0x8080808080808080;
     int dcache_line = VM_Version::dcache_line_size();
@@ -4673,13 +4674,15 @@ class StubGenerator: public StubCodeGenerator {
 
     __ align(CodeEntryAlignment);
 
-    StubCodeMark mark(this, "StubRoutines", "has_negatives");
+    StubCodeMark mark(this, "StubRoutines", "count_positives");
 
     address entry = __ pc();
 
     __ enter();
+    // precondition: a copy of len is already in result
+    // __ mov(result, len);
 
-  Label RET_TRUE, RET_TRUE_NO_POP, RET_FALSE, ALIGNED, LOOP16, CHECK_16,
+  Label RET_ADJUST, RET_ADJUST_16, RET_ADJUST_LONG, RET_NO_POP, RET_LEN, ALIGNED, LOOP16, CHECK_16,
         LARGE_LOOP, POST_LOOP16, LEN_OVER_15, LEN_OVER_8, POST_LOOP16_LOAD_TAIL;
 
   __ cmp(len, (u1)15);
@@ -4693,25 +4696,26 @@ class StubGenerator: public StubCodeGenerator {
   __ sub(rscratch1, zr, len, __ LSL, 3);  // LSL 3 is to get bits from bytes.
   __ lsrv(rscratch2, rscratch2, rscratch1);
   __ tst(rscratch2, UPPER_BIT_MASK);
-  __ cset(result, Assembler::NE);
+  __ csel(result, zr, result, Assembler::NE);
   __ leave();
   __ ret(lr);
   __ bind(LEN_OVER_8);
   __ ldp(rscratch1, rscratch2, Address(ary1, -16));
   __ sub(len, len, 8); // no data dep., then sub can be executed while loading
   __ tst(rscratch2, UPPER_BIT_MASK);
-  __ br(Assembler::NE, RET_TRUE_NO_POP);
+  __ br(Assembler::NE, RET_NO_POP);
   __ sub(rscratch2, zr, len, __ LSL, 3); // LSL 3 is to get bits from bytes
   __ lsrv(rscratch1, rscratch1, rscratch2);
   __ tst(rscratch1, UPPER_BIT_MASK);
-  __ cset(result, Assembler::NE);
+  __ bind(RET_NO_POP);
+  __ csel(result, zr, result, Assembler::NE);
   __ leave();
   __ ret(lr);
 
   Register tmp1 = r3, tmp2 = r4, tmp3 = r5, tmp4 = r6, tmp5 = r7, tmp6 = r10;
   const RegSet spilled_regs = RegSet::range(tmp1, tmp5) + tmp6;
 
-  has_negatives_long = __ pc(); // 2nd entry point
+  count_positives_long = __ pc(); // 2nd entry point
 
   __ enter();
 
@@ -4723,10 +4727,10 @@ class StubGenerator: public StubCodeGenerator {
     __ mov(tmp5, 16);
     __ sub(rscratch1, tmp5, rscratch2); // amount of bytes until aligned address
     __ add(ary1, ary1, rscratch1);
-    __ sub(len, len, rscratch1);
     __ orr(tmp6, tmp6, tmp1);
     __ tst(tmp6, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST);
+    __ sub(len, len, rscratch1);
 
   __ bind(ALIGNED);
     __ cmp(len, large_loop_size);
@@ -4741,7 +4745,7 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(len, len, 16);
     __ orr(tmp6, tmp6, tmp1);
     __ tst(tmp6, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST_16);
     __ cmp(len, large_loop_size);
     __ br(Assembler::LT, CHECK_16);
 
@@ -4773,7 +4777,7 @@ class StubGenerator: public StubCodeGenerator {
     __ orr(rscratch1, rscratch1, tmp6);
     __ orr(tmp2, tmp2, rscratch1);
     __ tst(tmp2, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST_LONG);
     __ cmp(len, large_loop_size);
     __ br(Assembler::GE, LARGE_LOOP);
 
@@ -4786,7 +4790,7 @@ class StubGenerator: public StubCodeGenerator {
     __ sub(len, len, 16);
     __ orr(tmp2, tmp2, tmp3);
     __ tst(tmp2, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST_16);
     __ cmp(len, (u1)16);
     __ br(Assembler::GE, LOOP16); // 16-byte load loop end
 
@@ -4794,31 +4798,36 @@ class StubGenerator: public StubCodeGenerator {
     __ cmp(len, (u1)8);
     __ br(Assembler::LE, POST_LOOP16_LOAD_TAIL);
     __ ldr(tmp3, Address(__ post(ary1, 8)));
-    __ sub(len, len, 8);
     __ tst(tmp3, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST);
+    __ sub(len, len, 8);
 
   __ bind(POST_LOOP16_LOAD_TAIL);
-    __ cbz(len, RET_FALSE); // Can't shift left by 64 when len==0
+    __ cbz(len, RET_LEN); // Can't shift left by 64 when len==0
     __ ldr(tmp1, Address(ary1));
     __ mov(tmp2, 64);
     __ sub(tmp4, tmp2, len, __ LSL, 3);
     __ lslv(tmp1, tmp1, tmp4);
     __ tst(tmp1, UPPER_BIT_MASK);
-    __ br(Assembler::NE, RET_TRUE);
+    __ br(Assembler::NE, RET_ADJUST);
     // Fallthrough
 
-  __ bind(RET_FALSE);
+  __ bind(RET_LEN);
     __ pop(spilled_regs, sp);
     __ leave();
-    __ mov(result, zr);
     __ ret(lr);
 
-  __ bind(RET_TRUE);
+    // difference result - len is the count of guaranteed to be
+    // positive bytes
+
+  __ bind(RET_ADJUST_LONG);
+    __ add(len, len, (u1)(large_loop_size - 16));
+  __ bind(RET_ADJUST_16);
+    __ add(len, len, 16);
+  __ bind(RET_ADJUST);
     __ pop(spilled_regs, sp);
-  __ bind(RET_TRUE_NO_POP);
     __ leave();
-    __ mov(result, 1);
+    __ sub(result, result, len);
     __ ret(lr);
 
     return entry;
@@ -5181,6 +5190,20 @@ class StubGenerator: public StubCodeGenerator {
     Label deoptimize_label;
 
     address start = __ pc();
+
+    BarrierSetAssembler* bs_asm = BarrierSet::barrier_set()->barrier_set_assembler();
+
+    if (bs_asm->nmethod_code_patching()) {
+      BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
+      // We can get here despite the nmethod being good, if we have not
+      // yet applied our cross modification fence.
+      Address thread_epoch_addr(rthread, in_bytes(bs_nm->thread_disarmed_offset()) + 4);
+      __ lea(rscratch2, ExternalAddress(bs_asm->patching_epoch_addr()));
+      __ ldrw(rscratch2, rscratch2);
+      __ strw(rscratch2, thread_epoch_addr);
+      __ isb();
+      __ membar(__ LoadLoad);
+    }
 
     __ set_last_Java_frame(sp, rfp, lr, rscratch1);
 
@@ -6504,7 +6527,9 @@ class StubGenerator: public StubCodeGenerator {
   }
 #endif // LINUX
 
-RuntimeStub* generate_cont_doYield() {
+  RuntimeStub* generate_cont_doYield() {
+    if (!Continuations::enabled()) return nullptr;
+
     const char *name = "cont_doYield";
 
     enum layout {
@@ -6566,22 +6591,14 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_jump_from_safepoint() {
+    if (!Continuations::enabled()) return nullptr;
+
     __ align(CodeEntryAlignment);
     StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
 
     address start = __ pc();
 
-#ifdef ASSERT
-    { // verify that threads correspond
-      Label L;
-      __ get_thread(rscratch1);
-      __ cmp(rthread, rscratch1);
-      __ br(Assembler::EQ, L);
-      __ stop("StubRoutines::cont_jump_from_safepoint: threads must correspond");
-      __ BIND(L);
-    }
-#endif
-
+    __ get_thread(rthread); // we're called directly from C++
     __ reset_last_Java_frame(true); // false would be fine, too, I guess
     __ reinit_heapbase();
 
@@ -6595,7 +6612,7 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw(bool return_barrier, bool exception) {
-    assert (return_barrier || !exception, "must be");
+    assert(return_barrier || !exception, "must be");
 
     address start = __ pc();
 
@@ -6690,6 +6707,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "Cont thaw");
     address start = __ pc();
     generate_cont_thaw(false, false);
@@ -6697,6 +6716,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier() {
+    if (!Continuations::enabled()) return nullptr;
+
     // TODO: will probably need multiple return barriers depending on return type
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
@@ -6707,6 +6728,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier_exception() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
 
@@ -6716,28 +6739,30 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_interpreter_forced_preempt_return() {
-      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-      address start = __ pc();
+    if (!Continuations::enabled()) return nullptr;
 
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
+    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
+    address start = __ pc();
 
-      assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
-      __ leave(); // we're now on the last thawed frame
+    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
 
-      __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
-      __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
-      __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
-      __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
-      // __ reinit_heapbase();
+    assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
+    __ leave(); // we're now on the last thawed frame
 
-      // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
-      __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-      __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
+    __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
+    __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
+    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
+    // __ reinit_heapbase();
 
-      __ ret(lr);
+    // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
+    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
 
-      return start;
-    }
+    __ ret(lr);
+
+    return start;
+  }
 
 #if INCLUDE_JFR
 
@@ -6781,7 +6806,7 @@ RuntimeStub* generate_cont_doYield() {
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
     jfr_prologue(the_pc, _masm, rthread);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 1);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint), 1);
     __ reset_last_Java_frame(true); // no epilogue, not returning anything
     __ leave();
     __ ret(lr);
@@ -6821,7 +6846,7 @@ RuntimeStub* generate_cont_doYield() {
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
     jfr_prologue(the_pc, _masm, rthread);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer), 1);
     jfr_epilogue(_masm, rthread);
     __ leave();
     __ ret(lr);
@@ -6962,7 +6987,7 @@ RuntimeStub* generate_cont_doYield() {
 
       // Register allocation
 
-      RegSetIterator<> regs = (RegSet::range(r0, r26) - r18_tls).begin();
+      RegSetIterator<Register> regs = (RegSet::range(r0, r26) - r18_tls).begin();
       Pa_base = *regs;       // Argument registers
       if (squaring)
         Pb_base = Pa_base;
@@ -7836,7 +7861,8 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
-    StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
+    StubRoutines::_cont_doYield      = StubRoutines::_cont_doYield_stub != nullptr
+                                        ? StubRoutines::_cont_doYield_stub->entry_point() : nullptr;
     StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
     StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
 
@@ -7872,8 +7898,8 @@ RuntimeStub* generate_cont_doYield() {
     // arraycopy stubs used by compilers
     generate_arraycopy_stubs();
 
-    // has negatives stub for large arrays.
-    StubRoutines::aarch64::_has_negatives = generate_has_negatives(StubRoutines::aarch64::_has_negatives_long);
+    // countPositives stub for large arrays.
+    StubRoutines::aarch64::_count_positives = generate_count_positives(StubRoutines::aarch64::_count_positives_long);
 
     // array equals stub for large arrays.
     if (!UseSimpleArrayEquals) {
@@ -8044,9 +8070,9 @@ DEFAULT_ATOMIC_OP(cmpxchg, 8, _seq_cst)
 
 // on exit, sp points to the ContinuationEntry
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
-  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+  assert(ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
   stack_slots += (int)ContinuationEntry::size()/wordSize;
   __ sub(sp, sp, (int)ContinuationEntry::size()); // place Continuation metadata
@@ -8064,15 +8090,17 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation
 //          sp points to ContinuationEntry
+//          c_rarg3 -- isVirtualThread
 void fill_continuation_entry(MacroAssembler* masm) {
 #ifdef ASSERT
   __ movw(rscratch1, 0x1234);
   __ strw(rscratch1, Address(sp, ContinuationEntry::cookie_offset()));
 #endif
 
-  __ str(c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
-  __ str(zr, Address(sp, ContinuationEntry::chunk_offset()));
-  __ strw(zr, Address(sp, ContinuationEntry::argsize_offset()));
+  __ str (c_rarg1, Address(sp, ContinuationEntry::cont_offset()));
+  __ strw(c_rarg3, Address(sp, ContinuationEntry::flags_offset()));
+  __ str (zr,      Address(sp, ContinuationEntry::chunk_offset()));
+  __ strw(zr,      Address(sp, ContinuationEntry::argsize_offset()));
 
   __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));

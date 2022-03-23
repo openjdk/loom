@@ -2877,7 +2877,6 @@ void LIR_Assembler::call(LIR_OpJavaCall* op, relocInfo::relocType rtype) {
          "must be aligned");
   __ call(AddressLiteral(op->addr(), rtype));
   add_call_info(code_offset(), op->info());
-  __ oopmap_metadata(op->info());
   __ post_call_nop();
 }
 
@@ -2885,7 +2884,6 @@ void LIR_Assembler::call(LIR_OpJavaCall* op, relocInfo::relocType rtype) {
 void LIR_Assembler::ic_call(LIR_OpJavaCall* op) {
   __ ic_call(op->addr());
   add_call_info(code_offset(), op->info());
-  __ oopmap_metadata(op->info());
   assert((__ offset() - NativeCall::instruction_size + NativeCall::displacement_offset) % BytesPerWord == 0,
          "must be aligned");
   __ post_call_nop();
@@ -3915,7 +3913,6 @@ void LIR_Assembler::rt_call(LIR_Opr result, address dest, const LIR_OprList* arg
   __ call(RuntimeAddress(dest));
   if (info != NULL) {
     add_call_info_here(info);
-    __ oopmap_metadata(info);
   }
   __ post_call_nop();
 }

@@ -25,17 +25,39 @@
 #ifndef SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
 #define SHARE_JFR_SUPPORT_JFRTHREADID_INLINE_HPP
 
+#include "jfr/support/jfrThreadId.hpp"
+
 #include "classfile/javaClasses.inline.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.inline.hpp"
 
+static constexpr const u2 excluded_bit = 32768;
+static constexpr const u2 epoch_mask = excluded_bit - 1;
+
 class ThreadIdAccess : AllStatic {
  public:
-  static traceid load(oop ref) {
-    return static_cast<traceid>(java_lang_Thread::thread_id_raw(ref));
+  static traceid id(oop ref) {
+    return static_cast<traceid>(java_lang_Thread::thread_id(ref));
   }
-  static void store(oop ref, traceid value) {
-    java_lang_VirtualThread::set_jfr_traceid(ref, static_cast<jlong>(value));
+  static bool is_excluded(oop ref) {
+    return epoch(ref) & excluded_bit;
+  }
+  static void include(oop ref) {
+    assert(is_excluded(ref), "invariant");
+    set_epoch(ref, epoch(ref) ^ excluded_bit);
+  }
+  static void exclude(oop ref) {
+    set_epoch(ref, excluded_bit | epoch(ref));
+  }
+  static u2 epoch(oop ref) {
+    return java_lang_Thread::jfr_epoch(ref);
+  }
+  static void set_epoch(oop ref, u2 epoch) {
+    java_lang_Thread::set_jfr_epoch(ref, epoch);
+  }
+  static u2 current_epoch() {
+    return JfrTraceIdEpoch::epoch_generation();
   }
 };
 

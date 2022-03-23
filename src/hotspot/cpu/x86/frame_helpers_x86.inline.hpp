@@ -31,8 +31,8 @@ bool Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
   address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  assert (f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
-  assert (f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
+  assert(f.raw_pc() == pc, "f.ra_pc: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.raw_pc()), p2i(pc));
+  assert(f.fp() == fp, "f.fp: " INTPTR_FORMAT " actual: " INTPTR_FORMAT, p2i(f.fp()), p2i(fp));
   return f.raw_pc() == pc && f.fp() == fp;
 }
 #endif
@@ -49,11 +49,10 @@ inline address* Interpreted::return_pc_address(const frame& f) {
   return (address*)(f.fp() + frame::return_addr_offset);
 }
 
-template <frame::addressing pointers>
 void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
-  assert (f.is_interpreted_frame(), "");
+  assert(f.is_interpreted_frame(), "");
   intptr_t* la = f.addr_at(frame::interpreter_frame_sender_sp_offset);
-  *la = pointers == frame::addressing::RELATIVE ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
+  *la = f.is_heap_frame() ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
 }
 
 // inline address* Frame::pc_address(const frame& f) {
@@ -75,18 +74,17 @@ inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask)
   // interpreter_frame_initial_sp_offset excludes expression stack slots
   int expression_stack_sz = expression_stack_size(f, mask);
   intptr_t* res = *(intptr_t**)f.addr_at(frame::interpreter_frame_initial_sp_offset) - expression_stack_sz;
-  assert (res == (intptr_t*)f.interpreter_frame_monitor_end() - expression_stack_sz, "");
-  assert (res >= f.unextended_sp(),
+  assert(res == (intptr_t*)f.interpreter_frame_monitor_end() - expression_stack_sz, "");
+  assert(res >= f.unextended_sp(),
     "res: " INTPTR_FORMAT " initial_sp: " INTPTR_FORMAT " last_sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " expression_stack_size: %d",
     p2i(res), p2i(f.addr_at(frame::interpreter_frame_initial_sp_offset)), f.at(frame::interpreter_frame_last_sp_offset), p2i(f.unextended_sp()), expression_stack_sz);
   return res;
   // Not true, but using unextended_sp might work
-  // assert (res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
+  // assert(res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
 }
 
-template <frame::addressing pointers>
 inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
-  return (intptr_t*)f.at<pointers>(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
+  return (intptr_t*)f.at(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
 }
 
 inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {

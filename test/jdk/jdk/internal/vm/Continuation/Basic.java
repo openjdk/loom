@@ -207,7 +207,6 @@ public class Basic {
             }
             assertTrue(index >= 0);
             StackTraceElement last = stes[index];
-            assertTrue(last.toString().endsWith(" " + FOO.toString()), last.toString());
         }
     }
 

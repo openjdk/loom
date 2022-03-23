@@ -1670,7 +1670,7 @@ void JvmtiExport::continuation_yield_cleanup(JavaThread* thread, jint continuati
     return;
   }
 
-  assert (thread == JavaThread::current(), "must be");
+  assert(thread == JavaThread::current(), "must be");
   JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == NULL) {
     return;

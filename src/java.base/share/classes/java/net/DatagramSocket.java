@@ -1366,9 +1366,7 @@ public class DatagramSocket implements java.io.Closeable {
         Throwable cause = e.getCause();
         if (cause instanceof SocketException)
             return (SocketException) cause;
-        SocketException se = new SocketException(e.getMessage());
-        se.initCause(e);
-        return se;
+        return new SocketException(e.getMessage(), e);
     }
 
     /**

@@ -663,6 +663,7 @@ void Method::compute_from_signature(Symbol* sig) {
   // we might as well compute the whole fingerprint.
   Fingerprinter fp(sig, is_static());
   set_size_of_parameters(fp.size_of_parameters());
+  set_num_stack_arg_slots(fp.num_stack_arg_slots());
   constMethod()->set_result_type(fp.return_type());
   constMethod()->set_fingerprint(fp.fingerprint());
 }
@@ -1074,7 +1075,7 @@ void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report,
 
 bool Method::is_always_compilable() const {
   // Generated adapters must be compiled
-  if (is_method_handle_intrinsic() && is_synthetic()) {
+  if (is_special_native_intrinsic() && is_synthetic()) {
     assert(!is_not_c1_compilable(), "sanity check");
     assert(!is_not_c2_compilable(), "sanity check");
     return true;
@@ -1232,8 +1233,6 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // later.  Ditto for mega-morphic itable calls.  If this proves to be a
   // problem we'll make these lazily later.
   (void) make_adapters(h_method, CHECK);
-
-  set_num_stack_arg_slots();
 
   // ONLY USE the h_method now as make_adapter may have blocked
 }
@@ -1771,25 +1770,6 @@ void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_compa
       }
     }
   }
-}
-
-void Method::set_num_stack_arg_slots() {
-  ResourceMark rm;
-  int sizeargs = size_of_parameters();
-  BasicType* sig_bt = NEW_RESOURCE_ARRAY(BasicType, sizeargs);
-  VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
-
-  int sig_index = 0;
-  if (!is_static()) sig_bt[sig_index++] = T_OBJECT; // 'this'
-  for (SignatureStream ss(signature()); !ss.at_return_type(); ss.next()) {
-    BasicType t = ss.type();
-    assert(type2size[t] == 1 || type2size[t] == 2, "size is 1 or 2");
-    sig_bt[sig_index++] = t;
-    if (type2size[t] == 2) sig_bt[sig_index++] = T_VOID;
-  }
-  assert(sig_index == sizeargs, "");
-
-  _num_stack_arg_slots = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
 }
 
 //-----------------------------------------------------------------------------------

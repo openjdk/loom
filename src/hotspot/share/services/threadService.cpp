@@ -573,7 +573,6 @@ StackFrameInfo::StackFrameInfo(javaVFrame* jvf, bool with_lock_info) {
   _bci = jvf->bci();
   _class_holder = OopHandle(_thread_service_storage, _method->method_holder()->klass_holder());
   _locked_monitors = NULL;
-  _cont_scope_name = OopHandle(_thread_service_storage, (jvf->continuation() != NULL) ? jdk_internal_vm_ContinuationScope::name(jdk_internal_vm_Continuation::scope(jvf->continuation())) : (oop)NULL);
   if (with_lock_info) {
     Thread* current_thread = Thread::current();
     ResourceMark rm(current_thread);
@@ -599,7 +598,6 @@ StackFrameInfo::~StackFrameInfo() {
     delete _locked_monitors;
   }
   _class_holder.release(_thread_service_storage);
-  _cont_scope_name.release(_thread_service_storage);
 }
 
 void StackFrameInfo::metadata_do(void f(Metadata*)) {
@@ -614,7 +612,6 @@ void StackFrameInfo::print_on(outputStream* st) const {
     oop o = _locked_monitors->at(i).resolve();
     st->print_cr("\t- locked <" INTPTR_FORMAT "> (a %s)", p2i(o), o->klass()->external_name());
   }
-
 }
 
 // Iterate through monitor cache to find JNI locked monitors
@@ -666,17 +663,20 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHasht
   assert(SafepointSynchronize::is_at_safepoint(), "all threads are stopped");
 
   if (_thread->has_last_Java_frame()) {
-    RegisterMap reg_map(_thread, true, false);
+    RegisterMap reg_map(_thread);
 
     vframe* start_vf = !full && _thread->is_vthread_mounted()
       ? _thread->vthread_carrier_last_java_vframe(&reg_map)
       : _thread->last_java_vframe(&reg_map);
     int count = 0;
     for (vframe* f = start_vf; f; f = f->sender() ) {
-      if (maxDepth >= 0 && count == maxDepth) // Skip frames if more than maxDepth
+      if (maxDepth >= 0 && count == maxDepth) {
+        // Skip frames if more than maxDepth
         break;
-      if (!full && f->is_vthread_entry())
+      }
+      if (!full && f->is_vthread_entry()) {
         break;
+      }
       if (f->is_java_frame()) {
         javaVFrame* jvf = javaVFrame::cast(f);
         add_stack_frame(jvf);
@@ -737,8 +737,7 @@ Handle ThreadStackTrace::allocate_fill_stack_trace_element_array(TRAPS) {
   for (int j = 0; j < _depth; j++) {
     StackFrameInfo* frame = _frames->at(j);
     methodHandle mh(THREAD, frame->method());
-    Handle contScopeNameH(THREAD, frame->cont_scope_name().resolve());
-    oop element = java_lang_StackTraceElement::create(mh, frame->bci(), contScopeNameH, CHECK_NH);
+    oop element = java_lang_StackTraceElement::create(mh, frame->bci(), CHECK_NH);
     backtrace->obj_at_put(j, element);
   }
   return backtrace;
@@ -902,7 +901,7 @@ void ThreadSnapshot::initialize(ThreadsList * t_list, JavaThread* thread) {
   if (thread->is_vthread_mounted() && thread->vthread() != threadObj) { // ThreadSnapshot only captures platform threads
     _thread_status = JavaThreadStatus::IN_OBJECT_WAIT;
     oop vthread = thread->vthread();
-    assert (vthread != NULL, "");
+    assert(vthread != NULL, "");
     blocker_object = vthread;
     blocker_object_owner = vthread;
   } else if (_thread_status == JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER ||

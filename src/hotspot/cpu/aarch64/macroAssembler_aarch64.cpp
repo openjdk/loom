@@ -314,6 +314,7 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
 }
 
 void MacroAssembler::push_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -324,6 +325,7 @@ void MacroAssembler::push_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::pop_cont_fastpath(Register java_thread) {
+  if (!Continuations::enabled()) return;
   Label done;
   ldr(rscratch1, Address(java_thread, JavaThread::cont_fastpath_offset()));
   cmp(sp, rscratch1);
@@ -333,10 +335,12 @@ void MacroAssembler::pop_cont_fastpath(Register java_thread) {
 }
 
 void MacroAssembler::inc_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   incrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
 void MacroAssembler::dec_held_monitor_count(Register java_thread) {
+  if (!Continuations::enabled()) return;
   decrementw(Address(java_thread, JavaThread::held_monitor_count_offset()));
 }
 
@@ -799,6 +803,11 @@ void MacroAssembler::get_vm_result_2(Register metadata_result, Register java_thr
 
 void MacroAssembler::align(int modulus) {
   while (offset() % modulus != 0) nop();
+}
+
+void MacroAssembler::post_call_nop() {
+  relocate(post_call_nop_Relocation::spec());
+  nop();
 }
 
 // these are no-ops overridden by InterpreterMacroAssembler
@@ -2584,7 +2593,7 @@ void MacroAssembler::debug64(char* msg, int64_t pc, int64_t regs[])
   fatal("DEBUG MESSAGE: %s", msg);
 }
 
-RegSet MacroAssembler::call_clobbered_registers() {
+RegSet MacroAssembler::call_clobbered_gp_registers() {
   RegSet regs = RegSet::range(r0, r17) - RegSet::of(rscratch1, rscratch2);
 #ifndef R18_RESERVED
   regs += r18_tls;
@@ -2594,7 +2603,7 @@ RegSet MacroAssembler::call_clobbered_registers() {
 
 void MacroAssembler::push_call_clobbered_registers_except(RegSet exclude) {
   int step = 4 * wordSize;
-  push(call_clobbered_registers() - exclude, sp);
+  push(call_clobbered_gp_registers() - exclude, sp);
   sub(sp, sp, step);
   mov(rscratch1, -step);
   // Push v0-v7, v16-v31.
@@ -2616,7 +2625,7 @@ void MacroAssembler::pop_call_clobbered_registers_except(RegSet exclude) {
 
   reinitialize_ptrue();
 
-  pop(call_clobbered_registers() - exclude, sp);
+  pop(call_clobbered_gp_registers() - exclude, sp);
 }
 
 void MacroAssembler::push_CPU_state(bool save_vectors, bool use_sve,
@@ -4173,7 +4182,8 @@ void MacroAssembler::movoop(Register dst, jobject obj, bool immediate) {
   // nmethod entry barrier necessitate using the constant pool. They have to be
   // ordered with respected to oop accesses.
   // Using immediate literals would necessitate ISBs.
-  if (BarrierSet::barrier_set()->barrier_set_nmethod() != NULL || !immediate) {
+  BarrierSet* bs = BarrierSet::barrier_set();
+  if ((bs->barrier_set_nmethod() != NULL && bs->barrier_set_assembler()->nmethod_code_patching()) || !immediate) {
     address dummy = address(uintptr_t(pc()) & -wordSize); // A nearby aligned address
     ldr_constant(dst, Address(dummy, rspec));
   } else
@@ -4380,16 +4390,17 @@ void MacroAssembler::remove_frame(int framesize) {
 }
 
 
-// This method checks if provided byte array contains byte with highest bit set.
-address MacroAssembler::has_negatives(Register ary1, Register len, Register result) {
+// This method counts leading positive bytes (highest bit not set) in provided byte array
+address MacroAssembler::count_positives(Register ary1, Register len, Register result) {
     // Simple and most common case of aligned small array which is not at the
     // end of memory page is placed here. All other cases are in stub.
     Label LOOP, END, STUB, STUB_LONG, SET_RESULT, DONE;
     const uint64_t UPPER_BIT_MASK=0x8080808080808080;
     assert_different_registers(ary1, len, result);
 
+    mov(result, len);
     cmpw(len, 0);
-    br(LE, SET_RESULT);
+    br(LE, DONE);
     cmpw(len, 4 * wordSize);
     br(GE, STUB_LONG); // size > 32 then go to stub
 
@@ -4408,19 +4419,20 @@ address MacroAssembler::has_negatives(Register ary1, Register len, Register resu
     subs(len, len, wordSize);
     br(GE, LOOP);
     cmpw(len, -wordSize);
-    br(EQ, SET_RESULT);
+    br(EQ, DONE);
 
   BIND(END);
-    ldr(result, Address(ary1));
-    sub(len, zr, len, LSL, 3); // LSL 3 is to get bits from bytes
-    lslv(result, result, len);
-    tst(result, UPPER_BIT_MASK);
-    b(SET_RESULT);
+    ldr(rscratch1, Address(ary1));
+    sub(rscratch2, zr, len, LSL, 3); // LSL 3 is to get bits from bytes
+    lslv(rscratch1, rscratch1, rscratch2);
+    tst(rscratch1, UPPER_BIT_MASK);
+    br(NE, SET_RESULT);
+    b(DONE);
 
   BIND(STUB);
-    RuntimeAddress has_neg = RuntimeAddress(StubRoutines::aarch64::has_negatives());
-    assert(has_neg.target() != NULL, "has_negatives stub has not been generated");
-    address tpc1 = trampoline_call(has_neg);
+    RuntimeAddress count_pos = RuntimeAddress(StubRoutines::aarch64::count_positives());
+    assert(count_pos.target() != NULL, "count_positives stub has not been generated");
+    address tpc1 = trampoline_call(count_pos);
     if (tpc1 == NULL) {
       DEBUG_ONLY(reset_labels(STUB_LONG, SET_RESULT, DONE));
       postcond(pc() == badAddress);
@@ -4429,9 +4441,9 @@ address MacroAssembler::has_negatives(Register ary1, Register len, Register resu
     b(DONE);
 
   BIND(STUB_LONG);
-    RuntimeAddress has_neg_long = RuntimeAddress(StubRoutines::aarch64::has_negatives_long());
-    assert(has_neg_long.target() != NULL, "has_negatives stub has not been generated");
-    address tpc2 = trampoline_call(has_neg_long);
+    RuntimeAddress count_pos_long = RuntimeAddress(StubRoutines::aarch64::count_positives_long());
+    assert(count_pos_long.target() != NULL, "count_positives_long stub has not been generated");
+    address tpc2 = trampoline_call(count_pos_long);
     if (tpc2 == NULL) {
       DEBUG_ONLY(reset_labels(SET_RESULT, DONE));
       postcond(pc() == badAddress);
@@ -4440,7 +4452,9 @@ address MacroAssembler::has_negatives(Register ary1, Register len, Register resu
     b(DONE);
 
   BIND(SET_RESULT);
-    cset(result, NE); // set true or false
+
+    add(len, len, wordSize);
+    sub(result, result, len);
 
   BIND(DONE);
   postcond(pc() != badAddress);

@@ -161,7 +161,7 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
 
   oop new_obj = NULL;
   bool new_obj_is_tenured = false;
-  size_t new_obj_size = o->compact_size();
+  size_t new_obj_size = o->size();
 
   // Find the objects age, MT safe.
   uint age = (test_mark.has_displaced_mark_helper() /* o->has_displaced_mark() */) ?
@@ -243,7 +243,7 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
   assert(new_obj != NULL, "allocation should have succeeded");
 
   // Copy obj
-  o->copy_disjoint_compact(cast_from_oop<HeapWord*>(new_obj), new_obj_size);
+  o->copy_disjoint(cast_from_oop<HeapWord*>(new_obj), new_obj_size);
 
   // Now we have to CAS in the header.
   // Make copy visible to threads reading the forwardee.

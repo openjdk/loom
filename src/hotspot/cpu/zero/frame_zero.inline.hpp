@@ -36,6 +36,7 @@ inline frame::frame() {
   _pc = NULL;
   _cb = NULL;
   _deopt_state = unknown;
+  _on_heap = false;
 }
 
 inline address  frame::sender_pc()           const { ShouldNotCallThis(); return NULL; }
@@ -47,6 +48,7 @@ inline frame::frame(intptr_t* sp) {
 inline frame::frame(ZeroFrame* zf, intptr_t* sp) {
   _zeroframe = zf;
   _sp = sp;
+  _on_heap = false;
   switch (zeroframe()->type()) {
   case ZeroFrame::ENTRY_FRAME:
     _pc = StubRoutines::call_stub_return_pc();
@@ -115,7 +117,6 @@ inline intptr_t* frame::interpreter_frame_mdp_addr() const {
   return NULL; // silence compiler warnings
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return get_interpreterState()->_stack + 1;
 }
@@ -129,7 +130,6 @@ inline int frame::interpreter_frame_monitor_size() {
   return BasicObjectLock::size();
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end - 1;
@@ -183,7 +183,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   Unimplemented();
   return NULL;

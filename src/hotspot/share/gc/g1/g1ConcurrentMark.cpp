@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -814,14 +814,7 @@ G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1Concu
 void G1ConcurrentMark::pre_concurrent_start(GCCause::Cause cause) {
   assert_at_safepoint_on_vm_thread();
 
-  if (CodeCache::is_marking_cycle_active()) {
-    // It's possible that a preceding initiating young GC decided
-    // that there is no need to do any concurrent marking. In that
-    // case, no remark was ever run. Yet the liveness information
-    // was indeed complete. We finish it here.
-    CodeCache::finish_marking_cycle();
-  }
-  CodeCache::start_marking_cycle();
+  G1CollectedHeap::start_codecache_marking_cycle_if_inactive();
 
   G1PreConcurrentStartTask cl(cause, this);
   G1CollectedHeap::heap()->run_batch_task(&cl);

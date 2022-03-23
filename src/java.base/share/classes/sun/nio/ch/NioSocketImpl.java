@@ -899,12 +899,12 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                         || NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal(fd));
                 }
-                if (NativeThread.isKernelThread(reader)
-                        || NativeThread.isKernelThread(writer)) {
+                if (NativeThread.isNativeThread(reader)
+                        || NativeThread.isNativeThread(writer)) {
                     nd.preClose(fd);
-                    if (NativeThread.isKernelThread(reader))
+                    if (NativeThread.isNativeThread(reader))
                         NativeThread.signal(reader);
-                    if (NativeThread.isKernelThread(writer))
+                    if (NativeThread.isNativeThread(writer))
                         NativeThread.signal(writer);
                 }
             }

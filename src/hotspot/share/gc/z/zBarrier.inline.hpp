@@ -330,22 +330,16 @@ inline bool ZBarrier::is_alive_barrier_on_phantom_oop(oop o) {
 // Keep alive barrier
 //
 inline void ZBarrier::keep_alive_barrier_on_weak_oop_field(volatile oop* p) {
-  // This operation is only valid when resurrection is blocked.
-  assert(ZResurrection::is_blocked(), "Invalid phase");
   const oop o = Atomic::load(p);
   barrier<is_good_or_null_fast_path, keep_alive_barrier_on_weak_oop_slow_path>(p, o);
 }
 
 inline void ZBarrier::keep_alive_barrier_on_phantom_oop_field(volatile oop* p) {
-  // This operation is only valid when resurrection is blocked.
-  assert(ZResurrection::is_blocked(), "Invalid phase");
   const oop o = Atomic::load(p);
   barrier<is_good_or_null_fast_path, keep_alive_barrier_on_phantom_oop_slow_path>(p, o);
 }
 
 inline void ZBarrier::keep_alive_barrier_on_phantom_root_oop_field(oop* p) {
-  // This operation is only valid when resurrection is blocked.
-  assert(ZResurrection::is_blocked(), "Invalid phase");
   const oop o = *p;
   root_barrier<is_good_or_null_fast_path, keep_alive_barrier_on_phantom_oop_slow_path>(p, o);
 }

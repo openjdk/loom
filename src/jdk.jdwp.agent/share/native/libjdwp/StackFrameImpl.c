@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -443,13 +443,6 @@ popFrames(PacketInputStream *in, PacketOutputStream *out)
     }
 
     if (threadControl_isDebugThread(thread)) {
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
-    /* "popFrames" is not supported on a vthread. Although JVMTI will produce INVALID_THREAD,
-       we check here and force the error to make it obvious to the reader. */
-    if (isVThread(thread)) {
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }

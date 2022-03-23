@@ -92,18 +92,15 @@ void G1FullGCCompactionPoint::switch_region() {
 void G1FullGCCompactionPoint::forward(oop object, size_t size) {
   assert(_current_region != NULL, "Must have been initialized");
 
-  size_t csize = object->compact_size((int)size); // TODO LOOM TRICKY; CONSIDER
-
   // Ensure the object fit in the current region.
-  while (!object_will_fit(csize)) {
+  while (!object_will_fit(size)) {
     switch_region();
   }
 
-  // Store a forwarding pointer if the object should be moved or compacted in place.
-  if (cast_from_oop<HeapWord*>(object) != _compaction_top || csize < size) {
+  // Store a forwarding pointer if the object should be moved.
+  if (cast_from_oop<HeapWord*>(object) != _compaction_top) {
     object->forward_to(cast_to_oop(_compaction_top));
     assert(object->is_forwarded(), "must be forwarded");
-    size = csize;
   } else {
     assert(!object->is_forwarded(), "must not be forwarded");
   }

@@ -123,7 +123,4 @@
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }
 
-  template <addressing pointers = addressing::ABSOLUTE>
-  inline intptr_t* interpreter_frame_last_sp() const;
-
 #endif // CPU_ARM_FRAME_ARM_HPP

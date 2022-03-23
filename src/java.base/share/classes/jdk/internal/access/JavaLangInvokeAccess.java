@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,7 +32,6 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -44,11 +43,6 @@ public interface JavaLangInvokeAccess {
      * Create a new MemberName instance. Used by {@code StackFrameInfo}.
      */
     Object newMemberName();
-
-    /**
-     * Create a new MemberName instance. Used by {@code StackFrameInfo}.
-     */
-    Object newMemberName(Method method);
 
     /**
      * Returns the name for the given MemberName. Used by {@code StackFrameInfo}.

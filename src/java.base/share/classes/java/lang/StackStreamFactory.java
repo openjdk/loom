@@ -823,7 +823,8 @@ final class StackStreamFactory {
 
             @Override
             final boolean filter(int index) {
-                return stackFrames[index].declaringClass() == Continuation.class && "yield0".equals(stackFrames[index].getMethodName());
+                return stackFrames[index].declaringClass() == Continuation.class
+                        && "yield0".equals(stackFrames[index].getMethodName());
             }
         }
 

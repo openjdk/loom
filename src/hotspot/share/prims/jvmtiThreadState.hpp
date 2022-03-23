@@ -158,6 +158,7 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   bool              _is_in_VTMT; // saved JavaThread.is_in_VTMT()
   bool              _is_virtual; // state belongs to a virtual thread
   bool              _hide_single_stepping;
+  bool              _pending_interp_only_mode;
   bool              _pending_step_for_popframe;
   bool              _pending_step_for_earlyret;
   int               _hide_level;
@@ -231,9 +232,12 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void unbind_from(JavaThread* thread);
   void bind_to(JavaThread* thread);
 
+  bool is_pending_interp_only_mode() { return _pending_interp_only_mode; }
+  void set_pending_interp_only_mode(bool val) { _pending_interp_only_mode = val; }
+
   // Used by the interpreter for fullspeed debugging support
   bool is_interp_only_mode()                {
-     return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
+    return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
   }
   void enter_interp_only_mode();
   void leave_interp_only_mode();

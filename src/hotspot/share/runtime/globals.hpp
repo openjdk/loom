@@ -2001,6 +2001,9 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
+  product(bool, LoomVM, true,                                               \
+          "Enable Loom Mechanisms in the VM")                               \
+                                                                            \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
                                                                             \
@@ -2012,9 +2015,6 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   develop(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
-                                                                            \
-  product(bool, TrimContinuationChunksInGC, false,                          \
-         "Trim stack chunks when copying objects in GC (PREVIEW)")          \
                                                                             \
   product(bool, UseChunkBitmaps, false,                                     \
          "Generate oop bitmaps for continuation chunks (PREVIEW)")          \

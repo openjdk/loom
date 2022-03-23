@@ -41,6 +41,7 @@
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/stringpool/jfrStringPool.hpp"
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "logging/log.hpp"
@@ -197,6 +198,8 @@ bool JfrRecorder::on_create_vm_2() {
     return true;
   }
   JavaThread* const thread = JavaThread::current();
+  JfrThreadLocal::assign_thread_id(thread, thread->jfr_thread_local());
+
   if (!JfrOptionSet::initialize(thread)) {
     return false;
   }

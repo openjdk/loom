@@ -29,11 +29,10 @@ import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import jdk.internal.misc.VM;
 
 /**
@@ -301,7 +300,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * Tests if this thread group is either the thread group
      * argument or one of its ancestor thread groups.
      *
-     * @param   g   a thread group.
+     * @param   g   a thread group, can be {@code null}
      * @return  {@code true} if this thread group is the thread group
      *          argument or one of its ancestor thread groups;
      *          {@code false} otherwise.
@@ -615,9 +614,14 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      * output. This method is useful only for debugging.
      */
     public void list() {
-        Map<ThreadGroup, List<Thread>> map = Stream.of(Thread.getAllThreads())
-                .filter(t -> parentOf(t.getThreadGroup()))
-                .collect(Collectors.groupingBy(Thread::getThreadGroup));
+        Map<ThreadGroup, List<Thread>> map = new HashMap<>();
+        for (Thread thread : Thread.getAllThreads()) {
+            ThreadGroup group = thread.getThreadGroup();
+            // group is null when thread terminates
+            if (group != null && parentOf(group)) {
+                map.computeIfAbsent(group, k -> new ArrayList<>()).add(thread);
+            }
+        }
         list(map, System.out, 0);
     }
 

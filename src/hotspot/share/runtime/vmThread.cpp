@@ -264,7 +264,7 @@ static void post_vm_operation_event(EventExecuteVMOperation* event, VM_Operation
   event->set_operation(op->type());
   event->set_safepoint(evaluate_at_safepoint);
   event->set_blocking(true);
-  event->set_caller(JFR_VM_THREAD_ID(op->calling_thread()));
+  event->set_caller(JFR_THREAD_ID(op->calling_thread()));
   event->set_safepointId(evaluate_at_safepoint ? SafepointSynchronize::safepoint_id() : 0);
   event->commit();
 }

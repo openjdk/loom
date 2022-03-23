@@ -37,7 +37,7 @@ private:
   void deoptimize(nmethod* nm, address* return_addr_ptr);
 
 public:
-  BarrierSetNMethod() : _current_phase(1) { }
+  BarrierSetNMethod() : _current_phase(1) {}
   bool supports_entry_barrier(nmethod* nm);
 
   virtual bool nmethod_entry_barrier(nmethod* nm);
