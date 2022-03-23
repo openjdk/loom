@@ -27,7 +27,6 @@
 
 #include "oops/cpCache.hpp"
 
-#include "code/codeCache.hpp"
 #include "oops/oopHandle.inline.hpp"
 #include "runtime/atomic.hpp"
 
@@ -90,9 +89,9 @@ inline ConstantPoolCache::ConstantPoolCache(int length,
                                             const intStack& invokedynamic_inverse_index_map,
                                             const intStack& invokedynamic_references_map) :
                                                   _length(length),
-                                                  _constant_pool(NULL) {
+                                                  _constant_pool(NULL),
+                                                  _marking_cycle(0) {
   CDS_JAVA_HEAP_ONLY(_archived_references_index = -1;)
-  _marking_cycle = CodeCache::marking_cycle();
   initialize(inverse_index_map, invokedynamic_inverse_index_map,
              invokedynamic_references_map);
   for (int i = 0; i < length; i++) {
