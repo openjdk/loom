@@ -168,7 +168,7 @@ runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
 serviceability/tmtools/jstack/DaemonThreadTest.java
-serviceability/dcmd/thread/JavaThreadDumpTest.java
+serviceability/dcmd/thread/ThreadDumpToFileTest.java
 serviceability/dcmd/thread/PrintTest.java
 serviceability/dcmd/thread/PrintConcurrentLocksTest.java
 
