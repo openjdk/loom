@@ -162,7 +162,7 @@ class MyThread extends Thread {
         // Note vthreads need a short sleep because they will never receive the kill,
         // and therefore sleep the full time, resulting in a test timeout if too long.
         try {
-            Thread.currentThread().sleep(kill001a.vthreadMode ? 1000 : kill001a.waitTime);
+            Thread.currentThread().sleep(kill001a.vthreadMode ? 20000 : kill001a.waitTime);
         } catch (InterruptedException e) {
             kill001a.log.display(ThreadInterrupted);
             e.printStackTrace(kill001a.log.getOutStream());
