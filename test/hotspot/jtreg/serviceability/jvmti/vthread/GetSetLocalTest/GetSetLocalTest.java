@@ -24,10 +24,12 @@
 /**
  * @test
  * @summary Verifies JVMTI GetLocalXXX/SetLocalXXX support for virtual threads.
+ * @library /test/lib
  * @compile --enable-preview -source ${jdk.version} GetSetLocalTest.java
  * @run main/othervm/native --enable-preview -agentlib:GetSetLocalTest GetSetLocalTest
  */
 
+import jdk.test.lib.Asserts;
 import java.util.concurrent.*;
 
 public class GetSetLocalTest {
@@ -61,7 +63,14 @@ public class GetSetLocalTest {
     static final Runnable CONSUMER = () -> {
         try {
             for (int i = 0; i < MSG_COUNT && !completed(); i++) {
-                String s = QUEUE.take();
+                String s = QUEUE.poll(100, TimeUnit.MILLISECONDS);
+
+                // Avoid scenario when PRODUCER may hang forever. It can poll queue before
+                // CONSUMER checks for completed() and stops putting new elements.
+                if (s == null) { // waited for 100 milliseconds
+                  Asserts.assertTrue(completed(), "expect native agent to complete its work");
+                  break;
+                }
             }
         } catch (InterruptedException e) { }
     };
