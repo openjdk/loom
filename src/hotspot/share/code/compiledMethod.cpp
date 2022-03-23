@@ -635,10 +635,12 @@ void CompiledMethod::cleanup_inline_caches(bool clean_all) {
     // Call this nmethod entry barrier from the sweeper.
     run_nmethod_entry_barrier();
     if (!clean_all) {
+      MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
       CodeCache::Sweep::end();
     }
     InlineCacheBuffer::refill_ic_stubs();
     if (!clean_all) {
+      MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
       CodeCache::Sweep::begin();
     }
   }
