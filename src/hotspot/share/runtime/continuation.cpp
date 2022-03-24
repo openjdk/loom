@@ -181,11 +181,11 @@ NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKl
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
+static void print_frames(JavaThread* thread, outputStream* st = tty);
 #endif
 
 #ifndef PRODUCT
 static void print_frame_layout(const frame& f, outputStream* st = tty);
-static void print_frames(JavaThread* thread, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
 #endif
 
@@ -3105,6 +3105,30 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
   }
   return true;
 }
+
+static void print_frames(JavaThread* thread, outputStream* st) {
+  st->print_cr("------- frames ---------");
+  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
+
+  RegisterMap map(thread, true, true, false);
+  map.set_include_argument_oops(false);
+
+  if (false) {
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.print_on(st);
+  } else {
+    map.set_skip_missing(true);
+    ResetNoHandleMark rnhm;
+    ResourceMark rm;
+    HandleMark hm(Thread::current());
+    FrameValues values;
+
+    int i = 0;
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.describe(values, i++, &map);
+    values.print_on(thread, st);
+  }
+
+  st->print_cr("======= end frames =========");
+}
 #endif
 
 #include CPU_HEADER_INLINE(continuation)
@@ -3187,32 +3211,6 @@ static void print_frame_layout(const frame& f, outputStream* st) {
   frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
   const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
-}
-
-static void print_frames(JavaThread* thread, outputStream* st) {
-  st->print_cr("------- frames ---------");
-  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
-
-  RegisterMap map(thread, true, true, false);
-  map.set_include_argument_oops(false);
-
-  if (false) {
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
-      f.print_on(st);
-    }
-  } else {
-    map.set_skip_missing(true);
-    ResetNoHandleMark rnhm;
-    ResourceMark rm;
-    HandleMark hm(Thread::current());
-    FrameValues values;
-
-    int i = 0;
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.describe(values, i++, &map);
-    values.print_on(thread, st);
-  }
-
-  st->print_cr("======= end frames =========");
 }
 #endif
 
