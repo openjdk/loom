@@ -452,7 +452,7 @@ inline void ContMirror::write() {
 
 inline void ContMirror::post_safepoint(Handle conth) {
   _cont = conth(); // reload oop
-  if (_tail != (oop)nullptr) {
+  if (_tail != nullptr) {
     _tail = jdk_internal_vm_Continuation::tail(_cont);
   }
 }
@@ -502,12 +502,12 @@ inline bool ContMirror::is_entry_frame(const frame& f) {
 
 bool ContMirror::chunk_invariant(outputStream* st) {
   // only the topmost chunk can be empty
-  if (_tail == (oop)nullptr) {
+  if (_tail == nullptr) {
     return true;
   }
 
   int i = 1;
-  for (stackChunkOop chunk = _tail->parent(); chunk != (oop)nullptr; chunk = chunk->parent()) {
+  for (stackChunkOop chunk = _tail->parent(); chunk != nullptr; chunk = chunk->parent()) {
     if (chunk->is_empty()) {
       assert(chunk != _tail, "");
       st->print_cr("i: %d", i);
@@ -524,7 +524,7 @@ bool ContMirror::chunk_invariant(outputStream* st) {
 static int num_java_frames(ContMirror& cont) {
   ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
   int count = 0;
-  for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
+  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
     count += chunk->num_java_frames();
   }
   return count;
@@ -666,7 +666,7 @@ const ContinuationEntry* Continuation::last_continuation(const JavaThread* threa
 }
 
 ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThread* thread, oop cont) {
-  if (thread == nullptr || cont == (oop)nullptr) {
+  if (thread == nullptr || cont == nullptr) {
     return nullptr;
   }
 
@@ -969,7 +969,7 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
 #ifdef ASSERT
 NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
-  assert(contOop != (oop)nullptr, "");
+  assert(contOop != nullptr, "");
   assert(oopDesc::is_oop(contOop), "");
   ContMirror cont(contOop);
 
@@ -1007,7 +1007,7 @@ void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
   st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d",
     contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
   st->print_cr("CHUNKS:");
-  for (stackChunkOop chunk = cont.tail(); chunk != (oop)nullptr; chunk = chunk->parent()) {
+  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
     st->print("* ");
     chunk->print_on(true, st);
   }
@@ -1564,7 +1564,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     // overlap = 0;
 
     chunk = allocate_chunk_slow(_size);
-    if (chunk == (oop)nullptr) {
+    if (chunk == nullptr) {
       return freeze_exception;
     }
 
@@ -1911,14 +1911,14 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
 
   stackChunkOop chunk0 = _cont.tail();
-  if (chunk0 != (oop)nullptr && chunk0->is_empty()) {
+  if (chunk0 !=nullptr && chunk0->is_empty()) {
     chunk0 = chunk0->parent();
-    assert(chunk0 == (oop)nullptr || !chunk0->is_empty(), "");
+    assert(chunk0 == nullptr || !chunk0->is_empty(), "");
   }
   // fields are uninitialized
   chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
   chunk->set_cont_raw<typename ConfigT::OopT>(_cont.mirror());
-  assert(chunk->parent() == (oop)nullptr || chunk->parent()->is_stackChunk(), "");
+  assert(chunk->parent() == nullptr || chunk->parent()->is_stackChunk(), "");
 
   if (start != nullptr) {
     assert(!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
@@ -3049,7 +3049,7 @@ public:
 
   virtual void do_oop(oop* p) {
     oop o = *p;
-    if (o == (oop)nullptr || is_good_oop(o)) {
+    if (o == nullptr || is_good_oop(o)) {
       return;
     }
     _p = (intptr_t*)p;
@@ -3057,7 +3057,7 @@ public:
   }
   virtual void do_oop(narrowOop* p) {
     oop o = RawAccess<>::oop_load(p);
-    if (o == (oop)nullptr || is_good_oop(o)) {
+    if (o == nullptr || is_good_oop(o)) {
       return;
     }
     _p = (intptr_t*)p;

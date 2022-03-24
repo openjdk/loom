@@ -124,7 +124,7 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    if (base == (oop)nullptr) {
+    if (base == nullptr) {
       assert(*derived_loc == derived_pointer(0), "");
       return;
     }
@@ -169,7 +169,7 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load(base_loc);
-    if (base != (oop)nullptr) {
+    if (base != nullptr) {
       assert(!CompressedOops::is_base(base), "");
       ZGC_ONLY(assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
 
@@ -856,7 +856,7 @@ public:
 }
 
 void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, outputStream* st) {
-  if (c == (oop)nullptr) {
+  if (c == nullptr) {
     st->print_cr("CHUNK NULL");
     return;
   }
