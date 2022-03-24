@@ -701,6 +701,7 @@ bool Continuation::is_cont_barrier_frame(const frame& f) {
 }
 
 bool Continuation::is_return_barrier_entry(const address pc) {
+  if (!Continuations::enabled()) return false;
   return pc == StubRoutines::cont_returnBarrier();
 }
 
