@@ -294,8 +294,6 @@ public:
 };
 
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  assert(chunk->is_stackChunk(), "");
-
   OopOopIterateStackClosure frame_closure(chunk, closure, mr);
   iterate_stack(chunk, &frame_closure);
 
@@ -693,7 +691,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
 
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
 
-  assert(chunk->is_stackChunk(), "");
   assert(chunk->stack_size() >= 0, "");
   assert(chunk->argsize() >= 0, "");
   assert(!chunk->has_bitmap() || chunk->is_gc_mode(), "");
@@ -863,8 +860,6 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
     st->print_cr("CHUNK NULL");
     return;
   }
-  assert(c->is_stackChunk(), "");
-
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
     p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());

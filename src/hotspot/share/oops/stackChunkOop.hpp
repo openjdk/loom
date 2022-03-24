@@ -52,8 +52,8 @@ private:
 public:
   static inline stackChunkOop cast(oop obj);
 
-  inline stackChunkOopDesc* parent() const;
-  inline void set_parent(stackChunkOopDesc* value);
+  inline stackChunkOop parent() const;
+  inline void set_parent(stackChunkOop value);
   template<typename P>
   inline bool is_parent_null() const;
   template<typename P>

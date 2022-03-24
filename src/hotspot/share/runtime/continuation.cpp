@@ -505,7 +505,7 @@ bool ContMirror::chunk_invariant(outputStream* st) {
   if (_tail == (oop)nullptr) {
     return true;
   }
-  assert(_tail->is_stackChunk(), "");
+
   int i = 1;
   for (stackChunkOop chunk = _tail->parent(); chunk != (oop)nullptr; chunk = chunk->parent()) {
     if (chunk->is_empty()) {
@@ -1285,7 +1285,6 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   }
 
   assert(chunk != nullptr, "");
-  assert(chunk->is_stackChunk(), "");
   assert(!chunk->has_mixed_frames(), "");
   assert(!chunk->is_gc_mode(), "");
   assert(!chunk->has_bitmap(), "");
@@ -2531,7 +2530,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   LogTarget(Trace, jvmcont) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
-    ls.print_cr("thaw slow return_barrier: %d " INTPTR_FORMAT, return_barrier, p2i((stackChunkOopDesc*)chunk));
+    ls.print_cr("thaw slow return_barrier: %d " INTPTR_FORMAT, return_barrier, p2i(chunk));
     chunk->print_on(true, &ls);
   }
 
