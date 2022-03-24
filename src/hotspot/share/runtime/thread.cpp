@@ -4116,3 +4116,11 @@ void JavaThread::vm_exit_on_osthread_failure(JavaThread* thread) {
                                   os::native_thread_creation_failed_msg());
   }
 }
+
+bool JavaThread::in_stack_reserved_zone(address a) const {
+  if (is_vthread_mounted()) {
+    // vthreads don't currently support the reserved zone
+    return false;
+  }
+  return stack_overflow_state()->in_stack_reserved_zone(a);
+}

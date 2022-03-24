@@ -1079,6 +1079,7 @@ private:
 #endif // ASSERT
 
   StackOverflow* stack_overflow_state() { return &_stack_overflow_state; }
+  const StackOverflow* stack_overflow_state() const { return &_stack_overflow_state; }
 
   //JNI functiontable getter/setter for JVMTI jni function table interception API.
   void set_jni_functions(struct JNINativeInterface_* functionTable) {
@@ -1214,6 +1215,8 @@ private:
 
   enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
   inline CarrierOrVirtual which_stack(address adr) const;
+
+  bool in_stack_reserved_zone(address a) const;
 
  private:
   DEBUG_ONLY(void verify_frame_info();)
