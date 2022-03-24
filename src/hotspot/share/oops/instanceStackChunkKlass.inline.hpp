@@ -220,7 +220,7 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
     assert (!f.is_done(), "");
     assert (f.is_compiled(), "");
 
-    should_continue = closure->template do_frame<frame_kind>((const StackChunkFrameStream<frame_kind>&)f, &full_map);
+    should_continue = closure->do_frame(f, &full_map);
     f.next(map);
     f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
   }
@@ -231,7 +231,7 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
       // in slow mode we might freeze deoptimized frames
       f.handle_deopted();
     }
-    should_continue = closure->template do_frame<frame_kind>((const StackChunkFrameStream<frame_kind>&)f, map);
+    should_continue = closure->do_frame(f, map);
   }
 }
 
