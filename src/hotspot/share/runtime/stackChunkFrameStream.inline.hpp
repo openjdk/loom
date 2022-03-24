@@ -72,7 +72,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
   DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
-  // assert (!is_empty(), ""); -- allowed to be empty
+  // assert(!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
 

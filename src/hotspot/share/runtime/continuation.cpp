@@ -1303,7 +1303,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   assert(chunk_start_sp >= cont_size, "");
 
   const int chunk_new_sp = chunk_start_sp - cont_size; // the chunk's new sp, after freeze
-  assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == is_chunk_available_size, "");
+  assert(!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == is_chunk_available_size, "");
 
   intptr_t* chunk_top = chunk->start_address() + chunk_new_sp;
   assert(empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");

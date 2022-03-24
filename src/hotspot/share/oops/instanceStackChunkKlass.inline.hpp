@@ -65,7 +65,7 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   static const size_t mask = BitsPerWord - 1;
   int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
   size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "");
+  assert(size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "");
   return res;
 }
 
@@ -206,7 +206,7 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
 template <chunk_frames frame_kind, class StackChunkFrameClosureType>
 inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure) {
   const SmallRegisterMap* map = SmallRegisterMap::instance;
-  assert (!map->in_cont(), "");
+  assert(!map->in_cont(), "");
 
   StackChunkFrameStream<frame_kind> f(obj);
   bool should_continue = true;
@@ -217,14 +217,14 @@ inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunk
 
     f.next(&full_map);
 
-    assert (!f.is_done(), "");
-    assert (f.is_compiled(), "");
+    assert(!f.is_done(), "");
+    assert(f.is_compiled(), "");
 
     should_continue = closure->do_frame(f, &full_map);
     f.next(map);
     f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
   }
-  assert (!f.is_stub(), "");
+  assert(!f.is_stub(), "");
 
   for(; should_continue && !f.is_done(); f.next(map)) {
     if (frame_kind == chunk_frames::MIXED) {
