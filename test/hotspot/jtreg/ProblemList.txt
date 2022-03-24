@@ -178,7 +178,9 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom specific
 
-serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	          8264699 generic-all
+runtime/Thread/StopAtExit.java                                               8283610 generic-all
+
+serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	     8264699 generic-all
 
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
