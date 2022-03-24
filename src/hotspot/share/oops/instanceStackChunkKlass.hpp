@@ -122,7 +122,7 @@ public:
 
   // Casting from Klass*
   static InstanceStackChunkKlass* cast(Klass* k) {
-    assert(InstanceKlass::cast(k)->is_stack_chunk_instance_klass(), "");
+    assert(k->is_stack_chunk_instance_klass(), "cast to InstanceStackChunkKlass");
     return static_cast<InstanceStackChunkKlass*>(k);
   }
 
@@ -139,9 +139,6 @@ public:
 
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;
-
-  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size) override;
-  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size) override;
 
   static void serialize_offsets(class SerializeClosure* f) NOT_CDS_RETURN;
 

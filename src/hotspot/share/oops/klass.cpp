@@ -49,7 +49,6 @@
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/handles.inline.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/stack.inline.hpp"
@@ -709,14 +708,6 @@ const char* Klass::signature_name() const {
     return result;
   }
   return name()->as_C_string();
-}
-
-void Klass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) {
-  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
-}
-
-void Klass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) {
-  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
 }
 
 const char* Klass::external_kind() const {

@@ -181,11 +181,11 @@ NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKl
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
+static void print_frames(JavaThread* thread, outputStream* st = tty);
 #endif
 
 #ifndef PRODUCT
 static void print_frame_layout(const frame& f, outputStream* st = tty);
-static void print_frames(JavaThread* thread, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
 #endif
 
@@ -1057,9 +1057,7 @@ private:
   inline freeze_result recurse_freeze_java_frame(const frame& f, frame& caller, int fsize, int argsize);
   inline void before_freeze_java_frame(const frame& f, const frame& caller, int fsize, int argsize, bool bottom);
   inline void after_freeze_java_frame(const frame& hf, bool bottom);
-  template<typename FKind> // the callee's type
   freeze_result finalize_freeze(const frame& callee, frame& caller, int argsize);
-  template <typename FKind>
   void patch(const frame& f, frame& hf, const frame& caller, bool bottom);
   NOINLINE freeze_result recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted);
   freeze_result recurse_freeze_compiled_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted);
@@ -1068,10 +1066,11 @@ private:
 
   inline bool stack_overflow();
 
+  static frame sender(const frame& f) { return f.is_interpreted_frame() ? sender<Interpreted>(f): sender<NonInterpretedUnknown>(f); }
   template<typename FKind> static inline frame sender(const frame& f);
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
   inline void set_top_frame_metadata_pd(const frame& hf);
-  template <typename FKind> inline void patch_pd(frame& callee, const frame& caller);
+  inline void patch_pd(frame& callee, const frame& caller);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 protected:
@@ -1463,7 +1462,7 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
   NOT_PRODUCT(_frames++;)
 
   if (FKind::frame_bottom(f) >= _bottom_address - 1) { // sometimes there's space after enterSpecial
-    return finalize_freeze<FKind>(f, caller, argsize); // recursion end
+    return finalize_freeze(f, caller, argsize); // recursion end
   } else {
     frame senderf = sender<FKind>(f);
     assert(FKind::interpreted || senderf.sp() == senderf.unextended_sp(), "");
@@ -1497,9 +1496,8 @@ inline void FreezeBase::after_freeze_java_frame(const frame& hf, bool bottom) {
   }
 }
 
-template<typename FKind> // the callee's type
 freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, int argsize) {
-  assert(FKind::interpreted || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
+  assert(callee.is_interpreted_frame() || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
   log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
     p2i(_bottom_address), _frames, _size << LogBytesPerWord, argsize);
 
@@ -1527,7 +1525,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
         StackChunkFrameStream<chunk_frames::MIXED> last(chunk);
         unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
       }
-      if (FKind::interpreted == top_interpreted) {
+      if (callee.is_interpreted_frame() == top_interpreted) {
         overlap = argsize;
       }
     }
@@ -1624,37 +1622,33 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
   assert(!empty || Continuation::is_continuation_entry_frame(callee, nullptr), "");
 
-  frame entry = sender<FKind>(callee);
+  frame entry = sender(callee);
 
   assert(Continuation::is_return_barrier_entry(entry.pc()) || Continuation::is_continuation_enterSpecial(entry), "");
-  assert(FKind::interpreted || entry.sp() == entry.unextended_sp(), "");
+  assert(callee.is_interpreted_frame() || entry.sp() == entry.unextended_sp(), "");
 #endif
 
   return freeze_ok_bottom;
 }
 
-template <typename FKind>
 void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bottom) {
-  assert(FKind::is_instance(f), "");
-
   if (bottom) {
     address last_pc = caller.pc();
     assert((last_pc == nullptr) == _cont.tail()->is_empty(), "");
-    FKind::patch_pc(caller, last_pc);
+    Frame::patch_pc(caller, last_pc);
   } else {
     assert(!caller.is_empty(), "");
   }
 
-  patch_pd<FKind>(hf, caller);
+  patch_pd(hf, caller);
 
-  if (FKind::interpreted) {
+  if (f.is_interpreted_frame()) {
     assert(hf.is_heap_frame(), "should be");
     Interpreted::patch_sender_sp(hf, caller.unextended_sp());
   }
 
 #ifdef ASSERT
-  if (!FKind::interpreted && !FKind::stub) {
-    assert(hf.get_cb()->is_compiled(), "");
+  if (hf.is_compiled_frame()) {
     if (f.is_deoptimized_frame()) { // TODO DEOPT: long term solution: unroll on freeze and patch pc
       log_develop_trace(jvmcont)("Freezing deoptimized frame");
       assert(f.cb()->as_compiled_method()->is_deopt_pc(f.raw_pc()), "");
@@ -1720,7 +1714,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 
   relativize_interpreted_frame_metadata(f, hf);
 
-  patch<Interpreted>(f, hf, caller, bottom);
+  patch(f, hf, caller, bottom);
 
   CONT_JFR_ONLY(_cont.record_interpreted_frame();)
   DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
@@ -1762,7 +1756,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
     _align_size += ContinuationHelper::align_wiggle; // See Thaw::align
   }
 
-  patch<Compiled>(f, hf, caller, bottom);
+  patch(f, hf, caller, bottom);
 
   assert(bottom || Interpreter::contains(Compiled::real_pc(caller)) == caller.is_interpreted_frame(), "");
 
@@ -2318,14 +2312,11 @@ protected:
 
 private:
   void thaw(const frame& hf, frame& caller, int num_frames, bool top);
-  template<typename FKind>
-  bool recurse_thaw_java_frame(frame& caller, int num_frames);
-  template<typename FKind>
+  template<typename FKind> bool recurse_thaw_java_frame(frame& caller, int num_frames);
   void finalize_thaw(frame& entry, int argsize);
 
   inline void before_thaw_java_frame(const frame& hf, const frame& caller, bool bottom, int num_frame);
   inline void after_thaw_java_frame(const frame& f, bool bottom);
-  template<typename FKind>
   inline void patch(frame& f, const frame& caller, bool bottom);
   void clear_bitmap_bits(intptr_t* start, int range);
 
@@ -2337,7 +2328,7 @@ private:
   void push_return_frame(frame& f);
   inline frame new_entry_frame();
   template<typename FKind> frame new_frame(const frame& hf, frame& caller, bool bottom);
-  template<typename FKind> inline void patch_pd(frame& f, const frame& sender);
+  inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom);
 
   intptr_t* push_interpreter_return_frame(intptr_t* sp);
@@ -2627,7 +2618,7 @@ bool ThawBase::recurse_thaw_java_frame(frame& caller, int num_frames) {
   }
 
   if (num_frames == 1 || _stream.is_done()) { // end recursion
-    finalize_thaw<FKind>(caller, argsize);
+    finalize_thaw(caller, FKind::interpreted ? 0 : argsize);
     return true; // bottom
   } else { // recurse
     thaw(_stream.to_frame(), caller, num_frames - 1, false);
@@ -2635,7 +2626,6 @@ bool ThawBase::recurse_thaw_java_frame(frame& caller, int num_frames) {
   }
 }
 
-template<typename FKind>
 void ThawBase::finalize_thaw(frame& entry, int argsize) {
   stackChunkOop chunk = _cont.tail();
 
@@ -2654,7 +2644,7 @@ void ThawBase::finalize_thaw(frame& entry, int argsize) {
   int delta = _stream.unextended_sp() - _top_unextended_sp;
   chunk->set_max_size(chunk->max_size() - delta);
 
-  _cont.set_argsize(FKind::interpreted ? 0 : argsize);
+  _cont.set_argsize(argsize);
   entry = new_entry_frame();
 
   assert(entry.sp() == _cont.entrySP(), "");
@@ -2682,16 +2672,15 @@ inline void ThawBase::after_thaw_java_frame(const frame& f, bool bottom) {
   }
 }
 
-template<typename FKind>
 inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   assert(!bottom || caller.fp() == _cont.entryFP(), "");
   if (bottom) {
-    FKind::patch_pc(caller, _cont.is_empty() ? caller.raw_pc() : StubRoutines::cont_returnBarrier());
+    Frame::patch_pc(caller, _cont.is_empty() ? caller.raw_pc() : StubRoutines::cont_returnBarrier());
   }
 
-  patch_pd<FKind>(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
+  patch_pd(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
 
-  if (FKind::interpreted) {
+  if (f.is_interpreted_frame()) {
     Interpreted::patch_sender_sp(f, caller.unextended_sp());
   }
 
@@ -2743,7 +2732,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
   derelativize_interpreted_frame_metadata(hf, f);
-  patch<Interpreted>(f, caller, bottom);
+  patch(f, caller, bottom);
 
 #ifdef ASSERT
   LogTarget(Trace, jvmcont) lt;
@@ -2807,7 +2796,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   copy_from_chunk(from, to, sz);
 
-  patch<Compiled>(f, caller, bottom);
+  patch(f, caller, bottom);
 
   if (f.cb()->is_nmethod()) {
     f.cb()->as_nmethod()->run_nmethod_entry_barrier();
@@ -3104,6 +3093,30 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
   }
   return true;
 }
+
+static void print_frames(JavaThread* thread, outputStream* st) {
+  st->print_cr("------- frames ---------");
+  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
+
+  RegisterMap map(thread, true, true, false);
+  map.set_include_argument_oops(false);
+
+  if (false) {
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.print_on(st);
+  } else {
+    map.set_skip_missing(true);
+    ResetNoHandleMark rnhm;
+    ResourceMark rm;
+    HandleMark hm(Thread::current());
+    FrameValues values;
+
+    int i = 0;
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.describe(values, i++, &map);
+    values.print_on(thread, st);
+  }
+
+  st->print_cr("======= end frames =========");
+}
 #endif
 
 #include CPU_HEADER_INLINE(continuation)
@@ -3186,32 +3199,6 @@ static void print_frame_layout(const frame& f, outputStream* st) {
   frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
   const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
-}
-
-static void print_frames(JavaThread* thread, outputStream* st) {
-  st->print_cr("------- frames ---------");
-  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
-
-  RegisterMap map(thread, true, true, false);
-  map.set_include_argument_oops(false);
-
-  if (false) {
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
-      f.print_on(st);
-    }
-  } else {
-    map.set_skip_missing(true);
-    ResetNoHandleMark rnhm;
-    ResourceMark rm;
-    HandleMark hm(Thread::current());
-    FrameValues values;
-
-    int i = 0;
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.describe(values, i++, &map);
-    values.print_on(thread, st);
-  }
-
-  st->print_cr("======= end frames =========");
 }
 #endif
 

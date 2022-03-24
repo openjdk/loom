@@ -29,6 +29,7 @@
 #include "gc/z/zOop.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/align.hpp"
+#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 
@@ -46,12 +47,12 @@ inline size_t ZUtils::object_size(uintptr_t addr) {
 }
 
 inline void ZUtils::object_copy_disjoint(uintptr_t from, uintptr_t to, size_t size) {
-  ZOop::from_address(from)->copy_disjoint((HeapWord*)to, bytes_to_words(size));
+  Copy::aligned_disjoint_words((HeapWord*)from, (HeapWord*)to, bytes_to_words(size));
 }
 
 inline void ZUtils::object_copy_conjoint(uintptr_t from, uintptr_t to, size_t size) {
   if (from != to) {
-    ZOop::from_address(from)->copy_conjoint((HeapWord*)to, bytes_to_words(size));
+    Copy::aligned_conjoint_words((HeapWord*)from, (HeapWord*)to, bytes_to_words(size));
   }
 }
 

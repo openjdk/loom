@@ -38,7 +38,6 @@
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
 #include "utilities/align.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -199,11 +198,12 @@ size_t oopDesc::size_given_klass(Klass* klass)  {
   return s;
 }
 
-bool oopDesc::is_instance()   const { return klass()->is_instance_klass();  }
-bool oopDesc::is_array()      const { return klass()->is_array_klass();     }
-bool oopDesc::is_objArray()   const { return klass()->is_objArray_klass();  }
-bool oopDesc::is_typeArray()  const { return klass()->is_typeArray_klass(); }
-bool oopDesc::is_stackChunk() const { return klass()->is_instance_klass() && InstanceKlass::cast(klass())->is_stack_chunk_instance_klass(); }
+bool oopDesc::is_instance()    const { return klass()->is_instance_klass();             }
+bool oopDesc::is_instanceRef() const { return klass()->is_reference_instance_klass();   }
+bool oopDesc::is_stackChunk()  const { return klass()->is_stack_chunk_instance_klass(); }
+bool oopDesc::is_array()       const { return klass()->is_array_klass();                }
+bool oopDesc::is_objArray()    const { return klass()->is_objArray_klass();             }
+bool oopDesc::is_typeArray()   const { return klass()->is_typeArray_klass();            }
 
 template<typename T>
 T*       oopDesc::field_addr(int offset)     const { return reinterpret_cast<T*>(cast_from_oop<intptr_t>(as_oop()) + offset); }
@@ -381,26 +381,6 @@ bool oopDesc::mark_must_be_preserved() const {
 
 bool oopDesc::mark_must_be_preserved(markWord m) const {
   return m.must_be_preserved(this);
-}
-
-void oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
-    klass()->copy_disjoint(this, to, word_size);
-  } else {
-    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  }
-}
-
-void oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh)) {
-    klass()->copy_conjoint(this, to, word_size);
-  } else {
-    Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  }
 }
 
 #endif // SHARE_OOPS_OOP_INLINE_HPP

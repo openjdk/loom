@@ -924,7 +924,7 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class JavaThreadDumpDCmd : public DCmdWithParser {
+class ThreadDumpToFileDCmd : public DCmdWithParser {
 private:
   void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS);
 protected:
@@ -932,12 +932,12 @@ protected:
   DCmdArgument<char*> _format;
   DCmdArgument<char*> _filepath;
 public:
-  JavaThreadDumpDCmd(outputStream *output, bool heap);
+  ThreadDumpToFileDCmd(outputStream *output, bool heap);
   static const char *name() {
-    return "JavaThread.dump";
+    return "Thread.dump_to_file";
   }
   static const char *description() {
-    return "Java thread dump in plain text or JSON format.";
+    return "Dump threads, with stack traces, to a file in plain text or JSON format.";
   }
   static const char* impact() {
     return "Medium: Depends on the number of threads.";

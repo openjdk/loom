@@ -337,9 +337,9 @@ void Thread::call_run() {
 
   // Perform common initialization actions
 
-  register_thread_stack_with_NMT();
-
   MACOS_AARCH64_ONLY(this->init_wx());
+
+  register_thread_stack_with_NMT();
 
   JFR_ONLY(Jfr::on_thread_start(this);)
 
@@ -1403,8 +1403,13 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
       }
     }
 
-    // Call Thread.exit()
     if (!is_Compiler_thread()) {
+      // We have finished executing user-defined Java code and now have to do the
+      // implementation specific clean-up by calling Thread.exit(). We prevent any
+      // asynchronous exceptions from being delivered while in Thread.exit()
+      // to ensure the clean-up is not corrupted.
+      NoAsyncExceptionDeliveryMark _no_async(this);
+
       EXCEPTION_MARK;
       JavaValue result(T_VOID);
       Klass* thread_klass = vmClasses::Thread_klass();
@@ -1415,6 +1420,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
                               THREAD);
       CLEAR_PENDING_EXCEPTION;
     }
+
     // notify JVMTI
     if (JvmtiExport::should_post_thread_life()) {
       JvmtiExport::post_thread_end(this);
@@ -1641,7 +1647,7 @@ void JavaThread::check_and_handle_async_exceptions() {
     // If we are at a polling page safepoint (not a poll return)
     // then we must defer async exception because live registers
     // will be clobbered by the exception path. Poll return is
-    // ok because the call we a returning from already collides
+    // ok because the call we are returning from already collides
     // with exception handling registers and so there is no issue.
     // (The exception handling path kills call result registers but
     //  this is ok since the exception kills the result anyway).
@@ -1662,6 +1668,9 @@ void JavaThread::check_and_handle_async_exceptions() {
   }
 
   if (!clear_async_exception_condition()) {
+    if ((_suspend_flags & _async_delivery_disabled) != 0) {
+      log_info(exceptions)("Async exception delivery is disabled");
+    }
     return;
   }
 

@@ -51,7 +51,6 @@
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "runtime/stackChunkFrameStream.inline.hpp"
 #include "utilities/bitMap.inline.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/ostream.hpp"
@@ -71,7 +70,7 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 #endif
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
-  : InstanceKlass(parser, InstanceKlass::_misc_kind_stack_chunk, ID) {
+  : InstanceKlass(parser, ID) {
   // see oopDesc::size_given_klass
   const jint lh = Klass::instance_layout_helper(size_helper(), true);
   set_layout_helper(lh);
@@ -82,33 +81,6 @@ InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
 size_t InstanceStackChunkKlass::oop_size(oop obj) const {
   // see oopDesc::size_given_klass
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
-}
-
-size_t InstanceStackChunkKlass::copy(oop obj, HeapWord* to_addr, size_t word_size, bool disjoint) {
-  assert(obj->is_stackChunk(), "Wrong object type");
-
-  HeapWord* from_addr = cast_from_oop<HeapWord*>(obj);
-
-  disjoint ? Copy::aligned_disjoint_words(from_addr, to_addr, word_size)
-           : Copy::aligned_conjoint_words(from_addr, to_addr, word_size);
-
-  // Build bitmap
-  stackChunkOop to_chunk = stackChunkOopDesc::cast(cast_to_oop(to_addr));
-  if (!to_chunk->has_bitmap()) {
-    build_bitmap(to_chunk);
-  } else {
-    assert(to_chunk->is_gc_mode(), "Should be set when bitmaps were built");
-  }
-
-  return word_size;
-}
-
-void InstanceStackChunkKlass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) {
-  copy(obj, to, word_size, true /* disjoint */);
-}
-
-void InstanceStackChunkKlass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) {
-  copy(obj, to, word_size, false /* disjoint */);
 }
 
 #ifndef PRODUCT

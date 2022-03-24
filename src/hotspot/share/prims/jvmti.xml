@@ -1730,7 +1730,7 @@ jvmtiEnv *jvmti;
       <description>
         <b> SuspendAllVirtualThreads is a preview API of the Java platform. </b>
         <i>Preview features may be removed in a future release, or upgraded to
-        permanent features of the Java platform.</i>.
+        permanent features of the Java platform.</i>
         <p/>
         Suspend all virtual threads except those already suspended.
         Virtual threads may be resumed with
@@ -1858,7 +1858,7 @@ jvmtiEnv *jvmti;
       <description>
         <b> ResumeAllVirtualThreads is a preview API of the Java platform. </b>
         <i>Preview features may be removed in a future release, or upgraded to
-        permanent features of the Java platform.</i>.
+        permanent features of the Java platform.</i>
         <p/>
         Resume all virtual threads except those already resumed.
         Virtual threads may be suspended with
@@ -10603,7 +10603,7 @@ myInit() {
         <description>
           <b> can_support_virtual_threads is a preview API of the Java platform. </b>
           <i>Preview features may be removed in a future release, or upgraded to
-          permanent features of the Java platform.</i>.
+          permanent features of the Java platform.</i>
           <p/>
           Can support virtual threads.
           If this capability is enabled then the following functions can be called:
@@ -12973,7 +12973,7 @@ myInit() {
     <description>
       <b> VirtualThreadStart is a preview API of the Java platform. </b>
       <i>Preview features may be removed in a future release, or upgraded to
-      permanent features of the Java platform.</i>.
+      permanent features of the Java platform.</i>
       <p/>
       Virtual thread start events are generated before its initial method executes.
       <p/>
@@ -13006,7 +13006,7 @@ myInit() {
     <description>
       <b> VirtualThreadEnd is a preview API of the Java platform. </b>
       <i>Preview features may be removed in a future release, or upgraded to
-      permanent features of the Java platform.</i>.
+      permanent features of the Java platform.</i>
       <p/>
       Virtual thread end events are generated after its initial method has finished execution.
       <p/>

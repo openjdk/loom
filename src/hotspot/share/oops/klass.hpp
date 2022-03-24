@@ -594,9 +594,6 @@ protected:
   // Returns "interface", "abstract class" or "class".
   const char* external_kind() const;
 
-  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size);
-  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size);
-
   // type testing operations
 #ifdef ASSERT
  protected:
@@ -618,18 +615,17 @@ protected:
   }
  public:
   #endif
-  inline  bool is_instance_klass()            const { return assert_same_query(
-                                                      layout_helper_is_instance(layout_helper()),
-                                                      is_instance_klass_slow()); }
-  inline  bool is_array_klass()               const { return assert_same_query(
-                                                    layout_helper_is_array(layout_helper()),
-                                                    is_array_klass_slow()); }
-  inline  bool is_objArray_klass()            const { return assert_same_query(
-                                                    layout_helper_is_objArray(layout_helper()),
-                                                    is_objArray_klass_slow()); }
-  inline  bool is_typeArray_klass()           const { return assert_same_query(
-                                                    layout_helper_is_typeArray(layout_helper()),
-                                                    is_typeArray_klass_slow()); }
+
+  bool is_instance_klass()              const { return assert_same_query(_id <= InstanceStackChunkKlassID, is_instance_klass_slow()); }
+  // Other is anything that is not one of the more specialized kinds of InstanceKlass.
+  bool is_other_instance_klass()        const { return _id == InstanceKlassID; }
+  bool is_reference_instance_klass()    const { return _id == InstanceRefKlassID; }
+  bool is_mirror_instance_klass()       const { return _id == InstanceMirrorKlassID; }
+  bool is_class_loader_instance_klass() const { return _id == InstanceClassLoaderKlassID; }
+  bool is_stack_chunk_instance_klass()  const { return _id == InstanceStackChunkKlassID; }
+  bool is_array_klass()                 const { return assert_same_query( _id >= TypeArrayKlassID, is_array_klass_slow()); }
+  bool is_objArray_klass()              const { return assert_same_query( _id == ObjArrayKlassID,  is_objArray_klass_slow()); }
+  bool is_typeArray_klass()             const { return assert_same_query( _id == TypeArrayKlassID, is_typeArray_klass_slow()); }
   #undef assert_same_query
 
   // Access flags
