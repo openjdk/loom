@@ -106,10 +106,6 @@ class oopDesc {
   // to be able to figure out the size of an object knowing its klass.
   inline size_t size_given_klass(Klass* klass);
 
-  // Copies the object
-  inline void copy_disjoint(HeapWord* to, size_t word_size);
-  inline void copy_conjoint(HeapWord* to, size_t word_size);
-
   // type test operations (inlined in oop.inline.hpp)
   inline bool is_instance()            const;
   inline bool is_array()               const;

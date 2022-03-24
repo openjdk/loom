@@ -594,9 +594,6 @@ protected:
   // Returns "interface", "abstract class" or "class".
   const char* external_kind() const;
 
-  virtual void copy_disjoint(oop obj, HeapWord* to, size_t word_size);
-  virtual void copy_conjoint(oop obj, HeapWord* to, size_t word_size);
-
   // type testing operations
 #ifdef ASSERT
  protected:

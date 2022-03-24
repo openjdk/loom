@@ -737,7 +737,8 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
     Prefetch::write(obj, interval);
 
     // Copy obj
-    old->copy_disjoint(cast_from_oop<HeapWord*>(obj), s);
+    Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), cast_from_oop<HeapWord*>(obj), s);
+    ContinuationGCSupport::transform_stack_chunk(obj);
 
     // Increment age if obj still in new generation
     obj->incr_age();
