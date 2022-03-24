@@ -111,8 +111,9 @@ private:
 
 #ifdef ASSERT
 public:
-  static bool debug_verify_continuation(oop continuation);
-  static void debug_print_continuation(oop continuation, outputStream* st = NULL);
+  static void debug_verify_continuation(oop continuation);
+  static void print(oop continuation);
+  static void print_on(outputStream* st, oop continuation);
 #endif
 };
 
