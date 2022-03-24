@@ -63,9 +63,9 @@ public:
 
   static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
     assert(is_continuation_enterSpecial(f), "");
-    ContinuationEntry* cont = (ContinuationEntry*)f.unextended_sp();
-    assert(cont == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
-    return cont;
+    ContinuationEntry* entry = (ContinuationEntry*)f.unextended_sp();
+    assert(entry == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
+    return entry;
   }
 
   static bool is_continuation_mounted(JavaThread* thread, oop cont);
@@ -76,10 +76,10 @@ public:
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
 
-  static bool is_frame_in_continuation(const ContinuationEntry* cont, const frame& f);
+  static bool is_frame_in_continuation(const ContinuationEntry* entry, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
 
-  static bool has_last_Java_frame(oop continuation);
+  static bool has_last_Java_frame(oop continuation, frame* frame, RegisterMap* map);
   static frame last_frame(oop continuation, RegisterMap *map);
   static frame top_frame(const frame& callee, RegisterMap* map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);

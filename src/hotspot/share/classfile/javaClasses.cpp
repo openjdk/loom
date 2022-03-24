@@ -2771,7 +2771,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
   bool skip_throwableInit_check = false;
   bool skip_hidden = !ShowHiddenFrames;
   bool show_carrier = ShowCarrierFrames;
-  ContinuationEntry* cont = thread->last_continuation();
+  ContinuationEntry* cont_entry = thread->last_continuation();
   for (frame fr = thread->last_frame(); max_depth == 0 || max_depth != total_count;) {
     Method* method = NULL;
     int bci = 0;
@@ -2786,11 +2786,11 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       if (fr.is_first_frame()) break;
 
       if (Continuation::is_continuation_enterSpecial(fr)) {
-        assert(cont == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
-        if (!show_carrier && cont->is_virtual_thread()) {
+        assert(cont_entry == Continuation::get_continuation_entry_for_entry_frame(thread, fr), "");
+        if (!show_carrier && cont_entry->is_virtual_thread()) {
           break;
         }
-        cont = cont->parent();
+        cont_entry = cont_entry->parent();
       }
 
       address pc = fr.pc();

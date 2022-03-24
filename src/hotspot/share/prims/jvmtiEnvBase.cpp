@@ -1283,11 +1283,11 @@ JvmtiEnvBase::cthread_with_mounted_vthread(JavaThread* jt) {
 
 bool
 JvmtiEnvBase::cthread_with_continuation(JavaThread* jt) {
-  const ContinuationEntry* cont = NULL;
+  const ContinuationEntry* cont_entry = NULL;
   if (jt->has_last_Java_frame()) {
-    cont = jt->vthread_continuation();
+    cont_entry = jt->vthread_continuation();
   }
-  return (cont != NULL && cthread_with_mounted_vthread(jt));
+  return (cont_entry != NULL && cthread_with_mounted_vthread(jt));
 }
 
 jvmtiError

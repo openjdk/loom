@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2021, Azul Systems, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -211,8 +211,8 @@ const ContinuationEntry* JavaThread::vthread_continuation() const {
 JavaThread::CarrierOrVirtual JavaThread::which_stack(address adr) const {
   address stack_end = _stack_base - _stack_size;
   if (adr >= stack_end) {
-    const ContinuationEntry* cont = vthread_continuation();
-    if (cont != nullptr && (address)cont->entry_sp() > adr) {
+    const ContinuationEntry* entry = vthread_continuation();
+    if (entry != nullptr && (address)entry->entry_sp() > adr) {
       return CarrierOrVirtual::VIRTUAL;
     }
     if (_stack_base > adr) {

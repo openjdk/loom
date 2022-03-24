@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -93,10 +93,10 @@ LiveFrameStream::LiveFrameStream(JavaThread* thread, RegisterMap* rm, Handle con
     _map = rm;
     if (cont.is_null()) {
       _jvf  = thread->last_java_vframe(rm);
-      _cont = thread->last_continuation();
+      _cont_entry = thread->last_continuation();
     } else {
       _jvf  = Continuation::last_java_vframe(cont, rm);
-      _cont = NULL;
+      _cont_entry = NULL;
     }
 }
 
@@ -116,7 +116,7 @@ void LiveFrameStream::next() {
       _jvf = NULL;
       return;
     }
-    _cont = _cont->parent();
+    _cont_entry = _cont_entry->parent();
   }
   assert(!Continuation::is_scope_bottom(_cont_scope(), _jvf->fr(), _jvf->register_map()), "");
 

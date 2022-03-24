@@ -137,7 +137,7 @@ void JfrStackFrame::write(JfrCheckpointWriter& cpw) const {
 
 class JfrVframeStream : public vframeStreamCommon {
  private:
-  const ContinuationEntry* _cont;
+  const ContinuationEntry* _cont_entry;
   bool _async_mode;
   bool _vthread;
   bool step_to_sender();
@@ -148,9 +148,9 @@ class JfrVframeStream : public vframeStreamCommon {
 };
 
 JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool stop_at_java_call_stub, bool async_mode) :
-  vframeStreamCommon(RegisterMap(jt, false, false, true)), _cont(JfrThreadLocal::is_vthread(jt) ? jt->last_continuation() : nullptr),
+  vframeStreamCommon(RegisterMap(jt, false, false, true)), _cont_entry(JfrThreadLocal::is_vthread(jt) ? jt->last_continuation() : nullptr),
     _async_mode(async_mode), _vthread(JfrThreadLocal::is_vthread(jt)) {
-  assert(!_vthread || _cont != nullptr, "invariant");
+  assert(!_vthread || _cont_entry != nullptr, "invariant");
   _reg_map.set_async(async_mode);
   _frame = fr;
   _stop_at_java_call_stub = stop_at_java_call_stub;
@@ -171,12 +171,12 @@ inline bool JfrVframeStream::step_to_sender() {
 inline void JfrVframeStream::next_frame() {
   do {
     if (_vthread && Continuation::is_continuation_enterSpecial(_frame)) {
-      if (_cont->is_virtual_thread()) {
+      if (_cont_entry->is_virtual_thread()) {
         // An entry of a vthread continuation is a termination point.
         _mode = at_end_mode;
         break;
       }
-      _cont = _cont->parent();
+      _cont_entry = _cont_entry->parent();
     }
   } while (step_to_sender() && !fill_from_frame());
 }
