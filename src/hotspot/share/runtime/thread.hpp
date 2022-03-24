@@ -1195,7 +1195,6 @@ private:
 
   // Continuation support
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  const ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
   bool cont_yield() { return _cont_yield; }
   void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }

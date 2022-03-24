@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -115,7 +115,7 @@ private:
 
   RegisterMap*        _map;
   javaVFrame*         _jvf;
-  ContinuationEntry* _cont;
+  ContinuationEntry*  _cont_entry;
 
   void fill_live_stackframe(Handle stackFrame, const methodHandle& method, TRAPS);
   static oop create_primitive_slot_instance(StackValueCollection* values,
@@ -133,7 +133,7 @@ public:
 
   Method* method() override { return _jvf->method(); }
   int bci()        override { return _jvf->bci(); }
-  oop cont() override { return continuation() != NULL ? continuation(): _cont->cont_oop(); }
+  oop cont() override { return continuation() != NULL ? continuation(): _cont_entry->cont_oop(); }
 
   void fill_frame(int index, objArrayHandle  frames_array,
                   const methodHandle& method, TRAPS) override;

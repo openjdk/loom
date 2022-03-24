@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -553,7 +553,7 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   }
 
   _frame = _thread->last_frame();
-  _cont = _thread->last_continuation();
+  _cont_entry = _thread->last_continuation();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);
   }
@@ -565,12 +565,11 @@ vframeStream::vframeStream(oop continuation, Handle continuation_scope)
   _stop_at_java_call_stub = false;
   _continuation_scope = continuation_scope;
 
-  if (!Continuation::has_last_Java_frame(continuation)) {
+  if (!Continuation::has_last_Java_frame(continuation, &_frame, &_reg_map)) {
     _mode = at_end_mode;
     return;
   }
 
-  _frame = Continuation::last_frame(continuation, &_reg_map);
   // _chunk = _reg_map.stack_chunk();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);

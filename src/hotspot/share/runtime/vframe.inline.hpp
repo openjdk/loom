@@ -33,14 +33,18 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/thread.inline.hpp"
 
-inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map), _cont(NULL) {
+inline vframeStreamCommon::vframeStreamCommon(RegisterMap reg_map) : _reg_map(reg_map), _cont_entry(NULL) {
   _thread = _reg_map.thread();
 }
 
 inline oop vframeStreamCommon::continuation() const {
-  if (_reg_map.cont() != NULL) return _reg_map.cont();
-  if (_cont != NULL)           return _cont->continuation();
-  return NULL;
+  if (_reg_map.cont() != NULL) {
+    return _reg_map.cont();
+  } else if (_cont_entry != NULL) {
+    return _cont_entry->continuation();
+  } else {
+    return NULL;
+  }
 }
 
 inline intptr_t* vframeStreamCommon::frame_id() const        { return _frame.id(); }
@@ -65,22 +69,24 @@ inline void vframeStreamCommon::next() {
 
   // handle general case
   do {
-    bool cont_entry = false;
+    bool is_enterSpecial_frame  = false;
     if (Continuation::is_continuation_enterSpecial(_frame)) {
       assert(!_reg_map.in_cont(), "");
-      assert(_cont != NULL, "");
-      assert(_cont->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont));
-      cont_entry = true;
+      assert(_cont_entry != NULL, "");
+      assert(_cont_entry->cont_oop() != NULL, "_cont: " INTPTR_FORMAT, p2i(_cont_entry));
+      is_enterSpecial_frame = true;
 
       // TODO: handle ShowCarrierFrames
-      if (_cont->is_virtual_thread() || (_continuation_scope.not_null() && _cont->scope() == _continuation_scope())) {
+      if (_cont_entry->is_virtual_thread() ||
+          (_continuation_scope.not_null() && _cont_entry->scope() == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }
     } else if (_reg_map.in_cont() && Continuation::is_continuation_entry_frame(_frame, &_reg_map)) {
       assert(_reg_map.cont() != NULL, "");
       oop scope = jdk_internal_vm_Continuation::scope(_reg_map.cont());
-      if (scope == java_lang_VirtualThread::vthread_scope() || (_continuation_scope.not_null() && scope == _continuation_scope())) {
+      if (scope == java_lang_VirtualThread::vthread_scope() ||
+          (_continuation_scope.not_null() && scope == _continuation_scope())) {
         _mode = at_end_mode;
         break;
       }
@@ -88,8 +94,8 @@ inline void vframeStreamCommon::next() {
 
     _frame = _frame.sender(&_reg_map);
 
-    if (cont_entry) {
-      _cont = _cont->parent();
+    if (is_enterSpecial_frame) {
+      _cont_entry = _cont_entry->parent();
     }
   } while (!fill_from_frame());
 }
@@ -104,7 +110,7 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
   }
 
   _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
-  _cont = _thread->last_continuation();
+  _cont_entry = _thread->last_continuation();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);
   }

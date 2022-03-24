@@ -93,8 +93,8 @@ frame ContinuationEntry::to_frame() const {
 }
 
 
-void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont) {
-  anchor->set_last_Java_fp(cont->entry_fp());
+void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry) {
+  anchor->set_last_Java_fp(entry->entry_fp());
 }
 
 void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
