@@ -216,7 +216,6 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
                                        : (intptr_t)hf.fp();
 }
 
-template <typename FKind>
 inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
   if (caller.is_interpreted_frame()) {
     assert (!caller.is_empty(), "");
@@ -306,7 +305,6 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, 
   return vsp;
 }
 
-template<typename FKind>
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
