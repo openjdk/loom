@@ -237,7 +237,6 @@
   nonstatic_field(InstanceKlass,               _static_oop_field_count,                       u2)                                    \
   nonstatic_field(InstanceKlass,               _nonstatic_oop_map_size,                       int)                                   \
   nonstatic_field(InstanceKlass,               _is_marked_dependent,                          bool)                                  \
-  nonstatic_field(InstanceKlass,               _kind,                                         u1)                                    \
   nonstatic_field(InstanceKlass,               _misc_flags,                                   u2)                                    \
   nonstatic_field(InstanceKlass,               _init_state,                                   u1)                                    \
   nonstatic_field(InstanceKlass,               _init_thread,                                  Thread*)                               \
