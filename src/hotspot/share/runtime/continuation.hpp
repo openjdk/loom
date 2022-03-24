@@ -54,11 +54,11 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
   // static intptr_t* thaw(JavaThread* thread, int kind);
-  static int try_force_yield(JavaThread* thread, oop cont);
+  static int try_force_yield(JavaThread* thread, oop continuation);
   static void jump_from_safepoint(JavaThread* thread);
 
   static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
-  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
 
   static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
@@ -68,7 +68,7 @@ public:
     return entry;
   }
 
-  static bool is_continuation_mounted(JavaThread* thread, oop cont);
+  static bool is_continuation_mounted(JavaThread* thread, oop continuation);
   static bool is_continuation_scope_mounted(JavaThread* thread, oop cont_scope);
 
   static bool is_cont_barrier_frame(const frame& f);
@@ -85,7 +85,7 @@ public:
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
   static frame continuation_parent_frame(RegisterMap* map);
 
-  static oop continuation_scope(oop cont);
+  static oop continuation_scope(oop continuation);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
@@ -111,8 +111,8 @@ private:
 
 #ifdef ASSERT
 public:
-  static bool debug_verify_continuation(oop cont);
-  static void debug_print_continuation(oop cont, outputStream* st = NULL);
+  static bool debug_verify_continuation(oop continuation);
+  static void debug_print_continuation(oop continuation, outputStream* st = NULL);
 #endif
 };
 
