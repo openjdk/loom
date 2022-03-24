@@ -397,7 +397,6 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
 void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
   Label done;
   // Note: In tiered we increment either counters in Method* or in MDO depending if we're profiling or not.
-  int increment = InvocationCounter::count_increment;
   Label no_mdo;
   if (ProfileInterpreter) {
     // Are we profiling?
@@ -408,7 +407,7 @@ void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
     const Address mdo_invocation_counter(rax, in_bytes(MethodData::invocation_counter_offset()) +
         in_bytes(InvocationCounter::counter_offset()));
     const Address mask(rax, in_bytes(MethodData::invoke_mask_offset()));
-    __ increment_mask_and_jump(mdo_invocation_counter, increment, mask, rcx, false, Assembler::zero, overflow);
+    __ increment_mask_and_jump(mdo_invocation_counter, mask, rcx, overflow);
     __ jmp(done);
   }
   __ bind(no_mdo);
@@ -418,8 +417,7 @@ void TemplateInterpreterGenerator::generate_counter_incr(Label* overflow) {
       InvocationCounter::counter_offset());
   __ get_method_counters(rbx, rax, done);
   const Address mask(rax, in_bytes(MethodCounters::invoke_mask_offset()));
-  __ increment_mask_and_jump(invocation_counter, increment, mask, rcx,
-      false, Assembler::zero, overflow);
+  __ increment_mask_and_jump(invocation_counter, mask, rcx, overflow);
   __ bind(done);
 }
 
