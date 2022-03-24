@@ -27,7 +27,9 @@
 
 #include "oops/stackChunkOop.hpp"
 
+#include "gc/shared/collectedHeap.hpp"
 #include "memory/memRegion.hpp"
+#include "memory/universe.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
@@ -37,12 +39,17 @@
 
 DEF_HANDLE_CONSTR(stackChunk, is_stackChunk_noinline)
 
-inline stackChunkOopDesc* stackChunkOopDesc::parent() const         { return (stackChunkOopDesc*)(oopDesc*)jdk_internal_vm_StackChunk::parent(as_oop()); }
+inline stackChunkOop stackChunkOopDesc::cast(oop obj) {
+  assert(obj == nullptr || obj->is_stackChunk(), "Wrong type");
+  return stackChunkOop(obj);
+}
+
+inline stackChunkOop stackChunkOopDesc::parent() const         { return stackChunkOopDesc::cast(jdk_internal_vm_StackChunk::parent(as_oop())); }
 template<typename P>
-inline bool stackChunkOopDesc::is_parent_null() const               { return jdk_internal_vm_StackChunk::is_parent_null<P>(as_oop()); }
-inline void stackChunkOopDesc::set_parent(stackChunkOopDesc* value) { jdk_internal_vm_StackChunk::set_parent(this, (oop)value); }
+inline bool stackChunkOopDesc::is_parent_null() const          { return jdk_internal_vm_StackChunk::is_parent_null<P>(as_oop()); }
+inline void stackChunkOopDesc::set_parent(stackChunkOop value) { jdk_internal_vm_StackChunk::set_parent(this, value); }
 template<typename P>
-inline void stackChunkOopDesc::set_parent_raw(oop value)            { jdk_internal_vm_StackChunk::set_parent_raw<P>(this, value); }
+inline void stackChunkOopDesc::set_parent_raw(oop value)       { jdk_internal_vm_StackChunk::set_parent_raw<P>(this, value); }
 
 inline int stackChunkOopDesc::stack_size() const        { return jdk_internal_vm_StackChunk::size(as_oop()); }
 
@@ -96,19 +103,16 @@ inline intptr_t* stackChunkOopDesc::from_offset(int offset) const {
 }
 
 inline bool stackChunkOopDesc::is_empty() const {
-  assert(is_stackChunk(), "");
   return sp() >= stack_size() - argsize();
 }
 
 inline bool stackChunkOopDesc::is_in_chunk(void* p) const {
-  assert(is_stackChunk(), "");
   HeapWord* start = (HeapWord*)start_address();
   HeapWord* end = start + stack_size();
   return (HeapWord*)p >= start && (HeapWord*)p < end;
 }
 
 bool stackChunkOopDesc::is_usable_in_chunk(void* p) const {
-  assert(is_stackChunk(), "");
 #if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
   HeapWord* start = (HeapWord*)start_address() + sp() - frame::sender_sp_offset;
 #else

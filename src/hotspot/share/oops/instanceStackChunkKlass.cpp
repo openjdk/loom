@@ -85,7 +85,7 @@ size_t InstanceStackChunkKlass::oop_size(oop obj) const {
 
 #ifndef PRODUCT
 void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
-  print_chunk((stackChunkOop)obj, false, st);
+  print_chunk(stackChunkOopDesc::cast(obj), false, st);
 }
 #endif
 
@@ -96,7 +96,7 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load((oop*)base_loc);
-    if (base == (oop)nullptr) {
+    if (base == nullptr) {
       assert(*derived_loc == derived_pointer(0), "");
       return;
     }
@@ -141,7 +141,7 @@ public:
     // The ordering in the following is crucial
     OrderAccess::loadload();
     oop base = Atomic::load(base_loc);
-    if (base != (oop)nullptr) {
+    if (base != nullptr) {
       assert(!CompressedOops::is_base(base), "");
       ZGC_ONLY(assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
 
@@ -266,8 +266,6 @@ public:
 };
 
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  assert(chunk->is_stackChunk(), "");
-
   OopOopIterateStackClosure frame_closure(chunk, closure, mr);
   iterate_stack(chunk, &frame_closure);
 
@@ -662,11 +660,9 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   DEBUG_ONLY(if (!VerifyContinuations) return true;)
 
   assert(oopDesc::is_oop(obj), "");
-  assert(obj->is_stackChunk(), "");
 
-  stackChunkOop chunk = (stackChunkOop)obj;
+  stackChunkOop chunk = stackChunkOopDesc::cast(obj);
 
-  assert(chunk->is_stackChunk(), "");
   assert(chunk->stack_size() >= 0, "");
   assert(chunk->argsize() >= 0, "");
   assert(!chunk->has_bitmap() || chunk->is_gc_mode(), "");
@@ -832,12 +828,10 @@ public:
 }
 
 void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, outputStream* st) {
-  if (c == (oop)nullptr) {
+  if (c == nullptr) {
     st->print_cr("CHUNK NULL");
     return;
   }
-  assert(c->is_stackChunk(), "");
-
   // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
     p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());

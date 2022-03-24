@@ -72,7 +72,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
     return sender;
   }
 
-  if (parent() != (oop)nullptr) {
+  if (parent() != nullptr) {
     assert(!parent()->is_empty(), "");
     return parent()->top_frame(map);
   }
