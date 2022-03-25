@@ -68,8 +68,8 @@ inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
   return sp;
 }
 
-template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
+template<typename FKind>
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
 }
 
@@ -78,8 +78,7 @@ void ContinuationEntry::update_register_map(RegisterMap* map) const {
   frame::update_map_with_saved_link(map, fp);
 }
 
-template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMapT* map) {
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
   frame::update_map_with_saved_link(map, Frame::callee_link_address(f));
 }
 

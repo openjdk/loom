@@ -49,13 +49,12 @@ inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
   return NULL;
 }
 
-template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
+template<typename FKind>
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
   Unimplemented();
 }
 
-template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMapT* map) {
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
   Unimplemented();
 }
 

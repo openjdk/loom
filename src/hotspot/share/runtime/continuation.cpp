@@ -181,7 +181,6 @@ static void log_frames(JavaThread* thread);
 #else
 static void verify_continuation(oop continuation) { }
 static void verify_stack_chunk(oop chunk) { }
-static void log_frames(JavaThread* thread) { }
 #endif
 
 #ifndef PRODUCT
