@@ -2388,15 +2388,15 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   static const int threshold = 500; // words
 
   int chunk_start_sp = chunk->sp();
-  int size = chunk->stack_size() - chunk_start_sp; // this initial size could be reduced if it's a partial thaw
-  int argsize;
+  const int full_chunk_size = chunk->stack_size() - chunk_start_sp; // this initial size could be reduced if it's a partial thaw
+  int argsize, thaw_size;
 
   intptr_t* const chunk_sp = chunk->start_address() + chunk_start_sp;
 
   bool partial, empty;
-  if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (size < threshold))) {
+  if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (full_chunk_size < threshold))) {
     DEBUG_ONLY(_mode = 1;)
-    prefetch_chunk_pd(chunk->start_address(), size); // prefetch anticipating memcpy starting at highest address
+    prefetch_chunk_pd(chunk->start_address(), full_chunk_size); // prefetch anticipating memcpy starting at highest address
 
     partial = false;
 
@@ -2405,18 +2405,19 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
     chunk->set_sp(chunk->stack_size());
     chunk->set_argsize(0);
-    // chunk->clear_flags();
     chunk->set_max_size(0);
-    log_develop_trace(jvmcont)("set max_size: 0");
-    // chunk->set_pc(nullptr);
+
+    thaw_size = full_chunk_size;
   } else { // thaw a single frame
     DEBUG_ONLY(_mode = 2;)
     partial = true;
 
     StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
     assert(chunk_sp == f.sp() && chunk_sp == f.unextended_sp(), "");
-    size = f.cb()->frame_size();
+
+    const int frame_size = f.cb()->frame_size();
     argsize = f.stack_argsize();
+
     f.next(SmallRegisterMap::instance);
     empty = f.is_done();
     assert(!empty || argsize == chunk->argsize(), "");
@@ -2425,36 +2426,34 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
       chunk->set_sp(chunk->stack_size());
       chunk->set_argsize(0);
       chunk->set_max_size(0);
-      log_develop_trace(jvmcont)("set max_size: 0");
-      // chunk->set_pc(nullptr);
     } else {
-      chunk->set_sp(chunk->sp() + size);
-      chunk->set_max_size(chunk->max_size() - size);
-      address top_pc = *(address*)(chunk_sp + size - frame::sender_sp_ret_address_offset());
+      chunk->set_sp(chunk->sp() + frame_size);
+      chunk->set_max_size(chunk->max_size() - frame_size);
+      address top_pc = *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset());
       chunk->set_pc(top_pc);
     }
     assert(empty == chunk->is_empty(), "");
-    size += argsize;
+    thaw_size = frame_size + argsize;
   }
 
   const bool is_last = empty && chunk->is_parent_null<typename ConfigT::OopT>();
 
   log_develop_trace(jvmcont)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
-                              partial, is_last, empty, size, argsize);
+                              partial, is_last, empty, thaw_size, argsize);
 
   intptr_t* stack_sp = _cont.entrySP();
   intptr_t* bottom_sp = ContinuationHelper::frame_align_pointer(stack_sp - argsize);
 
-  stack_sp -= size;
+  stack_sp -= thaw_size;
   assert(argsize != 0 || stack_sp == ContinuationHelper::frame_align_pointer(stack_sp), "");
   stack_sp = ContinuationHelper::frame_align_pointer(stack_sp);
 
   intptr_t* from = chunk_sp - ContinuationHelper::frame_metadata;
   intptr_t* to   = stack_sp - ContinuationHelper::frame_metadata;
-  copy_from_chunk(from, to, size + ContinuationHelper::frame_metadata);
-  assert(_cont.entrySP() - 1 <= to + size + ContinuationHelper::frame_metadata
-            && to + size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
-  assert(argsize != 0 || to + size + ContinuationHelper::frame_metadata == _cont.entrySP(), "");
+  copy_from_chunk(from, to, thaw_size + ContinuationHelper::frame_metadata);
+  assert(_cont.entrySP() - 1 <= to + thaw_size + ContinuationHelper::frame_metadata
+            && to + thaw_size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
+  assert(argsize != 0 || to + thaw_size + ContinuationHelper::frame_metadata == _cont.entrySP(), "");
 
   assert(!is_last || argsize == 0, "");
   _cont.set_argsize(argsize);
