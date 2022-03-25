@@ -47,7 +47,6 @@ inline void ContinuationGCSupport::transform_stack_chunk(oop obj) {
   }
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   if (!chunk->is_gc_mode()) {
-    // Relativize *and* transform to use an oop bitmap
     chunk->transform();
   }
 }
