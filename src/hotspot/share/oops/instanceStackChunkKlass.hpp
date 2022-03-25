@@ -129,8 +129,6 @@ public:
   inline size_t instance_size(size_t stack_size_in_words) const;
 
   static inline size_t bitmap_size(size_t stack_size_in_words); // in words
-  // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
-  static inline BitMap::idx_t bit_offset(size_t stack_size_in_words);
 
   // size of frame metadata (e.g. pc and link) - in words
   static inline int metadata_words();

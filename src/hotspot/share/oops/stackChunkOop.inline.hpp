@@ -170,17 +170,13 @@ inline BitMapView stackChunkOopDesc::bitmap() const {
   return bitmap;
 }
 
-inline BitMap::idx_t stackChunkOopDesc::bit_offset() const {
-  return InstanceStackChunkKlass::bit_offset(stack_size());
-}
-
 inline BitMap::idx_t stackChunkOopDesc::bit_index_for(intptr_t* p) const {
   return UseCompressedOops ? bit_index_for((narrowOop*)p) : bit_index_for((oop*)p);
 }
 
 template <typename OopT>
 inline BitMap::idx_t stackChunkOopDesc::bit_index_for(OopT* p) const {
-  return bit_offset() + (p - (OopT*)start_address());
+  return p - (OopT*)start_address();
 }
 
 inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
@@ -189,7 +185,7 @@ inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
 
 template <typename OopT>
 inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
-  return (OopT*)start_address() + (index - bit_offset());
+  return (OopT*)start_address() + index;
 }
 
 inline MemRegion stackChunkOopDesc::range() {

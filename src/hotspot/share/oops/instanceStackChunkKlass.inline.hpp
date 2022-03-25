@@ -61,17 +61,10 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   if (!UseChunkBitmaps) {
     return 0;
   }
-  size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
-  static const size_t mask = BitsPerWord - 1;
-  int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
-  size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert(size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "");
-  return res;
-}
 
-inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_words) {
-  static const size_t mask = BitsPerWord - 1;
-  return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
+  size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
+
+  return align_up(size_in_bits, BitsPerWord) >> LogBitsPerWord;
 }
 
 template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
