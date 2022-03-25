@@ -967,7 +967,7 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
 #ifdef ASSERT
 void Continuation::debug_verify_continuation(oop contOop) {
   if (!VerifyContinuations) {
-    return true;
+    return;
   }
   assert(contOop != nullptr, "");
   assert(oopDesc::is_oop(contOop), "");
@@ -1539,7 +1539,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _size, chunk->is_empty());
 
   DEBUG_ONLY(bool empty_chunk = true);
-  if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && requires_barriers(chunk))) {
+  if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && chunk->requires_barriers())) {
     // ALLOCATION
 
     if (lt.develop_is_enabled()) {
