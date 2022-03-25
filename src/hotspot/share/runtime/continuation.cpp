@@ -176,7 +176,7 @@ static void verify_continuation(oop continuation) { Continuation::debug_verify_c
 static void verify_stack_chunk(oop chunk) { InstanceStackChunkKlass::verify(chunk); }
 
 static void do_deopt_after_thaw(JavaThread* thread);
-static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
+static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOop chunk, outputStream* st);
 static void log_frames(JavaThread* thread);
 #else
 static void verify_continuation(oop continuation) { }
@@ -902,7 +902,7 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
 address Continuation::get_top_return_pc_post_barrier(JavaThread* thread, address pc) {
   ContinuationEntry* ce;
   if (thread != nullptr && is_return_barrier_entry(pc) && (ce = thread->last_continuation()) != nullptr) {
-    pc = ce->entry_pc();
+    return ce->entry_pc();
   }
   return pc;
 }
@@ -2199,20 +2199,11 @@ static bool is_safe_pc_to_preempt(address pc) {
     }
   }
 }
+
 static bool is_safe_to_preempt(JavaThread* thread) {
   if (!thread->has_last_Java_frame()) {
     return false;
   }
-
-  LogTarget(Trace, jvmcont, preempt) lt;
-  if (lt.is_enabled()) {
-    ResourceMark rm;
-    LogStream ls(lt);
-    frame f = thread->last_frame();
-    ls.print("is_safe_to_preempt %sSAFEPOINT ", Interpreter::contains(f.pc()) ? "INTERPRETER " : "");
-    f.print_on(&ls);
-  }
-
   if (!is_safe_pc_to_preempt(thread->last_Java_pc())) {
     return false;
   }
@@ -2278,7 +2269,6 @@ protected:
 
 #ifdef ASSERT
   public:
-    int _mode; // TODO: remove
     bool barriers() { return _barriers; }
   protected:
 #endif
@@ -2288,7 +2278,6 @@ protected:
       _thread(thread), _cont(cont),
       _fastpath(nullptr) {
     DEBUG_ONLY(_top_unextended_sp = nullptr;)
-    DEBUG_ONLY(_mode = 0;)
   }
 
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size);
@@ -2390,7 +2379,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   bool partial, empty;
   if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (full_chunk_size < threshold))) {
-    DEBUG_ONLY(_mode = 1;)
     prefetch_chunk_pd(chunk->start_address(), full_chunk_size); // prefetch anticipating memcpy starting at highest address
 
     partial = false;
@@ -2404,7 +2392,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
     thaw_size = full_chunk_size;
   } else { // thaw a single frame
-    DEBUG_ONLY(_mode = 2;)
     partial = true;
 
     StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
@@ -2516,7 +2503,6 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
     e.commit();
   }
 
-  DEBUG_ONLY(_mode = 3;)
   DEBUG_ONLY(_frames = 0;)
   _align_size = 0;
   int num_frames = (return_barrier ? 1 : 2);
@@ -2963,7 +2949,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   ContinuationHelper::set_anchor(thread, sp0);
   log_frames(thread);
   if (LoomVerifyAfterThaw) {
-    assert(do_verify_after_thaw(thread, thw._mode, thw.barriers(), cont.tail(), tty), "");
+    assert(do_verify_after_thaw(thread, thw.barriers(), cont.tail(), tty), "");
   }
   assert(ContinuationEntry::assert_entry_frame_laid_out(thread), "");
   ContinuationHelper::clear_anchor(thread);
@@ -3029,7 +3015,7 @@ public:
   }
 };
 
-static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st) {
+static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOop chunk, outputStream* st) {
   assert(thread->has_last_Java_frame(), "");
 
   ResourceMark rm;
@@ -3049,7 +3035,7 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
     fst.current()->oops_do(&cl, &cf, fst.register_map());
     if (cl.p() != nullptr) {
       frame fr = *fst.current();
-      st->print_cr("Failed for frame mode: %d barriers: %d %d", mode, barriers, chunk->requires_barriers());
+      st->print_cr("Failed for frame barriers: %d %d", barriers, chunk->requires_barriers());
       fr.print_on(st);
       if (!fr.is_interpreted_frame()) {
         st->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
