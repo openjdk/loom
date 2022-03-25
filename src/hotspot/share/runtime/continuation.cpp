@@ -1071,7 +1071,6 @@ private:
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 protected:
-  virtual bool requires_barriers(stackChunkOop chunk) = 0;
   virtual stackChunkOop allocate_chunk_slow(size_t stack_size) = 0;
 };
 
@@ -1093,7 +1092,6 @@ public:
   template <bool chunk_available> bool freeze_fast(intptr_t* top_sp);
 
 protected:
-  virtual bool requires_barriers(stackChunkOop chunk) override { return chunk->requires_barriers(); }
   virtual stackChunkOop allocate_chunk_slow(size_t stack_size) override { return allocate_chunk(stack_size); }
 };
 
