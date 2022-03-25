@@ -1876,11 +1876,11 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-      chunk = stackChunkOopDesc::cast(allocator.initialize(start));
+    chunk = stackChunkOopDesc::cast(allocator.initialize(start));
   } else {
     //HandleMark hm(current);
     Handle conth(current, _cont.continuation());
-      chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
+    chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
     _cont.post_safepoint(conth);
 
     if (chunk == nullptr) {
