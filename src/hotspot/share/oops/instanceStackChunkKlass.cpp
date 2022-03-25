@@ -351,6 +351,15 @@ void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk) {
   iterate_stack(chunk, &closure);
 }
 
+template <chunk_frames frame_kind, typename RegisterMapT>
+static void relativize_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+  bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
+  if (has_derived) {
+    RelativizeDerivedPointers derived_closure;
+    f.iterate_derived_pointers(&derived_closure, map);
+  }
+}
+
 class RelativizeStackClosure {
   const stackChunkOop _chunk;
 
@@ -359,11 +368,7 @@ public:
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
-    if (has_derived) {
-      RelativizeDerivedPointers derived_closure;
-      f.iterate_derived_pointers(&derived_closure, map);
-    }
+    relativize_frame(f, map);
     return true;
   }
 };
@@ -451,9 +456,8 @@ public:
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    if (!_chunk->is_gc_mode() && f.is_compiled() && f.oopmap()->has_derived_oops()) {
-      RelativizeDerivedPointers derived_oops_closure;
-      f.iterate_derived_pointers(&derived_oops_closure, map);
+    if (!_chunk->is_gc_mode()) {
+      relativize_frame(f, map);
     }
 
     if (UseChunkBitmaps) {
