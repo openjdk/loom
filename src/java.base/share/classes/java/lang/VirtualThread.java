@@ -24,12 +24,8 @@
  */
 package java.lang;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.security.PrivilegedExceptionAction;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -234,7 +230,7 @@ class VirtualThread extends Thread {
     private void submitRunContinuation(boolean lazySubmit) {
         try {
             if (lazySubmit && scheduler instanceof ForkJoinPool pool) {
-                ForkJoinPools.externalLazySubmit(pool, ForkJoinTask.adapt(runContinuation));
+                pool.lazySubmit(ForkJoinTask.adapt(runContinuation));
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -1048,38 +1044,6 @@ class VirtualThread extends Thread {
                          0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
-    }
-
-    /**
-     * Defines static methods to invoke non-public ForkJoinPool methods.
-     */
-    private static class ForkJoinPools {
-        static final MethodHandle externalLazySubmit;
-        static {
-            try {
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
-                @SuppressWarnings("removal")
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                MethodType methodType = MethodType.methodType(void.class, ForkJoinTask.class);
-                externalLazySubmit = l.findVirtual(ForkJoinPool.class, "externalLazySubmit", methodType);
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
-        }
-        /**
-         * Invokes the non-public ForkJoinPool.externalLazySubmit method to
-         * submit the task to the current carrier thread's work queue.
-         */
-        static void externalLazySubmit(ForkJoinPool pool, ForkJoinTask<?> task) {
-            try {
-                externalLazySubmit.invoke(pool, task);
-            } catch (RuntimeException | Error e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new InternalError(e);
-            }
-        }
     }
 
     /**
