@@ -28,6 +28,7 @@
 
 #include "oops/instanceOop.hpp"
 #include "runtime/handles.hpp"
+#include "runtime/stackChunkFrameStream.hpp"
 #include "utilities/bitMap.hpp"
 #include "utilities/macros.hpp"
 
@@ -43,7 +44,12 @@ typedef VMRegImpl* VMReg;
 // size and sp are in machine words
 // max_size is the maximum space a thawed chunk would take up on the stack, *not* including top-most frame's metadata
 class stackChunkOopDesc : public instanceOopDesc {
+public:
+  enum class barrier_type { LOAD, STORE };
+
 private:
+  template <barrier_type barrier> friend class DoBarriersStackClosure;
+
   // Chunk flags.
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
   static const uint8_t FLAG_GC_MODE = 1 << 2; // once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
@@ -117,6 +123,18 @@ public:
 
   inline bool requires_barriers();
 
+  template <barrier_type>
+  void do_barriers();
+
+  template <barrier_type, chunk_frames frames, typename RegisterMapT>
+  inline void do_barriers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
+
+  template <class StackChunkFrameClosureType>
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
+
+  void relativize();
+  void transform();
+
   inline frame relativize(frame fr) const;
   inline frame derelativize(frame fr) const;
 
@@ -156,6 +174,15 @@ public:
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
 private:
+  template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
+  void do_barriers0(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
+
+  template <chunk_frames frames, typename RegisterMapT>
+  static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
+
+  template <chunk_frames frames, class StackChunkFrameClosureType>
+  inline void iterate_stack(StackChunkFrameClosureType* closure);
+
   inline intptr_t* relative_base() const;
 
   inline intptr_t* derelativize_address(int offset) const;

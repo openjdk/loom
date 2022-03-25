@@ -98,16 +98,11 @@ Chunk layout:
 
 
 class InstanceStackChunkKlass: public InstanceKlass {
-public:
-  enum class barrier_type { LOAD, STORE };
-
-private:
   friend class VMStructs;
   friend class InstanceKlass;
   //friend class stackChunkOopDesc;
   friend class Continuations;
   //friend class OopOopIterateStackClosure;
-  template <barrier_type barrier> friend class DoBarriersStackClosure;
 
 public:
   static const KlassID ID = InstanceStackChunkKlassID;
@@ -177,15 +172,6 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  static void relativize_chunk(stackChunkOop chunk);
-  static void transform_chunk(stackChunkOop chunk);
-
-  template <barrier_type>
-  static void do_barriers(stackChunkOop chunk);
-
-  template <barrier_type, chunk_frames frames, typename RegisterMapT>
-  inline static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
 
@@ -211,19 +197,7 @@ private:
 
   void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
 
-  template <class StackChunkFrameClosureType>
-  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
-
-  template <chunk_frames frames, class StackChunkFrameClosureType>
-  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
-
   void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
-
-  template <chunk_frames frames, typename RegisterMapT>
-  static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
-  template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
-  static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
