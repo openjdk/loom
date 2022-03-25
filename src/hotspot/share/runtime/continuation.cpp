@@ -697,6 +697,7 @@ bool Continuation::is_cont_barrier_frame(const frame& f) {
 }
 
 bool Continuation::is_return_barrier_entry(const address pc) {
+  if (!Continuations::enabled()) return false;
   return pc == StubRoutines::cont_returnBarrier();
 }
 
@@ -1298,7 +1299,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   assert(chunk_start_sp >= cont_size, "");
 
   const int chunk_new_sp = chunk_start_sp - cont_size; // the chunk's new sp, after freeze
-  assert (!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == is_chunk_available_size, "");
+  assert(!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == is_chunk_available_size, "");
 
   intptr_t* chunk_top = chunk->start_address() + chunk_new_sp;
   assert(empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
@@ -1827,7 +1828,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   if (UNLIKELY(_barriers)) {
     log_develop_trace(jvmcont)("do barriers on humongous chunk");
-    InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail());
+    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
   }
 
   log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
@@ -1875,11 +1876,11 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-      chunk = stackChunkOopDesc::cast(allocator.initialize(start));
+    chunk = stackChunkOopDesc::cast(allocator.initialize(start));
   } else {
     //HandleMark hm(current);
     Handle conth(current, _cont.continuation());
-      chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
+    chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
     _cont.post_safepoint(conth);
 
     if (chunk == nullptr) {
@@ -2668,7 +2669,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_interpreted_frame(), "");
 
   if (UNLIKELY(_barriers)) {
-    InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<Interpreted>(caller, num_frames);
@@ -2734,7 +2735,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
 
   if (!stub_caller && UNLIKELY(_barriers)) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
-    InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<Compiled>(caller, num_frames);
@@ -2806,7 +2807,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     _stream.next(&map);
     assert(!_stream.is_done(), "");
     if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
-      InstanceStackChunkKlass::do_barriers<InstanceStackChunkKlass::barrier_type::STORE>(_cont.tail(), _stream, &map);
+      _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, &map);
     }
     assert(!_stream.is_done(), "");
   }

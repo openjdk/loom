@@ -30,7 +30,10 @@
 
 class ContinuationGCSupport : public AllStatic {
 public:
-  static void relativize_chunk(oop obj);
+  // Relativize the given oop if it is a stack chunk.
+  static void relativize_stack_chunk(oop obj);
+  // Relativize and transform to use a bitmap for future oop iteration for the
+  // given oop if it is a stack chunk.
   static void transform_stack_chunk(oop obj);
 };
 

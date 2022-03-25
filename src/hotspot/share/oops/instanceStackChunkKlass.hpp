@@ -98,16 +98,11 @@ Chunk layout:
 
 
 class InstanceStackChunkKlass: public InstanceKlass {
-public:
-  enum class barrier_type { LOAD, STORE };
-
-private:
   friend class VMStructs;
   friend class InstanceKlass;
   //friend class stackChunkOopDesc;
   friend class Continuations;
   //friend class OopOopIterateStackClosure;
-  template <barrier_type barrier> friend class DoBarriersStackClosure;
 
 public:
   static const KlassID ID = InstanceStackChunkKlassID;
@@ -129,8 +124,6 @@ public:
   inline size_t instance_size(size_t stack_size_in_words) const;
 
   static inline size_t bitmap_size(size_t stack_size_in_words); // in words
-  // the *last* bit in the bitmap corresponds to the last word in the stack; this returns the bit index corresponding to the first word
-  static inline BitMap::idx_t bit_offset(size_t stack_size_in_words);
 
   // size of frame metadata (e.g. pc and link) - in words
   static inline int metadata_words();
@@ -179,18 +172,8 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 public:
-  static void relativize_chunk(stackChunkOop chunk);
-
-  template <barrier_type>
-  static void do_barriers(stackChunkOop chunk);
-
-  template <barrier_type, chunk_frames frames, typename RegisterMapT>
-  inline static void do_barriers(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
-
-  static void build_bitmap(stackChunkOop chunk);
 
 private:
   static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
@@ -214,19 +197,7 @@ private:
 
   void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
 
-  template <class StackChunkFrameClosureType>
-  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
-
-  template <chunk_frames frames, class StackChunkFrameClosureType>
-  static inline void iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure);
-
   void oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr);
-
-  template <chunk_frames frames, typename RegisterMapT>
-  static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
-  template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
-  static void do_barriers0(stackChunkOop chunk, const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 };
 
 #endif // SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP

@@ -31,12 +31,14 @@
 #include "oops/oop.inline.hpp"
 #include "oops/stackChunkOop.inline.hpp"
 
-inline void ContinuationGCSupport::relativize_chunk(oop obj) {
+inline void ContinuationGCSupport::relativize_stack_chunk(oop obj) {
   if (!obj->is_stackChunk()) {
     return;
   }
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
-  InstanceStackChunkKlass::relativize_chunk(chunk);
+  if (!chunk->is_gc_mode()) {
+    chunk->relativize();
+  }
 }
 
 inline void ContinuationGCSupport::transform_stack_chunk(oop obj) {
@@ -44,8 +46,8 @@ inline void ContinuationGCSupport::transform_stack_chunk(oop obj) {
     return;
   }
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
-  if (!chunk->has_bitmap()) {
-    InstanceStackChunkKlass::build_bitmap(chunk);
+  if (!chunk->is_gc_mode()) {
+    chunk->transform();
   }
 }
 

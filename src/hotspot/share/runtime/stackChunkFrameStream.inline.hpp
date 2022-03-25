@@ -72,7 +72,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
   DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
-  // assert (!is_empty(), ""); -- allowed to be empty
+  // assert(!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
 
@@ -274,6 +274,12 @@ inline address StackChunkFrameStream<frame_kind>::orig_pc() const {
   assert(_cb == CodeCache::find_blob_fast(pc1), "");
 
   return pc1;
+}
+
+template <chunk_frames frame_kind>
+inline int StackChunkFrameStream<frame_kind>::to_offset(stackChunkOop chunk) const {
+  assert(!is_done(), "");
+  return _sp - chunk->start_address();
 }
 
 #ifdef ASSERT

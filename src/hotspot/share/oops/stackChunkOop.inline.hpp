@@ -34,6 +34,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/registerMap.hpp"
+#include "runtime/smallRegisterMap.inline.hpp"
 #include "utilities/macros.hpp"
 #include CPU_HEADER_INLINE(stackChunkOop)
 
@@ -152,6 +153,53 @@ inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
 }
 
+template <stackChunkOopDesc::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
+void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+  if (frame_kind == chunk_frames::MIXED) {
+    // we could freeze deopted frames in slow mode.
+    f.handle_deopted();
+  }
+  do_barriers0<barrier>(f, map);
+}
+
+template <class StackChunkFrameClosureType>
+inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
+  has_mixed_frames() ? iterate_stack<chunk_frames::MIXED>(closure)
+                     : iterate_stack<chunk_frames::COMPILED_ONLY>(closure);
+}
+
+template <chunk_frames frame_kind, class StackChunkFrameClosureType>
+inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
+  const SmallRegisterMap* map = SmallRegisterMap::instance;
+  assert(!map->in_cont(), "");
+
+  StackChunkFrameStream<frame_kind> f(this);
+  bool should_continue = true;
+
+  if (f.is_stub()) {
+    RegisterMap full_map((JavaThread*)nullptr, true, false, true);
+    full_map.set_include_argument_oops(false);
+
+    f.next(&full_map);
+
+    assert(!f.is_done(), "");
+    assert(f.is_compiled(), "");
+
+    should_continue = closure->do_frame(f, &full_map);
+    f.next(map);
+    f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
+  }
+  assert(!f.is_stub(), "");
+
+  for(; should_continue && !f.is_done(); f.next(map)) {
+    if (frame_kind == chunk_frames::MIXED) {
+      // in slow mode we might freeze deoptimized frames
+      f.handle_deopted();
+    }
+    should_continue = closure->do_frame(f, map);
+  }
+}
+
 inline frame stackChunkOopDesc::relativize(frame fr)   const { relativize_frame(fr);   return fr; }
 inline frame stackChunkOopDesc::derelativize(frame fr) const { derelativize_frame(fr); return fr; }
 
@@ -170,17 +218,14 @@ inline BitMapView stackChunkOopDesc::bitmap() const {
   return bitmap;
 }
 
-inline BitMap::idx_t stackChunkOopDesc::bit_offset() const {
-  return InstanceStackChunkKlass::bit_offset(stack_size());
-}
-
 inline BitMap::idx_t stackChunkOopDesc::bit_index_for(intptr_t* p) const {
   return UseCompressedOops ? bit_index_for((narrowOop*)p) : bit_index_for((oop*)p);
 }
 
 template <typename OopT>
 inline BitMap::idx_t stackChunkOopDesc::bit_index_for(OopT* p) const {
-  return bit_offset() + (p - (OopT*)start_address());
+  assert(p >= (OopT*)start_address(), "Address not in chunk");
+  return p - (OopT*)start_address();
 }
 
 inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
@@ -189,7 +234,7 @@ inline intptr_t* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
 
 template <typename OopT>
 inline OopT* stackChunkOopDesc::address_for_bit(BitMap::idx_t index) const {
-  return (OopT*)start_address() + (index - bit_offset());
+  return (OopT*)start_address() + index;
 }
 
 inline MemRegion stackChunkOopDesc::range() {

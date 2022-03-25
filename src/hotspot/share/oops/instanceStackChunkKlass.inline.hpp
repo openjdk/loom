@@ -61,27 +61,10 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
   if (!UseChunkBitmaps) {
     return 0;
   }
+
   size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
-  static const size_t mask = BitsPerWord - 1;
-  int remainder = (size_in_bits & mask) != 0 ? 1 : 0;
-  size_t res = (size_in_bits >> LogBitsPerWord) + remainder;
-  assert (size_in_bits + bit_offset(stack_size_in_words) == (res << LogBitsPerWord), "");
-  return res;
-}
 
-inline BitMap::idx_t InstanceStackChunkKlass::bit_offset(size_t stack_size_in_words) {
-  static const size_t mask = BitsPerWord - 1;
-  return (BitMap::idx_t)((BitsPerWord - (bitmap_size_in_bits(stack_size_in_words) & mask)) & mask);
-}
-
-template <InstanceStackChunkKlass::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
-void InstanceStackChunkKlass::do_barriers(stackChunkOop chunk, const StackChunkFrameStream<frame_kind>& f,
-                                          const RegisterMapT* map) {
-  if (frame_kind == chunk_frames::MIXED) {
-    // we could freeze deopted frames in slow mode.
-    f.handle_deopted();
-  }
-  do_barriers0<barrier>(chunk, f, map);
+  return align_up(size_in_bits, BitsPerWord) >> LogBitsPerWord;
 }
 
 template <typename T, class OopClosureType>
@@ -194,44 +177,6 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, 
       StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
       chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
     }
-  }
-}
-
-template <class StackChunkFrameClosureType>
-inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure) {
-  obj->has_mixed_frames() ? iterate_stack<chunk_frames::MIXED>(obj, closure)
-                          : iterate_stack<chunk_frames::COMPILED_ONLY>(obj, closure);
-}
-
-template <chunk_frames frame_kind, class StackChunkFrameClosureType>
-inline void InstanceStackChunkKlass::iterate_stack(stackChunkOop obj, StackChunkFrameClosureType* closure) {
-  const SmallRegisterMap* map = SmallRegisterMap::instance;
-  assert (!map->in_cont(), "");
-
-  StackChunkFrameStream<frame_kind> f(obj);
-  bool should_continue = true;
-
-  if (f.is_stub()) {
-    RegisterMap full_map((JavaThread*)nullptr, true, false, true);
-    full_map.set_include_argument_oops(false);
-
-    f.next(&full_map);
-
-    assert (!f.is_done(), "");
-    assert (f.is_compiled(), "");
-
-    should_continue = closure->template do_frame<frame_kind>((const StackChunkFrameStream<frame_kind>&)f, &full_map);
-    f.next(map);
-    f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
-  }
-  assert (!f.is_stub(), "");
-
-  for(; should_continue && !f.is_done(); f.next(map)) {
-    if (frame_kind == chunk_frames::MIXED) {
-      // in slow mode we might freeze deoptimized frames
-      f.handle_deopted();
-    }
-    should_continue = closure->template do_frame<frame_kind>((const StackChunkFrameStream<frame_kind>&)f, map);
   }
 }
 

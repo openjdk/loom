@@ -34,7 +34,7 @@ public:
   static constexpr SmallRegisterMap* instance = nullptr;
 private:
   static void assert_is_rbp(VMReg r) NOT_DEBUG_RETURN
-                                     DEBUG_ONLY({ assert (r == rbp->as_VMReg() || r == rbp->as_VMReg()->next(), "Reg: %s", r->name()); })
+                                     DEBUG_ONLY({ assert(r == rbp->as_VMReg() || r == rbp->as_VMReg()->next(), "Reg: %s", r->name()); })
 public:
   // as_RegisterMap is used when we didn't want to templatize and abstract over RegisterMap type to support SmallRegisterMap
   // Consider enhancing SmallRegisterMap to support those cases
