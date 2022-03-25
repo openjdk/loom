@@ -280,7 +280,7 @@ void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {
 }
 
 void ZMark::follow_object(oop obj, bool finalizable) {
-  ContinuationGCSupport::relativize_chunk(obj);
+  ContinuationGCSupport::relativize_stack_chunk(obj);
   if (finalizable) {
     ZMarkBarrierOopClosure<true /* finalizable */> cl;
     obj->oop_iterate(&cl);

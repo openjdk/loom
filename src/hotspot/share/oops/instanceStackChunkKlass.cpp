@@ -374,10 +374,7 @@ public:
 };
 
 void InstanceStackChunkKlass::relativize_chunk(stackChunkOop chunk) {
-  if (chunk->is_gc_mode()) {
-    // Already relativized
-    return;
-  }
+  assert(!chunk->is_gc_mode(), "Should only be called once per chunk");
   chunk->set_gc_mode(true);
   OrderAccess::storestore();
   RelativizeStackClosure closure(chunk);
@@ -396,9 +393,9 @@ static inline oop safe_load(P *addr) {
 }
 #endif
 
-class FixCompressedOopClosure : public OopClosure {
+class UncompressOopsOopClosure : public OopClosure {
   void do_oop(oop* p) override {
-    assert(UseCompressedOops, "");
+    assert(UseCompressedOops, "Only needed with compressed oops");
     oop obj = CompressedOops::decode(*(narrowOop*)p);
     assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     *p = obj;
@@ -410,7 +407,7 @@ class FixCompressedOopClosure : public OopClosure {
 enum class oop_kind { NARROW, WIDE };
 
 template <oop_kind oops>
-class BuildBitmapOopClosure : public OopClosure {
+class CompressOopsAndBuildBitmapOopClosure : public OopClosure {
   stackChunkOop _chunk;
   BitMapView _bm;
 
@@ -429,7 +426,7 @@ class BuildBitmapOopClosure : public OopClosure {
   }
 
 public:
-  BuildBitmapOopClosure(stackChunkOop chunk)
+  CompressOopsAndBuildBitmapOopClosure(stackChunkOop chunk)
     : _chunk(chunk), _bm(chunk->bitmap()) {}
 
   virtual void do_oop(oop* p) override {
@@ -448,50 +445,49 @@ public:
 };
 
 template <oop_kind oops>
-class BuildBitmapStackClosure {
+class TransformStackChunkClosure {
   stackChunkOop _chunk;
 
 public:
-  BuildBitmapStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
+  TransformStackChunkClosure(stackChunkOop chunk) : _chunk(chunk) {}
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    if (!_chunk->is_gc_mode()) {
-      relativize_frame(f, map);
-    }
+    // Relativize derived oops
+    relativize_frame(f, map);
 
     if (UseChunkBitmaps) {
-      BuildBitmapOopClosure<oops> oops_closure(_chunk);
-      f.iterate_oops(&oops_closure, map);
+      CompressOopsAndBuildBitmapOopClosure<oops> cl(_chunk);
+      f.iterate_oops(&cl, map);
     }
 
     return true;
   }
 };
 
-void InstanceStackChunkKlass::build_bitmap(stackChunkOop chunk) {
-  assert(!chunk->has_bitmap(), "");
+void InstanceStackChunkKlass::transform_chunk(stackChunkOop chunk) {
+  assert(!chunk->is_gc_mode(), "Should only be called once per chunk");
+  chunk->set_gc_mode(true);
+
   if (UseChunkBitmaps) {
+    assert(!chunk->has_bitmap(), "Should only be set once");
     chunk->set_has_bitmap(true);
-    BitMapView bm = chunk->bitmap();
-    bm.clear();
+    chunk->bitmap().clear();
   }
 
   if (UseCompressedOops) {
-    BuildBitmapStackClosure<oop_kind::NARROW> closure(chunk);
+    TransformStackChunkClosure<oop_kind::NARROW> closure(chunk);
     iterate_stack(chunk, &closure);
   } else {
-    BuildBitmapStackClosure<oop_kind::WIDE> closure(chunk);
+    TransformStackChunkClosure<oop_kind::WIDE> closure(chunk);
     iterate_stack(chunk, &closure);
   }
-
-  chunk->set_gc_mode(true); // must be set *after* the above closure
 }
 
 template <typename RegisterMapT>
 void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map) {
   if (chunk->has_bitmap() && UseCompressedOops) {
-    FixCompressedOopClosure oop_closure;
+    UncompressOopsOopClosure oop_closure;
     if (f.is_interpreted_frame()) {
       f.oops_interpreted_do(&oop_closure, nullptr);
     } else {

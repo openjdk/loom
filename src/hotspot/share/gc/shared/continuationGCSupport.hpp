@@ -30,7 +30,7 @@
 
 class ContinuationGCSupport : public AllStatic {
 public:
-  static void relativize_chunk(oop obj);
+  static void relativize_stack_chunk(oop obj);
   static void transform_stack_chunk(oop obj);
 };
 
