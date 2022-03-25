@@ -177,10 +177,11 @@ static void verify_stack_chunk(oop chunk) { InstanceStackChunkKlass::verify(chun
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
-static void print_frames(JavaThread* thread, outputStream* st = tty);
+static void log_frames(JavaThread* thread);
 #else
 static void verify_continuation(oop continuation) { }
 static void verify_stack_chunk(oop chunk) { }
+static void log_frames(JavaThread* thread) { }
 #endif
 
 #ifndef PRODUCT
@@ -2031,14 +2032,8 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked,
          "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
-  LogTarget(Trace, jvmcont) lt;
-#ifdef ASSERT
-  if (lt.develop_is_enabled()) {
-    LogStream ls(lt);
-    ls.print_cr("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
-    print_frames(current, &ls);
-  }
-#endif
+  log_trace(jvmcont)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
+  log_frames(current);
 
   CONT_JFR_ONLY(EventContinuationFreeze event;)
 
@@ -2477,12 +2472,8 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 #endif
 
 #ifdef ASSERT
-  intptr_t* sp0 = stack_sp;
-  ContinuationHelper::set_anchor(_thread, sp0);
-  if (lt.develop_is_enabled()) {
-    LogStream ls(lt);
-    print_frames(_thread, &ls);
-  }
+  ContinuationHelper::set_anchor(_thread, stack_sp);
+  log_frames(_thread);
   if (LoomDeoptAfterThaw) {
     do_deopt_after_thaw(_thread);
   }
@@ -2931,19 +2922,11 @@ void ThawBase::JVMTI_continue_cleanup(JavaThread* thread) {
 // called after preparations (stack overflow check and making room)
 template<typename ConfigT>
 static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
-  LogTarget(Trace, jvmcont) lt;
-#ifdef ASSERT
-  LogStream ls(lt);
-#endif
-  // NoSafepointVerifier nsv;
+  assert(thread == JavaThread::current(), "Must be current thread");
+
   CONT_JFR_ONLY(EventContinuationThaw event;)
 
-  if (kind != thaw_top) {
-    log_develop_trace(jvmcont)("== RETURN BARRIER");
-  }
   log_develop_trace(jvmcont)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
-
-  assert(thread == JavaThread::current(), "");
 
   ContinuationEntry* entry = thread->last_continuation();
   oop oopCont = entry->cont_oop();
@@ -2958,10 +2941,9 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
 #ifdef ASSERT
-  if (lt.develop_is_enabled()) {
-    ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
-    print_frames(thread, &ls);
-  }
+  ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
+  log_frames(thread);
+  ContinuationHelper::clear_anchor(thread);
 #endif
 
   Thaw<ConfigT> thw(thread, cont);
@@ -2979,16 +2961,16 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
     sp0 += ContinuationHelper::frame_metadata; // see push_interpreter_return_frame
   }
   ContinuationHelper::set_anchor(thread, sp0);
-  if (lt.develop_is_enabled()) {
-    print_frames(thread, &ls);
-  }
+  log_frames(thread);
   if (LoomVerifyAfterThaw) {
     assert(do_verify_after_thaw(thread, thw._mode, thw.barriers(), cont.tail(), tty), "");
   }
   assert(ContinuationEntry::assert_entry_frame_laid_out(thread), "");
   ContinuationHelper::clear_anchor(thread);
 
+  LogTarget(Trace, jvmcont) lt;
   if (lt.develop_is_enabled()) {
+    LogStream ls(lt);
     ls.print_cr("Jumping to frame (thaw):");
     frame(sp).print_on(&ls);
   }
@@ -3088,15 +3070,25 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
   return true;
 }
 
-static void print_frames(JavaThread* thread, outputStream* st) {
-  st->print_cr("------- frames ---------");
-  if (!thread->has_last_Java_frame()) st->print_cr("NO ANCHOR!");
+static void log_frames(JavaThread* thread) {
+  LogTarget(Trace, jvmcont) lt;
+  if (!lt.develop_is_enabled()) {
+    return;
+  }
+  LogStream ls(lt);
+
+  ls.print_cr("------- frames ---------");
+  if (!thread->has_last_Java_frame()) {
+    ls.print_cr("NO ANCHOR!");
+  }
 
   RegisterMap map(thread, true, true, false);
   map.set_include_argument_oops(false);
 
   if (false) {
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.print_on(st);
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
+      f.print_on(&ls);
+    }
   } else {
     map.set_skip_missing(true);
     ResetNoHandleMark rnhm;
@@ -3105,11 +3097,13 @@ static void print_frames(JavaThread* thread, outputStream* st) {
     FrameValues values;
 
     int i = 0;
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) f.describe(values, i++, &map);
-    values.print_on(thread, st);
+    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map)) {
+      f.describe(values, i++, &map);
+    }
+    values.print_on(thread, &ls);
   }
 
-  st->print_cr("======= end frames =========");
+  ls.print_cr("======= end frames =========");
 }
 #endif
 
