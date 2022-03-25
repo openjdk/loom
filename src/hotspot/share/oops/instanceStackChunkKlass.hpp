@@ -178,6 +178,7 @@ public:
 
 public:
   static void relativize_chunk(stackChunkOop chunk);
+  static void transform_chunk(stackChunkOop chunk);
 
   template <barrier_type>
   static void do_barriers(stackChunkOop chunk);
@@ -187,8 +188,6 @@ public:
 
   template <typename RegisterMapT>
   static void fix_thawed_frame(stackChunkOop chunk, const frame& f, const RegisterMapT* map);
-
-  static void build_bitmap(stackChunkOop chunk);
 
 private:
   static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
