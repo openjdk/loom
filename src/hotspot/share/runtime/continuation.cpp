@@ -259,8 +259,8 @@ public:
   static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry);
   static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry);
 
-  template<typename FKind, typename RegisterMapT> static void update_register_map(const frame& f, RegisterMapT* map);
-  template<typename RegisterMapT> static void update_register_map_with_callee(const frame& f, RegisterMapT* map);
+  template<typename FKind> static void update_register_map(const frame& f, RegisterMap* map);
+  static void update_register_map_with_callee(const frame& f, RegisterMap* map);
 
   static inline void push_pd(const frame& f);
 
@@ -2034,8 +2034,10 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked,
          "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
+#ifdef ASSERT
   log_trace(jvmcont)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
   log_frames(current);
+#endif
 
   CONT_JFR_ONLY(EventContinuationFreeze event;)
 
@@ -2080,10 +2082,6 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
     StackWatermarkSet::after_unwind(current);
     return 0;
   }
-
-  // if (current->held_monitor_count() > 0) {
-  //    return freeze_pinned_monitor;
-  // }
 
   log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
   assert(current == JavaThread::current(), "must be current thread except for preempt");
