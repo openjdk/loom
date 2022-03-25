@@ -40,10 +40,8 @@ frame stackChunkOopDesc::top_frame(RegisterMap* map) {
 
   map->set_stack_chunk(this);
   fs.initialize_register_map(map);
-  // if (map->update_map() && should_fix()) InstanceStackChunkKlass::fix_frame<true, false>(fs, map);
 
   frame f = fs.to_frame();
-  // if (!maybe_fix_async_walk(f, map)) return frame();
 
   assert(to_offset(f.sp()) == sp(), "f.offset_sp(): %d sp(): %d async: %d", f.offset_sp(), sp(), map->is_async());
   relativize_frame(f);
@@ -79,25 +77,6 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
 
   return Continuation::continuation_parent_frame(map);
 }
-
-// bool stackChunkOopDesc::maybe_fix_async_walk(frame& f, RegisterMap* map) const {
-//   if (!Continuation::is_return_barrier_entry(f.pc()))
-//     return true;
-
-//   // Can happen during async stack walks, where the continuation is in the midst of a freeze/thaw
-//   assert(map->is_async(), "");
-//   address pc0 = pc();
-
-//   // we write sp first, then pc; here we read in the opposite order, so if sp is right, so is pc.
-//   OrderAccess::loadload();
-//   if (sp() == to_offset(f.sp())) {
-//     f.set_pc(pc0);
-//     return true;
-//   }
-//   assert(false, "");
-//   log_debug(jvmcont)("failed to fix frame during async stackwalk");
-//   return false;
-// }
 
 static int num_java_frames(CompiledMethod* cm, address pc) {
   int count = 0;
@@ -203,10 +182,7 @@ static void relativize_frame(const StackChunkFrameStream<frame_kind>& f, const R
 }
 
 class RelativizeStackClosure {
-  const stackChunkOop _chunk;
-
 public:
-  RelativizeStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
@@ -219,13 +195,13 @@ void stackChunkOopDesc::relativize() {
   assert(!is_gc_mode(), "Should only be called once per chunk");
   set_gc_mode(true);
   OrderAccess::storestore();
-  RelativizeStackClosure closure(this);
+  RelativizeStackClosure closure;
   iterate_stack(&closure);
 }
 
-enum class oop_kind { NARROW, WIDE };
+enum class OopKind { Narrow, Wide };
 
-template <oop_kind oops>
+template <OopKind kind>
 class CompressOopsAndBuildBitmapOopClosure : public OopClosure {
   stackChunkOop _chunk;
   BitMapView _bm;
@@ -233,14 +209,13 @@ class CompressOopsAndBuildBitmapOopClosure : public OopClosure {
   void convert_oop_to_narrowOop(oop* p) {
     oop obj = *p;
     *p = nullptr;
-    // assuming little endian
     *(narrowOop*)p = CompressedOops::encode(obj);
   }
 
   template <typename T>
   void do_oop_work(T* p) {
     BitMap::idx_t index = _chunk->bit_index_for(p);
-    assert(!_bm.at(index), "");
+    assert(!_bm.at(index), "must not be set already");
     _bm.set_bit(index);
   }
 
@@ -249,8 +224,8 @@ public:
     : _chunk(chunk), _bm(chunk->bitmap()) {}
 
   virtual void do_oop(oop* p) override {
-    if (oops == oop_kind::NARROW) {
-      // Convert all oops to narrow before marking bit
+    if (kind == OopKind::Narrow) {
+      // Convert all oops to narrow before marking the oop in the bitmap.
       convert_oop_to_narrowOop(p);
       do_oop_work((narrowOop*)p);
     } else {
@@ -263,7 +238,7 @@ public:
   }
 };
 
-template <oop_kind oops>
+template <OopKind kind>
 class TransformStackChunkClosure {
   stackChunkOop _chunk;
 
@@ -276,7 +251,7 @@ public:
     relativize_frame(f, map);
 
     if (UseChunkBitmaps) {
-      CompressOopsAndBuildBitmapOopClosure<oops> cl(_chunk);
+      CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
       f.iterate_oops(&cl, map);
     }
 
@@ -295,10 +270,10 @@ void stackChunkOopDesc::transform() {
   }
 
   if (UseCompressedOops) {
-    TransformStackChunkClosure<oop_kind::NARROW> closure(this);
+    TransformStackChunkClosure<OopKind::Narrow> closure(this);
     iterate_stack(&closure);
   } else {
-    TransformStackChunkClosure<oop_kind::WIDE> closure(this);
+    TransformStackChunkClosure<OopKind::Wide> closure(this);
     iterate_stack(&closure);
   }
 }
@@ -320,7 +295,6 @@ public:
     }
   }
 };
-
 
 template <stackChunkOopDesc::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
