@@ -27,6 +27,7 @@
 
 #include "memory/allocation.hpp"
 #include "oops/oopsHierarchy.hpp"
+#include "runtime/frame.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
@@ -92,7 +93,7 @@ public:
 
   void handle_deopted() const;
 
-  inline int to_offset(stackChunkOop chunk) const { assert(!is_done(), ""); return _sp - chunk->start_address(); }
+  inline int to_offset(stackChunkOop chunk) const;
 
   inline frame to_frame() const;
 

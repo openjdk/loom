@@ -276,6 +276,12 @@ inline address StackChunkFrameStream<frame_kind>::orig_pc() const {
   return pc1;
 }
 
+template <chunk_frames frame_kind>
+inline int StackChunkFrameStream<frame_kind>::to_offset(stackChunkOop chunk) const {
+  assert(!is_done(), "");
+  return _sp - chunk->start_address();
+}
+
 #ifdef ASSERT
 template <chunk_frames frame_kind>
 bool StackChunkFrameStream<frame_kind>::is_deoptimized() const {
