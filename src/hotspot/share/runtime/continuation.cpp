@@ -82,8 +82,6 @@
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing
 
-enum class copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
-
 /*
  * This file contains the implementation of continuation freezing (yield) and thawing (run).
  *
@@ -1043,7 +1041,6 @@ protected:
   void init_chunk(stackChunkOop chunk);
 
   // fast path
-  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
   inline void unwind_frames();
 
@@ -1132,7 +1129,6 @@ void FreezeBase::init_rest() { // we want to postpone some initialization after 
   NOT_PRODUCT(_frames = 0;)
 }
 
-template <copy_alignment aligned>
 void FreezeBase::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
   stackChunkOop chunk = _cont.tail();
   chunk->copy_from_stack_to_chunk(from, to, size);
@@ -1709,9 +1705,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   assert(Interpreted::frame_bottom(hf) == hsp + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(f) - locals,
-                                            Interpreted::frame_bottom(hf) - locals, locals); // copy locals
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
+  copy_to_chunk(Interpreted::frame_bottom(f) - locals,
+                Interpreted::frame_bottom(hf) - locals, locals); // copy locals
+  copy_to_chunk(vsp, hsp, fsize - locals); // copy rest
   assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
   relativize_interpreted_frame_metadata(f, hf);
@@ -1751,7 +1747,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   intptr_t* hsp = Compiled::frame_top(hf, callee_argsize, callee_interpreted);
 
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
+  copy_to_chunk(vsp, hsp, fsize);
   assert(!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
   if (caller.is_interpreted_frame()) {
@@ -1802,7 +1798,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
   frame hf = new_hframe<StubF>(f, caller);
   intptr_t* hsp = StubF::frame_top(hf, 0, 0);
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
+  copy_to_chunk(vsp, hsp, fsize);
   DEBUG_ONLY(after_freeze_java_frame(hf, false);)
 
   caller = hf;
@@ -2300,7 +2296,6 @@ protected:
     DEBUG_ONLY(_mode = 0;)
   }
 
-  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size);
 
   // fast path
@@ -2498,7 +2493,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   return stack_sp;
 }
 
-template <copy_alignment aligned>
 void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
   assert(to + size <= _cont.entrySP(), "");
   _cont.tail()->copy_from_chunk_to_stack(from, to, size);
@@ -2727,9 +2721,9 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_heap_frame(), "should be");
   assert(!f.is_heap_frame(), "should not be");
 
-  copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(hf) - locals,
-                                        Interpreted::frame_bottom(f) - locals, locals); // copy locals
-  copy_from_chunk<copy_alignment::WORD_ALIGNED>(hsp, vsp, fsize - locals); // copy rest
+  copy_from_chunk(Interpreted::frame_bottom(hf) - locals,
+                  Interpreted::frame_bottom(f) - locals, locals); // copy locals
+  copy_from_chunk(hsp, vsp, fsize - locals); // copy rest
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
   derelativize_interpreted_frame_metadata(hf, f);
