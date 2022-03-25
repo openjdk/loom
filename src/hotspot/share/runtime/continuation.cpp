@@ -1821,7 +1821,6 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
   }
 
   set_top_frame_metadata_pd(top);
-  assert(top.pc() == Frame::real_pc(top), "");
 
   OrderAccess::storestore();
   chunk->set_sp(chunk->to_offset(top.sp()));
@@ -3194,12 +3193,10 @@ static address thaw_entry   = nullptr;
 static address freeze_entry = nullptr;
 
 address Continuation::thaw_entry() {
-  assert(::thaw_entry != nullptr,  "");
   return ::thaw_entry;
 }
 
 address Continuation::freeze_entry() {
-  assert(::freeze_entry != nullptr, "");
   return ::freeze_entry;
 }
 
