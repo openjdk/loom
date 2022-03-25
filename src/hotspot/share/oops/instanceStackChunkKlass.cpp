@@ -407,12 +407,11 @@ enum class oop_kind { NARROW, WIDE };
 template <oop_kind oops>
 class BuildBitmapOopClosure : public OopClosure {
   intptr_t* const _stack_start;
-  const BitMap::idx_t _bit_offset;
   BitMapView _bm;
 
 public:
-  BuildBitmapOopClosure(intptr_t* stack_start, BitMap::idx_t bit_offset, BitMapView bm)
-    : _stack_start(stack_start), _bit_offset(bit_offset), _bm(bm) {}
+  BuildBitmapOopClosure(intptr_t* stack_start, BitMapView bm)
+    : _stack_start(stack_start), _bm(bm) {}
 
   virtual void do_oop(oop* p) override {
     assert(p >= (oop*)_stack_start, "");
@@ -424,7 +423,7 @@ public:
       *(narrowOop*)p = CompressedOops::encode(obj);
       do_oop((narrowOop*)p);
     } else {
-      BitMap::idx_t index = _bit_offset + (p - (oop*)_stack_start);
+      BitMap::idx_t index = (p - (oop*)_stack_start);
       assert(!_bm.at(index), "");
       _bm.set_bit(index);
     }
@@ -432,7 +431,7 @@ public:
 
   virtual void do_oop(narrowOop* p) override {
     assert(p >= (narrowOop*)_stack_start, "");
-    BitMap::idx_t index = _bit_offset + (p - (narrowOop*)_stack_start);
+    BitMap::idx_t index = (p - (narrowOop*)_stack_start);
     assert(!_bm.at(index), "");
     _bm.set_bit(index);
   }
@@ -441,10 +440,9 @@ public:
 template <oop_kind oops>
 class BuildBitmapStackClosure {
   stackChunkOop _chunk;
-  const BitMap::idx_t _bit_offset;
 
 public:
-  BuildBitmapStackClosure(stackChunkOop chunk) : _chunk(chunk), _bit_offset(chunk->bit_offset()) {}
+  BuildBitmapStackClosure(stackChunkOop chunk) : _chunk(chunk) {}
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
@@ -454,7 +452,7 @@ public:
     }
 
     if (UseChunkBitmaps) {
-      BuildBitmapOopClosure<oops> oops_closure(_chunk->start_address(), _chunk->bit_offset(), _chunk->bitmap());
+      BuildBitmapOopClosure<oops> oops_closure(_chunk->start_address(), _chunk->bitmap());
       f.iterate_oops(&oops_closure, map);
     }
 
@@ -521,8 +519,8 @@ public:
     if (!SafepointSynchronize::is_at_safepoint()) {
       oop obj = safe_load(p);
       assert(obj == nullptr || dbg_is_good_oop(obj),
-              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT " bit_offset: " SIZE_FORMAT,
-              p2i(p), p2i((oopDesc*)obj), index, _chunk->bit_offset());
+              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT,
+              p2i(p), p2i((oopDesc*)obj), index);
     }
 
     return true; // continue processing
@@ -548,7 +546,7 @@ public:
     oop obj = safe_load(p);
     assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     if (_chunk->has_bitmap()) {
-      BitMap::idx_t index = (p - (T*)_chunk->start_address()) + _chunk->bit_offset();
+      BitMap::idx_t index = (p - (T*)_chunk->start_address());
       assert(_chunk->bitmap().at(index), "Bit not set at index " SIZE_FORMAT " corresponding to " INTPTR_FORMAT, index, p2i(p));
     }
   }
@@ -734,9 +732,9 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   }
 
   if (chunk->has_bitmap()) {
-    assert(chunk->bitmap().size() == chunk->bit_offset() + (size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)),
-      "bitmap().size(): %zu bit_offset: %zu stack_size: %d",
-      chunk->bitmap().size(), chunk->bit_offset(), chunk->stack_size());
+    assert(chunk->bitmap().size() == align_up((size_t)(chunk->stack_size() << (UseCompressedOops ? 1 : 0)), BitsPerWord),
+      "bitmap().size(): %zu stack_size: %d",
+      chunk->bitmap().size(), chunk->stack_size());
     int oop_count;
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(chunk);
