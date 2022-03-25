@@ -1,33 +1,4 @@
 /*
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- *
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
- * or visit www.oracle.com if you need additional information or have any
- * questions.
- */
-
-/*
- * This file is available under and governed by the GNU General Public
- * License version 2 only, as published by the Free Software Foundation.
- * However, the following notice accompanied the original version of this
- * file:
- *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
@@ -35,8 +6,7 @@
 
 package java.util.concurrent;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import jdk.internal.misc.Unsafe;
 
 /**
  * A {@link ForkJoinTask} with a completion action performed when
@@ -538,7 +508,7 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * @param delta the value to add
      */
     public final void addToPendingCount(int delta) {
-        PENDING.getAndAdd(this, delta);
+        U.getAndAddInt(this, PENDING, delta);
     }
 
     /**
@@ -550,12 +520,12 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
      * @return {@code true} if successful
      */
     public final boolean compareAndSetPendingCount(int expected, int count) {
-        return PENDING.compareAndSet(this, expected, count);
+        return U.compareAndSetInt(this, PENDING, expected, count);
     }
 
     // internal-only weak version
     final boolean weakCompareAndSetPendingCount(int expected, int count) {
-        return PENDING.weakCompareAndSet(this, expected, count);
+        return U.weakCompareAndSetInt(this, PENDING, expected, count);
     }
 
     /**
@@ -731,7 +701,6 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
         if (q != null && maxTasks > 0)
             q.helpComplete(this, owned, maxTasks);
     }
-
     // ForkJoinTask overrides
 
     /**
@@ -777,15 +746,16 @@ public abstract class CountedCompleter<T> extends ForkJoinTask<T> {
     @Override
     protected void setRawResult(T t) { }
 
-    // VarHandle mechanics
-    private static final VarHandle PENDING;
+    /*
+     * This class uses jdk-internal Unsafe for atomics and special
+     * memory modes, rather than VarHandles, to avoid initialization
+     * dependencies in other jdk components that require early
+     * parallelism.
+     */
+    private static final Unsafe U;
+    private static final long PENDING;
     static {
-        try {
-            MethodHandles.Lookup l = MethodHandles.lookup();
-            PENDING = l.findVarHandle(CountedCompleter.class, "pending", int.class);
-
-        } catch (ReflectiveOperationException e) {
-            throw new ExceptionInInitializerError(e);
-        }
+        U = Unsafe.getUnsafe();
+        PENDING = U.objectFieldOffset(CountedCompleter.class, "pending");
     }
 }
