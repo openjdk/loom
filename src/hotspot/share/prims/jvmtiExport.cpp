@@ -1272,18 +1272,6 @@ void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
-#ifdef DBG // TMP
-    JvmtiThreadState* state = thread->jvmti_thread_state();
-
-    if (state != NULL) {
-      printf("DBG: JvmtiExport::check_suspend_at_safepoint: state: %p virt: %d jt: %p vt-susp: %d ct-susp: %d\n",
-             (void*)state, state->is_virtual(), (void*)thread,
-             JvmtiVTSuspender::is_vthread_suspended(vt),
-             thread->is_thread_suspended()
-            );
-      fflush(0);
-    }
-#endif
     // block while vthread is externally suspended
     while (JvmtiVTSuspender::is_vthread_suspended(vth())) {
       ml.wait();

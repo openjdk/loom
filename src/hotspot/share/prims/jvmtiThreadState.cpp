@@ -361,7 +361,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
   }
 #ifdef ASSERT
   if (attempts == 0) {
-    tty->print_cr("DBG: start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
+    tty->print_cr("start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
                   thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
     print_info();
     assert(false, "stuck in JvmtiVTMTDisabler::start_VTMT");
@@ -543,27 +543,9 @@ void JvmtiThreadState::add_env(JvmtiEnvBase *env) {
 
 void JvmtiThreadState::enter_interp_only_mode() {
   assert(_thread != NULL, "sanity check");
-  if (_thread == NULL) {
-    ++_saved_interp_only_mode;
-    // TBD: It seems, invalidate_cur_stack_depth() has to be called at VTMT?
-  } else {
-#ifdef DBG // TMP
-  if (is_interp_only_mode()) {
-    ResourceMark rm(JavaThread::current());
-    oop name_oop = java_lang_Thread::name(get_thread_oop());
-    const char* name_str = java_lang_String::as_utf8_string(name_oop);
-    name_str = name_str == NULL ? "<NULL>" : name_str;
-
-    const char* virt = is_virtual() ? "virtual" : "carrier";
-    printf("DBG: enter_interp_only_mode: %s state: %p, interp_only: %d, saved_interp_only: %d, %s\n",
-           virt, (void*)this, _thread->get_interp_only_mode(), _saved_interp_only_mode, name_str); fflush(0);
-  }
-#endif
-    _thread->increment_interp_only_mode();
-    invalidate_cur_stack_depth();
-  }
+  _thread->increment_interp_only_mode();
+  invalidate_cur_stack_depth();
 }
-
 
 void JvmtiThreadState::leave_interp_only_mode() {
   assert(is_interp_only_mode(), "leaving interp only when mode not one");
