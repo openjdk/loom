@@ -82,8 +82,6 @@
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing
 
-enum class copy_alignment { WORD_ALIGNED, DWORD_ALIGNED };
-
 /*
  * This file contains the implementation of continuation freezing (yield) and thawing (run).
  *
@@ -174,14 +172,15 @@ Address |   |                            |    |   Caller is still in the chunk.
 #ifdef ASSERT
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // address p is readable and *(intptr_t*)p != errvalue
 
-NOINLINE static bool verify_continuation(oop continuation) { return Continuation::debug_verify_continuation(continuation); }
-#define VERIFY_CONTINUATION(cont) verify_continuation((cont))
-NOINLINE static bool verify_stack_chunk(oop chunk) { return InstanceStackChunkKlass::verify(chunk); }
-#define VERIFY_STACK_CHUNK(chunk) verify_stack_chunk((chunk))
+static void verify_continuation(oop continuation) { Continuation::debug_verify_continuation(continuation); }
+static void verify_stack_chunk(oop chunk) { InstanceStackChunkKlass::verify(chunk); }
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, stackChunkOop chunk, outputStream* st);
 static void print_frames(JavaThread* thread, outputStream* st = tty);
+#else
+static void verify_continuation(oop continuation) { }
+static void verify_stack_chunk(oop chunk) { }
 #endif
 
 #ifndef PRODUCT
@@ -970,8 +969,8 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
 }
 
 #ifdef ASSERT
-NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
-  DEBUG_ONLY(if (!VerifyContinuations) return true;)
+void Continuation::debug_verify_continuation(oop contOop) {
+  DEBUG_ONLY(if (!VerifyContinuations) return;)
   assert(contOop != nullptr, "");
   assert(oopDesc::is_oop(contOop), "");
   ContinuationWrapper cont(contOop);
@@ -998,17 +997,15 @@ NOINLINE bool Continuation::debug_verify_continuation(oop contOop) {
   const bool is_empty = cont.is_empty();
   assert(!nonempty_chunk || !is_empty, "");
   assert(is_empty == (!nonempty_chunk && cont.last_frame().is_empty()), "");
-
-  return true;
 }
 
-void Continuation::debug_print_continuation(oop contOop, outputStream* st) {
-  if (st == nullptr) st = tty;
+void Continuation::print(oop continuation) { print_on(tty, continuation); }
 
-  ContinuationWrapper cont(contOop);
+void Continuation::print_on(outputStream* st, oop continuation) {
+  ContinuationWrapper cont(continuation);
 
   st->print_cr("CONTINUATION: " PTR_FORMAT " done: %d",
-    contOop->identity_hash(), jdk_internal_vm_Continuation::done(contOop));
+    continuation->identity_hash(), jdk_internal_vm_Continuation::done(continuation));
   st->print_cr("CHUNKS:");
   for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
     st->print("* ");
@@ -1044,7 +1041,6 @@ protected:
   void init_chunk(stackChunkOop chunk);
 
   // fast path
-  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
   inline void unwind_frames();
 
@@ -1133,7 +1129,6 @@ void FreezeBase::init_rest() { // we want to postpone some initialization after 
   NOT_PRODUCT(_frames = 0;)
 }
 
-template <copy_alignment aligned>
 void FreezeBase::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
   stackChunkOop chunk = _cont.tail();
   chunk->copy_from_stack_to_chunk(from, to, size);
@@ -1340,7 +1335,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   }
 
   assert(_cont.chunk_invariant(tty), "");
-  assert(VERIFY_STACK_CHUNK(chunk), "");
+  verify_stack_chunk(chunk);
 
 #if CONT_JFR
   EventContinuationFreezeYoung e;
@@ -1710,9 +1705,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   assert(Interpreted::frame_bottom(hf) == hsp + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(f) - locals,
-                                            Interpreted::frame_bottom(hf) - locals, locals); // copy locals
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize - locals); // copy rest
+  copy_to_chunk(Interpreted::frame_bottom(f) - locals,
+                Interpreted::frame_bottom(hf) - locals, locals); // copy locals
+  copy_to_chunk(vsp, hsp, fsize - locals); // copy rest
   assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
   relativize_interpreted_frame_metadata(f, hf);
@@ -1752,7 +1747,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   intptr_t* hsp = Compiled::frame_top(hf, callee_argsize, callee_interpreted);
 
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
+  copy_to_chunk(vsp, hsp, fsize);
   assert(!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
   if (caller.is_interpreted_frame()) {
@@ -1803,7 +1798,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
   frame hf = new_hframe<StubF>(f, caller);
   intptr_t* hsp = StubF::frame_top(hf, 0, 0);
-  copy_to_chunk<copy_alignment::WORD_ALIGNED>(vsp, hsp, fsize);
+  copy_to_chunk(vsp, hsp, fsize);
   DEBUG_ONLY(after_freeze_java_frame(hf, false);)
 
   caller = hf;
@@ -2009,7 +2004,7 @@ static int early_return(int res, JavaThread* thread) {
 }
 
 static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
-  assert(VERIFY_CONTINUATION(cont.continuation()), "");
+  verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
 
   thread->set_cont_yield(false);
@@ -2020,7 +2015,7 @@ static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
 
 static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
-    assert(VERIFY_CONTINUATION(cont.continuation()), "");
+    verify_continuation(cont.continuation());
     return early_return(res, thread);
   }
 
@@ -2055,7 +2050,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(oopCont == current->last_continuation()->cont_oop(), "");
   assert(ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
-  assert(VERIFY_CONTINUATION(oopCont), "");
+  verify_continuation(oopCont);
   ContinuationWrapper cont(current, oopCont);
   log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
@@ -2063,7 +2058,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 
   if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
-    assert(VERIFY_CONTINUATION(cont.continuation()), "");
+    verify_continuation(cont.continuation());
     return early_return(freeze_pinned_cs, current);
   }
 
@@ -2243,7 +2238,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
   oop continuation = thread->last_continuation()->cont_oop();
   assert(continuation == ContinuationHelper::get_continuation(thread), "");
-  assert(VERIFY_CONTINUATION(continuation), "");
+  verify_continuation(continuation);
 
   stackChunkOop chunk = jdk_internal_vm_Continuation::tail(continuation);
   assert(chunk != nullptr, "");
@@ -2253,7 +2248,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   }
   assert(chunk != nullptr, "");
   assert(!chunk->is_empty(), "");
-  assert(VERIFY_STACK_CHUNK(chunk), "");
+  verify_stack_chunk(chunk);
 
   int size = chunk->max_size();
   guarantee (size > 0, "");
@@ -2301,7 +2296,6 @@ protected:
     DEBUG_ONLY(_mode = 0;)
   }
 
-  template <copy_alignment aligned = copy_alignment::DWORD_ALIGNED>
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size);
 
   // fast path
@@ -2360,7 +2354,7 @@ template <typename ConfigT>
 inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
   assert(!Interpreter::contains(_cont.entryPC()), "");
 
-  assert(VERIFY_CONTINUATION(_cont.continuation()), "");
+  verify_continuation(_cont.continuation());
   assert(!jdk_internal_vm_Continuation::done(_cont.continuation()), "");
   assert(!_cont.is_empty(), "");
 
@@ -2499,7 +2493,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   return stack_sp;
 }
 
-template <copy_alignment aligned>
 void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
   assert(to + size <= _cont.entrySP(), "");
   _cont.tail()->copy_from_chunk_to_stack(from, to, size);
@@ -2728,9 +2721,9 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_heap_frame(), "should be");
   assert(!f.is_heap_frame(), "should not be");
 
-  copy_from_chunk<copy_alignment::WORD_ALIGNED>(Interpreted::frame_bottom(hf) - locals,
-                                        Interpreted::frame_bottom(f) - locals, locals); // copy locals
-  copy_from_chunk<copy_alignment::WORD_ALIGNED>(hsp, vsp, fsize - locals); // copy rest
+  copy_from_chunk(Interpreted::frame_bottom(hf) - locals,
+                  Interpreted::frame_bottom(f) - locals, locals); // copy locals
+  copy_from_chunk(hsp, vsp, fsize - locals); // copy rest
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
   derelativize_interpreted_frame_metadata(hf, f);
@@ -2958,7 +2951,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   assert(!jdk_internal_vm_Continuation::done(oopCont), "");
   assert(oopCont == ContinuationHelper::get_continuation(thread), "");
-  assert(VERIFY_CONTINUATION(oopCont), "");
+  verify_continuation(oopCont);
 
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
@@ -2978,7 +2971,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   thread->reset_held_monitor_count();
 
-  assert(VERIFY_CONTINUATION(cont.continuation()), "");
+  verify_continuation(cont.continuation());
 
 #ifdef ASSERT
   intptr_t* sp0 = sp;
@@ -3004,7 +2997,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   CONT_JFR_ONLY(cont.post_jfr_event(&event, thread);)
 
-  assert(VERIFY_CONTINUATION(cont.continuation()), "");
+  verify_continuation(cont.continuation());
   log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
 
   return sp;
