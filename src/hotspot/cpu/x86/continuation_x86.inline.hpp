@@ -67,8 +67,8 @@ inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
   return sp;
 }
 
-template<typename FKind, typename RegisterMapT>
-inline void ContinuationHelper::update_register_map(const frame& f, RegisterMapT* map) {
+template<typename FKind>
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
 }
 
@@ -77,8 +77,7 @@ void ContinuationEntry::update_register_map(RegisterMap* map) const {
   frame::update_map_with_saved_link(map, fp);
 }
 
-template<typename RegisterMapT>
-inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMapT* map) {
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
   frame::update_map_with_saved_link(map, Frame::callee_link_address(f));
 }
 
@@ -204,11 +203,14 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
   assert(chunk->is_in_chunk(hf.sp() - 1), "");
   assert(chunk->is_in_chunk(hf.sp() - frame::sender_sp_offset), "");
 
+  address frame_pc = hf.pc();
+
   *(hf.sp() - 1) = (intptr_t)hf.pc();
 
   intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
   *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
                                        : (intptr_t)hf.fp();
+  assert(frame_pc == Frame::real_pc(hf), "");
 }
 
 inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
