@@ -243,10 +243,6 @@ public:
   static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
     return thaw0<SelfT>(thread, kind);
   }
-
-  static bool requires_barriers(stackChunkOop obj) {
-    return obj->requires_barriers();
-  }
 };
 
 class ContinuationHelper {
@@ -1098,7 +1094,7 @@ public:
   template <bool chunk_available> bool freeze_fast(intptr_t* top_sp);
 
 protected:
-  virtual bool requires_barriers(stackChunkOop chunk) override { return ConfigT::requires_barriers(chunk); }
+  virtual bool requires_barriers(stackChunkOop chunk) override { return chunk->requires_barriers(); }
   virtual stackChunkOop allocate_chunk_slow(size_t stack_size) override { return allocate_chunk(stack_size); }
 };
 
@@ -1183,7 +1179,7 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
 #endif
   ) {
   stackChunkOop chunk = _cont.tail();
-  if (chunk == nullptr || chunk->is_gc_mode() || ConfigT::requires_barriers(chunk) || chunk->has_mixed_frames()) {
+  if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
     log_develop_trace(jvmcont)("is_chunk_available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
     return false;
   }
@@ -1895,7 +1891,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
       return nullptr;
     }
 
-    _barriers = ConfigT::requires_barriers(chunk);
+    _barriers = chunk->requires_barriers();
   }
 
   assert(chunk->stack_size() == (int)stack_size, "");
@@ -1921,9 +1917,9 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->parent() == nullptr || chunk->parent()->is_stackChunk(), "");
 
   if (start != nullptr) {
-    assert(!ConfigT::requires_barriers(chunk), "Unfamiliar GC requires barriers on TLAB allocation");
+    assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
   } else {
-    _barriers = ConfigT::requires_barriers(chunk);
+    _barriers = chunk->requires_barriers();
   }
 
   _cont.set_tail(chunk);
@@ -2363,7 +2359,7 @@ inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
   stackChunkOop chunk = _cont.tail();
   assert(chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
 
-  _barriers = ConfigT::requires_barriers(chunk);
+  _barriers = chunk->requires_barriers();
   return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
                                         : thaw_slow(chunk, kind != thaw_top);
 }
