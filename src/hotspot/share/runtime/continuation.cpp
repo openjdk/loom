@@ -971,7 +971,9 @@ void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_o
 
 #ifdef ASSERT
 void Continuation::debug_verify_continuation(oop contOop) {
-  DEBUG_ONLY(if (!VerifyContinuations) return;)
+  if (!VerifyContinuations) {
+    return true;
+  }
   assert(contOop != nullptr, "");
   assert(oopDesc::is_oop(contOop), "");
   ContinuationWrapper cont(contOop);
@@ -1549,8 +1551,9 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
-      if (chunk == nullptr) ls.print_cr("no chunk");
-      else {
+      if (chunk == nullptr) {
+        ls.print_cr("no chunk");
+      } else {
         ls.print_cr("chunk barriers: %d _size: %d free size: %d",
           chunk->requires_barriers(), _size, chunk->sp() - ContinuationHelper::frame_metadata);
         chunk->print_on(&ls);
@@ -1662,7 +1665,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   { // TODO PD
     assert((f.at(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
     intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
-    if (real_unextended_sp != nullptr) f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
+    if (real_unextended_sp != nullptr) {
+      f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
+    }
   }
 #else
   Unimplemented();
@@ -1792,7 +1797,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
   }
 
   freeze_result result = recurse_freeze_compiled_frame(senderf, caller, 0, 0); // This might be deoptimized
-  if (UNLIKELY(result > freeze_ok_bottom)) return result;
+  if (UNLIKELY(result > freeze_ok_bottom)) {
+    return result;
+  }
   assert(result != freeze_ok_bottom, "");
   assert(!caller.is_interpreted_frame(), "");
 
@@ -2027,7 +2034,7 @@ static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_r
 template<typename ConfigT, bool preempt>
 static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(!current->cont_yield(), "");
-  assert(!current->has_pending_exception(), ""); // if (current->has_pending_exception()) return early_return(freeze_exception, current, fi);
+  assert(!current->has_pending_exception(), "");
   assert(current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
   assert(!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked,
          "thread_state: %d %s", current->thread_state(), current->thread_state_name());
@@ -3000,13 +3007,12 @@ static void do_deopt_after_thaw(JavaThread* thread) {
   }
 }
 
-static bool is_good_oop(oop o) {
-  return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass();
-}
-
 class ThawVerifyOopsClosure: public OopClosure {
   intptr_t* _p;
   outputStream* _st;
+  bool is_good_oop(oop o) {
+    return dbg_is_safe(o, -1) && dbg_is_safe(o->klass(), -1) && oopDesc::is_oop(o) && o->klass()->is_klass();
+  }
 public:
   ThawVerifyOopsClosure(outputStream* st) : _p(nullptr), _st(st) {}
   intptr_t* p() { return _p; }
@@ -3055,12 +3061,10 @@ static bool do_verify_after_thaw(JavaThread* thread, int mode, bool barriers, st
       if (!fr.is_interpreted_frame()) {
         st->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
       }
-  #ifdef ASSERT
       VMReg reg = fst.register_map()->find_register_spilled_here(cl.p(), fst.current()->sp());
       if (reg != nullptr) {
         st->print_cr("Reg %s %d", reg->name(), reg->is_stack() ? (int)reg->reg2stack() : -99);
       }
-  #endif
       cl.reset();
       DEBUG_ONLY(thread->print_frame_layout();)
       chunk->print_on(true, st);
