@@ -176,6 +176,7 @@ inline BitMap::idx_t stackChunkOopDesc::bit_index_for(intptr_t* p) const {
 
 template <typename OopT>
 inline BitMap::idx_t stackChunkOopDesc::bit_index_for(OopT* p) const {
+  assert(p >= (OopT*)start_address(), "Address not in chunk");
   return p - (OopT*)start_address();
 }
 

@@ -406,34 +406,39 @@ enum class oop_kind { NARROW, WIDE };
 
 template <oop_kind oops>
 class BuildBitmapOopClosure : public OopClosure {
-  intptr_t* const _stack_start;
+  stackChunkOop _chunk;
   BitMapView _bm;
 
+  void convert_oop_to_narrowOop(oop* p) {
+    oop obj = *p;
+    *p = nullptr;
+    // assuming little endian
+    *(narrowOop*)p = CompressedOops::encode(obj);
+  }
+
+  template <typename T>
+  void do_oop_work(T* p) {
+    BitMap::idx_t index = _chunk->bit_index_for(p);
+    assert(!_bm.at(index), "");
+    _bm.set_bit(index);
+  }
+
 public:
-  BuildBitmapOopClosure(intptr_t* stack_start, BitMapView bm)
-    : _stack_start(stack_start), _bm(bm) {}
+  BuildBitmapOopClosure(stackChunkOop chunk)
+    : _chunk(chunk), _bm(chunk->bitmap()) {}
 
   virtual void do_oop(oop* p) override {
-    assert(p >= (oop*)_stack_start, "");
     if (oops == oop_kind::NARROW) {
       // Convert all oops to narrow before marking bit
-      oop obj = *p;
-      *p = nullptr;
-      // assuming little endian
-      *(narrowOop*)p = CompressedOops::encode(obj);
-      do_oop((narrowOop*)p);
+      convert_oop_to_narrowOop(p);
+      do_oop_work((narrowOop*)p);
     } else {
-      BitMap::idx_t index = (p - (oop*)_stack_start);
-      assert(!_bm.at(index), "");
-      _bm.set_bit(index);
+      do_oop_work(p);
     }
   }
 
   virtual void do_oop(narrowOop* p) override {
-    assert(p >= (narrowOop*)_stack_start, "");
-    BitMap::idx_t index = (p - (narrowOop*)_stack_start);
-    assert(!_bm.at(index), "");
-    _bm.set_bit(index);
+    do_oop_work(p);
   }
 };
 
@@ -452,7 +457,7 @@ public:
     }
 
     if (UseChunkBitmaps) {
-      BuildBitmapOopClosure<oops> oops_closure(_chunk->start_address(), _chunk->bitmap());
+      BuildBitmapOopClosure<oops> oops_closure(_chunk);
       f.iterate_oops(&oops_closure, map);
     }
 
@@ -539,14 +544,14 @@ public:
   void do_oop(oop* p) override { (_chunk->has_bitmap() && UseCompressedOops) ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   void do_oop(narrowOop* p) override { do_oop_work(p); }
 
-  template <class T> inline void do_oop_work(T* p) {
+  template <typename T> inline void do_oop_work(T* p) {
      _count++;
     if (SafepointSynchronize::is_at_safepoint()) return;
 
     oop obj = safe_load(p);
     assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     if (_chunk->has_bitmap()) {
-      BitMap::idx_t index = (p - (T*)_chunk->start_address());
+      BitMap::idx_t index = _chunk->bit_index_for(p);
       assert(_chunk->bitmap().at(index), "Bit not set at index " SIZE_FORMAT " corresponding to " INTPTR_FORMAT, index, p2i(p));
     }
   }
