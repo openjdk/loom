@@ -79,8 +79,7 @@ void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline void Freeze<ConfigT>::set_top_frame_metadata_pd(const frame& hf) {
+inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
   Unimplemented();
 }
 
@@ -90,8 +89,7 @@ inline frame FreezeBase::sender(const frame& f) {
   return frame();
 }
 
-template <typename ConfigT>
-template<typename FKind> frame Freeze<ConfigT>::new_hframe(frame& f, frame& caller) {
+template<typename FKind> frame FreezeBase::new_hframe(frame& f, frame& caller) {
   Unimplemented();
   return frame();
 }
@@ -100,25 +98,20 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
   Unimplemented();
 }
 
-template <typename ConfigT>
-template <typename FKind>
-inline void Freeze<ConfigT>::patch_pd(frame& hf, const frame& caller) {
+inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline void Freeze<ConfigT>::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline frame Thaw<ConfigT>::new_entry_frame() {
+inline frame ThawBase::new_entry_frame() {
   Unimplemented();
   return frame();
 }
 
-template <typename ConfigT>
-template<typename FKind> frame Thaw<ConfigT>::new_frame(const frame& hf, frame& caller, bool bottom) {
+template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
   Unimplemented();
   return frame();
 }
@@ -131,31 +124,25 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, c
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline intptr_t* Thaw<ConfigT>::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
+inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
   Unimplemented();
   return NULL;
 }
 
-template <typename ConfigT>
-template<typename FKind>
-inline void Thaw<ConfigT>::patch_pd(frame& f, const frame& caller) {
+inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-intptr_t* Thaw<ConfigT>::push_interpreter_return_frame(intptr_t* sp) {
+intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
   Unimplemented();
   return NULL;
 }
 
-template <typename ConfigT>
-void Thaw<ConfigT>::patch_chunk_pd(intptr_t* sp) {
+void ThawBase::patch_chunk_pd(intptr_t* sp) {
   Unimplemented();
 }
 
-template <typename ConfigT>
-inline void Thaw<ConfigT>::prefetch_chunk_pd(void* start, int size) {
+inline void ThawBase::prefetch_chunk_pd(void* start, int size) {
   Unimplemented();
 }
 
