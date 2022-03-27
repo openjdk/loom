@@ -1658,7 +1658,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                                        (SP_MASK & c)))));
         else if ((int)c == 0)                 // was dropped on timeout
             cfg &= ~SRC;                      // suppress signal if last
-        if (!tryTerminate(false, false) && w != null) {
+        if (!tryTerminate(false, false, false) && w != null) {
             ReentrantLock lock; WorkQueue[] qs; int n, i;
             long ns = w.nsteals & 0xffffffffL;
             if ((lock = registrationLock) != null) {
@@ -1861,7 +1861,7 @@ public class ForkJoinPool extends AbstractExecutorService {
         if (idle && hasSubmissions() && w.phase < 0)
             reactivate();                        // check for stragglers
         if ((rs = runState) < 0 ||
-            (rs != 0 && idle && tryTerminate(false, false)))
+            (rs != 0 && idle && tryTerminate(false, false, true)))
             return -1;                           // quiescent termination
         while ((p = w.phase) < 0 && --spins > 0)
             Thread.onSpinWait();                 // spin before block
@@ -2469,9 +2469,10 @@ public class ForkJoinPool extends AbstractExecutorService {
      * @param now if true, unconditionally terminate, else only
      * if no work and no active workers
      * @param enable if true, terminate when next possible
+     * @param canInitiate false if can help terminate only if already triggered
      * @return true if terminating or terminated
      */
-    private boolean tryTerminate(boolean now, boolean enable) {
+    private boolean tryTerminate(boolean now, boolean enable, boolean canInitiate) {
         int rs; ReentrantLock lock; Condition cond;
         if ((rs = runState) >= 0) {                 // set SHUTDOWN and/or STOP
             if ((config & ISCOMMON) != 0)
@@ -2482,7 +2483,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                         return false;
                     getAndBitwiseOrRunState(SHUTDOWN);
                 }
-                if (!canStop())
+                if (!canInitiate || !canStop())
                     return false;
             }
             getAndBitwiseOrRunState(SHUTDOWN | STOP);
@@ -3397,7 +3398,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     public void shutdown() {
         checkPermission();
-        tryTerminate(false, true);
+        tryTerminate(false, true, true);
     }
 
     /**
@@ -3420,7 +3421,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     public List<Runnable> shutdownNow() {
         checkPermission();
-        tryTerminate(true, true);
+        tryTerminate(true, true, true);
         return Collections.emptyList();
     }
 
@@ -3483,7 +3484,7 @@ public class ForkJoinPool extends AbstractExecutorService {
             terminated = false;
         }
         else if (!(terminated = ((runState & TERMINATED) != 0))) {
-            tryTerminate(false, false); // reduce transient blocking
+            tryTerminate(false, false, false); // reduce transient blocking
             if ((lock = registrationLock) != null &&
                 !(terminated = (((runState & TERMINATED) != 0)))) {
                 lock.lock();
