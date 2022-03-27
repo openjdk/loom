@@ -287,7 +287,8 @@ class VM_VThreadGetCurrentLocation : public VM_Operation {
     ResourceMark rm;
     javaVFrame* jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
 
-    if (jvf != NULL) { // TBD: jvf can be NULL, most likely, when vthread is exiting
+    if (jvf != NULL) {
+      // jvf can be NULL, when the native enterSpecial frame is on the top
       Method* method = jvf->method();
       _method_id = method->jmethod_id();
       _bci = jvf->bci();
