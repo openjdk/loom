@@ -180,7 +180,10 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 runtime/Thread/StopAtExit.java                                               8283610 generic-all
 
-serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java	         8264699 generic-all
+runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java                 8283555 generic-all
+
+serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java        8279663 windows-all
+serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorVMEventsTest.java#id0  8280914 generic-all
 serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorVMEventsTest.java#id1  8280914 generic-all
 
