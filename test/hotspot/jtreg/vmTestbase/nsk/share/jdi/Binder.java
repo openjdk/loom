@@ -740,8 +740,7 @@ public class Binder extends DebugeeBinder {
             arg.setValue(argumentHandler.getLaunchExecName());
         }
 
-        // vthread fixme: at some point we are going to have to be able to pass tests
-        // without having this flag turned on.
+        // This flag is needed so VirtualThread.allThreads() includes known vthreads.
         arg = (Connector.StringArgument) arguments.get("enumeratevthreads");
         arg.setValue("y");
 
