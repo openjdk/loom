@@ -151,6 +151,7 @@ public class thread001 {
             if (checkedRequest != null) {
                 log.display("Disabling event request");
                 checkedRequest.disable();
+                vm.resume();
             }
 
             // force debuggee to quit
