@@ -620,20 +620,14 @@ void Continuation::jump_from_safepoint(JavaThread* thread) {
 }
 
 JVM_ENTRY(void, CONT_pin(JNIEnv* env, jclass cls)) {
-  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-  ContinuationEntry* entry = thread->last_continuation();
-  if (entry == nullptr) return; // no continuation mounted
-  if (!entry->pin()) {
+  if (!Continuation::pin(JavaThread::thread_from_jni_environment(env))) {
      THROW_MSG(vmSymbols::java_lang_IllegalStateException(), "pin overflow");
   }
 }
 JVM_END
 
 JVM_ENTRY(void, CONT_unpin(JNIEnv* env, jclass cls)) {
-  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
-  ContinuationEntry* entry = thread->last_continuation();
-  if (entry == nullptr) return; // no continuation mounted
-  if (!entry->unpin()) {
+  if (!Continuation::unpin(JavaThread::thread_from_jni_environment(env))) {
      THROW_MSG(vmSymbols::java_lang_IllegalStateException(), "pin underflow");
   }
 }
