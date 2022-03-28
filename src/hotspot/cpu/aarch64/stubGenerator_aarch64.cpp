@@ -8101,11 +8101,12 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ strw(c_rarg3, Address(sp, ContinuationEntry::flags_offset()));
   __ str (zr,      Address(sp, ContinuationEntry::chunk_offset()));
   __ strw(zr,      Address(sp, ContinuationEntry::argsize_offset()));
+  __ strw(zr,      Address(sp, ContinuationEntry::pin_count_offset()));
 
   __ ldr(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ str(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
-  __ ldr(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
-  __ str(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  __ ldrw(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+  __ strw(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
 
   __ str(zr, Address(rthread, JavaThread::cont_fastpath_offset()));
   __ reset_held_monitor_count(rthread);
@@ -8125,8 +8126,8 @@ void continuation_enter_cleanup(MacroAssembler* masm) {
 
   __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_cont_fastpath_offset()));
   __ str(rscratch1, Address(rthread, JavaThread::cont_fastpath_offset()));
-  __ ldr(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
-  __ str(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
+  __ ldrw(rscratch1, Address(sp, ContinuationEntry::parent_held_monitor_count_offset()));
+  __ strw(rscratch1, Address(rthread, JavaThread::held_monitor_count_offset()));
 
   __ ldr(rscratch2, Address(sp, ContinuationEntry::parent_offset()));
   __ str(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
