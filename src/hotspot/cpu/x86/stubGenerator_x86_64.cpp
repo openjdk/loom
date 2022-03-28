@@ -8339,6 +8339,7 @@ void fill_continuation_entry(MacroAssembler* masm) {
   __ movl  (Address(rsp, ContinuationEntry::flags_offset()), c_rarg3);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movl(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
+  __ movl(Address(rsp, ContinuationEntry::pin_count_offset()), (int32_t)0);
 
   __ movptr(rax, Address(r15_thread, JavaThread::cont_fastpath_offset()));
   __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rax);

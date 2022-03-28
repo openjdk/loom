@@ -619,6 +619,26 @@ void Continuation::jump_from_safepoint(JavaThread* thread) {
   ShouldNotReachHere();
 }
 
+JVM_ENTRY(void, CONT_pin(JNIEnv* env, jclass cls)) {
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ContinuationEntry* entry = thread->last_continuation();
+  if (entry == nullptr) return; // no continuation mounted
+  if (!entry->pin()) {
+     THROW_MSG(vmSymbols::java_lang_IllegalStateException(), "pin overflow");
+  }
+}
+JVM_END
+
+JVM_ENTRY(void, CONT_unpin(JNIEnv* env, jclass cls)) {
+  JavaThread* thread = JavaThread::thread_from_jni_environment(env);
+  ContinuationEntry* entry = thread->last_continuation();
+  if (entry == nullptr) return; // no continuation mounted
+  if (!entry->unpin()) {
+     THROW_MSG(vmSymbols::java_lang_IllegalStateException(), "pin underflow");
+  }
+}
+JVM_END
+
 JVM_ENTRY(jint, CONT_isPinned0(JNIEnv* env, jobject cont_scope)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
   return is_pinned0(thread, JNIHandles::resolve(cont_scope), false);
@@ -845,37 +865,17 @@ bool Continuation::is_in_usable_stack(address addr, const RegisterMap* map) {
 bool Continuation::pin(JavaThread* current) {
   ContinuationEntry* ce = current->last_continuation();
   if (ce == nullptr) {
-    return true;
+    return true; // no continuation mounted
   }
-
-  oop continuation = ce->cont_oop();
-  assert(continuation != nullptr, "");
-  assert(continuation == ContinuationHelper::get_continuation(current), "");
-
-  jshort value = jdk_internal_vm_Continuation::critical_section(continuation);
-  if (value < max_jshort) {
-    jdk_internal_vm_Continuation::set_critical_section(continuation, value + 1);
-    return true;
-  }
-  return false;
+  return ce->pin();
 }
 
 bool Continuation::unpin(JavaThread* current) {
   ContinuationEntry* ce = current->last_continuation();
   if (ce == nullptr) {
-    return true;
+    return true; // no continuation mounted
   }
-
-  oop continuation = ce->cont_oop();
-  assert(continuation != nullptr, "");
-  assert(continuation == ContinuationHelper::get_continuation(current), "");
-
-  jshort value = jdk_internal_vm_Continuation::critical_section(continuation);
-  if (value > 0) {
-    jdk_internal_vm_Continuation::set_critical_section(continuation, value - 1);
-    return true;
-  }
-  return false;
+  return ce->unpin();
 }
 
 bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const frame& callee,
@@ -2053,7 +2053,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
-  if (jdk_internal_vm_Continuation::critical_section(oopCont) > 0) {
+  if (entry->is_pinned()) {
     log_develop_debug(jvmcont)("PINNED due to critical section");
     verify_continuation(cont.continuation());
     return early_return(freeze_pinned_cs, current);
@@ -2098,7 +2098,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   if (entry == nullptr) {
     return freeze_ok;
   }
-  if (jdk_internal_vm_Continuation::critical_section(entry->continuation()) > 0) {
+  if (entry->is_pinned()) {
     return freeze_pinned_cs;
   }
 
@@ -2137,7 +2137,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
       if (entry == nullptr) {
         break;
       }
-      if (jdk_internal_vm_Continuation::critical_section(entry->continuation()) > 0) {
+      if (entry->is_pinned()) {
         return freeze_pinned_cs;
       }
     }
@@ -3243,6 +3243,8 @@ void Continuation::init() {
 
 static JNINativeMethod CONT_methods[] = {
     {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_TryForceYield0)},
+    {CC"pin",              CC"()V",                                    FN_PTR(CONT_pin)},
+    {CC"unpin",            CC"()V",                                    FN_PTR(CONT_unpin)},
     {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
 };
 

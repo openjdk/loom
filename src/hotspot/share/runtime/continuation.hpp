@@ -142,6 +142,7 @@ private:
   int _argsize;
   intptr_t* _parent_cont_fastpath;
   int _parent_held_monitor_count;
+  uint _pin_count;
 
 public:
   static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
@@ -149,6 +150,7 @@ public:
   static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
   static ByteSize flags_offset()    { return byte_offset_of(ContinuationEntry, _flags); }
   static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
+  static ByteSize pin_count_offset(){ return byte_offset_of(ContinuationEntry, _pin_count); }
   static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
   static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
 
@@ -168,6 +170,18 @@ public:
 
   int argsize() const { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
+
+  bool is_pinned() { return _pin_count > 0; }
+  bool pin() {
+    if (_pin_count == UINT_MAX) return false;
+    _pin_count++;
+    return true;
+  }
+  bool unpin() {
+    if (_pin_count == 0) return false;
+    _pin_count--;
+    return true;
+  }
 
   intptr_t* parent_cont_fastpath() const { return _parent_cont_fastpath; }
   void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }

@@ -141,8 +141,6 @@ public class Continuation {
     private Object yieldInfo;
     private boolean preempted;
 
-    private short cs; // critical section semaphore
-
     private Object[] scopeLocalCache;
 
     /**
@@ -448,30 +446,14 @@ public class Continuation {
      * Pins the current continuation (enters a critical section).
      * This increments an internal semaphore that, when greater than 0, pins the continuation.
      */
-    public static void pin() {
-        Continuation cont = JLA.getContinuation(currentCarrierThread());
-        if (cont != null) {
-            assert cont.cs >= 0;
-            if (cont.cs == Short.MAX_VALUE)
-                throw new IllegalStateException("Too many pins");
-            cont.cs++;
-        }
-    }
+    public static native void pin();
 
     /**
      * Unpins the current continuation (exits a critical section).
      * This decrements an internal semaphore that, when equal 0, unpins the current continuation
-     * if pinne with {@link #pin()}.
+     * if pinned with {@link #pin()}.
      */
-    public static void unpin() {
-        Continuation cont = JLA.getContinuation(currentCarrierThread());
-        if (cont != null) {
-            assert cont.cs >= 0;
-            if (cont.cs == 0)
-                throw new IllegalStateException("Not pinned");
-            cont.cs--;
-        }
-    }
+    public static native void unpin();
 
     /**
      * Tests whether the given scope is pinned.
