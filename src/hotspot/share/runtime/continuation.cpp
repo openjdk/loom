@@ -545,7 +545,6 @@ int Continuation::try_force_yield(JavaThread* target, const oop continuation) {
   log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
 
   ContinuationEntry* ce = target->last_continuation();
-  oop innermost = ce->continuation();
   while (ce != nullptr && ce->continuation() != continuation) {
     ce = ce->parent();
   }
@@ -564,6 +563,7 @@ int Continuation::try_force_yield(JavaThread* target, const oop continuation) {
          "fast_path at codelet %s",
          Interpreter::codelet_containing(target->last_Java_pc())->description());
 
+  const oop innermost = ce->continuation();
   const oop scope = jdk_internal_vm_Continuation::scope(continuation);
   if (innermost != continuation) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
