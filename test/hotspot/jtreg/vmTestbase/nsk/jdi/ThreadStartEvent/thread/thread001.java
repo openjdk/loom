@@ -151,6 +151,7 @@ public class thread001 {
             if (checkedRequest != null) {
                 log.display("Disabling event request");
                 checkedRequest.disable();
+                // need to resume all threads in case a stray ThreadStartEvent arrived
                 vm.resume();
             }
 
