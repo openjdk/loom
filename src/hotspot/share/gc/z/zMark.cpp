@@ -260,6 +260,7 @@ public:
   }
 
   virtual void do_nmethod(nmethod* nm) {
+    assert(!finalizable, "Can't handle finalizable marking of nmethods");
     nm->run_nmethod_entry_barrier();
   }
 };
@@ -280,7 +281,13 @@ void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {
 }
 
 void ZMark::follow_object(oop obj, bool finalizable) {
-  ContinuationGCSupport::relativize_stack_chunk(obj);
+  if (ContinuationGCSupport::relativize_stack_chunk(obj)) {
+    // Loom doesn't support mixing of finalizable marking and strong marking of chunks
+    ZMarkBarrierOopClosure<false /* finalizable */> cl;
+    obj->oop_iterate(&cl);
+    return;
+  }
+
   if (finalizable) {
     ZMarkBarrierOopClosure<true /* finalizable */> cl;
     obj->oop_iterate(&cl);
