@@ -166,7 +166,6 @@ void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosur
 }
 
 class OopIterateStackChunkFrameClosure {
-  stackChunkOop _chunk;
   OopIterateClosure* const _closure;
   MemRegion _bound;
   const bool _do_metadata;
@@ -175,9 +174,8 @@ public:
   int _num_frames;
   int _num_oops;
 
-  OopIterateStackChunkFrameClosure(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr)
-    : _chunk(chunk),
-      _closure(closure),
+  OopIterateStackChunkFrameClosure(OopIterateClosure* closure, MemRegion mr)
+    : _closure(closure),
       _bound(mr),
       _do_metadata(_closure->do_metadata()),
       _num_frames(0),
@@ -201,7 +199,7 @@ public:
 };
 
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  OopIterateStackChunkFrameClosure frame_closure(chunk, closure, mr);
+  OopIterateStackChunkFrameClosure frame_closure(closure, mr);
   chunk->iterate_stack(&frame_closure);
 
   assert(frame_closure._num_frames >= 0, "");
@@ -256,7 +254,7 @@ template void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, con
 
 #ifdef ASSERT
 
-template <typename OopT>
+template <typename T>
 class StackChunkVerifyBitmapClosure : public BitMapClosure {
   stackChunkOop _chunk;
 
@@ -266,7 +264,7 @@ public:
   StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {}
 
   bool do_bit(BitMap::idx_t index) override {
-    OopT* p = _chunk->address_for_bit<OopT>(index);
+    T* p = _chunk->address_for_bit<T>(index);
     _count++;
 
     if (!SafepointSynchronize::is_at_safepoint()) {
@@ -282,12 +280,11 @@ public:
 
 class StackChunkVerifyOopsClosure : public OopClosure {
   stackChunkOop _chunk;
-  intptr_t* _unextended_sp;
   int _count;
 
 public:
-  StackChunkVerifyOopsClosure(stackChunkOop chunk, intptr_t* unextended_sp)
-    : _chunk(chunk), _unextended_sp(unextended_sp), _count(0) {}
+  StackChunkVerifyOopsClosure(stackChunkOop chunk)
+    : _chunk(chunk), _count(0) {}
 
   void do_oop(oop* p) override { (_chunk->has_bitmap() && UseCompressedOops) ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
   void do_oop(narrowOop* p) override { do_oop_work(p); }
@@ -309,11 +306,10 @@ public:
 
 class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
   stackChunkOop _chunk;
-  intptr_t* _unextended_sp;
 
 public:
-  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk, intptr_t* unextended_sp)
-    : _chunk(chunk), _unextended_sp(unextended_sp) {}
+  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk)
+    : _chunk(chunk) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     if (SafepointSynchronize::is_at_safepoint()) {
@@ -392,11 +388,11 @@ public:
       _num_i2c++;
     }
 
-    StackChunkVerifyOopsClosure oops_closure(_chunk, f.unextended_sp());
+    StackChunkVerifyOopsClosure oops_closure(_chunk);
     f.iterate_oops(&oops_closure, map);
     assert(oops_closure.count() == num_oops, "oops: %d oopmap->num_oops(): %d", oops_closure.count(), num_oops);
 
-    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk, f.unextended_sp());
+    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk);
     f.iterate_derived_pointers(&derived_oops_closure, map);
 
     _callee_interpreted = f.is_interpreted();
@@ -546,11 +542,10 @@ public:
 #endif
 
 class PrintStackChunkClosure {
-  stackChunkOop _chunk;
   outputStream* _st;
 
 public:
-  PrintStackChunkClosure(stackChunkOop chunk, outputStream* st) : _chunk(chunk), _st(st) {}
+  PrintStackChunkClosure(outputStream* st) : _st(st) {}
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& fs, const RegisterMapT* map) {
@@ -584,7 +579,7 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   if (verbose) {
     st->cr();
     st->print_cr("------ chunk frames end: " INTPTR_FORMAT, p2i(c->bottom_address()));
-    PrintStackChunkClosure closure(c, st);
+    PrintStackChunkClosure closure(st);
     c->iterate_stack(&closure);
     st->print_cr("------");
 
