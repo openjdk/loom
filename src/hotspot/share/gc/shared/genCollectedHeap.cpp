@@ -913,6 +913,10 @@ bool GenCollectedHeap::is_in_young(oop p) const {
   return result;
 }
 
+bool GenCollectedHeap::requires_barriers(stackChunkOop obj) const {
+  return !is_in_young(obj);
+}
+
 // Returns "TRUE" iff "p" points into the committed areas of the heap.
 bool GenCollectedHeap::is_in(const void* p) const {
   return _young_gen->is_in(p) || _old_gen->is_in(p);
