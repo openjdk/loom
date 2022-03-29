@@ -334,6 +334,63 @@ template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::S
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
+class DerelativizeDerivedOopClosure : public DerivedOopClosure {
+public:
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+    // The ordering in the following is crucial
+    OrderAccess::loadload();
+    oop base = Atomic::load(base_loc);
+    if (base != nullptr) {
+      assert(!CompressedOops::is_base(base), "");
+      ZGC_ONLY(assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
+
+      OrderAccess::loadload();
+      intptr_t offset = Atomic::load((intptr_t*)derived_loc); // *derived_loc;
+
+      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
+      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
+      if (offset <= 0) {
+        offset = -offset;
+        Atomic::store((intptr_t*)derived_loc, cast_from_oop<intptr_t>(base) + offset);
+      }
+    }
+  }
+};
+
+class UncompressOopsOopClosure : public OopClosure {
+public:
+  void do_oop(oop* p) override {
+    assert(UseCompressedOops, "Only needed with compressed oops");
+    oop obj = CompressedOops::decode(*(narrowOop*)p);
+    assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+    *p = obj;
+  }
+
+  void do_oop(narrowOop* p) override {}
+};
+
+template <typename RegisterMapT>
+void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map) {
+  if (has_bitmap() && UseCompressedOops) {
+    UncompressOopsOopClosure oop_closure;
+    if (f.is_interpreted_frame()) {
+      f.oops_interpreted_do(&oop_closure, nullptr);
+    } else {
+      OopMapDo<UncompressOopsOopClosure, DerivedOopClosure, SkipNullValue> visitor(&oop_closure, nullptr);
+      visitor.oops_do(&f, map, f.oop_map());
+    }
+  }
+
+  if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
+    DerelativizeDerivedOopClosure derived_closure;
+    OopMapDo<OopClosure, DerelativizeDerivedOopClosure, SkipNullValue> visitor(nullptr, &derived_closure);
+    visitor.oops_do(&f, map, f.oop_map());
+  }
+}
+
+template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMap* map);
+template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const SmallRegisterMap* map);
+
 void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
   if (this == nullptr) {
     st->print_cr("NULL");

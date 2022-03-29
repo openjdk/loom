@@ -2718,7 +2718,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
   if (!bottom) {
     // can only fix caller once this frame is thawed (due to callee saved regs)
-    InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
+    _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && locals > 0) {
     assert(hf.is_heap_frame(), "should be");
     clear_bitmap_bits(Interpreted::frame_bottom(hf) - locals, locals);
@@ -2787,7 +2787,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   if (!bottom) {
     // can only fix caller once this frame is thawed (due to callee saved regs)
-    InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, SmallRegisterMap::instance);
+    _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
     clear_bitmap_bits(hsp + Compiled::size(hf), added_argsize);
   }
@@ -2832,7 +2832,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     map.set_include_argument_oops(false);
     f.oop_map()->update_register_map(&f, &map);
     ContinuationHelper::update_register_map_with_callee(caller, &map);
-    InstanceStackChunkKlass::fix_thawed_frame(_cont.tail(), caller, &map);
+    _cont.tail()->fix_thawed_frame(caller, &map);
   }
 
   DEBUG_ONLY(after_thaw_java_frame(f, false);)
@@ -2860,7 +2860,7 @@ void ThawBase::finish_thaw(frame& f) {
     f.set_sp(f.sp() - 1);
   }
   push_return_frame(f);
-  InstanceStackChunkKlass::fix_thawed_frame(chunk, f, SmallRegisterMap::instance); // can only fix caller after push_return_frame (due to callee saved regs)
+  chunk->fix_thawed_frame(f, SmallRegisterMap::instance); // can only fix caller after push_return_frame (due to callee saved regs)
 
   assert(_cont.is_empty() == _cont.last_frame().is_empty(), "");
 

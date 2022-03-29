@@ -129,6 +129,9 @@ public:
   template <barrier_type, chunk_frames frames, typename RegisterMapT>
   inline void do_barriers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
+  template <typename RegisterMapT>
+  void fix_thawed_frame(const frame& f, const RegisterMapT* map);
+
   template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
