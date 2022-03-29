@@ -597,15 +597,3 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   #endif
   }
 }
-
-#ifndef PRODUCT
-template void StackChunkFrameStream<chunk_frames::MIXED>::print_on(outputStream* st) const;
-template void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::print_on(outputStream* st) const;
-
-template <chunk_frames frames>
-void StackChunkFrameStream<frames>::print_on(outputStream* st) const {
-  st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d",
-    p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
-  to_frame().print_on(st);
-}
-#endif

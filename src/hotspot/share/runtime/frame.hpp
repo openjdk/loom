@@ -27,7 +27,7 @@
 
 #include "code/vmregTypes.hpp"
 #include "compiler/oopMap.hpp"
-#include "oops/stackChunkOop.hpp"
+#include "oops/oopsHierarchy.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/monitorChunk.hpp"
 #include "utilities/growableArray.hpp"
