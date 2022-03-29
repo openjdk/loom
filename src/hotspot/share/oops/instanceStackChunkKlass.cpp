@@ -211,11 +211,10 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, Oo
 }
 
 #ifdef ASSERT
-template<class P>
-static inline oop safe_load(P *addr) {
-  oop obj = (oop)RawAccess<>::oop_load(addr);
-  obj = (oop)NativeAccess<>::oop_load(&obj);
-  return obj;
+template <typename P>
+static inline oop safe_load(P* addr) {
+  oop obj = RawAccess<>::oop_load(addr);
+  return NativeAccess<>::oop_load(&obj);
 }
 #endif
 
