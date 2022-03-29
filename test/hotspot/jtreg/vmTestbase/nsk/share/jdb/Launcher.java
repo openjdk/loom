@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -161,6 +161,15 @@ public class Launcher extends DebugeeBinder {
 
         String jdbExecPath = argumentHandler.getJdbExecPath();
         args.add(jdbExecPath.trim());
+
+        if (argumentHandler.isLaunchingConnector()) {
+            /* Need --enable-preview on the debuggee in order to support virtual threads. */
+            boolean vthreadMode = "Virtual".equals(System.getProperty("main.wrapper"));
+            if (vthreadMode) {
+                args.add("-R--enable-preview");
+            }
+        }
+
         args.addAll(argumentHandler.enwrapJavaOptions(argumentHandler.getJavaOptions()));
 
         String jdbOptions = argumentHandler.getJdbOptions();
