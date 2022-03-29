@@ -1882,7 +1882,8 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
       return nullptr;
     }
 
-    _barriers = chunk->requires_barriers();
+    _barriers = !UseZGC && chunk->requires_barriers();
+    assert(!UseZGC || !chunk->requires_barriers(), "");
   }
 
   assert(chunk->stack_size() == (int)stack_size, "");
