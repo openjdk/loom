@@ -149,13 +149,17 @@ public class Reflection {
                 } catch (Exception e) { }
             });
             vthread.start();
+            try {
+                // give thread time to be scheduled
+                Thread.sleep(100);
 
-            Thread.sleep(100); // give thread time to be scheduled
-
-            // unpark with another virtual thread, runs on same carrier thread
-            Thread unparker = factory.newThread(() -> LockSupport.unpark(vthread));
-            unparker.start();
-            unparker.join();
+                // unpark with another virtual thread, runs on same carrier thread
+                Thread unparker = factory.newThread(() -> LockSupport.unpark(vthread));
+                unparker.start();
+                unparker.join();
+            } finally {
+                LockSupport.unpark(vthread);  // in case test fails
+            }
         }
     }
 

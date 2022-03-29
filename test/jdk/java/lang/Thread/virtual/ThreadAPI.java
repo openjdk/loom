@@ -1691,16 +1691,20 @@ public class ThreadAPI {
                 Thread t2 = builder.unstarted(LockSupport::park);
                 assertTrue(t2.getState() == Thread.State.NEW);
 
-                // runnable (not mounted)
+                // start t2 to make it runnable
                 t2.start();
-                assertTrue(t2.getState() == Thread.State.RUNNABLE);
+                try {
+                    assertTrue(t2.getState() == Thread.State.RUNNABLE);
 
-                // yield to allow t2 to run and park
-                Thread.yield();
-                assertTrue(t2.getState() == Thread.State.WAITING);
+                    // yield to allow t2 to run and park
+                    Thread.yield();
+                    assertTrue(t2.getState() == Thread.State.WAITING);
+                } finally {
+                    // unpark t2 to make it runnable again
+                    LockSupport.unpark(t2);
+                }
 
-                // unpark t2 and check runnable (not mounted)
-                LockSupport.unpark(t2);
+                // t2 should be runnable (not mounted)
                 assertTrue(t2.getState() == Thread.State.RUNNABLE);
 
                 completed.set(true);
