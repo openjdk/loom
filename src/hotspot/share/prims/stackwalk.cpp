@@ -76,7 +76,7 @@ void BaseFrameStream::set_continuation(Handle cont) {
   // This actually also sets a copy of the handle in the RegisterMap,
   // but that's OK, because we want them to be the same, anyway.
   // (although we don't rely on this sharing, and set the other copy again)
-  *(_continuation.raw_value()) = cont();
+  _continuation.replace(cont());
 }
 
 JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode, Handle cont_scope, Handle cont)

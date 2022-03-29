@@ -43,6 +43,11 @@ inline Handle::Handle(Thread* thread, oop obj, bool allocNull) {
   }
 }
 
+inline void Handle::replace(oop obj) {
+  assert(_handle != NULL, "should not use replace");
+  *_handle = obj;
+}
+
 // Inline constructors for Specific Handles for different oop types
 #define DEF_HANDLE_CONSTR(type, is_a)                   \
 inline type##Handle::type##Handle (Thread* thread, type##Oop obj, bool allocNull) : Handle(thread, (oop)obj, allocNull) { \

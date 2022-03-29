@@ -100,6 +100,8 @@ class Handle {
   // since duplicates is only valid as long as original handle is alive.
   oop* raw_value() const                         { return _handle; }
   static oop raw_resolve(oop *handle)            { return handle == NULL ? (oop)NULL : *handle; }
+
+  inline void replace(oop obj);
 };
 
 // Specific Handles for different oop types
