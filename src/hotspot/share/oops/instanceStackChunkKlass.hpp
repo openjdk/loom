@@ -100,9 +100,7 @@ Chunk layout:
 class InstanceStackChunkKlass: public InstanceKlass {
   friend class VMStructs;
   friend class InstanceKlass;
-  //friend class stackChunkOopDesc;
   friend class Continuations;
-  //friend class OopOopIterateStackClosure;
 
 public:
   static const KlassID ID = InstanceStackChunkKlassID;
