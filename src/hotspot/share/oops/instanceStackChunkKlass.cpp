@@ -502,7 +502,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   return true;
 }
 
-namespace {
 class DescribeStackChunkClosure {
   stackChunkOop _chunk;
   FrameValues _values;
@@ -544,10 +543,8 @@ public:
     }
   }
 };
-}
 #endif
 
-namespace {
 class PrintStackChunkClosure {
   stackChunkOop _chunk;
   outputStream* _st;
@@ -569,7 +566,6 @@ public:
     return true;
   }
 };
-}
 
 void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, outputStream* st) {
   if (c == nullptr) {
