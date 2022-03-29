@@ -219,6 +219,7 @@ static inline oop safe_load(P* addr) {
 #endif
 
 class UncompressOopsOopClosure : public OopClosure {
+public:
   void do_oop(oop* p) override {
     assert(UseCompressedOops, "Only needed with compressed oops");
     oop obj = CompressedOops::decode(*(narrowOop*)p);
@@ -236,7 +237,7 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
     if (f.is_interpreted_frame()) {
       f.oops_interpreted_do(&oop_closure, nullptr);
     } else {
-      OopMapDo<OopClosure, DerelativizeDerivedPointers, SkipNullValue> visitor(&oop_closure, nullptr);
+      OopMapDo<UncompressOopsOopClosure, DerivedOopClosure, SkipNullValue> visitor(&oop_closure, nullptr);
       visitor.oops_do(&f, map, f.oop_map());
     }
   }
