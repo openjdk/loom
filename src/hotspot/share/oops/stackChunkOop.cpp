@@ -126,8 +126,8 @@ void stackChunkOopDesc::do_barriers() {
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::barrier_type::LOAD> ();
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::barrier_type::STORE>();
 
-// We replace derived pointers with offsets; the converse is done in DerelativizeDerivedPointers
-class RelativizeDerivedPointers : public DerivedOopClosure {
+// We replace derived oops with offsets; the converse is done in DerelativizeDerivedOopClosure
+class RelativizeDerivedOopClosure : public DerivedOopClosure {
 public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // The ordering in the following is crucial
@@ -173,20 +173,20 @@ public:
 };
 
 template <chunk_frames frame_kind, typename RegisterMapT>
-static void relativize_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+static void relativize_derived_oops(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+  assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
   bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
   if (has_derived) {
-    RelativizeDerivedPointers derived_closure;
+    RelativizeDerivedOopClosure derived_closure;
     f.iterate_derived_pointers(&derived_closure, map);
   }
 }
 
-class RelativizeStackClosure {
+class RelativizeDerivedOopsStackChunkFrameClosure {
 public:
-
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    relativize_frame(f, map);
+    relativize_derived_oops(f, map);
     return true;
   }
 };
@@ -195,7 +195,7 @@ void stackChunkOopDesc::relativize() {
   assert(!is_gc_mode(), "Should only be called once per chunk");
   set_gc_mode(true);
   OrderAccess::storestore();
-  RelativizeStackClosure closure;
+  RelativizeDerivedOopsStackChunkFrameClosure closure;
   iterate_stack(&closure);
 }
 
@@ -247,8 +247,7 @@ public:
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    // Relativize derived oops
-    relativize_frame(f, map);
+    relativize_derived_oops(f, map);
 
     if (UseChunkBitmaps) {
       CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
@@ -314,11 +313,7 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
   }
 
-  assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
-  bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
-  if (has_derived) {
-    relativize_derived_pointers(f, map);
-  }
+  relativize_derived_oops(f, map);
 
   if (has_bitmap() && UseCompressedOops) {
     BarrierClosure<barrier, true> oops_closure(f.sp());
@@ -338,17 +333,6 @@ template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::L
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
-
-template <chunk_frames frame_kind, typename RegisterMapT>
-void stackChunkOopDesc::relativize_derived_pointers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-  RelativizeDerivedPointers derived_closure;
-  f.iterate_derived_pointers(&derived_closure, map);
-}
-
-template void stackChunkOopDesc::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
-template void stackChunkOopDesc::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
-template void stackChunkOopDesc::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
-template void stackChunkOopDesc::relativize_derived_pointers<>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
 void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
   if (this == nullptr) {

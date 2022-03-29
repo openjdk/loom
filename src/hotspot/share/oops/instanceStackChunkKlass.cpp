@@ -89,7 +89,7 @@ void InstanceStackChunkKlass::oop_print_on(oop obj, outputStream* st) {
 }
 #endif
 
-class DerelativizeDerivedPointers : public DerivedOopClosure {
+class DerelativizeDerivedOopClosure : public DerivedOopClosure {
 public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // The ordering in the following is crucial
@@ -243,8 +243,8 @@ void InstanceStackChunkKlass::fix_thawed_frame(stackChunkOop chunk, const frame&
   }
 
   if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
-    DerelativizeDerivedPointers derived_closure;
-    OopMapDo<OopClosure, DerelativizeDerivedPointers, SkipNullValue> visitor(nullptr, &derived_closure);
+    DerelativizeDerivedOopClosure derived_closure;
+    OopMapDo<OopClosure, DerelativizeDerivedOopClosure, SkipNullValue> visitor(nullptr, &derived_closure);
     visitor.oops_do(&f, map, f.oop_map());
   }
 }

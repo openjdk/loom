@@ -177,9 +177,6 @@ private:
   template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
   void do_barriers0(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
-  template <chunk_frames frames, typename RegisterMapT>
-  static void relativize_derived_pointers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
-
   template <chunk_frames frames, class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
