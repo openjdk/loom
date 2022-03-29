@@ -1871,6 +1871,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
     chunk = stackChunkOopDesc::cast(allocator.initialize(start));
+    assert(!chunk->requires_barriers(), "TLAB object requires barriers");
   } else {
     //HandleMark hm(current);
     Handle conth(current, _cont.continuation());
@@ -1882,8 +1883,8 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
       return nullptr;
     }
 
-    _barriers = !UseZGC && chunk->requires_barriers();
-    assert(!UseZGC || !chunk->requires_barriers(), "");
+    // assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
+    _barriers = chunk->requires_barriers();
   }
 
   assert(chunk->stack_size() == (int)stack_size, "");
