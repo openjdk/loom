@@ -191,7 +191,7 @@ private:
   inline void oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr);
 
   template <class OopClosureType>
-  inline void oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
+  inline void oop_oop_iterate_stack_with_bitmap(stackChunkOop chunk, OopClosureType* closure, intptr_t* start, intptr_t* end);
 
   void mark_methods(stackChunkOop chunk, OopIterateClosure* cl);
 

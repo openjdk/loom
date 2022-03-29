@@ -133,7 +133,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
     if ((intptr_t*)mr.end() < end) {
       end = (intptr_t*)mr.end();
     }
-    oop_oop_iterate_stack_helper(chunk, closure, start, end);
+    oop_oop_iterate_stack_with_bitmap(chunk, closure, start, end);
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, mr);
   }
@@ -142,7 +142,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
 template <class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
   if (LIKELY(chunk->has_bitmap())) {
-    oop_oop_iterate_stack_helper(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
+    oop_oop_iterate_stack_with_bitmap(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());
   }
@@ -163,8 +163,8 @@ public:
 };
 
 template <class OopClosureType>
-void InstanceStackChunkKlass::oop_oop_iterate_stack_helper(stackChunkOop chunk, OopClosureType* closure,
-                                                           intptr_t* start, intptr_t* end) {
+void InstanceStackChunkKlass::oop_oop_iterate_stack_with_bitmap(stackChunkOop chunk, OopClosureType* closure,
+                                                                intptr_t* start, intptr_t* end) {
   if (Devirtualizer::do_metadata(closure)) {
     mark_methods(chunk, closure);
   }
