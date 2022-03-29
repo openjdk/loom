@@ -355,7 +355,6 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     BarrierClosure<barrier, false> oops_closure(f.sp());
     f.iterate_oops(&oops_closure, map);
   }
-  OrderAccess::loadload(); // observing the barriers will prevent derived pointers from being derelativized concurrently
 }
 
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);

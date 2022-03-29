@@ -101,10 +101,8 @@ template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure) {
   T* parent_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
   T* cont_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
-  OrderAccess::storestore();
   Devirtualizer::do_oop(closure, parent_addr);
-  OrderAccess::storestore();
-  Devirtualizer::do_oop(closure, cont_addr); // must be last oop iterated
+  Devirtualizer::do_oop(closure, cont_addr);
 }
 
 template <typename T, class OopClosureType>
@@ -112,12 +110,10 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
   T* parent_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::parent_offset());
   T* cont_addr = chunk->field_addr<T>(jdk_internal_vm_StackChunk::cont_offset());
   if (mr.contains(parent_addr)) {
-    OrderAccess::storestore();
     Devirtualizer::do_oop(closure, parent_addr);
   }
   if (mr.contains(cont_addr)) {
-    OrderAccess::storestore();
-    Devirtualizer::do_oop(closure, cont_addr); // must be last oop iterated
+    Devirtualizer::do_oop(closure, cont_addr);
   }
 }
 
