@@ -1031,7 +1031,7 @@ public:
 
 protected:
   inline void init_rest();
-  void init_chunk(stackChunkOop chunk);
+  inline void init_chunk(stackChunkOop chunk);
 
   // fast path
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
@@ -1870,21 +1870,15 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-    chunk = stackChunkOopDesc::cast(allocator.initialize(start));
-    assert(!chunk->requires_barriers(), "TLAB object requires barriers");
+    chunk = stackChunkOopDesc::cast(allocator.init(start));
   } else {
-    //HandleMark hm(current);
     Handle conth(current, _cont.continuation());
     chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
     _cont.post_safepoint(conth);
 
-    if (chunk == nullptr) {
-      // OOME
+    if (chunk == nullptr) { // OOME
       return nullptr;
     }
-
-    // assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
-    _barriers = chunk->requires_barriers();
   }
 
   assert(chunk->stack_size() == (int)stack_size, "");
@@ -1900,19 +1894,21 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
 
   stackChunkOop chunk0 = _cont.tail();
-  if (chunk0 !=nullptr && chunk0->is_empty()) {
+  if (chunk0 != nullptr && chunk0->is_empty()) {
     chunk0 = chunk0->parent();
     assert(chunk0 == nullptr || !chunk0->is_empty(), "");
   }
   // fields are uninitialized
   chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
   chunk->set_cont_raw<typename ConfigT::OopT>(_cont.continuation());
+
   assert(chunk->parent() == nullptr || chunk->parent()->is_stackChunk(), "");
 
   if (start != nullptr) {
     assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
   } else {
-    _barriers = chunk->requires_barriers();
+    assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
+    _barriers = !UseZGC && chunk->requires_barriers();
   }
 
   _cont.set_tail(chunk);
