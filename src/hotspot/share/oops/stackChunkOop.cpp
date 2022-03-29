@@ -132,6 +132,8 @@ public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     // The ordering in the following is crucial
     OrderAccess::loadload();
+
+    // Read the base value once and use it for all calculations below
     oop base = Atomic::load((oop*)base_loc);
     if (base == nullptr) {
       assert(*derived_loc == derived_pointer(0), "");
@@ -168,16 +170,35 @@ public:
 
     OrderAccess::loadload();
     intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
-    if (derived_int_val <= 0) {
+
+    if (derived_int_val == 0) {
+      // Why do we get 0 values here?
       return;
     }
 
-    // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-    // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
+    if (derived_int_val < 0) {
+      // The derived oop had already been converted to an offset.
+      return;
+    }
+
+    // At this point, we've seen a non-offset (positive) value *after* we've
+    // read the base, but we write the offset *before* fixing the base, so we
+    // are guaranteed that the value in derived_loc is consistent with base
+    // (i.e. points into the object).
+    //
+    // Note above how ZGC could be writing the base concurrently with the store
+    // hand how we handle it by checking the state of the read base oop.
+
     intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
     if (offset < 0) {
-      // It looks as if a derived pointer appears live in the oopMap but isn't pointing into the object.
-      // This might be the result of address computation floating above corresponding range check for array access.
+      // It looks as if a derived pointer appears live in the oopMap but isn't
+      // pointing into the object. This might be the result of address
+      // computation floating above corresponding range check for array access.
+      //
+      // Note now the -1 will be stored as 1. Concurrently running threads
+      // might read this value and use it in the offset calculation above.
+      // This will just create a large negative value and we'll enter this
+      // code again.
       offset = -1;
     }
     Atomic::store((intptr_t*)derived_loc, -offset);
