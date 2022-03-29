@@ -313,6 +313,12 @@ public class DebugeeBinder extends Log.Logger implements Finalizable {
 
         args.add(argumentHandler.getLaunchExecPath());
 
+        /* Need --enable-preview on the debuggee in order to support virtual threads. */
+        boolean vthreadMode = "Virtual".equals(System.getProperty("main.wrapper"));
+        if (vthreadMode) {
+            args.add("--enable-preview");
+        }
+
         String javaOpts = argumentHandler.getLaunchOptions();
         if (javaOpts != null && javaOpts.length() > 0) {
             StringTokenizer st = new StringTokenizer(javaOpts);
