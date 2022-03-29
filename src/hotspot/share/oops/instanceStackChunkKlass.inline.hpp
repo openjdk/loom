@@ -73,7 +73,7 @@ void InstanceStackChunkKlass::oop_oop_iterate(oop obj, OopClosureType* closure) 
   if (Devirtualizer::do_metadata(closure)) {
     Devirtualizer::do_klass(closure, this);
   }
-  oop_oop_iterate_stack<OopClosureType>(chunk, closure);
+  oop_oop_iterate_stack<T>(chunk, closure);
   oop_oop_iterate_header<T>(chunk, closure);
 }
 
@@ -81,7 +81,7 @@ template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_reverse(oop obj, OopClosureType* closure) {
   assert(!Devirtualizer::do_metadata(closure), "Code to handle metadata is not implemented");
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
-  oop_oop_iterate_stack<OopClosureType>(chunk, closure);
+  oop_oop_iterate_stack<T>(chunk, closure);
   oop_oop_iterate_header<T>(chunk, closure);
 }
 
@@ -93,7 +93,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_bounded(oop obj, OopClosureType* c
       Devirtualizer::do_klass(closure, this);
     }
   }
-  oop_oop_iterate_stack_bounded(chunk, closure, mr);
+  oop_oop_iterate_stack_bounded<T>(chunk, closure, mr);
   oop_oop_iterate_header_bounded<T>(chunk, closure, mr);
 }
 
@@ -121,7 +121,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
   }
 }
 
-template <class OopClosureType>
+template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
   if (LIKELY(chunk->has_bitmap())) {
     intptr_t* start = chunk->sp_address() - metadata_words();
@@ -133,22 +133,22 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
     if ((intptr_t*)mr.end() < end) {
       end = (intptr_t*)mr.end();
     }
-    oop_oop_iterate_stack_with_bitmap(chunk, closure, start, end);
+    oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, start, end);
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, mr);
   }
 }
 
-template <class OopClosureType>
+template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
   if (LIKELY(chunk->has_bitmap())) {
-    oop_oop_iterate_stack_with_bitmap(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
+    oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());
   }
 }
 
-template <typename OopT, typename OopClosureType>
+template <typename T, class OopClosureType>
 class StackChunkOopIterateBitmapClosure {
   stackChunkOop _chunk;
   OopClosureType* const _closure;
@@ -157,12 +157,12 @@ public:
   StackChunkOopIterateBitmapClosure(stackChunkOop chunk, OopClosureType* closure) : _chunk(chunk), _closure(closure) {}
 
   bool do_bit(BitMap::idx_t index) {
-    Devirtualizer::do_oop(_closure, _chunk->address_for_bit<OopT>(index));
+    Devirtualizer::do_oop(_closure, _chunk->address_for_bit<T>(index));
     return true;
   }
 };
 
-template <class OopClosureType>
+template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_with_bitmap(stackChunkOop chunk, OopClosureType* closure,
                                                                 intptr_t* start, intptr_t* end) {
   if (Devirtualizer::do_metadata(closure)) {
@@ -170,13 +170,8 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_with_bitmap(stackChunkOop ch
   }
 
   if (end > start) {
-    if (UseCompressedOops) {
-      StackChunkOopIterateBitmapClosure<narrowOop, OopClosureType> bitmap_closure(chunk, closure);
-      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((narrowOop*)start), chunk->bit_index_for((narrowOop*)end));
-    } else {
-      StackChunkOopIterateBitmapClosure<oop, OopClosureType> bitmap_closure(chunk, closure);
-      chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((oop*)start), chunk->bit_index_for((oop*)end));
-    }
+    StackChunkOopIterateBitmapClosure<T, OopClosureType> bitmap_closure(chunk, closure);
+    chunk->bitmap().iterate(&bitmap_closure, chunk->bit_index_for((T*)start), chunk->bit_index_for((T*)end));
   }
 }
 
