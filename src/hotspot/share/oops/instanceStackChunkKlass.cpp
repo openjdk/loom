@@ -172,6 +172,7 @@ class OopOopIterateStackClosure {
   stackChunkOop _chunk;
   OopIterateClosure* const _closure;
   MemRegion _bound;
+  const bool _do_metadata;
 
 public:
   int _num_frames;
@@ -181,6 +182,7 @@ public:
     : _chunk(chunk),
       _closure(closure),
       _bound(mr),
+      _do_metadata(_closure->do_metadata()),
       _num_frames(0),
       _num_oops(0) {}
 
@@ -189,7 +191,7 @@ public:
     _num_frames++;
     assert(_closure != nullptr, "");
 
-    if (_closure->do_metadata()) {
+    if (_do_metadata) {
       MarkMethodsStackClosure(_closure).do_frame(f, map);
     }
 
