@@ -428,13 +428,6 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
     assert(oopDesc::is_oop_or_null(chunk->parent()), "");
   }
 
-  bool check_deopt = false;
-  if (Thread::current()->is_Java_thread() && !SafepointSynchronize::is_at_safepoint()) {
-    if (JavaThread::cast(Thread::current())->cont_fastpath_thread_state()) {
-      check_deopt = true;
-    }
-  }
-
   const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
   const bool gc_mode = chunk->is_gc_mode();
   const bool is_last = chunk->parent() == nullptr;

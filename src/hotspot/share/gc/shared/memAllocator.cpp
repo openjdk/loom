@@ -427,13 +427,21 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   return finish(mem);
 }
 
-oop StackChunkAllocator::initialize(HeapWord* mem) const {
-  // const size_t hs = oopDesc::header_size();
-  // Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
-
+oop StackChunkAllocator::init(HeapWord* mem) const {
   assert(_stack_size > 0, "");
   assert(_stack_size <= max_jint, "");
   assert(_word_size > _stack_size, "");
   jdk_internal_vm_StackChunk::set_size(mem, (jint)_stack_size);
   return finish(mem);
+}
+
+oop StackChunkAllocator::initialize(HeapWord* mem) const {
+  // const size_t hs = oopDesc::header_size();
+  // Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
+
+  // we zero the oop fields so that the object is walkable immediately in case it is humongous
+  // we do this first, and so we don't care about whether or not they're narrow or wide
+  *cast_to_oop(mem)->field_addr<oop>(jdk_internal_vm_StackChunk::parent_offset()) = NULL;
+  *cast_to_oop(mem)->field_addr<oop>(jdk_internal_vm_StackChunk::cont_offset()) = NULL;
+  return init(mem);
 }

@@ -323,9 +323,10 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 
   // Do not allow suspends inside VTMT transitions.
   // Block while transitions are disabled or there are suspend requests.
+  int64_t thread_id = java_lang_Thread::thread_id(vth()); // cannot use oops while blocked
   if (_VTMT_disable_count > 0 ||
       thread->is_suspended() ||
-      JvmtiVTSuspender::is_vthread_suspended(vth())
+      JvmtiVTSuspender::is_vthread_suspended(thread_id)
   ) {
     // Slow path: undo unsuccessful optimistic counter incrementation.
     // It can cause an extra waiting cycle for VTMT disablers.
@@ -339,7 +340,7 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
       // Block while transitions are disabled or there are suspend requests.
       if (_VTMT_disable_count > 0 ||
           thread->is_suspended() ||
-          JvmtiVTSuspender::is_vthread_suspended(vth())
+          JvmtiVTSuspender::is_vthread_suspended(thread_id)
       ) {
         // block while transitions are disabled or there are suspend requests
         if (ml.wait(10)) {
@@ -390,59 +391,6 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   }
 }
 
-/* VThreadList implementation */
-
-int
-VThreadList::find(oop vt) const {
-  for (int idx = 0; idx < length(); idx++) {
-    if (vt == at(idx).resolve()) return idx;
-  }
-  return -1;
-}
-
-bool
-VThreadList::contains(oop vt) const {
-  int idx = find(vt);
-  return idx != -1;
-}
-
-static OopHandle NULLHandle = OopHandle(NULL);
-
-void
-VThreadList::append(oop vt) {
-  assert(!contains(vt), "VThreadList::append sanity check");
-
-  OopHandle vthandle(JvmtiExport::jvmti_oop_storage(), vt);
-  GrowableArrayCHeap<OopHandle, mtServiceability>::append(vthandle);
-}
-
-void
-VThreadList::remove(oop vt) {
-  int idx = find(vt);
-  assert(idx != -1, "VThreadList::remove sanity check");
-  at(idx).release(JvmtiExport::jvmti_oop_storage());
-  at_put(idx, NULLHandle); // clear released OopHandle entry
-
-  // To work around assert in OopHandle assignment operator do not use remove_at().
-  // OopHandle doesn't allow overwrites if the oop pointer is non-null.
-  // Order doesn't matter, put the last element in idx
-  int last = length() - 1;
-  if (last > idx) {
-    at_put(idx, at(last));
-    at_put(last, NULLHandle); // clear moved OopHandle entry.
-  }
-  pop();
-}
-
-void
-VThreadList::invalidate() {
-  for (int idx = length() - 1; idx >= 0; idx--) {
-    at(idx).release(JvmtiExport::jvmti_oop_storage());
-    at_put(idx, NULLHandle); // clear released OopHandle entries
-  }
-  clear();
-}
-
 /* Virtual Threads Suspend/Resume management */
 
 JvmtiVTSuspender::SR_Mode
@@ -476,15 +424,16 @@ bool
 JvmtiVTSuspender::register_vthread_suspend(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
+  int64_t id = java_lang_Thread::thread_id(vt);
   if (_SR_mode == SR_all) {
-    assert(_not_suspended_list->contains(vt),
+    assert(_not_suspended_list->contains(id),
            "register_vthread_suspend sanity check");
-    _not_suspended_list->remove(vt);
+    _not_suspended_list->remove(id);
   } else {
-    assert(!_suspended_list->contains(vt),
+    assert(!_suspended_list->contains(id),
            "register_vthread_suspend sanity check");
     _SR_mode = SR_ind;
-    _suspended_list->append(vt);
+    _suspended_list->append(id);
   }
   return true;
 }
@@ -493,14 +442,15 @@ bool
 JvmtiVTSuspender::register_vthread_resume(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
+  int64_t id = java_lang_Thread::thread_id(vt);
   if (_SR_mode == SR_all) {
-    assert(!_not_suspended_list->contains(vt),
+    assert(!_not_suspended_list->contains(id),
            "register_vthread_resume sanity check");
-    _not_suspended_list->append(vt);
+    _not_suspended_list->append(id);
   } else if (_SR_mode == SR_ind) {
-    assert(_suspended_list->contains(vt),
+    assert(_suspended_list->contains(id),
            "register_vthread_resume check");
-    _suspended_list->remove(vt);
+    _suspended_list->remove(id);
     if (_suspended_list->length() == 0) {
       _SR_mode = SR_none;
     }
@@ -511,12 +461,17 @@ JvmtiVTSuspender::register_vthread_resume(oop vt) {
 }
 
 bool
-JvmtiVTSuspender::is_vthread_suspended(oop vt) {
+JvmtiVTSuspender::is_vthread_suspended(int64_t thread_id) {
   bool suspend_is_needed =
-   (_SR_mode == SR_all && !_not_suspended_list->contains(vt)) ||
-   (_SR_mode == SR_ind && _suspended_list->contains(vt));
+   (_SR_mode == SR_all && !_not_suspended_list->contains(thread_id)) ||
+   (_SR_mode == SR_ind && _suspended_list->contains(thread_id));
 
   return suspend_is_needed;
+}
+
+bool
+JvmtiVTSuspender::is_vthread_suspended(oop vt) {
+  return is_vthread_suspended(java_lang_Thread::thread_id(vt));
 }
 
 void JvmtiThreadState::add_env(JvmtiEnvBase *env) {

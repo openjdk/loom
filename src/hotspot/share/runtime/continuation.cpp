@@ -1031,7 +1031,8 @@ public:
 
 protected:
   inline void init_rest();
-  void init_chunk(stackChunkOop chunk);
+  inline void init_chunk(stackChunkOop chunk);
+  void throw_stack_overflow_on_humongous_chunk();
 
   // fast path
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
@@ -1147,6 +1148,10 @@ template <bool chunk_available>
 freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp) {
   if (freeze_fast<chunk_available>(sp)) {
     return freeze_ok;
+  }
+  if (_barriers) {
+    throw_stack_overflow_on_humongous_chunk();
+    return freeze_exception;
   }
   if (_thread->has_pending_exception()) {
     return freeze_exception;
@@ -1368,6 +1373,9 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
     finish_freeze(f, caller);
     _cont.write();
   }
+  if (_barriers && !_preempt) {
+    throw_stack_overflow_on_humongous_chunk();
+  }
 
   return res;
 }
@@ -1555,15 +1563,14 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     if (chunk == nullptr) {
       return freeze_exception;
     }
-
+    if (_barriers) {
+      log_develop_trace(jvmcont)("allocation requires barriers");
+      return freeze_exception;
+    }
     int sp = chunk->stack_size() - argsize;
     chunk->set_sp(sp);
     chunk->set_argsize(argsize);
     assert(chunk->is_empty(), "");
-
-    if (_barriers) {
-      log_develop_trace(jvmcont)("allocation requires barriers");
-    }
   } else {
     log_develop_trace(jvmcont)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
     if (chunk->is_empty()) {
@@ -1820,11 +1827,6 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   chunk->set_max_size(chunk->max_size() + _align_size);
 
-  if (UNLIKELY(_barriers)) {
-    log_develop_trace(jvmcont)("do barriers on humongous chunk");
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
-  }
-
   log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
 
   if (lt.develop_is_enabled()) {
@@ -1870,19 +1872,15 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-    chunk = stackChunkOopDesc::cast(allocator.initialize(start));
+    chunk = stackChunkOopDesc::cast(allocator.init(start));
   } else {
-    //HandleMark hm(current);
     Handle conth(current, _cont.continuation());
     chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
     _cont.post_safepoint(conth);
 
-    if (chunk == nullptr) {
-      // OOME
+    if (chunk == nullptr) { // OOME
       return nullptr;
     }
-
-    _barriers = chunk->requires_barriers();
   }
 
   assert(chunk->stack_size() == (int)stack_size, "");
@@ -1898,23 +1896,29 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
 
   stackChunkOop chunk0 = _cont.tail();
-  if (chunk0 !=nullptr && chunk0->is_empty()) {
+  if (chunk0 != nullptr && chunk0->is_empty()) {
     chunk0 = chunk0->parent();
     assert(chunk0 == nullptr || !chunk0->is_empty(), "");
   }
   // fields are uninitialized
   chunk->set_parent_raw<typename ConfigT::OopT>(chunk0);
   chunk->set_cont_raw<typename ConfigT::OopT>(_cont.continuation());
+
   assert(chunk->parent() == nullptr || chunk->parent()->is_stackChunk(), "");
 
   if (start != nullptr) {
     assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
   } else {
-    _barriers = chunk->requires_barriers();
+    assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
+    _barriers = !UseZGC && chunk->requires_barriers();
   }
 
   _cont.set_tail(chunk);
   return chunk;
+}
+
+void FreezeBase::throw_stack_overflow_on_humongous_chunk() {
+  Exceptions::_throw_msg(_thread, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Humongous stack chunk");
 }
 
 #if INCLUDE_JVMTI

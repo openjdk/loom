@@ -72,8 +72,10 @@ public class ForkJoinWorkerThread extends Thread {
      * Full nonpublic constructor.
      */
     ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool,
+                         boolean inheritInheritableThreadLocals,
                          boolean useSystemClassLoader) {
-        super(group, null, pool.nextWorkerThreadName(), 0L);
+        super(group, null, pool.nextWorkerThreadName(), 0L,
+                inheritInheritableThreadLocals);
         UncaughtExceptionHandler handler = (this.pool = pool).ueh;
         this.workQueue = new ForkJoinPool.WorkQueue(this, 0);
         super.setDaemon(true);
@@ -87,14 +89,19 @@ public class ForkJoinWorkerThread extends Thread {
      * Creates a ForkJoinWorkerThread operating in the given thread group and
      * pool. If the thread group is {@code null} then the thread group is chosen
      * by the security manager or is set to the current thread's thread group.
+     * The ForkJoinWorkerThread optionally inherits the initial values for
+     * inheritable thread-local variables.
      *
      * @param group the thread group, can be null
      * @param pool the pool this thread works in
+     * @param inheritInheritableThreadLocals {@code true} to inherit initial
+     * values for inheritable thread-locals from the constructing thread
      * @throws NullPointerException if pool is null
      * @since 19
      */
-    protected ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool) {
-        this(group, pool, false);
+    protected ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool,
+                                   boolean inheritInheritableThreadLocals) {
+        this(group, pool, inheritInheritableThreadLocals, false);
     }
 
     /**
@@ -104,7 +111,7 @@ public class ForkJoinWorkerThread extends Thread {
      * @throws NullPointerException if pool is null
      */
     protected ForkJoinWorkerThread(ForkJoinPool pool) {
-        this(null, pool, false);
+        this(null, pool, true);
     }
 
     /**
