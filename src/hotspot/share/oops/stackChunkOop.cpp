@@ -141,6 +141,18 @@ public:
 
 #if INCLUDE_ZGC
     if (UseZGC) {
+      // This closure can be concurrently called from both GC marking and from
+      // the mutator. For it to work it is important that the old base value is
+      // used for the offset calculation below. As soon at the base oop has
+      // been updated we must *not* proceed to run the code below this check.
+      //
+      // This code only works if there's only one possible transition from old
+      // to good. This isn't necessarily for oops when objects are marked from
+      // finalizers. In that case oops can go from old to finalizable_marked
+      // to good. This breaks this check, because finalizable_marked are not
+      // considered good, but it's also not the old value. To workaround this
+      // we upgrade finalizable marking through stack chunks to be strong
+      // marking. See: ZMark::follow_object.
       if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
         return;
       }

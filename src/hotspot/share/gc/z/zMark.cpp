@@ -282,7 +282,8 @@ void ZMark::follow_array_object(objArrayOop obj, bool finalizable) {
 
 void ZMark::follow_object(oop obj, bool finalizable) {
   if (ContinuationGCSupport::relativize_stack_chunk(obj)) {
-    // Loom doesn't support mixing of finalizable marking and strong marking of chunks
+    // Loom doesn't support mixing of finalizable marking and strong marking of
+    // stack chunks. See: RelativizeDerivedOopClosure.
     ZMarkBarrierOopClosure<false /* finalizable */> cl;
     obj->oop_iterate(&cl);
     return;
