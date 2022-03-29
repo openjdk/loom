@@ -427,7 +427,9 @@ oop ClassAllocator::initialize(HeapWord* mem) const {
   return finish(mem);
 }
 
-oop StackChunkAllocator::init(HeapWord* mem) const {
+// Does the minimal amount of initialization needed for a TLAB allocation
+// We don't need to do a full initialization, as such an allocation need not be immeidately walkable
+oop StackChunkAllocator::init_partial_for_tlab(HeapWord* mem) const {
   assert(_stack_size > 0, "");
   assert(_stack_size <= max_jint, "");
   assert(_word_size > _stack_size, "");
@@ -440,8 +442,8 @@ oop StackChunkAllocator::initialize(HeapWord* mem) const {
   // Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
 
   // we zero the oop fields so that the object is walkable immediately in case it is humongous
-  // we do this first, and so we don't care about whether or not they're narrow or wide
+  // we do this first, and so we don't care about whether they're narrow or wide
   *cast_to_oop(mem)->field_addr<oop>(jdk_internal_vm_StackChunk::parent_offset()) = NULL;
   *cast_to_oop(mem)->field_addr<oop>(jdk_internal_vm_StackChunk::cont_offset()) = NULL;
-  return init(mem);
+  return init_partial_for_tlab(mem);
 }
