@@ -3866,7 +3866,7 @@ JvmtiEnv::GetCurrentThreadCpuTime(jlong* nanos_ptr) {
 
   // Surprizingly the GetCurrentThreadCpuTime is used by non-JavaThread's.
   if (thread->is_Java_thread()) {
-    if (JavaThread::cast(thread)->mounted_vthread() != NULL) {
+    if (JavaThread::cast(thread)->is_vthread_mounted()) {
       return JVMTI_ERROR_INVALID_THREAD;
     }
   }
