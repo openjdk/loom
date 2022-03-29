@@ -116,15 +116,13 @@ template<typename OopClosureType>
 class StackChunkOopIterateFilterClosure: public OopClosure {
 private:
   OopClosureType* const _closure;
-  stackChunkOop _chunk;
   MemRegion _bound;
 
 public:
   int _num_oops;
 
-  StackChunkOopIterateFilterClosure(OopClosureType* closure, stackChunkOop chunk, MemRegion bound)
+  StackChunkOopIterateFilterClosure(OopClosureType* closure, MemRegion bound)
     : _closure(closure),
-      _chunk(chunk),
       _bound(bound),
       _num_oops(0) {}
 
@@ -134,7 +132,6 @@ public:
   template <typename T>
   void do_oop_work(T* p) {
     if (_bound.contains(p)) {
-      T before = *p;
       Devirtualizer::do_oop(_closure, p);
       _num_oops++;
     }
@@ -168,7 +165,7 @@ void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosur
   chunk->iterate_stack(&closure);
 }
 
-class OopOopIterateStackClosure {
+class OopIterateStackChunkFrameClosure {
   stackChunkOop _chunk;
   OopIterateClosure* const _closure;
   MemRegion _bound;
@@ -178,7 +175,7 @@ public:
   int _num_frames;
   int _num_oops;
 
-  OopOopIterateStackClosure(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr)
+  OopIterateStackChunkFrameClosure(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr)
     : _chunk(chunk),
       _closure(closure),
       _bound(mr),
@@ -195,7 +192,7 @@ public:
       MarkMethodsStackClosure(_closure).do_frame(f, map);
     }
 
-    StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _chunk, _bound);
+    StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _bound);
     f.iterate_oops(&cl, map);
     _num_oops += cl._num_oops;
 
@@ -204,7 +201,7 @@ public:
 };
 
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
-  OopOopIterateStackClosure frame_closure(chunk, closure, mr);
+  OopIterateStackChunkFrameClosure frame_closure(chunk, closure, mr);
   chunk->iterate_stack(&frame_closure);
 
   assert(frame_closure._num_frames >= 0, "");
