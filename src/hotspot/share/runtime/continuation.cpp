@@ -1865,8 +1865,8 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   if (CollectedHeap::stack_chunk_max_size() > 0 && size_in_words >= CollectedHeap::stack_chunk_max_size()) {
     if (!_preempt) {
       throw_stack_overflow_on_humongous_chunk();
-      return nullptr;
     }
+    return nullptr;
   }
 
   JavaThread* current = _preempt ? JavaThread::current() : _thread;
