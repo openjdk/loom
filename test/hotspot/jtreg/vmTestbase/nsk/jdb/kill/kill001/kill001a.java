@@ -121,8 +121,8 @@ public class kill001a {
         log.display("notKilled == " + notKilled);
 
         for (i = 0; i < numThreads ; i++) {
-            if (holder[i].isAlive() && !vthreadMode) {
-                log.display("Debuggee FAILED");
+            if (holder[i].isAlive()) {
+                log.display("Debuggee FAILED - thread " + i + " is alive");
                 return kill001.FAILED;
             }
         }
@@ -162,13 +162,16 @@ class MyThread extends Thread {
         // Note vthreads need a short sleep because they will never receive the kill,
         // and therefore sleep the full time, resulting in a test timeout if too long.
         try {
-            Thread.currentThread().sleep(kill001a.vthreadMode ? 20000 : kill001a.waitTime);
+            Thread.currentThread().sleep(kill001a.vthreadMode ? 10000 : kill001a.waitTime);
         } catch (InterruptedException e) {
             kill001a.log.display(ThreadInterrupted);
             e.printStackTrace(kill001a.log.getOutStream());
         }
 
-        kill001a.notKilled++;
+        // Need to make sure the increment is atomic
+        synchronized (kill001a.lock) {
+            kill001a.notKilled++;
+        }
         kill001a.log.display(ThreadFinished);
     }
 }
