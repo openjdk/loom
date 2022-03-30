@@ -378,7 +378,6 @@ template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::S
 class DerelativizeDerivedOopClosure : public DerivedOopClosure {
 public:
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // The ordering in the following is crucial
     oop base = *base_loc;
     if (base != nullptr) {
       assert(!CompressedOops::is_base(base), "");
@@ -386,8 +385,6 @@ public:
 
       intptr_t offset = *(intptr_t*)derived_loc;
 
-      // at this point, we've seen a non-offset value *after* we've read the base, but we write the offset *before* fixing the base,
-      // so we are guaranteed that the value in derived_loc is consistent with base (i.e. points into the object).
       if (offset <= 0) {
         offset = -offset;
         *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
