@@ -187,7 +187,7 @@ public:
     // (i.e. points into the object).
     //
     // Note above how ZGC could be writing the base concurrently with the store
-    // hand how we handle it by checking the state of the read base oop.
+    // and how we handle it by checking the state of the read base oop.
 
     intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
     if (offset < 0) {
