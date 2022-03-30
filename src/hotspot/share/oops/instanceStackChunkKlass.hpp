@@ -170,8 +170,6 @@ public:
   inline void oop_oop_iterate_bounded(oop obj, OopClosureType* closure, MemRegion mr);
 
 private:
-  static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
-
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
 

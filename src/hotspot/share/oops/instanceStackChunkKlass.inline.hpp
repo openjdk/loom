@@ -62,7 +62,8 @@ inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
     return 0;
   }
 
-  size_t size_in_bits = bitmap_size_in_bits(stack_size_in_words);
+  // One bit per potential narrowOop* or oop* address
+  size_t size_in_bits = stack_size_in_words << (UseCompressedOops ? 1 : 0);
 
   return align_up(size_in_bits, BitsPerWord) >> LogBitsPerWord;
 }
