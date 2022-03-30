@@ -311,7 +311,7 @@ JvmtiVTMTDisabler::enable_VTMT() {
 }
 
 void
-JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
+JvmtiVTMTDisabler::start_VTMT(jthread vthread, bool is_mount) {
   JavaThread* thread = JavaThread::current();
   HandleMark hm(thread);
   Handle vth = Handle(thread, JNIHandles::resolve_external_guard(vthread));
@@ -371,12 +371,13 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, int callsite_tag) {
 }
 
 void
-JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
+JvmtiVTMTDisabler::finish_VTMT(jthread vthread, bool is_mount) {
   JavaThread* thread = JavaThread::current();
 
   assert(thread->is_in_VTMT(), "sanity check");
   thread->set_is_in_VTMT(false);
   oop vt = JNIHandles::resolve_external_guard(vthread);
+  int64_t thread_id = java_lang_Thread::thread_id(vt);
   JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vt);
   if (vstate != NULL) {
     vstate->set_is_in_VTMT(false);
@@ -388,6 +389,24 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, int callsite_tag) {
   if (_VTMT_disable_count > 0) {
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
     ml.notify_all();
+  }
+  if ((!is_mount && thread->is_carrier_thread_suspended()) ||
+      (is_mount && JvmtiVTSuspender::is_vthread_suspended(thread_id))
+  ) {
+    while (true) {
+      ThreadBlockInVM tbivm(thread);
+      MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
+
+      // block while there are suspend requests
+      if ((!is_mount && thread->is_carrier_thread_suspended()) ||
+          (is_mount && JvmtiVTSuspender::is_vthread_suspended(thread_id))
+      ) {
+        // block while there are suspend requests
+        ml.wait(10);
+        continue;
+      }
+      break;
+    }
   }
 }
 

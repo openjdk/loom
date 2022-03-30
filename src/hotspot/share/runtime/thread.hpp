@@ -815,7 +815,7 @@ class JavaThread: public Thread {
     _async_delivery_disabled = 0x00000002U, // async exception delivery is disabled
     _trace_flag              = 0x00000004U, // call tracing backend
     _obj_deopt               = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
-    _thread_suspended        = 0x00000010U  // non-virtual thread is externally suspended
+    _carrier_thread_suspended = 0x00000010U  // carrier thread is externally suspended
   };
 
   // various suspension related flags - atomically updated
@@ -1255,11 +1255,11 @@ private:
   // current thread, i.e. reverts optimizations based on escape analysis.
   void wait_for_object_deoptimization();
 
-  inline void set_thread_suspended();
-  inline void clear_thread_suspended();
+  inline void set_carrier_thread_suspended();
+  inline void clear_carrier_thread_suspended();
 
-  bool is_thread_suspended() const {
-    return (_suspend_flags & _thread_suspended) != 0;
+  bool is_carrier_thread_suspended() const {
+    return (_suspend_flags & _carrier_thread_suspended) != 0;
   }
 
 #if INCLUDE_JVMTI

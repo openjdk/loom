@@ -712,7 +712,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
     // We have a JavaThread* so add more state bits.
     JavaThreadState jts = jt->thread_state();
 
-    if (jt->is_thread_suspended() ||
+    if (jt->is_carrier_thread_suspended() ||
         ((jt->mounted_vthread() == NULL || jt->mounted_vthread() == thread_oop) && jt->is_suspended())) {
       // Suspended non-virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
@@ -1551,15 +1551,15 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
   // A case of non-virtual thread.
   if (!is_virtual) {
     // Thread.suspend() is used in some tests. It sets jt->is_suspended() only.
-    if (java_thread->is_thread_suspended() ||
+    if (java_thread->is_carrier_thread_suspended() ||
         (!is_passive_cthread && java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_SUSPENDED;
     }
-    java_thread->set_thread_suspended();
+    java_thread->set_carrier_thread_suspended();
   }
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
-  assert(!single_suspend || (!is_virtual && java_thread->is_thread_suspended()) ||
+  assert(!single_suspend || (!is_virtual && java_thread->is_carrier_thread_suspended()) ||
           (is_virtual && JvmtiVTSuspender::is_vthread_suspended(thread_h())),
          "sanity check");
 
@@ -1616,11 +1616,11 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
 
   // A case of a non-virtual thread.
   if (!is_virtual) {
-    if (!java_thread->is_thread_suspended() &&
+    if (!java_thread->is_carrier_thread_suspended() &&
         (is_passive_cthread || !java_thread->is_suspended())) {
       return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     }
-    java_thread->clear_thread_suspended();
+    java_thread->clear_carrier_thread_suspended();
   }
   assert(!java_thread->is_in_VTMT(), "sanity check");
 
@@ -2078,7 +2078,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
   }
   assert(java_thread == _state->get_thread(), "Must be");
 
-  if (!self && !java_thread->is_suspended() && !java_thread->is_thread_suspended()) {
+  if (!self && !java_thread->is_suspended() && !java_thread->is_carrier_thread_suspended()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     return;
   }
@@ -2253,7 +2253,7 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
 
   tty->print_cr("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d is_VTMT_disabler: %d, is_in_VTMT = %d",
                 tname, java_thread->name(), java_thread->is_exiting(),
-                java_thread->is_suspended(), java_thread->is_thread_suspended(), is_vt_suspended,
+                java_thread->is_suspended(), java_thread->is_carrier_thread_suspended(), is_vt_suspended,
                 java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
 
   if (java_thread->has_last_Java_frame()) {

@@ -92,8 +92,8 @@ class JvmtiVTMTDisabler {
   JvmtiVTMTDisabler(bool is_SR = false);
   ~JvmtiVTMTDisabler();
 
-  static void start_VTMT(jthread vthread, int callsite_tag);
-  static void finish_VTMT(jthread vthread, int callsite_tag);
+  static void start_VTMT(jthread vthread, bool is_mount);
+  static void finish_VTMT(jthread vthread, bool is_mount);
   static int  VTMT_disable_count();
   static int  VTMT_count();
 };
