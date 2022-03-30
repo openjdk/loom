@@ -635,8 +635,8 @@ nmethod::nmethod(
     _consts_offset           = data_offset();
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     _oops_offset             = data_offset();
-    _metadata_offset         = _oops_offset         + align_up(code_buffer->total_oop_size(), oopSize);
-    scopes_data_offset       = _metadata_offset     + align_up(code_buffer->total_metadata_size(), wordSize);
+    _metadata_offset         = _oops_offset          + align_up(code_buffer->total_oop_size(), oopSize);
+    scopes_data_offset       = _metadata_offset      + align_up(code_buffer->total_metadata_size(), wordSize);
     _scopes_pcs_offset       = scopes_data_offset;
     _dependencies_offset     = _scopes_pcs_offset;
     _native_invokers_offset     = _dependencies_offset;
@@ -658,7 +658,7 @@ nmethod::nmethod(
     _pc_desc_container.reset_to(NULL);
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
 
-    _exception_offset        = code_offset()          + offsets->value(CodeOffsets::Exceptions);
+    _exception_offset        = code_offset()         + offsets->value(CodeOffsets::Exceptions);
 
     _scopes_data_begin = (address) this + scopes_data_offset;
     _deopt_handler_begin = (address) this + deoptimize_offset;
@@ -1141,9 +1141,9 @@ void nmethod::make_deoptimized() {
   ResourceMark rm;
   RelocIterator iter(this, oops_reloc_begin());
 
-  while(iter.next()) {
+  while (iter.next()) {
 
-    switch(iter.type()) {
+    switch (iter.type()) {
       case relocInfo::virtual_call_type:
       case relocInfo::opt_virtual_call_type: {
         CompiledIC *ic = CompiledIC_at(&iter);
@@ -1231,7 +1231,9 @@ void nmethod::mark_as_maybe_on_continuation() {
 }
 
 bool nmethod::is_not_on_continuation_stack() {
-  if (!Continuations::enabled()) return true;
+  if (!Continuations::enabled()) {
+    return true;
+  }
 
   // Odd marking cycles are found during concurrent marking. Even numbers are found
   // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
@@ -1262,7 +1264,7 @@ bool nmethod::can_convert_to_zombie() {
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
   return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && is_not_on_continuation_stack() &&
-          !is_locked_by_vm() && (!is_unloading() || is_unloaded());
+         !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 
 void nmethod::inc_decompile_count() {

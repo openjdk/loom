@@ -214,6 +214,11 @@ inline bool G1CollectedHeap::is_in_young(const oop obj) const {
   return heap_region_containing(obj)->is_young();
 }
 
+inline bool G1CollectedHeap::requires_barriers(stackChunkOop obj) const {
+  assert(obj != NULL, "");
+  return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
+}
+
 inline bool G1CollectedHeap::is_obj_dead(const oop obj, const HeapRegion* hr) const {
   return hr->is_obj_dead(obj, _cm->prev_mark_bitmap());
 }
@@ -259,11 +264,6 @@ inline void G1CollectedHeap::set_humongous_is_live(oop obj) {
     set_humongous_reclaim_candidate(region, false);
     _region_attr.clear_humongous(region);
   }
-}
-
-inline bool G1CollectedHeap::requires_barriers(stackChunkOop obj) const {
-  assert(obj != NULL, "");
-  return !heap_region_containing(obj)->is_young(); // is_in_young does an unnecessary NULL check
 }
 
 #endif // SHARE_GC_G1_G1COLLECTEDHEAP_INLINE_HPP

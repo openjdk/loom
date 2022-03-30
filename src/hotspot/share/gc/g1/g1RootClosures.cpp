@@ -43,8 +43,8 @@ public:
   CLDClosure* weak_clds()             { return &_closures._clds; }
   CLDClosure* strong_clds()           { return &_closures._clds; }
 
-  CodeBlobClosure* weak_codeblobs()   { return &_closures._codeblobs; }
-  CodeBlobClosure* strong_codeblobs() { return &_closures._codeblobs; }
+  CodeBlobClosure* strong_codeblobs()      { return &_closures._codeblobs; }
+  CodeBlobClosure* weak_codeblobs()        { return &_closures._codeblobs; }
 };
 
 // Closures used during concurrent start.
@@ -67,8 +67,8 @@ public:
   CLDClosure* weak_clds()             { return &_weak._clds; }
   CLDClosure* strong_clds()           { return &_strong._clds; }
 
-  CodeBlobClosure* strong_codeblobs() { return &_strong._codeblobs; }
-  CodeBlobClosure* weak_codeblobs()   { return &_weak._codeblobs; }
+  CodeBlobClosure* strong_codeblobs()      { return &_strong._codeblobs; }
+  CodeBlobClosure* weak_codeblobs()        { return &_weak._codeblobs; }
 };
 
 G1EvacuationRootClosures* G1EvacuationRootClosures::create_root_closures(G1ParScanThreadState* pss, G1CollectedHeap* g1h) {

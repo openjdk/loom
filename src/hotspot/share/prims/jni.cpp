@@ -2739,7 +2739,7 @@ JNI_ENTRY(jint, jni_MonitorExit(JNIEnv *env, jobject jobj))
   Handle obj(THREAD, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
   if (!Continuation::unpin(thread)) {
-    guarantee (false, "Should not reach here.");
+    fatal("Should not reach here.");
   }
   ret = JNI_OK;
   return ret;

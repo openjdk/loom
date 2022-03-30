@@ -751,8 +751,9 @@ ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap)
 
 bool ImmutableOopMap::has_any(OopMapValue::oop_types type) const {
   for (OopMapStream oms(this); !oms.is_done(); oms.next()) {
-    if (oms.current().type() == type)
+    if (oms.current().type() == type) {
       return true;
+    }
   }
   return false;
 }

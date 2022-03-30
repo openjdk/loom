@@ -85,8 +85,7 @@ size_t G1FullGCCompactTask::G1CompactRegionClosure::apply(oop obj) {
 
   // copy object and reinit its mark
   HeapWord* obj_addr = cast_from_oop<HeapWord*>(obj);
-  assert(size <= INT_MAX, "sanity check");
-  assert(obj_addr != destination, "everything in this pass should be moving or compressed in place");
+  assert(obj_addr != destination, "everything in this pass should be moving");
   Copy::aligned_conjoint_words(obj_addr, destination, size);
 
   // There is no need to transform stack chunks - marking already did that.

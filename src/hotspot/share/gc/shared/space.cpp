@@ -558,6 +558,7 @@ void CompactibleSpace::compact() {
       oop new_obj = cast_to_oop(compaction_top);
 
       ContinuationGCSupport::transform_stack_chunk(new_obj);
+
       new_obj->init_mark();
       assert(new_obj->klass() != NULL, "should have a class");
 

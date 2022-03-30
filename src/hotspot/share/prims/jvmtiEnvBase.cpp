@@ -617,7 +617,10 @@ JvmtiEnvBase::is_vthread_alive(oop vt) {
 
 JavaThread* JvmtiEnvBase::is_virtual_thread_mounted(oop vthread) {
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
-  if (carrier_thread == NULL) return NULL; // can be NULL
+  if (carrier_thread == NULL) {
+    // can be NULL
+    return NULL;
+  }
 
   JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
   oop cont = java_lang_VirtualThread::continuation(vthread);
@@ -656,7 +659,8 @@ javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
   JvmtiThreadState* state = java_lang_Thread::jvmti_thread_state(vthread);
   if (state == NULL) {
-    return jvf; // nothing to skip
+    // nothing to skip
+    return jvf;
   }
   jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
   return jvf;
@@ -1795,14 +1799,14 @@ VM_GetThreadListStackTraces::doit() {
 
 void
 GetSingleStackTraceClosure::do_thread(Thread *target) {
-    JavaThread *jt = JavaThread::cast(target);
-    oop thread_oop = jt->threadObj();
+  JavaThread *jt = JavaThread::cast(target);
+  oop thread_oop = jt->threadObj();
 
-    if (!jt->is_exiting() && thread_oop != NULL) {
-        ResourceMark rm;
-        _collector.fill_frames(_jthread, jt, thread_oop);
-        _collector.allocate_and_fill_stacks(1);
-    }
+  if (!jt->is_exiting() && thread_oop != NULL) {
+    ResourceMark rm;
+    _collector.fill_frames(_jthread, jt, thread_oop);
+    _collector.allocate_and_fill_stacks(1);
+  }
 }
 
 void

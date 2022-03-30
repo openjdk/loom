@@ -1602,7 +1602,9 @@ bool JavaThread::is_lock_owned_current(address adr) const {
   }
 
   for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
-    if (chunk->contains(adr)) return true;
+    if (chunk->contains(adr)) {
+      return true;
+    }
   }
 
   return false;

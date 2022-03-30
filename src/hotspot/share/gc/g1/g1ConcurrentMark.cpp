@@ -1300,6 +1300,8 @@ void G1ConcurrentMark::remark() {
     report_object_count(mark_finished);
   }
 
+  CodeCache::finish_marking_cycle();
+
   // Statistics
   double now = os::elapsedTime();
   _remark_mark_times.add((mark_work_end - start) * 1000.0);
@@ -1307,7 +1309,6 @@ void G1ConcurrentMark::remark() {
   _remark_times.add((now - start) * 1000.0);
 
   policy->record_concurrent_mark_remark_end();
-  CodeCache::finish_marking_cycle();
 }
 
 class G1ReclaimEmptyRegionsTask : public WorkerTask {

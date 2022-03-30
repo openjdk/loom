@@ -408,7 +408,6 @@ namespace AccessInternal {
 //           BarrierSet::AccessBarrier accessor that attaches GC-required barriers
 //           to the access.
 
-
 namespace AccessInternal {
   template <typename T>
   struct OopOrNarrowOopInternal: AllStatic {

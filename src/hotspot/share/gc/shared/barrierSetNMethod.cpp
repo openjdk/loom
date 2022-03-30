@@ -88,7 +88,7 @@ private:
 
 public:
   BarrierSetNMethodArmClosure(int disarm_value) :
-    _disarm_value(disarm_value) {}
+      _disarm_value(disarm_value) {}
 
   virtual void do_thread(Thread* thread) {
     thread->set_nmethod_disarm_value(_disarm_value);

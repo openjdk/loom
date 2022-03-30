@@ -811,10 +811,10 @@ class JavaThread: public Thread {
   enum SuspendFlags {
     // NOTE: avoid using the sign-bit as cc generates different test code
     //       when the sign-bit is used, and sometimes incorrectly - see CR 6398077
-    _has_async_exception     = 0x00000001U, // there is a pending async exception
-    _async_delivery_disabled = 0x00000002U, // async exception delivery is disabled
-    _trace_flag              = 0x00000004U, // call tracing backend
-    _obj_deopt               = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
+    _has_async_exception      = 0x00000001U, // there is a pending async exception
+    _async_delivery_disabled  = 0x00000002U, // async exception delivery is disabled
+    _trace_flag               = 0x00000004U, // call tracing backend
+    _obj_deopt                = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
     _carrier_thread_suspended = 0x00000010U  // carrier thread is externally suspended
   };
 
@@ -1205,14 +1205,19 @@ private:
   bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
   bool cont_preempt() { return _cont_preempt; }
   void set_cont_preempt(bool x) { _cont_preempt = x; }
+
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
   void inc_held_monitor_count() {
-    if (!Continuations::enabled()) return;
+    if (!Continuations::enabled()) {
+      return;
+    }
     _held_monitor_count++;
   }
   void dec_held_monitor_count() {
-    if (!Continuations::enabled()) return;
+    if (!Continuations::enabled()) {
+      return;
+    }
     assert(_held_monitor_count > 0, "");
     _held_monitor_count--;
   }

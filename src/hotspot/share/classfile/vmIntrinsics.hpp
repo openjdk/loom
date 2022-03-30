@@ -245,19 +245,19 @@ class methodHandle;
    do_name(     arraycopy_name,                                  "arraycopy")                                           \
    do_signature(arraycopy_signature,                             "(Ljava/lang/Object;ILjava/lang/Object;II)V")          \
                                                                                                                         \
-  do_intrinsic(_currentCarrierThread,     java_lang_Thread,       currentCarrierThread_name, currentThread_signature,   F_SN)  \
-  do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,    F_SN)  \
-  do_intrinsic(_scopeLocalCache,          java_lang_Thread,       scopeLocalCache_name, scopeLocalCache_signature, F_SN)  \
-  do_intrinsic(_setScopeLocalCache,       java_lang_Thread,       setScopeLocalCache_name, setScopeLocalCache_signature, F_SN) \
-  do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
+  do_intrinsic(_currentCarrierThread,     java_lang_Thread,       currentCarrierThread_name, currentThread_signature, F_SN) \
    do_name(     currentCarrierThread_name,                       "currentCarrierThread")                                \
+  do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,   F_SN)  \
    do_name(     currentThread_name,                              "currentThread")                                       \
-   do_name(     scopeLocalCache_name,                            "scopeLocalCache")                                     \
-   do_name(     setScopeLocalCache_name,                         "setScopeLocalCache")                                  \
-   do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
    do_signature(currentThread_signature,                         "()Ljava/lang/Thread;")                                \
+  do_intrinsic(_scopeLocalCache,          java_lang_Thread,       scopeLocalCache_name, scopeLocalCache_signature, F_SN) \
+   do_name(     scopeLocalCache_name,                            "scopeLocalCache")                                     \
    do_signature(scopeLocalCache_signature,                       "()[Ljava/lang/Object;")                               \
+  do_intrinsic(_setScopeLocalCache,       java_lang_Thread,       setScopeLocalCache_name, setScopeLocalCache_signature, F_SN) \
+   do_name(     setScopeLocalCache_name,                         "setScopeLocalCache")                                  \
    do_signature(setScopeLocalCache_signature,                    "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
+   do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
                                                                                                                         \
   /* reflective intrinsics, for java/lang/Class, etc. */                                                                \
   do_intrinsic(_isAssignableFrom,         java_lang_Class,        isAssignableFrom_name, class_boolean_signature, F_RN) \
@@ -517,14 +517,14 @@ class methodHandle;
                                                                                                                         \
   /* jdk/internal/vm/Continuation */                                                                                    \
   do_class(jdk_internal_vm_Continuation, "jdk/internal/vm/Continuation")                                                \
-  do_intrinsic(_Continuation_enter,  jdk_internal_vm_Continuation, enter_name,    continuationEnter_signature, F_S)     \
-    do_signature(continuationEnter_signature,   "(Ljdk/internal/vm/Continuation;Z)V")                                   \
+  do_intrinsic(_Continuation_enter,        jdk_internal_vm_Continuation, enter_name,        continuationEnter_signature, F_S) \
+   do_signature(continuationEnter_signature,                      "(Ljdk/internal/vm/Continuation;Z)V")                 \
   do_intrinsic(_Continuation_enterSpecial, jdk_internal_vm_Continuation, enterSpecial_name, continuationEnterSpecial_signature, F_SN) \
-    do_signature(continuationEnterSpecial_signature,   "(Ljdk/internal/vm/Continuation;ZZ)V")                           \
-  do_signature(continuationGetStacks_signature, "(III)V")                                                               \
+   do_signature(continuationEnterSpecial_signature,               "(Ljdk/internal/vm/Continuation;ZZ)V")                \
+  do_signature(continuationGetStacks_signature,                   "(III)V")                                             \
   do_alias(continuationOnPinned_signature,      int_void_signature)                                                     \
-  do_intrinsic(_Continuation_doYield, jdk_internal_vm_Continuation,  doYield_name, continuationDoYield_signature, F_S)  \
-    do_alias(continuationDoYield_signature,     void_int_signature)                                                     \
+  do_intrinsic(_Continuation_doYield,      jdk_internal_vm_Continuation, doYield_name,      continuationDoYield_signature, F_S) \
+   do_alias(    continuationDoYield_signature,     void_int_signature)                                                  \
                                                                                                                         \
   /* support for UnsafeConstants */                                                                                     \
   do_class(jdk_internal_misc_UnsafeConstants,      "jdk/internal/misc/UnsafeConstants")                                 \

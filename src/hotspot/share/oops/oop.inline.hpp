@@ -91,14 +91,6 @@ Klass* oopDesc::klass() const {
 
 Klass* oopDesc::klass_or_null() const {
   if (UseCompressedClassPointers) {
-    // narrowKlass v = _metadata._compressed_klass;
-    // if (!CompressedKlassPointers::is_null(v)) {
-    //   Klass* result = CompressedKlassPointers::decode_raw(v);
-    //   if(!check_alignment(result)) {
-    //     tty->print_cr("oop klass unaligned: %p oop: %p",  (void*) result, this);
-    //     return NULL;
-    //   }
-    // }
     return CompressedKlassPointers::decode(_metadata._compressed_klass);
   } else {
     return _metadata._klass;
@@ -184,7 +176,6 @@ size_t oopDesc::size_given_klass(Klass* klass)  {
       // in units of bytes and doing it this way we can round up just once,
       // skipping the intermediate round to HeapWordSize.
       s = align_up(size_in_bytes, MinObjAlignmentInBytes) / HeapWordSize;
-
 
       assert(s == klass->oop_size(this) || size_might_change(), "wrong array object size");
     } else {

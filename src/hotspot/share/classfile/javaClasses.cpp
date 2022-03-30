@@ -198,6 +198,7 @@ static void compute_offset(int& dest_offset, InstanceKlass* ik,
 #define FIELD_COMPUTE_OFFSET(offset, klass, name, signature, is_static) \
   compute_offset(offset, klass, name, vmSymbols::signature(), is_static)
 
+
 // java_lang_String
 
 int java_lang_String::_value_offset;
@@ -1684,12 +1685,12 @@ int java_lang_Thread_FieldHolder::_daemon_offset;
 int java_lang_Thread_FieldHolder::_thread_status_offset;
 
 #define THREAD_FIELD_HOLDER_FIELDS_DO(macro) \
-  macro(_group_offset,         k, vmSymbols::group_name(), threadgroup_signature, false); \
-  macro(_priority_offset,      k, vmSymbols::priority_name(), int_signature, false); \
-  macro(_stackSize_offset,     k, "stackSize", long_signature, false); \
-  macro(_stillborn_offset,     k, "stillborn", bool_signature, false); \
-  macro(_daemon_offset,        k, vmSymbols::daemon_name(), bool_signature, false); \
-  macro(_thread_status_offset, k, "threadStatus", int_signature, false)
+  macro(_group_offset,         k, vmSymbols::group_name(),    threadgroup_signature, false); \
+  macro(_priority_offset,      k, vmSymbols::priority_name(), int_signature,         false); \
+  macro(_stackSize_offset,     k, "stackSize",                long_signature,        false); \
+  macro(_stillborn_offset,     k, "stillborn",                bool_signature,        false); \
+  macro(_daemon_offset,        k, vmSymbols::daemon_name(),   bool_signature,        false); \
+  macro(_thread_status_offset, k, "threadStatus",             int_signature,         false)
 
 void java_lang_Thread_FieldHolder::compute_offsets() {
   assert(_group_offset == 0, "offsets should be initialized only once");
@@ -1749,7 +1750,7 @@ int java_lang_Thread_Constants::_static_VTHREAD_GROUP_offset = 0;
 int java_lang_Thread_Constants::_static_NOT_SUPPORTED_CLASSLOADER_offset = 0;
 
 #define THREAD_CONSTANTS_STATIC_FIELDS_DO(macro) \
-  macro(_static_VTHREAD_GROUP_offset, k, "VTHREAD_GROUP", threadgroup_signature, true); \
+  macro(_static_VTHREAD_GROUP_offset,             k, "VTHREAD_GROUP",             threadgroup_signature, true); \
   macro(_static_NOT_SUPPORTED_CLASSLOADER_offset, k, "NOT_SUPPORTED_CLASSLOADER", classloader_signature, true);
 
 void java_lang_Thread_Constants::compute_offsets() {
@@ -1997,7 +1998,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     GetStackTraceClosure(Handle java_thread) :
         HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
       // Pick some initial length
-      int init_length = MaxJavaStackTraceDepth/2;
+      int init_length = MaxJavaStackTraceDepth / 2;
       _methods = new GrowableArray<Method*>(init_length);
       _bcis = new GrowableArray<int>(init_length);
     }
@@ -2017,7 +2018,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
         if (thread->vthread_continuation()->cont_oop() !=
-              java_lang_VirtualThread::continuation(_java_thread())) {
+            java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
@@ -2033,7 +2034,10 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
            vfst.next()) {
 
         if (skip_hidden && (vfst.method()->is_hidden() ||
-                            vfst.method()->is_continuation_enter_intrinsic())) continue;
+                            vfst.method()->is_continuation_enter_intrinsic())) {
+          continue;
+        }
+
         _methods->push(vfst.method());
         _bcis->push(vfst.bci());
         total_count++;
@@ -2057,7 +2061,9 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   // Convert to StackTraceElement array
   InstanceKlass* k = vmClasses::StackTraceElement_klass();
   assert(k != NULL, "must be loaded in 1.4+");
-  if (k->should_be_initialized()) k->initialize(CHECK_NULL);
+  if (k->should_be_initialized()) {
+    k->initialize(CHECK_NULL);
+  }
   objArrayHandle trace = oopFactory::new_objArray_handle(k, gstc._depth, CHECK_NULL);
 
   for (int i = 0; i < gstc._depth; i++) {
@@ -2146,13 +2152,13 @@ objArrayOop java_lang_ThreadGroup::weaks(oop java_thread_group) {
 }
 
 #define THREADGROUP_FIELDS_DO(macro) \
-  macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,       false); \
-  macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,            false); \
-  macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,               false); \
-  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,              false); \
-  macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,               false); \
-  macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature, false); \
-  macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,               false); \
+  macro(_parent_offset,      k, vmSymbols::parent_name(),      threadgroup_signature,         false); \
+  macro(_name_offset,        k, vmSymbols::name_name(),        string_signature,              false); \
+  macro(_maxPriority_offset, k, vmSymbols::maxPriority_name(), int_signature,                 false); \
+  macro(_daemon_offset,      k, vmSymbols::daemon_name(),      bool_signature,                false); \
+  macro(_ngroups_offset,     k, vmSymbols::ngroups_name(),     int_signature,                 false); \
+  macro(_groups_offset,      k, vmSymbols::groups_name(),      threadgroup_array_signature,   false); \
+  macro(_nweaks_offset,      k, vmSymbols::nweaks_name(),      int_signature,                 false); \
   macro(_weaks_offset,       k, vmSymbols::weaks_name(),       weakreference_array_signature, false);
 
 void java_lang_ThreadGroup::compute_offsets() {
@@ -2178,11 +2184,11 @@ int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
-  macro(static_notify_jvmti_events_offset,  k, "notifyJvmtiEvents",  bool_signature, true); \
-  macro(static_vthread_scope_offset,  k, "VTHREAD_SCOPE",  continuationscope_signature, true); \
-  macro(_carrierThread_offset,  k, "carrierThread",  thread_signature, false); \
-  macro(_continuation_offset,  k, "cont",  continuation_signature, false); \
-  macro(_state_offset,  k, "state",  int_signature, false)
+  macro(static_notify_jvmti_events_offset, k, "notifyJvmtiEvents",  bool_signature,              true);  \
+  macro(static_vthread_scope_offset,       k, "VTHREAD_SCOPE",      continuationscope_signature, true);  \
+  macro(_carrierThread_offset,             k, "carrierThread",      thread_signature,            false); \
+  macro(_continuation_offset,              k, "cont",               continuation_signature,      false); \
+  macro(_state_offset,                     k, "state",              int_signature,               false)
 
 static bool vthread_notify_jvmti_events = JNI_FALSE;
 
@@ -3190,9 +3196,9 @@ int java_lang_StackFrameInfo::_version_offset;
 int java_lang_StackFrameInfo::_contScope_offset;
 
 #define STACKFRAMEINFO_FIELDS_DO(macro) \
-  macro(_memberName_offset,     k, "memberName",  object_signature, false); \
-  macro(_bci_offset,            k, "bci",         int_signature,    false); \
-  macro(_contScope_offset,      k, "contScope",   continuationscope_signature, false)
+  macro(_memberName_offset, k, "memberName", object_signature,            false); \
+  macro(_bci_offset,        k, "bci",        int_signature,               false); \
+  macro(_contScope_offset,  k, "contScope",  continuationscope_signature, false)
 
 void java_lang_StackFrameInfo::compute_offsets() {
   InstanceKlass* k = vmClasses::StackFrameInfo_klass();
@@ -5047,10 +5053,10 @@ int jdk_internal_vm_StackChunk::_maxSize_offset;
 int jdk_internal_vm_StackChunk::_cont_offset;
 
 #define STACKCHUNK_FIELDS_DO(macro) \
-  macro(_parent_offset,    k, vmSymbols::parent_name(),    stackchunk_signature, false); \
-  macro(_size_offset,      k, vmSymbols::size_name(),      int_signature,        false); \
-  macro(_sp_offset,        k, vmSymbols::sp_name(),        int_signature,        false); \
-  macro(_argsize_offset,   k, vmSymbols::argsize_name(),   int_signature,        false);
+  macro(_parent_offset,  k, vmSymbols::parent_name(),  stackchunk_signature, false); \
+  macro(_size_offset,    k, vmSymbols::size_name(),    int_signature,        false); \
+  macro(_sp_offset,      k, vmSymbols::sp_name(),      int_signature,        false); \
+  macro(_argsize_offset, k, vmSymbols::argsize_name(), int_signature,        false);
 
 void jdk_internal_vm_StackChunk::compute_offsets() {
   InstanceKlass* k = vmClasses::StackChunk_klass();

@@ -69,11 +69,11 @@ BarrierSet::BarrierSet(BarrierSetAssembler* barrier_set_assembler,
                        BarrierSetC2* barrier_set_c2,
                        BarrierSetNMethod* barrier_set_nmethod,
                        const FakeRtti& fake_rtti) :
-  _fake_rtti(fake_rtti),
-  _barrier_set_assembler(barrier_set_assembler),
-  _barrier_set_c1(barrier_set_c1),
-  _barrier_set_c2(barrier_set_c2),
-  _barrier_set_nmethod(select_barrier_set_nmethod(barrier_set_nmethod)) {
+    _fake_rtti(fake_rtti),
+    _barrier_set_assembler(barrier_set_assembler),
+    _barrier_set_c1(barrier_set_c1),
+    _barrier_set_c2(barrier_set_c2),
+    _barrier_set_nmethod(select_barrier_set_nmethod(barrier_set_nmethod)) {
 }
 
 void BarrierSet::on_thread_attach(Thread* thread) {

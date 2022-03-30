@@ -697,7 +697,9 @@ void DefNewGeneration::handle_promotion_failure(oop old) {
   _promotion_failed = true;
   _promotion_failed_info.register_copy_failure(old->size());
   _preserved_marks_set.get()->push_if_necessary(old, old->mark());
+
   ContinuationGCSupport::transform_stack_chunk(old);
+
   // forward to self
   old->forward_to(old);
 
@@ -738,6 +740,7 @@ oop DefNewGeneration::copy_to_survivor_space(oop old) {
 
     // Copy obj
     Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), cast_from_oop<HeapWord*>(obj), s);
+
     ContinuationGCSupport::transform_stack_chunk(obj);
 
     // Increment age if obj still in new generation

@@ -166,6 +166,7 @@ class CountPositivesNode: public StrIntrinsicNode {
   virtual const Type* bottom_type() const { return TypeInt::POS; }
 };
 
+
 //------------------------------EncodeISOArray--------------------------------
 // encode char[] to byte[] in ISO_8859_1 or ASCII
 class EncodeISOArrayNode: public Node {

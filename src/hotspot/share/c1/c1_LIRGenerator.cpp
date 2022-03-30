@@ -1438,7 +1438,6 @@ void LIRGenerator::do_scopeLocalCache(Intrinsic* x) {
               LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
 }
 
-
 void LIRGenerator::do_vthread(Intrinsic* x) {
   assert(x->number_of_arguments() == 0, "wrong type");
   LIR_Opr temp = new_register(T_ADDRESS);
@@ -1448,7 +1447,6 @@ void LIRGenerator::do_vthread(Intrinsic* x) {
   access_load(IN_NATIVE, T_OBJECT,
               LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
 }
-
 
 void LIRGenerator::do_RegisterFinalizer(Intrinsic* x) {
   assert(x->number_of_arguments() == 1, "wrong type");

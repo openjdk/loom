@@ -986,6 +986,7 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   return is_klass_loaded_by_klass_index(klass_index);
 }
 
+
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
   assert(!is_special_native_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");

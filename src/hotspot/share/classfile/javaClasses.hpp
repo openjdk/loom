@@ -1125,11 +1125,11 @@ class jdk_internal_vm_Continuation: AllStatic {
 };
 
 // Interface to jdk.internal.vm.StackChunk objects
-#define STACKCHUNK_INJECTED_FIELDS(macro)                                      \
-  macro(jdk_internal_vm_StackChunk, cont,      continuation_signature, false)  \
-  macro(jdk_internal_vm_StackChunk, flags,     byte_signature, false)          \
-  macro(jdk_internal_vm_StackChunk, pc,        intptr_signature, false)        \
-  macro(jdk_internal_vm_StackChunk, maxSize,   int_signature, false)           \
+#define STACKCHUNK_INJECTED_FIELDS(macro)                                    \
+  macro(jdk_internal_vm_StackChunk, cont,    continuation_signature, false)  \
+  macro(jdk_internal_vm_StackChunk, flags,   byte_signature, false)          \
+  macro(jdk_internal_vm_StackChunk, pc,      intptr_signature, false)        \
+  macro(jdk_internal_vm_StackChunk, maxSize, int_signature, false)           \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
