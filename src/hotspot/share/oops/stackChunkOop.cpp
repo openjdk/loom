@@ -230,9 +230,10 @@ void stackChunkOopDesc::relativize() {
   OrderAccess::storestore();
   RelativizeDerivedOopsStackChunkFrameClosure closure;
   iterate_stack(&closure);
-  // Derived oops must be fixed before their base pointers, this fence
-  // ensures the ordering between said fixes can be trusted to concurrent
-  // observers.
+
+  // The store of the derived oops must be ordered with the store of the base.
+  // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
+  // the GC code calling this function will update the base oop.
   OrderAccess::storestore();
 }
 
@@ -285,6 +286,11 @@ public:
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     relativize_derived_oops(f, map);
+
+    // This code is called from the STW collectors and don't have concurrent
+    // access to the derived oops. Therefore there's no need to add a
+    // storestore barrier here.
+    assert(SafepointSynchronize::is_at_safepoint(), "Should only be used by STW collectors");
 
     if (UseChunkBitmaps) {
       CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
@@ -352,9 +358,9 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
 
   relativize_derived_oops(f, map);
 
-  // Derived oops must be fixed before their base pointers, this fence
-  // ensures the ordering between said fixes can be trusted to concurrent
-  // observers.
+  // The store of the derived oops must be ordered with the store of the base.
+  // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
+  // the GC code calling this function will update the base oop.
   OrderAccess::storestore();
 
   if (has_bitmap() && UseCompressedOops) {

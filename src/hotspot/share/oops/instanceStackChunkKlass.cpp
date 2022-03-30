@@ -262,19 +262,54 @@ public:
     oop base = (_chunk->has_bitmap() && UseCompressedOops)
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
-    if (base != nullptr) {
-      ZGC_ONLY(if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) return;)
-      assert(!CompressedOops::is_base(base), "");
-      assert(oopDesc::is_oop(base), "");
-      ZGC_ONLY(assert(!UseZGC || ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
-      OrderAccess::loadload();
-      intptr_t offset = Atomic::load((intptr_t*)derived_loc);
-      offset = offset <= 0
-                  ? -offset
-                  : offset - cast_from_oop<intptr_t>(base);
-    } else {
-      assert(*derived_loc == derived_pointer(0), "");
+    if (base == nullptr) {
+      assert(*derived_loc == derived_pointer(0), "Unexpected");
+      return;
     }
+
+#if INCLUDE_ZGC
+    if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
+      // If the base oops has not been fixed, other threads could be fixing
+      // the derived oops concurrently with this code. Don't proceed with the
+      // verification.
+      return;
+    }
+#endif
+
+    assert(!UseCompressedOops || !CompressedOops::is_base(base), "Should not be the compressed oops base");
+    assert(oopDesc::is_oop(base), "Should be a valid oop");
+
+    // Order the loads of the base oop and the derived oop
+    OrderAccess::loadload();
+
+    intptr_t offset = Atomic::load((intptr_t*)derived_loc);
+
+    if (offset == 0 || offset == 1) {
+      // Special-casse. See: RelativizeDerivedOopClosure
+      return;
+    }
+
+    // Offsets are "tagged" as negative values
+
+    if (UseZGC) {
+      // For ZGC, we checked above that the base has been fixed and all derived
+      // pointers should therefore have been converted to offsets.
+      assert(offset < 0, "Unexpected non-offset value: " PTR_FORMAT, offset);
+    } else {
+      if (offset <= 0) {
+        // The offset was actually an offset
+        offset = -offset;
+      } else {
+        // The offset was a non-offset derived pointer that
+        // had not been converted to an offset yet.
+        offset = offset - cast_from_oop<intptr_t>(base);
+      }
+    }
+
+    // Check that the offset is within the object
+    size_t base_size_in_bytes = base->size() * BytesPerWord;
+    assert(size_t(offset) < base_size_in_bytes, "Offset must be within object: "
+           PTR_FORMAT " object size: " SIZE_FORMAT, offset, base_size_in_bytes);
   }
 };
 
