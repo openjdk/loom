@@ -26,17 +26,13 @@
 #define SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 
 #include "classfile/vmClasses.hpp"
+#include "memory/memRegion.hpp"
 #include "oops/instanceKlass.hpp"
-#include "oops/stackChunkOop.hpp"
-#include "runtime/handles.hpp"
-#include "runtime/stackChunkFrameStream.hpp"
+#include "oops/oopsHierarchy.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/ostream.hpp"
 
 class ClassFileParser;
-class frame;
-class ImmutableOopMap;
-class VMRegImpl;
-typedef VMRegImpl* VMReg;
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass.
 // It has a header containing metadata, and a blob containing a stack segment
@@ -138,9 +134,6 @@ public:
 #ifndef PRODUCT
   void oop_print_on(oop obj, outputStream* st) override;
 #endif
-
-  static bool verify(oop obj, size_t* out_size = NULL, int* out_oops = NULL,
-                     int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
   // Stack offset is an offset into the Heap
   static int offset_of_stack() { return _offset_of_stack; }

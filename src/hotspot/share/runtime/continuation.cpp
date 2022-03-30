@@ -173,14 +173,12 @@ Address |   |                            |    |   Caller is still in the chunk.
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // address p is readable and *(intptr_t*)p != errvalue
 
 static void verify_continuation(oop continuation) { Continuation::debug_verify_continuation(continuation); }
-static void verify_stack_chunk(oop chunk) { InstanceStackChunkKlass::verify(chunk); }
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOop chunk, outputStream* st);
 static void log_frames(JavaThread* thread);
 #else
 static void verify_continuation(oop continuation) { }
-static void verify_stack_chunk(oop chunk) { }
 #endif
 
 #ifndef PRODUCT
@@ -1324,8 +1322,9 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
     chunk->print_on(true, &ls);
   }
 
+  // Verification
   assert(_cont.chunk_invariant(tty), "");
-  verify_stack_chunk(chunk);
+  chunk->verify();
 
 #if CONT_JFR
   EventContinuationFreezeYoung e;
@@ -2228,13 +2227,16 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
   stackChunkOop chunk = jdk_internal_vm_Continuation::tail(continuation);
   assert(chunk != nullptr, "");
+
   if (UNLIKELY(chunk->is_empty())) {
     chunk = chunk->parent();
+    assert(chunk != nullptr, "");
+    assert(!chunk->is_empty(), "");
     jdk_internal_vm_Continuation::set_tail(continuation, chunk);
   }
-  assert(chunk != nullptr, "");
-  assert(!chunk->is_empty(), "");
-  verify_stack_chunk(chunk);
+
+  // Verification
+  chunk->verify();
 
   int size = chunk->max_size();
   guarantee (size > 0, "");

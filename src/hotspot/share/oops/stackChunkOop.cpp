@@ -25,6 +25,8 @@
 #include "precompiled.hpp"
 #include "code/compiledMethod.hpp"
 #include "code/scopeDesc.hpp"
+#include "logging/log.hpp"
+#include "logging/logStream.hpp"
 #include "memory/memRegion.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/oop.inline.hpp"
@@ -33,6 +35,12 @@
 #include "runtime/registerMap.hpp"
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "runtime/stackChunkFrameStream.inline.hpp"
+#if INCLUDE_SHENANDOAHGC
+#include "gc/shenandoah/shenandoahHeap.inline.hpp"
+#endif
+#if INCLUDE_ZGC
+#include "gc/z/zAddress.inline.hpp"
+#endif
 
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   assert(!is_empty(), "");
@@ -446,7 +454,288 @@ void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
 }
 
 #ifdef ASSERT
+
+template <typename P>
+static inline oop safe_load(P* addr) {
+  oop obj = RawAccess<>::oop_load(addr);
+  return NativeAccess<>::oop_load(&obj);
+}
+
+class StackChunkVerifyOopsClosure : public OopClosure {
+  stackChunkOop _chunk;
+  int _count;
+
+public:
+  StackChunkVerifyOopsClosure(stackChunkOop chunk)
+    : _chunk(chunk), _count(0) {}
+
+  void do_oop(oop* p) override { (_chunk->has_bitmap() && UseCompressedOops) ? do_oop_work((narrowOop*)p) : do_oop_work(p); }
+  void do_oop(narrowOop* p) override { do_oop_work(p); }
+
+  template <typename T> inline void do_oop_work(T* p) {
+     _count++;
+    if (SafepointSynchronize::is_at_safepoint()) return;
+
+    oop obj = safe_load(p);
+    assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
+    if (_chunk->has_bitmap()) {
+      BitMap::idx_t index = _chunk->bit_index_for(p);
+      assert(_chunk->bitmap().at(index), "Bit not set at index " SIZE_FORMAT " corresponding to " INTPTR_FORMAT, index, p2i(p));
+    }
+  }
+
+  int count() const { return _count; }
+};
+
+class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
+  stackChunkOop _chunk;
+  const bool    _requires_barriers;
+
+public:
+  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk)
+    : _chunk(chunk),
+      _requires_barriers(chunk->requires_barriers()) {}
+
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+    if (SafepointSynchronize::is_at_safepoint()) {
+      return;
+    }
+
+    oop base = (_chunk->has_bitmap() && UseCompressedOops)
+                  ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
+                  : Atomic::load((oop*)base_loc);
+    if (base == nullptr) {
+      assert(*derived_loc == derived_pointer(0), "Unexpected");
+      return;
+    }
+
+#if INCLUDE_ZGC
+    if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
+      // If the base oops has not been fixed, other threads could be fixing
+      // the derived oops concurrently with this code. Don't proceed with the
+      // verification.
+      return;
+    }
+#endif
+
+    assert(!UseCompressedOops || !CompressedOops::is_base(base), "Should not be the compressed oops base");
+    assert(oopDesc::is_oop(base), "Should be a valid oop");
+
+    // Order the loads of the base oop and the derived oop
+    OrderAccess::loadload();
+
+    intptr_t offset = Atomic::load((intptr_t*)derived_loc);
+
+    if (offset == 0 || offset == 1) {
+      // Special-case. See: RelativizeDerivedOopClosure
+      return;
+    }
+
+    // Offsets are "tagged" as negative values
+
+    if (UseZGC && _requires_barriers) {
+      // For ZGC when the _chunk has transition to a state where the layout has
+      // become stable(requires_barriers()), the earlier is_good check should
+      // guarantee that all derived oops have been converted too offsets.
+      assert(offset < 0, "Unexpected non-offset value: " PTR_FORMAT, offset);
+    } else {
+      if (offset <= 0) {
+        // The offset was actually an offset
+        offset = -offset;
+      } else {
+        // The offset was a non-offset derived pointer that
+        // had not been converted to an offset yet.
+        offset = offset - cast_from_oop<intptr_t>(base);
+      }
+    }
+
+    // Check that the offset is within the object
+    size_t base_size_in_bytes = base->size() * BytesPerWord;
+    assert(size_t(offset) < base_size_in_bytes, "Offset must be within object: "
+           PTR_FORMAT " object size: " SIZE_FORMAT, offset, base_size_in_bytes);
+  }
+};
+
+class VerifyStackChunkFrameClosure {
+  stackChunkOop _chunk;
+
+public:
+  intptr_t* _sp;
+  CodeBlob* _cb;
+  bool _callee_interpreted;
+  int _size;
+  int _argsize;
+  int _num_oops;
+  int _num_frames;
+  int _num_interpreted_frames;
+  int _num_i2c;
+
+  VerifyStackChunkFrameClosure(stackChunkOop chunk, int num_frames, int size)
+    : _chunk(chunk), _sp(nullptr), _cb(nullptr), _callee_interpreted(false),
+      _size(size), _argsize(0), _num_oops(0), _num_frames(num_frames), _num_interpreted_frames(0), _num_i2c(0) {}
+
+  template <chunk_frames frame_kind, typename RegisterMapT>
+  bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
+    _sp = f.sp();
+    _cb = f.cb();
+
+    int fsize = f.frame_size() - ((f.is_interpreted() == _callee_interpreted) ? _argsize : 0);
+    int num_oops = f.num_oops();
+    assert(num_oops >= 0, "");
+
+    _argsize   = f.stack_argsize();
+    _size     += fsize;
+    _num_oops += num_oops;
+    if (f.is_interpreted()) {
+      _num_interpreted_frames++;
+    }
+
+    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
+    LogTarget(Trace, jvmcont) lt;
+    if (lt.develop_is_enabled()) {
+      LogStream ls(lt);
+      f.print_on(&ls);
+    }
+    assert(f.pc() != nullptr,
+      "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
+      !_chunk->requires_barriers(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));
+
+    if (_num_frames == 0) {
+      assert(f.pc() == _chunk->pc(), "");
+    }
+
+    if (_num_frames > 0 && !_callee_interpreted && f.is_interpreted()) {
+      log_develop_trace(jvmcont)("debug_verify_stack_chunk i2c");
+      _num_i2c++;
+    }
+
+    StackChunkVerifyOopsClosure oops_closure(_chunk);
+    f.iterate_oops(&oops_closure, map);
+    assert(oops_closure.count() == num_oops, "oops: %d oopmap->num_oops(): %d", oops_closure.count(), num_oops);
+
+    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk);
+    f.iterate_derived_pointers(&derived_oops_closure, map);
+
+    _callee_interpreted = f.is_interpreted();
+    _num_frames++;
+    return true;
+  }
+};
+
+template <typename T>
+class StackChunkVerifyBitmapClosure : public BitMapClosure {
+  stackChunkOop _chunk;
+
+public:
+  int _count;
+
+  StackChunkVerifyBitmapClosure(stackChunkOop chunk) : _chunk(chunk), _count(0) {}
+
+  bool do_bit(BitMap::idx_t index) override {
+    T* p = _chunk->address_for_bit<T>(index);
+    _count++;
+
+    if (!SafepointSynchronize::is_at_safepoint()) {
+      oop obj = safe_load(p);
+      assert(obj == nullptr || dbg_is_good_oop(obj),
+              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT,
+              p2i(p), p2i((oopDesc*)obj), index);
+    }
+
+    return true; // continue processing
+  }
+};
+
 bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames, int* out_interpreted_frames) {
-  return InstanceStackChunkKlass::verify(this, out_size, out_oops, out_frames, out_interpreted_frames);
+  DEBUG_ONLY(if (!VerifyContinuations) return true;)
+
+  assert(oopDesc::is_oop(this), "");
+
+  assert(stack_size() >= 0, "");
+  assert(argsize() >= 0, "");
+  assert(!has_bitmap() || is_gc_mode(), "");
+
+  if (is_empty()) {
+    assert(argsize() == 0, "");
+    assert(max_size() == 0, "");
+  }
+
+  if (!SafepointSynchronize::is_at_safepoint()) {
+    assert(oopDesc::is_oop_or_null(parent()), "");
+  }
+
+  const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
+  const bool gc_mode = is_gc_mode();
+  const bool is_last = parent() == nullptr;
+  const bool mixed = has_mixed_frames();
+
+  // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset)
+  // for the top frame (below sp), and *not* for the bottom frame
+  int size = stack_size() - argsize() - sp();
+  assert(size >= 0, "");
+  assert((size == 0) == is_empty(), "");
+
+  const StackChunkFrameStream<chunk_frames::MIXED> first(this);
+  const bool has_safepoint_stub_frame = first.is_stub();
+
+  VerifyStackChunkFrameClosure closure(this,
+    has_safepoint_stub_frame ? 1 : 0, // iterate_stack skips the safepoint stub
+    has_safepoint_stub_frame ? first.frame_size() : 0);
+  iterate_stack(&closure);
+
+  assert(!is_empty() || closure._cb == nullptr, "");
+  if (closure._cb != nullptr && closure._cb->is_compiled()) {
+    assert(argsize() ==
+      (closure._cb->as_compiled_method()->method()->num_stack_arg_slots()*VMRegImpl::stack_slot_size) >>LogBytesPerWord,
+      "chunk argsize: %d bottom frame argsize: %d", argsize(),
+      (closure._cb->as_compiled_method()->method()->num_stack_arg_slots()*VMRegImpl::stack_slot_size) >>LogBytesPerWord);
+  }
+
+  assert(closure._num_interpreted_frames == 0 || has_mixed_frames(), "");
+
+  if (!concurrent) {
+    assert(closure._size <= size + argsize() + InstanceStackChunkKlass::metadata_words(),
+      "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d",
+      size, argsize(), closure._size, closure._sp - start_address(), sp(), stack_size());
+    assert(argsize() == closure._argsize,
+      "argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
+      argsize(), closure._argsize, closure._callee_interpreted);
+
+    int calculated_max_size = closure._size + closure._num_i2c * InstanceStackChunkKlass::align_wiggle();
+    assert(max_size() == calculated_max_size,
+      "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
+      max_size(), calculated_max_size, closure._argsize, closure._num_i2c);
+
+    if (out_size   != nullptr) *out_size   += size;
+    if (out_oops   != nullptr) *out_oops   += closure._num_oops;
+    if (out_frames != nullptr) *out_frames += closure._num_frames;
+    if (out_interpreted_frames != nullptr) *out_interpreted_frames += closure._num_interpreted_frames;
+  } else {
+    assert(out_size == nullptr && out_oops == nullptr && out_frames == nullptr && out_interpreted_frames == nullptr, "");
+  }
+
+  if (has_bitmap()) {
+    assert(bitmap().size() == align_up((size_t)(stack_size() << (UseCompressedOops ? 1 : 0)), BitsPerWord),
+      "bitmap().size(): %zu stack_size: %d",
+      bitmap().size(), stack_size());
+    int oop_count;
+    if (UseCompressedOops) {
+      StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(this);
+      bitmap().iterate(&bitmap_closure,
+        bit_index_for((narrowOop*)(sp_address() - InstanceStackChunkKlass::metadata_words())),
+        bit_index_for((narrowOop*)end_address()));
+      oop_count = bitmap_closure._count;
+    } else {
+      StackChunkVerifyBitmapClosure<oop> bitmap_closure(this);
+      bitmap().iterate(&bitmap_closure,
+        bit_index_for((oop*)(sp_address() - InstanceStackChunkKlass::metadata_words())),
+        bit_index_for((oop*)end_address()));
+      oop_count = bitmap_closure._count;
+    }
+    assert(oop_count == closure._num_oops,
+      "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
+  }
+
+  return true;
 }
 #endif

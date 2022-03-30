@@ -173,6 +173,7 @@ public:
   using oopDesc::print_on;
   void print_on(bool verbose, outputStream* st) const;
 
+  // Verifies the consistency of the chunk's data
   bool verify(size_t* out_size = NULL, int* out_oops = NULL,
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
