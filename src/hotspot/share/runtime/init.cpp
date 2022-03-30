@@ -171,7 +171,6 @@ jint init_globals() {
     JVMFlag::printFlags(tty, false, PrintFlagsRanges);
   }
 
-
   return JNI_OK;
 }
 

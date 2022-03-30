@@ -34,12 +34,6 @@ inline void Prefetch::read (const void *loc, intx interval) {
 #endif // AMD64
 }
 
-inline void Prefetch::read_streaming(const void *loc, intx interval) {
-#ifdef AMD64
-  __asm__ ("prefetchnta (%0,%1,1)" : : "r" (loc), "r" (interval));
-#endif // AMD64
-}
-
 inline void Prefetch::write(void *loc, intx interval) {
 #ifdef AMD64
 

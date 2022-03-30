@@ -31,10 +31,6 @@
 inline void Prefetch::read (const void *loc, intx interval) {
 }
 
-inline void Prefetch::read_streaming(const void *loc, intx interval) {
-  read (loc, interval);
-}
-
 inline void Prefetch::write(void *loc, intx interval) {
 }
 

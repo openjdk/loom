@@ -600,14 +600,6 @@ public:
       OopStorage::trigger_cleanup_if_needed();
     }
 
-    if (_subtasks.try_claim_task(SafepointSynchronize::SAFEPOINT_CLEANUP_KEEPALIVES)) {
-      const char* name = "cleaning keepalive jweak handles";
-      EventSafepointCleanupTask event;
-      TraceTime timer(name, TRACETIME_LOG(Info, safepoint, cleanup));
-
-      post_safepoint_cleanup_task_event(event, SafepointSynchronize::safepoint_id(), name);
-    }
-
     _subtasks.all_tasks_claimed();
   }
 };

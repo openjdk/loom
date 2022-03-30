@@ -84,7 +84,7 @@ class ThreadStateTransition : public StackObj {
   }
 
   static inline void transition_from_java(JavaThread *thread, JavaThreadState to) {
-    assert(thread->thread_state() == _thread_in_Java, "coming from wrong thread state: %s", thread->thread_state_name());
+    assert(thread->thread_state() == _thread_in_Java, "coming from wrong thread state");
     assert(to == _thread_in_vm || to == _thread_in_native, "invalid transition");
     thread->set_thread_state(to);
   }

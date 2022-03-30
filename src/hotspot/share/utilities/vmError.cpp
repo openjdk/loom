@@ -345,9 +345,6 @@ static frame next_frame(frame fr, Thread* t) {
 }
 
 void VMError::print_native_stack(outputStream* st, frame fr, Thread* t, char* buf, int buf_size) {
-  if (t != NULL) {
-    st->print_cr("Thread " INTPTR_FORMAT " [%ld]", p2i(t), (long) t->osthread()->thread_id());
-  }
 
   // see if it's a valid frame
   if (fr.pc()) {

@@ -77,7 +77,6 @@ class SafepointSynchronize : AllStatic {
     SAFEPOINT_CLEANUP_STRING_TABLE_REHASH,
     SAFEPOINT_CLEANUP_SYSTEM_DICTIONARY_RESIZE,
     SAFEPOINT_CLEANUP_REQUEST_OOPSTORAGE_CLEANUP,
-    SAFEPOINT_CLEANUP_KEEPALIVES,
     // Leave this one last.
     SAFEPOINT_CLEANUP_NUM_TASKS
   };
@@ -134,9 +133,9 @@ class SafepointSynchronize : AllStatic {
   // If true the VMThread may safely process the handshake operation for the JavaThread.
   static bool handshake_safe(JavaThread *thread);
 
-public:
-
   static uint64_t safepoint_counter()             { return _safepoint_counter; }
+
+public:
 
   static void init(Thread* vmthread);
 
