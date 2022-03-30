@@ -230,6 +230,10 @@ void stackChunkOopDesc::relativize() {
   OrderAccess::storestore();
   RelativizeDerivedOopsStackChunkFrameClosure closure;
   iterate_stack(&closure);
+  // Derived oops must be fixed before their base pointers, this fence
+  // ensures the ordering between said fixes can be trusted to concurrent
+  // observers.
+  OrderAccess::storestore();
 }
 
 enum class OopKind { Narrow, Wide };
@@ -347,6 +351,11 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
   }
 
   relativize_derived_oops(f, map);
+
+  // Derived oops must be fixed before their base pointers, this fence
+  // ensures the ordering between said fixes can be trusted to concurrent
+  // observers.
+  OrderAccess::storestore();
 
   if (has_bitmap() && UseCompressedOops) {
     BarrierClosure<barrier, true> oops_closure(f.sp());
