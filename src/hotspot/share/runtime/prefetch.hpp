@@ -43,7 +43,6 @@ class Prefetch : AllStatic {
 
   // Prefetch anticipating read; must not fault, semantically a no-op
   static void read(const void* loc, intx interval);
-  static void read_streaming(const void* loc, intx interval);
 
   // Prefetch anticipating write; must not fault, semantically a no-op
   static void write(void* loc, intx interval);
