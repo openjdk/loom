@@ -172,8 +172,6 @@ public:
 private:
   static size_t bitmap_size_in_bits(size_t stack_size_in_words) { return stack_size_in_words << (UseCompressedOops ? 1 : 0); }
 
-  size_t copy(oop obj, HeapWord* to, size_t word_size, bool disjoint);
-
   template <typename T, class OopClosureType>
   inline void oop_oop_iterate_header(stackChunkOop chunk, OopClosureType* closure);
 
