@@ -25,7 +25,7 @@
 #ifndef CPU_ARM_CONTINUATION_ARM_INLINE_HPP
 #define CPU_ARM_CONTINUATION_ARM_INLINE_HPP
 
-#include "oops/instanceStackChunkKlass.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 

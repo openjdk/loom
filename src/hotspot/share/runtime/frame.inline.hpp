@@ -30,7 +30,7 @@
 #include "code/codeBlob.inline.hpp"
 #include "code/compiledMethod.inline.hpp"
 #include "interpreter/interpreter.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "oops/method.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/registerMap.hpp"

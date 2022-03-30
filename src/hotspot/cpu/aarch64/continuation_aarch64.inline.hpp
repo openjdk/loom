@@ -26,7 +26,7 @@
 #define CPU_AARCH64_CONTINUATION_AARCH64_INLINE_HPP
 
 #include "code/codeBlob.inline.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 

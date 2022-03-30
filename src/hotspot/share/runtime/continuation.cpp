@@ -43,7 +43,6 @@
 #include "logging/logStream.hpp"
 #include "metaprogramming/conditional.hpp"
 #include "oops/access.inline.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/stackChunkOop.inline.hpp"

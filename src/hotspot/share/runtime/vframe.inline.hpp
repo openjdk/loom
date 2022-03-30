@@ -27,7 +27,6 @@
 
 #include "runtime/vframe.hpp"
 
-#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/stackChunkOop.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
