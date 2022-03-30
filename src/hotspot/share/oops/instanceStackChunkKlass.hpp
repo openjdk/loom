@@ -25,7 +25,6 @@
 #ifndef SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 #define SHARE_OOPS_INSTANCESTACKCHUNKKLASS_HPP
 
-#include "classfile/vmClasses.hpp"
 #include "memory/memRegion.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/oopsHierarchy.hpp"
@@ -137,11 +136,7 @@ public:
 
   // Stack offset is an offset into the Heap
   static int offset_of_stack() { return _offset_of_stack; }
-  static void init_offset_of_stack() {
-    // Cache the offset of the static fields in the Class instance
-    assert(_offset_of_stack == 0, "once");
-    _offset_of_stack = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
-  }
+  static void init_offset_of_stack();
 
   // Oop fields (and metadata) iterators
   //

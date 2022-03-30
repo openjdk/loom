@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
+#include "classfile/vmClasses.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "memory/iterator.inline.hpp"
 #include "memory/oopFactory.hpp"
@@ -261,4 +262,10 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
     st->print_cr("======");
   #endif
   }
+}
+
+void InstanceStackChunkKlass::init_offset_of_stack() {
+  // Cache the offset of the static fields in the Class instance
+  assert(_offset_of_stack == 0, "once");
+  _offset_of_stack = cast(vmClasses::StackChunk_klass())->size_helper() << LogHeapWordSize;
 }
