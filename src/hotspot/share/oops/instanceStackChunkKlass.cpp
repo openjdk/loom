@@ -249,10 +249,12 @@ public:
 
 class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
   stackChunkOop _chunk;
+  const bool    _requires_barriers;
 
 public:
   StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk)
-    : _chunk(chunk) {}
+    : _chunk(chunk),
+      _requires_barriers(chunk->requires_barriers()) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
     if (SafepointSynchronize::is_at_safepoint()) {
@@ -285,15 +287,16 @@ public:
     intptr_t offset = Atomic::load((intptr_t*)derived_loc);
 
     if (offset == 0 || offset == 1) {
-      // Special-casse. See: RelativizeDerivedOopClosure
+      // Special-case. See: RelativizeDerivedOopClosure
       return;
     }
 
     // Offsets are "tagged" as negative values
 
-    if (UseZGC) {
-      // For ZGC, we checked above that the base has been fixed and all derived
-      // pointers should therefore have been converted to offsets.
+    if (UseZGC && _requires_barriers) {
+      // For ZGC when the _chunk has transition to a state where the layout has
+      // become stable(requires_barriers()), the earlier is_good check should
+      // guarantee that all derived oops have been converted too offsets.
       assert(offset < 0, "Unexpected non-offset value: " PTR_FORMAT, offset);
     } else {
       if (offset <= 0) {
