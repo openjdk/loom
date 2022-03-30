@@ -390,9 +390,9 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, bool is_mount) {
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
     ml.notify_all();
   }
-  if ((!is_mount && thread->is_carrier_thread_suspended()) ||
-      (is_mount && JvmtiVTSuspender::is_vthread_suspended(thread_id))
-  ) {
+  // In unmount case the carrier thread is attached after unmount transition.
+  // Check and block it if there was external suspend request.
+  if (!is_mount && thread->is_carrier_thread_suspended()) {
     while (true) {
       ThreadBlockInVM tbivm(thread);
       MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
