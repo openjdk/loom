@@ -713,7 +713,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
     JavaThreadState jts = jt->thread_state();
 
     if (jt->is_carrier_thread_suspended() ||
-        ((jt->mounted_vthread() == NULL || jt->mounted_vthread() == thread_oop) && jt->is_suspended())) {
+        ((jt->jvmti_vthread() == NULL || jt->jvmti_vthread() == thread_oop) && jt->is_suspended())) {
       // Suspended non-virtual thread.
       state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
@@ -1276,7 +1276,7 @@ bool
 JvmtiEnvBase::cthread_with_mounted_vthread(JavaThread* jt) {
   oop thread_oop = jt->threadObj();
   assert(thread_oop != NULL, "sanity check");
-  oop mounted_vt = jt->mounted_vthread();
+  oop mounted_vt = jt->jvmti_vthread();
 
   return (mounted_vt != NULL && mounted_vt != thread_oop);
 }
@@ -2247,7 +2247,7 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
 
   ResourceMark rm (current_thread);
   const char* tname = JvmtiTrace::safe_get_thread_name(java_thread);
-  oop t_oop = java_thread->mounted_vthread();
+  oop t_oop = java_thread->jvmti_vthread();
   t_oop = t_oop == NULL ? java_thread->threadObj() : t_oop;
   bool is_vt_suspended = java_lang_VirtualThread::is_instance(t_oop) && JvmtiVTSuspender::is_vthread_suspended(t_oop);
 

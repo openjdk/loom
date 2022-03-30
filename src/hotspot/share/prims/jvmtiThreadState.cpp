@@ -119,8 +119,8 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   // thread can be NULL if virtual thread is unmounted
   if (thread != NULL) {
-    // set this as the state for the thread only if thread_oop is current thread->mounted_vthread()
-    if (thread_oop == NULL || thread->mounted_vthread() == NULL || thread->mounted_vthread() == thread_oop) {
+    // set this as the state for the thread only if thread_oop is current thread->jvmti_vthread()
+    if (thread_oop == NULL || thread->jvmti_vthread() == NULL || thread->jvmti_vthread() == thread_oop) {
       thread->set_jvmti_thread_state(this);
     }
     thread->set_interp_only_mode(0);

@@ -1026,7 +1026,7 @@ JvmtiEnv::SuspendAllVirtualThreads(jint except_count, const jthread* except_list
     }
 
     for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
-      oop vt_oop = java_thread->mounted_vthread();
+      oop vt_oop = java_thread->jvmti_vthread();
       if (!java_thread->is_exiting() &&
           !java_thread->is_jvmti_agent_thread() &&
           !java_thread->is_hidden_from_external_view() &&
@@ -1129,7 +1129,7 @@ JvmtiEnv::ResumeAllVirtualThreads(jint except_count, const jthread* except_list)
   }
 
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
-    oop vt_oop = java_thread->mounted_vthread();
+    oop vt_oop = java_thread->jvmti_vthread();
     if (!java_thread->is_exiting() &&
         !java_thread->is_jvmti_agent_thread() &&
         !java_thread->is_hidden_from_external_view() &&

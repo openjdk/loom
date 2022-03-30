@@ -1263,7 +1263,7 @@ bool              JvmtiExport::_should_post_vthread_unmount               = fals
 
 
 void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
-  oop vt = thread->mounted_vthread();
+  oop vt = thread->jvmti_vthread();
 
   if (vt != NULL && java_lang_VirtualThread::is_instance(vt)) {
     HandleMark hm(thread);

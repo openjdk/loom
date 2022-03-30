@@ -703,7 +703,7 @@ class JavaThread: public Thread {
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
-  OopHandle      _mounted_vthread;
+  OopHandle      _jvmti_vthread;
   OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
@@ -1129,8 +1129,8 @@ private:
   void set_vthread(oop p);
   oop scopeLocalCache() const;
   void set_scopeLocalCache(oop p);
-  oop mounted_vthread() const;
-  void set_mounted_vthread(oop p);
+  oop jvmti_vthread() const;
+  void set_jvmti_vthread(oop p);
 
   // Prepare thread and add to priority queue.  If a priority is
   // not specified, use the priority of the thread object. Threads_lock

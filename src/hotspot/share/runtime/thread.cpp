@@ -785,7 +785,7 @@ void JavaThread::set_threadOopHandles(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
-  _mounted_vthread = OopHandle(_thread_oop_storage, NULL);
+  _jvmti_vthread = OopHandle(_thread_oop_storage, NULL);
   _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
@@ -802,13 +802,13 @@ void JavaThread::set_vthread(oop p) {
   _vthread.replace(p);
 }
 
-oop JavaThread::mounted_vthread() const {
-  return _mounted_vthread.resolve();
+oop JavaThread::jvmti_vthread() const {
+  return _jvmti_vthread.resolve();
 }
 
-void JavaThread::set_mounted_vthread(oop p) {
+void JavaThread::set_jvmti_vthread(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
-  _mounted_vthread.replace(p);
+  _jvmti_vthread.replace(p);
 }
 
 oop JavaThread::scopeLocalCache() const {
@@ -1226,7 +1226,7 @@ JavaThread::~JavaThread() {
   // Ask ServiceThread to release the threadObj OopHandle
   ServiceThread::add_oop_handle_release(_threadObj);
   ServiceThread::add_oop_handle_release(_vthread);
-  ServiceThread::add_oop_handle_release(_mounted_vthread);
+  ServiceThread::add_oop_handle_release(_jvmti_vthread);
 
   // Return the sleep event to the free list
   ParkEvent::Release(_SleepEvent);
@@ -2400,7 +2400,7 @@ void JavaThread::print_stack_on(outputStream* st) {
 #if INCLUDE_JVMTI
 // Rebind JVMTI thread state from carrier to virtual or from virtual to carrier.
 JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
-  set_mounted_vthread(thread_oop);
+  set_jvmti_vthread(thread_oop);
 
   // unbind current JvmtiThreadState from JavaThread
   jvmti_thread_state()->unbind_from(this);

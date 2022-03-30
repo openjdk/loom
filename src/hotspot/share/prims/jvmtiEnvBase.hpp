@@ -90,8 +90,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
 
   // check if thread_oop represents a passive carrier thread
   static bool is_passive_carrier_thread(JavaThread* java_thread, oop thread_oop) {
-    return java_thread != NULL && java_thread->mounted_vthread() != NULL
-                               && java_thread->mounted_vthread() != thread_oop
+    return java_thread != NULL && java_thread->jvmti_vthread() != NULL
+                               && java_thread->jvmti_vthread() != thread_oop
                                && java_thread->threadObj() == thread_oop;
   }
 
@@ -180,8 +180,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // return virtual thread oop. Otherwise, return thread oop.
   static oop get_vthread_or_thread_oop(JavaThread* jt) {
     oop result = jt->threadObj();
-    if (jt->mounted_vthread() != NULL) {
-      result = jt->mounted_vthread();
+    if (jt->jvmti_vthread() != NULL) {
+      result = jt->jvmti_vthread();
     }
     return result;
   }

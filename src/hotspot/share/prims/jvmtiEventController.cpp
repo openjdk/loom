@@ -649,7 +649,7 @@ JvmtiEventControllerPrivate::recompute_enabled() {
       JvmtiThreadState* state = JvmtiThreadState::state_for_while_locked(tp, jt_oop);
 
       // create the thread state for mounted virtual thread if missing
-      oop vt_oop = tp->mounted_vthread();
+      oop vt_oop = tp->jvmti_vthread();
       if (vt_oop != NULL && java_lang_VirtualThread::is_instance(vt_oop)) {
         state = JvmtiThreadState::state_for_while_locked(tp, vt_oop);
       }

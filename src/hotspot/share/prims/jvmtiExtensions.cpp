@@ -104,7 +104,7 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
-  oop vthread_oop = java_thread->mounted_vthread();
+  oop vthread_oop = java_thread->jvmti_vthread();
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) { // not a virtual thread
     vthread_oop = NULL;
   }

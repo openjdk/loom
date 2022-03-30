@@ -81,7 +81,7 @@ inline JvmtiThreadState* JvmtiThreadState::state_for_while_locked(JavaThread *th
   NoSafepointVerifier nsv;  // oop is safe to use.
 
   if (thread_oop == NULL) { // then thread should not be NULL (see assert above)
-    thread_oop = thread->mounted_vthread() != NULL ? thread->mounted_vthread() : thread->threadObj();
+    thread_oop = thread->jvmti_vthread() != NULL ? thread->jvmti_vthread() : thread->threadObj();
   }
 
   // in a case of unmounted virtual thread the thread can be NULL
