@@ -1149,10 +1149,6 @@ freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp) {
   if (freeze_fast<chunk_available>(sp)) {
     return freeze_ok;
   }
-  if (_barriers) {
-    throw_stack_overflow_on_humongous_chunk();
-    return freeze_exception;
-  }
   if (_thread->has_pending_exception()) {
     return freeze_exception;
   }
@@ -1366,15 +1362,14 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
     f.print_on(&ls);
   }
 
+  JvmtiSampledObjectAllocEventCollector collector;
+
   frame caller;
   freeze_result res = freeze(f, caller, 0, false, true);
 
   if (res == freeze_ok) {
     finish_freeze(f, caller);
     _cont.write();
-  }
-  if (_barriers && !_preempt) {
-    throw_stack_overflow_on_humongous_chunk();
   }
 
   return res;
@@ -1563,10 +1558,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     if (chunk == nullptr) {
       return freeze_exception;
     }
-    if (_barriers) {
-      log_develop_trace(jvmcont)("allocation requires barriers");
-      return freeze_exception;
-    }
+
     int sp = chunk->stack_size() - argsize;
     chunk->set_sp(sp);
     chunk->set_argsize(argsize);
@@ -1827,6 +1819,11 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   chunk->set_max_size(chunk->max_size() + _align_size);
 
+  if (UNLIKELY(_barriers)) {
+    log_develop_trace(jvmcont)("do barriers on old chunk");
+    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
+  }
+
   log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
 
   if (lt.develop_is_enabled()) {
@@ -1864,6 +1861,13 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
 
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   size_t size_in_words = klass->instance_size(stack_size);
+
+  if (CollectedHeap::stack_chunk_max_size() > 0 && size_in_words >= CollectedHeap::stack_chunk_max_size()) {
+    if (!_preempt) {
+      throw_stack_overflow_on_humongous_chunk();
+      return nullptr;
+    }
+  }
 
   JavaThread* current = _preempt ? JavaThread::current() : _thread;
   assert(current == JavaThread::current(), "should be current");
@@ -1911,6 +1915,10 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   } else {
     assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
     _barriers = !UseZGC && chunk->requires_barriers();
+
+    if (_barriers) {
+      log_develop_trace(jvmcont)("allocation requires barriers");
+    }
   }
 
   _cont.set_tail(chunk);

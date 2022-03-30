@@ -113,6 +113,8 @@ class CollectedHeap : public CHeapObj<mtGC> {
   // Used for filler objects (static, but initialized in ctor).
   static size_t _filler_array_max_size;
 
+  static size_t _stack_chunk_max_size; // 0 for no limit
+
   // Last time the whole heap has been examined in support of RMI
   // MaxObjectInspectionAge.
   // This timestamp must be monotonically non-decreasing to avoid
@@ -202,6 +204,10 @@ class CollectedHeap : public CHeapObj<mtGC> {
 
   static inline size_t filler_array_max_size() {
     return _filler_array_max_size;
+  }
+
+  static inline size_t stack_chunk_max_size() {
+    return _stack_chunk_max_size;
   }
 
   virtual Name kind() const = 0;

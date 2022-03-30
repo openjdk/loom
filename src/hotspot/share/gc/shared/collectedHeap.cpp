@@ -61,6 +61,7 @@
 class ClassLoaderData;
 
 size_t CollectedHeap::_filler_array_max_size = 0;
+size_t CollectedHeap::_stack_chunk_max_size = 0;
 
 class GCMessage : public FormatBuffer<1024> {
  public:

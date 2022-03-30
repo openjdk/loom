@@ -1493,6 +1493,9 @@ G1CollectedHeap::G1CollectedHeap() :
   // objects are created.
   _filler_array_max_size = _humongous_object_threshold_in_words;
 
+  // Override the default _stack_chunk_max_size so that no humongous stack chunks are created
+  _stack_chunk_max_size = _humongous_object_threshold_in_words;
+
   uint n_queues = ParallelGCThreads;
   _task_queues = new G1ScannerTasksQueueSet(n_queues);
 
