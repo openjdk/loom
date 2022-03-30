@@ -115,11 +115,11 @@ public:
   }
 };
 
-class MarkMethodsStackClosure {
+class DoMethodsStackChunkFrameClosure {
   OopIterateClosure* _closure;
 
 public:
-  MarkMethodsStackClosure(OopIterateClosure* cl) : _closure(cl) {}
+  DoMethodsStackChunkFrameClosure(OopIterateClosure* cl) : _closure(cl) {}
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
@@ -137,8 +137,8 @@ public:
   }
 };
 
-void InstanceStackChunkKlass::mark_methods(stackChunkOop chunk, OopIterateClosure* cl) {
-  MarkMethodsStackClosure closure(cl);
+void InstanceStackChunkKlass::do_methods(stackChunkOop chunk, OopIterateClosure* cl) {
+  DoMethodsStackChunkFrameClosure closure(cl);
   chunk->iterate_stack(&closure);
 }
 
@@ -164,7 +164,7 @@ public:
     assert(_closure != nullptr, "");
 
     if (_do_metadata) {
-      MarkMethodsStackClosure(_closure).do_frame(f, map);
+      DoMethodsStackChunkFrameClosure(_closure).do_frame(f, map);
     }
 
     StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _bound);
@@ -278,7 +278,7 @@ public:
   }
 };
 
-class VerifyStackClosure {
+class VerifyStackChunkFrameClosure {
   stackChunkOop _chunk;
 
 public:
@@ -292,7 +292,7 @@ public:
   int _num_interpreted_frames;
   int _num_i2c;
 
-  VerifyStackClosure(stackChunkOop chunk, int num_frames, int size)
+  VerifyStackChunkFrameClosure(stackChunkOop chunk, int num_frames, int size)
     : _chunk(chunk), _sp(nullptr), _cb(nullptr), _callee_interpreted(false),
       _size(size), _argsize(0), _num_oops(0), _num_frames(num_frames), _num_interpreted_frames(0), _num_i2c(0) {}
 
@@ -380,7 +380,7 @@ bool InstanceStackChunkKlass::verify(oop obj, size_t* out_size, int* out_oops,
   const StackChunkFrameStream<chunk_frames::MIXED> first(chunk);
   const bool has_safepoint_stub_frame = first.is_stub();
 
-  VerifyStackClosure closure(chunk,
+  VerifyStackChunkFrameClosure closure(chunk,
     has_safepoint_stub_frame ? 1 : 0, // iterate_stack skips the safepoint stub
     has_safepoint_stub_frame ? first.frame_size() : 0);
   chunk->iterate_stack(&closure);

@@ -162,7 +162,7 @@ template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_with_bitmap(stackChunkOop chunk, OopClosureType* closure,
                                                                 intptr_t* start, intptr_t* end) {
   if (Devirtualizer::do_metadata(closure)) {
-    mark_methods(chunk, closure);
+    do_methods(chunk, closure);
   }
 
   if (end > start) {
