@@ -43,5 +43,6 @@ jdk/jshell/ToolTabSnippetTest.java
 jdk/jshell/PasteAndMeasurementsUITest.java
 
 ####
-# Uninvestigated timeouts
+# Uninvestigated jshell failures
 jdk/jshell/ToolSimpleTest.java
+jdk/jshell/ToolBasicTest.java
