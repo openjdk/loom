@@ -2016,7 +2016,7 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
                                                                             \
-  develop(bool, UseChunkBitmaps, false,                                     \
+  product(bool, UseChunkBitmaps, false,                                     \
          "Generate oop bitmaps for continuation chunks (PREVIEW)")          \
                                                                             \
   product(intx, ScopeLocalCacheSize, 16,                                    \
