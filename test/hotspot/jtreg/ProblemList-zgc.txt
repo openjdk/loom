@@ -32,7 +32,7 @@ serviceability/sa/CDSJMapClstats.java                         8276539   generic-
 serviceability/sa/ClhsdbJhisto.java                           8276539   generic-all
 
 serviceability/sa/ClhsdbCDSCore.java                          8268722   macosx-x64
-serviceability/sa/ClhsdbFindPC.java#xcomp-core                8268722   macosx-x64
+serviceability/sa/ClhsdbFindPC.java#xcomp-core                8268722,8284045   macosx-x64,generic-all
 serviceability/sa/ClhsdbFindPC.java#no-xcomp-core             8268722   macosx-x64
 serviceability/sa/ClhsdbFindPC.java#xcomp-process             8276402   generic-all
 serviceability/sa/ClhsdbJstack.java#id0                       8276402   generic-all
