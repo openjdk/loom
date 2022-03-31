@@ -1,7 +1,8 @@
 ### Filed bugs
 
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
-
+serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorThreadTest.java                           8284111 generic-all
+serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorThreadDisabledTest.java                   8284111 generic-all
 
 ##########
 
