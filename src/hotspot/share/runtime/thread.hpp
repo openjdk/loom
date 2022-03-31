@@ -814,8 +814,7 @@ class JavaThread: public Thread {
     _has_async_exception      = 0x00000001U, // there is a pending async exception
     _async_delivery_disabled  = 0x00000002U, // async exception delivery is disabled
     _trace_flag               = 0x00000004U, // call tracing backend
-    _obj_deopt                = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
-    _carrier_thread_suspended = 0x00000010U  // carrier thread is externally suspended
+    _obj_deopt                = 0x00000008U  // suspend for object reallocation and relocking for JVMTI agent
   };
 
   // various suspension related flags - atomically updated
@@ -929,6 +928,7 @@ class JavaThread: public Thread {
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
 #if INCLUDE_JVMTI
+  volatile bool         _carrier_thread_suspended;       // Carrier thread is externally suspended
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
 #endif
@@ -1260,14 +1260,14 @@ private:
   // current thread, i.e. reverts optimizations based on escape analysis.
   void wait_for_object_deoptimization();
 
+#if INCLUDE_JVMTI
   inline void set_carrier_thread_suspended();
   inline void clear_carrier_thread_suspended();
 
   bool is_carrier_thread_suspended() const {
-    return (_suspend_flags & _carrier_thread_suspended) != 0;
+    return _carrier_thread_suspended;
   }
 
-#if INCLUDE_JVMTI
   bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
 

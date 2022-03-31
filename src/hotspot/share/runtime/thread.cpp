@@ -1047,6 +1047,7 @@ JavaThread::JavaThread() :
   _in_deopt_handler(0),
   _doing_unsafe_access(false),
   _do_not_unlock_if_synchronized(false),
+  _carrier_thread_suspended(false),
 #if INCLUDE_JVMTI
   _is_in_VTMT(false),
   _is_VTMT_disabler(false),

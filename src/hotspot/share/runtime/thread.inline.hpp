@@ -123,12 +123,14 @@ inline void JavaThread::clear_obj_deopt_flag() {
   clear_suspend_flag(_obj_deopt);
 }
 
+#if INCLUDE_JVMTI
 inline void JavaThread::set_carrier_thread_suspended() {
-  set_suspend_flag(_carrier_thread_suspended);
+  _carrier_thread_suspended = true;
 }
 inline void JavaThread::clear_carrier_thread_suspended() {
-  clear_suspend_flag(_carrier_thread_suspended);
+  _carrier_thread_suspended = false;
 }
+#endif
 
 inline bool JavaThread::clear_async_exception_condition() {
   bool ret = has_async_exception_condition();
