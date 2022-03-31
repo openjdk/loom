@@ -336,6 +336,7 @@ public abstract class Poller {
     private void wakeup(int fdVal) {
         Thread t = map.remove(fdVal);
         if (t != null) {
+            implDeregister(fdVal);
             LockSupport.unpark(t);
         }
     }
@@ -344,7 +345,10 @@ public abstract class Poller {
      * Called by the polling facility when the file descriptor is polled
      */
     final void polled(int fdVal) {
-        wakeup(fdVal);
+        Thread t = map.remove(fdVal);
+        if (t != null) {
+            LockSupport.unpark(t);
+        }
     }
 
     /**
