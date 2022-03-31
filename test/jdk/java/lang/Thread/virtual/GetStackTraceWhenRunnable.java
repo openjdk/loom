@@ -24,8 +24,8 @@
 /**
  * @test
  * @summary Test Thread::getStackTrace on a virtual thread that is runnable-unmounted
- * @compile --enable-preview -source ${jdk.version} StackTraceWhenRunnable.java
- * @run main/othervm --enable-preview -Djdk.virtualThreadScheduler.maxPoolSize=1 StackTraceWhenRunnable
+ * @compile --enable-preview -source ${jdk.version} GetStackTraceWhenRunnable.java
+ * @run main/othervm --enable-preview -Djdk.virtualThreadScheduler.maxPoolSize=1 GetStackTraceWhenRunnable
  */
 
 import java.io.IOException;
@@ -34,7 +34,7 @@ import java.nio.channels.Selector;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.LockSupport;
 
-public class StackTraceWhenRunnable {
+public class GetStackTraceWhenRunnable {
 
     public static void main(String[] args) throws Exception {
         try (Selector sel = Selector.open()) {
