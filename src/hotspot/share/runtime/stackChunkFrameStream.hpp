@@ -125,6 +125,8 @@ public:
   template <typename RegisterMapT>
   inline void* reg_to_loc(VMReg reg, const RegisterMapT* map) const;
 
+  void assert_is_interpreted_and_frame_type_mixed() const NOT_DEBUG_RETURN;
+
 public:
   template <class OopClosureType, class RegisterMapT>
   inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;

@@ -85,7 +85,8 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
     assert(_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
-  assert(_sp >= chunk->start_address() && _sp <= chunk->end_address() + InstanceStackChunkKlass::metadata_words(), "");
+  assert(_sp >= chunk->start_address(), "");
+  assert(_sp <= chunk->end_address() + InstanceStackChunkKlass::metadata_words(), "");
 
   if (f.cb() != nullptr) {
     _oopmap = nullptr;
@@ -134,7 +135,8 @@ inline int StackChunkFrameStream<frame_kind>::stack_argsize() const {
   if (is_stub()) {
     return 0;
   }
-  assert(cb() != nullptr && cb()->is_compiled(), "");
+  assert(cb() != nullptr, "");
+  assert(cb()->is_compiled(), "");
   assert(cb()->as_compiled_method()->method() != nullptr, "");
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
@@ -192,7 +194,8 @@ inline void StackChunkFrameStream<frame_kind>::get_cb() {
     return;
   }
 
-  assert(pc() != nullptr && dbg_is_safe(pc(), -1), "");
+  assert(pc() != nullptr, "");
+  assert(dbg_is_safe(pc(), -1), "");
 
   _cb = CodeCache::find_blob_fast(pc());
 
@@ -248,7 +251,8 @@ inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map(RegisterM
 template<>
 template<>
 inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map(RegisterMap* map) {
-  assert(map->in_cont() && map->stack_chunk()() == _chunk, "");
+  assert(map->in_cont(), "");
+  assert(map->stack_chunk()() == _chunk, "");
   if (map->update_map()) {
     frame f = to_frame();
     oopmap()->update_register_map(&f, map); // we have callee-save registers in this case
@@ -270,7 +274,8 @@ inline address StackChunkFrameStream<frame_kind>::orig_pc() const {
     pc1 = *(address*)((address)unextended_sp() + cm->orig_pc_offset());
   }
 
-  assert(pc1 != nullptr && !cm->is_deopt_pc(pc1), "");
+  assert(pc1 != nullptr, "");
+  assert(!cm->is_deopt_pc(pc1), "");
   assert(_cb == CodeCache::find_blob_fast(pc1), "");
 
   return pc1;
@@ -385,6 +390,13 @@ bool StackChunkFrameStream<frame_kind>::is_in_oops(void* p, const RegisterMapT* 
   }
   return false;
 }
+
+template <chunk_frames frame_kind>
+void StackChunkFrameStream<frame_kind>::assert_is_interpreted_and_frame_type_mixed() const {
+  assert(is_interpreted(), "");
+  assert(frame_kind == chunk_frames::MIXED, "");
+}
+
 #endif
 
 #endif // SHARE_OOPS_STACKCHUNKFRAMESTREAM_INLINE_HPP
