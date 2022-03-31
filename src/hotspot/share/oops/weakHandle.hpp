@@ -50,14 +50,12 @@ class WeakHandle {
   WeakHandle(OopStorage* storage, Handle obj);
   WeakHandle(OopStorage* storage, oop obj);
 
-  static WeakHandle from_raw(oop* raw);
   inline oop resolve() const;
   inline oop peek() const;
   void release(OopStorage* storage) const;
   bool is_null() const { return _obj == NULL; }
 
   void replace(oop with_obj);
-  oop* raw() { return _obj; }
 
   void print() const;
   void print_on(outputStream* st) const;
