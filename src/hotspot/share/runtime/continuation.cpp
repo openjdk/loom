@@ -1844,7 +1844,6 @@ inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive
 
 void FreezeBase::init_chunk(stackChunkOop chunk) {
   chunk->clear_flags();
-  chunk->set_gc_mode(false);
   chunk->set_max_size(0);
   chunk->set_sp(chunk->stack_size());
   chunk->set_pc(nullptr);
