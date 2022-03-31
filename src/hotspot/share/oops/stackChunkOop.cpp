@@ -289,7 +289,7 @@ class TransformStackChunkClosure {
   stackChunkOop _chunk;
 
 public:
-  TransformStackChunkClosure(stackChunkOop chunk) : _chunk(chunk) {}
+  TransformStackChunkClosure(stackChunkOop chunk) : _chunk(chunk) { }
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
@@ -300,10 +300,8 @@ public:
     // storestore barrier here.
     assert(SafepointSynchronize::is_at_safepoint(), "Should only be used by STW collectors");
 
-    if (UseChunkBitmaps) {
-      CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
-      f.iterate_oops(&cl, map);
-    }
+    CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
+    f.iterate_oops(&cl, map);
 
     return true;
   }
@@ -313,11 +311,9 @@ void stackChunkOopDesc::transform() {
   assert(!is_gc_mode(), "Should only be called once per chunk");
   set_gc_mode(true);
 
-  if (UseChunkBitmaps) {
-    assert(!has_bitmap(), "Should only be set once");
-    set_has_bitmap(true);
-    bitmap().clear();
-  }
+  assert(!has_bitmap(), "Should only be set once");
+  set_has_bitmap(true);
+  bitmap().clear();
 
   if (UseCompressedOops) {
     TransformStackChunkClosure<OopKind::Narrow> closure(this);

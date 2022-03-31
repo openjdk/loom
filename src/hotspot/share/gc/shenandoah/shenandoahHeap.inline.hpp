@@ -335,7 +335,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
 
   // Try to install the new forwarding pointer.
   oop copy_val = cast_to_oop(copy);
-  ContinuationGCSupport::transform_stack_chunk(copy_val);
+  ContinuationGCSupport::relativize_stack_chunk(copy_val);
 
   oop result = ShenandoahForwarding::try_update_forwardee(p, copy_val);
   if (result == copy_val) {

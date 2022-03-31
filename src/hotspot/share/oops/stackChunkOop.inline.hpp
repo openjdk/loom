@@ -145,7 +145,7 @@ inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_f
 inline void stackChunkOopDesc::set_gc_mode(bool value)             { set_flag(FLAG_GC_MODE, value); }
 
 inline bool stackChunkOopDesc::has_bitmap() const                  { return is_flag(FLAG_HAS_BITMAP); }
-inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); assert(!value || UseChunkBitmaps, ""); }
+inline void stackChunkOopDesc::set_has_bitmap(bool value)          { set_flag(FLAG_HAS_BITMAP, value); }
 
 inline bool stackChunkOopDesc::has_thaw_slowpath_condition() const { return flags() != 0; }
 
