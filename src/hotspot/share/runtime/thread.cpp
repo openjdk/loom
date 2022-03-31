@@ -1050,7 +1050,9 @@ JavaThread::JavaThread() :
   _carrier_thread_suspended(false),
 #if INCLUDE_JVMTI
   _is_in_VTMT(false),
+#ifdef ASSERT
   _is_VTMT_disabler(false),
+#endif
 #endif
   _jni_attach_state(_not_attaching_via_jni),
 #if INCLUDE_JVMCI
@@ -1811,9 +1813,11 @@ void JavaThread::set_is_in_VTMT(bool val) {
   _is_in_VTMT = val;
 }
 
+#ifdef ASSERT
 void JavaThread::set_is_VTMT_disabler(bool val) {
   _is_VTMT_disabler = val;
 }
+#endif
 #endif
 
 // External suspension mechanism.

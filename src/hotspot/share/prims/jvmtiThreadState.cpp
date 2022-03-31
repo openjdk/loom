@@ -281,7 +281,9 @@ JvmtiVTMTDisabler::disable_VTMT() {
     }
     assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
     if (attempts != 0) {
+#ifdef ASSERT
       thread->set_is_VTMT_disabler(true);
+#endif
     }
   }
 #ifdef ASSERT
@@ -306,7 +308,9 @@ JvmtiVTMTDisabler::enable_VTMT() {
     if (_VTMT_disable_count == 0 || _is_SR) {
       ml.notify_all();
     }
+#ifdef ASSERT
     current->set_is_VTMT_disabler(false);
+#endif
   }
 }
 

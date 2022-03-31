@@ -930,7 +930,9 @@ class JavaThread: public Thread {
 #if INCLUDE_JVMTI
   volatile bool         _carrier_thread_suspended;       // Carrier thread is externally suspended
   bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
+#ifdef ASSERT
   bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
+#endif
 #endif
 
   // JNI attach states:
@@ -1268,11 +1270,12 @@ private:
     return _carrier_thread_suspended;
   }
 
-  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   bool is_in_VTMT() const                        { return _is_in_VTMT; }
-
   void set_is_in_VTMT(bool val);
+#ifdef ASSERT
+  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
   void set_is_VTMT_disabler(bool val);
+#endif
 #endif
 
   bool is_cont_force_yield() { return cont_preempt(); }
