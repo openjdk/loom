@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1266,14 +1266,13 @@ void JvmtiExport::check_suspend_at_safepoint(JavaThread *thread) {
   oop vt = thread->jvmti_vthread();
 
   if (vt != NULL && java_lang_VirtualThread::is_instance(vt)) {
-    HandleMark hm(thread);
-    Handle vth = Handle(thread, vt);
+    int64_t id = java_lang_Thread::thread_id(vt);
 
     ThreadBlockInVM tbivm(thread);
     MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
     // block while vthread is externally suspended
-    while (JvmtiVTSuspender::is_vthread_suspended(vth())) {
+    while (JvmtiVTSuspender::is_vthread_suspended(id)) {
       ml.wait();
     }
   }
