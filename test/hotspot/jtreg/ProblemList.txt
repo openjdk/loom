@@ -178,6 +178,8 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom specific
 
+compiler/c2/irTests/DivLNodeIdealizationTests.java                           8284115 generic-all
+
 runtime/Thread/StopAtExit.java                                               8283610 generic-all
 
 runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java                 8283555 generic-all
@@ -192,4 +194,4 @@ serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1          828
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
-gc/metaspace/TestPerfCountersAndMemoryPools.java                              8278109 generic-all
+gc/metaspace/TestPerfCountersAndMemoryPools.java                             8278109 generic-all
