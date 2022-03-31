@@ -1485,7 +1485,9 @@ inline void FreezeBase::after_freeze_java_frame(const frame& hf, bool bottom) {
 }
 
 freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, int argsize) {
-  assert(callee.is_interpreted_frame() || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
+  assert(callee.is_interpreted_frame()
+    || callee.cb()->as_nmethod()->is_osr_method()
+    || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
   log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
     p2i(_bottom_address), _frames, _size << LogBytesPerWord, argsize);
 
