@@ -41,8 +41,6 @@
 class RegisterMap;
 class SmallRegisterMap;
 
-template StackValue* StackValue::create_stack_value(ScopeValue*, address, const RegisterMap*);
-template StackValue* StackValue::create_stack_value(ScopeValue*, address, const SmallRegisterMap*);
 
 template <typename OopT>
 static oop read_oop_local(OopT* p) {
@@ -54,6 +52,17 @@ static oop read_oop_local(OopT* p) {
   oop obj = RawAccess<>::oop_load(p);
   return NativeAccess<>::oop_load(&obj);
 }
+
+template StackValue* StackValue::create_stack_value(const frame* fr, const RegisterMap* reg_map, ScopeValue* sv);
+template StackValue* StackValue::create_stack_value(const frame* fr, const SmallRegisterMap* reg_map, ScopeValue* sv);
+
+template<typename RegisterMapT>
+StackValue* StackValue::create_stack_value(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
+  return create_stack_value(sv, stack_value_address(fr, reg_map, sv), reg_map);
+}
+
+template StackValue* StackValue::create_stack_value(ScopeValue*, address, const RegisterMap*);
+template StackValue* StackValue::create_stack_value(ScopeValue*, address, const SmallRegisterMap*);
 
 template<typename RegisterMapT>
 StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, const RegisterMapT* reg_map) {
@@ -204,6 +213,38 @@ StackValue* StackValue::create_stack_value(ScopeValue* sv, address value_addr, c
   return new StackValue((intptr_t) 0);   // dummy
 }
 
+template address StackValue::stack_value_address(const frame* fr, const RegisterMap* reg_map, ScopeValue* sv);
+template address StackValue::stack_value_address(const frame* fr, const SmallRegisterMap* reg_map, ScopeValue* sv);
+
+template<typename RegisterMapT>
+address StackValue::stack_value_address(const frame* fr, const RegisterMapT* reg_map, ScopeValue* sv) {
+  if (!sv->is_location()) {
+    return NULL;
+  }
+  Location loc = ((LocationValue *)sv)->location();
+  if (loc.type() == Location::invalid) {
+    return NULL;
+  }
+
+  if (!reg_map->in_cont()) {
+    address value_addr = loc.is_register()
+      // Value was in a callee-save register
+      ? reg_map->location(VMRegImpl::as_VMReg(loc.register_number()), fr->sp())
+      // Else value was directly saved on the stack. The frame's original stack pointer,
+      // before any extension by its callee (due to Compiler1 linkage on SPARC), must be used.
+      : ((address)fr->unextended_sp()) + loc.stack_offset();
+
+    assert(value_addr == NULL || reg_map->thread() == NULL || reg_map->thread()->is_in_usable_stack(value_addr), INTPTR_FORMAT, p2i(value_addr));
+    return value_addr;
+  }
+
+  address value_addr = loc.is_register()
+    ? reg_map->as_RegisterMap()->stack_chunk()->reg_to_location(*fr, reg_map->as_RegisterMap(), VMRegImpl::as_VMReg(loc.register_number()))
+    : reg_map->as_RegisterMap()->stack_chunk()->usp_offset_to_location(*fr, loc.stack_offset());
+
+  assert(value_addr == NULL || Continuation::is_in_usable_stack(value_addr, reg_map->as_RegisterMap()) || (reg_map->thread() != NULL && reg_map->thread()->is_in_usable_stack(value_addr)), INTPTR_FORMAT, p2i(value_addr));
+  return value_addr;
+}
 
 BasicLock* StackValue::resolve_monitor_lock(const frame* fr, Location location) {
   assert(location.is_stack(), "for now we only look at the stack");

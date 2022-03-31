@@ -41,7 +41,7 @@
 #include "runtime/monitorChunk.hpp"
 #include "runtime/registerMap.hpp"
 #include "runtime/signature.hpp"
-#include "runtime/stackValue.inline.hpp"
+#include "runtime/stackValue.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/vframeArray.hpp"
 #include "runtime/vframe_hp.hpp"
