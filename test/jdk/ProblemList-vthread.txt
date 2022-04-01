@@ -3,10 +3,6 @@
 java/foreign/channels/TestSocketChannels.java                         8272749 windows-all
 java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
 
-java/foreign/StdLibTest.java                                          8281222 generic-all
-java/foreign/TestSegmentCopy.java                                     8281222 generic-all
-java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 generic-all
-
 # JFR is not completely fixed to support vthreads
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
