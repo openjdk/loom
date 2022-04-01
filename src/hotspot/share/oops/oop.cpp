@@ -38,9 +38,7 @@
 #include "utilities/macros.hpp"
 
 void oopDesc::print_on(outputStream* st) const {
-  if (this == NULL) {
-    st->print_cr("NULL");
-  } else if (*((juint*)this) == badHeapWordVal) {
+  if (*((juint*)this) == badHeapWordVal) {
     st->print("BAD WORD");
   } else if (*((juint*)this) == badMetaWordVal) {
     st->print("BAD META WORD");
@@ -76,16 +74,12 @@ char* oopDesc::print_value_string() {
 }
 
 void oopDesc::print_value_on(outputStream* st) const {
-  if (this == NULL) {
-    st->print("NULL");
+  oop obj = cast_to_oop(this);
+  if (java_lang_String::is_instance(obj)) {
+    java_lang_String::print(obj, st);
+    print_address_on(st);
   } else {
-    oop obj = cast_to_oop(this);
-    if (java_lang_String::is_instance(obj)) {
-      java_lang_String::print(obj, st);
-      print_address_on(st);
-    } else {
-      klass()->oop_print_value_on(obj, st);
-    }
+    klass()->oop_print_value_on(obj, st);
   }
 }
 

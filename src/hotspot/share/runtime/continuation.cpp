@@ -544,7 +544,7 @@ int Continuation::try_force_yield(JavaThread* target, const oop continuation) {
   log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
 
   ContinuationEntry* ce = target->last_continuation();
-  while (ce != nullptr && ce->continuation() != continuation) {
+  while (ce != nullptr && ce->cont_oop() != continuation) {
     ce = ce->parent();
   }
   if (ce == nullptr) {
@@ -562,7 +562,7 @@ int Continuation::try_force_yield(JavaThread* target, const oop continuation) {
          "fast_path at codelet %s",
          Interpreter::codelet_containing(target->last_Java_pc())->description());
 
-  const oop innermost = ce->continuation();
+  const oop innermost = ce->cont_oop();
   const oop scope = jdk_internal_vm_Continuation::scope(continuation);
   if (innermost != continuation) { // we have nested continuations
     // make sure none of the continuations in the hierarchy are pinned
@@ -661,7 +661,7 @@ JVM_END
 const ContinuationEntry* Continuation::last_continuation(const JavaThread* thread, oop cont_scope) {
   // guarantee (thread->has_last_Java_frame(), "");
   for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
-    if (cont_scope == jdk_internal_vm_Continuation::scope(entry->continuation())) {
+    if (cont_scope == jdk_internal_vm_Continuation::scope(entry->cont_oop())) {
       return entry;
     }
   }
@@ -674,7 +674,7 @@ ContinuationEntry* Continuation::get_continuation_entry_for_continuation(JavaThr
   }
 
   for (ContinuationEntry* entry = thread->last_continuation(); entry != nullptr; entry = entry->parent()) {
-    if (continuation == entry->continuation()) {
+    if (continuation == entry->cont_oop()) {
       return entry;
     }
   }
@@ -774,7 +774,9 @@ frame Continuation::last_frame(oop continuation, RegisterMap *map) {
 
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
   assert(map != nullptr, "");
-  oop continuation = get_continuation_entry_for_sp(map->thread(), callee.sp())->cont_oop();
+  ContinuationEntry* ce = get_continuation_entry_for_sp(map->thread(), callee.sp());
+  assert (ce != nullptr, "");
+  oop continuation = ce->cont_oop();
   ContinuationWrapper cont(continuation);
   return continuation_top_frame(cont, map);
 }
@@ -839,7 +841,11 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
     return false;
   }
 
-  oop continuation = get_continuation_entry_for_sp(map->thread(), f.sp())->cont_oop();
+  ContinuationEntry* ce = get_continuation_entry_for_sp(map->thread(), f.sp());
+  if (ce == nullptr) {
+    return false;
+  }
+  oop continuation = ce->cont_oop();
   if (continuation == nullptr) {
     return false;
   }
@@ -2134,7 +2140,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 
     f = f.sender(&map);
     if (!Continuation::is_frame_in_continuation(entry, f)) {
-      oop scope = jdk_internal_vm_Continuation::scope(entry->continuation());
+      oop scope = jdk_internal_vm_Continuation::scope(entry->cont_oop());
       if (scope == cont_scope) {
         break;
       }
@@ -2225,7 +2231,9 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
 
   assert(thread == JavaThread::current(), "");
 
-  oop continuation = thread->last_continuation()->cont_oop();
+  ContinuationEntry* ce = thread->last_continuation();
+  assert (ce != nullptr, "");
+  oop continuation = ce->cont_oop();
   assert(continuation == ContinuationHelper::get_continuation(thread), "");
   verify_continuation(continuation);
 
@@ -2359,7 +2367,7 @@ inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
 
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
-  assert(chunk != (oop) nullptr, "");
+  assert(chunk != nullptr, "");
   assert(chunk == _cont.tail(), "");
   assert(!chunk->is_empty(), "");
   assert(!chunk->has_mixed_frames(), "");
@@ -2924,6 +2932,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   log_develop_trace(jvmcont)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
 
   ContinuationEntry* entry = thread->last_continuation();
+  assert (entry != nullptr, "");
   oop oopCont = entry->cont_oop();
 
   assert(!jdk_internal_vm_Continuation::done(oopCont), "");
@@ -3055,7 +3064,9 @@ static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOo
       }
       cl.reset();
       DEBUG_ONLY(thread->print_frame_layout();)
-      chunk->print_on(true, st);
+      if (chunk != nullptr) {
+        chunk->print_on(true, st);
+      }
       return false;
     }
   }

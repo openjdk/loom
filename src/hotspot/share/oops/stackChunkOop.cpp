@@ -62,7 +62,6 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   assert(!map->include_argument_oops(), "");
   assert(!f.is_empty(), "");
   assert(map->stack_chunk() == this, "");
-  assert(this != nullptr, "");
   assert(!is_empty(), "");
 
   int index = f.frame_index();
@@ -439,9 +438,7 @@ template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const Register
 template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const SmallRegisterMap* map);
 
 void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
-  if (this == nullptr) {
-    st->print_cr("NULL");
-  } else if (*((juint*)this) == badHeapWordVal) {
+  if (*((juint*)this) == badHeapWordVal) {
     st->print("BAD WORD");
   } else if (*((juint*)this) == badMetaWordVal) {
     st->print("BAD META WORD");

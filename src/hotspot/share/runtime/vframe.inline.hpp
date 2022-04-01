@@ -40,7 +40,7 @@ inline oop vframeStreamCommon::continuation() const {
   if (_reg_map.cont() != NULL) {
     return _reg_map.cont();
   } else if (_cont_entry != NULL) {
-    return _cont_entry->continuation();
+    return _cont_entry->cont_oop();
   } else {
     return NULL;
   }

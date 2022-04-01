@@ -415,8 +415,10 @@ oop StackWalk::walk(Handle stackStream, jlong mode, int skip_frames, Handle cont
   if (lt.is_enabled()) {
     ResourceMark rm(THREAD);
     LogStream ls(lt);
-    ls.print("cont_scope: ");
-    cont_scope()->print_on(&ls);
+    if (cont_scope() != nullptr) {
+      ls.print("cont_scope: ");
+      cont_scope()->print_on(&ls);
+    }
     ls.cr();
   }
 

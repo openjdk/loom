@@ -127,9 +127,6 @@ bool stackChunkOopDesc::is_usable_in_chunk(void* p) const {
 inline bool stackChunkOopDesc::is_flag(uint8_t flag) const {
   return (flags() & flag) != 0;
 }
-inline bool stackChunkOopDesc::is_non_null_and_flag(uint8_t flag) const {
-  return this != nullptr && is_flag(flag);
-}
 inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
   uint32_t flags = this->flags();
   set_flags((uint8_t)(value ? flags |= flag : flags &= ~flag));
