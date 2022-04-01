@@ -26,10 +26,9 @@
 * @summary Tests class unloading on virtual threads
 *
 * @compile --enable-preview -source ${jdk.version} ClassUnloading.java
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -XX:-UseCompressedOops ClassUnloading
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -XX:+UseCompressedOops ClassUnloading
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,ClassUnloading ClassUnloading
-* @run main/othervm --enable-preview -XX:-UseChunkBitmaps ClassUnloading
+* @run main/othervm --enable-preview -XX:-UseCompressedOops ClassUnloading
+* @run main/othervm --enable-preview -XX:+UseCompressedOops ClassUnloading
+* @run main/othervm --enable-preview -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,ClassUnloading ClassUnloading
 */
 
 // @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,Basic Basic
