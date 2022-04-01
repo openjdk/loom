@@ -877,23 +877,11 @@ oop frame::interpreter_callee_receiver(Symbol* signature) {
 }
 
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const {
-  Thread* current = Thread::current();
-  methodHandle m(current, interpreter_frame_method());
-  jint bci = interpreter_frame_bci();
-
-  ResourceMark rm;
-  InterpreterOopMap mask;
-  if (query_oop_map_cache) {
-    m->mask_for(bci, &mask);
-  } else {
-    OopMapCache::compute_one_oop_map(m, bci, &mask);
-  }
-
-  oops_interpreted_do0(f, map, m, bci, mask);
-}
-
-void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
+  Thread *thread = Thread::current();
+  methodHandle m (thread, interpreter_frame_method());
+  jint      bci = interpreter_frame_bci();
+
   assert(!Universe::heap()->is_in(m()),
           "must be valid oop");
   assert(m->is_method(), "checking frame value");
@@ -934,12 +922,12 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
   // interpreted or compiled frame.
   if (!m->is_native()) {
     Bytecode_invoke call = Bytecode_invoke_check(m, bci);
-    if (call.is_valid()) {
+    if (map != nullptr && call.is_valid()) {
       signature = call.signature();
       has_receiver = call.has_receiver();
-      if (map != NULL && map->include_argument_oops() &&
+      if (map->include_argument_oops() &&
           interpreter_frame_expression_stack_size() > 0) {
-        // ResourceMark rm(thread);  // is this right ???
+        ResourceMark rm(thread);  // is this right ???
         // we are at a call site & the expression stack is not empty
         // => process callee's arguments
         //
@@ -958,7 +946,12 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
   InterpreterFrameClosure blk(this, max_locals, m->max_stack(), f);
 
   // process locals & expression stack
-  // mask.print();
+  InterpreterOopMap mask;
+  if (query_oop_map_cache) {
+    m->mask_for(bci, &mask);
+  } else {
+    OopMapCache::compute_one_oop_map(m, bci, &mask);
+  }
   mask.iterate_oop(&blk);
 }
 
@@ -1146,8 +1139,7 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   }
 #endif
   if (is_interpreted_frame()) {
-    !map->in_cont() ? oops_interpreted_do(f, map, use_interpreter_oop_map_cache)
-                    : oops_interpreted_do(f, map, use_interpreter_oop_map_cache);
+    oops_interpreted_do(f, map, use_interpreter_oop_map_cache);
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
   } else if (is_optimized_entry_frame()) {
