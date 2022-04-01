@@ -214,7 +214,7 @@ public:
 };
 
 template <chunk_frames frame_kind, typename RegisterMapT>
-static void relativize_derived_oops_internal(const StackChunkFrameStream<frame_kind>& f,
+static void relativize_derived_oops_in_frame(const StackChunkFrameStream<frame_kind>& f,
                                              const RegisterMapT* map) {
   assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
   bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
@@ -228,7 +228,7 @@ class RelativizeDerivedOopsStackChunkFrameClosure {
 public:
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    relativize_derived_oops_internal(f, map);
+    relativize_derived_oops_in_frame(f, map);
     return true;
   }
 };
@@ -294,7 +294,7 @@ public:
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    relativize_derived_oops_internal(f, map);
+    relativize_derived_oops_in_frame(f, map);
 
     // This code is called from the STW collectors and don't have concurrent
     // access to the derived oops. Therefore there's no need to add a
@@ -361,7 +361,7 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
   }
 
-  relativize_derived_oops_internal(f, map);
+  relativize_derived_oops_in_frame(f, map);
 
   // The store of the derived oops must be ordered with the store of the base.
   // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
