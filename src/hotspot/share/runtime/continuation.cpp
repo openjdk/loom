@@ -51,9 +51,9 @@
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuationHelper.inline.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/frame.inline.hpp"
-#include "runtime/frame_helpers.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
@@ -240,33 +240,6 @@ public:
   static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
     return thaw0<SelfT>(thread, kind);
   }
-};
-
-class ContinuationHelper {
-public:
-  static const int frame_metadata; // size, in words, of frame metadata (e.g. pc and link)
-  static const int align_wiggle; // size, in words, of maximum shift in frame position due to alignment
-
-  static oop get_continuation(JavaThread* thread);
-  static bool stack_overflow_check(JavaThread* thread, int size, address sp);
-
-  static inline void clear_anchor(JavaThread* thread);
-  static void set_anchor(JavaThread* thread, intptr_t* sp);
-  static void set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp);
-  static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry);
-  static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry);
-
-  template<typename FKind> static void update_register_map(const frame& f, RegisterMap* map);
-  static void update_register_map_with_callee(const frame& f, RegisterMap* map);
-
-  static inline void push_pd(const frame& f);
-
-  static inline void maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry);
-  static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
-  static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
-
-  static inline int frame_align_words(int size);
-  static inline intptr_t* frame_align_pointer(intptr_t* sp);
 };
 
 oop ContinuationHelper::get_continuation(JavaThread* thread) {
@@ -706,7 +679,8 @@ bool Continuation::is_continuation_scope_mounted(JavaThread* thread, oop cont_sc
 // The continuation object can be extracted from the thread.
 bool Continuation::is_cont_barrier_frame(const frame& f) {
   assert(f.is_interpreted_frame() || f.cb() != nullptr, "");
-  return is_return_barrier_entry(f.is_interpreted_frame() ? Interpreted::return_pc(f) : Compiled::return_pc(f));
+  return is_return_barrier_entry(f.is_interpreted_frame() ? ContinuationHelper::InterpretedFrame::return_pc(f)
+                                                          : ContinuationHelper::CompiledFrame::return_pc(f));
 }
 
 bool Continuation::is_return_barrier_entry(const address pc) {
@@ -726,7 +700,7 @@ bool Continuation::is_continuation_entry_frame(const frame& f, const RegisterMap
   // we can do this because the entry frame is never inlined
   Method* m = (map != nullptr && map->in_cont() && f.is_interpreted_frame())
                   ? map->stack_chunk()->interpreter_frame_method(f)
-                  : Frame::frame_method(f);
+                  : ContinuationHelper::Frame::frame_method(f);
   return m != nullptr && m->intrinsic_id() == vmIntrinsics::_Continuation_enter;
 }
 
@@ -1064,7 +1038,8 @@ private:
 
   inline bool stack_overflow();
 
-  static frame sender(const frame& f) { return f.is_interpreted_frame() ? sender<Interpreted>(f): sender<NonInterpretedUnknown>(f); }
+  static frame sender(const frame& f) { return f.is_interpreted_frame() ? sender<ContinuationHelper::InterpretedFrame>(f)
+                                                                        : sender<ContinuationHelper::NonInterpretedUnknownFrame>(f); }
   template<typename FKind> static inline frame sender(const frame& f);
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
   inline void set_top_frame_metadata_pd(const frame& hf);
@@ -1393,7 +1368,7 @@ frame FreezeBase::freeze_start_frame() {
 frame FreezeBase::freeze_start_frame_yield_stub(frame f) {
   // log_develop_trace(jvmcont)("%s nop at freeze yield", nativePostCallNop_at(_fi->pc) != nullptr ? "has" : "no");
   assert(StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
-  f = sender<StubF>(f);
+  f = sender<ContinuationHelper::StubFrame>(f);
   return f;
 }
 
@@ -1404,11 +1379,11 @@ frame FreezeBase::freeze_start_frame_safepoint_stub(frame f) {
   Unimplemented();
 #endif
   if (!Interpreter::contains(f.pc())) {
-    assert(Frame::is_stub(f.cb()), "must be");
+    assert(ContinuationHelper::Frame::is_stub(f.cb()), "must be");
     assert(f.oop_map() != nullptr, "must be");
 
-    if (Interpreter::contains(StubF::return_pc(f))) {
-      f = sender<StubF>(f); // Safepoint stub in interpreter
+    if (Interpreter::contains(ContinuationHelper::StubFrame::return_pc(f))) {
+      f = sender<ContinuationHelper::StubFrame>(f); // Safepoint stub in interpreter
     }
   }
   return f;
@@ -1416,7 +1391,7 @@ frame FreezeBase::freeze_start_frame_safepoint_stub(frame f) {
 
 NOINLINE freeze_result FreezeBase::freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top) {
   assert(f.unextended_sp() < _bottom_address, ""); // see recurse_freeze_java_frame
-  assert(f.is_interpreted_frame() || ((top && _preempt) == Frame::is_stub(f.cb())), "");
+  assert(f.is_interpreted_frame() || ((top && _preempt) == ContinuationHelper::Frame::is_stub(f.cb())), "");
 
   if (stack_overflow()) {
     return freeze_exception;
@@ -1427,14 +1402,14 @@ NOINLINE freeze_result FreezeBase::freeze(frame& f, frame& caller, int callee_ar
       // special native frame
       return freeze_pinned_native;
     }
-    if (UNLIKELY(Compiled::is_owning_locks(_cont.thread(), SmallRegisterMap::instance, f))) {
+    if (UNLIKELY(ContinuationHelper::CompiledFrame::is_owning_locks(_cont.thread(), SmallRegisterMap::instance, f))) {
       return freeze_pinned_monitor;
     }
 
     return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
   } else if (f.is_interpreted_frame()) {
     assert((_preempt && top) || !f.interpreter_frame_method()->is_native(), "");
-    if (Interpreted::is_owning_locks(f)) {
+    if (ContinuationHelper::InterpretedFrame::is_owning_locks(f)) {
       return freeze_pinned_monitor;
     }
     if (_preempt && top && f.interpreter_frame_method()->is_native()) {
@@ -1443,7 +1418,7 @@ NOINLINE freeze_result FreezeBase::freeze(frame& f, frame& caller, int callee_ar
     }
 
     return recurse_freeze_interpreted_frame(f, caller, callee_argsize, callee_interpreted);
-  } else if (_preempt && top && Frame::is_stub(f.cb())) {
+  } else if (_preempt && top && ContinuationHelper::Frame::is_stub(f.cb())) {
     return recurse_freeze_stub_frame(f, caller);
   } else {
     return freeze_pinned_native;
@@ -1631,7 +1606,7 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
   if (bottom) {
     address last_pc = caller.pc();
     assert((last_pc == nullptr) == _cont.tail()->is_empty(), "");
-    Frame::patch_pc(caller, last_pc);
+    ContinuationHelper::Frame::patch_pc(caller, last_pc);
   } else {
     assert(!caller.is_empty(), "");
   }
@@ -1640,7 +1615,7 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
 
   if (f.is_interpreted_frame()) {
     assert(hf.is_heap_frame(), "should be");
-    Interpreted::patch_sender_sp(hf, caller.unextended_sp());
+    ContinuationHelper::InterpretedFrame::patch_sender_sp(hf, caller.unextended_sp());
   }
 
 #ifdef ASSERT
@@ -1648,7 +1623,7 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
     if (f.is_deoptimized_frame()) { // TODO DEOPT: long term solution: unroll on freeze and patch pc
       log_develop_trace(jvmcont)("Freezing deoptimized frame");
       assert(f.cb()->as_compiled_method()->is_deopt_pc(f.raw_pc()), "");
-      assert(f.cb()->as_compiled_method()->is_deopt_pc(Frame::real_pc(f)), "");
+      assert(f.cb()->as_compiled_method()->is_deopt_pc(ContinuationHelper::Frame::real_pc(f)), "");
     }
   }
 #endif
@@ -1667,30 +1642,30 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   Unimplemented();
 #endif
 
-  intptr_t* const vsp = Interpreted::frame_top(f, callee_argsize, callee_interpreted);
-  const int argsize = Interpreted::stack_argsize(f);
+  intptr_t* const vsp = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
+  const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
   const int locals = f.interpreter_frame_method()->max_locals();
-  assert(Interpreted::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
   const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
 
 #ifdef ASSERT
-{
-  ResourceMark rm;
-  InterpreterOopMap mask;
-  f.interpreted_frame_oop_map(&mask);
-  assert(vsp <= Interpreted::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
-    p2i(vsp), p2i(Interpreted::frame_top(f, &mask)));
-}
+  {
+    ResourceMark rm;
+    InterpreterOopMap mask;
+    f.interpreted_frame_oop_map(&mask);
+    assert(vsp <= ContinuationHelper::InterpretedFrame::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
+           p2i(vsp), p2i(ContinuationHelper::InterpretedFrame::frame_top(f, &mask)));
+  }
 #endif
 
-  Method* frame_method = Frame::frame_method(f);
+  Method* frame_method = ContinuationHelper::Frame::frame_method(f);
 
   log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
     frame_method->name_and_sig_as_C_string(), _size, fsize, argsize);
   // we'd rather not yield inside methods annotated with @JvmtiMountTransition
-  assert(!Frame::frame_method(f)->jvmti_mount_transition(), "");
+  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition(), "");
 
-  freeze_result result = recurse_freeze_java_frame<Interpreted>(f, caller, fsize, argsize);
+  freeze_result result = recurse_freeze_java_frame<ContinuationHelper::InterpretedFrame>(f, caller, fsize, argsize);
   if (UNLIKELY(result > freeze_ok_bottom)) {
     return result;
   }
@@ -1699,14 +1674,14 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, bottom);)
 
-  frame hf = new_hframe<Interpreted>(f, caller);
+  frame hf = new_hframe<ContinuationHelper::InterpretedFrame>(f, caller);
 
-  intptr_t* hsp = Interpreted::frame_top(hf, callee_argsize, callee_interpreted);
-  assert(Interpreted::frame_bottom(hf) == hsp + fsize, "");
+  intptr_t* hsp = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(hf) == hsp + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-  copy_to_chunk(Interpreted::frame_bottom(f) - locals,
-                Interpreted::frame_bottom(hf) - locals, locals); // copy locals
+  copy_to_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals,
+                ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals, locals); // copy locals
   copy_to_chunk(vsp, hsp, fsize - locals); // copy rest
   assert(!bottom || !caller.is_interpreted_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
@@ -1725,16 +1700,18 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 }
 
 freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
-  intptr_t* const vsp = Compiled::frame_top(f, callee_argsize, callee_interpreted);
-  const int argsize = Compiled::stack_argsize(f);
-  const int fsize = Compiled::frame_bottom(f) + argsize - vsp;
+  intptr_t* const vsp = ContinuationHelper::CompiledFrame::frame_top(f, callee_argsize, callee_interpreted);
+  const int argsize = ContinuationHelper::CompiledFrame::stack_argsize(f);
+  const int fsize = ContinuationHelper::CompiledFrame::frame_bottom(f) + argsize - vsp;
 
   log_develop_trace(jvmcont)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
-    Frame::frame_method(f) != nullptr ? Frame::frame_method(f)->name_and_sig_as_C_string():"", _size,fsize,argsize);
+                             ContinuationHelper::Frame::frame_method(f) != nullptr ?
+                             ContinuationHelper::Frame::frame_method(f)->name_and_sig_as_C_string() : "",
+                             _size, fsize, argsize);
   // we'd rather not yield inside methods annotated with @JvmtiMountTransition
-  assert(!Frame::frame_method(f)->jvmti_mount_transition(), "");
+  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition(), "");
 
-  freeze_result result = recurse_freeze_java_frame<Compiled>(f, caller, fsize, argsize);
+  freeze_result result = recurse_freeze_java_frame<ContinuationHelper::CompiledFrame>(f, caller, fsize, argsize);
   if (UNLIKELY(result > freeze_ok_bottom)) {
     return result;
   }
@@ -1743,9 +1720,9 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, bottom);)
 
-  frame hf = new_hframe<Compiled>(f, caller);
+  frame hf = new_hframe<ContinuationHelper::CompiledFrame>(f, caller);
 
-  intptr_t* hsp = Compiled::frame_top(hf, callee_argsize, callee_interpreted);
+  intptr_t* hsp = ContinuationHelper::CompiledFrame::frame_top(hf, callee_argsize, callee_interpreted);
 
   copy_to_chunk(vsp, hsp, fsize);
   assert(!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
@@ -1756,7 +1733,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   patch(f, hf, caller, bottom);
 
-  assert(bottom || Interpreter::contains(Compiled::real_pc(caller)) == caller.is_interpreted_frame(), "");
+  assert(bottom || Interpreter::contains(ContinuationHelper::CompiledFrame::real_pc(caller)) == caller.is_interpreted_frame(), "");
 
   DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
   caller = hf;
@@ -1764,7 +1741,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 }
 
 NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& caller) {
-  intptr_t* const vsp = StubF::frame_top(f, 0, 0);
+  intptr_t* const vsp = ContinuationHelper::StubFrame::frame_top(f, 0, 0);
   const int fsize = f.cb()->frame_size();
 
   log_develop_trace(jvmcont)("recurse_freeze_stub_frame %s _size: %d fsize: %d :: " INTPTR_FORMAT " - " INTPTR_FORMAT,
@@ -1776,9 +1753,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
 
   RegisterMap map(_cont.thread(), true, false, false);
   map.set_include_argument_oops(false);
-  ContinuationHelper::update_register_map<StubF>(f, &map);
+  ContinuationHelper::update_register_map<ContinuationHelper::StubFrame>(f, &map);
   f.oop_map()->update_register_map(&f, &map); // we have callee-save registers in this case
-  frame senderf = sender<StubF>(f);
+  frame senderf = sender<ContinuationHelper::StubFrame>(f);
   assert(senderf.unextended_sp() < _bottom_address - 1, "");
   assert(senderf.is_compiled_frame(), "");
 
@@ -1786,7 +1763,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
     // native frame
     return freeze_pinned_native;
   }
-  if (UNLIKELY(Compiled::is_owning_locks(_cont.thread(), &map, senderf))) {
+  if (UNLIKELY(ContinuationHelper::CompiledFrame::is_owning_locks(_cont.thread(), &map, senderf))) {
     return freeze_pinned_monitor;
   }
 
@@ -1798,8 +1775,8 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
   assert(!caller.is_interpreted_frame(), "");
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
-  frame hf = new_hframe<StubF>(f, caller);
-  intptr_t* hsp = StubF::frame_top(hf, 0, 0);
+  frame hf = new_hframe<ContinuationHelper::StubFrame>(f, caller);
+  intptr_t* hsp = ContinuationHelper::StubFrame::frame_top(hf, 0, 0);
   copy_to_chunk(vsp, hsp, fsize);
   DEBUG_ONLY(after_freeze_java_frame(hf, false);)
 
@@ -1960,10 +1937,16 @@ static void JVMTI_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
 
 static freeze_result is_pinned(const frame& f, RegisterMap* map) {
   if (f.is_interpreted_frame()) {
-    if (Interpreted::is_owning_locks(f))           return freeze_pinned_monitor;
-    if (f.interpreter_frame_method()->is_native()) return freeze_pinned_native; // interpreter native entry
+    if (ContinuationHelper::InterpretedFrame::is_owning_locks(f)) {
+      return freeze_pinned_monitor;
+    }
+    if (f.interpreter_frame_method()->is_native()) {
+      return freeze_pinned_native; // interpreter native entry
+    }
   } else if (f.is_compiled_frame()) {
-    if (Compiled::is_owning_locks(map->thread(), map, f)) return freeze_pinned_monitor;
+    if (ContinuationHelper::CompiledFrame::is_owning_locks(map->thread(), map, f)) {
+      return freeze_pinned_monitor;
+    }
   } else {
     return freeze_pinned_native;
   }
@@ -2126,7 +2109,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
     Unimplemented();
 #endif
     if (!Interpreter::contains(f.pc())) {
-      assert(Frame::is_stub(f.cb()), "must be");
+      assert(ContinuationHelper::Frame::is_stub(f.cb()), "must be");
       assert(f.oop_map() != nullptr, "must be");
       f.oop_map()->update_register_map(&f, &map); // we have callee-save registers in this case
     }
@@ -2578,7 +2561,7 @@ void ThawBase::thaw(const frame& hf, frame& caller, int num_frames, bool top) {
   assert(!hf.is_empty(), "");
 
   if (top && hf.is_safepoint_blob_frame()) {
-    assert(Frame::is_stub(hf.cb()), "cb: %s", hf.cb()->name());
+    assert(ContinuationHelper::Frame::is_stub(hf.cb()), "cb: %s", hf.cb()->name());
     recurse_thaw_stub_frame(hf, caller, num_frames);
   } else if (!hf.is_interpreted_frame()) {
     recurse_thaw_compiled_frame(hf, caller, num_frames, false);
@@ -2662,13 +2645,14 @@ inline void ThawBase::after_thaw_java_frame(const frame& f, bool bottom) {
 inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   assert(!bottom || caller.fp() == _cont.entryFP(), "");
   if (bottom) {
-    Frame::patch_pc(caller, _cont.is_empty() ? caller.raw_pc() : StubRoutines::cont_returnBarrier());
+    ContinuationHelper::Frame::patch_pc(caller, _cont.is_empty() ? caller.raw_pc()
+                                                                       : StubRoutines::cont_returnBarrier());
   }
 
   patch_pd(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
 
   if (f.is_interpreted_frame()) {
-    Interpreted::patch_sender_sp(f, caller.unextended_sp());
+    ContinuationHelper::InterpretedFrame::patch_sender_sp(f, caller.unextended_sp());
   }
 
   assert(!bottom || !_cont.is_empty() || Continuation::is_continuation_entry_frame(f, nullptr), "");
@@ -2690,31 +2674,31 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
     _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
   }
 
-  const bool bottom = recurse_thaw_java_frame<Interpreted>(caller, num_frames);
+  const bool bottom = recurse_thaw_java_frame<ContinuationHelper::InterpretedFrame>(caller, num_frames);
 
   DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
 
-  frame f = new_frame<Interpreted>(hf, caller, bottom);
+  frame f = new_frame<ContinuationHelper::InterpretedFrame>(hf, caller, bottom);
 
   intptr_t* const vsp = f.sp();
   intptr_t* const hsp = hf.unextended_sp();
-  intptr_t* const frame_bottom = Interpreted::frame_bottom(f);
+  intptr_t* const frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
 
   assert(hf.is_heap_frame(), "should be");
-  const int fsize = Interpreted::frame_bottom(hf) - hsp;
+  const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hsp;
 
   assert(!bottom || vsp + fsize >= _cont.entrySP() - 2, "");
   assert(!bottom || vsp + fsize <= _cont.entrySP(), "");
 
-  assert(Interpreted::frame_bottom(f) == vsp + fsize, "");
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) == vsp + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
   const int locals = hf.interpreter_frame_method()->max_locals();
   assert(hf.is_heap_frame(), "should be");
   assert(!f.is_heap_frame(), "should not be");
 
-  copy_from_chunk(Interpreted::frame_bottom(hf) - locals,
-                  Interpreted::frame_bottom(f) - locals, locals); // copy locals
+  copy_from_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals,
+                  ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals, locals); // copy locals
   copy_from_chunk(hsp, vsp, fsize - locals); // copy rest
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
@@ -2730,7 +2714,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 #endif
 
   assert(f.is_interpreted_frame_valid(_cont.thread()), "invalid thawed frame");
-  assert(Interpreted::frame_bottom(f) <= Frame::frame_top(caller), "");
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) <= ContinuationHelper::Frame::frame_top(caller), "");
 
   CONT_JFR_ONLY(_cont.record_interpreted_frame();)
 
@@ -2741,7 +2725,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && locals > 0) {
     assert(hf.is_heap_frame(), "should be");
-    clear_bitmap_bits(Interpreted::frame_bottom(hf) - locals, locals);
+    clear_bitmap_bits(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals, locals);
   }
 
   DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2756,7 +2740,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
   }
 
-  const bool bottom = recurse_thaw_java_frame<Compiled>(caller, num_frames);
+  const bool bottom = recurse_thaw_java_frame<ContinuationHelper::CompiledFrame>(caller, num_frames);
 
   DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
 
@@ -2766,12 +2750,12 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     _align_size += ContinuationHelper::align_wiggle; // we add one whether or not we've aligned because we add it in freeze_interpreted_frame
   }
 
-  frame f = new_frame<Compiled>(hf, caller, bottom);
+  frame f = new_frame<ContinuationHelper::CompiledFrame>(hf, caller, bottom);
   intptr_t* const vsp = f.sp();
   intptr_t* const hsp = hf.unextended_sp();
 
   const int added_argsize = (bottom || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
-  int fsize = Compiled::size(hf) + added_argsize;
+  int fsize = ContinuationHelper::CompiledFrame::size(hf) + added_argsize;
   assert(fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "");
 
   intptr_t* from = hsp - ContinuationHelper::frame_metadata;
@@ -2798,11 +2782,11 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     assert(_thread->is_interp_only_mode() || stub_caller, "expected a stub-caller");
 
     log_develop_trace(jvmcont)("Deoptimizing thawed frame");
-    DEBUG_ONLY(Frame::patch_pc(f, nullptr));
+    DEBUG_ONLY(ContinuationHelper::Frame::patch_pc(f, nullptr));
 
     f.deoptimize(nullptr); // we're assuming there are no monitors; this doesn't revoke biased locks
     assert(f.is_deoptimized_frame(), "");
-    assert(Frame::is_deopt_return(f.raw_pc(), f), "");
+    assert(ContinuationHelper::Frame::is_deopt_return(f.raw_pc(), f), "");
     maybe_set_fastpath(f.sp());
   }
 
@@ -2810,7 +2794,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     // can only fix caller once this frame is thawed (due to callee saved regs)
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
-    clear_bitmap_bits(hsp + Compiled::size(hf), added_argsize);
+    clear_bitmap_bits(hsp + ContinuationHelper::CompiledFrame::size(hf), added_argsize);
   }
 
   DEBUG_ONLY(after_thaw_java_frame(f, bottom);)
@@ -2835,13 +2819,13 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
 
   DEBUG_ONLY(before_thaw_java_frame(hf, caller, false, num_frames);)
 
-  assert(Frame::is_stub(hf.cb()), "");
+  assert(ContinuationHelper::Frame::is_stub(hf.cb()), "");
   assert(caller.sp() == caller.unextended_sp(), "");
   assert(!caller.is_interpreted_frame(), "");
 
-  int fsize = StubF::size(hf);
+  int fsize = ContinuationHelper::StubFrame::size(hf);
 
-  frame f = new_frame<StubF>(hf, caller, false);
+  frame f = new_frame<ContinuationHelper::StubFrame>(hf, caller, false);
   intptr_t* vsp = f.sp();
   intptr_t* hsp = hf.sp();
 
@@ -2909,10 +2893,10 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
   intptr_t* sp = f.sp();
   address pc = f.raw_pc();
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
+  ContinuationHelper::Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
   ContinuationHelper::push_pd(f);
 
-  assert(Frame::assert_frame_laid_out(f), "");
+  assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
 }
 
 void ThawBase::JVMTI_continue_cleanup(JavaThread* thread) {
@@ -3056,7 +3040,9 @@ static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOo
       st->print_cr("Failed for frame barriers: %d %d", barriers, chunk->requires_barriers());
       fr.print_on(st);
       if (!fr.is_interpreted_frame()) {
-        st->print_cr("size: %d argsize: %d", NonInterpretedUnknown::size(fr), NonInterpretedUnknown::stack_argsize(fr));
+        st->print_cr("size: %d argsize: %d",
+                     ContinuationHelper::NonInterpretedUnknownFrame::size(fr),
+                     ContinuationHelper::NonInterpretedUnknownFrame::stack_argsize(fr));
       }
       VMReg reg = fst.register_map()->find_register_spilled_here(cl.p(), fst.current()->sp());
       if (reg != nullptr) {
@@ -3188,7 +3174,7 @@ static void print_frame_layout(const frame& f, outputStream* st) {
                   JavaThread::current(), true, false, false);
   map.set_include_argument_oops(false);
   map.set_skip_missing(true);
-  frame::update_map_with_saved_link(&map, Frame::callee_link_address(f));
+  frame::update_map_with_saved_link(&map, ContinuationHelper::Frame::callee_link_address(f));
   const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
 }

@@ -22,12 +22,71 @@
  *
  */
 
-#ifndef CPU_X86_FRAME_HELPERS_X86_INLINE_HPP
-#define CPU_X86_FRAME_HELPERS_X86_INLINE_HPP
+#ifndef CPU_X86_CONTINUATIONHELPER_X86_INLINE_HPP
+#define CPU_X86_CONTINUATIONHELPER_X86_INLINE_HPP
 
+#include "runtime/continuationHelper.hpp"
+
+#include "runtime/frame.inline.hpp"
+#include "runtime/registerMap.hpp"
+#include "utilities/macros.hpp"
+
+const int ContinuationHelper::frame_metadata = frame::sender_sp_offset;
+const int ContinuationHelper::align_wiggle = 1;
+
+template<typename FKind>
+static inline intptr_t** link_address(const frame& f) {
+  assert(FKind::is_instance(f), "");
+  return FKind::interpreted
+    ? (intptr_t**)(f.fp() + frame::link_offset)
+    : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - frame::sender_sp_offset);
+}
+
+inline int ContinuationHelper::frame_align_words(int size) {
+#ifdef _LP64
+  return size & 1;
+#else
+  return 0;
+#endif
+}
+
+inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
+#ifdef _LP64
+  sp = align_down(sp, 16);
+  assert((intptr_t)sp % 16 == 0, "");
+#endif
+  return sp;
+}
+
+template<typename FKind>
+inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
+  frame::update_map_with_saved_link(map, link_address<FKind>(f));
+}
+
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
+  intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
+  frame::update_map_with_saved_link(map, fp);
+}
+
+inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
+  frame::update_map_with_saved_link(map, ContinuationHelper::Frame::callee_link_address(f));
+}
+
+inline void ContinuationHelper::push_pd(const frame& f) {
+  *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
+}
+
+void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry) {
+  anchor->set_last_Java_fp(entry->entry_fp());
+}
+
+void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
+  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
+  anchor->set_last_Java_fp(fp);
+}
 
 #ifdef ASSERT
-bool Frame::assert_frame_laid_out(frame f) {
+inline bool ContinuationHelper::Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
   address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
@@ -37,39 +96,35 @@ bool Frame::assert_frame_laid_out(frame f) {
 }
 #endif
 
-inline intptr_t** Frame::callee_link_address(const frame& f) {
+inline intptr_t** ContinuationHelper::Frame::callee_link_address(const frame& f) {
   return (intptr_t**)(f.sp() - frame::sender_sp_offset);
 }
 
-inline address* Frame::return_pc_address(const frame& f) {
+inline address* ContinuationHelper::Frame::return_pc_address(const frame& f) {
   return (address*)(f.real_fp() - 1);
 }
 
-inline address* Interpreted::return_pc_address(const frame& f) {
+inline address* ContinuationHelper::InterpretedFrame::return_pc_address(const frame& f) {
   return (address*)(f.fp() + frame::return_addr_offset);
 }
 
-void Interpreted::patch_sender_sp(frame& f, intptr_t* sp) {
+inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(frame& f, intptr_t* sp) {
   assert(f.is_interpreted_frame(), "");
   intptr_t* la = f.addr_at(frame::interpreter_frame_sender_sp_offset);
   *la = f.is_heap_frame() ? (intptr_t)(sp - f.fp()) : (intptr_t)sp;
 }
 
-// inline address* Frame::pc_address(const frame& f) {
-//   return (address*)(f.sp() - frame::return_addr_offset);
-// }
-
-inline address Frame::real_pc(const frame& f) {
+inline address ContinuationHelper::Frame::real_pc(const frame& f) {
   address* pc_addr = &(((address*) f.sp())[-1]);
   return *pc_addr;
 }
 
-inline void Frame::patch_pc(const frame& f, address pc) {
+inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
   address* pc_addr = &(((address*) f.sp())[-1]);
   *pc_addr = pc;
 }
 
-inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask) { // inclusive; this will be copied with the frame
+inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(const frame& f, InterpreterOopMap* mask) { // inclusive; this will be copied with the frame
   // interpreter_frame_last_sp_offset, points to unextended_sp includes arguments in the frame
   // interpreter_frame_initial_sp_offset excludes expression stack slots
   int expression_stack_sz = expression_stack_size(f, mask);
@@ -83,12 +138,12 @@ inline intptr_t* Interpreted::frame_top(const frame& f, InterpreterOopMap* mask)
   // assert(res == f.unextended_sp(), "res: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT, p2i(res), p2i(f.unextended_sp() + 1));
 }
 
-inline intptr_t* Interpreted::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
+inline intptr_t* ContinuationHelper::InterpretedFrame::frame_bottom(const frame& f) { // exclusive; this will not be copied with the frame
   return (intptr_t*)f.at(frame::interpreter_frame_locals_offset) + 1; // exclusive, so we add 1 word
 }
 
-inline intptr_t* Interpreted::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
+inline intptr_t* ContinuationHelper::InterpretedFrame::frame_top(const frame& f, int callee_argsize, bool callee_interpreted) {
   return f.unextended_sp() + (callee_interpreted ? callee_argsize : 0);
 }
 
-#endif // CPU_X86_FRAME_HELPERS_X86_INLINE_HPP
+#endif // CPU_X86_CONTINUATIONHELPER_X86_INLINE_HPP

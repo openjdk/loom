@@ -30,73 +30,19 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
-const int ContinuationHelper::frame_metadata = frame::sender_sp_offset;
-const int ContinuationHelper::align_wiggle = 1;
-
-template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
-static inline intptr_t** link_address(const frame& f) {
-  assert(FKind::is_instance(f), "");
-  return FKind::interpreted
-            ? (intptr_t**)(f.fp() + frame::link_offset)
-            : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - frame::sender_sp_offset);
-}
-
 static void patch_callee_link(const frame& f, intptr_t* fp) {
-  *Frame::callee_link_address(f) = fp;
+  *ContinuationHelper::Frame::callee_link_address(f) = fp;
 }
 
 static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
-  intptr_t* la = (intptr_t*)Frame::callee_link_address(f);
+  intptr_t* la = (intptr_t*)ContinuationHelper::Frame::callee_link_address(f);
   intptr_t new_value = fp - la;
   *la = new_value;
-}
-
-inline int ContinuationHelper::frame_align_words(int size) {
-#ifdef _LP64
-  return size & 1;
-#else
-  return 0;
-#endif
-}
-
-inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
-#ifdef _LP64
-  sp = align_down(sp, 16);
-  assert((intptr_t)sp % 16 == 0, "");
-#endif
-  return sp;
-}
-
-template<typename FKind>
-inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
-  frame::update_map_with_saved_link(map, link_address<FKind>(f));
-}
-
-void ContinuationEntry::update_register_map(RegisterMap* map) const {
-  intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
-  frame::update_map_with_saved_link(map, fp);
-}
-
-inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
-  frame::update_map_with_saved_link(map, Frame::callee_link_address(f));
-}
-
-inline void ContinuationHelper::push_pd(const frame& f) {
-  *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
 frame ContinuationEntry::to_frame() const {
   static CodeBlob* cb = CodeCache::find_blob(entry_pc());
   return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
-}
-
-void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry) {
-  anchor->set_last_Java_fp(entry->entry_fp());
-}
-
-void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-  anchor->set_last_Java_fp(fp);
 }
 
 ////// Freeze
@@ -141,7 +87,7 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
       || f.unextended_sp() == (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset), "");
     int locals = f.interpreter_frame_method()->max_locals();
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
-    fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
+    fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? ContinuationHelper::InterpretedFrame::stack_argsize(f) : 0);
     sp = fp - (f.fp() - f.unextended_sp());
     assert(sp <= fp, "");
     assert(fp <= caller.unextended_sp(), "");
@@ -211,7 +157,7 @@ inline void FreezeBase::set_top_frame_metadata_pd(const frame& hf) {
   intptr_t* fp_addr = hf.sp() - frame::sender_sp_offset;
   *fp_addr = hf.is_interpreted_frame() ? (intptr_t)(hf.fp() - fp_addr)
                                        : (intptr_t)hf.fp();
-  assert(frame_pc == Frame::real_pc(hf), "");
+  assert(frame_pc == ContinuationHelper::Frame::real_pc(hf), "");
 }
 
 inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
@@ -250,7 +196,7 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
 
   if (FKind::interpreted) {
     intptr_t* hsp = hf.unextended_sp();
-    const int fsize = Interpreted::frame_bottom(hf) - hf.unextended_sp();
+    const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp();
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);

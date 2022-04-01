@@ -29,39 +29,6 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
-// TODO: Implement
-const int ContinuationHelper::frame_metadata = 0;
-const int ContinuationHelper::align_wiggle = 0;
-
-template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
-static inline intptr_t** link_address(const frame& f) {
-  Unimplemented();
-  return NULL;
-}
-
-inline int ContinuationHelper::frame_align_words(int size) {
-  Unimplemented();
-  return 0;
-}
-
-inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
-  Unimplemented();
-  return NULL;
-}
-
-template<typename FKind>
-inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
-  Unimplemented();
-}
-
-inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
-  Unimplemented();
-}
-
-inline void ContinuationHelper::push_pd(const frame& f) {
-  Unimplemented();
-}
-
 frame ContinuationEntry::to_frame() const {
   Unimplemented();
   return frame();
