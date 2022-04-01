@@ -341,6 +341,7 @@ class ContinuationWrapper : public StackObj {
 private:
   JavaThread* const  _thread;   // Thread being frozen/thawed
   ContinuationEntry* _entry;
+  // This oop is managed by the post_safepoint method, which is explicitly called after safepoints
   oop                _continuation;  // jdk.internal.vm.Continuation instance
   stackChunkOop      _tail;
 
