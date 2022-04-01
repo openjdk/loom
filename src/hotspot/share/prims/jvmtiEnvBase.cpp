@@ -1579,6 +1579,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
         // The thread was in the process of exiting.
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
       }
+      return JVMTI_ERROR_THREAD_SUSPENDED;
     }
   }
   return JVMTI_ERROR_NONE;

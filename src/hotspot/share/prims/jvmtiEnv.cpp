@@ -145,18 +145,18 @@ JvmtiEnv::Deallocate(unsigned char* mem) {
 // data - NULL is a valid value, must be checked
 jvmtiError
 JvmtiEnv::SetThreadLocalStorage(jthread thread, const void* data) {
+  JavaThread* current = JavaThread::current();
   jvmtiError err = JVMTI_ERROR_NONE;
   JavaThread* java_thread = NULL;
   JvmtiThreadState* state = NULL;
   JvmtiVTMTDisabler vtmt_disabler;
+  ThreadsListHandle tlh(current);
   oop thread_obj = NULL;
-  JavaThread* current = JavaThread::current();
 
   if (thread == NULL) {
     java_thread = current;
     state = java_thread->jvmti_thread_state();
   } else {
-    ThreadsListHandle tlh;
     err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
     if (err != JVMTI_ERROR_NONE) {
       return err;
@@ -871,9 +871,6 @@ JvmtiEnv::GetThreadState(jthread thread, jint* thread_state_ptr) {
   } else {
     *thread_state_ptr = JvmtiEnvBase::get_thread_state(thread_oop, java_thread);
   }
-  // java_thread can be suspended only if its virtual or carrier thread object is suspended.
-  assert(java_thread == NULL || !java_thread->is_suspended() ||
-         (*thread_state_ptr | JVMTI_THREAD_STATE_SUSPENDED) != 0, "sanity check");
   return JVMTI_ERROR_NONE;
 } /* end GetThreadState */
 
