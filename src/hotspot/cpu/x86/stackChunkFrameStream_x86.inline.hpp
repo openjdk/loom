@@ -72,7 +72,7 @@ inline intptr_t* StackChunkFrameStream<frame_kind>::derelativize(int offset) con
 
 template <chunk_frames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   return derelativize(frame::interpreter_frame_last_sp_offset);
 }
 
@@ -87,13 +87,13 @@ inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interprete
 
 template <chunk_frames frame_kind>
 intptr_t* StackChunkFrameStream<frame_kind>::next_sp_for_interpreter_frame() const {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   return (derelativize(frame::interpreter_frame_locals_offset) + 1 >= _end) ? _end : fp() + frame::sender_sp_offset;
 }
 
 template <chunk_frames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   if (derelativize(frame::interpreter_frame_locals_offset) + 1 >= _end) {
     _unextended_sp = _end;
     _sp = _end;
@@ -106,7 +106,7 @@ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
 
 template <chunk_frames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   // InterpreterOopMap mask;
   // to_frame().interpreted_frame_oop_map(&mask);
   // intptr_t* top = derelativize(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
@@ -118,14 +118,14 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
 
 template <chunk_frames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() const {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   int diff = (int)(derelativize(frame::interpreter_frame_locals_offset) - derelativize(frame::interpreter_frame_sender_sp_offset) + 1);
   return diff;
 }
 
 template <chunk_frames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const {
-  assert(frame_kind == chunk_frames::MIXED && is_interpreted(), "");
+  assert_is_interpreted_and_frame_type_mixed();
   ResourceMark rm;
   InterpreterOopMap mask;
   frame f = to_frame();

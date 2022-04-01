@@ -1108,7 +1108,8 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preem
 
   log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT,
                 p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
-  assert(_bottom_address != nullptr && _bottom_address <= _cont.entrySP(), "");
+  assert(_bottom_address != nullptr, "");
+  assert(_bottom_address <= _cont.entrySP(), "");
   DEBUG_ONLY(_last_write = nullptr;)
 }
 
@@ -1445,7 +1446,8 @@ template<typename FKind>
 inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame& caller, int fsize, int argsize) {
   assert(FKind::is_instance(f), "");
 
-  assert(fsize > 0 && argsize >= 0, "");
+  assert(fsize > 0, "");
+  assert(argsize >= 0, "");
   _size += fsize;
   NOT_PRODUCT(_frames++;)
 
@@ -2345,7 +2347,8 @@ inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
   assert(!_cont.is_empty(), "");
 
   stackChunkOop chunk = _cont.tail();
-  assert(chunk != nullptr && !chunk->is_empty(), ""); // guaranteed by prepare_thaw
+  assert(chunk != nullptr, "guaranteed by prepare_thaw");
+  assert(!chunk->is_empty(), "guaranteed by prepare_thaw");
 
   _barriers = chunk->requires_barriers();
   return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
@@ -2397,7 +2400,8 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
     partial = true;
 
     StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
-    assert(chunk_sp == f.sp() && chunk_sp == f.unextended_sp(), "");
+    assert(chunk_sp == f.sp(), "");
+    assert(chunk_sp == f.unextended_sp(), "");
 
     const int frame_size = f.cb()->frame_size();
     argsize = f.stack_argsize();
@@ -2435,8 +2439,8 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   intptr_t* from = chunk_sp - ContinuationHelper::frame_metadata;
   intptr_t* to   = stack_sp - ContinuationHelper::frame_metadata;
   copy_from_chunk(from, to, thaw_size + ContinuationHelper::frame_metadata);
-  assert(_cont.entrySP() - 1 <= to + thaw_size + ContinuationHelper::frame_metadata
-            && to + thaw_size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
+  assert(_cont.entrySP() - 1 <= to + thaw_size + ContinuationHelper::frame_metadata, "");
+  assert(to + thaw_size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
   assert(argsize != 0 || to + thaw_size + ContinuationHelper::frame_metadata == _cont.entrySP(), "");
 
   assert(!is_last || argsize == 0, "");
@@ -2560,7 +2564,8 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 void ThawBase::thaw(const frame& hf, frame& caller, int num_frames, bool top) {
   log_develop_debug(jvmcont)("thaw num_frames: %d", num_frames);
   assert(!_cont.is_empty(), "no more frames");
-  assert(num_frames > 0 && !hf.is_empty(), "");
+  assert(num_frames > 0, "");
+  assert(!hf.is_empty(), "");
 
   if (top && hf.is_safepoint_blob_frame()) {
     assert(Frame::is_stub(hf.cb()), "cb: %s", hf.cb()->name());
@@ -2763,8 +2768,8 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
   int sz = fsize + ContinuationHelper::frame_metadata;
 
-  assert(!bottom || _cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP(), "");
-  assert(!bottom || hf.compiled_frame_stack_argsize() != 0 || to + sz && to + sz == _cont.entrySP(), "");
+  assert(!bottom || (_cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP()), "");
+  assert(!bottom || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
 
   copy_from_chunk(from, to, sz);
 
@@ -2786,7 +2791,8 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     DEBUG_ONLY(Frame::patch_pc(f, nullptr));
 
     f.deoptimize(nullptr); // we're assuming there are no monitors; this doesn't revoke biased locks
-    assert(f.is_deoptimized_frame() && Frame::is_deopt_return(f.raw_pc(), f), "");
+    assert(f.is_deoptimized_frame(), "");
+    assert(Frame::is_deopt_return(f.raw_pc(), f), "");
     maybe_set_fastpath(f.sp());
   }
 
@@ -3142,7 +3148,8 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
     sp = interpreted_bottom ? f.sp() : entry->bottom_sender_sp();
   }
 
-  assert(sp != nullptr && sp <= entry->entry_sp(), "");
+  assert(sp != nullptr, "");
+  assert(sp <= entry->entry_sp(), "");
   address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
 
   if (pc != StubRoutines::cont_returnBarrier()) {
@@ -3256,5 +3263,6 @@ void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
     assert(thread->is_Java_thread(), "");
     ThreadToNativeFromVM trans((JavaThread*)thread);
     int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
-    guarantee(status == JNI_OK && !env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
+    guarantee(status == JNI_OK, "register jdk.internal.vm.Continuation natives");
+    guarantee(!env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
 }

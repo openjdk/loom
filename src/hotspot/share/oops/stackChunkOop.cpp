@@ -711,7 +711,10 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
     if (out_frames != nullptr) *out_frames += closure._num_frames;
     if (out_interpreted_frames != nullptr) *out_interpreted_frames += closure._num_interpreted_frames;
   } else {
-    assert(out_size == nullptr && out_oops == nullptr && out_frames == nullptr && out_interpreted_frames == nullptr, "");
+    assert(out_size == nullptr, "");
+    assert(out_oops == nullptr, "");
+    assert(out_frames == nullptr, "");
+    assert(out_interpreted_frames == nullptr, "");
   }
 
   if (has_bitmap()) {

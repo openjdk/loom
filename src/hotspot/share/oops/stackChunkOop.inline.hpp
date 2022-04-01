@@ -258,7 +258,8 @@ inline address stackChunkOopDesc::usp_offset_to_location(const frame& fr, const 
 
 inline address stackChunkOopDesc::reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) const {
   assert(fr.is_compiled_frame(), "");
-  assert(map != nullptr && map->stack_chunk() == as_oop(), "");
+  assert(map != nullptr, "");
+  assert(map->stack_chunk() == as_oop(), "");
 
   // the offsets are saved in the map after going through relativize_usp_offset, so they are sp - loc, in words
   intptr_t offset = (intptr_t)map->location(reg, nullptr); // see usp_offset_to_index for the chunk case
@@ -324,17 +325,17 @@ inline intptr_t* stackChunkOopDesc::relative_base() const {
 inline intptr_t* stackChunkOopDesc::derelativize_address(int offset) const {
   intptr_t* base = relative_base();
   intptr_t* p = base - offset;
-  // tty->print_cr(">>> derelativize_address: %d -> %p (base: %p)", offset, p, base);
-  assert(start_address() <= p && p <= base, "");
+  assert(start_address() <= p && p <= base, "start_address: " PTR_FORMAT " p: " PTR_FORMAT " base: " PTR_FORMAT,
+         p2i(start_address()), p2i(p), p2i(base));
   return p;
 }
 
 inline int stackChunkOopDesc::relativize_address(intptr_t* p) const {
   intptr_t* base = relative_base();
   intptr_t offset = base - p;
-  // tty->print_cr(">>> relativize_address: %p -> %ld (base: %p)", p, offset, base);
-  assert(start_address() <= p && p <= base, "");
-  assert(0 <= offset && offset <= std::numeric_limits<int>::max(), "");
+  assert(start_address() <= p && p <= base, "start_address: " PTR_FORMAT " p: " PTR_FORMAT " base: " PTR_FORMAT,
+         p2i(start_address()), p2i(p), p2i(base));
+  assert(0 <= offset && offset <= std::numeric_limits<int>::max(), "offset: " PTR_FORMAT, offset);
   return offset;
 }
 

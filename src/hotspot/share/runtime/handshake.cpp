@@ -776,8 +776,8 @@ bool HandshakeState::continue_resume(JavaThread* caller) {
     return false;
   }
   MutexLocker ml(&_lock, Mutex::_no_safepoint_check_flag);
-  assert(is_blocked() && caller_thread() == caller,
-         "this is the only thread that can continue this thread");
+  assert(is_blocked(), "should be blocked");
+  assert(caller_thread() == caller, "this is the only thread that can continue this thread");
 
   // Resume the thread.
   set_caller_thread(nullptr); // !is_blocked()
