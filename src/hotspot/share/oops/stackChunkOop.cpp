@@ -688,14 +688,14 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   assert(closure._num_interpreted_frames == 0 || has_mixed_frames(), "");
 
   if (!concurrent) {
-    assert(closure._size <= size + argsize() + InstanceStackChunkKlass::metadata_words(),
+    assert(closure._size <= size + argsize() + frame::metadata_words,
       "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d",
       size, argsize(), closure._size, closure._sp - start_address(), sp(), stack_size());
     assert(argsize() == closure._argsize,
       "argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
       argsize(), closure._argsize, closure._callee_interpreted);
 
-    int calculated_max_size = closure._size + closure._num_i2c * InstanceStackChunkKlass::align_wiggle();
+    int calculated_max_size = closure._size + closure._num_i2c * frame::align_wiggle;
     assert(max_size() == calculated_max_size,
       "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
       max_size(), calculated_max_size, closure._argsize, closure._num_i2c);
@@ -719,13 +719,13 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(this);
       bitmap().iterate(&bitmap_closure,
-        bit_index_for((narrowOop*)(sp_address() - InstanceStackChunkKlass::metadata_words())),
+        bit_index_for((narrowOop*)(sp_address() - frame::metadata_words)),
         bit_index_for((narrowOop*)end_address()));
       oop_count = bitmap_closure._count;
     } else {
       StackChunkVerifyBitmapClosure<oop> bitmap_closure(this);
       bitmap().iterate(&bitmap_closure,
-        bit_index_for((oop*)(sp_address() - InstanceStackChunkKlass::metadata_words())),
+        bit_index_for((oop*)(sp_address() - frame::metadata_words)),
         bit_index_for((oop*)end_address()));
       oop_count = bitmap_closure._count;
     }

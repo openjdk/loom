@@ -49,7 +49,6 @@
 #include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
-#include CPU_HEADER_INLINE(instanceStackChunkKlass)
 
 const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
 
@@ -117,7 +116,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
   if (LIKELY(chunk->has_bitmap())) {
-    intptr_t* start = chunk->sp_address() - metadata_words();
+    intptr_t* start = chunk->sp_address() - frame::metadata_words;
     intptr_t* end = chunk->end_address();
     // mr.end() can actually be less than start. In that case, we only walk the metadata
     if ((intptr_t*)mr.start() > start) {
@@ -135,7 +134,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
   if (LIKELY(chunk->has_bitmap())) {
-    oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, chunk->sp_address() - metadata_words(), chunk->end_address());
+    oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, chunk->sp_address() - frame::metadata_words, chunk->end_address());
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());
   }

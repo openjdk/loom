@@ -185,7 +185,7 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* vsp = caller.unextended_sp() - fsize;
     intptr_t* fp = vsp + (hf.fp() - hsp);
-    if ((intptr_t)fp % 16 != 0) {
+    if ((intptr_t)fp % frame::frame_alignment != 0) {
       fp--;
       vsp--;
     }
@@ -197,7 +197,7 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
     intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
     assert((int)offset == locals + frame::sender_sp_offset - 1, "");
     *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + offset;
-    assert((intptr_t)f.fp() % 16 == 0, "");
+    assert((intptr_t)f.fp() % frame::frame_alignment == 0, "");
     return f;
   } else {
     int fsize = FKind::size(hf);
@@ -229,7 +229,7 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, 
     vsp--;
     caller.set_sp(caller.sp() - 1);
   }
-  assert((intptr_t)vsp % 16 == 0, "");
+  assert(is_aligned(vsp, frame::frame_alignment), "");
 #endif
 
   return vsp;
@@ -244,12 +244,11 @@ intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
   intptr_t* fp = sp - frame::sender_sp_offset;
 
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
+    p2i(sp), p2i(sp - frame::metadata_words), p2i(fp));
 
-  sp = align_down(sp, 16);
-  assert((intptr_t)sp % 16 == 0, "");
+  sp = align_down(sp, frame::frame_alignment);
 
-  sp -= ContinuationHelper::frame_metadata;
+  sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;

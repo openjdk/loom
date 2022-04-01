@@ -99,8 +99,11 @@
     entry_frame_call_wrapper_offset                  = -8,
 
     // we don't need a save area
-    arg_reg_save_area_bytes                          =  0
+    arg_reg_save_area_bytes                          =  0,
 
+    metadata_words = sender_sp_offset, // size, in words, of frame metadata (e.g. pc and link)
+    frame_alignment = 16, // in bytes
+    align_wiggle = 1 // size, in words, of maximum shift in frame position due to alignment
   };
 
   intptr_t ptr_at(int offset) const {

@@ -31,9 +31,6 @@
 #include "runtime/registerMap.hpp"
 #include "utilities/macros.hpp"
 
-const int ContinuationHelper::frame_metadata = frame::sender_sp_offset;
-const int ContinuationHelper::align_wiggle = 1;
-
 template<typename FKind>
 static inline intptr_t** link_address(const frame& f) {
   assert(FKind::is_instance(f), "");
@@ -52,8 +49,7 @@ inline int ContinuationHelper::frame_align_words(int size) {
 
 inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* sp) {
 #ifdef _LP64
-  sp = align_down(sp, 16);
-  assert((intptr_t)sp % 16 == 0, "");
+  sp = align_down(sp, frame::frame_alignment);
 #endif
   return sp;
 }

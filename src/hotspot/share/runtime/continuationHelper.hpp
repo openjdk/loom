@@ -35,9 +35,6 @@
 
 class ContinuationHelper {
 public:
-  static const int frame_metadata; // size, in words, of frame metadata (e.g. pc and link)
-  static const int align_wiggle; // size, in words, of maximum shift in frame position due to alignment
-
   static oop get_continuation(JavaThread* thread);
   static bool stack_overflow_check(JavaThread* thread, int size, address sp);
 

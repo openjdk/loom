@@ -118,11 +118,6 @@ public:
 
   static inline size_t bitmap_size(size_t stack_size_in_words); // in words
 
-  // size of frame metadata (e.g. pc and link) - in words
-  static inline int metadata_words();
-  // size of maximum shift in frame position due to alignment - in words
-  static inline int align_wiggle();
-
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;
 

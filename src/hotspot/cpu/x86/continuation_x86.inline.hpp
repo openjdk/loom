@@ -237,7 +237,7 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, 
     vsp--;
     caller.set_sp(caller.sp() - 1);
   }
-  assert((intptr_t)vsp % 16 == 0, "");
+  assert(is_aligned(vsp, frame::frame_alignment), "");
 #endif
 
   return vsp;
@@ -252,9 +252,9 @@ intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
 
   log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    p2i(sp), p2i(sp - ContinuationHelper::frame_metadata), p2i(fp));
+    p2i(sp), p2i(sp - frame::metadata_words), p2i(fp));
 
-  sp -= ContinuationHelper::frame_metadata;
+  sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
   return sp;

@@ -194,7 +194,7 @@ public:
   intptr_t* bottom_sender_sp() const {
     intptr_t* sp = entry_sp() - argsize();
 #ifdef _LP64
-    sp = align_down(sp, 16);
+    sp = align_down(sp, frame::frame_alignment);
 #endif
     return sp;
   }

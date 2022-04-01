@@ -93,7 +93,7 @@ inline intptr_t* stackChunkOopDesc::sp_address()  const { return start_address()
 
 inline int stackChunkOopDesc::to_offset(intptr_t* p) const {
   assert(is_in_chunk(p)
-    || (p >= start_address() && (p - start_address()) <= stack_size() + InstanceStackChunkKlass::metadata_words()),
+    || (p >= start_address() && (p - start_address()) <= stack_size() + frame::metadata_words),
     "p: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT, p2i(p), p2i(start_address()), p2i(bottom_address()));
   return p - start_address();
 }
@@ -316,7 +316,7 @@ inline void stackChunkOopDesc::copy_from_chunk_to_stack(intptr_t* from, intptr_t
 
 inline intptr_t* stackChunkOopDesc::relative_base() const {
   // we relativize with respect to end rather than start because GC might compact the chunk
-  return end_address() + InstanceStackChunkKlass::metadata_words();
+  return end_address() + frame::metadata_words;
 }
 
 inline intptr_t* stackChunkOopDesc::derelativize_address(int offset) const {

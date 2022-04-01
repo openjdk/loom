@@ -51,13 +51,13 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DE
   DEBUG_ONLY(_index = 0;)
   _end = chunk->bottom_address();
   _sp = chunk->start_address() + chunk->sp();
-  assert(_sp <= chunk->end_address() + InstanceStackChunkKlass::metadata_words(), "");
+  assert(_sp <= chunk->end_address() + frame::metadata_words, "");
 
   get_cb();
 
   if (frame_kind == chunk_frames::MIXED) {
     _unextended_sp = (!is_done() && is_interpreted()) ? unextended_sp_for_interpreter_frame() : _sp;
-    assert(_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
+    assert(_unextended_sp >= _sp - frame::metadata_words, "");
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
 
@@ -82,11 +82,11 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
   _sp = f.sp();
   if (frame_kind == chunk_frames::MIXED) {
     _unextended_sp = f.unextended_sp();
-    assert(_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
+    assert(_unextended_sp >= _sp - frame::metadata_words, "");
   }
   DEBUG_ONLY(else _unextended_sp = nullptr;)
   assert(_sp >= chunk->start_address(), "");
-  assert(_sp <= chunk->end_address() + InstanceStackChunkKlass::metadata_words(), "");
+  assert(_sp <= chunk->end_address() + frame::metadata_words, "");
 
   if (f.cb() != nullptr) {
     _oopmap = nullptr;
@@ -161,12 +161,12 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map) {
       next_for_interpreter_frame();
     } else {
       _sp = _unextended_sp + cb()->frame_size();
-      if (_sp >= _end - InstanceStackChunkKlass::metadata_words()) {
+      if (_sp >= _end - frame::metadata_words) {
         _sp = _end;
       }
       _unextended_sp = is_interpreted() ? unextended_sp_for_interpreter_frame() : _sp;
     }
-    assert(_unextended_sp >= _sp - InstanceStackChunkKlass::metadata_words(), "");
+    assert(_unextended_sp >= _sp - frame::metadata_words, "");
   } else {
     _sp += cb()->frame_size();
   }

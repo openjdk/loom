@@ -1086,7 +1086,7 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preem
   if (((intptr_t)_bottom_address & 0xf) != 0) {
     _bottom_address--;
   }
-  assert((intptr_t)_bottom_address % 16 == 0, "");
+  assert(is_aligned(_bottom_address, frame::frame_alignment), "");
 #endif
 
   log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT,
@@ -1159,8 +1159,8 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
   }
 
   // assert(CodeCache::find_blob(*(address*)(top_sp - SENDER_SP_RET_ADDRESS_OFFSET)) == StubRoutines::cont_doYield_stub(), ""); -- fails on Windows
-  assert(StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
-  intptr_t* const stack_top     = top_sp + ContinuationHelper::frame_metadata;
+  assert(StubRoutines::cont_doYield_stub()->frame_size() == frame::metadata_words, "");
+  intptr_t* const stack_top     = top_sp + frame::metadata_words;
   intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize());
 
   int size = stack_bottom - stack_top; // in words
@@ -1171,7 +1171,7 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
   }
   assert(size > 0, "");
 
-  bool available = chunk_sp - ContinuationHelper::frame_metadata >= size;
+  bool available = chunk_sp - frame::metadata_words >= size;
   log_develop_trace(jvmcont)("is_chunk_available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
     available, _cont.argsize(), size, p2i(stack_top), p2i(stack_bottom));
   DEBUG_ONLY(if (out_size != nullptr) *out_size = size;)
@@ -1183,10 +1183,10 @@ template <bool chunk_available>
 bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   assert(_cont.chunk_invariant(tty), "");
   assert(!Interpreter::contains(_cont.entryPC()), "");
-  assert(StubRoutines::cont_doYield_stub()->frame_size() == ContinuationHelper::frame_metadata, "");
+  assert(StubRoutines::cont_doYield_stub()->frame_size() == frame::metadata_words, "");
 
   // properties of the continuation on the stack; all sizes are in words
-  intptr_t* const cont_stack_top    = top_sp + ContinuationHelper::frame_metadata;
+  intptr_t* const cont_stack_top    = top_sp + frame::metadata_words;
   intptr_t* const cont_stack_bottom = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize()); // see alignment in thaw
 
   const int cont_size = cont_stack_bottom - cont_stack_top;
@@ -1237,7 +1237,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
     assert(!is_chunk_available(top_sp), "");
     assert(_thread->cont_fastpath(), "");
 
-    chunk = allocate_chunk(cont_size + ContinuationHelper::frame_metadata);
+    chunk = allocate_chunk(cont_size + frame::metadata_words);
     if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
       log_develop_trace(jvmcont)("Retrying slow. Barriers: %d", _barriers);
       return false;
@@ -1248,7 +1248,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
 
     // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
     // They'll then be stored twice: in the chunk and in the parent chunk's top frame
-    chunk_start_sp = cont_size + ContinuationHelper::frame_metadata;
+    chunk_start_sp = cont_size + frame::metadata_words;
     assert(chunk_start_sp == chunk->stack_size(), "");
 
     DEBUG_ONLY(orig_chunk_sp = chunk->start_address() + chunk_start_sp;)
@@ -1281,9 +1281,9 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
 
   log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT,
                               p2i(chunk->start_address()), chunk_new_sp, p2i(chunk_top));
-  intptr_t* from = cont_stack_top - ContinuationHelper::frame_metadata;
-  intptr_t* to   = chunk_top - ContinuationHelper::frame_metadata;
-  copy_to_chunk(from, to, cont_size + ContinuationHelper::frame_metadata);
+  intptr_t* from = cont_stack_top - frame::metadata_words;
+  intptr_t* to   = chunk_top - frame::metadata_words;
+  copy_to_chunk(from, to, cont_size + frame::metadata_words);
   // Because we're not patched yet, the chunk is now in a bad state
 
   // patch pc
@@ -1487,7 +1487,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
   assert(chunk == nullptr || (chunk->max_size() == 0) == chunk->is_empty(), "");
 
-  _size += ContinuationHelper::frame_metadata; // for top frame's metadata
+  _size += frame::metadata_words; // for top frame's metadata
 
   int overlap = 0; // the args overlap the caller -- if there is one in this chunk and is of the same kind
   int unextended_sp = -1;
@@ -1529,7 +1529,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
         ls.print_cr("no chunk");
       } else {
         ls.print_cr("chunk barriers: %d _size: %d free size: %d",
-          chunk->requires_barriers(), _size, chunk->sp() - ContinuationHelper::frame_metadata);
+          chunk->requires_barriers(), _size, chunk->sp() - frame::metadata_words);
         chunk->print_on(&ls);
       }
     }
@@ -1570,7 +1570,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   // will either see no continuation or a consistent chunk.
   unwind_frames();
 
-  chunk->set_max_size(chunk->max_size() + _size - ContinuationHelper::frame_metadata);
+  chunk->set_max_size(chunk->max_size() + _size - frame::metadata_words);
 
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
@@ -1645,8 +1645,8 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   intptr_t* const vsp = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
   const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
   const int locals = f.interpreter_frame_method()->max_locals();
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= f.fp() + ContinuationHelper::frame_metadata + locals, "");// = on x86
-  const int fsize = f.fp() + ContinuationHelper::frame_metadata + locals - vsp;
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= f.fp() + frame::metadata_words + locals, "");// = on x86
+  const int fsize = f.fp() + frame::metadata_words + locals - vsp;
 
 #ifdef ASSERT
   {
@@ -1728,7 +1728,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
   assert(!bottom || !caller.is_compiled_frame() || (hsp + fsize) == (caller.unextended_sp() + argsize), "");
 
   if (caller.is_interpreted_frame()) {
-    _align_size += ContinuationHelper::align_wiggle; // See Thaw::align
+    _align_size += frame::align_wiggle; // See Thaw::align
   }
 
   patch(f, hf, caller, bottom);
@@ -2236,8 +2236,8 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   int size = chunk->max_size();
   guarantee (size > 0, "");
 
-  size += 2*ContinuationHelper::frame_metadata; // 2x because we might want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
-  size += ContinuationHelper::align_wiggle; // just in case we have an interpreted entry after which we need to align
+  size += 2*frame::metadata_words; // 2x because we might want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
+  size += frame::align_wiggle; // just in case we have an interpreted entry after which we need to align
   size <<= LogBytesPerWord;
 
   const address bottom = (address)thread->last_continuation()->entry_sp();
@@ -2429,12 +2429,12 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   assert(argsize != 0 || stack_sp == ContinuationHelper::frame_align_pointer(stack_sp), "");
   stack_sp = ContinuationHelper::frame_align_pointer(stack_sp);
 
-  intptr_t* from = chunk_sp - ContinuationHelper::frame_metadata;
-  intptr_t* to   = stack_sp - ContinuationHelper::frame_metadata;
-  copy_from_chunk(from, to, thaw_size + ContinuationHelper::frame_metadata);
-  assert(_cont.entrySP() - 1 <= to + thaw_size + ContinuationHelper::frame_metadata, "");
-  assert(to + thaw_size + ContinuationHelper::frame_metadata <= _cont.entrySP(), "");
-  assert(argsize != 0 || to + thaw_size + ContinuationHelper::frame_metadata == _cont.entrySP(), "");
+  intptr_t* from = chunk_sp - frame::metadata_words;
+  intptr_t* to   = stack_sp - frame::metadata_words;
+  copy_from_chunk(from, to, thaw_size + frame::metadata_words);
+  assert(_cont.entrySP() - 1 <= to + thaw_size + frame::metadata_words, "");
+  assert(to + thaw_size + frame::metadata_words <= _cont.entrySP(), "");
+  assert(argsize != 0 || to + thaw_size + frame::metadata_words == _cont.entrySP(), "");
 
   assert(!is_last || argsize == 0, "");
   _cont.set_argsize(argsize);
@@ -2747,7 +2747,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(caller.sp() == caller.unextended_sp(), "");
 
   if ((!bottom && caller.is_interpreted_frame()) || (bottom && Interpreter::contains(_cont.tail()->pc()))) {
-    _align_size += ContinuationHelper::align_wiggle; // we add one whether or not we've aligned because we add it in freeze_interpreted_frame
+    _align_size += frame::align_wiggle; // we add one whether or not we've aligned because we add it in freeze_interpreted_frame
   }
 
   frame f = new_frame<ContinuationHelper::CompiledFrame>(hf, caller, bottom);
@@ -2758,9 +2758,9 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   int fsize = ContinuationHelper::CompiledFrame::size(hf) + added_argsize;
   assert(fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "");
 
-  intptr_t* from = hsp - ContinuationHelper::frame_metadata;
-  intptr_t* to   = vsp - ContinuationHelper::frame_metadata;
-  int sz = fsize + ContinuationHelper::frame_metadata;
+  intptr_t* from = hsp - frame::metadata_words;
+  intptr_t* to   = vsp - frame::metadata_words;
+  int sz = fsize + frame::metadata_words;
 
   assert(!bottom || (_cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP()), "");
   assert(!bottom || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
@@ -2829,8 +2829,8 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
   intptr_t* vsp = f.sp();
   intptr_t* hsp = hf.sp();
 
-  copy_from_chunk(hsp - ContinuationHelper::frame_metadata, vsp - ContinuationHelper::frame_metadata,
-                  fsize + ContinuationHelper::frame_metadata);
+  copy_from_chunk(hsp - frame::metadata_words, vsp - frame::metadata_words,
+                  fsize + frame::metadata_words);
 
   { // can only fix caller once this frame is thawed (due to callee saved regs)
     RegisterMap map(nullptr, true, false, false); // map.clear();
@@ -2860,7 +2860,7 @@ void ThawBase::finish_thaw(frame& f) {
   }
   assert(chunk->is_empty() == (chunk->max_size() == 0), "");
 
-  if ((intptr_t)f.sp() % 16 != 0) {
+  if ((intptr_t)f.sp() % frame::frame_alignment != 0) {
     assert(f.is_interpreted_frame(), "");
     f.set_sp(f.sp() - 1);
   }
@@ -2936,7 +2936,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   Thaw<ConfigT> thw(thread, cont);
   intptr_t* const sp = thw.thaw(kind);
-  assert((intptr_t)sp % 16 == 0, "");
+  assert(is_aligned(sp, frame::frame_alignment), "");
 
   thread->reset_held_monitor_count();
 
@@ -2946,7 +2946,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   intptr_t* sp0 = sp;
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
   if (pc0 == StubRoutines::cont_interpreter_forced_preempt_return()) {
-    sp0 += ContinuationHelper::frame_metadata; // see push_interpreter_return_frame
+    sp0 += frame::metadata_words; // see push_interpreter_return_frame
   }
   ContinuationHelper::set_anchor(thread, sp0);
   log_frames(thread);

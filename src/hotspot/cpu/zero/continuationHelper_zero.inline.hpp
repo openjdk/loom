@@ -32,8 +32,6 @@
 #include "utilities/macros.hpp"
 
 // TODO: Implement
-const int ContinuationHelper::frame_metadata = 0;
-const int ContinuationHelper::align_wiggle = 0;
 
 template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
 static inline intptr_t** link_address(const frame& f) {

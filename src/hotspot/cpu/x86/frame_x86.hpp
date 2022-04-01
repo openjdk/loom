@@ -86,16 +86,20 @@
     entry_frame_after_call_words                     =  60,
     entry_frame_call_wrapper_offset                  =  2,
 
-    arg_reg_save_area_bytes                          = 32 // Register argument save area
+    arg_reg_save_area_bytes                          = 32, // Register argument save area
 #else
     entry_frame_after_call_words                     = 13,
     entry_frame_call_wrapper_offset                  = -6,
 
-    arg_reg_save_area_bytes                          =  0
+    arg_reg_save_area_bytes                          =  0,
 #endif // _WIN64
 #else
-    entry_frame_call_wrapper_offset                  =  2
+    entry_frame_call_wrapper_offset                  =  2,
 #endif // AMD64
+
+    metadata_words = sender_sp_offset, // size, in words, of frame metadata (e.g. pc and link)
+    frame_alignment = 16, // compiled frame alignment, in bytes
+    align_wiggle = 1 // size, in words, of maximum shift in frame position due to alignment
   };
 
   intptr_t ptr_at(int offset) const {
