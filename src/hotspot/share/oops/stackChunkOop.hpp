@@ -135,11 +135,9 @@ public:
   template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
-  void relativize();
+  // Derived oop pointers are relativised, with respect to their oop base.
+  void relativize_derived_oops();
   void transform();
-
-  inline frame relativize(frame fr) const;
-  inline frame derelativize(frame fr) const;
 
   inline BitMapView bitmap() const;
   inline BitMap::idx_t bit_index_for(intptr_t* p) const;
@@ -149,9 +147,12 @@ public:
 
   MemRegion range();
 
-  // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held during safepoints.
-  // This is orthogonal to the relativizing of the actual content of interpreted frames.
+  // Returns a relative frame (with offset_sp, offset_unextended_sp, and offset_fp) that can be held
+  // during safepoints.  This is orthogonal to the relativizing of the actual content of interpreted frames.
   // To be used, frame objects need to be derelativized with `derelativize`.
+  inline frame relativize(frame fr) const;
+  inline frame derelativize(frame fr) const;
+
   frame top_frame(RegisterMap* map);
   frame sender(const frame& fr, RegisterMap* map);
 
@@ -159,7 +160,7 @@ public:
   inline address usp_offset_to_location(const frame& fr, const int usp_offset_in_bytes) const;
   inline address reg_to_location(const frame& fr, const RegisterMap* map, VMReg reg) const;
 
-  // access to relativized interpreter frames (both the frame object and frame content are relativized)
+  // Access to relativized interpreter frames (both the frame object and frame content are relativized)
   inline Method* interpreter_frame_method(const frame& fr);
   inline address interpreter_frame_bcp(const frame& fr);
   inline intptr_t* interpreter_frame_expression_stack_at(const frame& fr, int index) const;
