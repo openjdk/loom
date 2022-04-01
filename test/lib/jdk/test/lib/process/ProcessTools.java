@@ -316,6 +316,9 @@ public final class ProcessTools {
 
         String mainWrapper = System.getProperty("main.wrapper");
         if (noModule && mainWrapper != null) {
+            if (mainWrapper.equalsIgnoreCase("virtual")) {
+                args.add("--enable-preview");
+            }
             boolean skipNext = false;
             boolean added = false;
             for (String cmd : command) {
@@ -357,9 +360,6 @@ public final class ProcessTools {
                 if (cmd.startsWith("-")) {
                     args.add(cmd);
                     continue;
-                }
-                if (mainWrapper.equalsIgnoreCase("virtual")) {
-                    args.add("--enable-preview");
                 }
                 args.add("jdk.test.lib.process.ProcessTools");
                 args.add(mainWrapper);
