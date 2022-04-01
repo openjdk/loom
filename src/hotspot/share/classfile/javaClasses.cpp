@@ -1992,6 +1992,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   public:
     const Handle _java_thread;
     int _depth;
+    bool _retry_handshake;
     GrowableArray<Method*>* _methods;
     GrowableArray<int>*     _bcis;
 
@@ -2003,11 +2004,15 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       _bcis = new GrowableArray<int>(init_length);
     }
 
-    bool can_be_processed_by(Thread* thread) {
-      return thread->is_Java_thread();
-    }
+    bool retry() { return _retry_handshake; }
 
     void do_thread(Thread* th) {
+      if (!Thread::current()->is_Java_thread()) {
+        _retry_handshake = true;
+        return;
+      }
+      _retry_handshake = false;
+
       JavaThread* thread = JavaThread::cast(th);
 
       if (!thread->has_last_Java_frame()) {
@@ -2017,8 +2022,8 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
       bool carrier = false;
       if (java_lang_VirtualThread::is_instance(_java_thread())) {
         // if (thread->vthread() != _java_thread()) // We might be inside a System.executeOnCarrierThread
-        if (thread->vthread_continuation()->cont_oop() !=
-            java_lang_VirtualThread::continuation(_java_thread())) {
+        const ContinuationEntry* ce = thread->vthread_continuation();
+        if (ce == nullptr || ce->cont_oop() != java_lang_VirtualThread::continuation(_java_thread())) {
           return; // not mounted
         }
       } else {
@@ -2051,7 +2056,9 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark   hm(THREAD);
   GetStackTraceClosure gstc(Handle(THREAD, java_thread));
-  Handshake::execute(&gstc, &tlh, thread);
+  do {
+   Handshake::execute(&gstc, &tlh, thread);
+  } while (gstc.retry());
 
   // Stop if no stack trace is found.
   if (gstc._depth == 0) {
