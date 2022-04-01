@@ -192,14 +192,6 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
     return setter;
   }
 
-  // Symbol* kname = m->klass_name();
-  // Symbol* name = m->name();
-  // if (kname == vmSymbols::jdk_internal_vm_Continuation()) {
-  //   if (name == vmSymbols::enter_name()) {
-  //     return java_lang_continuation_enter;
-  //   }
-  // }
-
   // Note: for now: zero locals for all non-empty methods
   return zerolocals;
 }

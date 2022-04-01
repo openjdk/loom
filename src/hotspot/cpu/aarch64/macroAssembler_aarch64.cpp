@@ -581,7 +581,6 @@ void MacroAssembler::call_VM_helper(Register oop_result, address entry_point, in
 // Maybe emit a call via a trampoline.  If the code cache is small
 // trampolines won't be emitted.
 address MacroAssembler::trampoline_call1(Address entry, CodeBuffer* cbuf, bool check_emit_size) {
-  //assert(JavaThread::current()->is_Compiler_thread(), "just checking");
   assert(entry.rspec().type() == relocInfo::runtime_call_type
          || entry.rspec().type() == relocInfo::opt_virtual_call_type
          || entry.rspec().type() == relocInfo::static_call_type

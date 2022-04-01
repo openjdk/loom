@@ -44,7 +44,7 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 #endif
 
 template <chunk_frames frame_kind>
-StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, bool gc) DEBUG_ONLY(: _chunk(chunk)) {
+StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
 

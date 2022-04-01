@@ -1215,8 +1215,6 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   __ enter(); // push(rbp);
 
-  //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-  //bs->nmethod_entry_barrier(masm);
   OopMap* map = continuation_enter_setup(masm, stack_slots);
 
   // Frame is now completed as far as size and linkage.
@@ -1228,9 +1226,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
   __ br(Assembler::NE, call_thaw);
 
   address mark = __ pc();
-//  __ relocate(resolve.rspec());
-  //if (!far_branches()) {
-//  __ bl(resolve.target());
+
   __ trampoline_call1(resolve, NULL, false);
 
   oop_maps->add_gc_map(__ pc() - start, map);
@@ -1257,7 +1253,6 @@ static void gen_continuation_enter(MacroAssembler* masm,
       __ mov(r19, r0); // save return value contaning the exception oop in callee-saved R19
 
       continuation_enter_cleanup(masm);
-      // __ mov(sp, rfp);
 
       __ ldr(c_rarg1, Address(rfp, wordSize)); // return address
       __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address), rthread, c_rarg1);

@@ -6578,7 +6578,6 @@ class StubGenerator: public StubCodeGenerator {
     __ ret(lr);
 
     OopMap* map = new OopMap(framesize, 1);
-    // map->set_callee_saved(VMRegImpl::stack2reg(rfp_off), rfp->as_VMReg());
     oop_maps->add_gc_map(the_pc - start, map);
 
     RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)

@@ -7518,7 +7518,6 @@ address generate_avx_ghash_processBlocks() {
     __ ret(0);
 
     OopMap* map = new OopMap(framesize, 1);
-    // map->set_callee_saved(VMRegImpl::stack2reg(rbp_off), rbp->as_VMReg());
     oop_maps->add_gc_map(the_pc - start, map);
 
     RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)

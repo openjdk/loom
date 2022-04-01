@@ -76,15 +76,6 @@ inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interprete
   return derelativize(frame::interpreter_frame_last_sp_offset);
 }
 
-// template <chunk_frames frame_kind>
-// inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame_caller() const {
-//   assert(frame_kind == chunk_frames::MIXED, "");
-//   intptr_t* callee_fp = sp() - frame::sender_sp_offset;
-//   intptr_t* unextended_sp = callee_fp + callee_fp[frame::interpreter_frame_sender_sp_offset];
-//   assert(unextended_sp > callee_fp && unextended_sp >= sp(), "callee_fp: %p (%d) offset: %ld", callee_fp, _chunk->to_offset(callee_fp), callee_fp[frame::interpreter_frame_sender_sp_offset]);
-//   return unextended_sp;
-// }
-
 template <chunk_frames frame_kind>
 intptr_t* StackChunkFrameStream<frame_kind>::next_sp_for_interpreter_frame() const {
   assert_is_interpreted_and_frame_type_mixed();
@@ -107,9 +98,6 @@ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
 template <chunk_frames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   assert_is_interpreted_and_frame_type_mixed();
-  // InterpreterOopMap mask;
-  // to_frame().interpreted_frame_oop_map(&mask);
-  // intptr_t* top = derelativize(frame::interpreter_frame_initial_sp_offset) - mask.expression_stack_size();
 
   intptr_t* top = unextended_sp(); // later subtract argsize if callee is interpreted
   intptr_t* bottom = derelativize(frame::interpreter_frame_locals_offset) + 1; // the sender's unextended sp: derelativize(frame::interpreter_frame_sender_sp_offset);

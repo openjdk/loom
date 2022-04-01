@@ -50,6 +50,7 @@
 #include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/frame_helpers.inline.hpp"

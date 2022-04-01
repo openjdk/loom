@@ -58,7 +58,7 @@ private:
 
 public:
   StackChunkFrameStream() { NOT_PRODUCT(_chunk = nullptr; _index = -1;) DEBUG_ONLY(_has_stub = false;) }
-  inline StackChunkFrameStream(stackChunkOop chunk, bool gc = false);
+  inline StackChunkFrameStream(stackChunkOop chunk);
   inline StackChunkFrameStream(stackChunkOop chunk, const frame& f);
 
   bool is_done() const { return _sp >= _end; }

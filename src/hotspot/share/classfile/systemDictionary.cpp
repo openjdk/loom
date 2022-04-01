@@ -271,7 +271,6 @@ Klass* SystemDictionary::resolve_or_fail(Symbol* class_name, Handle class_loader
 // Forwards to resolve_array_class_or_null or resolve_instance_class_or_null
 
 Klass* SystemDictionary::resolve_or_null(Symbol* class_name, Handle class_loader, Handle protection_domain, TRAPS) {
-  assert(class_name != NULL, "must not be NULL");
   if (Signature::is_array(class_name)) {
     return resolve_array_class_or_null(class_name, class_loader, protection_domain, THREAD);
   } else {
