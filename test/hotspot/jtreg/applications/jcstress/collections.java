@@ -26,6 +26,5 @@
 /**
  * @test collections
  * @library /test/lib /
- * @run driver/timeout=21600 applications.jcstress.JcstressRunner -v -vt -spinStyle LOCKSUPPORT_PARK_NANOS -f 0 -t org.openjdk.jcstress.tests.collections\.
+ * @run driver/timeout=21600 applications.jcstress.JcstressRunner -v -t org.openjdk.jcstress.tests.collections\.
  */
-
