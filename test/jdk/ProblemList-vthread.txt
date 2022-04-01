@@ -59,6 +59,7 @@ java/lang/Thread/MainThreadTest.java
 
 # Test don't expect FJ pool creating thread on demand
 java/lang/management/ThreadMXBean/ThreadLists.java
+java/lang/management/ThreadMXBean/ResetPeakThreadCount.java
 
 ####
 
