@@ -98,7 +98,7 @@ class InstanceStackChunkKlass: public InstanceKlass {
   friend class Continuations;
 
 public:
-  static const KlassID ID = InstanceStackChunkKlassID;
+  static const KlassKind Kind = InstanceStackChunkKlassKind;
 
 private:
   static int _offset_of_stack;

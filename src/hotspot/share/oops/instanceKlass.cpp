@@ -445,8 +445,10 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
     } else if (class_name == vmSymbols::jdk_internal_vm_StackChunk()) {
       ik = new (loader_data, size, THREAD) InstanceStackChunkKlass(parser);
     } else if (is_class_loader(class_name, parser)) {
+      // class loader
       ik = new (loader_data, size, THREAD) InstanceClassLoaderKlass(parser);
     } else {
+      // normal
       ik = new (loader_data, size, THREAD) InstanceKlass(parser);
     }
   } else {
@@ -484,8 +486,8 @@ Array<int>* InstanceKlass::create_new_default_vtable_indices(int len, TRAPS) {
   return vtable_indices;
 }
 
-InstanceKlass::InstanceKlass(const ClassFileParser& parser, KlassID id) :
-  Klass(id),
+InstanceKlass::InstanceKlass(const ClassFileParser& parser, KlassKind kind) :
+  Klass(kind),
   _nest_members(NULL),
   _nest_host(NULL),
   _permitted_subclasses(NULL),

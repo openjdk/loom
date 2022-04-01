@@ -50,7 +50,7 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 #endif
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
-  : InstanceKlass(parser, ID) {
+  : InstanceKlass(parser, Kind) {
   // see oopDesc::size_given_klass
   const jint lh = Klass::instance_layout_helper(size_helper(), true);
   set_layout_helper(lh);
