@@ -1555,8 +1555,16 @@ private:
   }
   javaVFrame* last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(last_frame(), reg_map); }
 
-  frame vthread_carrier_last_frame(RegisterMap* reg_map);
-  javaVFrame* vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
+  frame carrier_last_frame(RegisterMap* reg_map);
+  javaVFrame* carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(carrier_last_frame(reg_map), reg_map); }
+
+  frame vthread_last_frame();
+  javaVFrame* vthread_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_last_frame(), reg_map); }
+
+  frame platform_thread_last_frame(RegisterMap* reg_map);
+  javaVFrame*  platform_thread_last_java_vframe(RegisterMap* reg_map) {
+    return last_java_vframe(platform_thread_last_frame(reg_map), reg_map);
+  }
 
   javaVFrame* last_java_vframe(const frame f, RegisterMap* reg_map);
 

@@ -2381,9 +2381,7 @@ void JavaThread::print_stack_on(outputStream* st) {
   HandleMark hm(current_thread);
 
   RegisterMap reg_map(this, true, true);
-  vframe* start_vf = is_vthread_mounted()
-      ? vthread_carrier_last_java_vframe(&reg_map)
-      : last_java_vframe(&reg_map);
+  vframe* start_vf = platform_thread_last_java_vframe(&reg_map);
   int count = 0;
   for (vframe* f = start_vf; f != NULL; f = f->sender()) {
     if (f->is_java_frame()) {
@@ -2534,7 +2532,12 @@ void JavaThread::trace_stack() {
 
 #endif // PRODUCT
 
-frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
+frame JavaThread::vthread_last_frame() {
+  assert (is_vthread_mounted(), "Virtual thread not mounted");
+  return last_frame();
+}
+
+frame JavaThread::carrier_last_frame(RegisterMap* reg_map) {
   const ContinuationEntry* entry = vthread_continuation();
   guarantee (entry != NULL, "Not a carrier thread");
   frame f = entry->to_frame();
@@ -2543,6 +2546,10 @@ frame JavaThread::vthread_carrier_last_frame(RegisterMap* reg_map) {
   }
   entry->update_register_map(reg_map);
   return f.sender(reg_map);
+}
+
+frame JavaThread::platform_thread_last_frame(RegisterMap* reg_map) {
+  return is_vthread_mounted() ? carrier_last_frame(reg_map) : last_frame();
 }
 
 javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {

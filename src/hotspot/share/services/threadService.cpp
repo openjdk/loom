@@ -665,8 +665,9 @@ void ThreadStackTrace::dump_stack_at_safepoint(int maxDepth, ObjectMonitorsHasht
   if (_thread->has_last_Java_frame()) {
     RegisterMap reg_map(_thread);
 
+    // If full, we want to print both vthread and carrier frames
     vframe* start_vf = !full && _thread->is_vthread_mounted()
-      ? _thread->vthread_carrier_last_java_vframe(&reg_map)
+      ? _thread->carrier_last_java_vframe(&reg_map)
       : _thread->last_java_vframe(&reg_map);
     int count = 0;
     for (vframe* f = start_vf; f; f = f->sender() ) {

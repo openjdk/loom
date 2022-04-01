@@ -108,7 +108,12 @@ inline vframeStream::vframeStream(JavaThread* thread, bool stop_at_java_call_stu
     return;
   }
 
-  _frame = vthread_carrier ? _thread->vthread_carrier_last_frame(&_reg_map) : _thread->last_frame();
+  if (thread->is_vthread_mounted()) {
+    _frame = vthread_carrier ? _thread->carrier_last_frame(&_reg_map) : _thread->vthread_last_frame();
+  } else {
+    _frame = _thread->last_frame();
+  }
+
   _cont_entry = _thread->last_continuation();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);

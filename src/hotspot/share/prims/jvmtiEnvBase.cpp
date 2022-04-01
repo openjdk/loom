@@ -698,7 +698,7 @@ javaVFrame*
 JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   // Strip vthread frames in case of carrier thread with mounted continuation.
   javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
-                        jt->vthread_carrier_last_java_vframe(reg_map_p) :
+                        jt->carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
   jvf = check_and_skip_hidden_frames(jt, jvf);
   return jvf;
