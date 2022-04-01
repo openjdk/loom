@@ -279,7 +279,7 @@ inline bool jdk_internal_vm_StackChunk::is_parent_null(oop ref) {
 
 template<typename P>
 inline void jdk_internal_vm_StackChunk::set_parent_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_parent_offset), value);
+  RawAccess<>::oop_store(ref->field_addr<P>(_parent_offset), value);
 }
 
 inline oop jdk_internal_vm_StackChunk::cont(oop ref) {
@@ -297,7 +297,7 @@ inline oop jdk_internal_vm_StackChunk::cont_raw(oop ref) {
 
 template<typename P>
 inline void jdk_internal_vm_StackChunk::set_cont_raw(oop ref, oop value) {
-  RawAccess<IS_DEST_UNINITIALIZED>::oop_store(ref->field_addr<P>(_cont_offset), value);
+  RawAccess<>::oop_store(ref->field_addr<P>(_cont_offset), value);
 }
 
 inline int jdk_internal_vm_StackChunk::size(oop ref) {

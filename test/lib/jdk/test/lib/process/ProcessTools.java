@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -314,7 +314,8 @@ public final class ProcessTools {
         String[] doubleWordArgs = {"-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path",
                                    "--add-modules", "-d", "--add-exports", "--patch-module", "--module-path"};
 
-        if (noModule && System.getProperty("main.wrapper") != null) {
+        String mainWrapper = System.getProperty("main.wrapper");
+        if (noModule && mainWrapper != null) {
             boolean skipNext = false;
             boolean added = false;
             for (String cmd : command) {
@@ -357,8 +358,11 @@ public final class ProcessTools {
                     args.add(cmd);
                     continue;
                 }
+                if (mainWrapper.equalsIgnoreCase("virtual")) {
+                    args.add("--enable-preview");
+                }
                 args.add("jdk.test.lib.process.ProcessTools");
-                args.add(System.getProperty("main.wrapper"));
+                args.add(mainWrapper);
                 added = true;
                 // Should be main
                 // System.out.println("Wrapped TOFIND: " + cmd);

@@ -127,36 +127,6 @@ public class HoldsLock {
         stop(carrier);
     }
 
-    @Test
-    public void testStackTrace() throws Exception {
-        var q = new ArrayBlockingQueue<Runnable>(5);
-
-        Thread carrier = spawnCarrier(q);
-        Thread vthread = spawnVirtual(executor(q), () -> {
-            synchronized (LOCK1) {
-                try {
-                    LOCK1.wait();
-                } catch (InterruptedException e) {}
-            }
-        });
-
-        while (vthread.getState() != Thread.State.WAITING) {
-            Thread.sleep(10);
-        }
-
-        // System.out.println(Arrays.toString(vthread.getStackTrace()));
-        var vthreadStack = vthread.getStackTrace();
-        assertTrue("enter".equals(vthreadStack[vthreadStack.length - 1].getMethodName()));
-
-        System.out.println(Arrays.toString(carrier.getStackTrace()));
-        var carrierStack = carrier.getStackTrace();
-        assertTrue("run".equals(carrierStack[0].getMethodName()));
-        assertTrue("run".equals(carrierStack[carrierStack.length - 1].getMethodName()));
-
-        stop(vthread);
-        stop(carrier);
-    }
-
     static Thread spawnCarrier(BlockingQueue<Runnable> q) {
         return Thread.ofPlatform().start(() -> { eventLoop(q); });
     }
@@ -175,7 +145,7 @@ public class HoldsLock {
     }
 
     static Thread spawnVirtual(Executor scheduler, Runnable task) {
-       var t = newThread(scheduler, task);
+        var t = newThread(scheduler, task);
         t.start();
         return t;
     }

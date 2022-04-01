@@ -844,7 +844,7 @@ public:
       Copy::aligned_conjoint_words(compact_from, compact_to, size);
       oop new_obj = cast_to_oop(compact_to);
 
-      ContinuationGCSupport::transform_stack_chunk(new_obj);
+      ContinuationGCSupport::relativize_stack_chunk(new_obj);
       new_obj->init_mark();
     }
   }
@@ -957,7 +957,7 @@ void ShenandoahFullGC::compact_humongous_objects() {
       assert(r->is_stw_move_allowed(), "Region " SIZE_FORMAT " should be movable", r->index());
 
       Copy::aligned_conjoint_words(r->bottom(), heap->get_region(new_start)->bottom(), words_size);
-      ContinuationGCSupport::transform_stack_chunk(cast_to_oop<HeapWord*>(r->bottom()));
+      ContinuationGCSupport::relativize_stack_chunk(cast_to_oop<HeapWord*>(r->bottom()));
 
       oop new_obj = cast_to_oop(heap->get_region(new_start)->bottom());
       new_obj->init_mark();

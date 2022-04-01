@@ -135,6 +135,9 @@ class TestHelper {
         return builder;
     }
 
+    /**
+     * Schedule a thread to be interrupted after a delay.
+     */
     static void scheduleInterrupt(Thread thread, long delay) {
         Interrupter task  = new Interrupter(thread, delay);
         new Thread(task).start();

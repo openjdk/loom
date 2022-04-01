@@ -143,7 +143,8 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
     fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? Interpreted::stack_argsize(f) : 0);
     sp = fp - (f.fp() - f.unextended_sp());
-    assert(sp <= fp && fp <= caller.unextended_sp(), "");
+    assert(sp <= fp, "");
+    assert(fp <= caller.unextended_sp(), "");
     caller.set_sp(fp + frame::sender_sp_offset);
 
     assert(_cont.tail()->is_in_chunk(sp), "");
@@ -276,7 +277,8 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
       vsp = align(hf, vsp, caller, bottom);
     }
 
-    assert(hf.cb() != nullptr && hf.oop_map() != nullptr, "");
+    assert(hf.cb() != nullptr, "");
+    assert(hf.oop_map() != nullptr, "");
     intptr_t* fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
