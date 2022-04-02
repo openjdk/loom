@@ -1082,8 +1082,6 @@ JavaThread::JavaThread() :
   _frames_to_pop_failed_realloc(0),
 
   _cont_entry(nullptr),
-  _cont_yield(false),
-  _cont_preempt(false),
   _cont_fastpath_thread_state(1),
   _cont_fastpath(0),
   _held_monitor_count(0),
@@ -1734,11 +1732,6 @@ void JavaThread::handle_special_runtime_exit_condition(bool check_asyncs) {
   }
 
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)
-
-  if (is_cont_force_yield()) {
-    Continuation::jump_from_safepoint(this); // does not return
-    ShouldNotReachHere();
-  }
 }
 
 class InstallAsyncExceptionClosure : public HandshakeClosure {
@@ -1843,25 +1836,6 @@ bool JavaThread::java_resume() {
             "missing ThreadsListHandle in calling context.");
   return this->handshake_state()->resume();
 }
-
-bool JavaThread::block_suspend(JavaThread* caller) {
-  ThreadsListHandle tlh;
-  if (!tlh.includes(this)) {
-    log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " not on ThreadsList, no suspension", p2i(this));
-    return false;
-  }
-  return this->handshake_state()->block_suspend(caller);
-}
-
-bool JavaThread::continue_resume(JavaThread* caller) {
-  ThreadsListHandle tlh;
-  if (!tlh.includes(this)) {
-    log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " not on ThreadsList, nothing to resume", p2i(this));
-    return false;
-  }
-  return this->handshake_state()->continue_resume(caller);
-}
-
 
 // Wait for another thread to perform object reallocation and relocking on behalf of
 // this thread. The current thread is required to change to _thread_blocked in order

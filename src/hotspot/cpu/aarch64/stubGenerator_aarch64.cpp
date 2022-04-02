@@ -6589,27 +6589,6 @@ class StubGenerator: public StubCodeGenerator {
     return stub;
   }
 
-  address generate_cont_jump_from_safepoint() {
-    if (!Continuations::enabled()) return nullptr;
-
-    __ align(CodeEntryAlignment);
-    StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
-
-    address start = __ pc();
-
-    __ get_thread(rthread); // we're called directly from C++
-    __ reset_last_Java_frame(true); // false would be fine, too, I guess
-    __ reinit_heapbase();
-
-    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
-    __ mov(sp, rscratch1);
-    continuation_enter_cleanup(_masm);
-    __ leave();
-    __ ret(lr);
-
-    return start;
-  }
-
   address generate_cont_thaw(bool return_barrier, bool exception) {
     assert(return_barrier || !exception, "must be");
 
@@ -6733,32 +6712,6 @@ class StubGenerator: public StubCodeGenerator {
     address start = __ pc();
 
     generate_cont_thaw(true, true);
-
-    return start;
-  }
-
-  address generate_cont_interpreter_forced_preempt_return() {
-    if (!Continuations::enabled()) return nullptr;
-
-    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-    address start = __ pc();
-
-    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
-
-    assert_asm(_masm, __ cmp(sp, rfp), Assembler::EQ, "sp != fp"); // __ mov(rfp, sp);
-    __ leave(); // we're now on the last thawed frame
-
-    __ ldr(rbcp,    Address(rfp, frame::interpreter_frame_bcp_offset    * wordSize)); // InterpreterMacroAssembler::restore_bcp()
-    __ ldr(rlocals, Address(rfp, frame::interpreter_frame_locals_offset * wordSize)); // InterpreterMacroAssembler::restore_locals()
-    __ ldr(rcpool,  Address(rfp, frame::interpreter_frame_cache_offset  * wordSize)); // InterpreterMacroAssembler::restore_constant_pool_cache()
-    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize)); // InterpreterMacroAssembler::get_method(rmethod) -- might not be necessary
-    // __ reinit_heapbase();
-
-    // Restore stack bottom in case i2c adjusted stack and NULL it as marker that esp is now tos until next java call
-    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-    __ str(zr,  Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-
-    __ ret(lr);
 
     return start;
   }
@@ -7862,8 +7815,6 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
     StubRoutines::_cont_doYield      = StubRoutines::_cont_doYield_stub == nullptr ? nullptr
                                         : StubRoutines::_cont_doYield_stub->entry_point();
-    StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
-    StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
 
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint_stub = generate_jfr_write_checkpoint();)
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint = StubRoutines::_jfr_write_checkpoint_stub->entry_point();)

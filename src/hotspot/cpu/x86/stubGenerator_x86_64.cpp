@@ -7529,25 +7529,6 @@ address generate_avx_ghash_processBlocks() {
     return stub;
   }
 
-  address generate_cont_jump_from_safepoint() {
-    if (!Continuations::enabled()) return nullptr;
-
-    StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
-
-    address start = __ pc();
-
-    __ get_thread(r15_thread); // we're called directly from C++
-    __ reset_last_Java_frame(true); // false would be fine, too, I guess
-    __ reinit_heapbase();
-
-    __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-    continuation_enter_cleanup(_masm);
-    __ pop(rbp);
-    __ ret(0);
-
-    return start;
-  }
-
   address generate_cont_thaw(bool return_barrier, bool exception) {
     assert(return_barrier || !exception, "must be");
 
@@ -7651,28 +7632,6 @@ address generate_avx_ghash_processBlocks() {
     address start = __ pc();
 
     generate_cont_thaw(true, true);
-
-    return start;
-  }
-
-  address generate_cont_interpreter_forced_preempt_return() {
-    if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-    address start = __ pc();
-
-    // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
-    // see InterpreterMacroAssembler::restore_bcp/restore_locals
-    // TODO: use InterpreterMacroAssembler
-    static const Register _locals_register = r14;
-    static const Register _bcp_register    = r13;
-
-    __ pop(rbp);
-
-    __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
-    __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
-    // __ reinit_heapbase();
-
-    __ ret(0);
 
     return start;
   }
@@ -8013,8 +7972,6 @@ address generate_avx_ghash_processBlocks() {
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
     StubRoutines::_cont_doYield      = StubRoutines::_cont_doYield_stub == nullptr ? nullptr
                                         : StubRoutines::_cont_doYield_stub->entry_point();
-    StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
-    StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
 
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint_stub = generate_jfr_write_checkpoint();)
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint = StubRoutines::_jfr_write_checkpoint_stub->entry_point();)

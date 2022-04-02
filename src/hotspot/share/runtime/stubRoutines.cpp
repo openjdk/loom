@@ -185,8 +185,6 @@ address StubRoutines::_cont_doYield       = NULL;
 address StubRoutines::_cont_thaw          = NULL;
 address StubRoutines::_cont_returnBarrier = NULL;
 address StubRoutines::_cont_returnBarrierExc = NULL;
-address StubRoutines::_cont_jump_from_sp  = NULL;
-address StubRoutines::_cont_interpreter_forced_preempt_return = NULL;
 
 JFR_ONLY(RuntimeStub* StubRoutines::_jfr_write_checkpoint_stub = NULL;)
 JFR_ONLY(address StubRoutines::_jfr_write_checkpoint = NULL;)

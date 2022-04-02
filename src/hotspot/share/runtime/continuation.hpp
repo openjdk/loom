@@ -50,12 +50,8 @@ public:
   static void init();
 
   static address freeze_entry();
-  // static int freeze(JavaThread* thread, intptr_t* sp);
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
-  // static intptr_t* thaw(JavaThread* thread, int kind);
-  static int try_force_yield(JavaThread* thread, oop continuation);
-  static void jump_from_safepoint(JavaThread* thread);
 
   static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);

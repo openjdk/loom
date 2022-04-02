@@ -206,7 +206,6 @@ const char* freeze_result_names[6] = {
 };
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
-static bool is_safe_to_preempt(JavaThread* thread);
 template<typename ConfigT> static inline int freeze0(JavaThread* current, intptr_t* const sp);
 
 enum thaw_kind {
@@ -219,7 +218,6 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier);
 template<typename ConfigT> static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind);
 
 extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
-extern "C" jint JNICALL CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread);
 
 enum class oop_kind { NARROW, WIDE };
 template <oop_kind oops, typename BarrierSetT>
@@ -229,12 +227,7 @@ public:
   typedef typename Conditional<oops == oop_kind::NARROW, narrowOop, oop>::type OopT;
 
   static int freeze(JavaThread* thread, intptr_t* const sp) {
-    return freeze0<SelfT, false>(thread, sp);
-  }
-
-  __COLD
-  static int freeze_preempt(JavaThread* thread, intptr_t* const sp) {
-    return freeze0<SelfT, true>(thread, sp);
+    return freeze0<SelfT>(thread, sp);
   }
 
   static intptr_t* thaw(JavaThread* thread, thaw_kind kind) {
@@ -507,60 +500,6 @@ static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
   return ConfigT::freeze(current, sp);
 JRT_END
 
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
-static FreezeContFnT preempt_freeze = nullptr;
-
-// Called while the thread is blocked by the JavaThread caller, might not be completely in blocked state.
-// May still be in thread_in_vm getting to the blocked state.  I don't think we care that much since
-// the only frames we're looking at are Java frames.
-int Continuation::try_force_yield(JavaThread* target, const oop continuation) {
-  log_trace(jvmcont, preempt)("try_force_yield: thread state: %s", target->thread_state_name());
-
-  ContinuationEntry* ce = target->last_continuation();
-  while (ce != nullptr && ce->cont_oop() != continuation) {
-    ce = ce->parent();
-  }
-  if (ce == nullptr) {
-    return -1; // no continuation
-  }
-  if (target->_cont_yield) {
-    return -2; // during yield
-  }
-  if (!is_safe_to_preempt(target)) {
-    return freeze_pinned_native;
-  }
-
-  assert(target->has_last_Java_frame(), "");
-  assert(!Interpreter::contains(target->last_Java_pc()) || !target->cont_fastpath(),
-         "fast_path at codelet %s",
-         Interpreter::codelet_containing(target->last_Java_pc())->description());
-
-  const oop innermost = ce->cont_oop();
-  const oop scope = jdk_internal_vm_Continuation::scope(continuation);
-  if (innermost != continuation) { // we have nested continuations
-    // make sure none of the continuations in the hierarchy are pinned
-    freeze_result res_pinned = is_pinned0(target, scope, true);
-    if (res_pinned != freeze_ok) {
-      log_trace(jvmcont, preempt)("try_force_yield: res_pinned");
-      return res_pinned;
-    }
-    jdk_internal_vm_Continuation::set_yieldInfo(continuation, scope);
-  }
-
-  assert(target->has_last_Java_frame(), "");
-  int res = preempt_freeze(target, target->last_Java_sp());
-  log_trace(jvmcont, preempt)("try_force_yield: %s", freeze_result_names[res]);
-  if (res == 0) { // success
-    target->set_cont_preempt(true);
-    // target->frame_anchor()->patch_last_Java_pc(StubRoutines::cont_jump_from_sp());
-
-    // The target thread calls
-    // Continuation::jump_from_safepoint from JavaThread::handle_special_runtime_exit_condition
-    // to yield on return from suspension/blocking handshake.
-  }
-  return res;
-}
-
 JRT_LEAF(int, Continuation::prepare_thaw(JavaThread* thread, bool return_barrier))
   return prepare_thaw0(thread, return_barrier);
 JRT_END
@@ -574,22 +513,6 @@ static JRT_LEAF(intptr_t*, thaw(JavaThread* thread, int kind))
 
   return ConfigT::thaw(thread, (thaw_kind)kind);
 JRT_END
-
-typedef void (*cont_jump_from_sp_t)();
-
-void Continuation::jump_from_safepoint(JavaThread* thread) {
-  assert(thread == JavaThread::current(), "");
-  assert(thread->is_cont_force_yield(), "");
-  log_develop_trace(jvmcont)("force_yield_if_preempted: is_cont_force_yield");
-  thread->set_cont_preempt(false);
-  if (thread->thread_state() == _thread_in_vm) {
-    thread->set_thread_state(_thread_in_Java);
-  }
-  StackWatermarkSet::after_unwind(thread);
-  MACOS_AARCH64_ONLY(thread->enable_wx(WXExec));
-  CAST_TO_FN_PTR(cont_jump_from_sp_t, StubRoutines::cont_jump_from_sp())(); // does not return
-  ShouldNotReachHere();
-}
 
 JVM_ENTRY(void, CONT_pin(JNIEnv* env, jclass cls)) {
   if (!Continuation::pin(JavaThread::thread_from_jni_environment(env))) {
@@ -608,26 +531,6 @@ JVM_END
 JVM_ENTRY(jint, CONT_isPinned0(JNIEnv* env, jobject cont_scope)) {
   JavaThread* thread = JavaThread::thread_from_jni_environment(env);
   return is_pinned0(thread, JNIHandles::resolve(cont_scope), false);
-}
-JVM_END
-
-JVM_ENTRY(jint, CONT_TryForceYield0(JNIEnv* env, jobject jcont, jobject jthread)) {
-  JavaThread* current = JavaThread::thread_from_jni_environment(env);
-  assert(current == JavaThread::current(), "should be");
-  jint result = -1; // no continuation (should have enum)
-
-  oop thread_oop = JNIHandles::resolve(jthread);
-  if (thread_oop != nullptr) {
-    JavaThread* target = java_lang_Thread::thread(thread_oop);
-    assert(target != current, "should be different threads");
-    // Suspend the target thread and freeze it.
-    if (target->block_suspend(current)) {
-      oop oopCont = JNIHandles::resolve_non_null(jcont);
-      result = Continuation::try_force_yield(target, oopCont);
-      target->continue_resume(current);
-    }
-  }
-  return result;
 }
 JVM_END
 
@@ -1993,7 +1896,6 @@ static inline bool can_freeze_fast(JavaThread* thread) {
 }
 
 static int early_return(int res, JavaThread* thread) {
-  thread->set_cont_yield(false);
   log_develop_trace(jvmcont)("=== end of freeze (fail %d)", res);
   return res;
 }
@@ -2002,7 +1904,6 @@ static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
 
-  thread->set_cont_yield(false);
   log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
   return 0;
@@ -2018,13 +1919,10 @@ static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_r
   return freeze_epilog(thread, cont);
 }
 
-template<typename ConfigT, bool preempt>
+template<typename ConfigT>
 static inline int freeze0(JavaThread* current, intptr_t* const sp) {
-  assert(!current->cont_yield(), "");
   assert(!current->has_pending_exception(), "");
   assert(current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
-  assert(!preempt || current->thread_state() == _thread_in_vm || current->thread_state() == _thread_blocked,
-         "thread_state: %d %s", current->thread_state(), current->thread_state_name());
 
 #ifdef ASSERT
   log_trace(jvmcont)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
@@ -2032,8 +1930,6 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 #endif
 
   CONT_JFR_ONLY(EventContinuationFreeze event;)
-
-  current->set_cont_yield(true);
 
   ContinuationEntry* entry = current->last_continuation();
 
@@ -2056,15 +1952,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   bool fast = can_freeze_fast(current);
   assert(!fast || current->held_monitor_count() == 0, "");
 
-  // no need to templatize on preempt, as it's currently only used on the slow path
-  Freeze<ConfigT> fr(current, cont, preempt);
-
-  if (preempt) { // UNLIKELY
-    freeze_result res = fr.freeze_slow();
-    cont.set_preempted(true);
-    CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
-    return freeze_epilog(current, cont, res);
-  }
+  Freeze<ConfigT> fr(current, cont, false);
 
   if (fast && fr.is_chunk_available(sp)) {
     freeze_result res = fr.template try_freeze_fast<true>(sp);
@@ -2139,72 +2027,6 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   return freeze_ok;
 }
 
-static bool is_safe_frame_to_preempt(JavaThread* thread) {
-  assert(thread->has_last_Java_frame(), "");
-  vframeStream st(thread);
-  st.dont_walk_cont();
-
-  // We don't want to preempt inside methods annotated with @JvmtiMountTransition
-  int i = 0;
-  for (;!st.at_end(); st.next()) {
-    if (++i > 5) {
-      // annotations are never deep
-      break;
-    }
-    if (st.method()->jvmti_mount_transition()) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static bool is_safe_pc_to_preempt(address pc) {
-  if (Interpreter::contains(pc)) {
-    // We don't want to preempt when returning from some useful VM function, and certainly not when inside one.
-    InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
-    if (codelet != nullptr) {
-      // We allow preemption only when at a safepoint codelet or a return byteocde
-      if (codelet->bytecode() >= 0 && Bytecodes::is_return(codelet->bytecode())) {
-        log_trace(jvmcont, preempt)("is_safe_to_preempt: safe bytecode: %s",
-                                    Bytecodes::name(codelet->bytecode()));
-        assert(codelet->kind() == InterpreterCodelet::codelet_bytecode, "");
-        return true;
-      } else if (codelet->kind() == InterpreterCodelet::codelet_safepoint_entry) {
-        log_trace(jvmcont, preempt)("is_safe_to_preempt: safepoint entry: %s", codelet->description());
-        return true;
-      } else {
-        log_trace(jvmcont, preempt)("is_safe_to_preempt: %s (unsafe)", codelet->description());
-        return false;
-      }
-    } else {
-      log_trace(jvmcont, preempt)("is_safe_to_preempt: no codelet (safe?)");
-      return true;
-    }
-  } else {
-    CodeBlob* cb = CodeCache::find_blob(pc);
-    if (cb->is_safepoint_stub()) {
-      log_trace(jvmcont, preempt)("is_safe_to_preempt: safepoint stub");
-      return true;
-    } else {
-      log_trace(jvmcont, preempt)("is_safe_to_preempt: not safepoint stub");
-      return false;
-    }
-  }
-}
-
-static bool is_safe_to_preempt(JavaThread* thread) {
-  if (!thread->has_last_Java_frame()) {
-    return false;
-  }
-  if (!is_safe_pc_to_preempt(thread->last_Java_pc())) {
-    return false;
-  }
-  if (!is_safe_frame_to_preempt(thread)) {
-    return false;
-  }
-  return true;
-}
-
 /////////////// THAW ////
 
 // make room on the stack for thaw
@@ -2237,8 +2059,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   guarantee (size > 0, "");
 
   // For the top pc+fp in push push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
-  // 2x because we might also want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
-  size += 2*frame::metadata_words;
+  size += frame::metadata_words;
   size += frame::align_wiggle; // just in case we have an interpreted entry after which we need to align
   size <<= LogBytesPerWord;
 
@@ -2310,7 +2131,6 @@ private:
   inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom);
 
-  intptr_t* push_interpreter_return_frame(intptr_t* sp);
   void maybe_set_fastpath(intptr_t* sp) { if (sp > _fastpath) _fastpath = sp; }
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
@@ -2546,12 +2366,6 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
     assert(f.is_interpreted_frame() || f.is_compiled_frame() || f.is_safepoint_blob_frame(), "");
   }
 #endif
-
-  if (last_interpreted && _cont.is_preempted()) {
-    assert(f.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
-    assert(Interpreter::contains(f.pc()), "");
-    sp = push_interpreter_return_frame(sp);
-  }
 
   return sp;
 }
@@ -2947,9 +2761,6 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 #ifdef ASSERT
   intptr_t* sp0 = sp;
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
-  if (pc0 == StubRoutines::cont_interpreter_forced_preempt_return()) {
-    sp0 += frame::metadata_words; // see push_interpreter_return_frame
-  }
   ContinuationHelper::set_anchor(thread, sp0);
   log_frames(thread);
   if (LoomVerifyAfterThaw) {
@@ -3226,7 +3037,6 @@ private:
     typedef Config<use_compressed ? oop_kind::NARROW : oop_kind::WIDE, BarrierSetT> SelectedConfigT;
 
     freeze_entry = (address)freeze<SelectedConfigT>;
-    preempt_freeze = SelectedConfigT::freeze_preempt;
 
     // if we want, we could templatize by king and have three different that entries
     thaw_entry   = (address)thaw<SelectedConfigT>;
@@ -3253,7 +3063,6 @@ void Continuation::init() {
 #define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
 
 static JNINativeMethod CONT_methods[] = {
-    {CC"tryForceYield0",   CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_TryForceYield0)},
     {CC"pin",              CC"()V",                                    FN_PTR(CONT_pin)},
     {CC"unpin",            CC"()V",                                    FN_PTR(CONT_unpin)},
     {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},

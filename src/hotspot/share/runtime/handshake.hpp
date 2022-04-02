@@ -101,9 +101,6 @@ class HandshakeState {
   // Set to the thread executing the handshake operation.
   Thread* volatile _active_handshaker;
 
-  // Caller of suspension.  Only the caller can resume the thread.
-  JavaThread* _caller;
-
   bool claim_handshake();
   bool possibly_can_process_handshake();
   bool can_process_handshake();
@@ -179,16 +176,6 @@ class HandshakeState {
 
   bool suspend();
   bool resume();
-
-  void set_caller_thread(JavaThread* caller){ return Atomic::store(&_caller, caller); }
-  JavaThread* caller_thread() const         { return Atomic::load(&_caller); }
-
-  // "blocked" is short for saying "suspended by caller"
-  bool is_blocked() const                   { return caller_thread() != nullptr; }
-  bool is_suspended_or_blocked() const      { return is_suspended() || is_blocked(); }
-
-  bool block_suspend(JavaThread* caller);
-  bool continue_resume(JavaThread* caller);
 };
 
 #endif // SHARE_RUNTIME_HANDSHAKE_HPP

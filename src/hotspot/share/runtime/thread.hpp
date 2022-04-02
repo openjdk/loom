@@ -1055,8 +1055,6 @@ class JavaThread: public Thread {
   int _frames_to_pop_failed_realloc;
 
   ContinuationEntry* _cont_entry;
-  bool _cont_yield; // a continuation yield is in progress
-  bool _cont_preempt;
   int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
   intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the continuation that we know about
   int _held_monitor_count; // used by continuations for fast lock detection
@@ -1197,16 +1195,12 @@ private:
 
   // Continuation support
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  bool cont_yield() { return _cont_yield; }
-  void set_cont_yield(bool x) { _cont_yield = x; }
   void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
   void push_cont_fastpath(intptr_t* sp) { if (sp > _cont_fastpath) _cont_fastpath = sp; }
   void set_cont_fastpath_thread_state(bool x) { _cont_fastpath_thread_state = (int)x; }
   intptr_t* raw_cont_fastpath() { return _cont_fastpath; }
   bool cont_fastpath() { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
   bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
-  bool cont_preempt() { return _cont_preempt; }
-  void set_cont_preempt(bool x) { _cont_preempt = x; }
 
   int held_monitor_count() { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
@@ -1250,11 +1244,6 @@ private:
   bool java_resume();
   bool is_suspended()     { return _handshake.is_suspended(); }
 
-  // lower-level blocking logic called by the JVM.  The caller suspends this
-  // thread, does something, and then releases it.
-  bool block_suspend(JavaThread* caller);
-  bool continue_resume(JavaThread* caller);
-
   // Check for async exception in addition to safepoint.
   static void check_special_condition_for_native_trans(JavaThread *thread);
 
@@ -1278,16 +1267,13 @@ private:
 #endif
 #endif
 
-  bool is_cont_force_yield() { return cont_preempt(); }
-
   // these next two are also used for self-suspension and async exception support
   void handle_special_runtime_exit_condition(bool check_asyncs = true);
 
   // Return true if JavaThread has an asynchronous condition or
   // if external suspension is requested.
   bool has_special_runtime_exit_condition() {
-    return (_suspend_flags & (_has_async_exception | _obj_deopt JFR_ONLY(| _trace_flag))) != 0
-           || is_cont_force_yield();
+    return (_suspend_flags & (_has_async_exception | _obj_deopt JFR_ONLY(| _trace_flag))) != 0;
   }
 
   // Fast-locking support
@@ -1446,7 +1432,6 @@ private:
 
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
-  static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
 
   // Returns the jni environment for this thread

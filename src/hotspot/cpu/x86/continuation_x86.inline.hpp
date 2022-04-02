@@ -247,19 +247,6 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
-intptr_t* ThawBase::push_interpreter_return_frame(intptr_t* sp) {
-  address pc = StubRoutines::cont_interpreter_forced_preempt_return();
-  intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
-
-  log_develop_trace(jvmcont)("push_interpreter_return_frame initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    p2i(sp), p2i(sp - frame::metadata_words), p2i(fp));
-
-  sp -= frame::metadata_words;
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
-  return sp;
-}
-
 static inline void derelativize_one(intptr_t* const fp, int offset) {
   intptr_t* addr = fp + offset;
   *addr = (intptr_t)(fp + *addr);
