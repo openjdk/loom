@@ -1541,10 +1541,6 @@ private:
   void movdqu(XMMRegister dst, Address src);
   void movdqu(XMMRegister dst, XMMRegister src);
 
-  // Move Aligned 256bit Vector
-  void vmovdqa(Address dst, XMMRegister src);
-  void vmovdqa(XMMRegister dst, Address src);
-
   // Move Unaligned 256bit Vector
   void vmovdqu(Address dst, XMMRegister src);
   void vmovdqu(XMMRegister dst, Address src);
@@ -1573,19 +1569,6 @@ private:
   void evmovdquq(XMMRegister dst, KRegister mask, Address src, bool merge, int vector_len);
   void evmovdquq(XMMRegister dst, KRegister mask, XMMRegister src, bool merge, int vector_len);
 
-  // Move Aligned 512bit Vector
-  void evmovdqab(Address dst, XMMRegister src, int vector_len);
-  void evmovdqab(XMMRegister dst, Address src, int vector_len);
-  void evmovdqab(XMMRegister dst, KRegister mask, Address src, int vector_len);
-  void evmovdqaw(Address dst, XMMRegister src, int vector_len);
-  void evmovdqaw(Address dst, KRegister mask, XMMRegister src, int vector_len);
-  void evmovdqaw(XMMRegister dst, Address src, int vector_len);
-  void evmovdqaw(XMMRegister dst, KRegister mask, Address src, int vector_len);
-  void evmovdqal(Address dst, XMMRegister src, int vector_len);
-  void evmovdqal(XMMRegister dst, Address src, int vector_len);
-  void evmovdqaq(Address dst, XMMRegister src, int vector_len);
-  void evmovdqaq(XMMRegister dst, Address src, int vector_len);
-
   // Move lower 64bit to high 64bit in 128bit register
   void movlhps(XMMRegister dst, XMMRegister src);
 
@@ -1594,14 +1577,6 @@ private:
   void movl(Register dst, Register src);
   void movl(Register dst, Address src);
   void movl(Address dst, Register src);
-
-  void movntq(Address dst, Register src);
-  void movntdq(Address dst, XMMRegister src);
-  void vmovntdq(Address dst, XMMRegister src);
-  void evmovntdq(Address dst, XMMRegister src, int vector_len);
-  void movntdqa(XMMRegister dst, Address src);
-  void vmovntdqa(XMMRegister dst, Address src);
-  void evmovntdqa(XMMRegister dst, Address src, int vector_len);
 
   // These dummies prevent using movl from converting a zero (like NULL) into Register
   // by giving the compiler two choices it can't resolve
