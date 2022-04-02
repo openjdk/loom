@@ -253,10 +253,10 @@ class StubRoutines: AllStatic {
 
   static RuntimeStub* _cont_doYield_stub;
   static address _cont_doYield;
-  static address _cont_jump_from_sp;
   static address _cont_thaw;
   static address _cont_returnBarrier;
   static address _cont_returnBarrierExc;
+  static address _cont_jump_from_sp;
   static address _cont_interpreter_forced_preempt_return;
 
   JFR_ONLY(static RuntimeStub* _jfr_write_checkpoint_stub;)
@@ -444,10 +444,10 @@ class StubRoutines: AllStatic {
 
   static RuntimeStub* cont_doYield_stub() { return _cont_doYield_stub; }
   static address cont_doYield()        { return _cont_doYield; }
-  static address cont_jump_from_sp()   { return _cont_jump_from_sp; }
   static address cont_thaw()           { return _cont_thaw; }
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
+  static address cont_jump_from_sp()   { return _cont_jump_from_sp; }
   static address cont_interpreter_forced_preempt_return() { return _cont_interpreter_forced_preempt_return; }
 
   JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })

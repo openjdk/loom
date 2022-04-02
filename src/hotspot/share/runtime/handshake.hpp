@@ -177,15 +177,15 @@ class HandshakeState {
   bool has_async_suspend_handshake()        { return _async_suspend_handshake; }
   void set_async_suspend_handshake(bool to) { _async_suspend_handshake = to; }
 
+  bool suspend();
+  bool resume();
+
   void set_caller_thread(JavaThread* caller){ return Atomic::store(&_caller, caller); }
   JavaThread* caller_thread() const         { return Atomic::load(&_caller); }
 
   // "blocked" is short for saying "suspended by caller"
   bool is_blocked() const                   { return caller_thread() != nullptr; }
   bool is_suspended_or_blocked() const      { return is_suspended() || is_blocked(); }
-
-  bool suspend();
-  bool resume();
 
   bool block_suspend(JavaThread* caller);
   bool continue_resume(JavaThread* caller);

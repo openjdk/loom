@@ -64,6 +64,7 @@ public class Continuation {
         /** Native frame on stack */ NATIVE,
         /** Monitor held */          MONITOR,
         /** In critical section */   CRITICAL_SECTION }
+
     /** Preemption attempt result */
     public enum PreemptStatus {
         /** Success */                                                      SUCCESS(null),
@@ -81,19 +82,6 @@ public class Continuation {
          * @return whether or not the continuation is pinned
          **/
         public Pinned pinned() { return pinned; }
-    }
-
-    private static PreemptStatus preemptStatus(int status) {
-        switch (status) {
-            case -5: return PreemptStatus.PERM_FAIL_UNSUPPORTED;
-            case  0: return PreemptStatus.SUCCESS;
-            case -1: return PreemptStatus.PERM_FAIL_NOT_MOUNTED;
-            case -2: return PreemptStatus.PERM_FAIL_YIELDING;
-            case  2: return PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
-            case  3: return PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
-            case  4: return PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
-            default: throw new AssertionError("Unknown status: " + status);
-        }
     }
 
     private static Pinned pinnedReason(int reason) {
@@ -512,14 +500,8 @@ public class Continuation {
      * @throws UnsupportedOperationException if this continuation does not support preemption
      */
     public PreemptStatus tryPreempt(Thread thread) {
-        PreemptStatus res = preemptStatus(tryForceYield0(thread));
-        if (res == PreemptStatus.PERM_FAIL_UNSUPPORTED) {
-            throw new UnsupportedOperationException("Thread-local handshakes disabled");
-        }
-        return res;
+        throw new UnsupportedOperationException("Not implemented");
     }
-
-    private native int tryForceYield0(Thread thread);
 
     // native methods
     private static native void registerNatives();

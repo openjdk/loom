@@ -23,7 +23,6 @@
  */
 
 #include "precompiled.hpp"
-#include "c1/c1_IR.hpp"
 #include "c1/c1_MacroAssembler.hpp"
 #include "c1/c1_Runtime1.hpp"
 #include "gc/shared/barrierSet.hpp"
@@ -96,7 +95,6 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   jcc(Assembler::notZero, slow_case);
   // done
   bind(done);
-
   return null_check_offset;
 }
 

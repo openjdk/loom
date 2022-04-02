@@ -2236,7 +2236,9 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   int size = chunk->max_size();
   guarantee (size > 0, "");
 
-  size += 2*frame::metadata_words; // 2x because we might want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
+  // For the top pc+fp in push push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
+  // 2x because we might also want to add a frame for StubRoutines::cont_interpreter_forced_preempt_return()
+  size += 2*frame::metadata_words;
   size += frame::align_wiggle; // just in case we have an interpreted entry after which we need to align
   size <<= LogBytesPerWord;
 
