@@ -330,7 +330,6 @@ runtime/cds/appcds/javaldr/GCDuringDump.java
 runtime/cds/appcds/javaldr/GCSharedStringsDuringDump.java
 runtime/cds/appcds/javaldr/HumongousDuringDump.java
 runtime/cds/appcds/javaldr/LockDuringDump.java
-runtime/cds/appcds/jigsaw/CheckUnsupportedDumpingOptions.java
 runtime/cds/appcds/jigsaw/JigsawOptionsCombo.java
 runtime/cds/appcds/jigsaw/PatchModule/AppClassInCP.java
 runtime/cds/appcds/jigsaw/RedefineClassesInModuleGraph.java
