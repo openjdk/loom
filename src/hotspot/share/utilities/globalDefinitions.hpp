@@ -45,21 +45,9 @@ class oopDesc;
 #ifndef ALWAYSINLINE
 #define ALWAYSINLINE inline
 #endif
-#ifndef __HOT
-#define __HOT
-#endif
-#ifndef __COLD
-#define __COLD
-#endif
 
 #ifndef ATTRIBUTE_ALIGNED
 #define ATTRIBUTE_ALIGNED(x)
-#endif
-#ifndef LIKELY
-#define LIKELY(condition)   (condition)
-#endif
-#ifndef UNLIKELY
-#define UNLIKELY(condition) (condition)
 #endif
 
 #ifndef ATTRIBUTE_FLATTEN

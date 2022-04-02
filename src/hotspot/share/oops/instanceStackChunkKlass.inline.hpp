@@ -115,7 +115,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
-  if (LIKELY(chunk->has_bitmap())) {
+  if (chunk->has_bitmap()) { // LIKELY
     intptr_t* start = chunk->sp_address() - frame::metadata_words;
     intptr_t* end = chunk->end_address();
     // mr.end() can actually be less than start. In that case, we only walk the metadata
@@ -133,7 +133,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
-  if (LIKELY(chunk->has_bitmap())) {
+  if (chunk->has_bitmap()) { // LIKELY
     oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, chunk->sp_address() - frame::metadata_words, chunk->end_address());
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());

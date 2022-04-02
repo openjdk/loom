@@ -309,7 +309,7 @@ void StackChunkFrameStream<frame_kind>::handle_deopted() const {
 
   address pc1 = pc();
   int oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);
-  if (UNLIKELY(oopmap_slot < 0)) { // we could have marked frames for deoptimization in thaw_chunk
+  if (oopmap_slot < 0) { // UNLIKELY; we could have marked frames for deoptimization in thaw_chunk
     if (cb()->as_compiled_method()->is_deopt_pc(pc1)) {
       pc1 = orig_pc();
       oopmap_slot = CodeCache::find_oopmap_slot_fast(pc1);

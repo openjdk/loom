@@ -168,6 +168,10 @@ Address |   |                            |    |   Caller is still in the chunk.
 
 // Data invariants are defined by Continuation::debug_verify_continuation and Continuation::debug_verify_stack_chunk
 
+// Used to just annotatate cold/hot branches
+#define LIKELY(condition)   (condition)
+#define UNLIKELY(condition) (condition)
+
 // debugging functions
 #ifdef ASSERT
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue); // address p is readable and *(intptr_t*)p != errvalue
