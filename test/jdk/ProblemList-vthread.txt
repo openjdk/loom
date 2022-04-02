@@ -38,8 +38,6 @@ java/lang/Thread/virtual/HoldsLock.java
 
 jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
-jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
-jdk/internal/vm/Continuation/Preempt.java
 jdk/internal/vm/Continuation/Fuzz.java
 
 ####
