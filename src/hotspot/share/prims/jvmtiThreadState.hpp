@@ -227,9 +227,6 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   void add_env(JvmtiEnvBase *env);
 
-  void unbind_from(JavaThread* thread);
-  void bind_to(JavaThread* thread);
-
   bool is_pending_interp_only_mode() { return _pending_interp_only_mode; }
   void set_pending_interp_only_mode(bool val) { _pending_interp_only_mode = val; }
 
@@ -239,6 +236,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   }
   void enter_interp_only_mode();
   void leave_interp_only_mode();
+
+  static void unbind_from(JvmtiThreadState* state, JavaThread* thread);
+  static void bind_to(JvmtiThreadState* state, JavaThread* thread);
 
   // access to the linked list of all JVMTI thread states
   static JvmtiThreadState *first() {

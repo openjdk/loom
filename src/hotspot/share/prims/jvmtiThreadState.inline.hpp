@@ -129,28 +129,28 @@ inline void JvmtiThreadState::set_should_post_on_exceptions(bool val) {
   get_thread_or_saved()->set_should_post_on_exceptions_flag(val ? JNI_TRUE : JNI_FALSE);
 }
 
-inline void JvmtiThreadState::unbind_from(JavaThread* thread) {
-  if (this == NULL) {
+inline void JvmtiThreadState::unbind_from(JvmtiThreadState* state, JavaThread* thread) {
+  if (state == NULL) {
     return;
   }
   // save interp_only_mode
-  _saved_interp_only_mode = thread->get_interp_only_mode();
-  set_thread(NULL); // it is to make sure stale _thread value is never used
+  state->_saved_interp_only_mode = thread->get_interp_only_mode();
+  state->set_thread(NULL); // it is to make sure stale _thread value is never used
 }
 
-inline void JvmtiThreadState::bind_to(JavaThread* thread) {
+inline void JvmtiThreadState::bind_to(JvmtiThreadState* state, JavaThread* thread) {
   // restore thread interp_only_mode
-  thread->set_interp_only_mode(this == NULL ? 0 : _saved_interp_only_mode);
+  thread->set_interp_only_mode(state == NULL ? 0 : state->_saved_interp_only_mode);
 
   // make continuation to notice the interp_only_mode change
   Continuation::set_cont_fastpath_thread_state(thread);
 
   // bind JavaThread to JvmtiThreadState
-  thread->set_jvmti_thread_state(this);
+  thread->set_jvmti_thread_state(state);
 
-  if (this != NULL) {
+  if (state != NULL) {
     // bind to JavaThread
-    set_thread(thread);
+    state->set_thread(thread);
   }
 }
 #endif // SHARE_PRIMS_JVMTITHREADSTATE_INLINE_HPP

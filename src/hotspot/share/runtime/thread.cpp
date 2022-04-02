@@ -2408,10 +2408,10 @@ JvmtiThreadState* JavaThread::rebind_to_jvmti_thread_state_of(oop thread_oop) {
   set_jvmti_vthread(thread_oop);
 
   // unbind current JvmtiThreadState from JavaThread
-  jvmti_thread_state()->unbind_from(this);
+  JvmtiThreadState::unbind_from(jvmti_thread_state(), this);
 
   // bind new JvmtiThreadState to JavaThread
-  java_lang_Thread::jvmti_thread_state(thread_oop)->bind_to(this);
+  JvmtiThreadState::bind_to(java_lang_Thread::jvmti_thread_state(thread_oop), this);
 
   return jvmti_thread_state();
 }
