@@ -1295,8 +1295,6 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
     f.print_on(&ls);
   }
 
-  JvmtiSampledObjectAllocEventCollector collector;
-
   frame caller;
   freeze_result res = freeze(f, caller, 0, false, true);
 
