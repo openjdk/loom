@@ -10,6 +10,7 @@ serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorThreadDisabledTest.java   
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_TwoFields_InternedStrings/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_InternedStrings_NonbranchyTree/TestDescription.java
 vmTestbase/vm/gc/compact/Humongous_NonbranchyTree/TestDescription.java
 vmTestbase/vm/gc/compact/Humongous_NonbranchyTree5M/TestDescription.java
