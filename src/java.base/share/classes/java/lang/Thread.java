@@ -748,6 +748,7 @@ public class Thread implements Runnable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
+        PreviewFeatures.ensureEnabled();
         return new ThreadBuilders.PlatformThreadBuilder();
     }
 
