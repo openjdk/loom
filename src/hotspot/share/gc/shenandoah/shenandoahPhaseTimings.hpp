@@ -44,7 +44,6 @@ class outputStream;
   f(CNT_PREFIX ## CLDUnlink,                DESC_PREFIX "Unlink CLDs")                 \
   f(CNT_PREFIX ## WeakRefProc,              DESC_PREFIX "Weak References")             \
   f(CNT_PREFIX ## ParallelMark,             DESC_PREFIX "Parallel Mark")               \
-//f(CNT_PREFIX ## NMethodKeepAliveRoots,    DESC_PREFIX "NMethod Keepalive")           \
   // end
 
 #define SHENANDOAH_PHASE_DO(f)                                                         \

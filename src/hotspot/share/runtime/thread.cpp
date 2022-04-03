@@ -1988,10 +1988,7 @@ void JavaThread::deoptimize_marked_methods_only_anchors() {
   for (; !fst.is_done(); fst.next()) {
     if (fst.current()->should_be_deoptimized()) {
       if (!java_callee) {
-        //tty->print_cr("Patching RA");
         Deoptimization::deoptimize(this, *fst.current());
-      } else {
-        //tty->print_cr("Not patching RA");
       }
     }
     java_callee = fst.current()->is_compiled_frame();
@@ -3857,12 +3854,6 @@ void Threads::print_on(outputStream* st, bool print_stacks,
     ResourceMark rm;
     p->print_on(st, print_extended_info);
     if (print_stacks) {
-      // if (p->has_last_Java_frame()) {
-      //   static char buf[O_BUFLEN];
-      //   frame fr = p->last_frame();
-      //   VMError::print_native_stack(tty, fr, p, buf, sizeof(buf));
-      // }
-
       if (internal_format) {
         p->trace_stack();
       } else {

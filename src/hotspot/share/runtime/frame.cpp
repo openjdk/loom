@@ -1263,10 +1263,6 @@ public:
   virtual void do_oop(oop* p) override { _oops->push(p); }
   virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // oop base = *base_loc;
-    // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
-    // assert(offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
-
     _base->push(base_loc);
     _derived->push(derived_loc);
   }

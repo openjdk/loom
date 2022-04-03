@@ -238,7 +238,7 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
     st->print_cr("CHUNK NULL");
     return;
   }
-  // HeapRegion* hr = G1CollectedHeap::heap()->heap_region_containing(chunk);
+
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
     p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
   st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT,

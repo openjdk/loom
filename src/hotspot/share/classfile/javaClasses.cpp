@@ -5501,14 +5501,6 @@ void JavaClasses::check_offsets() {
   CHECK_OFFSET("java/lang/Integer",   java_lang_boxing_object, value, "I");
   CHECK_LONG_OFFSET("java/lang/Long", java_lang_boxing_object, value, "J");
 
-  // jdk.internal.vm.Continuation
-
-  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, target,   "Ljava/lang/Runnable;");
-  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, stack,    "[I");
-  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, parent,   "Ljdk/internal/vm/Continuation;");
-  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, lastFP,   "I");
-  // CHECK_OFFSET("jdk/internal/vm/Continuation", jdk_internal_vm_Continuation, lastSP,   "I");
-
   if (!valid) vm_exit_during_initialization("Field offset verification failed");
 }
 

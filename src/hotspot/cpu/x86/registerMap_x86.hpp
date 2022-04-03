@@ -38,5 +38,4 @@
   void pd_initialize() {}
   void pd_initialize_from(const RegisterMap* map) {}
 
-
 #endif // CPU_X86_REGISTERMAP_X86_HPP

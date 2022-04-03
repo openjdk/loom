@@ -751,7 +751,7 @@ address SharedRuntime::compute_compiled_exc_handler(CompiledMethod* cm, address 
     tty->print_cr(" Compiled exception table :");
     table.print();
     nm->print();
-    // nm->print_code();
+    nm->print_code();
     guarantee(false, "missing exception handler");
     return NULL;
   }

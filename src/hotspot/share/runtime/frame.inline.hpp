@@ -104,11 +104,4 @@ inline CodeBlob* frame::get_cb() const {
   return _cb;
 }
 
-// inline void frame::set_cb(CodeBlob* cb) {
-//   if (_cb == NULL) _cb = cb;
-//   assert(_cb == cb, "");
-//   assert(_cb->contains(_pc), "");
-// }
-
-
 #endif // SHARE_RUNTIME_FRAME_INLINE_HPP

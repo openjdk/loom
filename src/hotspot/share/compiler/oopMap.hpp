@@ -126,7 +126,6 @@ public:
   bool is_narrowoop()         { return mask_bits(value(), type_mask_in_place) == narrowoop_value; }
   bool is_callee_saved()      { return mask_bits(value(), type_mask_in_place) == callee_saved_value; }
   bool is_derived_oop()       { return mask_bits(value(), type_mask_in_place) == derived_oop_value; }
-  bool is_oop_or_narrow()     { return is_oop() || is_narrowoop(); }
 
   VMReg reg() const { return VMRegImpl::as_VMReg(mask_bits(value(), register_mask_in_place) >> register_shift); }
   oop_types type() const      { return (oop_types)mask_bits(value(), type_mask_in_place); }
@@ -252,12 +251,6 @@ class OopMapSet : public ResourceObj {
 #ifndef PRODUCT
   static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map);
 #endif
-
-  // // Iterates through frame for a compiled method for dead ones and values, too
-  // static void all_do(const frame* fr, const RegisterMap* reg_map,
-  //                    OopClosure* oop_fn,
-  //                    DerivedOopClosure* derived_oop_fn,
-  //                    OopClosure* value_fn);
 
   // Printing
   void print_on(outputStream* st) const;

@@ -74,7 +74,6 @@ static inline derived_pointer operator+(derived_pointer p, intptr_t offset) {
 
 OopMapStream::OopMapStream(const OopMap* oop_map)
   : _stream(oop_map->write_stream()->buffer()) {
-  // _stream = new CompressedReadStream(oop_map->write_stream()->buffer());
   _size = oop_map->omv_count();
   _position = 0;
   _valid_omv = false;
@@ -82,7 +81,6 @@ OopMapStream::OopMapStream(const OopMap* oop_map)
 
 OopMapStream::OopMapStream(const ImmutableOopMap* oop_map)
   : _stream(oop_map->data_addr()) {
-  // _stream = new CompressedReadStream(oop_map->data_addr());
   _size = oop_map->count();
   _position = 0;
   _valid_omv = false;
@@ -309,8 +307,6 @@ void OopMap::copy_and_sort_data_to(address addr) const {
 
   assert(stream->position() == write_stream()->position(), "");
   memcpy(addr, stream->buffer(), stream->position());
-  //copy_data_to(addr);
-  //sort.print();
 }
 
 int OopMap::heap_size() const {
@@ -509,14 +505,12 @@ static void update_register_map1(const ImmutableOopMap* oopmap, const frame* fr,
 
 // Update callee-saved register info for the following frame
 void ImmutableOopMap::update_register_map(const frame *fr, RegisterMap *reg_map) const {
-  // ResourceMark rm;
   CodeBlob* cb = fr->cb();
   assert(cb != NULL, "no codeblob");
   // Any reg might be saved by a safepoint handler (see generate_handler_blob).
   assert( reg_map->_update_for_id == NULL || fr->is_older(reg_map->_update_for_id),
          "already updated this map; do not 'update' it twice!" );
   debug_only(reg_map->_update_for_id = fr->id());
-
 
   // Check if caller must update oop argument
   assert((reg_map->include_argument_oops() ||
@@ -528,16 +522,6 @@ void ImmutableOopMap::update_register_map(const frame *fr, RegisterMap *reg_map)
 
   DEBUG_ONLY(int nof_callee = 0;)
   update_register_map1(this, fr, reg_map);
-
-  /*
-  for (OopMapStream oms(this, OopMapValue::callee_saved_value); !oms.is_done(); oms.next()) {
-    OopMapValue omv = oms.current();
-    VMReg reg = omv.content_reg();
-    oop* loc = fr->oopmapreg_to_oop_location(omv.reg(), reg_map);
-    reg_map->set_location(reg, (address) loc);
-    DEBUG_ONLY(nof_callee++;)
-  }
-  */
 
   // Check that runtime stubs save all callee-saved registers
 #ifdef COMPILER2
@@ -740,7 +724,6 @@ ImmutableOopMap::ImmutableOopMap(const OopMap* oopmap)
   _num_oops = oopmap->num_oops();
   _has_derived_oops = oopmap->has_derived_oops();
   address addr = data_addr();
-  //oopmap->copy_data_to(addr);
   oopmap->copy_and_sort_data_to(addr);
 }
 
@@ -842,7 +825,7 @@ void ImmutableOopMapBuilder::fill(ImmutableOopMapSet* set, int sz) {
       fill_pair(&pairs[i], map, _mapping[i]._offset, set);
     }
 
-    const ImmutableOopMap* nv = set->find_map_at_offset(map->offset());
+    //const ImmutableOopMap* nv = set->find_map_at_offset(map->offset());
     //assert(memcmp(map->data(), nv->data_addr(), map->data_size()) == 0, "check identity");
   }
 }

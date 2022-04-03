@@ -88,7 +88,7 @@ public:
   JavaFrameAnchor()                              { clear(); }
   JavaFrameAnchor(JavaFrameAnchor *src)          { copy(src); }
 
-  void set_last_Java_pc(address pc)              { _last_Java_pc = pc; }  // FIXME
+  void set_last_Java_pc(address pc)              { _last_Java_pc = pc; }
 
   // Assembly stub generation helpers
 
