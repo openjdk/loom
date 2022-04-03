@@ -163,7 +163,7 @@ class HandshakeState {
   bool _async_suspend_handshake;
 
   // Called from the suspend handshake.
-  bool suspend_with_handshake(JavaThread* caller);
+  bool suspend_with_handshake();
 
   // Called from the async handshake (the trap)
   // to stop a thread from continuing execution when suspended.

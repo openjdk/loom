@@ -659,9 +659,8 @@ class ThreadSelfSuspensionHandshake : public AsyncHandshakeClosure {
   virtual bool is_suspend() { return true; }
 };
 
-bool HandshakeState::suspend_with_handshake(JavaThread* caller) {
-  // This tested for _handshakee->threadObj() != NULL as well, but the test doesn't work
-  // for that.  TODO: can you suspend a thread during initialization ?
+bool HandshakeState::suspend_with_handshake() {
+  assert(_handshakee->threadObj() != NULL, "cannot suspend with a NULL threadObj");
   if (_handshakee->is_exiting()) {
     log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " exiting", p2i(_handshakee));
     return false;
@@ -680,9 +679,9 @@ bool HandshakeState::suspend_with_handshake(JavaThread* caller) {
     }
   }
   // no suspend request
-  assert(!is_suspended(), "cannot be suspended without a request");
+  assert(!is_suspended(), "cannot be suspended without a suspend request");
   // Thread is safe, so it must execute the request, thus we can count it as suspended
-  // or blocked from this point.
+  // from this point.
   set_suspended(true);
   set_async_suspend_handshake(true);
   log_trace(thread, suspend)("JavaThread:" INTPTR_FORMAT " suspended, arming ThreadSuspension", p2i(_handshakee));
@@ -693,13 +692,12 @@ bool HandshakeState::suspend_with_handshake(JavaThread* caller) {
 
 // This is the closure that synchronously honors the suspend request.
 class SuspendThreadHandshake : public HandshakeClosure {
-  JavaThread* _caller;
-  bool        _did_suspend;
+  bool _did_suspend;
 public:
-  SuspendThreadHandshake(JavaThread* caller) : HandshakeClosure("SuspendThread"), _caller(caller), _did_suspend(false) {}
+  SuspendThreadHandshake() : HandshakeClosure("SuspendThread"), _did_suspend(false) {}
   void do_thread(Thread* thr) {
     JavaThread* target = JavaThread::cast(thr);
-    _did_suspend = target->handshake_state()->suspend_with_handshake(_caller);
+    _did_suspend = target->handshake_state()->suspend_with_handshake();
   }
   bool did_suspend() { return _did_suspend; }
 };
@@ -716,7 +714,7 @@ bool HandshakeState::suspend() {
     do_self_suspend();
     return true;
   } else {
-    SuspendThreadHandshake st(nullptr);
+    SuspendThreadHandshake st;
     Handshake::execute(&st, _handshakee);
     return st.did_suspend();
   }
