@@ -323,7 +323,8 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns the Thread object for the current carrier thread.
+     * Returns the Thread object for the current platform thread. If the
+     * current thread is a virtual thread then this method returns the carrier.
      */
     @IntrinsicCandidate
     static native Thread currentCarrierThread();
