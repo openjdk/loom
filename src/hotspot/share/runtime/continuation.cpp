@@ -308,11 +308,12 @@ NOINLINE void ContinuationHelper::flush_stack_processing(JavaThread* thread, int
 // Intermediary to the jdk.internal.vm.Continuation objects and ContinuationEntry
 // This object is created when we begin a operation for a continuation, and is destroyed when the operation completes.
 // Contents are read from the Java object at the entry points of this module, and written at exit or calls into Java
+// It also serves as a custom NoSafepointVerifier
 class ContinuationWrapper : public StackObj {
 private:
   JavaThread* const  _thread;   // Thread being frozen/thawed
   ContinuationEntry* _entry;
-  // This oop is managed by the post_safepoint method, which is explicitly called after safepoints
+  // These oops are managed by SafepointOp
   oop                _continuation;  // jdk.internal.vm.Continuation instance
   stackChunkOop      _tail;
 
@@ -323,12 +324,59 @@ private:
 
   ContinuationWrapper(const ContinuationWrapper& cont); // no copy constructor
 
+private:
+  DEBUG_ONLY(Thread* _current_thread;)
+  friend class SafepointOp;
+
+  void disallow_safepoint() {
+    #ifdef ASSERT
+      assert(_continuation != nullptr, "");
+      _current_thread = Thread::current();
+      if (_current_thread->is_Java_thread()) {
+        JavaThread::cast(_current_thread)->inc_no_safepoint_count();
+      }
+    #endif
+  }
+
+  void allow_safepoint() {
+    #ifdef ASSERT
+      // we could have already allowed safepoints in done
+      if (_continuation != nullptr && _current_thread->is_Java_thread()) {
+        JavaThread::cast(_current_thread)->dec_no_safepoint_count();
+      }
+    #endif
+  }
+
 public:
+  void done() {
+    allow_safepoint(); // must be done first
+    _continuation = nullptr;
+    _tail = (stackChunkOop)badOop;
+  }
+
+  class SafepointOp : public StackObj {
+    ContinuationWrapper& _cont;
+    Handle _conth;
+  public:
+    SafepointOp(Thread* current, ContinuationWrapper& cont)
+      : _cont(cont), _conth(current, cont._continuation) {
+      _cont.allow_safepoint();
+    }
+    ~SafepointOp() { // reload oops
+      _cont._continuation = _conth();
+      if (_cont._tail != nullptr) {
+        _cont._tail = jdk_internal_vm_Continuation::tail(_cont._continuation);
+      }
+      _cont.disallow_safepoint();
+    }
+  };
+
+public:
+  ~ContinuationWrapper() { allow_safepoint(); }
+
   ContinuationWrapper(JavaThread* thread, oop continuation);
   ContinuationWrapper(oop continuation);
   ContinuationWrapper(const RegisterMap* map);
-
-  inline void post_safepoint(Handle conth);
 
   JavaThread* thread() const         { return _thread; }
   oop continuation()                 { return _continuation; }
@@ -339,7 +387,11 @@ public:
   bool is_preempted()            { return jdk_internal_vm_Continuation::is_preempted(_continuation); }
   void set_preempted(bool value) { jdk_internal_vm_Continuation::set_preempted(_continuation, value); }
   void read()                    { _tail  = jdk_internal_vm_Continuation::tail(_continuation); }
-  void write()                   { jdk_internal_vm_Continuation::set_tail(_continuation, _tail); }
+  void write() {
+    assert(oopDesc::is_oop(_continuation), "bad oop");
+    assert(oopDesc::is_oop_or_null(_tail), "bad oop");
+    jdk_internal_vm_Continuation::set_tail(_continuation, _tail);
+  }
 
   NOT_PRODUCT(intptr_t hash()    { return Thread::current()->is_Java_thread() ? _continuation->identity_hash() : -1; })
 
@@ -380,6 +432,7 @@ ContinuationWrapper::ContinuationWrapper(JavaThread* thread, oop continuation)
          "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
   assert(_continuation == _entry->cont_oop(), "cont: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: "
          INTPTR_FORMAT, p2i((oopDesc*)_continuation), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
+  disallow_safepoint();
   read();
 }
 
@@ -391,6 +444,7 @@ ContinuationWrapper::ContinuationWrapper(oop continuation)
   {
   assert(oopDesc::is_oop(_continuation),
          "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
+  disallow_safepoint();
   read();
 }
 
@@ -406,14 +460,8 @@ ContinuationWrapper::ContinuationWrapper(const RegisterMap* map)
   assert(_entry == nullptr || _continuation == _entry->cont_oop(),
     "cont: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: " INTPTR_FORMAT,
     p2i( (oopDesc*)_continuation), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
+  disallow_safepoint();
   read();
-}
-
-inline void ContinuationWrapper::post_safepoint(Handle conth) {
-  _continuation = conth(); // reload oop
-  if (_tail != (oop)nullptr) {
-    _tail = (stackChunkOop)jdk_internal_vm_Continuation::tail(_continuation);
-  }
 }
 
 const frame ContinuationWrapper::last_frame() {
@@ -1173,8 +1221,6 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   // will either see no continuation on the stack, or a consistent chunk.
   unwind_frames();
 
-  NoSafepointVerifier nsv;
-
   log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
     p2i((oopDesc*)chunk), chunk->stack_size(), chunk_start_sp, _cont.argsize());
   assert(chunk_start_sp <= chunk->stack_size(), "");
@@ -1731,6 +1777,7 @@ inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive
   assert(t == JavaThread::current(), "");
   if ((address)&t < t->stack_overflow_state()->stack_overflow_limit()) {
     if (!_preempt) {
+      ContinuationWrapper::SafepointOp so(t, _cont); // could also call _cont.done() instead
       Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
     }
     return true;
@@ -1769,9 +1816,8 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   if (start != nullptr) {
     chunk = stackChunkOopDesc::cast(allocator.init_partial_for_tlab(start));
   } else {
-    Handle conth(current, _cont.continuation());
+    ContinuationWrapper::SafepointOp so(current, _cont);
     chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
-    _cont.post_safepoint(conth);
 
     if (chunk == nullptr) { // OOME
       return nullptr;
@@ -1817,6 +1863,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
 }
 
 void FreezeBase::throw_stack_overflow_on_humongous_chunk() {
+  ContinuationWrapper::SafepointOp so(_thread, _cont); // could also call _cont.done() instead
   Exceptions::_throw_msg(_thread, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Humongous stack chunk");
 }
 
@@ -1835,10 +1882,8 @@ static void JVMTI_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
   if (JvmtiExport::can_post_frame_pop()) {
     int num_frames = num_java_frames(cont);
 
-    // The call to JVMTI can safepoint, so we need to restore oops.
-    Handle conth(Thread::current(), cont.continuation());
+    ContinuationWrapper::SafepointOp so(Thread::current(), cont);
     JvmtiExport::continuation_yield_cleanup(JavaThread::current(), num_frames);
-    cont.post_safepoint(conth);
   }
   invalidate_JVMTI_stack(thread);
 #endif
@@ -1976,6 +2021,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
                              : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     freeze_epilog(current, cont, res);
+    cont.done(); // allow safepoint in the transition back to Java
     StackWatermarkSet::after_unwind(current);
     return res;
   JRT_BLOCK_END
