@@ -346,11 +346,6 @@ void OopMap::set_oop(VMReg reg) {
 }
 
 
-// void OopMap::set_value(VMReg reg) {
-//   set_xxx(reg, OopMapValue::live_value, VMRegImpl::Bad());
-// }
-
-
 void OopMap::set_narrowoop(VMReg reg) {
   set_xxx(reg, OopMapValue::narrowoop_value, VMRegImpl::Bad());
 }

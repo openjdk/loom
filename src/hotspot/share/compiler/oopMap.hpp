@@ -60,7 +60,7 @@ private:
 
 public:
   // Constants
-  enum { type_bits                = 2, // 3
+  enum { type_bits                = 2,
          register_bits            = BitsPerShort - type_bits };
 
   enum { type_shift               = 0,
@@ -76,7 +76,6 @@ public:
          narrowoop_value,
          callee_saved_value,
          derived_oop_value,
-         // live_value,
          unused_value = -1          // Only used as a sentinel value
   };
 
@@ -127,7 +126,6 @@ public:
   bool is_narrowoop()         { return mask_bits(value(), type_mask_in_place) == narrowoop_value; }
   bool is_callee_saved()      { return mask_bits(value(), type_mask_in_place) == callee_saved_value; }
   bool is_derived_oop()       { return mask_bits(value(), type_mask_in_place) == derived_oop_value; }
-  // bool is_live()              { return mask_bits(value(), type_mask_in_place) == live_value; }
   bool is_oop_or_narrow()     { return is_oop() || is_narrowoop(); }
 
   VMReg reg() const { return VMRegImpl::as_VMReg(mask_bits(value(), register_mask_in_place) >> register_shift); }
