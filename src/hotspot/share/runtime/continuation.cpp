@@ -1730,7 +1730,9 @@ inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive
   JavaThread* t = !_preempt ? _thread : JavaThread::current();
   assert(t == JavaThread::current(), "");
   if ((address)&t < t->stack_overflow_state()->stack_overflow_limit()) {
-    Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
+    if (!_preempt) {
+      Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
+    }
     return true;
   }
   return false;
