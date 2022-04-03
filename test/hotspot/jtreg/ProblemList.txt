@@ -195,3 +195,4 @@ vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            827
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 
 gc/metaspace/TestPerfCountersAndMemoryPools.java                             8278109 generic-all
+vmTestbase/gc/gctests/ReferencesGC/ReferencesGC.java                         8284234 generic-all
