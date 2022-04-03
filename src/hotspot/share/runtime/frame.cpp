@@ -1503,14 +1503,8 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
 
     if (cm->method()->is_continuation_enter_intrinsic()) {
-      address usp = (address)unextended_sp();
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_offset())), "parent");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::cont_offset())),   "continuation");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::flags_offset())),   "flags");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::chunk_offset())),   "chunk");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::argsize_offset())), "argsize");
-      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_cont_fastpath_offset())),      "parent fastpath");
-      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_held_monitor_count_offset())), "parent held monitor count");
+      ContinuationEntry* ce = Continuation::get_continuation_entry_for_entry_frame(reg_map->thread(), *this); // (ContinuationEntry*)unextended_sp();
+      ce->describe(values, frame_no);
     }
   } else if (is_native_frame()) {
     // For now just label the frame
