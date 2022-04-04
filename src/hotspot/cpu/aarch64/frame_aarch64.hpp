@@ -105,7 +105,7 @@
     metadata_words                                   = sender_sp_offset,
     // in bytes
     frame_alignment                                  = 16,
-    // size, in words, of frame metadata (e.g. pc and link)
+    // size, in words, of maximum shift in frame position due to alignment
     align_wiggle                                     =  1
   };
 
