@@ -149,10 +149,6 @@ oop java_lang_ref_Reference::unknown_referent_no_keepalive(oop ref) {
   return ref->obj_field_access<ON_UNKNOWN_OOP_REF | AS_NO_KEEPALIVE>(_referent_offset);
 }
 
-oop java_lang_ref_Reference::unknown_referent(oop ref) {
-  return ref->obj_field_access<ON_UNKNOWN_OOP_REF>(_referent_offset);
-}
-
 void java_lang_ref_Reference::clear_referent(oop ref) {
   ref->obj_field_put_raw(_referent_offset, nullptr);
 }
