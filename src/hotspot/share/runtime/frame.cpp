@@ -70,7 +70,7 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frame
   NOT_PRODUCT(_async = false;)
 
   if (walk_cont && thread != NULL && thread->last_continuation() != NULL) {
-    _chunk = stackChunkHandle(Thread::current(), NULL, true);
+    _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
   }
 
 #ifndef PRODUCT
@@ -88,7 +88,7 @@ RegisterMap::RegisterMap(oop continuation, bool update_map) {
   NOT_PRODUCT(_skip_missing = false;)
   NOT_PRODUCT(_async = false;)
 
-  _chunk = stackChunkHandle(Thread::current(), NULL, true);
+  _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -108,7 +108,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   NOT_PRODUCT(_async = map->_async;)
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
-  _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); //
+  _chunk = map->_chunk;
 
   pd_initialize_from(map);
   if (update_map()) {

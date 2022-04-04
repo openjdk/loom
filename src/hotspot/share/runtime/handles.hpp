@@ -73,7 +73,7 @@ class Handle {
  public:
   // Constructors
   Handle()                                       { _handle = NULL; }
-  inline Handle(Thread* thread, oop obj, bool allocNull = false);
+  inline Handle(Thread* thread, oop obj);
 
   // General access
   oop     operator () () const                   { return obj(); }
@@ -113,9 +113,10 @@ class Handle {
                                                  \
    public:                                       \
     /* Constructors */                           \
-    type##Handle ()                              : Handle()                 {} \
-    inline type##Handle (Thread* thread, type##Oop obj, bool allocNull = false); \
-    \
+    type##Handle ()                              : Handle() {} \
+    inline type##Handle (Thread* thread, type##Oop obj); \
+    type##Handle (oop *handle, bool dummy)       : Handle(handle, dummy) {} \
+                                                 \
     /* Operators for ease of use */              \
     type##Oop    operator () () const            { return obj(); } \
     type##Oop    operator -> () const            { return non_null_obj(); } \
@@ -203,8 +204,10 @@ class HandleArea: public Arena {
  public:
 #ifdef ASSERT
   oop* allocate_handle(oop obj);
+  oop* allocate_null_handle();
 #else
   oop* allocate_handle(oop obj) { return real_allocate_handle(obj); }
+  oop* allocate_null_handle()   { return allocate_handle(nullptr); }
 #endif
 
   // Garbage collection support

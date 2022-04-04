@@ -34,9 +34,9 @@
 // these inline functions are in a separate file to break an include cycle
 // between Thread and Handle
 
-inline Handle::Handle(Thread* thread, oop obj, bool allocNull) {
+inline Handle::Handle(Thread* thread, oop obj) {
   assert(thread == Thread::current(), "sanity check");
-  if (obj == NULL && !allocNull) {
+  if (obj == NULL) {
     _handle = NULL;
   } else {
     _handle = thread->handle_area()->allocate_handle(obj);
@@ -53,8 +53,8 @@ inline void Handle::replace(oop obj) {
 
 // Inline constructors for Specific Handles for different oop types
 #define DEF_HANDLE_CONSTR(type, is_a)                   \
-inline type##Handle::type##Handle (Thread* thread, type##Oop obj, bool allocNull) : Handle(thread, (oop)obj, allocNull) { \
-  assert(is_null() || (allocNull && obj == NULL) || ((oop)obj)->is_a(), "illegal type");                \
+inline type##Handle::type##Handle (Thread* thread, type##Oop obj) : Handle(thread, (oop)obj) { \
+  assert(is_null() || ((oop)obj)->is_a(), "illegal type");                \
 }
 
 DEF_HANDLE_CONSTR(instance , is_instance_noinline )
