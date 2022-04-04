@@ -344,7 +344,7 @@ public:
 
 template <stackChunkOopDesc::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-  // we need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
+  // We need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) {
     return;
   }
@@ -357,7 +357,8 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // The entry barrier takes care of having the right synchronization
     // when keeping the nmethod alive during concurrent execution.
     nm->run_nmethod_entry_barrier();
-    // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
+    // There is no need to mark the Method, as class redefinition will walk the
+    // CodeCache, noting their Methods
   }
 
   relativize_derived_oops_in_frame(f, map);
@@ -587,8 +588,8 @@ public:
       f.print_on(&ls);
     }
     assert(f.pc() != nullptr,
-      "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
-      !_chunk->requires_barriers(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));
+           "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
+           !_chunk->requires_barriers(), _num_frames, p2i(f.sp()), p2i(_chunk->start_address()), p2i(_chunk->bottom_address()));
 
     if (_num_frames == 0) {
       assert(f.pc() == _chunk->pc(), "");
@@ -652,8 +653,8 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
 
   const bool concurrent = !Thread::current()->is_Java_thread();
 
-  // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset)
-  // for the top frame (below sp), and *not* for the bottom frame
+  // If argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset)
+  // for the top frame (below sp), and *not* for the bottom frame.
   int size = stack_size() - argsize() - sp();
   assert(size >= 0, "");
   assert((size == 0) == is_empty(), "");
@@ -662,8 +663,8 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   const bool has_safepoint_stub_frame = first.is_stub();
 
   VerifyStackChunkFrameClosure closure(this,
-    has_safepoint_stub_frame ? 1 : 0, // iterate_stack skips the safepoint stub
-    has_safepoint_stub_frame ? first.frame_size() : 0);
+                                       has_safepoint_stub_frame ? 1 : 0, // Iterate_stack skips the safepoint stub
+                                       has_safepoint_stub_frame ? first.frame_size() : 0);
   iterate_stack(&closure);
 
   assert(!is_empty() || closure._cb == nullptr, "");
@@ -678,16 +679,16 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
 
   if (!concurrent) {
     assert(closure._size <= size + argsize() + frame::metadata_words,
-      "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d",
-      size, argsize(), closure._size, closure._sp - start_address(), sp(), stack_size());
+           "size: %d argsize: %d closure.size: %d end sp: " PTR_FORMAT " start sp: %d chunk size: %d",
+           size, argsize(), closure._size, closure._sp - start_address(), sp(), stack_size());
     assert(argsize() == closure._argsize,
-      "argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
-      argsize(), closure._argsize, closure._callee_interpreted);
+           "argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
+           argsize(), closure._argsize, closure._callee_interpreted);
 
     int calculated_max_size = closure._size + closure._num_i2c * frame::align_wiggle;
     assert(max_size() == calculated_max_size,
-      "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
-      max_size(), calculated_max_size, closure._argsize, closure._num_i2c);
+           "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
+           max_size(), calculated_max_size, closure._argsize, closure._num_i2c);
 
     if (out_size   != nullptr) *out_size   += size;
     if (out_oops   != nullptr) *out_oops   += closure._num_oops;
@@ -704,22 +705,23 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
     assert(bitmap().size() == align_up((size_t)(stack_size() << (UseCompressedOops ? 1 : 0)), BitsPerWord),
       "bitmap().size(): %zu stack_size: %d",
       bitmap().size(), stack_size());
+
     int oop_count;
     if (UseCompressedOops) {
       StackChunkVerifyBitmapClosure<narrowOop> bitmap_closure(this);
       bitmap().iterate(&bitmap_closure,
-        bit_index_for((narrowOop*)(sp_address() - frame::metadata_words)),
-        bit_index_for((narrowOop*)end_address()));
+                       bit_index_for((narrowOop*)(sp_address() - frame::metadata_words)),
+                       bit_index_for((narrowOop*)end_address()));
       oop_count = bitmap_closure._count;
     } else {
       StackChunkVerifyBitmapClosure<oop> bitmap_closure(this);
       bitmap().iterate(&bitmap_closure,
-        bit_index_for((oop*)(sp_address() - frame::metadata_words)),
-        bit_index_for((oop*)end_address()));
+                       bit_index_for((oop*)(sp_address() - frame::metadata_words)),
+                       bit_index_for((oop*)end_address()));
       oop_count = bitmap_closure._count;
     }
     assert(oop_count == closure._num_oops,
-      "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
+           "bitmap_closure._count: %d closure._num_oops: %d", oop_count, closure._num_oops);
   }
 
   return true;

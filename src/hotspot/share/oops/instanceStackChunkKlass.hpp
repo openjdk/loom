@@ -34,8 +34,9 @@
 class ClassFileParser;
 
 // An InstanceStackChunkKlass is a specialization of the InstanceKlass.
-// It has a header containing metadata, and a blob containing a stack segment
-// (some integral number of stack frames)
+//
+// The stackChunkOops have a header containing metadata, and a blob containing a
+// stack segment (some integral number of stack frames).
 //
 // A chunk is said to be "mixed" if it contains interpreter frames or stubs
 // (which can only be a safepoint stub as the topmost frame). Otherwise, it
@@ -135,7 +136,7 @@ public:
 
   // Oop fields (and metadata) iterators
   //
-  // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses.)
+  // The InstanceClassLoaderKlass iterators also visit the CLD pointer (or mirror of anonymous klasses).
 
   // Forward iteration
   // Iterate over the oop fields and metadata.

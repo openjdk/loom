@@ -52,8 +52,8 @@ private:
 
   // Chunk flags.
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
-  static const uint8_t FLAG_GC_MODE = 1 << 2; // once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
-  static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
+  static const uint8_t FLAG_GC_MODE = 1 << 2; // Once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
+  static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // Can only be true if FLAG_GC_MODE is true
 
 public:
   static inline stackChunkOop cast(oop obj);

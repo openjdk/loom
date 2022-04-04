@@ -3076,7 +3076,7 @@ private:
 
     freeze_entry = (address)freeze<SelectedConfigT>;
 
-    // if we want, we could templatize by king and have three different that entries
+    // If we wanted, we could templatize by kind and have three different thaw entries
     thaw_entry   = (address)thaw<SelectedConfigT>;
   }
 };

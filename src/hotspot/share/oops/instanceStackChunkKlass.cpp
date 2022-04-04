@@ -106,7 +106,8 @@ public:
       // The do_nmethod function takes care of having the right synchronization
       // when keeping the nmethod alive during concurrent execution.
       _closure->do_nmethod(nm);
-      // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
+      // There is no need to mark the Method, as class redefinition will walk the
+      // CodeCache, noting their Methods
     }
     return true;
   }
@@ -203,7 +204,8 @@ public:
   bool do_frame(const StackChunkFrameStream<frame_kind>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",
-      p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
+                  p2i(fs.sp()), fs.is_interpreted(), f.frame_size(),
+                  fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
     f.print_on(_st);
     const ImmutableOopMap* oopmap = fs.oopmap();
     if (oopmap != nullptr) {
@@ -221,12 +223,12 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   }
 
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
-    p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
+               p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
   st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT,
-    c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
+               c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
   st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT,
-    c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
+               c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
 
   if (verbose) {
     st->cr();
