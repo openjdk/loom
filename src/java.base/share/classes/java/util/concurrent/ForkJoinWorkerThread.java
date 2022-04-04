@@ -71,8 +71,9 @@ public class ForkJoinWorkerThread extends Thread {
     /**
      * Full nonpublic constructor.
      */
-    ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool,
+    ForkJoinWorkerThread(ThreadGroup group,
                          boolean inheritInheritableThreadLocals,
+                         ForkJoinPool pool,
                          boolean useSystemClassLoader) {
         super(group, null, pool.nextWorkerThreadName(), 0L,
                 inheritInheritableThreadLocals);
@@ -85,6 +86,11 @@ public class ForkJoinWorkerThread extends Thread {
             super.setContextClassLoader(ClassLoader.getSystemClassLoader());
     }
 
+    ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool,
+                         boolean useSystemClassLoader) {
+        this(group, true, pool, useSystemClassLoader);
+    }
+
     /**
      * Creates a ForkJoinWorkerThread operating in the given thread group and
      * pool. If the thread group is {@code null} then the thread group is chosen
@@ -93,15 +99,16 @@ public class ForkJoinWorkerThread extends Thread {
      * inheritable thread-local variables.
      *
      * @param group the thread group, can be null
-     * @param pool the pool this thread works in
      * @param inheritInheritableThreadLocals {@code true} to inherit initial
      * values for inheritable thread-locals from the constructing thread
+     * @param pool the pool this thread works in
      * @throws NullPointerException if pool is null
      * @since 19
      */
-    protected ForkJoinWorkerThread(ThreadGroup group, ForkJoinPool pool,
-                                   boolean inheritInheritableThreadLocals) {
-        this(group, pool, inheritInheritableThreadLocals, false);
+    protected ForkJoinWorkerThread(ThreadGroup group,
+                                   boolean inheritInheritableThreadLocals,
+                                   ForkJoinPool pool) {
+        this(group, inheritInheritableThreadLocals, pool, false);
     }
 
     /**
@@ -111,7 +118,7 @@ public class ForkJoinWorkerThread extends Thread {
      * @throws NullPointerException if pool is null
      */
     protected ForkJoinWorkerThread(ForkJoinPool pool) {
-        this(null, pool, true);
+        this(null, true, pool, false);
     }
 
     /**
