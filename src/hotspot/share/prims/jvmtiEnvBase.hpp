@@ -339,7 +339,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   // check if virtual thread is not terminated (alive)
   static bool is_vthread_alive(oop vt);
 
-  static JavaThread* is_virtual_thread_mounted(oop vthread);
+  // return JavaThread if virtual thread is mounted, NULL otherwise
+  static JavaThread* get_JavaThread_or_null(oop vthread);
 
   // get virtual thread last java vframe
   static javaVFrame* get_vthread_jvf(oop vthread);

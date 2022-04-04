@@ -826,7 +826,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   assert(cont != NULL, "vthread contintuation must not be NULL");
 
   javaVFrame* jvf = NULL;
-  JavaThread* java_thread = JvmtiEnvBase::is_virtual_thread_mounted(_vthread_h());
+  JavaThread* java_thread = JvmtiEnvBase::get_JavaThread_or_null(_vthread_h());
   bool is_cont_mounted = (java_thread != NULL);
 
   if (is_cont_mounted) {

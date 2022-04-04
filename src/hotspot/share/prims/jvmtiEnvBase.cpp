@@ -615,7 +615,8 @@ JvmtiEnvBase::is_vthread_alive(oop vt) {
   return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
 }
 
-JavaThread* JvmtiEnvBase::is_virtual_thread_mounted(oop vthread) {
+// return JavaThread if virtual thread is mounted, NULL otherwise
+JavaThread* JvmtiEnvBase::get_JavaThread_or_null(oop vthread) {
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread);
   if (carrier_thread == NULL) {
     // can be NULL
@@ -675,7 +676,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   oop cont = java_lang_VirtualThread::continuation(vthread);
   javaVFrame* jvf = NULL;
 
-  JavaThread* java_thread = is_virtual_thread_mounted(vthread);
+  JavaThread* java_thread = get_JavaThread_or_null(vthread);
   if (java_thread != NULL) {
     if (!java_thread->has_last_Java_frame()) {
       // TBD: This is a temporary work around to avoid a guarantee caused by
@@ -1320,7 +1321,7 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       }
     }
     if (java_thread == NULL && java_lang_VirtualThread::is_instance(thread_oop)) {
-      java_thread = is_virtual_thread_mounted(thread_oop);
+      java_thread = get_JavaThread_or_null(thread_oop);
     }
   }
   *jt_pp = java_thread;
