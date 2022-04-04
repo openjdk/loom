@@ -882,17 +882,6 @@ void Continuation::describe(FrameValues &values) {
 }
 #endif
 
-void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
-  EventContinuationIterateOops e;
-  if (e.should_commit()) {
-    e.set_id(cast_from_oop<u8>(chunk));
-    e.set_safepoint(SafepointSynchronize::is_at_safepoint());
-    e.set_numFrames((u2)num_frames);
-    e.set_numOops((u2)num_oops);
-    e.commit();
-  }
-}
-
 #ifdef ASSERT
 void Continuation::debug_verify_continuation(oop contOop) {
   if (!VerifyContinuations) {

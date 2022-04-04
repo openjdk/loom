@@ -133,13 +133,6 @@
     <Field type="ushort" name="size" label="Stack size in bytes" />
   </Event>
 
-  <Event name="ContinuationIterateOops" experimental="true" category="Java Virtual Machine" label="Continuation Iterate OOPs" thread="true" stackTrace="false" startTime="false">
-    <Field type="ulong" name="id" label="Continuation ID" />
-    <Field type="boolean" name="safepoint" label="Safepoint" />
-    <Field type="ushort" name="numFrames" label="Frames" />
-    <Field type="ushort" name="numOops" label="Oops" />
-  </Event>
-
   <Event name="ContinuationFreezeYoung" experimental="true" category="Java Virtual Machine" label="Continuation Freeze Young" thread="true" stackTrace="false" startTime="false">
     <Field type="ulong" name="id" label="Continuation ID" />
     <Field type="uint" name="size" label="Size" />

@@ -128,10 +128,6 @@
       <setting name="threshold">0 ms</setting>
     </event>
 
-    <event name="jdk.ContinuationIterateOops">
-      <setting name="enabled">true</setting>
-    </event>
-
     <event name="jdk.ContinuationFreezeYoung">
       <setting name="enabled">true</setting>
     </event>

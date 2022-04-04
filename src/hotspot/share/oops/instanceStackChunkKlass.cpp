@@ -51,15 +51,13 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
   : InstanceKlass(parser, Kind) {
-  // see oopDesc::size_given_klass
+  // Change the layout_helper to use the slow path because StackChunkOops are
+  // variable sized InstanceOops.
   const jint lh = Klass::instance_layout_helper(size_helper(), true);
   set_layout_helper(lh);
-  assert(layout_helper_is_instance(layout_helper()), "");
-  assert(layout_helper_needs_slow_path(layout_helper()), "");
 }
 
 size_t InstanceStackChunkKlass::oop_size(oop obj) const {
-  // see oopDesc::size_given_klass
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
 
@@ -76,12 +74,10 @@ private:
   MemRegion _bound;
 
 public:
-  int _num_oops;
 
   StackChunkOopIterateFilterClosure(OopClosureType* closure, MemRegion bound)
     : _closure(closure),
-      _bound(bound),
-      _num_oops(0) {}
+      _bound(bound) {}
 
   virtual void do_oop(oop* p)       override { do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }
@@ -90,7 +86,6 @@ public:
   void do_oop_work(T* p) {
     if (_bound.contains(p)) {
       Devirtualizer::do_oop(_closure, p);
-      _num_oops++;
     }
   }
 };
@@ -128,28 +123,21 @@ class OopIterateStackChunkFrameClosure {
   const bool _do_metadata;
 
 public:
-  int _num_frames;
-  int _num_oops;
-
   OopIterateStackChunkFrameClosure(OopIterateClosure* closure, MemRegion mr)
     : _closure(closure),
       _bound(mr),
-      _do_metadata(_closure->do_metadata()),
-      _num_frames(0),
-      _num_oops(0) {}
+      _do_metadata(_closure->do_metadata()) {
+    assert(_closure != nullptr, "must be set");
+  }
 
   template <chunk_frames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    _num_frames++;
-    assert(_closure != nullptr, "");
-
     if (_do_metadata) {
       DoMethodsStackChunkFrameClosure(_closure).do_frame(f, map);
     }
 
     StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _bound);
     f.iterate_oops(&cl, map);
-    _num_oops += cl._num_oops;
 
     return true;
   }
@@ -158,13 +146,6 @@ public:
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   OopIterateStackChunkFrameClosure frame_closure(closure, mr);
   chunk->iterate_stack(&frame_closure);
-
-  assert(frame_closure._num_frames >= 0, "");
-  assert(frame_closure._num_oops >= 0, "");
-
-  if (closure != nullptr) {
-    Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
-  }
 }
 
 #ifdef ASSERT

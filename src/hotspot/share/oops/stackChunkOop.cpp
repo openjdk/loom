@@ -651,9 +651,6 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   assert(oopDesc::is_oop_or_null(parent()), "");
 
   const bool concurrent = !Thread::current()->is_Java_thread();
-  const bool gc_mode = is_gc_mode();
-  const bool is_last = parent() == nullptr;
-  const bool mixed = has_mixed_frames();
 
   // if argsize == 0 and the chunk isn't mixed, the chunk contains the metadata (pc, fp -- frame::sender_sp_offset)
   // for the top frame (below sp), and *not* for the bottom frame
