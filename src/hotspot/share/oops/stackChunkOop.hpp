@@ -125,7 +125,7 @@ public:
   template <BarrierType>
   void do_barriers();
 
-  template <BarrierType, chunk_frames frames, typename RegisterMapT>
+  template <BarrierType, ChunkFrames frames, typename RegisterMapT>
   inline void do_barriers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
@@ -178,10 +178,10 @@ public:
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
 private:
-  template <BarrierType barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
+  template <BarrierType barrier, ChunkFrames frames = ChunkFrames::Mixed, typename RegisterMapT>
   void do_barriers0(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
-  template <chunk_frames frames, class StackChunkFrameClosureType>
+  template <ChunkFrames frames, class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   inline intptr_t* relative_base() const;

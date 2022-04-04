@@ -469,7 +469,7 @@ const frame ContinuationWrapper::last_frame() {
   if (chunk == nullptr) {
     return frame();
   }
-  return StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
+  return StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame();
 }
 
 inline stackChunkOop ContinuationWrapper::nonempty_chunk(stackChunkOop chunk) const {
@@ -1436,7 +1436,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       bool top_interpreted = Interpreter::contains(chunk->pc());
       unextended_sp = chunk->sp();
       if (top_interpreted) {
-        StackChunkFrameStream<chunk_frames::MIXED> last(chunk);
+        StackChunkFrameStream<ChunkFrames::Mixed> last(chunk);
         unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
       }
       if (callee.is_interpreted_frame() == top_interpreted) {
@@ -1451,7 +1451,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(_size >= 0, "");
 
   assert(chunk == nullptr || chunk->is_empty()
-          || unextended_sp == chunk->to_offset(StackChunkFrameStream<chunk_frames::MIXED>(chunk).unextended_sp()), "");
+          || unextended_sp == chunk->to_offset(StackChunkFrameStream<ChunkFrames::Mixed>(chunk).unextended_sp()), "");
   assert(chunk != nullptr || unextended_sp < _size, "");
 
     // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
@@ -1501,8 +1501,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(!_barriers || chunk->is_empty(), "");
 
   assert(!chunk->has_bitmap(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).is_done(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame().is_empty(), "");
+  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
+  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
 
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
   // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
@@ -1517,7 +1517,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->print_on(&ls);
   }
 
-  caller = StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
+  caller = StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame();
 
   DEBUG_ONLY(_last_write = caller.unextended_sp() + (empty_chunk ? argsize : overlap);)
   assert(chunk->is_in_chunk(_last_write - _size),
@@ -2121,7 +2121,7 @@ protected:
   intptr_t* _top_unextended_sp;
   int _align_size;
 
-  StackChunkFrameStream<chunk_frames::MIXED> _stream;
+  StackChunkFrameStream<ChunkFrames::Mixed> _stream;
 
   NOT_PRODUCT(int _frames;)
 
@@ -2252,7 +2252,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   } else { // thaw a single frame
     partial = true;
 
-    StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
+    StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
     assert(chunk_sp == f.sp(), "");
     assert(chunk_sp == f.unextended_sp(), "");
 
@@ -2367,7 +2367,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   int num_frames = (return_barrier ? 1 : 2);
   bool last_interpreted = chunk->has_mixed_frames() && Interpreter::contains(chunk->pc());
 
-  _stream = StackChunkFrameStream<chunk_frames::MIXED>(chunk);
+  _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp = _stream.unextended_sp();
 
   frame hf = _stream.to_frame();

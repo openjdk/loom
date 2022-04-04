@@ -27,13 +27,13 @@
 #include "utilities/ostream.hpp"
 
 #ifndef PRODUCT
-template void StackChunkFrameStream<chunk_frames::MIXED>::print_on(outputStream* st) const;
-template void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::print_on(outputStream* st) const;
+template void StackChunkFrameStream<ChunkFrames::Mixed>::print_on(outputStream* st) const;
+template void StackChunkFrameStream<ChunkFrames::CompiledOnly>::print_on(outputStream* st) const;
 
-template <chunk_frames frames>
+template <ChunkFrames frames>
 void StackChunkFrameStream<frames>::print_on(outputStream* st) const {
   st->print_cr("chunk: " INTPTR_FORMAT " index: %d sp offset: %d stack size: %d",
-    p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
+               p2i(_chunk), _index, _chunk->to_offset(_sp), _chunk->stack_size());
   to_frame().print_on(st);
 }
 #endif

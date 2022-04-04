@@ -96,7 +96,7 @@ class DoMethodsStackChunkFrameClosure {
 public:
   DoMethodsStackChunkFrameClosure(OopIterateClosure* cl) : _closure(cl) {}
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (f.is_interpreted()) {
       Method* m = f.to_frame().interpreter_frame_method();
@@ -131,7 +131,7 @@ public:
     assert(_closure != nullptr, "must be set");
   }
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (_do_metadata) {
       DoMethodsStackChunkFrameClosure(_closure).do_frame(f, map);
@@ -166,7 +166,7 @@ public:
   const RegisterMap* get_map(const RegisterMap* map,      intptr_t* sp) { return map; }
   const RegisterMap* get_map(const SmallRegisterMap* map, intptr_t* sp) { return map->copy_to_RegisterMap(&_map, sp); }
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     ResetNoHandleMark rnhm;
     HandleMark hm(Thread::current());
@@ -200,7 +200,7 @@ class PrintStackChunkClosure {
 public:
   PrintStackChunkClosure(outputStream* st) : _st(st) {}
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",

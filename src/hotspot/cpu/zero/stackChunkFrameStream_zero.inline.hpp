@@ -30,67 +30,67 @@
 #include "runtime/registerMap.hpp"
 
 #ifdef ASSERT
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
   Unimplemented();
   return true;
 }
 #endif
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
   Unimplemented();
   return frame();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline address StackChunkFrameStream<frame_kind>::get_pc() const {
   Unimplemented();
   return NULL;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::fp() const {
   Unimplemented();
   return NULL;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::derelativize(int offset) const {
   Unimplemented();
   return NULL;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
   Unimplemented();
   return NULL;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 intptr_t* StackChunkFrameStream<frame_kind>::next_sp_for_interpreter_frame() const {
   Unimplemented();
   return NULL;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   Unimplemented();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   Unimplemented();
   return 0;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() const {
   Unimplemented();
   return 0;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const {
   Unimplemented();
   return 0;
@@ -98,17 +98,17 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::Mixed>::update_reg_map_pd(RegisterMap* map) {
   Unimplemented();
 }
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::CompiledOnly>::update_reg_map_pd(RegisterMap* map) {
   Unimplemented();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::update_reg_map_pd(RegisterMapT* map) {}
 

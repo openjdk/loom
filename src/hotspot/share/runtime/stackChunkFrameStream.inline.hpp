@@ -43,10 +43,10 @@
 extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 #endif
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
-  assert(frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
+  assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
 
   DEBUG_ONLY(_index = 0;)
   _end = chunk->bottom_address();
@@ -55,7 +55,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DE
 
   get_cb();
 
-  if (frame_kind == chunk_frames::MIXED) {
+  if (frame_kind == ChunkFrames::Mixed) {
     _unextended_sp = (!is_done() && is_interpreted()) ? unextended_sp_for_interpreter_frame() : _sp;
     assert(_unextended_sp >= _sp - frame::metadata_words, "");
   }
@@ -67,11 +67,11 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DE
   } DEBUG_ONLY(else _has_stub = false;)
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, const frame& f)
   DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
-  assert(frame_kind == chunk_frames::MIXED || !chunk->has_mixed_frames(), "");
+  assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
   // assert(!is_empty(), ""); -- allowed to be empty
 
   DEBUG_ONLY(_index = 0;)
@@ -80,7 +80,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
 
   assert(chunk->is_in_chunk(f.sp()), "");
   _sp = f.sp();
-  if (frame_kind == chunk_frames::MIXED) {
+  if (frame_kind == ChunkFrames::Mixed) {
     _unextended_sp = f.unextended_sp();
     assert(_unextended_sp >= _sp - frame::metadata_words, "");
   }
@@ -101,33 +101,33 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
   } DEBUG_ONLY(else _has_stub = false;)
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline bool StackChunkFrameStream<frame_kind>::is_stub() const {
   return cb() != nullptr && (_cb->is_safepoint_stub() || _cb->is_runtime_stub());
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline bool StackChunkFrameStream<frame_kind>::is_compiled() const {
   return cb() != nullptr && _cb->is_compiled();
 }
 
 template <>
-inline bool StackChunkFrameStream<chunk_frames::MIXED>::is_interpreted() const {
+inline bool StackChunkFrameStream<ChunkFrames::Mixed>::is_interpreted() const {
   return !is_done() && Interpreter::contains(pc());
 }
 
 template <>
-inline bool StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::is_interpreted() const {
+inline bool StackChunkFrameStream<ChunkFrames::CompiledOnly>::is_interpreted() const {
   return false;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::frame_size() const {
   return is_interpreted() ? interpreter_frame_size()
                           : cb()->frame_size() + stack_argsize();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::stack_argsize() const {
   if (is_interpreted()) {
     return interpreter_frame_stack_argsize();
@@ -141,22 +141,22 @@ inline int StackChunkFrameStream<frame_kind>::stack_argsize() const {
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::num_oops() const {
   return is_interpreted() ? interpreter_frame_num_oops() : oopmap()->num_oops();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::initialize_register_map(RegisterMap* map) {
   update_reg_map_pd(map);
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map) {
   update_reg_map(map);
   bool safepoint = is_stub();
-  if (frame_kind == chunk_frames::MIXED) {
+  if (frame_kind == ChunkFrames::Mixed) {
     if (is_interpreted()) {
       next_for_interpreter_frame();
     } else {
@@ -181,12 +181,12 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map) {
   DEBUG_ONLY(_index++;)
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::next_sp() const {
   return is_interpreted() ? next_sp_for_interpreter_frame() : unextended_sp() + cb()->frame_size();
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::get_cb() {
   _oopmap = nullptr;
   if (is_done() || is_interpreted()) {
@@ -205,7 +205,7 @@ inline void StackChunkFrameStream<frame_kind>::get_cb() {
     "not alive - not_entrant: %d zombie: %d unloaded: %d", _cb->is_not_entrant(), _cb->is_zombie(), _cb->is_unloaded());
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::get_oopmap() const {
   if (is_interpreted()) {
     return;
@@ -214,7 +214,7 @@ inline void StackChunkFrameStream<frame_kind>::get_oopmap() const {
   get_oopmap(pc(), CodeCache::find_oopmap_slot_fast(pc()));
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::get_oopmap(address pc, int oopmap_slot) const {
   assert(cb() != nullptr, "");
   assert(!is_compiled() || !cb()->as_compiled_method()->is_deopt_pc(pc), "");
@@ -230,7 +230,7 @@ inline void StackChunkFrameStream<frame_kind>::get_oopmap(address pc, int oopmap
   assert(_oopmap != nullptr, "");
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void* StackChunkFrameStream<frame_kind>::reg_to_loc(VMReg reg, const RegisterMapT* map) const {
   assert(!is_done(), "");
@@ -240,7 +240,7 @@ inline void* StackChunkFrameStream<frame_kind>::reg_to_loc(VMReg reg, const Regi
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::Mixed>::update_reg_map(RegisterMap* map) {
   assert(!map->in_cont() || map->stack_chunk() == _chunk, "");
   if (map->update_map() && is_stub()) {
     frame f = to_frame();
@@ -250,7 +250,7 @@ inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map(RegisterM
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::CompiledOnly>::update_reg_map(RegisterMap* map) {
   assert(map->in_cont(), "");
   assert(map->stack_chunk()() == _chunk, "");
   if (map->update_map()) {
@@ -259,11 +259,11 @@ inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map(R
   }
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::update_reg_map(RegisterMapT* map) {}
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline address StackChunkFrameStream<frame_kind>::orig_pc() const {
   address pc1 = pc();
   if (is_interpreted() || is_stub()) {
@@ -281,21 +281,21 @@ inline address StackChunkFrameStream<frame_kind>::orig_pc() const {
   return pc1;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::to_offset(stackChunkOop chunk) const {
   assert(!is_done(), "");
   return _sp - chunk->start_address();
 }
 
 #ifdef ASSERT
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 bool StackChunkFrameStream<frame_kind>::is_deoptimized() const {
   address pc1 = pc();
   return is_compiled() && CodeCache::find_oopmap_slot_fast(pc1) < 0 && cb()->as_compiled_method()->is_deopt_pc(pc1);
 }
 #endif
 
-template<chunk_frames frame_kind>
+template<ChunkFrames frame_kind>
 void StackChunkFrameStream<frame_kind>::handle_deopted() const {
   assert(!is_done(), "");
 
@@ -318,7 +318,7 @@ void StackChunkFrameStream<frame_kind>::handle_deopted() const {
   get_oopmap(pc1, oopmap_slot);
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <class OopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* closure, const RegisterMapT* map) const {
   if (is_interpreted()) {
@@ -347,7 +347,7 @@ inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* clos
   }
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <class DerivedOopClosureType, class RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const {
   if (is_interpreted()) {
@@ -377,7 +377,7 @@ inline void StackChunkFrameStream<frame_kind>::iterate_derived_pointers(DerivedO
 
 #ifdef ASSERT
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 bool StackChunkFrameStream<frame_kind>::is_in_oops(void* p, const RegisterMapT* map) const {
   for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {
@@ -391,10 +391,10 @@ bool StackChunkFrameStream<frame_kind>::is_in_oops(void* p, const RegisterMapT* 
   return false;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 void StackChunkFrameStream<frame_kind>::assert_is_interpreted_and_frame_type_mixed() const {
   assert(is_interpreted(), "");
-  assert(frame_kind == chunk_frames::MIXED, "");
+  assert(frame_kind == ChunkFrames::Mixed, "");
 }
 
 #endif

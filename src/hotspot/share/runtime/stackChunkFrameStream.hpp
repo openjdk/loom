@@ -36,9 +36,9 @@ class ImmutableOopMap;
 class VMRegImpl;
 typedef VMRegImpl* VMReg;
 
-enum chunk_frames { COMPILED_ONLY, MIXED };
+enum ChunkFrames { CompiledOnly, Mixed };
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 class StackChunkFrameStream : public StackObj {
 private:
   intptr_t* _end;
@@ -73,7 +73,7 @@ public:
   intptr_t*        sp() const  { return _sp; }
   inline address   pc() const  { return get_pc(); }
   inline intptr_t* fp() const;
-  inline intptr_t* unextended_sp() const { return frame_kind == chunk_frames::MIXED ? _unextended_sp : _sp; }
+  inline intptr_t* unextended_sp() const { return frame_kind == ChunkFrames::Mixed ? _unextended_sp : _sp; }
   NOT_PRODUCT(int index() { return _index; })
   inline address orig_pc() const;
 

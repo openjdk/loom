@@ -150,9 +150,9 @@ inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
 }
 
-template <stackChunkOopDesc::BarrierType barrier, chunk_frames frame_kind, typename RegisterMapT>
+template <stackChunkOopDesc::BarrierType barrier, ChunkFrames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-  if (frame_kind == chunk_frames::MIXED) {
+  if (frame_kind == ChunkFrames::Mixed) {
     // we could freeze deopted frames in slow mode.
     f.handle_deopted();
   }
@@ -161,11 +161,11 @@ void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, 
 
 template <class StackChunkFrameClosureType>
 inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
-  has_mixed_frames() ? iterate_stack<chunk_frames::MIXED>(closure)
-                     : iterate_stack<chunk_frames::COMPILED_ONLY>(closure);
+  has_mixed_frames() ? iterate_stack<ChunkFrames::Mixed>(closure)
+                     : iterate_stack<ChunkFrames::CompiledOnly>(closure);
 }
 
-template <chunk_frames frame_kind, class StackChunkFrameClosureType>
+template <ChunkFrames frame_kind, class StackChunkFrameClosureType>
 inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure) {
   const SmallRegisterMap* map = SmallRegisterMap::instance;
   assert(!map->in_cont(), "");
@@ -189,7 +189,7 @@ inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure
   assert(!f.is_stub(), "");
 
   for(; should_continue && !f.is_done(); f.next(map)) {
-    if (frame_kind == chunk_frames::MIXED) {
+    if (frame_kind == ChunkFrames::Mixed) {
       // in slow mode we might freeze deoptimized frames
       f.handle_deopted();
     }
