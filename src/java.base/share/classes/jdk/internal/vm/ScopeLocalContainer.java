@@ -45,10 +45,12 @@ public class ScopeLocalContainer extends StackableScope {
         Unsafe.getUnsafe().ensureClassInitialized(StructureViolationExceptions.class);
     }
 
+    private ScopeLocalContainer() {
+    }
+
     /**
-     * Returns the "latest" ScopeLocalContainer (or a named subclass of one) for
-     * the current Thread. This may be on the current thread's scope task or may
-     * require walking up the tree to find it.
+     * Returns the "latest" ScopeLocalContainer for the current Thread. This may be on
+     * the current thread's scope task or ma require walking up the tree to find it.
      */
     public static <T extends ScopeLocalContainer> T latest(Class<T> containerClass) {
         StackableScope scope = head();

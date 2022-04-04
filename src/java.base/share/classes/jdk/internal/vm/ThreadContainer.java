@@ -33,19 +33,19 @@ import java.util.stream.Stream;
 public abstract class ThreadContainer extends StackableScope {
 
     /**
-     * Creates a ThreadContainer owned by the current thread.
-     */
-    protected ThreadContainer() {
-        super(false);
-    }
-
-    /**
      * Creates a ThreadContainer.
      * @param shared true for a shared container, false for a container
      * owned by the current thread
      */
     ThreadContainer(boolean shared) {
         super(shared);
+    }
+
+    /**
+     * Creates a ThreadContainer owned by the current thread.
+     */
+    protected ThreadContainer() {
+        super(false);
     }
 
     /**
