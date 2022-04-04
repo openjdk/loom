@@ -520,18 +520,7 @@ bool ContinuationWrapper::chunk_invariant(outputStream* st) {
   }
   return true;
 }
-#endif
-
-#if INCLUDE_JVMTI
-static int num_java_frames(ContinuationWrapper& cont) {
-  ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
-  int count = 0;
-  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
-    count += chunk->num_java_frames();
-  }
-  return count;
-}
-#endif // INCLUDE_JVMTI
+#endif // ASSERT
 
 /////////////////////////////////////////////////////////////////
 
@@ -1860,26 +1849,33 @@ void FreezeBase::throw_stack_overflow_on_humongous_chunk() {
 }
 
 #if INCLUDE_JVMTI
-static void invalidate_JVMTI_stack(JavaThread* thread) {
+static int num_java_frames(ContinuationWrapper& cont) {
+  ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
+  int count = 0;
+  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
+    count += chunk->num_java_frames();
+  }
+  return count;
+}
+
+static void invalidate_jvmti_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
     JvmtiThreadState *state = thread->jvmti_thread_state();
     if (state != nullptr)
       state->invalidate_cur_stack_depth();
   }
 }
-#endif // INCLUDE_JVMTI
 
-static void JVMTI_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
-#if INCLUDE_JVMTI
+static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
   if (JvmtiExport::can_post_frame_pop()) {
     int num_frames = num_java_frames(cont);
 
     ContinuationWrapper::SafepointOp so(Thread::current(), cont);
     JvmtiExport::continuation_yield_cleanup(JavaThread::current(), num_frames);
   }
-  invalidate_JVMTI_stack(thread);
-#endif
+  invalidate_jvmti_stack(thread);
 }
+#endif // INCLUDE_JVMTI
 
 static freeze_result is_pinned(const frame& f, RegisterMap* map) {
   if (f.is_interpreted_frame()) {
@@ -1923,7 +1919,7 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   }
   return false;
 }
-#endif
+#endif // ASSERT
 
 static inline bool can_freeze_fast(JavaThread* thread) {
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
@@ -1958,7 +1954,7 @@ static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_r
     return early_return(res, thread);
   }
 
-  JVMTI_yield_cleanup(thread, cont); // can safepoint
+  JVMTI_ONLY(jvmti_yield_cleanup(thread, cont)); // can safepoint
   return freeze_epilog(thread, cont);
 }
 
@@ -2180,7 +2176,6 @@ private:
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
-  static void JVMTI_continue_cleanup(JavaThread* thread);
 };
 
 template <typename ConfigT>
@@ -2392,9 +2387,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 
   assert(_cont.chunk_invariant(tty), "");
 
-  if (!return_barrier) {
-    JVMTI_continue_cleanup(_thread);
-  }
+  JVMTI_ONLY(if (!return_barrier) invalidate_jvmti_stack(_thread));
 
   _thread->set_cont_fastpath(_fastpath);
 
@@ -2758,12 +2751,6 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
   ContinuationHelper::push_pd(f);
 
   assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
-}
-
-void ThawBase::JVMTI_continue_cleanup(JavaThread* thread) {
-#if INCLUDE_JVMTI
-  invalidate_JVMTI_stack(thread);
-#endif // INCLUDE_JVMTI
 }
 
 // returns new top sp
