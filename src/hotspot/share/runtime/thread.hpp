@@ -32,7 +32,6 @@
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopHandle.hpp"
-#include "oops/weakHandle.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
@@ -736,7 +735,6 @@ class JavaThread: public Thread {
   // will be carried out as soon as possible which, in most cases, is just before deoptimization of
   // the frame, when control returns to it.
   JvmtiDeferredUpdates* _jvmti_deferred_updates;
-  GrowableArray<WeakHandle>* _keepalive_cleanup;
 
   // Handshake value for fixing 6243940. We need a place for the i2c
   // adapter to store the callee Method*. This value is NEVER live
@@ -1290,9 +1288,6 @@ private:
   // Side structure for deferring update of java frame locals until deopt occurs
   JvmtiDeferredUpdates* deferred_updates() const      { return _jvmti_deferred_updates; }
   void set_deferred_updates(JvmtiDeferredUpdates* du) { _jvmti_deferred_updates = du; }
-
-  void set_keepalive_cleanup(GrowableArray<WeakHandle>* lst) { _keepalive_cleanup = lst; }
-  GrowableArray<WeakHandle>* keepalive_cleanup() const { return _keepalive_cleanup; }
 
   // These only really exist to make debugging deopt problems simpler
 

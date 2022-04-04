@@ -1016,7 +1016,6 @@ JavaThread::JavaThread() :
   _vframe_array_head(nullptr),
   _vframe_array_last(nullptr),
   _jvmti_deferred_updates(nullptr),
-  _keepalive_cleanup(new (ResourceObj::C_HEAP, mtInternal) GrowableArray<WeakHandle>(16, mtInternal)),
   _callee_target(nullptr),
   _vm_result(nullptr),
   _vm_result_2(nullptr),
