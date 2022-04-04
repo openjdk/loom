@@ -580,6 +580,9 @@ public class ThreadImpl implements ThreadMXBean {
 
     /**
      * Returns true if the given Thread is a virutal thread.
+     *
+     * @implNote This method uses reflection because Thread::isVirtual is a preview API
+     * and the java.management cannot be compiled with --enable-preview.
      */
     private static boolean isVirtual(Thread thread) {
         try {
