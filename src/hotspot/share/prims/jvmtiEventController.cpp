@@ -218,7 +218,6 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     // invalidate_cur_stack_depth is called in enter_interp_only_mode
     state->enter_interp_only_mode();
 
-    // TBD: find out why the other place where this is called is insufficient
     Continuation::set_cont_fastpath_thread_state(jt);
 
     if (jt->has_last_Java_frame()) {
@@ -579,11 +578,6 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
       state->set_should_post_on_exceptions(should_post_on_exceptions);
     }
   }
-#if 0
-  if (state->get_thread() == NULL) {
-    return any_env_enabled;
-  }
-#endif
   // compute interp_only mode
   bool should_be_interp = (any_env_enabled & INTERP_EVENT_BITS) != 0 || has_frame_pops;
   bool is_now_interp = state->is_interp_only_mode();
@@ -595,12 +589,6 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
       leave_interp_only_mode(state);
     }
   }
-#if 0
-  // TBD: there is a race here, so get_thread() can return NULL below.
-  if (state->get_thread() != NULL) {
-    Continuation::set_cont_fastpath_thread_state(state->get_thread());
-  }
-#endif
   return any_env_enabled;
 }
 
