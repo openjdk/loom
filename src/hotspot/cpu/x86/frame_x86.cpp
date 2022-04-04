@@ -644,27 +644,6 @@ frame::frame(void* sp, void* fp, void* pc) {
 
 #endif
 
-void frame::print_raw() const {
-  tty->print_cr("pc_return " INTPTR_FORMAT, *addr_at(pc_return_offset));
-  tty->print_cr("link " INTPTR_FORMAT, *addr_at(link_offset));
-  tty->print_cr("return_addr " INTPTR_FORMAT, *addr_at(return_addr_offset));
-  tty->print_cr("sender_sp " INTPTR_FORMAT, *addr_at(sender_sp_offset));
-  tty->print_cr("interpreter_frame_result_handler " INTPTR_FORMAT, *addr_at(interpreter_frame_result_handler_offset));
-  tty->print_cr("interpreter_frame_oop_temp " INTPTR_FORMAT, *addr_at(interpreter_frame_oop_temp_offset));
-  tty->print_cr("interpreter_frame_sender_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_sender_sp_offset));
-  tty->print_cr("interpreter_frame_last_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_last_sp_offset));
-  tty->print_cr("interpreter_frame_method " INTPTR_FORMAT, *addr_at(interpreter_frame_method_offset));
-  tty->print_cr("interpreter_frame_mirror " INTPTR_FORMAT, *addr_at(interpreter_frame_mirror_offset));
-  tty->print_cr("interpreter_frame_mdp " INTPTR_FORMAT, *addr_at(interpreter_frame_mdp_offset));
-  tty->print_cr("interpreter_frame_cache " INTPTR_FORMAT, *addr_at(interpreter_frame_cache_offset));
-  tty->print_cr("interpreter_frame_locals " INTPTR_FORMAT, *addr_at(interpreter_frame_locals_offset));
-  tty->print_cr("interpreter_frame_bcp " INTPTR_FORMAT, *addr_at(interpreter_frame_bcp_offset));
-  tty->print_cr("interpreter_frame_initial_sp " INTPTR_FORMAT, *addr_at(interpreter_frame_initial_sp_offset));
-  tty->print_cr("interpreter_frame_monitor_block_top " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_top_offset));
-  tty->print_cr("interpreter_frame_monitor_block_bottom " INTPTR_FORMAT, *addr_at(interpreter_frame_monitor_block_bottom_offset));
-  tty->print_cr("address::%s", is_heap_frame() ? "heap_frame" : "stack_frame");
-}
-
 void JavaFrameAnchor::make_walkable(JavaThread* thread) {
   // last frame set?
   if (last_Java_sp() == NULL) return;

@@ -71,26 +71,23 @@ void AbstractInterpreter::layout_activation(Method* method,
   // It is also guaranteed to be walkable even though it is in a
   // skeletal state
 
-  const int max_locals = method->max_locals() * Interpreter::stackElementWords;
-  const int params = method->size_of_parameters() * Interpreter::stackElementWords;
-  const int extra_locals = max_locals - params;
+  int max_locals = method->max_locals() * Interpreter::stackElementWords;
+  int extra_locals = (method->max_locals() - method->size_of_parameters()) *
+    Interpreter::stackElementWords;
 
+#ifdef ASSERT
   assert(caller->sp() == interpreter_frame->sender_sp(), "Frame not properly walkable");
+#endif
 
   interpreter_frame->interpreter_frame_set_method(method);
   // NOTE the difference in using sender_sp and
   // interpreter_frame_sender_sp interpreter_frame_sender_sp is
   // the original sp of the caller (the unextended_sp) and
   // sender_sp is fp+8/16 (32bit/64bit) XXX
-  intptr_t* const locals = interpreter_frame->sender_sp() + max_locals - 1;
+  intptr_t* locals = interpreter_frame->sender_sp() + max_locals - 1;
 
 #ifdef ASSERT
   if (caller->is_interpreted_frame()) {
-    if (locals >= caller->fp() + frame::interpreter_frame_initial_sp_offset) {
-      tty->print("method: "); method->print_on(tty);
-      tty->print("caller: "); caller->print_on(tty);
-      tty->print_cr("sender_sp: " INTPTR_FORMAT " locals: " INTPTR_FORMAT " max_locals: %d caller.fp: " INTPTR_FORMAT " caller.initial_sp: " INTPTR_FORMAT, p2i(interpreter_frame->sender_sp()), p2i(locals), max_locals, p2i(caller->fp()), p2i(caller->fp() + frame::interpreter_frame_initial_sp_offset));
-    }
     assert(locals < caller->fp() + frame::interpreter_frame_initial_sp_offset, "bad placement");
   }
 #endif
@@ -109,12 +106,16 @@ void AbstractInterpreter::layout_activation(Method* method,
   // All frames but the initial (oldest) interpreter frame we fill in have
   // a value for sender_sp that allows walking the stack but isn't
   // truly correct. Correct the value here.
-  if (extra_locals != 0 && interpreter_frame->sender_sp() == interpreter_frame->interpreter_frame_sender_sp()) {
-    interpreter_frame->set_interpreter_frame_sender_sp(caller->sp() + extra_locals);
+  if (extra_locals != 0 &&
+      interpreter_frame->sender_sp() ==
+      interpreter_frame->interpreter_frame_sender_sp()) {
+    interpreter_frame->set_interpreter_frame_sender_sp(caller->sp() +
+                                                       extra_locals);
   }
-
-  *interpreter_frame->interpreter_frame_cache_addr()  = method->constants()->cache();
-  *interpreter_frame->interpreter_frame_mirror_addr() = method->method_holder()->java_mirror();
+  *interpreter_frame->interpreter_frame_cache_addr() =
+    method->constants()->cache();
+  *interpreter_frame->interpreter_frame_mirror_addr() =
+    method->method_holder()->java_mirror();
 }
 
 #ifndef _LP64
