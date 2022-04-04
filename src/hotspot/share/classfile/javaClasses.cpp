@@ -1997,21 +1997,26 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
     GrowableArray<int>*     _bcis;
 
     GetStackTraceClosure(Handle java_thread) :
-        HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0) {
+        HandshakeClosure("GetStackTraceClosure"), _java_thread(java_thread), _depth(0), _retry_handshake(false) {
       // Pick some initial length
       int init_length = MaxJavaStackTraceDepth / 2;
       _methods = new GrowableArray<Method*>(init_length);
       _bcis = new GrowableArray<int>(init_length);
     }
 
-    bool retry() { return _retry_handshake; }
+    bool read_reset_retry() {
+      bool ret = _retry_handshake;
+      // If we re-execute the handshake this method need to return false
+      // when the handshake cannot be performed. (E.g. thread terminating)
+      _retry_handshake = false;
+      return ret;
+    }
 
     void do_thread(Thread* th) {
       if (!Thread::current()->is_Java_thread()) {
         _retry_handshake = true;
         return;
       }
-      _retry_handshake = false;
 
       JavaThread* thread = JavaThread::cast(th);
 
@@ -2058,7 +2063,7 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   GetStackTraceClosure gstc(Handle(THREAD, java_thread));
   do {
    Handshake::execute(&gstc, &tlh, thread);
-  } while (gstc.retry());
+  } while (gstc.read_reset_retry());
 
   // Stop if no stack trace is found.
   if (gstc._depth == 0) {
