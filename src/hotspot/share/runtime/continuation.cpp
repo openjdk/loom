@@ -1743,7 +1743,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   if (UNLIKELY(_barriers)) {
     log_develop_trace(continuations)("do barriers on old chunk");
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>();
   }
 
   log_develop_trace(continuations)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
@@ -2525,7 +2525,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_interpreted_frame(), "");
 
   if (UNLIKELY(_barriers)) {
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<ContinuationHelper::InterpretedFrame>(caller, num_frames);
@@ -2591,7 +2591,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
 
   if (!stub_caller && UNLIKELY(_barriers)) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<ContinuationHelper::CompiledFrame>(caller, num_frames);
@@ -2664,7 +2664,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     _stream.next(&map);
     assert(!_stream.is_done(), "");
     if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
-      _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, &map);
+      _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
     }
     assert(!_stream.is_done(), "");
   }

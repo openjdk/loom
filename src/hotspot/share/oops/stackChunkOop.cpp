@@ -110,7 +110,7 @@ int stackChunkOopDesc::num_java_frames() const {
   return n;
 }
 
-template <stackChunkOopDesc::barrier_type barrier>
+template <stackChunkOopDesc::BarrierType barrier>
 class DoBarriersStackClosure {
   const stackChunkOop _chunk;
 
@@ -124,14 +124,14 @@ public:
   }
 };
 
-template <stackChunkOopDesc::barrier_type barrier>
+template <stackChunkOopDesc::BarrierType barrier>
 void stackChunkOopDesc::do_barriers() {
   DoBarriersStackClosure<barrier> closure(this);
   iterate_stack(&closure);
 }
 
-template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::barrier_type::LOAD> ();
-template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::barrier_type::STORE>();
+template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Load> ();
+template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Store>();
 
 // We replace derived oops with offsets; the converse is done in DerelativizeDerivedOopClosure
 class RelativizeDerivedOopClosure : public DerivedOopClosure {
@@ -324,7 +324,7 @@ void stackChunkOopDesc::transform() {
   }
 }
 
-template <stackChunkOopDesc::barrier_type barrier, bool compressedOopsWithBitmap>
+template <stackChunkOopDesc::BarrierType barrier, bool compressedOopsWithBitmap>
 class BarrierClosure: public OopClosure {
   NOT_PRODUCT(intptr_t* _sp;)
 
@@ -336,13 +336,13 @@ public:
 
   template <class T> inline void do_oop_work(T* p) {
     oop value = (oop)HeapAccess<>::oop_load(p);
-    if (barrier == stackChunkOopDesc::barrier_type::STORE) {
+    if (barrier == stackChunkOopDesc::BarrierType::Store) {
       HeapAccess<>::oop_store(p, value);
     }
   }
 };
 
-template <stackChunkOopDesc::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
+template <stackChunkOopDesc::BarrierType barrier, chunk_frames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   // We need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
   if (f.is_done()) {
@@ -377,14 +377,14 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
   }
 }
 
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::LOAD> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
-template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::barrier_type::STORE>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Load> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const RegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Load> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const RegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Load> (const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<chunk_frames::MIXED>& f, const SmallRegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Load> (const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
+template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<chunk_frames::COMPILED_ONLY>& f, const SmallRegisterMap* map);
 
 class DerelativizeDerivedOopClosure : public DerivedOopClosure {
 public:

@@ -150,7 +150,7 @@ inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
 }
 
-template <stackChunkOopDesc::barrier_type barrier, chunk_frames frame_kind, typename RegisterMapT>
+template <stackChunkOopDesc::BarrierType barrier, chunk_frames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   if (frame_kind == chunk_frames::MIXED) {
     // we could freeze deopted frames in slow mode.

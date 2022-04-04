@@ -45,10 +45,10 @@ typedef VMRegImpl* VMReg;
 // max_size is the maximum space a thawed chunk would take up on the stack, *not* including top-most frame's metadata
 class stackChunkOopDesc : public instanceOopDesc {
 public:
-  enum class barrier_type { LOAD, STORE };
+  enum class BarrierType { Load, Store };
 
 private:
-  template <barrier_type barrier> friend class DoBarriersStackClosure;
+  template <BarrierType barrier> friend class DoBarriersStackClosure;
 
   // Chunk flags.
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
@@ -122,10 +122,10 @@ public:
 
   inline bool requires_barriers();
 
-  template <barrier_type>
+  template <BarrierType>
   void do_barriers();
 
-  template <barrier_type, chunk_frames frames, typename RegisterMapT>
+  template <BarrierType, chunk_frames frames, typename RegisterMapT>
   inline void do_barriers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
@@ -178,7 +178,7 @@ public:
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
 private:
-  template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
+  template <BarrierType barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
   void do_barriers0(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <chunk_frames frames, class StackChunkFrameClosureType>
