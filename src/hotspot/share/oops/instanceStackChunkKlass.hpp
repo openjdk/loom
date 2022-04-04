@@ -117,7 +117,8 @@ public:
 
   inline size_t instance_size(size_t stack_size_in_words) const;
 
-  static inline size_t bitmap_size(size_t stack_size_in_words); // in words
+  static inline size_t bitmap_size_in_bits(size_t stack_size_in_words); // In bits
+  static inline size_t bitmap_size(size_t stack_size_in_words); // In words
 
   // Returns the size of the instance including the stack data.
   virtual size_t oop_size(oop obj) const override;

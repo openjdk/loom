@@ -702,9 +702,9 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   }
 
   if (has_bitmap()) {
-    assert(bitmap().size() == align_up((size_t)(stack_size() << (UseCompressedOops ? 1 : 0)), BitsPerWord),
-      "bitmap().size(): %zu stack_size: %d",
-      bitmap().size(), stack_size());
+    assert(bitmap().size() == InstanceStackChunkKlass::bitmap_size_in_bits(stack_size()),
+           "bitmap().size(): %zu stack_size: %d",
+           bitmap().size(), stack_size());
 
     int oop_count;
     if (UseCompressedOops) {

@@ -203,10 +203,9 @@ inline frame stackChunkOopDesc::derelativize(frame fr) const { derelativize_fram
 inline BitMapView stackChunkOopDesc::bitmap() const {
   int stack_sz = stack_size();
 
-  // The bitmap is located after the stack
+  // The bitmap is located after the stack.
   HeapWord* bitmap_addr = start_of_stack() + stack_sz;
-  size_t bitmap_size = InstanceStackChunkKlass::bitmap_size(stack_sz);
-  size_t bitmap_size_in_bits = bitmap_size << LogBitsPerWord;
+  size_t bitmap_size_in_bits = InstanceStackChunkKlass::bitmap_size_in_bits(stack_sz);
 
   BitMapView bitmap((BitMap::bm_word_t*)bitmap_addr, bitmap_size_in_bits);
 
