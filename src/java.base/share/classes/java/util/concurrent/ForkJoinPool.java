@@ -400,7 +400,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      * an effect in creating threads or letting them time out and
      * terminate when idle.
      *
-     * Field "mode" mainly holds lifetime status, atomically and
+     * Field "runState" holds lifetime status, atomically and
      * monotonically setting SHUTDOWN, STOP, and finally TERMINATED
      * bits. It is updated only via bitwise atomics (getAndBitwiseOr).
      *
@@ -595,7 +595,9 @@ public class ForkJoinPool extends AbstractExecutorService {
      * track pool status while waiting in ForkJoinTask.awaitDone, and
      * interrupt interruptible callers on termination, while also
      * avoiding cancelling other tasks that are normally completing
-     * during quiescent termination.
+     * during quiescent termination. This is tracked by recording
+     * ForkJoinTask.POOLSUBMIT in task status and/or as a bit flag
+     * argument to joining methods.
      *
      * Trimming workers. To release resources after periods of lack of
      * use, a worker starting to wait when the pool is quiescent will
@@ -1081,6 +1083,9 @@ public class ForkJoinPool extends AbstractExecutorService {
         final int getAndSetAccess(int v) {
             return U.getAndSetInt(this, ACCESS, v);
         }
+        final void releaseAccess() {
+            U.putIntRelease(this, ACCESS, 0);
+        }
 
         /**
          * Constructor. For owned queues, most fields are initialized
@@ -1103,8 +1108,8 @@ public class ForkJoinPool extends AbstractExecutorService {
          * Returns the approximate number of tasks in the queue.
          */
         final int queueSize() {
-            int unused = access, n = top - base; // for ordering effect
-            return (n < 0) ? 0 : n;   // ignore transient negative
+            int unused = access;            // for ordering effect
+            return Math.max(top - base, 0); // ignore transient negative
         }
 
         /**
@@ -1161,15 +1166,12 @@ public class ForkJoinPool extends AbstractExecutorService {
             if (p - b > 0 && a != null && (cap = a.length) > 0) {
                 do {
                     if (fifo == 0 || (nb = b + 1) == p) {
-                        if ((t = getAndClearSlot(a, (cap - 1) & s)) != null) {
+                        if ((t = getAndClearSlot(a, (cap - 1) & s)) != null)
                             top = s;
-                            U.storeStoreFence();
-                        }
                         break;                   // lost race for only task
                     }
                     else if ((t = getAndClearSlot(a, (cap - 1) & b)) != null) {
                         base = nb;
-                        U.storeStoreFence();
                         break;
                     }
                     else {
@@ -1179,6 +1181,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                         }
                     }
                 } while (p - b > 0);
+                U.storeStoreFence(); // for timely index updates
             }
             return t;
         }
@@ -1195,23 +1198,22 @@ public class ForkJoinPool extends AbstractExecutorService {
          * Pops the given task only if it is at the current top.
          */
         final boolean tryUnpush(ForkJoinTask<?> task, boolean owned) {
-            boolean taken = false;
             ForkJoinTask<?>[] a = array;
             int p = top, s, cap, k;
             if (task != null && base != p && a != null && (cap = a.length) > 0 &&
                 a[k = (cap - 1) & (s = p - 1)] == task) {
                 if (owned || getAndSetAccess(1) == 0) {
-                    if ((owned || (top == p && a[k] == task)) &&
-                        getAndClearSlot(a, k) != null) {
-                        taken = true;
-                        top = s;
-                        U.storeStoreFence();
-                    }
-                    if (!owned)
+                    if (top != p || a[k] != task ||
+                        getAndClearSlot(a, k) == null)
                         access = 0;
+                    else {
+                        top = s;
+                        releaseAccess();
+                        return true;
+                    }
                 }
             }
-            return taken;
+            return false;
         }
 
         /**
@@ -1321,7 +1323,6 @@ public class ForkJoinPool extends AbstractExecutorService {
          * @return task status if removed, else 0
          */
         final int tryRemoveAndExec(ForkJoinTask<?> task, boolean owned) {
-            boolean taken = false;
             ForkJoinTask<?>[] a = array;
             int p = top, s = p - 1, d = p - base, cap;
             if (task != null && d > 0 && a != null && (cap = a.length) > 0) {
@@ -1330,9 +1331,12 @@ public class ForkJoinPool extends AbstractExecutorService {
                     if ((t = a[k = i & m]) == task) {
                         if (!owned && getAndSetAccess(1) != 0)
                             break;                 // fail if locked
-                        if ((owned || (top == p && a[k] == task)) &&
-                            getAndClearSlot(a, k) != null) {
-                            taken = true;
+                        else if (top != p || a[k] != task ||
+                                 getAndClearSlot(a, k) == null) {
+                            access = 0;
+                            break;                 // missed
+                        }
+                        else {
                             if (i != s && i == base)
                                 base = i + 1;      // avoid shift
                             else {
@@ -1340,19 +1344,15 @@ public class ForkJoinPool extends AbstractExecutorService {
                                     a[j & m] = getAndClearSlot(a, ++j & m);
                                 top = s;
                             }
-                            U.storeStoreFence();
+                            releaseAccess();
+                            return task.doExec();
                         }
-                        if (!owned)
-                            access = 0;
-                        break;
                     }
                     else if (t == null || --d == 0)
                         break;
                 }
             }
-            if (!taken)
-                return 0;
-            return task.doExec();
+            return 0;
         }
 
         /**
@@ -1367,7 +1367,6 @@ public class ForkJoinPool extends AbstractExecutorService {
             int status = 0;
             if (task != null) {
                 outer: for (;;) {
-                    boolean taken = false;
                     ForkJoinTask<?>[] a; ForkJoinTask<?> t;
                     int p, s, cap, k;
                     if ((status = task.status) < 0)
@@ -1384,19 +1383,15 @@ public class ForkJoinPool extends AbstractExecutorService {
                     }
                     if (!owned && getAndSetAccess(1) != 0)
                         break;                 // fail if locked
-                    if ((owned || (top == p && a[k] == t)) &&
-                        getAndClearSlot(a, k) != null) {
-                        taken = true;
-                        top = s;
-                        U.storeStoreFence();
-                    }
-                    if (!owned)
+                    if (top != p || a[k] != t || getAndClearSlot(a, k) == null) {
                         access = 0;
-                    if (taken) {
-                        t.doExec();
-                        if (limit != 0 && --limit == 0)
-                            break;
+                        break;                 // missed
                     }
+                    top = s;
+                    releaseAccess();
+                    t.doExec();
+                    if (limit != 0 && --limit == 0)
+                        break;
                 }
                 status = task.status;
             }
@@ -1561,7 +1556,7 @@ public class ForkJoinPool extends AbstractExecutorService {
 
     /**
      * Tries to construct and start one worker. Assumes that total
-     * count has already been incremented as a reservation.  Invokes
+     * count has already been incremented as a reservation.  InvThreadokes
      * deregisterWorker on any failure.
      *
      * @return true if successful
@@ -1778,7 +1773,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      */
     private boolean hasTasks(boolean submissionsOnly) {
         int step = submissionsOnly ? 2 : 1;
-        for (int checkSum = -1;;) { // repeat until queues stable
+        for (int checkSum = 0;;) { // repeat until stable (normally twice)
             U.loadFence();
             WorkQueue[] qs = queues;
             int n = (qs == null) ? 0 : qs.length, sum = 0;
@@ -1868,21 +1863,23 @@ public class ForkJoinPool extends AbstractExecutorService {
             w.stackPred = (int)pc;               // set ctl stack link
         } while (pc != (pc = compareAndExchangeCtl(
                             pc, qc = ((pc - RC_UNIT) & UC_MASK) | sp)));
-        if ((qc & RC_MASK) <= 0L)
+        if ((qc & RC_MASK) <= 0L) {
+            if (hasTasks(true) && (w.phase >= 0 || reactivate() == w))
+                return 0;                        // check for stragglers
+            if (runState != 0 && tryTerminate(false, false))
+                return -1;                       // quiescent termination
             idle = true;
-        if (idle && hasTasks(true) && (w.phase >= 0 || reactivate() == w))
-            return 0;                            // check for stragglers
-        int rs = runState;
-        if (rs < 0 || (rs != 0 && idle && tryTerminate(false, false)))
-            return -1;                           // quiescent termination
+        }
         WorkQueue[] qs = queues; // spin for expected #accesses in scan+signal
         int spins = ((qs == null) ? 0 : ((qs.length & SMASK) << 1)) | 0xf;
         while ((p = w.phase) < 0 && --spins > 0)
-            Thread.onSpinWait();                 // spin before block
-        if (p < 0) {                             // await signal
+            Thread.onSpinWait();
+        if (p < 0) {
             long deadline = idle ? keepAlive + System.currentTimeMillis() : 0L;
             LockSupport.setCurrentBlocker(this);
-            for (;;) {
+            for (;;) {                           // await signal or termination
+                if (runState < 0)
+                    return -1;
                 w.access = PARKED;               // enable unpark
                 if (w.phase < 0) {
                     if (idle)
@@ -1906,7 +1903,7 @@ public class ForkJoinPool extends AbstractExecutorService {
                 }
             }
         }
-        return (runState < 0) ? -1 : 0;
+        return 0;
     }
 
     /**
@@ -2515,6 +2512,8 @@ public class ForkJoinPool extends AbstractExecutorService {
                 WorkQueue q; Thread thread;
                 if ((q = qs[(r + i) & (n - 1)]) != null &&
                     (thread = q.owner) != current && q.access != STOP) {
+                    for (ForkJoinTask<?> t; (t = q.poll(null)) != null; )
+                        ForkJoinTask.cancelIgnoringExceptions(t);
                     if (thread != null && !thread.isInterrupted()) {
                         q.forcePhaseActive();      // for awaitWork
                         try {
@@ -2522,8 +2521,6 @@ public class ForkJoinPool extends AbstractExecutorService {
                         } catch (Throwable ignore) {
                         }
                     }
-                    for (ForkJoinTask<?> t; (t = q.poll(null)) != null; )
-                        ForkJoinTask.cancelIgnoringExceptions(t);
                 }
             }
         }
@@ -3305,7 +3302,7 @@ public class ForkJoinPool extends AbstractExecutorService {
      * @return {@code true} if there are any queued submissions
      */
     public boolean hasQueuedSubmissions() {
-        return (runState & TERMINATED) == 0 && hasTasks(true);
+        return hasTasks(true);
     }
 
     /**
