@@ -60,7 +60,6 @@
 #include "runtime/stackWatermarkSet.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
@@ -525,6 +524,7 @@ bool ContinuationWrapper::chunk_invariant(outputStream* st) {
 /////////////////////////////////////////////////////////////////
 
 // Entry point to freeze. Transitions are handled manually
+// Called from generate_cont_doYield() in stubGenerator_<cpu>.cpp through Continuation::freeze_entry();
 template<typename ConfigT>
 static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
   assert(sp == current->frame_anchor()->last_Java_sp(), "");
@@ -1934,11 +1934,6 @@ static inline bool can_freeze_fast(JavaThread* thread) {
   return fast;
 }
 
-static int early_return(int res, JavaThread* thread) {
-  log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
-  return res;
-}
-
 static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
@@ -1951,7 +1946,8 @@ static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
 static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
     verify_continuation(cont.continuation());
-    return early_return(res, thread);
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
+    return res;
   }
 
   JVMTI_ONLY(jvmti_yield_cleanup(thread, cont)); // can safepoint
@@ -1986,7 +1982,8 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   if (entry->is_pinned()) {
     log_develop_debug(continuations)("PINNED due to critical section");
     verify_continuation(cont.continuation());
-    return early_return(freeze_pinned_cs, current);
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", freeze_pinned_cs);
+    return freeze_pinned_cs;
   }
 
   bool fast = can_freeze_fast(current);
@@ -2939,7 +2936,7 @@ static void log_frames(JavaThread* thread) {
 
   ls.print_cr("======= end frames =========");
 }
-#endif
+#endif // ASSERT
 
 #include CPU_HEADER_INLINE(continuation)
 
