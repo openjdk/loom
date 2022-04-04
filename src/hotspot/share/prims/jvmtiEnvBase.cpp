@@ -809,7 +809,7 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
       for (int j = 0; j < nweaks; j++) {
         oop weak_obj = weaks->obj_at(j);
         assert(weak_obj != NULL, "weak_obj != NULL");
-        oop group_obj = java_lang_ref_Reference::unknown_referent(weak_obj);
+        oop group_obj = java_lang_ref_Reference::weak_referent(weak_obj);
         if (group_obj != NULL) {
           group_objs[count++] = Handle(current_thread, group_obj);
         }
