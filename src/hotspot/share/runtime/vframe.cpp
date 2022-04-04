@@ -54,9 +54,23 @@
 #include "runtime/vframeArray.hpp"
 #include "runtime/vframe_hp.hpp"
 
+static oop* allocate_handle(Handle reg_map_chunk) {
+  if (reg_map_chunk() != nullptr) {
+    return Thread::current()->handle_area()->allocate_handle(reg_map_chunk());
+  }
+
+  if (reg_map_chunk.not_null()) {
+    // NULL oop but the handle was still allocated, keep using an allocated handle.
+    return Thread::current()->handle_area()->allocate_null_handle();
+  }
+
+  // NULL oop and NULL handle, keep using an unallocated handle.
+  return NULL;
+}
+
 vframe::vframe(const frame* fr, const RegisterMap* reg_map, JavaThread* thread)
 : _reg_map(reg_map), _thread(thread),
-  _chunk(Thread::current(), reg_map->stack_chunk()(), reg_map->stack_chunk().not_null()) {
+  _chunk(allocate_handle(reg_map->stack_chunk()), true /* dummy */) {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
 }
