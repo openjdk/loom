@@ -7,6 +7,7 @@ serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorThreadDisabledTest.java   
 ##########
 
 # 8282492
+vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java
