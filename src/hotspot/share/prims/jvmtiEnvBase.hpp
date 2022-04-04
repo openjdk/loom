@@ -190,8 +190,8 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                                  JavaThread** jt_pp, oop* thread_oop_p);
 
   // Return true if java thread is a carrier thread with a mounted virtual thread.
-  static bool cthread_with_mounted_vthread(JavaThread* jt);
-  static bool cthread_with_continuation(JavaThread* jt);
+  static bool is_cthread_with_mounted_vthread(JavaThread* jt);
+  static bool is_cthread_with_continuation(JavaThread* jt);
 
   static JvmtiEnv* JvmtiEnv_from_jvmti_env(jvmtiEnv *env) {
     return (JvmtiEnv*)((intptr_t)env - in_bytes(jvmti_external_offset()));

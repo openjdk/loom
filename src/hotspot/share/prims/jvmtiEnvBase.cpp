@@ -697,7 +697,7 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
 javaVFrame*
 JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   // Strip vthread frames in case of carrier thread with mounted continuation.
-  javaVFrame *jvf = JvmtiEnvBase::cthread_with_continuation(jt) ?
+  javaVFrame *jvf = JvmtiEnvBase::is_cthread_with_continuation(jt) ?
                         jt->carrier_last_java_vframe(reg_map_p) :
                         jt->last_java_vframe(reg_map_p);
   jvf = check_and_skip_hidden_frames(jt, jvf);
@@ -867,7 +867,7 @@ JvmtiEnvBase::get_current_contended_monitor(JavaThread *calling_thread, JavaThre
   Thread *current_thread = Thread::current();
   assert(java_thread->is_handshake_safe_for(current_thread),
          "call by myself or at handshake");
-  if (!is_virtual && JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+  if (!is_virtual && JvmtiEnvBase::is_cthread_with_continuation(java_thread)) {
     // Carrier thread with a mounted continuation case.
     // No contended monitor can be owned by carrier thread in this case.
     *monitor_ptr = nullptr;
@@ -916,7 +916,7 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
   assert(java_thread->is_handshake_safe_for(current_thread),
          "call by myself or at handshake");
 
-  if (JvmtiEnvBase::cthread_with_continuation(java_thread)) {
+  if (JvmtiEnvBase::is_cthread_with_continuation(java_thread)) {
     // Carrier thread with a mounted continuation case.
     // No contended monitor can be owned by carrier thread in this case.
     return JVMTI_ERROR_NONE;
@@ -1277,21 +1277,21 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
 }
 
 bool
-JvmtiEnvBase::cthread_with_mounted_vthread(JavaThread* jt) {
+JvmtiEnvBase::is_cthread_with_mounted_vthread(JavaThread* jt) {
   oop thread_oop = jt->threadObj();
   assert(thread_oop != NULL, "sanity check");
   oop mounted_vt = jt->jvmti_vthread();
 
-  return (mounted_vt != NULL && mounted_vt != thread_oop);
+  return mounted_vt != NULL && mounted_vt != thread_oop;
 }
 
 bool
-JvmtiEnvBase::cthread_with_continuation(JavaThread* jt) {
+JvmtiEnvBase::is_cthread_with_continuation(JavaThread* jt) {
   const ContinuationEntry* cont_entry = NULL;
   if (jt->has_last_Java_frame()) {
     cont_entry = jt->vthread_continuation();
   }
-  return (cont_entry != NULL && cthread_with_mounted_vthread(jt));
+  return cont_entry != NULL && is_cthread_with_mounted_vthread(jt);
 }
 
 jvmtiError
