@@ -3937,7 +3937,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountBegin(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
-  if (DisableJVMTIVirtualThreadTransitions) {
+  if (!DoJVMTIVirtualThreadTransitions) {
     assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
     return;
   }
@@ -3949,7 +3949,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean first_mount))
 #if INCLUDE_JVMTI
-  if (DisableJVMTIVirtualThreadTransitions) {
+  if (!DoJVMTIVirtualThreadTransitions) {
     assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
     return;
   }
@@ -3974,7 +3974,7 @@ JVM_ENTRY(void, JVM_VirtualThreadMountEnd(JNIEnv* env, jobject vthread, jboolean
         JvmtiExport::post_vthread_start(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_start
-      if (!DisableVirtualThreadCompatibleLifecycleEvents &&
+      if (PostVirtualThreadCompatibleLifecycleEvents &&
           JvmtiExport::should_post_thread_life()) {
         // JvmtiEventController::thread_started is called here
         JvmtiExport::post_thread_start(thread);
@@ -3991,7 +3991,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboolean last_unmount))
 #if INCLUDE_JVMTI
-  if (DisableJVMTIVirtualThreadTransitions) {
+  if (!DoJVMTIVirtualThreadTransitions) {
     assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
     return;
   }
@@ -4007,7 +4007,7 @@ JVM_ENTRY(void, JVM_VirtualThreadUnmountBegin(JNIEnv* env, jobject vthread, jboo
         JvmtiExport::post_vthread_end(vthread);
       }
     } else { // compatibility for vthread unaware agents: legacy thread_end
-      if (!DisableVirtualThreadCompatibleLifecycleEvents &&
+      if (PostVirtualThreadCompatibleLifecycleEvents &&
           JvmtiExport::should_post_thread_life()) {
         JvmtiExport::post_thread_end(thread);
       }
@@ -4031,7 +4031,7 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadUnmountEnd(JNIEnv* env, jobject vthread, jboolean last_unmount))
 #if INCLUDE_JVMTI
-  if (DisableJVMTIVirtualThreadTransitions) {
+  if (!DoJVMTIVirtualThreadTransitions) {
     assert(!JvmtiExport::can_support_virtual_threads(), "sanity check");
     return;
   }

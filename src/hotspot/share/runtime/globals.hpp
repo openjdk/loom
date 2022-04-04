@@ -686,13 +686,13 @@ const intx ObjectAlignmentInBytes = 8;
                "Disable the use of stack guard pages if the JVM is loaded " \
                "on the primordial process thread")                          \
                                                                             \
-  product(bool, DisableVirtualThreadCompatibleLifecycleEvents, false, EXPERIMENTAL,\
-               "Disable generation of virtual thread ThreadStart and "      \
-               "ThreadEnd events for virtual thread unaware agents")        \
+  product(bool, PostVirtualThreadCompatibleLifecycleEvents, true, EXPERIMENTAL, \
+               "Post virtual thread ThreadStart and ThreadEnd events for "  \
+               "virtual thread unaware agents")                             \
                                                                             \
-  product(bool, DisableJVMTIVirtualThreadTransitions, false, EXPERIMENTAL,  \
-               "Disable JVMTI virtual thread mount/unmount transitions to " \
-               "avoid performance overhead for agents that don't need them")\
+  product(bool, DoJVMTIVirtualThreadTransitions, true, EXPERIMENTAL,        \
+               "Do JVMTI virtual thread mount/unmount transitions "         \
+               "(disabling this flag implies no JVMTI events are posted)")  \
                                                                             \
   /* notice: the max range value here is max_jint, not max_intx  */         \
   /* because of overflow issue                                   */         \
