@@ -41,6 +41,7 @@
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.inline.hpp"
 #include "prims/methodHandles.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/flags/flagSetting.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.hpp"
@@ -1995,6 +1996,9 @@ void MacroAssembler::enter() {
 }
 
 void MacroAssembler::post_call_nop() {
+  if (!Continuations::enabled()) {
+    return;
+  }
   relocate(post_call_nop_Relocation::spec());
   emit_int8((int8_t)0x0f);
   emit_int8((int8_t)0x1f);

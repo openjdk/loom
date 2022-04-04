@@ -46,6 +46,7 @@
 #include "oops/accessDecorators.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.inline.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/icache.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
@@ -805,6 +806,9 @@ void MacroAssembler::align(int modulus) {
 }
 
 void MacroAssembler::post_call_nop() {
+  if (!Continuations::enabled()) {
+    return;
+  }
   relocate(post_call_nop_Relocation::spec());
   nop();
 }

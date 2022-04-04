@@ -57,6 +57,7 @@
 #include "prims/jvmtiImpl.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "prims/methodHandles.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/flags/flagSetting.hpp"
@@ -1133,6 +1134,10 @@ void nmethod::finalize_relocations() {
 }
 
 void nmethod::make_deoptimized() {
+  if (!Continuations::enabled()) {
+    return;
+  }
+
   assert(method() == NULL || can_be_deoptimized(), "");
   assert(!is_zombie(), "");
 
