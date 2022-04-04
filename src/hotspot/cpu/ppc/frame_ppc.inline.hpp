@@ -211,11 +211,11 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 }
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
-  return *((oop*)map->location(R3->as_VMReg(), (intptr_t*) NULL));
+  return *((oop*)map->location(R3->as_VMReg(), nullptr));
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
-  *((oop*)map->location(R3->as_VMReg(), (intptr_t*) NULL)) = obj;
+  *((oop*)map->location(R3->as_VMReg(), nullptr)) = obj;
 }
 
 inline const ImmutableOopMap* frame::get_oop_map() const {

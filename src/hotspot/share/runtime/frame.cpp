@@ -168,7 +168,7 @@ void RegisterMap::print_on(outputStream* st) const {
   for(int i = 0; i < reg_count; i++) {
 
     VMReg r = VMRegImpl::as_VMReg(i);
-    intptr_t* src = (intptr_t*) location(r, (intptr_t*)NULL);
+    intptr_t* src = (intptr_t*) location(r, nullptr);
     if (src != NULL) {
 
       r->print_on(st);

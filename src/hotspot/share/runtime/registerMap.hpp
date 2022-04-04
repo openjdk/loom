@@ -112,7 +112,7 @@ class RegisterMap : public StackObj {
     if (slot_idx > 0) {
       return pd_location(base_reg, slot_idx);
     } else {
-      return location(base_reg, (intptr_t*)NULL);
+      return location(base_reg, nullptr);
     }
   }
 
