@@ -297,7 +297,7 @@ inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread,
 }
 
 NOINLINE void ContinuationHelper::flush_stack_processing(JavaThread* thread, intptr_t* sp) {
-  log_develop_trace(jvmcont)("flush_stack_processing");
+  log_develop_trace(continuations)("flush_stack_processing");
   for (StackFrameStream fst(thread, true, true); fst.current()->sp() <= sp; fst.next()) {
     ;
   }
@@ -492,7 +492,7 @@ stackChunkOop ContinuationWrapper::find_chunk_by_address(void* p) const {
 #if CONT_JFR
 template<typename Event> void ContinuationWrapper::post_jfr_event(Event* e, JavaThread* jt) {
   if (e->should_commit()) {
-    log_develop_trace(jvmcont)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
+    log_develop_trace(continuations)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
     e->set_carrierThread(JFR_JVM_THREAD_ID(jt));
     e->set_contClass(_continuation->klass());
     e->set_numIFrames(_e_num_interpreted_frames);
@@ -728,7 +728,7 @@ frame Continuation::continuation_parent_frame(RegisterMap* map) {
   ContinuationWrapper cont(map);
   assert(map->thread() != nullptr || !cont.is_mounted(), "");
 
-  log_develop_trace(jvmcont)("continuation_parent_frame");
+  log_develop_trace(continuations)("continuation_parent_frame");
   if (map->update_map()) {
     // we need to register the link address for the entry frame
     if (cont.entry() != nullptr) {
@@ -813,10 +813,10 @@ bool Continuation::fix_continuation_bottom_sender(JavaThread* thread, const fram
           callee.is_interpreted_frame() ? callee.interpreter_frame_last_sp() : callee.unextended_sp());
     assert(ce != nullptr, "callee.unextended_sp(): " INTPTR_FORMAT, p2i(callee.unextended_sp()));
 
-    log_develop_debug(jvmcont)("fix_continuation_bottom_sender: "
+    log_develop_debug(continuations)("fix_continuation_bottom_sender: "
                                   "[" JLONG_FORMAT "] [%d]", java_tid(thread), thread->osthread()->thread_id());
-    log_develop_trace(jvmcont)("sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(ce->entry_pc()));
-    log_develop_trace(jvmcont)("sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(ce->entry_sp()));
+    log_develop_trace(continuations)("sender_pc: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_pc), p2i(ce->entry_pc()));
+    log_develop_trace(continuations)("sender_sp: " INTPTR_FORMAT " -> " INTPTR_FORMAT, p2i(*sender_sp), p2i(ce->entry_sp()));
 
     *sender_pc = ce->entry_pc();
     *sender_sp = ce->entry_sp();
@@ -913,7 +913,7 @@ void Continuation::debug_verify_continuation(oop contOop) {
   int num_oops = 0;
 
   for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
-    log_develop_trace(jvmcont)("debug_verify_continuation chunk %d", num_chunks);
+    log_develop_trace(continuations)("debug_verify_continuation chunk %d", num_chunks);
     chunk->verify(&max_size, &num_oops, &num_frames, &num_interpreted_frames);
     if (!chunk->is_empty()) {
       nonempty_chunk = true;
@@ -1044,7 +1044,7 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preem
   assert(is_aligned(_bottom_address, frame::frame_alignment), "");
 #endif
 
-  log_develop_trace(jvmcont)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT,
+  log_develop_trace(continuations)("bottom_address: " INTPTR_FORMAT " entrySP: " INTPTR_FORMAT " argsize: " PTR_FORMAT,
                 p2i(_bottom_address), p2i(_cont.entrySP()), (_cont.entrySP() - _bottom_address) << LogBytesPerWord);
   assert(_bottom_address != nullptr, "");
   assert(_bottom_address <= _cont.entrySP(), "");
@@ -1096,7 +1096,7 @@ freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp) {
   }
   // TODO R REMOVE when deopt change is fixed
   assert(!_thread->cont_fastpath() || _barriers, "");
-  log_develop_trace(jvmcont)("-- RETRYING SLOW --");
+  log_develop_trace(continuations)("-- RETRYING SLOW --");
   return freeze_slow();
 }
 
@@ -1109,7 +1109,7 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
   ) {
   stackChunkOop chunk = _cont.tail();
   if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
-    log_develop_trace(jvmcont)("is_chunk_available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
+    log_develop_trace(continuations)("is_chunk_available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
     return false;
   }
 
@@ -1127,7 +1127,7 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
   assert(size > 0, "");
 
   bool available = chunk_sp - frame::metadata_words >= size;
-  log_develop_trace(jvmcont)("is_chunk_available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
+  log_develop_trace(continuations)("is_chunk_available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
     available, _cont.argsize(), size, p2i(stack_top), p2i(stack_bottom));
   DEBUG_ONLY(if (out_size != nullptr) *out_size = size;)
   return available;
@@ -1146,7 +1146,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
 
   const int cont_size = cont_stack_bottom - cont_stack_top;
 
-  log_develop_trace(jvmcont)("freeze_fast size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
+  log_develop_trace(continuations)("freeze_fast size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
     cont_size, _cont.argsize(), p2i(cont_stack_top), p2i(cont_stack_bottom));
   assert(cont_size > 0, "");
 
@@ -1194,7 +1194,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
 
     chunk = allocate_chunk(cont_size + frame::metadata_words);
     if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
-      log_develop_trace(jvmcont)("Retrying slow. Barriers: %d", _barriers);
+      log_develop_trace(continuations)("Retrying slow. Barriers: %d", _barriers);
       return false;
     }
 
@@ -1221,7 +1221,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   // will either see no continuation on the stack, or a consistent chunk.
   unwind_frames();
 
-  log_develop_trace(jvmcont)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
+  log_develop_trace(continuations)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
     p2i((oopDesc*)chunk), chunk->stack_size(), chunk_start_sp, _cont.argsize());
   assert(chunk_start_sp <= chunk->stack_size(), "");
   assert(chunk_start_sp >= cont_size, "");
@@ -1232,7 +1232,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   intptr_t* chunk_top = chunk->start_address() + chunk_new_sp;
   assert(empty || *(address*)(orig_chunk_sp - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
-  log_develop_trace(jvmcont)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT,
+  log_develop_trace(continuations)("freeze_fast start: " INTPTR_FORMAT " sp: %d chunk_top: " INTPTR_FORMAT,
                               p2i(chunk->start_address()), chunk_new_sp, p2i(chunk_top));
   intptr_t* from = cont_stack_top - frame::metadata_words;
   intptr_t* to   = chunk_top - frame::metadata_words;
@@ -1251,8 +1251,8 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
 
   _cont.write();
 
-  log_develop_trace(jvmcont)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());
-  LogTarget(Trace, jvmcont) lt;
+  log_develop_trace(continuations)("FREEZE CHUNK #" INTPTR_FORMAT " (young)", _cont.hash());
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     chunk->print_on(true, &ls);
@@ -1280,7 +1280,7 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
   ResourceMark rm;
 #endif
 
-  log_develop_trace(jvmcont)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());
+  log_develop_trace(continuations)("freeze_slow  #" INTPTR_FORMAT, _cont.hash());
   assert(_thread->thread_state() == _thread_in_vm || _thread->thread_state() == _thread_blocked, "");
 
   init_rest();
@@ -1289,7 +1289,7 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
 
   frame f = freeze_start_frame();
 
-  LogTarget(Debug, jvmcont) lt;
+  LogTarget(Debug, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     f.print_on(&ls);
@@ -1317,7 +1317,6 @@ frame FreezeBase::freeze_start_frame() {
 }
 
 frame FreezeBase::freeze_start_frame_yield_stub(frame f) {
-  // log_develop_trace(jvmcont)("%s nop at freeze yield", nativePostCallNop_at(_fi->pc) != nullptr ? "has" : "no");
   assert(StubRoutines::cont_doYield_stub()->contains(f.pc()), "must be");
   f = sender<ContinuationHelper::StubFrame>(f);
   return f;
@@ -1396,7 +1395,7 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
 }
 
 inline void FreezeBase::before_freeze_java_frame(const frame& f, const frame& caller, int fsize, int argsize, bool bottom) {
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("======== FREEZING FRAME interpreted: %d bottom: %d", f.is_interpreted_frame(), bottom);
@@ -1407,7 +1406,7 @@ inline void FreezeBase::before_freeze_java_frame(const frame& f, const frame& ca
 }
 
 inline void FreezeBase::after_freeze_java_frame(const frame& hf, bool bottom) {
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     DEBUG_ONLY(hf.print_value_on(&ls, nullptr);)
@@ -1424,14 +1423,14 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(callee.is_interpreted_frame()
     || callee.cb()->as_nmethod()->is_osr_method()
     || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
-  log_develop_trace(jvmcont)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
+  log_develop_trace(continuations)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
     p2i(_bottom_address), _frames, _size << LogBytesPerWord, argsize);
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
 
 #ifdef ASSERT
   bool empty = _cont.is_empty();
-  log_develop_trace(jvmcont)("empty: %d", empty);
+  log_develop_trace(continuations)("empty: %d", empty);
 #endif
 
   stackChunkOop chunk = _cont.tail();
@@ -1457,7 +1456,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     }
   }
 
-  log_develop_trace(jvmcont)("finalize _size: %d overlap: %d unextended_sp: %d", _size, overlap, unextended_sp);
+  log_develop_trace(continuations)("finalize _size: %d overlap: %d unextended_sp: %d", _size, overlap, unextended_sp);
 
   _size -= overlap;
   assert(_size >= 0, "");
@@ -1498,7 +1497,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->set_argsize(argsize);
     assert(chunk->is_empty(), "");
   } else {
-    log_develop_trace(jvmcont)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
+    log_develop_trace(continuations)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
     if (chunk->is_empty()) {
       int sp = chunk->stack_size() - argsize;
       chunk->set_sp(sp);
@@ -1572,7 +1571,7 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
 #ifdef ASSERT
   if (hf.is_compiled_frame()) {
     if (f.is_deoptimized_frame()) { // TODO DEOPT: long term solution: unroll on freeze and patch pc
-      log_develop_trace(jvmcont)("Freezing deoptimized frame");
+      log_develop_trace(continuations)("Freezing deoptimized frame");
       assert(f.cb()->as_compiled_method()->is_deopt_pc(f.raw_pc()), "");
       assert(f.cb()->as_compiled_method()->is_deopt_pc(ContinuationHelper::Frame::real_pc(f)), "");
     }
@@ -1611,7 +1610,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 
   Method* frame_method = ContinuationHelper::Frame::frame_method(f);
 
-  log_develop_trace(jvmcont)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
+  log_develop_trace(continuations)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
     frame_method->name_and_sig_as_C_string(), _size, fsize, argsize);
   // we'd rather not yield inside methods annotated with @JvmtiMountTransition
   assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition(), "");
@@ -1655,7 +1654,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
   const int argsize = ContinuationHelper::CompiledFrame::stack_argsize(f);
   const int fsize = ContinuationHelper::CompiledFrame::frame_bottom(f) + argsize - vsp;
 
-  log_develop_trace(jvmcont)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
+  log_develop_trace(continuations)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
                              ContinuationHelper::Frame::frame_method(f) != nullptr ?
                              ContinuationHelper::Frame::frame_method(f)->name_and_sig_as_C_string() : "",
                              _size, fsize, argsize);
@@ -1695,7 +1694,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
   intptr_t* const vsp = ContinuationHelper::StubFrame::frame_top(f, 0, 0);
   const int fsize = f.cb()->frame_size();
 
-  log_develop_trace(jvmcont)("recurse_freeze_stub_frame %s _size: %d fsize: %d :: " INTPTR_FORMAT " - " INTPTR_FORMAT,
+  log_develop_trace(continuations)("recurse_freeze_stub_frame %s _size: %d fsize: %d :: " INTPTR_FORMAT " - " INTPTR_FORMAT,
     f.cb()->name(), _size, fsize, p2i(vsp), p2i(vsp+fsize));
 
   // recurse_freeze_java_frame and freeze inlined here because we need to use a full RegisterMap for lock ownership
@@ -1739,7 +1738,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
   stackChunkOop chunk = _cont.tail();
   assert(chunk->to_offset(top.sp()) <= chunk->sp(), "");
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     assert(top.is_heap_frame(), "should be");
@@ -1754,11 +1753,11 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
   chunk->set_max_size(chunk->max_size() + _align_size);
 
   if (UNLIKELY(_barriers)) {
-    log_develop_trace(jvmcont)("do barriers on old chunk");
+    log_develop_trace(continuations)("do barriers on old chunk");
     _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
   }
 
-  log_develop_trace(jvmcont)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
+  log_develop_trace(continuations)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
 
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
@@ -1793,7 +1792,7 @@ void FreezeBase::init_chunk(stackChunkOop chunk) {
 
 template <typename ConfigT>
 stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
-  log_develop_trace(jvmcont)("allocate_chunk allocating new chunk");
+  log_develop_trace(continuations)("allocate_chunk allocating new chunk");
 
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   size_t size_in_words = klass->instance_size(stack_size);
@@ -1852,7 +1851,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
     _barriers = !UseZGC && chunk->requires_barriers();
 
     if (_barriers) {
-      log_develop_trace(jvmcont)("allocation requires barriers");
+      log_develop_trace(continuations)("allocation requires barriers");
     }
   }
 
@@ -1945,7 +1944,7 @@ static inline bool can_freeze_fast(JavaThread* thread) {
 }
 
 static int early_return(int res, JavaThread* thread) {
-  log_develop_trace(jvmcont)("=== end of freeze (fail %d)", res);
+  log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
   return res;
 }
 
@@ -1953,7 +1952,7 @@ static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
 
-  log_develop_debug(jvmcont)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
+  log_develop_debug(continuations)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
   return 0;
 }
@@ -1974,7 +1973,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
 
 #ifdef ASSERT
-  log_trace(jvmcont)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
+  log_trace(continuations)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
   log_frames(current);
 #endif
 
@@ -1988,12 +1987,12 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 
   verify_continuation(oopCont);
   ContinuationWrapper cont(current, oopCont);
-  log_develop_debug(jvmcont)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+  log_develop_debug(continuations)("FREEZE #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
   if (entry->is_pinned()) {
-    log_develop_debug(jvmcont)("PINNED due to critical section");
+    log_develop_debug(continuations)("PINNED due to critical section");
     verify_continuation(cont.continuation());
     return early_return(freeze_pinned_cs, current);
   }
@@ -2012,7 +2011,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
     return 0;
   }
 
-  log_develop_trace(jvmcont)("chunk unavailable; transitioning to VM");
+  log_develop_trace(continuations)("chunk unavailable; transitioning to VM");
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
     freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
@@ -2082,7 +2081,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 // make room on the stack for thaw
 // returns the size in bytes, or 0 on failure
 static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
-  log_develop_trace(jvmcont)("~~~~ prepare_thaw return_barrier: %d", return_barrier);
+  log_develop_trace(continuations)("~~~~ prepare_thaw return_barrier: %d", return_barrier);
 
   assert(thread == JavaThread::current(), "");
 
@@ -2118,7 +2117,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
     return 0;
   }
 
-  log_develop_trace(jvmcont)("prepare_thaw bottom: " INTPTR_FORMAT " top: " INTPTR_FORMAT " size: %d",
+  log_develop_trace(continuations)("prepare_thaw bottom: " INTPTR_FORMAT " top: " INTPTR_FORMAT " size: %d",
                               p2i(bottom), p2i(bottom - size), size);
   return size;
 }
@@ -2232,7 +2231,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   // TODO: explain why we're not setting the tail
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("thaw_fast");
@@ -2291,7 +2290,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   const bool is_last = empty && chunk->is_parent_null<typename ConfigT::OopT>();
 
-  log_develop_trace(jvmcont)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
+  log_develop_trace(continuations)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
                               partial, is_last, empty, thaw_size, argsize);
 
   intptr_t* stack_sp = _cont.entrySP();
@@ -2310,7 +2309,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   assert(!is_last || argsize == 0, "");
   _cont.set_argsize(argsize);
-  log_develop_trace(jvmcont)("setting entry argsize: %d", _cont.argsize());
+  log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
   patch_chunk(bottom_sp, is_last);
 
   DEBUG_ONLY(address pc = *(address*)(bottom_sp - frame::sender_sp_ret_address_offset());)
@@ -2348,7 +2347,7 @@ void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
 }
 
 void ThawBase::patch_chunk(intptr_t* sp, bool is_last) {
-  log_develop_trace(jvmcont)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp));
+  log_develop_trace(continuations)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp));
 
   address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
@@ -2361,7 +2360,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   assert(chunk != nullptr, "");
   assert(!chunk->is_empty(), "");
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("thaw slow return_barrier: %d " INTPTR_FORMAT, return_barrier, p2i(chunk));
@@ -2421,7 +2420,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 }
 
 void ThawBase::thaw(const frame& hf, frame& caller, int num_frames, bool top) {
-  log_develop_debug(jvmcont)("thaw num_frames: %d", num_frames);
+  log_develop_debug(continuations)("thaw num_frames: %d", num_frames);
   assert(!_cont.is_empty(), "no more frames");
   assert(num_frames > 0, "");
   assert(!hf.is_empty(), "");
@@ -2450,7 +2449,7 @@ bool ThawBase::recurse_thaw_java_frame(frame& caller, int num_frames) {
   // we never leave a compiled caller of an interpreted frame as the top frame in the chunk
   // as it makes detecting that situation and adjusting unextended_sp tricky
   if (num_frames == 1 && !_stream.is_done() && FKind::interpreted && _stream.is_compiled()) {
-    log_develop_trace(jvmcont)("thawing extra compiled frame to not leave a compiled interpreted-caller at top");
+    log_develop_trace(continuations)("thawing extra compiled frame to not leave a compiled interpreted-caller at top");
     num_frames++;
   }
 
@@ -2489,7 +2488,7 @@ void ThawBase::finalize_thaw(frame& entry, int argsize) {
 }
 
 inline void ThawBase::before_thaw_java_frame(const frame& hf, const frame& caller, bool bottom, int num_frame) {
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("======== THAWING FRAME: %d", num_frame);
@@ -2500,7 +2499,7 @@ inline void ThawBase::before_thaw_java_frame(const frame& hf, const frame& calle
 }
 
 inline void ThawBase::after_thaw_java_frame(const frame& f, bool bottom) {
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("thawed frame:");
@@ -2527,7 +2526,7 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
 
   void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
     // we need to clear the bits that correspond to arguments as they reside in the caller frame
-    log_develop_trace(jvmcont)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
+    log_develop_trace(continuations)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
     stackChunkOop chunk = _cont.tail();
     chunk->bitmap().clear_range(chunk->bit_index_for(start),
                                 chunk->bit_index_for(start+range));
@@ -2572,7 +2571,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   patch(f, caller, bottom);
 
 #ifdef ASSERT
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     print_frame_layout(f, &ls);
@@ -2647,7 +2646,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     // cannot rely on nmethod patching for deopt.
     assert(_thread->is_interp_only_mode() || stub_caller, "expected a stub-caller");
 
-    log_develop_trace(jvmcont)("Deoptimizing thawed frame");
+    log_develop_trace(continuations)("Deoptimizing thawed frame");
     DEBUG_ONLY(ContinuationHelper::Frame::patch_pc(f, nullptr));
 
     f.deoptimize(nullptr); // we're assuming there are no monitors; this doesn't revoke biased locks
@@ -2735,9 +2734,9 @@ void ThawBase::finish_thaw(frame& f) {
 
   assert(_cont.is_empty() == _cont.last_frame().is_empty(), "");
 
-  log_develop_trace(jvmcont)("thawed %d frames", _frames);
+  log_develop_trace(continuations)("thawed %d frames", _frames);
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("top hframe after (thaw):");
@@ -2749,7 +2748,7 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
   assert(!f.is_compiled_frame() || f.is_deoptimized_frame() == f.cb()->as_compiled_method()->is_deopt_pc(f.raw_pc()), "");
   assert(!f.is_compiled_frame() || f.is_deoptimized_frame() == (f.pc() != f.raw_pc()), "");
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("push_return_frame");
@@ -2779,7 +2778,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 
   CONT_JFR_ONLY(EventContinuationThaw event;)
 
-  log_develop_trace(jvmcont)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
+  log_develop_trace(continuations)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
 
   ContinuationEntry* entry = thread->last_continuation();
   assert (entry != nullptr, "");
@@ -2792,7 +2791,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
   ContinuationWrapper cont(thread, oopCont);
-  log_develop_debug(jvmcont)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
+  log_develop_debug(continuations)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
 #ifdef ASSERT
   ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
@@ -2819,7 +2818,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   assert(ContinuationEntry::assert_entry_frame_laid_out(thread), "");
   ContinuationHelper::clear_anchor(thread);
 
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("Jumping to frame (thaw):");
@@ -2830,7 +2829,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   CONT_JFR_ONLY(cont.post_jfr_event(&event, thread);)
 
   verify_continuation(cont.continuation());
-  log_develop_debug(jvmcont)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
+  log_develop_debug(continuations)("=== End of thaw #" INTPTR_FORMAT, cont.hash());
 
   return sp;
 }
@@ -2923,7 +2922,7 @@ static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOo
 }
 
 static void log_frames(JavaThread* thread) {
-  LogTarget(Trace, jvmcont) lt;
+  LogTarget(Trace, continuations) lt;
   if (!lt.develop_is_enabled()) {
     return;
   }

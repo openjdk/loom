@@ -339,7 +339,7 @@ inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* clos
       assert(p != nullptr, "");
       assert((_has_stub && _index == 1) || is_in_frame(p), "");
 
-      log_develop_trace(jvmcont)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT,
+      log_develop_trace(continuations)("StackChunkFrameStream::iterate_oops narrow: %d reg: %s p: " INTPTR_FORMAT " sp offset: " INTPTR_FORMAT,
           omv.type() == OopMapValue::narrowoop_value, omv.reg()->name(), p2i(p), (intptr_t*)p - sp());
           omv.type() == OopMapValue::narrowoop_value ? Devirtualizer::do_oop(closure, (narrowOop*)p) : Devirtualizer::do_oop(closure, (oop*)p);
     }

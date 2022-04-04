@@ -137,7 +137,7 @@ void RegisterMap::set_stack_chunk(stackChunkOop chunk) {
   assert(chunk == NULL || _walk_cont, "");
   assert(chunk == NULL || _chunk.not_null(), "");
   if (_chunk.is_null()) return;
-  log_trace(jvmcont)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
+  log_trace(continuations)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
   _chunk.replace(chunk); // reuse handle. see comment above in the constructor
 }
 

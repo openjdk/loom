@@ -351,7 +351,7 @@ inline int jdk_internal_vm_StackChunk::maxSize(oop ref) {
 inline void jdk_internal_vm_StackChunk::set_maxSize(oop ref, int value) {
 #ifdef ASSERT
   jint old = maxSize(ref);
-  log_develop_trace(jvmcont)("%s max_size: %d -> %d", value >= old ? "add" : "sub", old, value);
+  log_develop_trace(continuations)("%s max_size: %d -> %d", value >= old ? "add" : "sub", old, value);
 #endif
   ref->int_field_put(_maxSize_offset, value);
 }

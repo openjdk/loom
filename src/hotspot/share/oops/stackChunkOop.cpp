@@ -586,8 +586,8 @@ public:
       _num_interpreted_frames++;
     }
 
-    log_develop_trace(jvmcont)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
-    LogTarget(Trace, jvmcont) lt;
+    log_develop_trace(continuations)("debug_verify_stack_chunk frame: %d sp: " INTPTR_FORMAT " pc: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d oops: %d", _num_frames, f.sp() - _chunk->start_address(), p2i(f.pc()), f.is_interpreted(), fsize, _argsize, num_oops);
+    LogTarget(Trace, continuations) lt;
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       f.print_on(&ls);
@@ -601,7 +601,7 @@ public:
     }
 
     if (_num_frames > 0 && !_callee_interpreted && f.is_interpreted()) {
-      log_develop_trace(jvmcont)("debug_verify_stack_chunk i2c");
+      log_develop_trace(continuations)("debug_verify_stack_chunk i2c");
       _num_i2c++;
     }
 
