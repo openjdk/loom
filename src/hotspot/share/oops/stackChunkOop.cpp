@@ -468,8 +468,6 @@ public:
 
   template <typename T> inline void do_oop_work(T* p) {
      _count++;
-    if (SafepointSynchronize::is_at_safepoint()) return;
-
     oop obj = safe_load(p);
     assert(obj == nullptr || dbg_is_good_oop(obj), "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT, p2i(p), p2i((oopDesc*)obj));
     if (_chunk->has_bitmap()) {
@@ -491,10 +489,6 @@ public:
       _requires_barriers(chunk->requires_barriers()) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    if (SafepointSynchronize::is_at_safepoint()) {
-      return;
-    }
-
     oop base = (_chunk->has_bitmap() && UseCompressedOops)
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
@@ -631,12 +625,10 @@ public:
     T* p = _chunk->address_for_bit<T>(index);
     _count++;
 
-    if (!SafepointSynchronize::is_at_safepoint()) {
-      oop obj = safe_load(p);
-      assert(obj == nullptr || dbg_is_good_oop(obj),
-              "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT,
-              p2i(p), p2i((oopDesc*)obj), index);
-    }
+    oop obj = safe_load(p);
+    assert(obj == nullptr || dbg_is_good_oop(obj),
+           "p: " INTPTR_FORMAT " obj: " INTPTR_FORMAT " index: " SIZE_FORMAT,
+           p2i(p), p2i((oopDesc*)obj), index);
 
     return true; // continue processing
   }
@@ -656,11 +648,9 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
     assert(max_size() == 0, "");
   }
 
-  if (!SafepointSynchronize::is_at_safepoint()) {
-    assert(oopDesc::is_oop_or_null(parent()), "");
-  }
+  assert(oopDesc::is_oop_or_null(parent()), "");
 
-  const bool concurrent = !SafepointSynchronize::is_at_safepoint() && !Thread::current()->is_Java_thread();
+  const bool concurrent = !Thread::current()->is_Java_thread();
   const bool gc_mode = is_gc_mode();
   const bool is_last = parent() == nullptr;
   const bool mixed = has_mixed_frames();
