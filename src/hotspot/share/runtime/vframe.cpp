@@ -56,7 +56,7 @@
 
 vframe::vframe(const frame* fr, const RegisterMap* reg_map, JavaThread* thread)
 : _reg_map(reg_map), _thread(thread),
-  _chunk(Thread::current(), reg_map->stack_chunk()(), reg_map->stack_chunk().not_null()) {
+  _chunk(Thread::current(), reg_map->stack_chunk()()) {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
 }
