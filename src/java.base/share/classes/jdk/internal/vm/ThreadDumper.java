@@ -98,12 +98,22 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
+        try {
+            dumpThreads(ps);
+        } finally {
+            ps.flush();
+        }
+    }
+
+    /**
+     * Generate a thread dump in plain text format to the given print stream.
+     */
+    private static void dumpThreads(PrintStream ps) {
         ps.println(processId());
         ps.println(Instant.now());
         ps.println(Runtime.version());
         ps.println();
         dumpThreads(ThreadContainers.root(), ps);
-        ps.flush();
     }
 
     private static void dumpThreads(ThreadContainer container, PrintStream ps) {
@@ -127,8 +137,11 @@ public class ThreadDumper {
      */
     public static void dumpThreadsToJson(OutputStream out) {
         PrintStream ps = new PrintStream(out, true, StandardCharsets.UTF_8);
-        dumpThreadsToJson(ps);
-        ps.flush();
+        try {
+            dumpThreadsToJson(ps);
+        } finally {
+            ps.flush();
+        }
     }
 
     /**
