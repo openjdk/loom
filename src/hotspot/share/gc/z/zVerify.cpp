@@ -204,6 +204,7 @@ public:
     return _verify_weaks ? DO_FIELDS : DO_FIELDS_EXCEPT_REFERENT;
   }
 
+  // Don't follow this metadata when verifying oops
   virtual void do_method(Method* m) {}
   virtual void do_nmethod(nmethod* nm) {}
 };

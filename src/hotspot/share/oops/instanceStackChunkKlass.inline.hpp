@@ -50,8 +50,6 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 
-const int TwoWordAlignmentMask  = (1 << (LogBytesPerWord+1)) - 1;
-
 inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words) const {
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }

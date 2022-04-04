@@ -101,9 +101,12 @@
     // we don't need a save area
     arg_reg_save_area_bytes                          =  0,
 
-    metadata_words = sender_sp_offset, // size, in words, of frame metadata (e.g. pc and link)
-    frame_alignment = 16, // in bytes
-    align_wiggle = 1 // size, in words, of maximum shift in frame position due to alignment
+    // size, in words, of frame metadata (e.g. pc and link)
+    metadata_words                                   = sender_sp_offset,
+    // in bytes
+    frame_alignment                                  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle                                     =  1
   };
 
   intptr_t ptr_at(int offset) const {
@@ -151,8 +154,8 @@
   frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc);
 
   frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb);
-
-  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool on_heap); // used for fast frame construction by continuations
+  // used for fast frame construction by continuations
+  frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool on_heap);
 
   frame(intptr_t* sp, intptr_t* fp);
 

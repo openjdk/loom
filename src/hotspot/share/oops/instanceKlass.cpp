@@ -441,17 +441,20 @@ InstanceKlass* InstanceKlass::allocate_instance_klass(const ClassFileParser& par
   // Allocation
   if (REF_NONE == parser.reference_type()) {
     if (class_name == vmSymbols::java_lang_Class()) {
+      // mirror - java.lang.Class
       ik = new (loader_data, size, THREAD) InstanceMirrorKlass(parser);
     } else if (class_name == vmSymbols::jdk_internal_vm_StackChunk()) {
+      // stack chunk
       ik = new (loader_data, size, THREAD) InstanceStackChunkKlass(parser);
     } else if (is_class_loader(class_name, parser)) {
-      // class loader
+      // class loader - java.lang.ClassLoader
       ik = new (loader_data, size, THREAD) InstanceClassLoaderKlass(parser);
     } else {
       // normal
       ik = new (loader_data, size, THREAD) InstanceKlass(parser);
     }
   } else {
+    // java.lang.ref.Reference
     ik = new (loader_data, size, THREAD) InstanceRefKlass(parser);
   }
 

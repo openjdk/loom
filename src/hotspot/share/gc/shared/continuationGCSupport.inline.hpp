@@ -48,6 +48,7 @@ inline void ContinuationGCSupport::transform_stack_chunk(oop obj) {
   if (!obj->is_stackChunk()) {
     return;
   }
+
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
   if (!chunk->is_gc_mode()) {
     chunk->transform();

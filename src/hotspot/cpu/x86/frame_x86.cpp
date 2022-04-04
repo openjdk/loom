@@ -629,6 +629,7 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     values.describe(frame_no, ret_pc_loc, err_msg("return address for #%d", frame_no));
   values.describe(frame_no, sp() - sender_sp_offset, err_msg("saved fp for #%d", frame_no), 0);
 }
+
 #endif // !PRODUCT
 
 intptr_t *frame::initial_deoptimization_info() {

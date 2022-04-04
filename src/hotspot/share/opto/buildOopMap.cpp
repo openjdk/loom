@@ -343,7 +343,6 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
 
     } else {
       // Other - some reaching non-oop value
-      // omap->set_value( r);
 #ifdef ASSERT
       if( t->isa_rawptr() && C->cfg()->_raw_oops.member(def) ) {
         def->dump();

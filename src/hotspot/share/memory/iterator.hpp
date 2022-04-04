@@ -269,8 +269,8 @@ class MarkingCodeBlobClosure : public CodeBlobToOopClosure {
   MarkingCodeBlobClosure(OopClosure* cl, bool fix_relocations, bool keepalive_nmethods) :
       CodeBlobToOopClosure(cl, fix_relocations),
       _keepalive_nmethods(keepalive_nmethods) {}
-  // Called for each code blob, but at most once per unique blob.
 
+  // Called for each code blob, but at most once per unique blob.
   virtual void do_code_blob(CodeBlob* cb);
 };
 

@@ -449,7 +449,6 @@ class StubRoutines: AllStatic {
   JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })
   JFR_ONLY(static address jfr_get_event_writer() { return _jfr_get_event_writer; })
 
-
   static address select_fill_function(BasicType t, bool aligned, const char* &name);
 
   //

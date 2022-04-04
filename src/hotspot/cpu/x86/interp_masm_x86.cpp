@@ -1284,6 +1284,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     jcc(Assembler::zero, done);
 
     bind(slow_case);
+
     // Call the runtime routine for slow case
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
@@ -1354,6 +1355,7 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
     call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
 
     bind(done);
+
     restore_bcp();
   }
 }

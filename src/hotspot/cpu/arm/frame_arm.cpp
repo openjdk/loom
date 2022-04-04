@@ -520,6 +520,7 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
 frame::frame(void* sp, void* fp, void* pc) {
   init((intptr_t*)sp, (intptr_t*)fp, (address)pc);
 }
+
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {
