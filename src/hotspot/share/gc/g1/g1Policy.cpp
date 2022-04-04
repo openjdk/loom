@@ -1082,9 +1082,8 @@ void G1Policy::decide_on_concurrent_start_pause() {
     } else if (_g1h->is_user_requested_concurrent_full_gc(cause) ||
                (cause == GCCause::_codecache_GC_threshold) ||
                (cause == GCCause::_wb_breakpoint)) {
-      // Initiate a concurrent start.  A concurrent start must be a
-      // young only GC, so the collector state must be updated to
-      // reflect this.
+      // Initiate a concurrent start.  A concurrent start must be a young only
+      // GC, so the collector state must be updated to reflect this.
       collector_state()->set_in_young_only_phase(true);
       collector_state()->set_in_young_gc_before_mixed(false);
 

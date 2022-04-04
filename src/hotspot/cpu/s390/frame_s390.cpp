@@ -632,6 +632,7 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
     DESCRIBE_ADDRESS(fresult);
   }
 }
+
 #endif // !PRODUCT
 
 intptr_t *frame::initial_deoptimization_info() {

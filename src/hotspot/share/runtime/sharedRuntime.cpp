@@ -1167,7 +1167,7 @@ Handle SharedRuntime::find_callee_info_helper(vframeStream& vfst, Bytecodes::Cod
 
     // Retrieve from a compiled argument list
     receiver = Handle(current, callerFrame.retrieve_receiver(&reg_map2));
-    assert(oopDesc::is_oop_or_null(receiver()), ""); // if (receiver() != NULL) oopDesc::verify(receiver()); //
+    assert(oopDesc::is_oop_or_null(receiver()), "");
 
     if (receiver.is_null()) {
       THROW_(vmSymbols::java_lang_NullPointerException(), nullHandle);

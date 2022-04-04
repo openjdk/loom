@@ -414,6 +414,7 @@ void ZeroFrame::identify_vp_word(int       frame_index,
 void frame::describe_pd(FrameValues& values, int frame_no) {
 
 }
+
 #endif
 
 intptr_t *frame::initial_deoptimization_info() {

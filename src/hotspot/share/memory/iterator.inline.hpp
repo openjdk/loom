@@ -27,8 +27,8 @@
 
 #include "memory/iterator.hpp"
 
-#include "code/nmethod.hpp"
 #include "classfile/classLoaderData.hpp"
+#include "code/nmethod.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.hpp"
