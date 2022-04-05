@@ -56,7 +56,7 @@ inline frame FreezeBase::sender(const frame& f) {
   return frame();
 }
 
-template<typename FKind> frame FreezeBase::new_hframe(frame& f, frame& caller) {
+template<typename FKind> frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   Unimplemented();
   return frame();
 }
@@ -78,7 +78,7 @@ inline frame ThawBase::new_entry_frame() {
   return frame();
 }
 
-template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
+template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame& caller, bool bottom) {
   Unimplemented();
   return frame();
 }

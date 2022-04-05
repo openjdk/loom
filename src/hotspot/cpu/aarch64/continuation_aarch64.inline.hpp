@@ -63,7 +63,7 @@ inline frame FreezeBase::sender(const frame& f) {
 }
 
 template<typename FKind>
-frame FreezeBase::new_hframe(frame& f, frame& caller) {
+frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   assert(FKind::is_instance(f), "");
   assert(!caller.is_interpreted_frame()
     || caller.unextended_sp() == (intptr_t*)caller.at(frame::interpreter_frame_last_sp_offset), "");
@@ -86,7 +86,11 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
-    fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have had a safepoint in finalize_freeze, after constructing f.
+    // we need to re-read fp because it may be an oop and we might have had a safepoint in finalize_freeze,
+    // after constructing f.
+    // This comment doesn't make sense since we don't reread fp
+    fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset);
+
     int fsize = FKind::size(f);
     sp = caller.unextended_sp() - fsize;
     if (caller.is_interpreted_frame()) {
@@ -185,7 +189,7 @@ inline frame ThawBase::new_entry_frame() {
   return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
 }
 
-template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
+template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame& caller, bool bottom) {
   assert(FKind::is_instance(hf), "");
 
   if (FKind::interpreted) {
