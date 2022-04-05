@@ -953,12 +953,9 @@ jvmtiError
 JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread, javaVFrame* jvf,
                                  GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
   jvmtiError err = JVMTI_ERROR_NONE;
-#ifdef ASSERT
-  uint32_t debug_bits = 0;
-#endif
-  // assert((SafepointSynchronize::is_at_safepoint() ||
-  //         java_thread->is_thread_fully_suspended(false, &debug_bits)),
-  //        "at safepoint or target thread is suspended");
+  Thread *current_thread = Thread::current();
+  assert(java_thread->is_handshake_safe_for(current_thread),
+         "call by myself or at handshake");
 
   int depth = 0;
   for ( ; jvf != NULL; jvf = jvf->java_sender()) {
