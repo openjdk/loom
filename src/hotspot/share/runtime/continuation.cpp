@@ -27,17 +27,13 @@
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.inline.hpp"
 #include "code/compiledMethod.inline.hpp"
-#include "code/scopeDesc.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/memAllocator.hpp"
-#include "gc/shared/oopStorage.hpp"
 #include "gc/shared/threadLocalAllocBuffer.inline.hpp"
 #include "interpreter/interpreter.hpp"
-#include "interpreter/linkResolver.hpp"
-#include "interpreter/oopMapCache.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
@@ -46,21 +42,17 @@
 #include "oops/oopsHierarchy.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/stackChunkOop.inline.hpp"
-#include "oops/weakHandle.inline.hpp"
-#include "prims/jvmtiDeferredUpdates.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/continuationHelper.inline.hpp"
-#include "runtime/deoptimization.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
-#include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/keepStackGCProcessed.hpp"
 #include "runtime/orderAccess.hpp"
+#include "runtime/osThread.hpp"
 #include "runtime/prefetch.inline.hpp"
-#include "runtime/sharedRuntime.hpp"
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "runtime/stackChunkFrameStream.inline.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
@@ -68,7 +60,6 @@
 #include "runtime/stackWatermarkSet.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
@@ -239,13 +230,13 @@ public:
   }
 };
 
-oop ContinuationHelper::get_continuation(JavaThread* thread) {
+static oop get_continuation(JavaThread* thread) {
   assert(thread != nullptr, "");
   assert(thread->threadObj() != nullptr, "");
   return java_lang_Thread::continuation(thread->threadObj());
 }
 
-bool ContinuationHelper::stack_overflow_check(JavaThread* thread, int size, address sp) {
+static bool stack_overflow_check(JavaThread* thread, int size, address sp) {
   const int page_size = os::vm_page_size();
   if (size > page_size) {
     if (sp - size < thread->stack_overflow_state()->stack_overflow_limit()) {
@@ -255,38 +246,43 @@ bool ContinuationHelper::stack_overflow_check(JavaThread* thread, int size, addr
   return true;
 }
 
-inline void ContinuationHelper::clear_anchor(JavaThread* thread) {
+#ifdef ASSERT
+inline void clear_anchor(JavaThread* thread) {
   thread->frame_anchor()->clear();
 }
 
-void ContinuationHelper::set_anchor(JavaThread* thread, intptr_t* sp) {
+static void set_anchor(JavaThread* thread, intptr_t* sp) {
   address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());
   assert(pc != nullptr, "");
 
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp(sp);
   anchor->set_last_Java_pc(pc);
-  set_anchor_pd(anchor, sp);
+  ContinuationHelper::set_anchor_pd(anchor, sp);
 
   assert(thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
 }
+#endif // ASSERT
 
-void ContinuationHelper::set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
+static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
   JavaFrameAnchor* anchor = thread->frame_anchor();
   anchor->set_last_Java_sp(entry->entry_sp());
   anchor->set_last_Java_pc(entry->entry_pc());
-  set_anchor_to_entry_pd(anchor, entry);
+  ContinuationHelper::set_anchor_to_entry_pd(anchor, entry);
 
   assert(thread->has_last_Java_frame(), "");
   assert(thread->last_frame().cb() != nullptr, "");
 }
 
-inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry) {
-  maybe_flush_stack_processing(thread, (intptr_t*)((uintptr_t)entry->entry_sp() + ContinuationEntry::size()));
+NOINLINE static void flush_stack_processing(JavaThread* thread, intptr_t* sp) {
+  log_develop_trace(continuations)("flush_stack_processing");
+  for (StackFrameStream fst(thread, true, true); fst.current()->sp() <= sp; fst.next()) {
+    ;
+  }
 }
 
-inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp) {
+inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp) {
   StackWatermark* sw;
   uintptr_t watermark;
   if ((sw = StackWatermarkSet::get(thread, StackWatermarkKind::gc)) != nullptr
@@ -296,12 +292,10 @@ inline void ContinuationHelper::maybe_flush_stack_processing(JavaThread* thread,
   }
 }
 
-NOINLINE void ContinuationHelper::flush_stack_processing(JavaThread* thread, intptr_t* sp) {
-  log_develop_trace(continuations)("flush_stack_processing");
-  for (StackFrameStream fst(thread, true, true); fst.current()->sp() <= sp; fst.next()) {
-    ;
-  }
+inline void maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry) {
+  maybe_flush_stack_processing(thread, (intptr_t*)((uintptr_t)entry->entry_sp() + ContinuationEntry::size()));
 }
+
 
 /////////////////////////////////////////////////////////////////////
 
@@ -525,22 +519,12 @@ bool ContinuationWrapper::chunk_invariant(outputStream* st) {
   }
   return true;
 }
-#endif
-
-#if INCLUDE_JVMTI
-static int num_java_frames(ContinuationWrapper& cont) {
-  ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
-  int count = 0;
-  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
-    count += chunk->num_java_frames();
-  }
-  return count;
-}
-#endif // INCLUDE_JVMTI
+#endif // ASSERT
 
 /////////////////////////////////////////////////////////////////
 
 // Entry point to freeze. Transitions are handled manually
+// Called from generate_cont_doYield() in stubGenerator_<cpu>.cpp through Continuation::freeze_entry();
 template<typename ConfigT>
 static JRT_BLOCK_ENTRY(int, freeze(JavaThread* current, intptr_t* sp))
   assert(sp == current->frame_anchor()->last_Java_sp(), "");
@@ -1072,11 +1056,11 @@ void FreezeBase::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
 #endif
 }
 
-// Called _after_ the last possible sfepoint during the freeze operation (chunk allocation)
+// Called _after_ the last possible safepoint during the freeze operation (chunk allocation)
 void FreezeBase::unwind_frames() {
   ContinuationEntry* entry = _cont.entry();
-  ContinuationHelper::maybe_flush_stack_processing(_thread, entry);
-  ContinuationHelper::set_anchor_to_entry(_thread, entry);
+  maybe_flush_stack_processing(_thread, entry);
+  set_anchor_to_entry(_thread, entry);
 }
 
 template <typename ConfigT>
@@ -1865,26 +1849,33 @@ void FreezeBase::throw_stack_overflow_on_humongous_chunk() {
 }
 
 #if INCLUDE_JVMTI
-static void invalidate_JVMTI_stack(JavaThread* thread) {
+static int num_java_frames(ContinuationWrapper& cont) {
+  ResourceMark rm; // used for scope traversal in num_java_frames(CompiledMethod*, address)
+  int count = 0;
+  for (stackChunkOop chunk = cont.tail(); chunk != nullptr; chunk = chunk->parent()) {
+    count += chunk->num_java_frames();
+  }
+  return count;
+}
+
+static void invalidate_jvmti_stack(JavaThread* thread) {
   if (thread->is_interp_only_mode()) {
     JvmtiThreadState *state = thread->jvmti_thread_state();
     if (state != nullptr)
       state->invalidate_cur_stack_depth();
   }
 }
-#endif // INCLUDE_JVMTI
 
-static void JVMTI_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
-#if INCLUDE_JVMTI
+static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
   if (JvmtiExport::can_post_frame_pop()) {
     int num_frames = num_java_frames(cont);
 
     ContinuationWrapper::SafepointOp so(Thread::current(), cont);
     JvmtiExport::continuation_yield_cleanup(JavaThread::current(), num_frames);
   }
-  invalidate_JVMTI_stack(thread);
-#endif
+  invalidate_jvmti_stack(thread);
 }
+#endif // INCLUDE_JVMTI
 
 static freeze_result is_pinned(const frame& f, RegisterMap* map) {
   if (f.is_interpreted_frame()) {
@@ -1928,7 +1919,7 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   }
   return false;
 }
-#endif
+#endif // ASSERT
 
 static inline bool can_freeze_fast(JavaThread* thread) {
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
@@ -1943,11 +1934,6 @@ static inline bool can_freeze_fast(JavaThread* thread) {
   return fast;
 }
 
-static int early_return(int res, JavaThread* thread) {
-  log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
-  return res;
-}
-
 static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
@@ -1960,17 +1946,19 @@ static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
 static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
     verify_continuation(cont.continuation());
-    return early_return(res, thread);
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
+    return res;
   }
 
-  JVMTI_yield_cleanup(thread, cont); // can safepoint
+  JVMTI_ONLY(jvmti_yield_cleanup(thread, cont)); // can safepoint
   return freeze_epilog(thread, cont);
 }
 
 template<typename ConfigT>
 static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   assert(!current->has_pending_exception(), "");
-  assert(current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
+  // This was a bug once?
+  // assert(current->deferred_updates() == nullptr || current->deferred_updates()->count() == 0, "");
 
 #ifdef ASSERT
   log_trace(continuations)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()));
@@ -1981,7 +1969,7 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
 
   ContinuationEntry* entry = current->last_continuation();
 
-  oop oopCont = ContinuationHelper::get_continuation(current);
+  oop oopCont = get_continuation(current);
   assert(oopCont == current->last_continuation()->cont_oop(), "");
   assert(ContinuationEntry::assert_entry_frame_laid_out(current), "");
 
@@ -1994,7 +1982,8 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   if (entry->is_pinned()) {
     log_develop_debug(continuations)("PINNED due to critical section");
     verify_continuation(cont.continuation());
-    return early_return(freeze_pinned_cs, current);
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", freeze_pinned_cs);
+    return freeze_pinned_cs;
   }
 
   bool fast = can_freeze_fast(current);
@@ -2088,7 +2077,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   ContinuationEntry* ce = thread->last_continuation();
   assert (ce != nullptr, "");
   oop continuation = ce->cont_oop();
-  assert(continuation == ContinuationHelper::get_continuation(thread), "");
+  assert(continuation == get_continuation(thread), "");
   verify_continuation(continuation);
 
   stackChunkOop chunk = jdk_internal_vm_Continuation::tail(continuation);
@@ -2113,7 +2102,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   size <<= LogBytesPerWord;
 
   const address bottom = (address)thread->last_continuation()->entry_sp();
-  if (!ContinuationHelper::stack_overflow_check(thread, size + 300, bottom)) {
+  if (!stack_overflow_check(thread, size + 300, bottom)) {
     return 0;
   }
 
@@ -2184,7 +2173,6 @@ private:
 
   static inline void derelativize_interpreted_frame_metadata(const frame& hf, const frame& f);
   static inline void set_interpreter_frame_bottom(const frame& f, intptr_t* bottom);
-  static void JVMTI_continue_cleanup(JavaThread* thread);
 };
 
 template <typename ConfigT>
@@ -2329,12 +2317,12 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 #endif
 
 #ifdef ASSERT
-  ContinuationHelper::set_anchor(_thread, stack_sp);
+  set_anchor(_thread, stack_sp);
   log_frames(_thread);
   if (LoomDeoptAfterThaw) {
     do_deopt_after_thaw(_thread);
   }
-  ContinuationHelper::clear_anchor(_thread);
+  clear_anchor(_thread);
 #endif
 
   return stack_sp;
@@ -2396,9 +2384,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 
   assert(_cont.chunk_invariant(tty), "");
 
-  if (!return_barrier) {
-    JVMTI_continue_cleanup(_thread);
-  }
+  JVMTI_ONLY(if (!return_barrier) invalidate_jvmti_stack(_thread));
 
   _thread->set_cont_fastpath(_fastpath);
 
@@ -2764,12 +2750,6 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
   assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
 }
 
-void ThawBase::JVMTI_continue_cleanup(JavaThread* thread) {
-#if INCLUDE_JVMTI
-  invalidate_JVMTI_stack(thread);
-#endif // INCLUDE_JVMTI
-}
-
 // returns new top sp
 // called after preparations (stack overflow check and making room)
 template<typename ConfigT>
@@ -2785,7 +2765,7 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   oop oopCont = entry->cont_oop();
 
   assert(!jdk_internal_vm_Continuation::done(oopCont), "");
-  assert(oopCont == ContinuationHelper::get_continuation(thread), "");
+  assert(oopCont == get_continuation(thread), "");
   verify_continuation(oopCont);
 
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
@@ -2794,9 +2774,9 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
   log_develop_debug(continuations)("THAW #" INTPTR_FORMAT " " INTPTR_FORMAT, cont.hash(), p2i((oopDesc*)oopCont));
 
 #ifdef ASSERT
-  ContinuationHelper::set_anchor_to_entry(thread, cont.entry());
+  set_anchor_to_entry(thread, cont.entry());
   log_frames(thread);
-  ContinuationHelper::clear_anchor(thread);
+  clear_anchor(thread);
 #endif
 
   Thaw<ConfigT> thw(thread, cont);
@@ -2810,13 +2790,13 @@ static inline intptr_t* thaw0(JavaThread* thread, const thaw_kind kind) {
 #ifdef ASSERT
   intptr_t* sp0 = sp;
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
-  ContinuationHelper::set_anchor(thread, sp0);
+  set_anchor(thread, sp0);
   log_frames(thread);
   if (LoomVerifyAfterThaw) {
     assert(do_verify_after_thaw(thread, thw.barriers(), cont.tail(), tty), "");
   }
   assert(ContinuationEntry::assert_entry_frame_laid_out(thread), "");
-  ContinuationHelper::clear_anchor(thread);
+  clear_anchor(thread);
 
   LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
@@ -2956,7 +2936,7 @@ static void log_frames(JavaThread* thread) {
 
   ls.print_cr("======= end frames =========");
 }
-#endif
+#endif // ASSERT
 
 #include CPU_HEADER_INLINE(continuation)
 
@@ -2978,7 +2958,7 @@ ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
 }
 
 void ContinuationEntry::flush_stack_processing(JavaThread* thread) const {
-  ContinuationHelper::maybe_flush_stack_processing(thread, this);
+  maybe_flush_stack_processing(thread, this);
 }
 
 /////////////////////////////////////////////
@@ -2988,7 +2968,7 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
   assert(thread->has_last_Java_frame(), "Wrong place to use this assertion");
 
   ContinuationEntry* entry =
-    Continuation::get_continuation_entry_for_continuation(thread, ContinuationHelper::get_continuation(thread));
+    Continuation::get_continuation_entry_for_continuation(thread, get_continuation(thread));
   assert(entry != nullptr, "");
 
   intptr_t* unextended_sp = entry->entry_sp();

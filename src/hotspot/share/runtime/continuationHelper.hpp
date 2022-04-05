@@ -35,23 +35,13 @@
 
 class ContinuationHelper {
 public:
-  static oop get_continuation(JavaThread* thread);
-  static bool stack_overflow_check(JavaThread* thread, int size, address sp);
-
-  static inline void clear_anchor(JavaThread* thread);
-  static void set_anchor(JavaThread* thread, intptr_t* sp);
   static void set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp);
-  static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry);
   static void set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry);
 
   template<typename FKind> static void update_register_map(const frame& f, RegisterMap* map);
   static void update_register_map_with_callee(const frame& f, RegisterMap* map);
 
   static inline void push_pd(const frame& f);
-
-  static inline void maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry);
-  static inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp);
-  static NOINLINE void flush_stack_processing(JavaThread* thread, intptr_t* sp);
 
   static inline int frame_align_words(int size);
   static inline intptr_t* frame_align_pointer(intptr_t* sp);
