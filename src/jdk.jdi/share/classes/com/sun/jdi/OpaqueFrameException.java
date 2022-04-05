@@ -30,7 +30,8 @@ package com.sun.jdi;
  *
  * @since 19
  */
-public class OpaqueFrameException extends RuntimeException {
+public sealed class OpaqueFrameException
+        extends RuntimeException permits NativeMethodException {
     private static final long serialVersionUID = -6590097682282386695L;
 
     /**
