@@ -65,10 +65,7 @@ class frame {
   // Instance variables:
   union {
     intptr_t* _sp; // stack pointer (from Thread::last_Java_sp)
-    struct {
-      int _offset_sp; // used by frames in continuation chunks
-      int _frame_index;
-    };
+    int _offset_sp; // used by frames in stack chunks
   };
   address   _pc; // program counter (the next instruction after the call)
   mutable CodeBlob* _cb; // CodeBlob that "owns" pc
@@ -85,6 +82,12 @@ class frame {
   // Frames in stack chunks are on the Java heap and use relative addressing; on the stack
   // they use absolute addressing
   bool        _on_heap;  // This frame represents a frame on the heap.
+  DEBUG_ONLY(int _frame_index;) // the frame index in a stack chunk; -1 when on a thread stack
+
+  // We use different assertions to allow for intermediate states (e.g. during thawing or relativizing the frame)
+  void assert_on_heap() const  { assert(is_heap_frame(), "Using offset with a non-chunk frame"); }
+  void assert_offset() const   { assert(_frame_index >= 0,  "Using offset with a non-chunk frame"); assert_on_heap(); }
+  void assert_absolute() const { assert(_frame_index == -1, "Using absolute addresses with a chunk frame"); }
 
  public:
   // Constructors
@@ -116,24 +119,28 @@ class frame {
   // is deoptimization. It likely no one else should ever use it.
   address raw_pc() const;
 
-  void set_pc( address   newpc );
-  void set_pc_preserve_deopt( address   newpc );
+  void set_pc(address newpc);
+  void set_pc_preserve_deopt(address newpc);
   void set_pc_preserve_deopt(address newpc, CodeBlob* cb);
 
-  intptr_t* sp() const           {
-    // assert !relative to StackChunk start
-    return _sp;
-  }
+  intptr_t* sp() const           { assert_absolute(); return _sp; }
   void set_sp( intptr_t* newsp ) { _sp = newsp; }
 
-  int offset_sp() const {
-    // assert relative to StackChunk start
-    return _offset_sp;
-  }
+  int offset_sp() const           { assert_offset();  return _offset_sp; }
+  void set_offset_sp( int newsp ) { assert_on_heap(); _offset_sp = newsp; }
 
-  void set_offset_sp( int newsp ) { _offset_sp = newsp; }
-  int frame_index() const           { return _frame_index; }
-  void set_frame_index( int index ) { _frame_index = index; }
+  int frame_index() const {
+  #ifdef ASSERT
+    return _frame_index;
+  #else
+    return -1;
+  #endif
+  }
+  void set_frame_index( int index ) {
+    #ifdef ASSERT
+      _frame_index = index;
+    #endif
+  }
 
   static int sender_sp_ret_address_offset();
 

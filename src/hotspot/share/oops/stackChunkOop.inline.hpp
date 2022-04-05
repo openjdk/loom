@@ -345,6 +345,7 @@ inline void stackChunkOopDesc::derelativize_frame(frame& fr) const {
   fr.set_sp(derelativize_address(fr.offset_sp()));
   fr.set_unextended_sp(derelativize_address(fr.offset_unextended_sp()));
   derelativize_frame_pd(fr);
+  fr.set_frame_index(-1); // for the sake of assertions in frame
 }
 
 #endif // SHARE_OOPS_STACKCHUNKOOP_INLINE_HPP

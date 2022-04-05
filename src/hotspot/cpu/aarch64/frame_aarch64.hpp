@@ -119,7 +119,10 @@
 
  private:
   // an additional field beyond _sp and _pc:
-  intptr_t*   _fp; // frame pointer
+  union {
+    intptr_t*  _fp; // frame pointer
+    int _offset_fp; // relative frame pointer for use in stack-chunk frames
+  };
   // The interpreter and adapters will extend the frame of the caller.
   // Since oopMaps are based on the sp of the caller before extension
   // we need to know that value. However in order to compute the address
@@ -127,7 +130,11 @@
   // uses sp() to mean "raw" sp and unextended_sp() to mean the caller's
   // original sp we use that convention.
 
-  intptr_t*     _unextended_sp;
+  union {
+    intptr_t* _unextended_sp;
+    int _offset_unextended_sp; // for use in stack-chunk frames
+  };
+
   void adjust_unextended_sp() NOT_DEBUG_RETURN;
 
   // true means _sp value is correct and we can use it to get the sender's sp
@@ -164,10 +171,10 @@
 
   // accessors for the instance variables
   // Note: not necessarily the real 'frame pointer' (see real_fp)
-  intptr_t*   fp() const { return _fp; }
-  void set_fp(intptr_t* newfp) { _fp = newfp; }
-  int offset_fp() const { return (int)(intptr_t)_fp; }
-  void set_offset_fp(int value) { _fp = (intptr_t*)(intptr_t)value; }
+  intptr_t*   fp() const        { assert_absolute(); return _fp; }
+  void set_fp(intptr_t* newfp)  { _fp = newfp; }
+  int offset_fp() const         { assert_offset();  return _offset_fp; }
+  void set_offset_fp(int value) { assert_on_heap(); _offset_fp = value; }
 
   inline address* sender_pc_addr() const;
   inline address  sender_pc_maybe_signed() const;

@@ -64,7 +64,7 @@ frame stackChunkOopDesc::sender(const frame& f, RegisterMap* map) {
   assert(map->stack_chunk() == this, "");
   assert(!is_empty(), "");
 
-  int index = f.frame_index();
+  int index = f.frame_index(); // we need to capture the index before calling derelativize, which destroys it
   StackChunkFrameStream<ChunkFrames::Mixed> fs(this, derelativize(f));
   fs.next(map);
 

@@ -47,6 +47,7 @@ inline frame::frame() {
   _deopt_state = unknown;
   _oop_map = NULL;
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 }
 
 inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
@@ -54,13 +55,13 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _unextended_sp = sp;
   _fp = fp;
   _pc = pc;
-  assert(pc != NULL, "no pc?");
-  _cb = CodeCache::find_blob(pc); // not fast because this constructor can be used on native frames
-
-  setup(pc);
-
   _oop_map = NULL;
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
+
+  assert(pc != NULL, "no pc?");
+  _cb = CodeCache::find_blob(pc); // not fast because this constructor can be used on native frames
+  setup(pc);
 }
 
 inline void frame::setup(address pc) {
@@ -95,6 +96,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   setup(pc);
 }
@@ -109,6 +111,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
   _on_heap = on_heap;
+  DEBUG_ONLY(_frame_index = -1;)
+
   // In thaw, non-heap frames use this constructor to pass oop_map.  I don't know why.
   assert(_on_heap || _cb != nullptr, "these frames are always heap frames");
   if (cb != NULL) {
@@ -133,6 +137,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   setup(pc);
 }
@@ -145,6 +150,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   _fp = fp;
   _pc = (address)(sp[-1]);
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   // Here's a sticky one. This constructor can be called via AsyncGetCallTrace
   // when last_Java_sp is non-null but the pc fetched is junk. If we are truly
@@ -198,13 +204,10 @@ inline intptr_t* frame::link_or_null() const {
   return os::is_readable_pointer(ptr) ? *ptr : NULL;
 }
 
-inline intptr_t* frame::unextended_sp() const     { return _unextended_sp; }
-
-inline void frame::set_unextended_sp(intptr_t* value) { _unextended_sp = value; }
-
-inline int frame::offset_unextended_sp() const { return (int)(intptr_t)_unextended_sp; }
-inline void frame::set_offset_unextended_sp(int value) { _unextended_sp = (intptr_t*)(intptr_t)value; }
-
+inline intptr_t* frame::unextended_sp() const          { assert_absolute(); return _unextended_sp; }
+inline void frame::set_unextended_sp(intptr_t* value)  { _unextended_sp = value; }
+inline int  frame::offset_unextended_sp() const        { assert_offset();   return _offset_unextended_sp; }
+inline void frame::set_offset_unextended_sp(int value) { assert_on_heap();  _offset_unextended_sp = value; }
 
 inline intptr_t* frame::real_fp() const {
   if (_cb != NULL) {
