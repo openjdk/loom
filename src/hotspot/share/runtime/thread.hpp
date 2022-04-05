@@ -32,7 +32,6 @@
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopHandle.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/handshake.hpp"
@@ -84,6 +83,8 @@ class Metadata;
 class ResourceArea;
 
 class OopStorage;
+
+class ContinuationEntry;
 
 DEBUG_ONLY(class ResourceMark;)
 
@@ -809,10 +810,10 @@ class JavaThread: public Thread {
   enum SuspendFlags {
     // NOTE: avoid using the sign-bit as cc generates different test code
     //       when the sign-bit is used, and sometimes incorrectly - see CR 6398077
-    _has_async_exception      = 0x00000001U, // there is a pending async exception
-    _async_delivery_disabled  = 0x00000002U, // async exception delivery is disabled
-    _trace_flag               = 0x00000004U, // call tracing backend
-    _obj_deopt                = 0x00000008U  // suspend for object reallocation and relocking for JVMTI agent
+    _has_async_exception     = 0x00000001U, // there is a pending async exception
+    _async_delivery_disabled = 0x00000002U, // async exception delivery is disabled
+    _trace_flag              = 0x00000004U, // call tracing backend
+    _obj_deopt               = 0x00000008U  // suspend for object reallocation and relocking for JVMTI agent
   };
 
   // various suspension related flags - atomically updated
@@ -1053,9 +1054,10 @@ class JavaThread: public Thread {
   int _frames_to_pop_failed_realloc;
 
   ContinuationEntry* _cont_entry;
+  intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the
+                            // continuation that we know about
   int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
-  intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the continuation that we know about
-  int _held_monitor_count; // used by continuations for fast lock detection
+  int _held_monitor_count;  // used by continuations for fast lock detection
 private:
 
   friend class VMThread;
@@ -1193,28 +1195,17 @@ private:
 
   // Continuation support
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
-  void push_cont_fastpath(intptr_t* sp) { if (sp > _cont_fastpath) _cont_fastpath = sp; }
-  void set_cont_fastpath_thread_state(bool x) { _cont_fastpath_thread_state = (int)x; }
-  intptr_t* raw_cont_fastpath() { return _cont_fastpath; }
-  bool cont_fastpath() { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
-  bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
+  void set_cont_fastpath(intptr_t* x)          { _cont_fastpath = x; }
+  void push_cont_fastpath(intptr_t* sp)        { if (sp > _cont_fastpath) _cont_fastpath = sp; }
+  void set_cont_fastpath_thread_state(bool x)  { _cont_fastpath_thread_state = (int)x; }
+  intptr_t* raw_cont_fastpath() const          { return _cont_fastpath; }
+  bool cont_fastpath() const                   { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath_thread_state() const      { return _cont_fastpath_thread_state != 0; }
 
-  int held_monitor_count() { return _held_monitor_count; }
+  int held_monitor_count()        { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
-  void inc_held_monitor_count() {
-    if (!Continuations::enabled()) {
-      return;
-    }
-    _held_monitor_count++;
-  }
-  void dec_held_monitor_count() {
-    if (!Continuations::enabled()) {
-      return;
-    }
-    assert(_held_monitor_count > 0, "");
-    _held_monitor_count--;
-  }
+  void inc_held_monitor_count();
+  void dec_held_monitor_count();
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
