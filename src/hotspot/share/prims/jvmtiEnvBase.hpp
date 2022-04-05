@@ -355,10 +355,10 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jint get_vthread_state(oop thread_oop, JavaThread* jt);
 
   // enumerates the live threads in the given thread group
-  static int get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p);
+  static jvmtiError get_live_threads(JavaThread* current_thread, Handle group_hdl, jint *count_ptr, Handle **thread_objs_p);
 
   // enumerates the subgroups in the given thread group
-  static int get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p);
+  static jvmtiError get_subgroups(JavaThread* current_thread, Handle group_hdl, jint *count_ptr, Handle **group_objs_p);
 
   // JVMTI API helper functions which are called when target thread is suspended
   // or at safepoint / thread local handshake.

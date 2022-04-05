@@ -1626,14 +1626,15 @@ JvmtiEnv::GetThreadGroupInfo(jthreadGroup group, jvmtiThreadGroupInfo* info_ptr)
 // groups_ptr - pre-checked for NULL
 jvmtiError
 JvmtiEnv::GetThreadGroupChildren(jthreadGroup group, jint* thread_count_ptr, jthread** threads_ptr, jint* group_count_ptr, jthreadGroup** groups_ptr) {
+  jvmtiError err;
   JavaThread* current_thread = JavaThread::current();
   oop group_obj = JNIHandles::resolve_external_guard(group);
   NULL_CHECK(group_obj, JVMTI_ERROR_INVALID_THREAD_GROUP);
 
   Handle *thread_objs = NULL;
   Handle *group_objs  = NULL;
-  int nthreads = 0;
-  int ngroups = 0;
+  jint nthreads = 0;
+  jint ngroups = 0;
   int hidden_threads = 0;
 
   ResourceMark rm(current_thread);
@@ -1641,17 +1642,23 @@ JvmtiEnv::GetThreadGroupChildren(jthreadGroup group, jint* thread_count_ptr, jth
 
   Handle group_hdl(current_thread, group_obj);
 
-  nthreads = get_live_threads(current_thread, group_hdl, &thread_objs);
-  ngroups = get_subgroups(current_thread, group_hdl, &group_objs);
+  err = get_live_threads(current_thread, group_hdl, &nthreads, &thread_objs);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
+  err = get_subgroups(current_thread, group_hdl, &ngroups, &group_objs);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
+  }
 
   *group_count_ptr  = ngroups;
   *thread_count_ptr = nthreads;
   *threads_ptr     = new_jthreadArray(nthreads, thread_objs);
   *groups_ptr      = new_jthreadGroupArray(ngroups, group_objs);
-  if ((nthreads > 0) && (*threads_ptr == NULL)) {
+  if (nthreads > 0 && *threads_ptr == NULL) {
     return JVMTI_ERROR_OUT_OF_MEMORY;
   }
-  if ((ngroups > 0) && (*groups_ptr == NULL)) {
+  if (ngroups > 0 && *groups_ptr == NULL) {
     return JVMTI_ERROR_OUT_OF_MEMORY;
   }
 

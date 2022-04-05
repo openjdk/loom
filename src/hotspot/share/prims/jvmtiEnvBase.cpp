@@ -761,14 +761,14 @@ JvmtiEnvBase::get_vthread_state(oop thread_oop, JavaThread* java_thread) {
   return state;
 }
 
-int
-JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Handle **thread_objs_p) {
-  int count = 0;
+jvmtiError
+JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, jint *count_ptr, Handle **thread_objs_p) {
+  jint count = 0;
   Handle *thread_objs = NULL;
   ThreadsListEnumerator tle(current_thread, true);
   int nthreads = tle.num_threads();
   if (nthreads > 0) {
-    thread_objs = NEW_RESOURCE_ARRAY(Handle, nthreads);
+    thread_objs = NEW_RESOURCE_ARRAY_RETURN_NULL(Handle, nthreads);
     NULL_CHECK(thread_objs, JVMTI_ERROR_OUT_OF_MEMORY);
     for (int i = 0; i < nthreads; i++) {
       Handle thread = tle.get_threadObj(i);
@@ -778,20 +778,21 @@ JvmtiEnvBase::get_live_threads(JavaThread* current_thread, Handle group_hdl, Han
     }
   }
   *thread_objs_p = thread_objs;
-  return count;
+  *count_ptr = count;
+  return JVMTI_ERROR_NONE;
 }
 
-int
-JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle **group_objs_p) {
+jvmtiError
+JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, jint *count_ptr, Handle **group_objs_p) {
   ObjectLocker ol(group_hdl, current_thread);
 
   int ngroups  = java_lang_ThreadGroup::ngroups(group_hdl());
   int nweaks  = java_lang_ThreadGroup::nweaks(group_hdl());
 
-  int count = 0;
+  jint count = 0;
   Handle *group_objs = NULL;
   if (ngroups > 0 || nweaks > 0) {
-    group_objs = NEW_RESOURCE_ARRAY(Handle, ngroups + nweaks);
+    group_objs = NEW_RESOURCE_ARRAY_RETURN_NULL(Handle, ngroups + nweaks);
     NULL_CHECK(group_objs, JVMTI_ERROR_OUT_OF_MEMORY);
 
     // strongly reachable subgroups
@@ -818,7 +819,8 @@ JvmtiEnvBase::get_subgroups(JavaThread* current_thread, Handle group_hdl, Handle
     }
   }
   *group_objs_p = group_objs;
-  return count;
+  *count_ptr = count;
+  return JVMTI_ERROR_NONE;
 }
 
 //
