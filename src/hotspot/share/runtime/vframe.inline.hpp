@@ -46,7 +46,15 @@ inline oop vframeStreamCommon::continuation() const {
   }
 }
 
-inline intptr_t* vframeStreamCommon::frame_id() const        { return _frame.id(); }
+inline intptr_t* vframeStreamCommon::frame_id() const {
+  if (_frame.is_heap_frame()) {
+    // Make something sufficiently unique
+    intptr_t id = _reg_map.stack_chunk_index() << 16;
+    id += _frame.offset_unextended_sp();
+    return reinterpret_cast<intptr_t*>(id);
+  }
+  return _frame.id();
+}
 
 inline int vframeStreamCommon::vframe_id() const {
   assert(_mode == compiled_mode, "unexpected mode: %d", _mode);

@@ -72,6 +72,7 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frame
   if (walk_cont && thread != NULL && thread->last_continuation() != NULL) {
     _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
   }
+  _chunk_index = -1;
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -89,6 +90,7 @@ RegisterMap::RegisterMap(oop continuation, bool update_map) {
   NOT_PRODUCT(_async = false;)
 
   _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
+  _chunk_index = -1;
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -109,6 +111,7 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
   _chunk = map->_chunk;
+  _chunk_index = map->_chunk_index;
 
   pd_initialize_from(map);
   if (update_map()) {
@@ -139,6 +142,11 @@ void RegisterMap::set_stack_chunk(stackChunkOop chunk) {
   if (_chunk.is_null()) return;
   log_trace(continuations)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
   _chunk.replace(chunk); // reuse handle. see comment above in the constructor
+  if (chunk == NULL) {
+    _chunk_index = -1;
+  } else {
+    _chunk_index++;
+  }
 }
 
 void RegisterMap::clear() {

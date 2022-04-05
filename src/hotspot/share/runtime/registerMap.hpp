@@ -76,6 +76,7 @@ class RegisterMap : public StackObj {
   bool              _include_argument_oops;   // Should include argument_oop marked locations for compiler
   JavaThread*       _thread;                  // Reference to current thread
   stackChunkHandle  _chunk;                   // The current continuation stack chunk, if any
+  int               _chunk_index;             // incremented whenever a new chunk is set
 
   bool              _update_map;              // Tells if the register map need to be
                                               // updated when traversing the stack
@@ -153,6 +154,8 @@ class RegisterMap : public StackObj {
   oop cont() const;
   stackChunkHandle stack_chunk() const { return _chunk; }
   void set_stack_chunk(stackChunkOop chunk);
+  int stack_chunk_index() const { return _chunk_index; }
+  void set_stack_chunk_index(int index) { _chunk_index = index; }
 
   const RegisterMap* as_RegisterMap() const { return this; }
   RegisterMap* as_RegisterMap() { return this; }

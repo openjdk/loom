@@ -224,11 +224,13 @@ StackValueCollection* compiledVFrame::expressions() const {
 
 StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
   stackChunkOop c = _reg_map.stack_chunk()();
+  int index = _reg_map.stack_chunk_index();
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(_chunk());
 
   StackValue* res = StackValue::create_stack_value(&_fr, register_map(), sv);
 
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(c);
+  const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk_index(index);
   return res;
 }
 
