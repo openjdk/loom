@@ -326,7 +326,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                    GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitors_list,
                                    jint depth);
  public:
-  static vframe* vframeForNoProcess(JavaThread* java_thread, jint depth, bool for_cont = false);
+  static vframe* vframe_for_no_process(JavaThread* java_thread, jint depth, bool for_cont = false);
 
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
@@ -346,7 +346,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static javaVFrame* get_vthread_jvf(oop vthread);
 
   // get carrier thread last java vframe
-  static javaVFrame* get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map);
+  static javaVFrame* get_cthread_last_java_vframe(JavaThread* jt, RegisterMap* reg_map);
 
   // get ordinary thread thread state
   static jint get_thread_state(oop thread_oop, JavaThread* jt);

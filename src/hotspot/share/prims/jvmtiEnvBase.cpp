@@ -557,15 +557,15 @@ JvmtiEnvBase::new_jthreadGroupArray(int length, Handle *handles) {
   return (jthreadGroup *) new_jobjectArray(length,handles);
 }
 
-// return the vframe on the specified thread and depth, NULL if no such frame
-// The thread and the oops in the returned vframe might not have been process.
+// Return the vframe on the specified thread and depth, NULL if no such frame.
+// The thread and the oops in the returned vframe might not have been processed.
 vframe*
-JvmtiEnvBase::vframeForNoProcess(JavaThread* java_thread, jint depth, bool for_cont) {
+JvmtiEnvBase::vframe_for_no_process(JavaThread* java_thread, jint depth, bool for_cont) {
   if (!java_thread->has_last_Java_frame()) {
     return NULL;
   }
   RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
-  vframe *vf = for_cont ? JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map)
+  vframe *vf = for_cont ? get_cthread_last_java_vframe(java_thread, &reg_map)
                         : java_thread->last_java_vframe(&reg_map);
   int d = 0;
   while ((vf != NULL) && (d < depth)) {
@@ -695,8 +695,10 @@ JvmtiEnvBase::get_vthread_jvf(oop vthread) {
   return jvf;
 }
 
+// Return correct javaVFrame for a carrier (non-virtual) thread.
+// It strips vthread frames at the top if there are any.
 javaVFrame*
-JvmtiEnvBase::get_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
+JvmtiEnvBase::get_cthread_last_java_vframe(JavaThread* jt, RegisterMap* reg_map_p) {
   // Strip vthread frames in case of carrier thread with mounted continuation.
   javaVFrame *jvf = JvmtiEnvBase::is_cthread_with_continuation(jt) ?
                         jt->carrier_last_java_vframe(reg_map_p) :
@@ -930,7 +932,7 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
     RegisterMap  reg_map(java_thread);
 
     int depth = 0;
-    for (javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    for (javaVFrame *jvf = get_cthread_last_java_vframe(java_thread, &reg_map);
          jvf != NULL;
          jvf = jvf->java_sender()) {
       if (MaxJavaStackTraceDepth == 0 || depth++ < MaxJavaStackTraceDepth) {  // check for stack too deep
@@ -1149,7 +1151,7 @@ JvmtiEnvBase::get_stack_trace(JavaThread *java_thread,
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, true, false); // don't process frames
     ResourceMark rm(current_thread);
-    javaVFrame *jvf = get_last_java_vframe(java_thread, &reg_map);
+    javaVFrame *jvf = get_cthread_last_java_vframe(java_thread, &reg_map);
 
     err = get_stack_trace(jvf, start_depth, max_count, frame_buffer, count_ptr);
   } else {
@@ -1187,7 +1189,7 @@ JvmtiEnvBase::get_frame_count(JavaThread* jt, jint *count_ptr) {
   } else {
     ResourceMark rm(current_thread);
     RegisterMap reg_map(jt, true, true);
-    javaVFrame *jvf = get_last_java_vframe(jt, &reg_map);
+    javaVFrame *jvf = get_cthread_last_java_vframe(jt, &reg_map);
 
     *count_ptr = get_frame_count(jvf);
   }
@@ -1215,7 +1217,7 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
          "call by myself or at handshake");
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframeForNoProcess(java_thread, depth, true /* for cont */);
+  vframe *vf = vframe_for_no_process(java_thread, depth, true /* for cont */);
   if (vf == NULL) {
     return JVMTI_ERROR_NO_MORE_FRAMES;
   }
@@ -1720,7 +1722,7 @@ MultipleStackTracesCollector::fill_frames(jthread jt, JavaThread *thr, oop threa
       javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(thread_oop);
       infop->frame_buffer = NEW_RESOURCE_ARRAY(jvmtiFrameInfo, max_frame_count());
       _result = env()->get_stack_trace(jvf, 0, max_frame_count(),
-                                     infop->frame_buffer, &(infop->frame_count));
+                                       infop->frame_buffer, &(infop->frame_count));
     }
   } else {
     state = JvmtiEnvBase::get_thread_state(thread_oop, thr);
@@ -1841,7 +1843,7 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
                               jvalue value, TosState tos, Handle* ret_ob_h) {
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframeForNoProcess(java_thread, 0);
+  vframe *vf = vframe_for_no_process(java_thread, 0);
   NULL_CHECK(vf, JVMTI_ERROR_NO_MORE_FRAMES);
 
   javaVFrame *jvf = (javaVFrame*) vf;
@@ -2128,7 +2130,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
     // There can be two situations here:
     //  1. There are no more java frames
     //  2. Two top java frames are separated by non-java native frames
-    if(JvmtiEnvBase::vframeForNoProcess(java_thread, 1) == NULL) {
+    if(JvmtiEnvBase::vframe_for_no_process(java_thread, 1) == NULL) {
       _result = JVMTI_ERROR_NO_MORE_FRAMES;
       return;
     } else {
@@ -2182,7 +2184,7 @@ SetFramePopClosure::doit(Thread *target, bool self) {
     return;
   }
 
-  vframe *vf = JvmtiEnvBase::vframeForNoProcess(java_thread, _depth);
+  vframe *vf = JvmtiEnvBase::vframe_for_no_process(java_thread, _depth);
   if (vf == NULL) {
     _result = JVMTI_ERROR_NO_MORE_FRAMES;
     return;
@@ -2265,7 +2267,7 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
     RegisterMap reg_map(java_thread, true, true);
     ResourceMark rm(current_thread);
     HandleMark hm(current_thread);
-    javaVFrame *jvf = JvmtiEnvBase::get_last_java_vframe(java_thread, &reg_map);
+    javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
     while (jvf != NULL) {
       tty->print_cr("  %s:%d",
                     jvf->method()->external_name(),
