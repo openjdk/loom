@@ -2285,11 +2285,11 @@ void Method::set_on_stack(const bool value) {
   }
 }
 
-void Method::record_marking_cycle() {
+void Method::record_gc_epoch() {
   // If any method is on the stack in continuations, none of them can be reclaimed,
   // so save the marking cycle to check for the whole class in the cpCache.
   // The cpCache is writeable.
-  constants()->cache()->record_marking_cycle();
+  constants()->cache()->record_gc_epoch();
 }
 
 // Called when the class loader is unloaded to make all methods weak.

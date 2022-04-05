@@ -96,6 +96,8 @@ public:
 };
 
 void BarrierSetNMethod::arm_all_nmethods() {
+  // Change to a new global GC phase. Doing this requires changing the thread-local
+  // disarm value for all threads, to reflect the new GC phase.
   ++_current_phase;
   if (_current_phase == 4) {
     _current_phase = 1;

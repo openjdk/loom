@@ -60,7 +60,7 @@ inline void ClaimMetadataVisitingOopIterateClosure::do_nmethod(nmethod* nm) {
 
 inline void ClaimMetadataVisitingOopIterateClosure::do_method(Method* m) {
   // Mark interpreted frames for marking_cycle
-  m->record_marking_cycle();
+  m->record_gc_epoch();
 }
 
 // Implementation of the non-virtual do_oop dispatch.

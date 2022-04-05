@@ -64,7 +64,7 @@ inline void G1MarkAndPushClosure::do_cld(ClassLoaderData* cld) {
 }
 
 inline void G1MarkAndPushClosure::do_method(Method* m) {
-  m->record_marking_cycle();
+  m->record_gc_epoch();
 }
 
 inline void G1MarkAndPushClosure::do_nmethod(nmethod* nm) {

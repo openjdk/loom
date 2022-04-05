@@ -96,7 +96,6 @@ class CodeCache : AllStatic {
   static address _high_bound;                           // Upper bound of CodeHeap addresses
   static int _number_of_nmethods_with_dependencies;     // Total number of nmethods with dependencies
   static uint8_t _unloading_cycle;                      // Global state for recognizing old nmethods that need to be unloaded
-  static uint64_t _marking_cycle;
 
   static ExceptionCache* volatile _exception_cache_purge_list;
 
@@ -203,14 +202,6 @@ class CodeCache : AllStatic {
 
   static void increment_unloading_cycle();
 
- private:
-  static void increment_marking_cycle();
-
- public:
-  static void start_marking_cycle();
-  static void finish_marking_cycle();
-  static bool is_marking_cycle_active();
-  static uint64_t marking_cycle() { return _marking_cycle; }
   static void release_exception_cache(ExceptionCache* entry);
   static void purge_exception_caches();
 

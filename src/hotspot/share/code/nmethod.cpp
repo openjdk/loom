@@ -631,7 +631,7 @@ nmethod::nmethod(
     // values something that will never match a pc like the nmethod vtable entry
     _exception_offset        = 0;
     _orig_pc_offset          = 0;
-    _marking_cycle           = 0;
+    _gc_epoch                = Continuations::gc_epoch();
 
     _consts_offset           = data_offset();
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
@@ -768,7 +768,7 @@ nmethod::nmethod(
     _comp_level              = comp_level;
     _orig_pc_offset          = orig_pc_offset;
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
-    _marking_cycle           = CodeCache::marking_cycle();
+    _gc_epoch                = Continuations::gc_epoch();
 
     // Section offsets
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
@@ -1232,22 +1232,17 @@ void nmethod::mark_as_seen_on_stack() {
 
 void nmethod::mark_as_maybe_on_continuation() {
   assert(is_alive(), "Must be an alive method");
-  _marking_cycle = CodeCache::marking_cycle();
+  _gc_epoch = Continuations::gc_epoch();
 }
 
-bool nmethod::is_not_on_continuation_stack() {
+bool nmethod::is_maybe_on_continuation_stack() {
   if (!Continuations::enabled()) {
-    return true;
+    return false;
   }
 
-  // Odd marking cycles are found during concurrent marking. Even numbers are found
-  // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
-  // normal execution). Therefore we align up by 2 so that nmethods encountered during
-  // concurrent marking are treated as if they were encountered in the inactive phase
-  // after that concurrent GC. Each GC increments the marking cycle twice - once when
-  // it starts and once when it ends. So we can only be sure there are no new continuations
-  // when they have not been encountered from before a GC to after a GC.
-  return CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
+  // If the condition below is true, it means that the nmethod was found to
+  // be alive the previous completed marking cycle.
+  return _gc_epoch >= Continuations::previous_completed_gc_marking_cycle();
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1268,7 +1263,7 @@ bool nmethod::can_convert_to_zombie() {
   // If an is_unloading() nmethod is still not_entrant, then it is not safe to
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
-  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && is_not_on_continuation_stack() &&
+  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !is_maybe_on_continuation_stack() &&
          !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 
