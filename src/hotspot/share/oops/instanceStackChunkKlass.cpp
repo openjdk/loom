@@ -51,15 +51,13 @@ void InstanceStackChunkKlass::serialize_offsets(SerializeClosure* f) {
 
 InstanceStackChunkKlass::InstanceStackChunkKlass(const ClassFileParser& parser)
   : InstanceKlass(parser, Kind) {
-  // see oopDesc::size_given_klass
+  // Change the layout_helper to use the slow path because StackChunkOops are
+  // variable sized InstanceOops.
   const jint lh = Klass::instance_layout_helper(size_helper(), true);
   set_layout_helper(lh);
-  assert(layout_helper_is_instance(layout_helper()), "");
-  assert(layout_helper_needs_slow_path(layout_helper()), "");
 }
 
 size_t InstanceStackChunkKlass::oop_size(oop obj) const {
-  // see oopDesc::size_given_klass
   return instance_size(jdk_internal_vm_StackChunk::size(obj));
 }
 
@@ -76,12 +74,10 @@ private:
   MemRegion _bound;
 
 public:
-  int _num_oops;
 
   StackChunkOopIterateFilterClosure(OopClosureType* closure, MemRegion bound)
     : _closure(closure),
-      _bound(bound),
-      _num_oops(0) {}
+      _bound(bound) {}
 
   virtual void do_oop(oop* p)       override { do_oop_work(p); }
   virtual void do_oop(narrowOop* p) override { do_oop_work(p); }
@@ -90,7 +86,6 @@ public:
   void do_oop_work(T* p) {
     if (_bound.contains(p)) {
       Devirtualizer::do_oop(_closure, p);
-      _num_oops++;
     }
   }
 };
@@ -101,7 +96,7 @@ class DoMethodsStackChunkFrameClosure {
 public:
   DoMethodsStackChunkFrameClosure(OopIterateClosure* cl) : _closure(cl) {}
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     if (f.is_interpreted()) {
       Method* m = f.to_frame().interpreter_frame_method();
@@ -111,7 +106,8 @@ public:
       // The do_nmethod function takes care of having the right synchronization
       // when keeping the nmethod alive during concurrent execution.
       _closure->do_nmethod(nm);
-      // there's no need to mark the Method, as class redefinition will walk the CodeCache, noting their Methods
+      // There is no need to mark the Method, as class redefinition will walk the
+      // CodeCache, noting their Methods
     }
     return true;
   }
@@ -128,28 +124,21 @@ class OopIterateStackChunkFrameClosure {
   const bool _do_metadata;
 
 public:
-  int _num_frames;
-  int _num_oops;
-
   OopIterateStackChunkFrameClosure(OopIterateClosure* closure, MemRegion mr)
     : _closure(closure),
       _bound(mr),
-      _do_metadata(_closure->do_metadata()),
-      _num_frames(0),
-      _num_oops(0) {}
+      _do_metadata(_closure->do_metadata()) {
+    assert(_closure != nullptr, "must be set");
+  }
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    _num_frames++;
-    assert(_closure != nullptr, "");
-
     if (_do_metadata) {
       DoMethodsStackChunkFrameClosure(_closure).do_frame(f, map);
     }
 
     StackChunkOopIterateFilterClosure<OopIterateClosure> cl(_closure, _bound);
     f.iterate_oops(&cl, map);
-    _num_oops += cl._num_oops;
 
     return true;
   }
@@ -158,13 +147,6 @@ public:
 void InstanceStackChunkKlass::oop_oop_iterate_stack_slow(stackChunkOop chunk, OopIterateClosure* closure, MemRegion mr) {
   OopIterateStackChunkFrameClosure frame_closure(closure, mr);
   chunk->iterate_stack(&frame_closure);
-
-  assert(frame_closure._num_frames >= 0, "");
-  assert(frame_closure._num_oops >= 0, "");
-
-  if (closure != nullptr) {
-    Continuation::emit_chunk_iterate_event(chunk, frame_closure._num_frames, frame_closure._num_oops);
-  }
 }
 
 #ifdef ASSERT
@@ -184,7 +166,7 @@ public:
   const RegisterMap* get_map(const RegisterMap* map,      intptr_t* sp) { return map; }
   const RegisterMap* get_map(const SmallRegisterMap* map, intptr_t* sp) { return map->copy_to_RegisterMap(&_map, sp); }
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     ResetNoHandleMark rnhm;
     HandleMark hm(Thread::current());
@@ -218,11 +200,12 @@ class PrintStackChunkClosure {
 public:
   PrintStackChunkClosure(outputStream* st) : _st(st) {}
 
-  template <chunk_frames frame_kind, typename RegisterMapT>
+  template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& fs, const RegisterMapT* map) {
     frame f = fs.to_frame();
     _st->print_cr("-- frame sp: " INTPTR_FORMAT " interpreted: %d size: %d argsize: %d",
-      p2i(fs.sp()), fs.is_interpreted(), f.frame_size(), fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
+                  p2i(fs.sp()), fs.is_interpreted(), f.frame_size(),
+                  fs.is_interpreted() ? 0 : f.compiled_frame_stack_argsize());
     f.print_on(_st);
     const ImmutableOopMap* oopmap = fs.oopmap();
     if (oopmap != nullptr) {
@@ -240,12 +223,12 @@ void InstanceStackChunkKlass::print_chunk(const stackChunkOop c, bool verbose, o
   }
 
   st->print_cr("CHUNK " INTPTR_FORMAT " " INTPTR_FORMAT " - " INTPTR_FORMAT " :: " INTPTR_FORMAT,
-    p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
+               p2i((oopDesc*)c), p2i(c->start_address()), p2i(c->end_address()), c->identity_hash());
   st->print_cr("       barriers: %d gc_mode: %d bitmap: %d parent: " INTPTR_FORMAT,
-    c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
+               c->requires_barriers(), c->is_gc_mode(), c->has_bitmap(), p2i((oopDesc*)c->parent()));
   st->print_cr("       flags mixed: %d", c->has_mixed_frames());
   st->print_cr("       size: %d argsize: %d max_size: %d sp: %d pc: " INTPTR_FORMAT,
-    c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
+               c->stack_size(), c->argsize(), c->max_size(), c->sp(), p2i(c->pc()));
 
   if (verbose) {
     st->cr();

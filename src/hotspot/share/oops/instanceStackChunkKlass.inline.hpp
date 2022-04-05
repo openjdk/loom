@@ -54,11 +54,15 @@ inline size_t InstanceStackChunkKlass::instance_size(size_t stack_size_in_words)
   return align_object_size(size_helper() + stack_size_in_words + bitmap_size(stack_size_in_words));
 }
 
-inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
-  // One bit per potential narrowOop* or oop* address
-  size_t size_in_bits = stack_size_in_words << (UseCompressedOops ? 1 : 0);
+inline size_t InstanceStackChunkKlass::bitmap_size_in_bits(size_t stack_size_in_words) {
+  // Need one bit per potential narrowOop* or oop* address.
+  size_t size_in_bits = stack_size_in_words << (LogBitsPerWord - LogBitsPerHeapOop);
 
-  return align_up(size_in_bits, BitsPerWord) >> LogBitsPerWord;
+  return align_up(size_in_bits, BitsPerWord);
+}
+
+inline size_t InstanceStackChunkKlass::bitmap_size(size_t stack_size_in_words) {
+  return bitmap_size_in_bits(stack_size_in_words) >> LogBitsPerWord;
 }
 
 template <typename T, class OopClosureType>
@@ -113,7 +117,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_header_bounded(stackChunkOop chunk
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk, OopClosureType* closure, MemRegion mr) {
-  if (chunk->has_bitmap()) { // LIKELY
+  if (chunk->has_bitmap()) {
     intptr_t* start = chunk->sp_address() - frame::metadata_words;
     intptr_t* end = chunk->end_address();
     // mr.end() can actually be less than start. In that case, we only walk the metadata
@@ -131,7 +135,7 @@ void InstanceStackChunkKlass::oop_oop_iterate_stack_bounded(stackChunkOop chunk,
 
 template <typename T, class OopClosureType>
 void InstanceStackChunkKlass::oop_oop_iterate_stack(stackChunkOop chunk, OopClosureType* closure) {
-  if (chunk->has_bitmap()) { // LIKELY
+  if (chunk->has_bitmap()) {
     oop_oop_iterate_stack_with_bitmap<T>(chunk, closure, chunk->sp_address() - frame::metadata_words, chunk->end_address());
   } else {
     oop_oop_iterate_stack_slow(chunk, closure, chunk->range());

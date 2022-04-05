@@ -30,7 +30,7 @@
 #include "runtime/registerMap.hpp"
 
 #ifdef ASSERT
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
   assert(!is_done(), "");
   intptr_t* p = (intptr_t*)p0;
@@ -40,7 +40,7 @@ inline bool StackChunkFrameStream<frame_kind>::is_in_frame(void* p0) const {
 }
 #endif
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
   if (is_done()) {
     return frame(_sp, _sp, nullptr, nullptr, nullptr, nullptr, true);
@@ -49,40 +49,40 @@ inline frame StackChunkFrameStream<frame_kind>::to_frame() const {
   }
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline address StackChunkFrameStream<frame_kind>::get_pc() const {
   assert(!is_done(), "");
   return *(address*)(_sp - 1);
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::fp() const {
   intptr_t* fp_addr = _sp - frame::sender_sp_offset;
-  return (frame_kind == chunk_frames::MIXED && is_interpreted())
+  return (frame_kind == ChunkFrames::Mixed && is_interpreted())
     ? fp_addr + *fp_addr // derelativize
     : *(intptr_t**)fp_addr;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::derelativize(int offset) const {
   intptr_t* fp = this->fp();
   assert(fp != nullptr, "");
   return fp + fp[offset];
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline intptr_t* StackChunkFrameStream<frame_kind>::unextended_sp_for_interpreter_frame() const {
   assert_is_interpreted_and_frame_type_mixed();
   return derelativize(frame::interpreter_frame_last_sp_offset);
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 intptr_t* StackChunkFrameStream<frame_kind>::next_sp_for_interpreter_frame() const {
   assert_is_interpreted_and_frame_type_mixed();
   return (derelativize(frame::interpreter_frame_locals_offset) + 1 >= _end) ? _end : fp() + frame::sender_sp_offset;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   assert_is_interpreted_and_frame_type_mixed();
   if (derelativize(frame::interpreter_frame_locals_offset) + 1 >= _end) {
@@ -95,7 +95,7 @@ inline void StackChunkFrameStream<frame_kind>::next_for_interpreter_frame() {
   }
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   assert_is_interpreted_and_frame_type_mixed();
 
@@ -104,14 +104,14 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_size() const {
   return (int)(bottom - top);
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() const {
   assert_is_interpreted_and_frame_type_mixed();
   int diff = (int)(derelativize(frame::interpreter_frame_locals_offset) - derelativize(frame::interpreter_frame_sender_sp_offset) + 1);
   return diff;
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const {
   assert_is_interpreted_and_frame_type_mixed();
   ResourceMark rm;
@@ -126,7 +126,7 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::Mixed>::update_reg_map_pd(RegisterMap* map) {
   if (map->update_map()) {
     frame::update_map_with_saved_link(map, map->in_cont() ? (intptr_t**)(intptr_t)frame::sender_sp_offset
                                                           : (intptr_t**)(_sp - frame::sender_sp_offset));
@@ -135,14 +135,14 @@ inline void StackChunkFrameStream<chunk_frames::MIXED>::update_reg_map_pd(Regist
 
 template<>
 template<>
-inline void StackChunkFrameStream<chunk_frames::COMPILED_ONLY>::update_reg_map_pd(RegisterMap* map) {
+inline void StackChunkFrameStream<ChunkFrames::CompiledOnly>::update_reg_map_pd(RegisterMap* map) {
   if (map->update_map()) {
     frame::update_map_with_saved_link(map, map->in_cont() ? (intptr_t**)(intptr_t)frame::sender_sp_offset
                                                           : (intptr_t**)(_sp - frame::sender_sp_offset));
   }
 }
 
-template <chunk_frames frame_kind>
+template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::update_reg_map_pd(RegisterMapT* map) {}
 

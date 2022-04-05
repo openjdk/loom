@@ -45,15 +45,15 @@ typedef VMRegImpl* VMReg;
 // max_size is the maximum space a thawed chunk would take up on the stack, *not* including top-most frame's metadata
 class stackChunkOopDesc : public instanceOopDesc {
 public:
-  enum class barrier_type { LOAD, STORE };
+  enum class BarrierType { Load, Store };
 
 private:
-  template <barrier_type barrier> friend class DoBarriersStackClosure;
+  template <BarrierType barrier> friend class DoBarriersStackClosure;
 
   // Chunk flags.
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
-  static const uint8_t FLAG_GC_MODE = 1 << 2; // once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
-  static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // can only be true if FLAG_GC_MODE is true
+  static const uint8_t FLAG_GC_MODE = 1 << 2; // Once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
+  static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // Can only be true if FLAG_GC_MODE is true
 
 public:
   static inline stackChunkOop cast(oop obj);
@@ -122,10 +122,10 @@ public:
 
   inline bool requires_barriers();
 
-  template <barrier_type>
+  template <BarrierType>
   void do_barriers();
 
-  template <barrier_type, chunk_frames frames, typename RegisterMapT>
+  template <BarrierType, ChunkFrames frames, typename RegisterMapT>
   inline void do_barriers(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
   template <typename RegisterMapT>
@@ -178,10 +178,10 @@ public:
               int* out_frames = NULL, int* out_interpreted_frames = NULL) NOT_DEBUG({ return true; });
 
 private:
-  template <barrier_type barrier, chunk_frames frames = chunk_frames::MIXED, typename RegisterMapT>
+  template <BarrierType barrier, ChunkFrames frames = ChunkFrames::Mixed, typename RegisterMapT>
   void do_barriers0(const StackChunkFrameStream<frames>& f, const RegisterMapT* map);
 
-  template <chunk_frames frames, class StackChunkFrameClosureType>
+  template <ChunkFrames frames, class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
   inline intptr_t* relative_base() const;

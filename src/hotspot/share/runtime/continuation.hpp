@@ -103,7 +103,6 @@ public:
 
 private:
   friend class InstanceStackChunkKlass;
-  static void emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops);
 
 #ifdef ASSERT
 public:

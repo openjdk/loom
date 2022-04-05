@@ -463,7 +463,7 @@ const frame ContinuationWrapper::last_frame() {
   if (chunk == nullptr) {
     return frame();
   }
-  return StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
+  return StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame();
 }
 
 inline stackChunkOop ContinuationWrapper::nonempty_chunk(stackChunkOop chunk) const {
@@ -865,17 +865,6 @@ void Continuation::describe(FrameValues &values) {
   }
 }
 #endif
-
-void Continuation::emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops) {
-  EventContinuationIterateOops e;
-  if (e.should_commit()) {
-    e.set_id(cast_from_oop<u8>(chunk));
-    e.set_safepoint(SafepointSynchronize::is_at_safepoint());
-    e.set_numFrames((u2)num_frames);
-    e.set_numOops((u2)num_oops);
-    e.commit();
-  }
-}
 
 #ifdef ASSERT
 void Continuation::debug_verify_continuation(oop contOop) {
@@ -1431,7 +1420,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       bool top_interpreted = Interpreter::contains(chunk->pc());
       unextended_sp = chunk->sp();
       if (top_interpreted) {
-        StackChunkFrameStream<chunk_frames::MIXED> last(chunk);
+        StackChunkFrameStream<ChunkFrames::Mixed> last(chunk);
         unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
       }
       if (callee.is_interpreted_frame() == top_interpreted) {
@@ -1446,7 +1435,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(_size >= 0, "");
 
   assert(chunk == nullptr || chunk->is_empty()
-          || unextended_sp == chunk->to_offset(StackChunkFrameStream<chunk_frames::MIXED>(chunk).unextended_sp()), "");
+          || unextended_sp == chunk->to_offset(StackChunkFrameStream<ChunkFrames::Mixed>(chunk).unextended_sp()), "");
   assert(chunk != nullptr || unextended_sp < _size, "");
 
     // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
@@ -1496,8 +1485,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(!_barriers || chunk->is_empty(), "");
 
   assert(!chunk->has_bitmap(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).is_done(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame().is_empty(), "");
+  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
+  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
 
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
   // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
@@ -1512,7 +1501,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->print_on(&ls);
   }
 
-  caller = StackChunkFrameStream<chunk_frames::MIXED>(chunk).to_frame();
+  caller = StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame();
 
   DEBUG_ONLY(_last_write = caller.unextended_sp() + (empty_chunk ? argsize : overlap);)
   assert(chunk->is_in_chunk(_last_write - _size),
@@ -1738,7 +1727,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   if (UNLIKELY(_barriers)) {
     log_develop_trace(continuations)("do barriers on old chunk");
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>();
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>();
   }
 
   log_develop_trace(continuations)("finish_freeze: has_mixed_frames: %d", chunk->has_mixed_frames());
@@ -2121,7 +2110,7 @@ protected:
   intptr_t* _top_unextended_sp;
   int _align_size;
 
-  StackChunkFrameStream<chunk_frames::MIXED> _stream;
+  StackChunkFrameStream<ChunkFrames::Mixed> _stream;
 
   NOT_PRODUCT(int _frames;)
 
@@ -2251,7 +2240,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   } else { // thaw a single frame
     partial = true;
 
-    StackChunkFrameStream<chunk_frames::COMPILED_ONLY> f(chunk);
+    StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
     assert(chunk_sp == f.sp(), "");
     assert(chunk_sp == f.unextended_sp(), "");
 
@@ -2366,7 +2355,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   int num_frames = (return_barrier ? 1 : 2);
   bool last_interpreted = chunk->has_mixed_frames() && Interpreter::contains(chunk->pc());
 
-  _stream = StackChunkFrameStream<chunk_frames::MIXED>(chunk);
+  _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp = _stream.unextended_sp();
 
   frame hf = _stream.to_frame();
@@ -2522,7 +2511,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_interpreted_frame(), "");
 
   if (UNLIKELY(_barriers)) {
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<ContinuationHelper::InterpretedFrame>(caller, num_frames);
@@ -2588,7 +2577,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
 
   if (!stub_caller && UNLIKELY(_barriers)) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
-    _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
   const bool bottom = recurse_thaw_java_frame<ContinuationHelper::CompiledFrame>(caller, num_frames);
@@ -2661,7 +2650,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     _stream.next(&map);
     assert(!_stream.is_done(), "");
     if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
-      _cont.tail()->do_barriers<stackChunkOopDesc::barrier_type::STORE>(_stream, &map);
+      _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
     }
     assert(!_stream.is_done(), "");
   }
@@ -3067,7 +3056,7 @@ private:
 
     freeze_entry = (address)freeze<SelectedConfigT>;
 
-    // if we want, we could templatize by king and have three different that entries
+    // If we wanted, we could templatize by kind and have three different thaw entries
     thaw_entry   = (address)thaw<SelectedConfigT>;
   }
 };
