@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -199,7 +199,7 @@ $(eval $(call SetTestOpt,FAILURE_HANDLER_TIMEOUT,JTREG))
 
 $(eval $(call ParseKeywordVariable, JTREG, \
     SINGLE_KEYWORDS := JOBS TIMEOUT_FACTOR FAILURE_HANDLER_TIMEOUT \
-        TEST_MODE ASSERT VERBOSE RETAIN MAIN_WRAPPER MAX_MEM RUN_PROBLEM_LISTS \
+        TEST_MODE ASSERT VERBOSE RETAIN MAX_MEM RUN_PROBLEM_LISTS \
         RETRY_COUNT REPEAT_COUNT MAX_OUTPUT $(CUSTOM_JTREG_SINGLE_KEYWORDS), \
     STRING_KEYWORDS := OPTIONS JAVA_OPTIONS VM_OPTIONS KEYWORDS \
         EXTRA_PROBLEM_LISTS LAUNCHER_OPTIONS \
@@ -594,9 +594,6 @@ define SetupRunMicroTestBody
   # Set library path for native dependencies
   $1_JMH_JVM_ARGS := -Djava.library.path=$$(TEST_IMAGE_DIR)/micro/native
 
-  # Allow preview features in microbenchmarks
-  $1_JMH_JVM_ARGS += --enable-preview
-
   ifneq ($$(MICRO_VM_OPTIONS)$$(MICRO_JAVA_OPTIONS), )
     $1_JMH_JVM_ARGS += $$(MICRO_VM_OPTIONS) $$(MICRO_JAVA_OPTIONS)
   endif
@@ -746,7 +743,6 @@ define SetupRunJtregTestBody
 
   JTREG_VERBOSE ?= fail,error,summary
   JTREG_RETAIN ?= fail,error
-  JTREG_MAIN_WRAPPER ?=
   JTREG_RUN_PROBLEM_LISTS ?= false
   JTREG_RETRY_COUNT ?= 0
   JTREG_REPEAT_COUNT ?= 0
@@ -757,11 +753,6 @@ define SetupRunJtregTestBody
       $$(info Please choose one or the other.)
       $$(error Cannot continue)
     endif
-  endif
-
-  ifneq ($$(JTREG_MAIN_WRAPPER), )
-    JT_HOME = $$(JT_HOME_MW)
-    $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER)
   endif
 
   ifneq ($$(JTREG_LAUNCHER_OPTIONS), )

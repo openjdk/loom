@@ -429,8 +429,8 @@ JDWP "Java(tm) Debug Wire Protocol"
                      "Can the VM return the constant pool information?")
             (boolean canForceEarlyReturn
                      "Can the VM force early return from a method?")
-            (boolean supportsVirtualThreads
-                     "Does the VM support virtual threads, temporary capability")
+            (boolean reserved22
+                     "Reserved for future capability")
             (boolean reserved23
                      "Reserved for future capability")
             (boolean reserved24

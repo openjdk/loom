@@ -3075,7 +3075,7 @@ void Continuations::init() {
 // While virtual threads are in Preview, there are some VM mechanisms we disable if continuations aren't used
 // See NMethodSweeper::do_stack_scanning and nmethod::is_not_on_continuation_stack
 bool Continuations::enabled() {
-  return LoomVM; // vmClasses::Continuation_klass()->is_initialized(); // Arguments::enable_preview();
+  return Arguments::enable_preview();
 }
 
 void Continuation::init() {
