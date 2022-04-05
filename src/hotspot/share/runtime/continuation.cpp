@@ -754,11 +754,16 @@ bool Continuation::is_scope_bottom(oop cont_scope, const frame& f, const Registe
     return false;
   }
 
-  ContinuationEntry* ce = get_continuation_entry_for_sp(map->thread(), f.sp());
-  if (ce == nullptr) {
-    return false;
+  oop continuation;
+  if (map->in_cont()) {
+    continuation = map->cont();
+  } else {
+    ContinuationEntry* ce = get_continuation_entry_for_sp(map->thread(), f.sp());
+    if (ce == nullptr) {
+      return false;
+    }
+    continuation = ce->cont_oop();
   }
-  oop continuation = ce->cont_oop();
   if (continuation == nullptr) {
     return false;
   }
