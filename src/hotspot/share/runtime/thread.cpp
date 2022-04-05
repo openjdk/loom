@@ -77,6 +77,7 @@
 #include "prims/jvmtiThreadState.inline.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlagLimit.hpp"
 #include "runtime/deoptimization.hpp"
@@ -1081,8 +1082,8 @@ JavaThread::JavaThread() :
   _frames_to_pop_failed_realloc(0),
 
   _cont_entry(nullptr),
-  _cont_fastpath_thread_state(1),
   _cont_fastpath(0),
+  _cont_fastpath_thread_state(1),
   _held_monitor_count(0),
 
   _handshake(this),
@@ -2501,6 +2502,21 @@ void JavaThread::trace_stack() {
 
 
 #endif // PRODUCT
+
+void JavaThread::inc_held_monitor_count() {
+  if (!Continuations::enabled()) {
+    return;
+  }
+  _held_monitor_count++;
+}
+
+void JavaThread::dec_held_monitor_count() {
+  if (!Continuations::enabled()) {
+    return;
+  }
+  assert(_held_monitor_count > 0, "");
+  _held_monitor_count--;
+}
 
 frame JavaThread::vthread_last_frame() {
   assert (is_vthread_mounted(), "Virtual thread not mounted");
