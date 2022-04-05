@@ -73,23 +73,6 @@ public class JoinWithDuration {
     }
 
     /**
-     * Test join on current thread.
-     */
-    @Test
-    public void testJoinSelf() throws Exception {
-        Thread thread = Thread.currentThread();
-
-        assertFalse(thread.join(Duration.ofNanos(-100)));
-        assertFalse(thread.join(Duration.ofNanos(0)));
-        assertFalse(thread.join(Duration.ofNanos(100)));
-
-        // test duration of join
-        long start = millisTime();
-        assertFalse(thread.join(Duration.ofMillis(2000)));
-        expectDuration(start, /*min*/1900, /*max*/20_000);
-    }
-
-    /**
      * Test join on thread that terminates while waiting.
      */
     @Test
@@ -163,6 +146,23 @@ public class JoinWithDuration {
         } finally {
             wakerThread.interrupt();
         }
+    }
+
+    /**
+     * Test join on current thread.
+     */
+    @Test
+    public void testJoinSelf() throws Exception {
+        Thread thread = Thread.currentThread();
+
+        assertFalse(thread.join(Duration.ofNanos(-100)));
+        assertFalse(thread.join(Duration.ofNanos(0)));
+        assertFalse(thread.join(Duration.ofNanos(100)));
+
+        // test duration of join
+        long start = millisTime();
+        assertFalse(thread.join(Duration.ofMillis(2000)));
+        expectDuration(start, /*min*/1900, /*max*/20_000);
     }
 
     /**
