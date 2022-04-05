@@ -143,7 +143,7 @@ public:
     // Read the base value once and use it for all calculations below
     oop base = Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      assert(*derived_loc == derived_pointer(0), "");
+      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
     assert(!CompressedOops::is_base(base), "");
@@ -494,7 +494,7 @@ public:
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      assert(*derived_loc == derived_pointer(0), "Unexpected");
+      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
 
