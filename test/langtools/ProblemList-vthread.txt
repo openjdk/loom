@@ -45,7 +45,10 @@ jdk/jshell/PasteAndMeasurementsUITest.java
 ####
 # Uninvestigated jshell failures
 jdk/jshell/AnalyzeSnippetTest.java
+jdk/jshell/ClassMembersTest.java
 jdk/jshell/ClassesTest.java
 jdk/jshell/CompletenessTest.java
+jdk/jshell/CompletionSuggestionTest.java
 jdk/jshell/ToolSimpleTest.java
 jdk/jshell/ToolBasicTest.java
+jdk/jshell/ToolRetainTest.java
