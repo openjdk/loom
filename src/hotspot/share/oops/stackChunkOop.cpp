@@ -110,6 +110,30 @@ int stackChunkOopDesc::num_java_frames() const {
   return n;
 }
 
+// We use the high-order (sign) bit to tag derived oop offsets.
+// However, we cannot rely on simple nagation, as offsets could hypothetically be zero or even negative
+
+static inline bool is_derived_oop_offset(intptr_t value) {
+  return value < 0;
+}
+
+static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
+  assert (!is_derived_oop_offset(untagged), "");
+  assert (untagged <= INT_MAX, "");
+  assert (untagged >= INT_MIN, "");
+  intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << 63));
+  assert(is_derived_oop_offset(tagged), "");
+  return tagged;
+}
+
+static inline intptr_t untag_derived_oop_offset(intptr_t tagged) {
+  assert (is_derived_oop_offset(tagged), "");
+  intptr_t untagged = (tagged << 1) >> 1;  // signed shift
+  assert (untagged <= INT_MAX, "");
+  assert (untagged >= INT_MIN, "");
+  return untagged;
+}
+
 template <stackChunkOopDesc::BarrierType barrier>
 class DoBarriersStackClosure {
   const stackChunkOop _chunk;
@@ -143,7 +167,7 @@ public:
     // Read the base value once and use it for all calculations below
     oop base = Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      assert(*derived_loc == derived_pointer(0), "");
+      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
     assert(!CompressedOops::is_base(base), "");
@@ -178,12 +202,7 @@ public:
     OrderAccess::loadload();
     intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
 
-    if (derived_int_val == 0) {
-      // Why do we get 0 values here?
-      return;
-    }
-
-    if (derived_int_val < 0) {
+    if (is_derived_oop_offset(derived_int_val)) {
       // The derived oop had already been converted to an offset.
       return;
     }
@@ -197,18 +216,7 @@ public:
     // and how we handle it by checking the state of the read base oop.
 
     intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-    if (offset < 0) {
-      // It looks as if a derived pointer appears live in the oopMap but isn't
-      // pointing into the object. This might be the result of address
-      // computation floating above corresponding range check for array access.
-      //
-      // Note now the -1 will be stored as 1. Concurrently running threads
-      // might read this value and use it in the offset calculation above.
-      // This will just create a large negative value and we'll enter this
-      // code again.
-      offset = -1;
-    }
-    Atomic::store((intptr_t*)derived_loc, -offset);
+    Atomic::store((intptr_t*)derived_loc, tag_derived_oop_offset(offset));
   }
 };
 
@@ -396,8 +404,8 @@ public:
 
       intptr_t offset = *(intptr_t*)derived_loc;
 
-      if (offset <= 0) {
-        offset = -offset;
+      if (is_derived_oop_offset(offset)) {
+        offset = untag_derived_oop_offset(offset);
         *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
       }
     }
@@ -494,7 +502,7 @@ public:
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      assert(*derived_loc == derived_pointer(0), "Unexpected");
+      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
 
@@ -513,28 +521,21 @@ public:
     // Order the loads of the base oop and the derived oop
     OrderAccess::loadload();
 
-    intptr_t offset = Atomic::load((intptr_t*)derived_loc);
+    intptr_t value = Atomic::load((intptr_t*)derived_loc);
 
-    if (offset == 0 || offset == 1) {
-      // Special-case. See: RelativizeDerivedOopClosure
-      return;
-    }
-
-    // Offsets are "tagged" as negative values
-
+    intptr_t offset;
     if (UseZGC && _requires_barriers) {
       // For ZGC when the _chunk has transition to a state where the layout has
       // become stable(requires_barriers()), the earlier is_good check should
       // guarantee that all derived oops have been converted too offsets.
-      assert(offset < 0, "Unexpected non-offset value: " PTR_FORMAT, offset);
+      assert(is_derived_oop_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
     } else {
-      if (offset <= 0) {
-        // The offset was actually an offset
-        offset = -offset;
+      if (is_derived_oop_offset(value)) {
+        offset = untag_derived_oop_offset(value);
       } else {
         // The offset was a non-offset derived pointer that
         // had not been converted to an offset yet.
-        offset = offset - cast_from_oop<intptr_t>(base);
+        offset = value - cast_from_oop<intptr_t>(base);
       }
     }
 
