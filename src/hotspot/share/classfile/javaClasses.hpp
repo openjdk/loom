@@ -1164,6 +1164,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
 
   static inline int sp(oop ref);
   static inline void set_sp(oop ref, int value);
+  static inline void set_sp(HeapWord* ref, int value); // used while allocating
   static inline intptr_t pc(oop ref);
   static inline void set_pc(oop ref, intptr_t value);
   static inline int argsize(oop ref);
