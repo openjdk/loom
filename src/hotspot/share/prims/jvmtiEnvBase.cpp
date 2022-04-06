@@ -2223,7 +2223,7 @@ GetCurrentContendedMonitorClosure::do_thread(Thread *target) {
 }
 
 void
-VM_VThreadGetStackTrace::doit() {
+VM_VirtualThreadGetStackTrace::doit() {
   if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
     _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
     return;
@@ -2292,7 +2292,7 @@ PrintStackTraceClosure::do_thread(Thread *target) {
 #endif
 
 void
-VM_VThreadGetFrameCount::doit() {
+VM_VirtualThreadGetFrameCount::doit() {
   _result = ((JvmtiEnvBase*)_env)->get_frame_count(_vthread_h(), _count_ptr);
 }
 
@@ -2315,7 +2315,7 @@ GetFrameLocationClosure::do_thread(Thread *target) {
 }
 
 void
-VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
+VirtualThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
   if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
     _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
     return;
@@ -2336,7 +2336,7 @@ VThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
 }
 
 void
-VThreadGetThreadClosure::do_thread(Thread *target) {
+VirtualThreadGetThreadClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
   JavaThread *jt = JavaThread::cast(target);
   oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
@@ -2344,7 +2344,7 @@ VThreadGetThreadClosure::do_thread(Thread *target) {
 }
 
 void
-VThreadGetStackTraceClosure::do_thread(Thread *target) {
+VirtualThreadGetStackTraceClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
   if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
     _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
@@ -2361,20 +2361,20 @@ VThreadGetStackTraceClosure::do_thread(Thread *target) {
 }
 
 void
-VThreadGetFrameCountClosure::do_thread(Thread *target) {
+VirtualThreadGetFrameCountClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
   _result = ((JvmtiEnvBase*)_env)->get_frame_count(_vthread_h(), _count_ptr);
 }
 
 void
-VThreadGetFrameLocationClosure::do_thread(Thread *target) {
+VirtualThreadGetFrameLocationClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
   _result = ((JvmtiEnvBase*)_env)->get_frame_location(_vthread_h(), _depth,
                                                       _method_ptr, _location_ptr);
 }
 
 void
-VThreadGetThreadStateClosure::do_thread(Thread *target) {
+VirtualThreadGetThreadStateClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
   jshort vthread_state = java_lang_VirtualThread::state(_vthread_h());
   oop carrier_thread_oop = java_lang_VirtualThread::carrier_thread(_vthread_h());
