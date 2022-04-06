@@ -1807,8 +1807,6 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->max_size() == 0, "");
   assert(chunk->sp() == chunk->stack_size(), "");
 
-  chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
-
   stackChunkOop chunk0 = _cont.tail();
   if (chunk0 != nullptr && chunk0->is_empty()) {
     chunk0 = chunk0->parent();
