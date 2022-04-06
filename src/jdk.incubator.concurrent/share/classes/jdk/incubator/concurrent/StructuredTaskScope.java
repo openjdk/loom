@@ -485,16 +485,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * <p> This method may only be invoked by the task scope owner.
      *
+     * @return this task scope
      * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      */
-    public void join() throws InterruptedException {
+    public StructuredTaskScope<T> join() throws InterruptedException {
         try {
             implJoin(null);
         } catch (TimeoutException e) {
             throw new InternalError();
         }
+        return this;
     }
 
     /**
@@ -507,16 +509,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> This method may only be invoked by the task scope owner.
      *
      * @param deadline the deadline
+     * @return this task scope
      * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner
      * @throws InterruptedException if interrupted while waiting
      * @throws TimeoutException if the deadline is reached while waiting
      */
-    public void joinUntil(Instant deadline)
+    public StructuredTaskScope<T> joinUntil(Instant deadline)
         throws InterruptedException, TimeoutException
     {
         Duration timeout = Duration.between(Instant.now(), deadline);
         implJoin(timeout);
+        return this;
     }
 
     /**
@@ -882,6 +886,32 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         /**
+         * {@inheritDoc}
+         * @return this task scope
+         * @throws IllegalStateException {@inheritDoc}
+         * @throws WrongThreadException {@inheritDoc}
+         */
+        @Override
+        public ShutdownOnSuccess<T> join() throws InterruptedException {
+            super.join();
+            return this;
+        }
+
+        /**
+         * {@inheritDoc}
+         * @return this task scope
+         * @throws IllegalStateException {@inheritDoc}
+         * @throws WrongThreadException {@inheritDoc}
+         */
+        @Override
+        public ShutdownOnSuccess<T> joinUntil(Instant deadline)
+            throws InterruptedException, TimeoutException
+        {
+            super.joinUntil(deadline);
+            return this;
+        }
+
+        /**
          * {@return the result of the first task that completed with a result}
          *
          * <p> When no task completed with a result but a task completed with an exception
@@ -1029,6 +1059,32 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                     }
                 }
             }
+        }
+
+        /**
+         * {@inheritDoc}
+         * @return this task scope
+         * @throws IllegalStateException {@inheritDoc}
+         * @throws WrongThreadException {@inheritDoc}
+         */
+        @Override
+        public ShutdownOnFailure join() throws InterruptedException {
+            super.join();
+            return this;
+        }
+
+        /**
+         * {@inheritDoc}
+         * @return this task scope
+         * @throws IllegalStateException {@inheritDoc}
+         * @throws WrongThreadException {@inheritDoc}
+         */
+        @Override
+        public ShutdownOnFailure joinUntil(Instant deadline)
+            throws InterruptedException, TimeoutException
+        {
+            super.joinUntil(deadline);
+            return this;
         }
 
         /**
