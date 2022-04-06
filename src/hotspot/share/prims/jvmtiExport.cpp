@@ -3172,7 +3172,7 @@ bool JvmtiSampledObjectAllocEventCollector::object_alloc_is_safe_to_sample() {
 }
 
 // Setup current thread to record sampled allocated objects.
-JvmtiSampledObjectAllocEventCollector::JvmtiSampledObjectAllocEventCollector() {
+void JvmtiSampledObjectAllocEventCollector::start() {
   if (JvmtiExport::should_post_sampled_object_alloc()) {
     if (!object_alloc_is_safe_to_sample()) {
       return;

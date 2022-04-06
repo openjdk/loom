@@ -419,11 +419,11 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, bool is_mount) {
 JvmtiVTSuspender::SR_Mode
 JvmtiVTSuspender::_SR_mode = SR_none;
 
-VThreadList*
-JvmtiVTSuspender::_suspended_list = new VThreadList();
+VirtualThreadList*
+JvmtiVTSuspender::_suspended_list = new VirtualThreadList();
 
-VThreadList*
-JvmtiVTSuspender::_not_suspended_list = new VThreadList();
+VirtualThreadList*
+JvmtiVTSuspender::_not_suspended_list = new VirtualThreadList();
 
 void
 JvmtiVTSuspender::register_all_vthreads_suspend() {

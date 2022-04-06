@@ -1334,9 +1334,9 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // there is no monitor info to collect if target virtual thread is unmounted
     if (java_thread != NULL) {
-      VThreadGetOwnedMonitorInfoClosure op(this,
-                                           Handle(calling_thread, thread_oop),
-                                           owned_monitors_list);
+      VirtualThreadGetOwnedMonitorInfoClosure op(this,
+                                                 Handle(calling_thread, thread_oop),
+                                                 owned_monitors_list);
       Handshake::execute(&op, java_thread);
       err = op.result();
     }
@@ -1409,9 +1409,9 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // there is no monitor info to collect if target virtual thread is unmounted
     if (java_thread != NULL) {
-      VThreadGetOwnedMonitorInfoClosure op(this,
-                                           Handle(calling_thread, thread_oop),
-                                           owned_monitors_list);
+      VirtualThreadGetOwnedMonitorInfoClosure op(this,
+                                                 Handle(calling_thread, thread_oop),
+                                                 owned_monitors_list);
       Handshake::execute(&op, java_thread);
       err = op.result();
     }
@@ -1695,14 +1695,14 @@ JvmtiEnv::GetStackTrace(jthread thread, jint start_depth, jint max_frame_count, 
     if (java_thread == NULL) { // target virtual thread is unmounted
       ResourceMark rm(current_thread);
 
-      VM_VThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
-                                 start_depth, max_frame_count,
-                                 frame_buffer, count_ptr);
+      VM_VirtualThreadGetStackTrace op(this, Handle(current_thread, thread_obj),
+                                       start_depth, max_frame_count,
+                                       frame_buffer, count_ptr);
       VMThread::execute(&op);
       return op.result();
     }
-    VThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
-                                   start_depth, max_frame_count, frame_buffer, count_ptr);
+    VirtualThreadGetStackTraceClosure op(this, Handle(current_thread, thread_obj),
+                                         start_depth, max_frame_count, frame_buffer, count_ptr);
     Handshake::execute(&op, java_thread);
     return op.result();
   }
@@ -1814,11 +1814,11 @@ JvmtiEnv::GetFrameCount(jthread thread, jint* count_ptr) {
   // Support for virtual threads
   if (java_lang_VirtualThread::is_instance(thread_obj)) {
     if (java_thread == NULL) { // target virtual thread is unmounted
-      VM_VThreadGetFrameCount op(this, Handle(current_thread, thread_obj),  count_ptr);
+      VM_VirtualThreadGetFrameCount op(this, Handle(current_thread, thread_obj),  count_ptr);
       VMThread::execute(&op);
       return op.result();
     }
-    VThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
+    VirtualThreadGetFrameCountClosure op(this, Handle(current_thread, thread_obj), count_ptr);
     Handshake::execute(&op, java_thread);
     return op.result();
   }
@@ -1911,8 +1911,8 @@ JvmtiEnv::GetFrameLocation(jthread thread, jint depth, jmethodID* method_ptr, jl
       err = get_frame_location(thread_obj, depth, method_ptr, location_ptr);
       return err;
     }
-    VThreadGetFrameLocationClosure op(this, Handle(current_thread, thread_obj),
-                                      depth, method_ptr, location_ptr);
+    VirtualThreadGetFrameLocationClosure op(this, Handle(current_thread, thread_obj),
+                                            depth, method_ptr, location_ptr);
     Handshake::execute(&op, java_thread);
     return op.result();
   }

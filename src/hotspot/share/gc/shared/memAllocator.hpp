@@ -111,7 +111,6 @@ public:
   StackChunkAllocator(Klass* klass, size_t word_size, size_t stack_size, Thread* thread = Thread::current())
     : MemAllocator(klass, word_size, thread),
       _stack_size(stack_size) {}
-  oop init_partial_for_tlab(HeapWord* mem) const;
   virtual oop initialize(HeapWord* mem) const;
 };
 

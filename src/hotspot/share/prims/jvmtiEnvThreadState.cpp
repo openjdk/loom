@@ -264,7 +264,7 @@ bool JvmtiEnvThreadState::is_frame_pop(int cur_frame_number) {
   return get_frame_pops()->contains(fp);
 }
 
-class VM_VThreadGetCurrentLocation : public VM_Operation {
+class VM_VirtualThreadGetCurrentLocation : public VM_Operation {
  private:
    Handle _vthread_h;
    jmethodID _method_id;
@@ -272,14 +272,14 @@ class VM_VThreadGetCurrentLocation : public VM_Operation {
    bool _completed;
 
  public:
-  VM_VThreadGetCurrentLocation(Handle vthread_h)
+  VM_VirtualThreadGetCurrentLocation(Handle vthread_h)
     : _vthread_h(vthread_h),
       _method_id(NULL),
       _bci(0),
       _completed(false)
   {}
 
-  VMOp_Type type() const { return VMOp_VThreadGetCurrentLocation; }
+  VMOp_Type type() const { return VMOp_VirtualThreadGetCurrentLocation; }
   void doit() {
     if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
       return; // _completed remains false
@@ -381,7 +381,7 @@ void JvmtiEnvThreadState::reset_current_location(jvmtiEvent event_type, bool ena
       int bci;
       JavaThread* cur_thread = JavaThread::current();
       HandleMark hm(cur_thread);
-      VM_VThreadGetCurrentLocation op(Handle(cur_thread, thread_oop));
+      VM_VirtualThreadGetCurrentLocation op(Handle(cur_thread, thread_oop));
       VMThread::execute(&op);
       // do nothing if virtual thread has been already terminated
       if (op.completed()) {

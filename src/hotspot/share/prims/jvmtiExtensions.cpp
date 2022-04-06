@@ -154,7 +154,7 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
   if (thread_ptr == NULL) {
       return JVMTI_ERROR_NULL_POINTER;
   }
-  VThreadGetThreadClosure op(Handle(current_thread, vthread_oop), thread_ptr);
+  VirtualThreadGetThreadClosure op(Handle(current_thread, vthread_oop), thread_ptr);
   Handshake::execute(&op, &tlh, current_thread);
   return op.result();
 }

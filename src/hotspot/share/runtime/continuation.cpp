@@ -933,6 +933,8 @@ protected:
   int _size; // total size of all frames plus metadata in words.
   int _align_size;
 
+  JvmtiSampledObjectAllocEventCollector* _jvmti_event_collector;
+
   NOT_PRODUCT(int _frames;)
   DEBUG_ONLY(intptr_t* _last_write;)
 
@@ -941,9 +943,10 @@ protected:
 public:
   NOINLINE freeze_result freeze_slow();
 
+  void set_jvmti_event_collector(JvmtiSampledObjectAllocEventCollector* jsoaec) { _jvmti_event_collector = jsoaec; }
+
 protected:
   inline void init_rest();
-  inline void init_chunk(stackChunkOop chunk);
   void throw_stack_overflow_on_humongous_chunk();
 
   // fast path
@@ -1006,6 +1009,7 @@ protected:
 
 FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preempt) :
     _thread(thread), _cont(cont), _barriers(false), _preempt(preempt) {
+  DEBUG_ONLY(_jvmti_event_collector = nullptr;)
 
   assert(_thread != nullptr, "");
   assert(_thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
@@ -1760,14 +1764,6 @@ inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive
   return false;
 }
 
-void FreezeBase::init_chunk(stackChunkOop chunk) {
-  chunk->clear_flags();
-  chunk->set_max_size(0);
-  chunk->set_sp(chunk->stack_size());
-  chunk->set_pc(nullptr);
-  chunk->set_argsize(0);
-}
-
 template <typename ConfigT>
 stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   log_develop_trace(continuations)("allocate_chunk allocating new chunk");
@@ -1789,9 +1785,12 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-    chunk = stackChunkOopDesc::cast(allocator.init_partial_for_tlab(start));
+    chunk = stackChunkOopDesc::cast(allocator.StackChunkAllocator::initialize(start));
   } else {
     ContinuationWrapper::SafepointOp so(current, _cont);
+    assert(_jvmti_event_collector != nullptr, "");
+    _jvmti_event_collector->start(); // can safepoint
+
     chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
 
     if (chunk == nullptr) { // OOME
@@ -1803,13 +1802,10 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
   assert((intptr_t)chunk->start_address() % 8 == 0, "");
 
-  init_chunk(chunk);
-
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
   assert(chunk->max_size() == 0, "");
-
-  chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
+  assert(chunk->sp() == chunk->stack_size(), "");
 
   stackChunkOop chunk0 = _cont.tail();
   if (chunk0 != nullptr && chunk0->is_empty()) {
@@ -1997,6 +1993,10 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   log_develop_trace(continuations)("chunk unavailable; transitioning to VM");
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
+    // delays a possible JvmtiSampledObjectAllocEventCollector in alloc_chunk
+    JvmtiSampledObjectAllocEventCollector jsoaec(false);
+    fr.set_jvmti_event_collector(&jsoaec);
+
     freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
                              : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
