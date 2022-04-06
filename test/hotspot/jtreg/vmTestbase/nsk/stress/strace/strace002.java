@@ -79,6 +79,7 @@ public class strace002 {
             "java.lang.Thread.exit",
             "java.lang.Thread.yield",
             "java.lang.Thread.yield0",
+            "java.lang.Thread.clearReferences",
             "java.lang.Thread.currentCarrierThread",
             "java.lang.Thread.currentThread",
             "nsk.stress.strace.strace002Thread.run",
