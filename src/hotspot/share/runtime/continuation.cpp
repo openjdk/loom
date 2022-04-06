@@ -1566,24 +1566,30 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
 #endif
 }
 
-NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
+#ifdef ASSERT
+static void verify_frame_top(const frame& f, intptr_t* top) {
+  ResourceMark rm;
+  InterpreterOopMap mask;
+  f.interpreted_frame_oop_map(&mask);
+  assert(top <= ContinuationHelper::InterpretedFrame::frame_top(f, &mask),
+         "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
+           p2i(top), p2i(ContinuationHelper::InterpretedFrame::frame_top(f, &mask)));
+}
+#endif // ASSERT
+
+NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, frame& caller,
+                                                                    int callee_argsize,
+                                                                    bool callee_interpreted) {
   adjust_interpreted_frame_unextended_sp(f);
 
+  // Why 'vsp' what is 'v' ?  isn't this the sp on the real stack?
   intptr_t* const vsp = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
   const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
   const int locals = f.interpreter_frame_method()->max_locals();
   assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= f.fp() + frame::metadata_words + locals, "");// = on x86
   const int fsize = f.fp() + frame::metadata_words + locals - vsp;
 
-#ifdef ASSERT
-  {
-    ResourceMark rm;
-    InterpreterOopMap mask;
-    f.interpreted_frame_oop_map(&mask);
-    assert(vsp <= ContinuationHelper::InterpretedFrame::frame_top(f, &mask), "vsp: " INTPTR_FORMAT " Interpreted::frame_top: " INTPTR_FORMAT,
-           p2i(vsp), p2i(ContinuationHelper::InterpretedFrame::frame_top(f, &mask)));
-  }
-#endif
+  DEBUG_ONLY(verify_frame_top(f, vsp));
 
   Method* frame_method = ContinuationHelper::Frame::frame_method(f);
 
@@ -2209,7 +2215,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
   // TODO: explain why we're not setting the tail
 
-  // LogTarget might generate some test code
   LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
