@@ -117,20 +117,22 @@ static inline bool is_derived_oop_offset(intptr_t value) {
   return value < 0;
 }
 
+static const intptr_t OFFSET_MAX = (intptr_t)((uintptr_t)1 << 35); // INT_MAX
+static const intptr_t OFFSET_MIN = -OFFSET_MAX - 1;
+
 static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
-  assert (!is_derived_oop_offset(untagged), "");
-  assert (untagged <= INT_MAX, "");
-  assert (untagged >= INT_MIN, "");
-  intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << 63));
+  assert(untagged <= OFFSET_MAX, "");
+  assert(untagged >= OFFSET_MIN, "");
+  intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << (BitsPerWord-1)));
   assert(is_derived_oop_offset(tagged), "");
   return tagged;
 }
 
 static inline intptr_t untag_derived_oop_offset(intptr_t tagged) {
-  assert (is_derived_oop_offset(tagged), "");
-  intptr_t untagged = (tagged << 1) >> 1;  // signed shift
-  assert (untagged <= INT_MAX, "");
-  assert (untagged >= INT_MIN, "");
+  assert(is_derived_oop_offset(tagged), "");
+  intptr_t untagged = (intptr_t)((uintptr_t)tagged << 1) >> 1;  // unsigned left shift; signed right shift
+  assert(untagged <= OFFSET_MAX, "");
+  assert(untagged >= OFFSET_MIN, "");
   return untagged;
 }
 
@@ -167,7 +169,6 @@ public:
     // Read the base value once and use it for all calculations below
     oop base = Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
     assert(!CompressedOops::is_base(base), "");
@@ -502,7 +503,6 @@ public:
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
     if (base == nullptr) {
-      // assert(*derived_loc == derived_pointer(0), "Unexpected");
       return;
     }
 
@@ -522,29 +522,15 @@ public:
     OrderAccess::loadload();
 
     intptr_t value = Atomic::load((intptr_t*)derived_loc);
-
-    intptr_t offset;
     if (UseZGC && _requires_barriers) {
       // For ZGC when the _chunk has transition to a state where the layout has
       // become stable(requires_barriers()), the earlier is_good check should
       // guarantee that all derived oops have been converted too offsets.
       assert(is_derived_oop_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
-    } else {
-      if (is_derived_oop_offset(value)) {
-        offset = untag_derived_oop_offset(value);
-      } else {
-        // The offset was a non-offset derived pointer that
-        // had not been converted to an offset yet.
-        offset = value - cast_from_oop<intptr_t>(base);
-      }
     }
 
-    // Check that the offset is within the object
-    size_t base_size_in_bytes = base->size() * BytesPerWord;
-    // Was seen to fail on aarch64.
-    // Seems like live derived oops used for array access could be bogus when spilled, but the effect is benign
-    // assert(size_t(offset) < base_size_in_bytes, "Offset must be within object: "
-    //        PTR_FORMAT " object size: " SIZE_FORMAT, offset, base_size_in_bytes);
+    // There's not much else we can assert about derived pointers. Their offsets are allowed to
+    // fall outside of their base object, and even be negative.
   }
 };
 
