@@ -208,10 +208,9 @@ public:
       return;
     }
 
-    // At this point, we've seen a non-offset (positive) value *after* we've
+    // At this point, we've seen a non-offset value *after* we've
     // read the base, but we write the offset *before* fixing the base, so we
-    // are guaranteed that the value in derived_loc is consistent with base
-    // (i.e. points into the object).
+    // are guaranteed that the value in derived_loc is consistent with base.
     //
     // Note above how ZGC could be writing the base concurrently with the store
     // and how we handle it by checking the state of the read base oop.
