@@ -947,7 +947,6 @@ public:
 
 protected:
   inline void init_rest();
-  inline void init_chunk(stackChunkOop chunk);
   void throw_stack_overflow_on_humongous_chunk();
 
   // fast path
@@ -1765,14 +1764,6 @@ inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive
   return false;
 }
 
-void FreezeBase::init_chunk(stackChunkOop chunk) {
-  chunk->clear_flags();
-  chunk->set_max_size(0);
-  chunk->set_sp(chunk->stack_size());
-  chunk->set_pc(nullptr);
-  chunk->set_argsize(0);
-}
-
 template <typename ConfigT>
 stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   log_develop_trace(continuations)("allocate_chunk allocating new chunk");
@@ -1794,7 +1785,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
   HeapWord* start = current->tlab().allocate(size_in_words);
   if (start != nullptr) {
-    chunk = stackChunkOopDesc::cast(allocator.init_partial_for_tlab(start));
+    chunk = stackChunkOopDesc::cast(allocator.StackChunkAllocator::initialize(start));
   } else {
     ContinuationWrapper::SafepointOp so(current, _cont);
     assert(_jvmti_event_collector != nullptr, "");
@@ -1811,11 +1802,10 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
   assert((intptr_t)chunk->start_address() % 8 == 0, "");
 
-  init_chunk(chunk);
-
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
   assert(chunk->max_size() == 0, "");
+  assert(chunk->sp() == chunk->stack_size(), "");
 
   chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
 
