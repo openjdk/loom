@@ -427,7 +427,7 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
   intptr_t* l_sender_sp = (!PreserveFramePointer || _sp_is_trusted) ? unextended_sp() + _cb->frame_size()
                                                                     : sender_sp();
-  assert(l_sender_sp == real_fp(), "");
+  assert(!_sp_is_trusted || l_sender_sp == real_fp(), "");
 
   // the return_address is always the word on the stack
   // For ROP protection, C1/C2 will have signed the sender_pc, but there is no requirement to authenticate it here.

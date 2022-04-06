@@ -1214,7 +1214,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   Label call_thaw, exit;
 
-  __ enter(); // push(rbp);
+  __ enter();
 
   OopMap* map = continuation_enter_setup(masm, stack_slots);
 

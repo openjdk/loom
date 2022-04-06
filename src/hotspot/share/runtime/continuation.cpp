@@ -980,6 +980,7 @@ private:
   template<typename FKind> frame new_hframe(frame& f, frame& caller);
   inline void set_top_frame_metadata_pd(const frame& hf);
   inline void patch_pd(frame& callee, const frame& caller);
+  void adjust_interpreted_frame_unextended_sp(frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 protected:
@@ -1562,17 +1563,7 @@ void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bott
 }
 
 NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
-#if (defined(X86) || defined(AARCH64)) && !defined(ZERO)
-  { // TODO PD
-    assert((f.at(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
-    intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
-    if (real_unextended_sp != nullptr) {
-      f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
-    }
-  }
-#else
-  Unimplemented();
-#endif
+  adjust_interpreted_frame_unextended_sp(f);
 
   intptr_t* const vsp = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
   const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
@@ -2090,7 +2081,7 @@ static inline int prepare_thaw0(JavaThread* thread, bool return_barrier) {
   int size = chunk->max_size();
   guarantee (size > 0, "");
 
-  // For the top pc+fp in push push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
+  // For the top pc+fp in push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
   size += frame::metadata_words;
   size += frame::align_wiggle; // just in case we have an interpreted entry after which we need to align
   size <<= LogBytesPerWord;
@@ -2491,10 +2482,10 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   assert(!bottom || caller.fp() == _cont.entryFP(), "");
   if (bottom) {
     ContinuationHelper::Frame::patch_pc(caller, _cont.is_empty() ? caller.raw_pc()
-                                                                       : StubRoutines::cont_returnBarrier());
+                                                                 : StubRoutines::cont_returnBarrier());
   }
 
-  patch_pd(f, caller); // TODO: reevaluate if and when this is necessary -only bottom & interpreted caller?
+  patch_pd(f, caller);
 
   if (f.is_interpreted_frame()) {
     ContinuationHelper::InterpretedFrame::patch_sender_sp(f, caller.unextended_sp());

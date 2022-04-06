@@ -114,6 +114,14 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
   }
 }
 
+void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
+  assert((f.at(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+  intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
+  if (real_unextended_sp != nullptr) {
+    f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
+  }
+}
+
 static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int offset) {
   assert(*(hfp + offset) == *(vfp + offset), "");
   intptr_t* addr = hfp + offset;
