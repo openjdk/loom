@@ -117,23 +117,33 @@ static inline bool is_derived_oop_offset(intptr_t value) {
   return value < 0;
 }
 
-static const intptr_t OFFSET_MAX = (intptr_t)((uintptr_t)1 << 35); // INT_MAX
+#if defined(X86) || defined(AARCH64)
+static const intptr_t OFFSET_MAX = (intptr_t)((uintptr_t)1 << 35); // 32 bit offset + 3 for jlong (offset in bytes)
 static const intptr_t OFFSET_MIN = -OFFSET_MAX - 1;
+#endif
 
 static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
+#if defined(X86) || defined(AARCH64)
   assert(untagged <= OFFSET_MAX, "");
   assert(untagged >= OFFSET_MIN, "");
   intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << (BitsPerWord-1)));
   assert(is_derived_oop_offset(tagged), "");
   return tagged;
+#else
+  Unimplemented();
+#endif
 }
 
 static inline intptr_t untag_derived_oop_offset(intptr_t tagged) {
+#if defined(X86) || defined(AARCH64)
   assert(is_derived_oop_offset(tagged), "");
   intptr_t untagged = (intptr_t)((uintptr_t)tagged << 1) >> 1;  // unsigned left shift; signed right shift
   assert(untagged <= OFFSET_MAX, "");
   assert(untagged >= OFFSET_MIN, "");
   return untagged;
+#else
+  Unimplemented();
+#endif
 }
 
 template <stackChunkOopDesc::BarrierType barrier>
