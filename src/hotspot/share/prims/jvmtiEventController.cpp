@@ -211,9 +211,9 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     assert(state != NULL, "sanity check");
     assert(state->get_thread() == jt, "handshake unsafe conditions");
     if (!state->is_pending_interp_only_mode()) {
-      return;
+      return; // the pending flag has been already cleared, so bail out
     }
-    state->set_pending_interp_only_mode(false);
+    state->set_pending_interp_only_mode(false); // clear the pending flag
 
     // invalidate_cur_stack_depth is called in enter_interp_only_mode
     state->enter_interp_only_mode();
@@ -352,11 +352,12 @@ void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state
 
   assert(state != NULL, "sanity check");
   if (state->is_pending_interp_only_mode()) {
-    return; // EnterInterpOnlyModeClosure handshake is already waiting for execution
+    return; // an EnterInterpOnlyModeClosure handshake is already pending for execution
   }
+  // this flag will be cleared in EnterInterpOnlyModeClosure handshake
   state->set_pending_interp_only_mode(true);
   if (target == NULL) { // an unmounted virtual thread
-    return; // enter_interp_only_mode will be done after mount
+    return; // EnterInterpOnlyModeClosure will be executed right after mount
   }
   EnterInterpOnlyModeClosure hs;
   if (target->is_handshake_safe_for(current)) {
@@ -373,7 +374,7 @@ JvmtiEventControllerPrivate::leave_interp_only_mode(JvmtiThreadState *state) {
   EC_TRACE(("[%s] # Leaving interpreter only mode",
             JvmtiTrace::safe_get_thread_name(state->get_thread_or_saved())));
   if (state->is_pending_interp_only_mode()) {
-    state->set_pending_interp_only_mode(false);
+    state->set_pending_interp_only_mode(false); // just clear the pending flag
     assert(!state->is_interp_only_mode(), "sanity check");
     return;
   }
