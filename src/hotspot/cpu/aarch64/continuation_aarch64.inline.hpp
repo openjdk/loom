@@ -86,9 +86,8 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
-    // we need to re-read fp because it may be an oop and we might have had a safepoint in finalize_freeze,
-    // after constructing f.
-    // This comment doesn't make sense since we don't reread fp
+    // We need to re-read fp out of the frame because it may be an oop and we might have
+    // had a safepoint in finalize_freeze, after constructing f.
     fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset);
 
     int fsize = FKind::size(f);

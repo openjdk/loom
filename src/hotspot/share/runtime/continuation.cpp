@@ -1000,8 +1000,8 @@ public:
     , int* out_size = nullptr
 #endif
   );
-  freeze_result try_freeze_fast(intptr_t* sp, bool chunk_available);
-  bool freeze_fast(intptr_t* top_sp, bool chunk_available);
+  template <bool chunk_available> freeze_result try_freeze_fast(intptr_t* sp);
+  template <bool chunk_available> bool freeze_fast(intptr_t* top_sp);
 
 protected:
   virtual stackChunkOop allocate_chunk_slow(size_t stack_size) override { return allocate_chunk(stack_size); }
@@ -1062,8 +1062,9 @@ void FreezeBase::unwind_frames() {
 }
 
 template <typename ConfigT>
-freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp, bool chunk_available) {
-  if (freeze_fast(sp, chunk_available)) {
+template <bool chunk_available>
+freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp) {
+  if (freeze_fast<chunk_available>(sp)) {
     return freeze_ok;
   }
   if (_thread->has_pending_exception()) {
@@ -1115,7 +1116,8 @@ bool Freeze<ConfigT>::is_chunk_available(intptr_t* top_sp
 }
 
 template <typename ConfigT>
-bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp, bool chunk_available) {
+template <bool chunk_available>
+bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   assert(_cont.chunk_invariant(tty), "");
   assert(!Interpreter::contains(_cont.entryPC()), "");
   assert(StubRoutines::cont_doYield_stub()->frame_size() == frame::metadata_words, "");
@@ -1971,7 +1973,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   bool fast = can_freeze_fast(current);
   if (fast && fr.is_chunk_available(sp)) {
-    freeze_result res = fr.try_freeze_fast(sp, true);
+    freeze_result res = fr.template try_freeze_fast<true>(sp);
     assert(res == freeze_ok, "");
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     freeze_epilog(current, cont);
@@ -1986,7 +1988,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
     JvmtiSampledObjectAllocEventCollector jsoaec(false);
     fr.set_jvmti_event_collector(&jsoaec);
 
-    freeze_result res = fast ? fr.try_freeze_fast(sp, false)
+    freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
                              : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
     freeze_epilog(current, cont, res);
@@ -2088,7 +2090,7 @@ static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier)
   size <<= LogBytesPerWord;
 
   const address bottom = (address)thread->last_continuation()->entry_sp();
-  // 300 ?
+  // Comment needed: 300 ?
   if (!stack_overflow_check(thread, size + 300, bottom)) {
     return 0;
   }
