@@ -933,6 +933,8 @@ protected:
   int _size; // total size of all frames plus metadata in words.
   int _align_size;
 
+  JvmtiSampledObjectAllocEventCollector* _jvmti_event_collector;
+
   NOT_PRODUCT(int _frames;)
   DEBUG_ONLY(intptr_t* _last_write;)
 
@@ -940,6 +942,8 @@ protected:
 
 public:
   NOINLINE freeze_result freeze_slow();
+
+  void set_jvmti_event_collector(JvmtiSampledObjectAllocEventCollector* jsoaec) { _jvmti_event_collector = jsoaec; }
 
 protected:
   inline void init_rest();
@@ -1006,6 +1010,7 @@ protected:
 
 FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preempt) :
     _thread(thread), _cont(cont), _barriers(false), _preempt(preempt) {
+  DEBUG_ONLY(_jvmti_event_collector = nullptr;)
 
   assert(_thread != nullptr, "");
   assert(_thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
@@ -1792,6 +1797,9 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
     chunk = stackChunkOopDesc::cast(allocator.init_partial_for_tlab(start));
   } else {
     ContinuationWrapper::SafepointOp so(current, _cont);
+    assert(_jvmti_event_collector != nullptr, "");
+    _jvmti_event_collector->start(); // can safepoint
+
     chunk = stackChunkOopDesc::cast(allocator.allocate()); // can safepoint
 
     if (chunk == nullptr) { // OOME
@@ -1997,6 +2005,10 @@ static inline int freeze0(JavaThread* current, intptr_t* const sp) {
   log_develop_trace(continuations)("chunk unavailable; transitioning to VM");
   assert(current == JavaThread::current(), "must be current thread except for preempt");
   JRT_BLOCK
+    // delays a possible JvmtiSampledObjectAllocEventCollector in alloc_chunk
+    JvmtiSampledObjectAllocEventCollector jsoaec(false);
+    fr.set_jvmti_event_collector(&jsoaec);
+
     freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
                              : fr.freeze_slow();
     CONT_JFR_ONLY(cont.post_jfr_event(&event, current);)
