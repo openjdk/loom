@@ -233,7 +233,14 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
 
     assert(hf.cb() != nullptr, "");
     assert(hf.oop_map() != nullptr, "");
-    intptr_t* fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+    intptr_t* fp;
+    if (PreserveFramePointer) {
+      // we need to recreate a "real" frame pointer, pointing into the stack
+      fp = vsp + FKind::size(hf) - frame::sender_sp_offset;
+    } else {
+       // we need to re-read fp because it may be an oop and we might have fixed the frame.
+      fp = *(intptr_t**)(hf.sp() - frame::sender_sp_offset);
+    }
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
 }

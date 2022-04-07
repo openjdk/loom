@@ -2168,7 +2168,8 @@ public:
   inline bool can_thaw_fast(stackChunkOop chunk) {
     return    !_barriers
            &&  _thread->cont_fastpath_thread_state()
-           && !chunk->has_thaw_slowpath_condition();
+           && !chunk->has_thaw_slowpath_condition()
+           && !PreserveFramePointer;
   }
 
   inline intptr_t* thaw(thaw_kind kind);

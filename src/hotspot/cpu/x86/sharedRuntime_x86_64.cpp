@@ -1461,6 +1461,9 @@ static void gen_continuation_enter(MacroAssembler* masm,
   Label call_thaw, exit;
 
   __ push(rbp);
+  if (PreserveFramePointer) {
+    __ mov(rbp, rsp);
+  }
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
