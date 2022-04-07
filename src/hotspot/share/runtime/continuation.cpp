@@ -1616,7 +1616,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   DEBUG_ONLY(after_freeze_java_frame(hf, bottom);)
   caller = hf;
 
-  // Mark frame_method's marking cycle for GC and redefinition on_stack calculation.
+  // Mark frame_method's GC epoch for class redefinition on_stack calculation.
   frame_method->record_gc_epoch();
 
   return freeze_ok;
