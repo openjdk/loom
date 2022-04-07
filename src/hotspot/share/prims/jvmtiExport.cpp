@@ -180,31 +180,31 @@ public:
 
 class JvmtiThreadEventMark : public JvmtiEventMark {
 private:
-  jthread _jt;
+  jobject _jthread;
 
 public:
   JvmtiThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
-    _jt = (jthread)(to_jobject(thread->threadObj()));
+    _jthread = to_jobject(thread->threadObj());
   };
- jthread jni_thread() { return _jt; }
+ jthread jni_thread() { return (jthread)_jthread; }
 };
 
 class JvmtiVirtualThreadEventMark : public JvmtiEventMark {
 private:
-  jthread _jt;
+  jobject _jthread;
 
 public:
   JvmtiVirtualThreadEventMark(JavaThread *thread) :
     JvmtiEventMark(thread) {
     JvmtiThreadState* state = thread->jvmti_thread_state();
     if (state != NULL && state->is_virtual()) {
-      _jt = (jthread)(to_jobject(thread->vthread()));
+      _jthread = to_jobject(thread->vthread());
     } else {
-      _jt = (jthread)(to_jobject(thread->threadObj()));
+      _jthread = to_jobject(thread->threadObj());
     }
   };
-  jthread jni_thread() { return _jt; }
+  jthread jni_thread() { return (jthread)_jthread; }
 };
 
 class JvmtiClassEventMark : public JvmtiVirtualThreadEventMark {
