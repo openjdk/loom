@@ -74,7 +74,7 @@ class nmethod : public CompiledMethod {
   // Shared fields for all nmethod's
   int       _entry_bci;        // != InvocationEntryBci if this nmethod is an on-stack replacement method
 
-  uint64_t  _marking_cycle;
+  uint64_t  _gc_epoch;
 
   // To support simple linked-list chaining of nmethods:
   nmethod*  _osr_link;         // from InstanceKlass::osr_nmethods_head
@@ -571,7 +571,7 @@ public:
   // See comment at definition of _last_seen_on_stack
   void mark_as_seen_on_stack();
   void mark_as_maybe_on_continuation();
-  bool is_not_on_continuation_stack();
+  bool is_maybe_on_continuation_stack();
   bool can_convert_to_zombie();
 
   // Evolution support. We make old (discarded) compiled methods point to new Method*s.

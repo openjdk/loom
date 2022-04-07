@@ -829,7 +829,6 @@ void CodeCache::purge_exception_caches() {
 }
 
 uint8_t CodeCache::_unloading_cycle = 1;
-uint64_t CodeCache::_marking_cycle = 0;
 
 void CodeCache::increment_unloading_cycle() {
   // 2-bit value (see IsUnloadingState in nmethod.cpp for details)
@@ -838,28 +837,6 @@ void CodeCache::increment_unloading_cycle() {
   if (_unloading_cycle == 0) {
     _unloading_cycle = 1;
   }
-}
-
-void CodeCache::increment_marking_cycle() {
-  ++_marking_cycle;
-  BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
-  if (bs_nm != NULL) {
-    bs_nm->arm_all_nmethods();
-  }
-}
-
-bool CodeCache::is_marking_cycle_active() {
-  return (_marking_cycle % 2) == 1;
-}
-
-void CodeCache::start_marking_cycle() {
-  assert(!is_marking_cycle_active(), "Previous marking cycle never ended");
-  increment_marking_cycle();
-}
-
-void CodeCache::finish_marking_cycle() {
-  assert(is_marking_cycle_active(), "Marking cycle started before last one finished");
-  increment_marking_cycle();
 }
 
 CodeCache::UnloadingScope::UnloadingScope(BoolObjectClosure* is_alive)

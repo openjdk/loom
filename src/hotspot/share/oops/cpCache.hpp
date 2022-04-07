@@ -414,7 +414,7 @@ class ConstantPoolCache: public MetaspaceObj {
   Array<u2>*           _reference_map;
 
   // RedefineClasses support
-  uint64_t             _marking_cycle;
+  uint64_t             _gc_epoch;
 
   // The narrowOop pointer to the archived resolved_references. Set at CDS dump
   // time when caching java heap object is supported.
@@ -509,8 +509,8 @@ class ConstantPoolCache: public MetaspaceObj {
   DEBUG_ONLY(bool on_stack() { return false; })
   void deallocate_contents(ClassLoaderData* data);
   bool is_klass() const { return false; }
-  void record_marking_cycle();
-  uint64_t marking_cycle() { return _marking_cycle; }
+  void record_gc_epoch();
+  uint64_t gc_epoch() { return _gc_epoch; }
 
   // Printing
   void print_on(outputStream* st) const;

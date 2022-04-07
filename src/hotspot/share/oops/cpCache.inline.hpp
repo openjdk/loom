@@ -90,7 +90,7 @@ inline ConstantPoolCache::ConstantPoolCache(int length,
                                             const intStack& invokedynamic_references_map) :
                                                   _length(length),
                                                   _constant_pool(NULL),
-                                                  _marking_cycle(0) {
+                                                  _gc_epoch(0) {
   CDS_JAVA_HEAP_ONLY(_archived_references_index = -1;)
   initialize(inverse_index_map, invokedynamic_inverse_index_map,
              invokedynamic_references_map);

@@ -56,6 +56,7 @@
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/handshake.hpp"
 #include "runtime/prefetch.inline.hpp"
 #include "runtime/safepointMechanism.hpp"
@@ -109,7 +110,11 @@ void ZMark::start() {
   // marking information for all pages.
   ZGlobalSeqNum++;
 
-  CodeCache::start_marking_cycle();
+  // Tell the sweeper that we start a marking cycle.
+  // Unlike other GCs, the color switch implicitly changes the nmethods
+  // to be armed, and the thread-local disarm values are lazily updated
+  // when JavaThreads wake up from safepoints.
+  Continuations::on_gc_marking_cycle_start();
 
   // Reset flush/continue counters
   _nproactiveflush = 0;
@@ -817,7 +822,10 @@ bool ZMark::end() {
   // Update statistics
   ZStatMark::set_at_mark_end(_nproactiveflush, _nterminateflush, _ntrycomplete, _ncontinue);
 
-  CodeCache::finish_marking_cycle();
+  // Tell the sweeper that we finished a marking cycle.
+  // Unlike other GCs, we do not arm the nmethods
+  // when marking terminates.
+  Continuations::on_gc_marking_cycle_finish();
 
   // Mark completed
   return true;

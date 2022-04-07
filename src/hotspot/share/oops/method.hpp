@@ -764,7 +764,7 @@ public:
   bool on_stack() const                             { return access_flags().on_stack(); }
   void set_on_stack(const bool value);
 
-  void record_marking_cycle();
+  void record_gc_epoch();
 
   // see the definition in Method*.cpp for the gory details
   bool should_not_be_cached() const;

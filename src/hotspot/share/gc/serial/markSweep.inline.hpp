@@ -86,7 +86,7 @@ inline void MarkAndPushClosure::do_oop(oop* p)               { do_oop_work(p); }
 inline void MarkAndPushClosure::do_oop(narrowOop* p)         { do_oop_work(p); }
 inline void MarkAndPushClosure::do_klass(Klass* k)           { MarkSweep::follow_klass(k); }
 inline void MarkAndPushClosure::do_cld(ClassLoaderData* cld) { MarkSweep::follow_cld(cld); }
-inline void MarkAndPushClosure::do_method(Method* m)         { m->record_marking_cycle(); }
+inline void MarkAndPushClosure::do_method(Method* m)         { m->record_gc_epoch(); }
 inline void MarkAndPushClosure::do_nmethod(nmethod* nm)      { nm->follow_nmethod(this); }
 
 template <class T> inline void MarkSweep::adjust_pointer(T* p) {

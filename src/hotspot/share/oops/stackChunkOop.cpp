@@ -369,7 +369,7 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
 
   if (f.is_interpreted()) {
     Method* m = f.to_frame().interpreter_frame_method();
-    m->record_marking_cycle();
+    m->record_gc_epoch();
   } else if (f.is_compiled()) {
     nmethod* nm = f.cb()->as_nmethod();
     // The entry barrier takes care of having the right synchronization
