@@ -118,7 +118,7 @@ See corresponding stack-chunk layout in instanceStackChunkKlass.hpp
         |   |  oopDesc* chunk            |
         |   |  ContinuationEntry* parent |
         |   |  ...                       |
-        |   |============================| <------ JavaThread::_cont_entry
+        |   |============================| <------ JavaThread::_cont_entry = entry->sp()
         |   |  ? alignment word ?        |
         |   |----------------------------| <--\
         |   |                            |    |
@@ -127,7 +127,6 @@ Address |   |                            |    |   Caller is still in the chunk.
         |   |----------------------------|    |
         |   |  pc (? return barrier ?)   |    |  This pc contains the return barrier when the bottom-most frame
         |   |  rbp                       |    |  isn't the last one in the continuation.
-        |   |============================|    |
         |   |                            |    |
         |   |    frame                   |    |
         |   |                            |    |
@@ -139,7 +138,7 @@ Address |   |                            |    |   Caller is still in the chunk.
             |                            |    |
             |    frame                   |    |
             |                            |    |
-            |----------------------------| <--/
+            |----------------------------| <--/ the sp passed to freeze
             |                            |
             |    doYield/safepoint stub  | When preempting forcefully, we could have a safepoint stub
             |                            | instead of a doYield stub
@@ -1153,15 +1152,20 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
       assert(*(address*)(chunk->sp_address() - frame::sender_sp_ret_address_offset()) == chunk->pc(), "");
 
       chunk_start_sp = chunk->sp() + _cont.argsize(); // we overlap; we'll overwrite the chunk's top frame's callee arguments
-      assert(chunk_start_sp <= chunk->stack_size(), "");
+      assert(chunk_start_sp <= chunk->stack_size(), "sp not pointing into stack");
 
+      // increase max_size by what we're freezing minus the overlap
       chunk->set_max_size(chunk->max_size() + cont_size - _cont.argsize());
 
       intptr_t* const bottom_sp = cont_stack_bottom - _cont.argsize();
       assert(bottom_sp == _bottom_address, "");
-      assert(*(address*)(bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
+      // Because the chunk isn't empty, we know there's a caller in the chunk, therefore the bottom-most frame
+      // should have a return barrier (installed back when we thawed it).
+      assert(*(address*)(bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(),
+             "should be the continuation return barrier");
+      // We copy the fp from the chunk back to the stack because it contains some caller data
       patch_chunk_pd(bottom_sp, chunk->sp_address());
-      // we don't patch the pc at this time, so as not to make the stack unwalkable
+      // we don't patch the return pc at this time, so as not to make the stack unwalkable for async walks
     } else { // the chunk is empty
       chunk_start_sp = chunk->sp();
 
@@ -1207,7 +1211,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   log_develop_trace(continuations)("freeze_fast start: chunk " INTPTR_FORMAT " size: %d orig sp: %d argsize: %d",
     p2i((oopDesc*)chunk), chunk->stack_size(), chunk_start_sp, _cont.argsize());
   assert(chunk_start_sp <= chunk->stack_size(), "");
-  assert(chunk_start_sp >= cont_size, "");
+  assert(chunk_start_sp >= cont_size, "no room in the chunk");
 
   const int chunk_new_sp = chunk_start_sp - cont_size; // the chunk's new sp, after freeze
   assert(!is_chunk_available0 || orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == is_chunk_available_size, "");
@@ -1222,14 +1226,14 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* top_sp) {
   copy_to_chunk(from, to, cont_size + frame::metadata_words);
   // Because we're not patched yet, the chunk is now in a bad state
 
-  // patch pc
+  // patch return pc of the bottom-most frozen frame (now in the chunk) with the actual caller's return address
   intptr_t* chunk_bottom_sp = chunk_top + cont_size - _cont.argsize();
   assert(empty || *(address*)(chunk_bottom_sp-frame::sender_sp_ret_address_offset()) == StubRoutines::cont_returnBarrier(), "");
   *(address*)(chunk_bottom_sp - frame::sender_sp_ret_address_offset()) = chunk->pc();
 
   // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
   chunk->set_sp(chunk_new_sp);
-  assert(chunk->sp_address() == chunk_top, "");
+  // set chunk->pc to the return address of the topmost frame in the chunk
   chunk->set_pc(*(address*)(cont_stack_top - frame::sender_sp_ret_address_offset()));
 
   _cont.write();
@@ -2629,6 +2633,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   if (!bottom) {
     // can only fix caller once this frame is thawed (due to callee saved regs)
+    // This happens on the stack
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
     clear_bitmap_bits(hsp + ContinuationHelper::CompiledFrame::size(hf), added_argsize);

@@ -50,6 +50,7 @@ frame ContinuationEntry::to_frame() const {
 // Fast path
 
 inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+  // copy the spilled rbp from the heap to the stack
   *(vsp - frame::sender_sp_offset) = *(hsp - frame::sender_sp_offset);
 }
 

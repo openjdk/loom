@@ -609,7 +609,8 @@ void VM_BaseGetOrSetLocal::doit() {
     return;
   };
 
-  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+  frame fr = _jvf->fr();
+  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), fr)) {
     _result = JVMTI_ERROR_OPAQUE_FRAME; // deferred locals currently unsupported in continuations
     return;
   }
