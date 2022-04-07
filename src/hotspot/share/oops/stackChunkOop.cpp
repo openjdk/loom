@@ -110,6 +110,11 @@ int stackChunkOopDesc::num_java_frames() const {
   return n;
 }
 
+// The high-order bit tagging has only been verified to work on these platforms.
+#if (defined(X86) && defined(_LP64)) || defined(AARCH64)
+#define HIGH_ORDER_BIT_TAGGING_SUPPORTED
+#endif
+
 // We use the high-order (sign) bit to tag derived oop offsets.
 // However, we cannot rely on simple nagation, as offsets could hypothetically be zero or even negative
 
@@ -117,13 +122,13 @@ static inline bool is_derived_oop_offset(intptr_t value) {
   return value < 0;
 }
 
-#if defined(X86) || defined(AARCH64)
+#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
 static const intptr_t OFFSET_MAX = (intptr_t)((uintptr_t)1 << 35); // 32 bit offset + 3 for jlong (offset in bytes)
 static const intptr_t OFFSET_MIN = -OFFSET_MAX - 1;
 #endif
 
 static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
-#if defined(X86) || defined(AARCH64)
+#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
   assert(untagged <= OFFSET_MAX, "");
   assert(untagged >= OFFSET_MIN, "");
   intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << (BitsPerWord-1)));
@@ -135,7 +140,7 @@ static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
 }
 
 static inline intptr_t untag_derived_oop_offset(intptr_t tagged) {
-#if defined(X86) || defined(AARCH64)
+#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
   assert(is_derived_oop_offset(tagged), "");
   intptr_t untagged = (intptr_t)((uintptr_t)tagged << 1) >> 1;  // unsigned left shift; signed right shift
   assert(untagged <= OFFSET_MAX, "");
