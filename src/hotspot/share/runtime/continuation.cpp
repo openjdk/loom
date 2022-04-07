@@ -687,7 +687,7 @@ frame Continuation::last_frame(oop continuation, RegisterMap *map) {
 frame Continuation::top_frame(const frame& callee, RegisterMap* map) {
   assert(map != nullptr, "");
   ContinuationEntry* ce = get_continuation_entry_for_sp(map->thread(), callee.sp());
-  assert (ce != nullptr, "");
+  assert(ce != nullptr, "");
   oop continuation = ce->cont_oop();
   ContinuationWrapper cont(continuation);
   return continuation_top_frame(cont, map);
@@ -2065,7 +2065,7 @@ static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier)
   assert(thread == JavaThread::current(), "");
 
   ContinuationEntry* ce = thread->last_continuation();
-  assert (ce != nullptr, "");
+  assert(ce != nullptr, "");
   oop continuation = ce->cont_oop();
   assert(continuation == get_continuation(thread), "");
   verify_continuation(continuation);
@@ -2756,7 +2756,7 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const thaw_kind kind) 
   log_develop_trace(continuations)("~~~~ thaw kind: %d sp: " INTPTR_FORMAT, kind, p2i(thread->last_continuation()->entry_sp()));
 
   ContinuationEntry* entry = thread->last_continuation();
-  assert (entry != nullptr, "");
+  assert(entry != nullptr, "");
   oop oopCont = entry->cont_oop();
 
   assert(!jdk_internal_vm_Continuation::done(oopCont), "");
