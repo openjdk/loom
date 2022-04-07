@@ -305,7 +305,7 @@ inline int jdk_internal_vm_StackChunk::size(oop ref) {
 }
 
 inline void jdk_internal_vm_StackChunk::set_size(HeapWord* ref, int value) {
-  *(cast_to_oop(ref))->field_addr<jint>(_size_offset) = value; // ref->int_field_put(_size_offset, value);
+  *(cast_to_oop(ref))->field_addr<jint>(_size_offset) = value;
 }
 
 inline int jdk_internal_vm_StackChunk::sp(oop ref) {
@@ -314,6 +314,10 @@ inline int jdk_internal_vm_StackChunk::sp(oop ref) {
 
 inline void jdk_internal_vm_StackChunk::set_sp(oop ref, int value) {
   ref->int_field_put(_sp_offset, value);
+}
+
+inline void jdk_internal_vm_StackChunk::set_sp(HeapWord* ref, int value) {
+  *(cast_to_oop(ref))->field_addr<jint>(_sp_offset) = value;
 }
 
 inline intptr_t jdk_internal_vm_StackChunk::pc(oop ref) {

@@ -83,7 +83,6 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
 
   jvmtiError err;
 
-  *vthread_ptr = NULL;
   if (thread == NULL) {
     java_thread = current_thread;
     cthread_oop = java_thread->threadObj();
@@ -99,6 +98,7 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   if (cthread_oop == NULL || java_lang_VirtualThread::is_instance(cthread_oop)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
+  *vthread_ptr = NULL;
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {

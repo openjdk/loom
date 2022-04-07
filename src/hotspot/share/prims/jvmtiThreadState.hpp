@@ -133,8 +133,8 @@ class JvmtiVTSuspender : AllStatic {
  public:
   static void register_all_vthreads_suspend();
   static void register_all_vthreads_resume();
-  static bool register_vthread_suspend(oop vt);
-  static bool register_vthread_resume(oop vt);
+  static void register_vthread_suspend(oop vt);
+  static void register_vthread_resume(oop vt);
   static bool is_vthread_suspended(oop vt);
   static bool is_vthread_suspended(int64_t thread_id);
 };

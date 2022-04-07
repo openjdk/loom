@@ -100,6 +100,14 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
   }
 }
 
+void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
+  assert((f.at(frame::interpreter_frame_last_sp_offset) != 0) || (f.unextended_sp() == f.sp()), "");
+  intptr_t* real_unextended_sp = (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset);
+  if (real_unextended_sp != nullptr) {
+    f.set_unextended_sp(real_unextended_sp); // can be null at a safepoint
+  }
+}
+
 static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int offset) {
   assert(*(hfp + offset) == *(vfp + offset), "");
   intptr_t* addr = hfp + offset;
@@ -215,9 +223,15 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
 
     assert(hf.cb() != nullptr, "");
     assert(hf.oop_map() != nullptr, "");
-    intptr_t* fp = FKind::stub
-      ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
-      : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+    intptr_t* fp;
+    if (PreserveFramePointer) {
+      // we need to recreate a "real" frame pointer, pointing into the stack
+      fp = vsp + FKind::size(hf) - frame::sender_sp_offset;
+    } else {
+      fp = FKind::stub
+        ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
+        : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+    }
     return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
 }

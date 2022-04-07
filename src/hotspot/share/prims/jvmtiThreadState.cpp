@@ -443,7 +443,7 @@ JvmtiVTSuspender::register_all_vthreads_resume() {
   _not_suspended_list->invalidate();
 }
 
-bool
+void
 JvmtiVTSuspender::register_vthread_suspend(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
@@ -458,10 +458,9 @@ JvmtiVTSuspender::register_vthread_suspend(oop vt) {
     _SR_mode = SR_ind;
     _suspended_list->append(id);
   }
-  return true;
 }
 
-bool
+void
 JvmtiVTSuspender::register_vthread_resume(oop vt) {
   MonitorLocker ml(JvmtiVTMT_lock, Mutex::_no_safepoint_check_flag);
 
@@ -480,7 +479,6 @@ JvmtiVTSuspender::register_vthread_resume(oop vt) {
   } else {
     assert(false, "register_vthread_resume: no suspend mode enabled");
   }
-  return true;
 }
 
 bool
