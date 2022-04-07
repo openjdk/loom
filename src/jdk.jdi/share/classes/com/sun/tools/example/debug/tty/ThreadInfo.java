@@ -65,7 +65,12 @@ class ThreadInfo {
     private static void initThreads() {
         if (!gotInitialThreads) {
             for (ThreadReference thread : Env.vm().allThreads()) {
-                threads.add(new ThreadInfo(thread));
+                ThreadInfo ti = new ThreadInfo(thread);
+                if (thread.isVirtual()) {
+                    vthreads.add(ti);
+                } else {
+                    threads.add(ti);
+                }
             }
             gotInitialThreads = true;
         }
