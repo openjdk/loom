@@ -563,7 +563,7 @@ class JvmtiSampledObjectAllocEventCollector : public JvmtiObjectAllocEventCollec
   }
   ~JvmtiSampledObjectAllocEventCollector()  NOT_JVMTI_RETURN;
   bool is_sampled_object_alloc_event()    { return true; }
-  void start();
+  void start() NOT_JVMTI_RETURN;
   static bool object_alloc_is_safe_to_sample() NOT_JVMTI_RETURN_(false);
 };
 
