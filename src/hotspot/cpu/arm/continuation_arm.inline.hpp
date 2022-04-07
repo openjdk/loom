@@ -69,7 +69,7 @@ inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
   Unimplemented();
 }
 
-inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+inline void FreezeBase::patch_chunk_pd(intptr_t* frame_sp, intptr_t* heap_sp) {
   Unimplemented();
 }
 
@@ -91,7 +91,7 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, c
   Unimplemented();
 }
 
-inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
+inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp, frame& caller, bool bottom) {
   Unimplemented();
   return NULL;
 }
