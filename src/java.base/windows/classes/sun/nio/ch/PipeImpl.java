@@ -129,13 +129,13 @@ class PipeImpl
                         }
 
                         // Establish connection (assume connection is eagerly accepted)
-                        sc1 = SocketChannel.open();
                         if (sa instanceof InetSocketAddress
                                 && Thread.currentThread().isVirtual()) {
                             // workaround "lost event" issue on older releases of Windows
+                            sc1 = SocketChannel.open();
                             sc1.socket().connect(sa, 10_000);
                         } else {
-                            sc1.connect(sa);
+                            sc1 = SocketChannel.open(sa);
                         }
                         RANDOM_NUMBER_GENERATOR.nextBytes(secret.array());
                         do {
