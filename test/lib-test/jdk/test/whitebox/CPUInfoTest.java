@@ -63,7 +63,7 @@ public class CPUInfoTest {
                     "vzeroupper",   "avx512_vpopcntdq", "avx512_vpclmulqdq", "avx512_vaes",
                     "avx512_vnni",  "clflush",          "clflushopt",        "clwb",
                     "avx512_vbmi2", "avx512_vbmi",      "rdtscp",            "rdpid",
-                    "fsrm",         "hv"
+                    "hv"
                     );
             // @formatter:on
             // Checkstyle: resume

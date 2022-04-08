@@ -202,8 +202,10 @@ JvmtiEnvEventEnable::~JvmtiEnvEventEnable() {
 //
 
 class EnterInterpOnlyModeClosure : public HandshakeClosure {
+ private:
+  bool _completed;
  public:
-  EnterInterpOnlyModeClosure() : HandshakeClosure("EnterInterpOnlyMode") { }
+  EnterInterpOnlyModeClosure() : HandshakeClosure("EnterInterpOnlyMode"), _completed(false) { }
   void do_thread(Thread* th) {
     JavaThread* jt = JavaThread::cast(th);
     JvmtiThreadState* state = jt->jvmti_thread_state();
@@ -211,6 +213,7 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
     assert(state != NULL, "sanity check");
     assert(state->get_thread() == jt, "handshake unsafe conditions");
     if (!state->is_pending_interp_only_mode()) {
+      _completed = true;
       return; // the pending flag has been already cleared, so bail out
     }
     state->set_pending_interp_only_mode(false); // clear the pending flag
@@ -234,6 +237,10 @@ class EnterInterpOnlyModeClosure : public HandshakeClosure {
         }
       }
     }
+    _completed = true;
+  }
+  bool completed() {
+    return _completed;
   }
 };
 
@@ -365,6 +372,7 @@ void JvmtiEventControllerPrivate::enter_interp_only_mode(JvmtiThreadState *state
   } else {
     assert(state->get_thread() != NULL, "sanity check");
     Handshake::execute(&hs, target);
+    guarantee(hs.completed(), "Handshake failed: Target thread is not alive?");
   }
 }
 

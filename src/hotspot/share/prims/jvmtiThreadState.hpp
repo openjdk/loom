@@ -227,8 +227,8 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   void add_env(JvmtiEnvBase *env);
 
-  // The interp_only_mode can pending upon virtual thread is mounted or/and
-  // a EnterInterpOnlyModeClosure handshake is executed.
+  // The pending_interp_only_mode is set when the interp_only_mode is triggered.
+  // It is cleared by EnterInterpOnlyModeClosure handshake.
   bool is_pending_interp_only_mode() { return _pending_interp_only_mode; }
   void set_pending_interp_only_mode(bool val) { _pending_interp_only_mode = val; }
 

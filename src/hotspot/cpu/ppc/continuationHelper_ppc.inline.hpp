@@ -33,6 +33,20 @@
 
 // TODO: Implement
 
+frame ContinuationEntry::to_frame() const {
+  Unimplemented();
+  return frame();
+}
+
+intptr_t* ContinuationEntry::entry_fp() const {
+  Unimplemented();
+  return nullptr;
+}
+
+void ContinuationEntry::update_register_map(RegisterMap* map) const {
+  Unimplemented();
+}
+
 template<typename FKind>
 static inline intptr_t** link_address(const frame& f) {
   Unimplemented();
@@ -63,7 +77,15 @@ inline void ContinuationHelper::push_pd(const frame& f) {
 }
 
 
+void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* cont) {
+  Unimplemented();
+}
+
 #ifdef ASSERT
+void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
+  Unimplemented();
+}
+
 inline bool ContinuationHelper::Frame::assert_frame_laid_out(frame f) {
   Unimplemented();
   return false;

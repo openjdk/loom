@@ -40,6 +40,7 @@ inline frame::frame() {
   _cb = NULL;
   _deopt_state = unknown;
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 }
 
 inline frame::frame(intptr_t* sp) {
@@ -54,6 +55,7 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
   adjust_unextended_sp();
+  DEBUG_ONLY(_frame_index = -1;)
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
@@ -77,6 +79,7 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
   adjust_unextended_sp();
+  DEBUG_ONLY(_frame_index = -1;)
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
@@ -100,6 +103,7 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   // assert(_pc != NULL, "no pc?"); // see comments in x86
   _cb = CodeCache::find_blob(_pc);
   adjust_unextended_sp();
+  DEBUG_ONLY(_frame_index = -1;)
 
   address original_pc = CompiledMethod::get_deopt_original_pc(this);
   if (original_pc != NULL) {
