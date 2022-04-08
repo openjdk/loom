@@ -881,4 +881,5 @@ jdk/jfr/event/runtime/TestClassLoaderStatsEvent.java            8247965 generic-
 jdk/jfr/tool/TestPrintXML.java                                  8278262 generic-all
 jdk/jfr/threading/TestDeepVirtualStackTrace.java                8283068 macosx-aarch64
 
+java/lang/Thread/virtual/PreviewFeaturesNotEnabled.java         0000000 generic-all
 jdk/incubator/concurrent/ScopeLocal/Stress.java                 0000000 generic-all
