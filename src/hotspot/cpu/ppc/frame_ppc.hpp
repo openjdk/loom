@@ -419,7 +419,11 @@
 
   enum {
     // normal return address is 1 bundle past PC
-    pc_return_offset = 0
+    pc_return_offset = 0,
+    metadata_words   = 0,
+    frame_alignment  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle     =  1
   };
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }

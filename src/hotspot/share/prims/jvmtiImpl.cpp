@@ -609,7 +609,8 @@ void VM_BaseGetOrSetLocal::doit() {
     return;
   };
 
-  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+  frame fr = _jvf->fr();
+  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), fr)) {
     _result = JVMTI_ERROR_OPAQUE_FRAME; // deferred locals currently unsupported in continuations
     return;
   }
@@ -648,7 +649,7 @@ void VM_BaseGetOrSetLocal::doit() {
     // meaning they are not mutable.
     if (can_be_deoptimized(_jvf)) {
       // Continuation can't be unmounted at this point (it was checked/reported in get_java_vframe).
-      if (Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+      if (Continuation::is_frame_in_continuation(_jvf->thread(), fr)) {
         _result = JVMTI_ERROR_OPAQUE_FRAME; // can't deoptimize for top continuation frame
         return;
       }

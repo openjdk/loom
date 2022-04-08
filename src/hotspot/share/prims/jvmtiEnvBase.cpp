@@ -1272,6 +1272,25 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
   return JVMTI_ERROR_NONE;
 }
 
+jvmtiError
+JvmtiEnvBase::set_frame_pop(JvmtiThreadState* state, javaVFrame* jvf, jint depth) {
+  vframe* vf = jvf;
+  for (int d = 0; vf != NULL && d < depth; d++) { 
+    vf = vf->java_sender(); 
+  } 
+  if (vf == NULL) {
+    return JVMTI_ERROR_NO_MORE_FRAMES;
+  }
+  if (!vf->is_java_frame() || ((javaVFrame*)vf)->method()->is_native()) {
+    return JVMTI_ERROR_OPAQUE_FRAME;
+  }
+  assert(vf->frame_pointer() != NULL, "frame pointer mustn't be NULL");
+
+  int frame_number = (int)get_frame_count(jvf) - depth;
+  state->env_thread_state((JvmtiEnvBase*)this)->set_frame_pop(frame_number);
+  return JVMTI_ERROR_NONE;
+}
+
 bool
 JvmtiEnvBase::is_cthread_with_mounted_vthread(JavaThread* jt) {
   oop thread_oop = jt->threadObj();
@@ -2125,7 +2144,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
     // There can be two situations here:
     //  1. There are no more java frames
     //  2. Two top java frames are separated by non-java native frames
-    if(JvmtiEnvBase::vframe_for_no_process(java_thread, 1) == NULL) {
+    if (JvmtiEnvBase::vframe_for_no_process(java_thread, 1) == NULL) {
       _result = JVMTI_ERROR_NO_MORE_FRAMES;
       return;
     } else {
@@ -2170,15 +2189,12 @@ SetFramePopClosure::doit(Thread *target, bool self) {
   if (java_thread->is_exiting()) {
     return; /* JVMTI_ERROR_THREAD_NOT_ALIVE (default) */
   }
-
-  // TBD: This might need to be corrected for detached carrier and virtual threads.
   assert(_state->get_thread_or_saved() == java_thread, "Must be");
 
   if (!self && !java_thread->is_suspended()) {
     _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     return;
   }
-
   vframe *vf = JvmtiEnvBase::vframe_for_no_process(java_thread, _depth);
   if (vf == NULL) {
     _result = JVMTI_ERROR_NO_MORE_FRAMES;
@@ -2389,4 +2405,19 @@ VirtualThreadGetThreadStateClosure::do_thread(Thread *target) {
   }
   *_state_ptr = state;
   _result = JVMTI_ERROR_NONE;
+}
+
+void
+VirtualThreadSetFramePopClosure::doit(Thread *target, bool self) {
+  if (!JvmtiEnvBase::is_vthread_alive(_vthread_h())) {
+    _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
+    return;
+  }
+  if (!self && !JvmtiVTSuspender::is_vthread_suspended(_vthread_h())) {
+    _result = JVMTI_ERROR_THREAD_NOT_SUSPENDED;
+    return;
+  }
+  ResourceMark rm;
+  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
+  _result = ((JvmtiEnvBase*)_env)->set_frame_pop(_state, jvf, _depth);
 }

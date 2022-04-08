@@ -228,12 +228,6 @@ inline int frame::frame_size() const {
     : cb()->frame_size();
 }
 
-inline int frame::num_oops() const {
-  assert(!is_interpreted_frame(), "interpreted");
-  assert(oop_map() != NULL, "");
-  return oop_map()->num_oops() ;
-}
-
 inline int frame::compiled_frame_stack_argsize() const {
   assert(cb()->is_compiled(), "");
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;

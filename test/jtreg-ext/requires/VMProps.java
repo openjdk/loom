@@ -242,7 +242,7 @@ public class VMProps implements Callable<Map<String, String>> {
         if (WB.getBooleanVMFlag("EnableJVMCI") == null) {
             return "false";
         }
-        
+
         if (vmCompMode().equals("Xint")) {
             return "false";
         }

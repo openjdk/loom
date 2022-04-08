@@ -40,6 +40,7 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 # Loom specific
 
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
+gc/whitebox/TestConcMarkCycleWB.java                                    8284404 generic-all
 
 gc/g1/plab/TestPLABPromotion.java                                       8278126 generic-all
 gc/g1/plab/TestPLABResize.java                                          8278126 generic-all

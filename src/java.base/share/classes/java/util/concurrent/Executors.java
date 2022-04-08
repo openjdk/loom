@@ -266,6 +266,7 @@ public class Executors {
      * that creates virtual threads.
      *
      * @return a new executor that creates a new virtual Thread for each task
+     * @throws UnsupportedOperationException if preview features are not enabled
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
