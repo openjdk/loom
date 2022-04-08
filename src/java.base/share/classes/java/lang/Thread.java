@@ -744,6 +744,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
+     * @throws UnsupportedOperationException if preview features are not enabled
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
@@ -766,6 +767,7 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
+     * @throws UnsupportedOperationException if preview features are not enabled
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
@@ -1438,6 +1440,7 @@ public class Thread implements Runnable {
      *
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
+     * @throws UnsupportedOperationException if preview features are not enabled
      * @see <a href="#inheritance">Inheritance</a>
      * @since 19
      */
