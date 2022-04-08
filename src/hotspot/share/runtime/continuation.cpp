@@ -138,11 +138,11 @@ Address |   |                            |    |   Caller is still in the chunk.
             |                            |    |
             |    frame                   |    |
             |                            |    |
-            |----------------------------| <--/ the sp passed to freeze
+            |----------------------------| <--/
             |                            |
             |    doYield/safepoint stub  | When preempting forcefully, we could have a safepoint stub
             |                            | instead of a doYield stub
-            |============================|
+            |============================| <- the sp passed to freeze
             |                            |
             |  Native freeze/thaw frames |
             |      .                     |
@@ -1123,7 +1123,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
   assert(StubRoutines::cont_doYield_stub()->frame_size() == frame::metadata_words, "");
 
   // properties of the continuation on the stack; all sizes are in words
-  intptr_t* const cont_stack_top    = frame_sp + frame::metadata_words;
+  intptr_t* const cont_stack_top    = frame_sp + frame::metadata_words; // we add metadata_words to skip the doYield stub frame
   intptr_t* const cont_stack_bottom = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize()); // see alignment in thaw
 
   const int cont_size = cont_stack_bottom - cont_stack_top;
@@ -2504,13 +2504,13 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   assert(!bottom || (_cont.is_empty() != Continuation::is_cont_barrier_frame(f)), "");
 }
 
-  void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
-    // we need to clear the bits that correspond to arguments as they reside in the caller frame
-    log_develop_trace(continuations)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
-    stackChunkOop chunk = _cont.tail();
-    chunk->bitmap().clear_range(chunk->bit_index_for(start),
-                                chunk->bit_index_for(start+range));
-  }
+void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
+  // we need to clear the bits that correspond to arguments as they reside in the caller frame
+  log_develop_trace(continuations)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
+  stackChunkOop chunk = _cont.tail();
+  chunk->bitmap().clear_range(chunk->bit_index_for(start),
+                              chunk->bit_index_for(start+range));
+}
 
 NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
   assert(hf.is_interpreted_frame(), "");
@@ -2610,7 +2610,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(!bottom || (_cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP()), "");
   assert(!bottom || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
 
-  copy_from_chunk(from, to, sz);
+  copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 
   patch(f, caller, bottom);
 
