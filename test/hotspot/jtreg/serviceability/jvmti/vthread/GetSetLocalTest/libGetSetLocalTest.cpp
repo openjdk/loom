@@ -258,7 +258,7 @@ test_SetLocal(jvmtiEnv *jvmti, JNIEnv *jni, jthread cthread, jthread vthread,
     if (err != JVMTI_ERROR_OPAQUE_FRAME) {
       LOG("JVMTI SetLocalObject for unmounted vthread or depth > 0 failed to return JVMTI_ERROR_OPAQUE_FRAME: %d\n", err);
       fatal(jni, "JVMTI SetLocalObject for unmounted vthread or depth > 0 failed to return JVMTI_ERROR_OPAQUE_FRAME");
-    }  
+    }
   }
   else if (err != JVMTI_ERROR_INVALID_SLOT) {
     LOG("JVMTI SetLocalObject with invalid slot -1 returned error: %d\n", err);
