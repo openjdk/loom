@@ -30,7 +30,11 @@
 
  public:
   enum {
-    pc_return_offset = 0
+    pc_return_offset = 0,
+    metadata_words   = 0,
+    frame_alignment  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle     =  1
   };
 
  const ImmutableOopMap* get_oop_map() const;

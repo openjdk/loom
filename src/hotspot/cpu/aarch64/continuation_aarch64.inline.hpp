@@ -34,9 +34,9 @@
 
 // Fast path
 
-inline void FreezeBase::patch_chunk_pd(intptr_t* vsp, intptr_t* hsp) {
+inline void FreezeBase::patch_chunk_pd(intptr_t* frame_sp, intptr_t* heap_sp) {
   // copy the spilled fp from the heap to the stack
-  *(vsp - frame::sender_sp_offset) = *(hsp - frame::sender_sp_offset);
+  *(frame_sp - frame::sender_sp_offset) = *(heap_sp - frame::sender_sp_offset);
 }
 
 // Slow path
@@ -63,7 +63,7 @@ inline frame FreezeBase::sender(const frame& f) {
 }
 
 template<typename FKind>
-frame FreezeBase::new_hframe(frame& f, frame& caller) {
+frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
   assert(FKind::is_instance(f), "");
   assert(!caller.is_interpreted_frame()
     || caller.unextended_sp() == (intptr_t*)caller.at(frame::interpreter_frame_last_sp_offset), "");
@@ -86,7 +86,10 @@ frame FreezeBase::new_hframe(frame& f, frame& caller) {
     *hf.addr_at(frame::interpreter_frame_locals_offset) = frame::sender_sp_offset + locals - 1;
     return hf;
   } else {
-    fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have had a safepoint in finalize_freeze, after constructing f.
+    // We need to re-read fp out of the frame because it may be an oop and we might have
+    // had a safepoint in finalize_freeze, after constructing f.
+    fp = *(intptr_t**)(f.sp() - frame::sender_sp_offset);
+
     int fsize = FKind::size(f);
     sp = caller.unextended_sp() - fsize;
     if (caller.is_interpreted_frame()) {
@@ -185,23 +188,23 @@ inline frame ThawBase::new_entry_frame() {
   return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
 }
 
-template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& caller, bool bottom) {
+template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame& caller, bool bottom) {
   assert(FKind::is_instance(hf), "");
 
   if (FKind::interpreted) {
-    intptr_t* hsp = hf.unextended_sp();
+    intptr_t* heap_sp = hf.unextended_sp();
     const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp();
     const int locals = hf.interpreter_frame_method()->max_locals();
-    intptr_t* vsp = caller.unextended_sp() - fsize;
-    intptr_t* fp = vsp + (hf.fp() - hsp);
+    intptr_t* frame_sp = caller.unextended_sp() - fsize;
+    intptr_t* fp = frame_sp + (hf.fp() - heap_sp);
     if ((intptr_t)fp % frame::frame_alignment != 0) {
       fp--;
-      vsp--;
+      frame_sp--;
     }
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
-    assert(vsp == unextended_sp, "");
+    assert(frame_sp == unextended_sp, "");
     caller.set_sp(fp + frame::sender_sp_offset);
-    frame f(vsp, vsp, fp, hf.pc());
+    frame f(frame_sp, frame_sp, fp, hf.pc());
     // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
     intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
     assert((int)offset == locals + frame::sender_sp_offset - 1, "");
@@ -210,16 +213,16 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
     return f;
   } else {
     int fsize = FKind::size(hf);
-    intptr_t* vsp = caller.unextended_sp() - fsize;
+    intptr_t* frame_sp = caller.unextended_sp() - fsize;
     if (bottom || caller.is_interpreted_frame()) {
       int argsize = hf.compiled_frame_stack_argsize();
 
       fsize += argsize;
-      vsp   -= argsize;
+      frame_sp   -= argsize;
       caller.set_sp(caller.sp() - argsize);
-      assert(caller.sp() == vsp + (fsize-argsize), "");
+      assert(caller.sp() == frame_sp + (fsize-argsize), "");
 
-      vsp = align(hf, vsp, caller, bottom);
+      frame_sp = align(hf, frame_sp, caller, bottom);
     }
 
     assert(hf.cb() != nullptr, "");
@@ -227,27 +230,27 @@ template<typename FKind> frame ThawBase::new_frame(const frame& hf, frame& calle
     intptr_t* fp;
     if (PreserveFramePointer) {
       // we need to recreate a "real" frame pointer, pointing into the stack
-      fp = vsp + FKind::size(hf) - frame::sender_sp_offset;
+      fp = frame_sp + FKind::size(hf) - frame::sender_sp_offset;
     } else {
       fp = FKind::stub
-        ? vsp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
+        ? frame_sp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
         : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     }
-    return frame(vsp, vsp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
+    return frame(frame_sp, frame_sp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
   }
 }
 
-inline intptr_t* ThawBase::align(const frame& hf, intptr_t* vsp, frame& caller, bool bottom) {
+inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp, frame& caller, bool bottom) {
 #ifdef _LP64
-  if (((intptr_t)vsp & 0xf) != 0) {
+  if (((intptr_t)frame_sp & 0xf) != 0) {
     assert(caller.is_interpreted_frame() || (bottom && hf.compiled_frame_stack_argsize() % 2 != 0), "");
-    vsp--;
+    frame_sp--;
     caller.set_sp(caller.sp() - 1);
   }
-  assert(is_aligned(vsp, frame::frame_alignment), "");
+  assert(is_aligned(frame_sp, frame::frame_alignment), "");
 #endif
 
-  return vsp;
+  return frame_sp;
 }
 
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {

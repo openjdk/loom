@@ -54,7 +54,11 @@
     interpreter_frame_monitor_block_bottom_offset    = interpreter_frame_initial_sp_offset,
 
     // Entry frames
-    entry_frame_call_wrapper_offset                  =  0
+    entry_frame_call_wrapper_offset                  =  0,
+    metadata_words                                   = sender_sp_offset,
+    frame_alignment                                  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle                                     =  1
   };
 
   intptr_t ptr_at(int offset) const {

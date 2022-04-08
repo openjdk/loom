@@ -55,17 +55,31 @@ inline void frame::find_codeblob_and_set_pc_and_deopt_state(address pc) {
 
 // Initialize all fields, _unextended_sp will be adjusted in find_codeblob_and_set_pc_and_deopt_state.
 inline frame::frame() : _sp(NULL), _pc(NULL), _cb(NULL), _deopt_state(unknown), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
                         _unextended_sp(NULL), _fp(NULL) {}
 
-inline frame::frame(intptr_t* sp) : _sp(sp), _on_heap(false), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
+                        _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)own_abi()->return_pc);
 }
 
-inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _on_heap(false), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
+                        _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // Also sets _fp and adjusts _unextended_sp.
 }
 
 inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                                                                         _frame_index(-1),
+#endif
                                                                          _unextended_sp(unextended_sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // Also sets _fp and adjusts _unextended_sp.
 }
@@ -74,6 +88,9 @@ inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp)
 #ifndef PRODUCT
 inline frame::frame(void* sp, void* pc, void* unextended_sp) :
   _sp((intptr_t*)sp), _pc(NULL), _cb(NULL), _on_heap(false),
+#ifdef ASSERT
+  _frame_index(-1),
+#endif
   _unextended_sp((intptr_t*)unextended_sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)pc); // Also sets _fp and adjusts _unextended_sp.
 }
