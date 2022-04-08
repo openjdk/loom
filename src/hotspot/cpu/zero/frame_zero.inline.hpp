@@ -37,6 +37,7 @@ inline frame::frame() {
   _cb = NULL;
   _deopt_state = unknown;
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 }
 
 inline address  frame::sender_pc()           const { ShouldNotCallThis(); return NULL; }
@@ -49,6 +50,7 @@ inline frame::frame(ZeroFrame* zf, intptr_t* sp) {
   _zeroframe = zf;
   _sp = sp;
   _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
   switch (zeroframe()->type()) {
   case ZeroFrame::ENTRY_FRAME:
     _pc = StubRoutines::call_stub_return_pc();
