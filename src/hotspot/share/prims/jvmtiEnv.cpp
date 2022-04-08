@@ -1950,25 +1950,22 @@ JvmtiEnv::NotifyFramePop(jthread thread, jint depth) {
   JavaThread* current = JavaThread::current();
   HandleMark hm(current);
   Handle thread_handle(current, thread_obj);
-
-  // Support for virtual threads
-  if (java_lang_VirtualThread::is_instance(thread_obj)) {
-    if (java_thread == NULL) {
-      // java_thread is NULL if virtual thread is unmounted
-      JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_handle);
-      if (state == NULL) {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE;
-      }
-      MutexLocker mu(JvmtiThreadState_lock);
-      int frame_number = state->count_frames() - depth;
-      state->env_thread_state(this)->set_frame_pop(frame_number);
-      return JVMTI_ERROR_NONE;
-    }
-  }
-
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread, thread_handle);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
+
+  // Support for virtual threads
+  if (java_lang_VirtualThread::is_instance(thread_handle())) {
+    VirtualThreadSetFramePopClosure op(this, thread_handle, state, depth);
+    MutexLocker mu(current, JvmtiThreadState_lock);
+    if (java_thread == NULL || java_thread == current) {
+      // Target virtual thread is unmounted or current.
+      op.doit(java_thread, true /* self */);
+    } else {
+      Handshake::execute(&op, java_thread);
+    }
+    return op.result();
   }
 
   SetFramePopClosure op(this, state, depth);
