@@ -573,8 +573,8 @@ JvmtiEventControllerPrivate::recompute_thread_enabled(JvmtiThreadState *state) {
     state->thread_event_enable()->_event_enabled.set_bits(any_env_enabled);
 
     if (state->get_thread() != NULL) {
-      // Update the JavaThread or mounted virtual thread cached value for
-      // thread-specific should_post_on_exceptions value.
+      // The JavaThread for carrier or mounted virtual thread case.
+      // Update the cached value for thread-specific should_post_on_exceptions value.
       bool should_post_on_exceptions = (any_env_enabled & SHOULD_POST_ON_EXCEPTIONS_BITS) != 0;
       state->set_should_post_on_exceptions(should_post_on_exceptions);
     }

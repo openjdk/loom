@@ -119,8 +119,8 @@ JvmtiThreadState::JvmtiThreadState(JavaThread* thread, oop thread_oop)
 
   if (thread != NULL) {
     if (thread_oop == NULL || thread->jvmti_vthread() == NULL || thread->jvmti_vthread() == thread_oop) {
-      // Set this as the state for the JavaThread or mounted virtual thread
-      // only if thread_oop is current thread->jvmti_vthread().
+      // The JavaThread for carrier or mounted virtual thread case.
+      // Set this only if thread_oop is current thread->jvmti_vthread().
       thread->set_jvmti_thread_state(this);
     }
     thread->set_interp_only_mode(0);
@@ -214,7 +214,7 @@ JvmtiThreadState::periodic_clean_up() {
 // Virtual Threads Mount Transition (VTMT) mechanism
 //
 
-// VTMT cannot be disabled while this counter is positive
+// VTMT cannot be disabled while this counter is positive.
 volatile int JvmtiVTMTDisabler::_VTMT_count = 0;
 
 // VTMT is disabled while this counter is positive

@@ -1733,11 +1733,11 @@ jvmtiEnv *jvmti;
         permanent features of the Java platform.</i>
         <p/>
         Suspend all virtual threads except those already suspended.
+        Virtual threads that are currently suspended do not change state.
         Virtual threads may be resumed with
         <functionlink id="ResumeAllVirtualThreads"></functionlink> or
         <functionlink id="ResumeThreadList"></functionlink> or
         <functionlink id="ResumeThread"></functionlink>.
-        Virtual threads that are currently suspended do not change state.
       </description>
       <origin>new</origin>
       <capabilities>
@@ -1861,11 +1861,11 @@ jvmtiEnv *jvmti;
         permanent features of the Java platform.</i>
         <p/>
         Resume all virtual threads except those already resumed.
-        Virtual threads may be resumed with
-        <functionlink id="ResumeAllVirtualThreads"></functionlink> or
-        <functionlink id="ResumeThreadList"></functionlink> or
-        <functionlink id="ResumeThread"></functionlink>.
         Virtual threads that are currently resumed do not change state.
+        Virtual threads may be suspended with
+        <functionlink id="SuspendAllVirtualThreads"></functionlink> or
+        <functionlink id="SuspendThreadList"></functionlink> or
+        <functionlink id="SuspendThread"></functionlink>.
       </description>
       <origin>new</origin>
       <capabilities>
