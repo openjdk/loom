@@ -1888,7 +1888,6 @@ void JvmtiExport::post_method_exit_inner(JavaThread* thread,
   }
 
   state->decr_cur_stack_depth();
-
 }
 
 

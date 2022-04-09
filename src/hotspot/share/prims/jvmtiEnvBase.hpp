@@ -84,7 +84,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
 
   static jvmtiError suspend_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend,
                                    int* need_safepoint_p);
-  static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_suspend);
+  static jvmtiError resume_thread(oop thread_oop, JavaThread* java_thread, bool single_resume);
   static jvmtiError check_thread_list(jint count, const jthread* list);
   static bool is_in_thread_list(jint count, const jthread* list, oop jt_oop);
 
@@ -176,7 +176,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
     return err;
   }
 
-  // If there is a virtual thread mounted to the JavaThread* then
+  // If there is a virtual thread mounted on the JavaThread* then
   // return virtual thread oop. Otherwise, return thread oop.
   static oop get_vthread_or_thread_oop(JavaThread* jt) {
     oop result = jt->threadObj();
@@ -383,7 +383,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
-                          GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
+                                GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   static jvmtiError check_top_frame(Thread* current_thread, JavaThread* java_thread,
                                     jvalue value, TosState tos, Handle* ret_ob_h);
   jvmtiError force_early_return(jthread thread, jvalue value, TosState tos);
