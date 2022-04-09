@@ -38,7 +38,7 @@
  *
  */
 
-// * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
+// @run main/othervm/timeout=300 --enable-preview -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. -XX:+PreserveFramePointer Fuzz
 
 // * @run main/othervm/timeout=3000 -XX:StartFlightRecording=filename=test.jfr,settings=profile -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xbootclasspath/a:. Fuzz
 
