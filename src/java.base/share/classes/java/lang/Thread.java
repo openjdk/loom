@@ -33,10 +33,8 @@ import java.security.ProtectionDomain;
 import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
-
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.PreviewFeatures;
@@ -54,7 +52,6 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
 import sun.security.util.SecurityConstants;
-
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -89,20 +86,20 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * maintained by the operating system. Platforms threads are suitable for executing
  * all types of tasks but may be a limited resource.
  *
+ * <p> Platform threads get an automatically generated thread name by default.
+ *
  * <p> Platform threads are designated <i>daemon</i> or <i>non-daemon</i> threads.
  * When the Java virtual machine starts up, there is usually one non-daemon
  * thread (the thread that typically calls the application's {@code main} method).
  * The Java virtual machine terminates when all started non-daemon threads have
- * terminated. Unstarted daemon threads do not prevent the Java virtual machine from
- * terminating. The Java virtual machine can also be terminated by invoking the
- * {@linkplain Runtime#exit(int)} method, in which case it will terminate even
+ * terminated. Unstarted non-daemon threads do not prevent the Java virtual machine
+ * from terminating. The Java virtual machine can also be terminated by invoking
+ * the {@linkplain Runtime#exit(int)} method, in which case it will terminate even
  * if there are non-daemon threads still running.
  *
  * <p> In addition to the daemon status, platform threads have a {@linkplain
  * #getPriority() thread priority} and are members of a {@linkplain ThreadGroup
  * thread group}.
- *
- * <p> Platform threads get an automatically generated thread name by default.
  *
  * <h2><a id="virtual-threads">Virtual threads</a></h2>
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i>.
@@ -113,15 +110,23 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * of the time blocked, often waiting for I/O operations to complete. Virtual threads
  * are not intended for long running CPU intensive operations.
  *
- * <p> Virtual threads typically employ a small set of platform threads used
- * as <em>carrier threads</em>. Locking and I/O operations are the <i>scheduling
- * points</i> where a carrier thread is re-scheduled from one virtual thread to
+ * <p> Virtual threads typically employ a small set of platform threads used as
+ * <em>carrier threads</em>. Locking and I/O operations are examples of <i>scheduling
+ * points</i> where a carrier thread may be re-scheduled from one virtual thread to
  * another. Code executing in a virtual thread will usually not be aware of the
  * underlying carrier thread, and in particular, the {@linkplain Thread#currentThread()}
  * method, to obtain a reference to the <i>current thread</i>, will return the {@code
  * Thread} object for the virtual thread, not the underlying carrier thread.
  *
- * <p> Virtual threads get an empty thread name by default.
+ * <p> Virtual threads do not have a thread name by default. The {@link #getName()
+ * getName} method returns the empty string if a thread name is not set.
+ *
+ * <p> Virtual threads are daemon threads and so do not prevent the Java virtual
+ * machine from terminating. Unlike platform threads, virtual threads do not have
+ * a thread priority and are not members of a {@linkplain ThreadGroup thread-group}.
+ * The {@link #getPriority() getPriority} method returns {@link Thread#NORM_PRIORITY}
+ * and {@link #getThreadGroup() getThreadGroup} methods returns a <em>placeholder</em>
+ * group.
  *
  * <h2>Creating and starting threads</h2>
  *
@@ -153,12 +158,18 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * }
  *
  * <h2><a id="inheritance">Inheritance</a></h2>
- * Creating a {@code Thread} will inherit, by default, the initial values of
- * {@linkplain InheritableThreadLocal inheritable-thread-local} variables
- * (including the context class loader) from the parent thread. Platform threads
- * inherit the daemon status and thread priority. Platform threads also inherit
- * the thread group when a thread group is not provided (or not selected by a
- * security manager).
+ * A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
+ * inheritable-thread-local} variables (including the context class loader) from
+ * the parent thread values at the time that the child {@code Thread} is created.
+ * Platform threads also inherit the daemon status, thread priority, and when not
+ * provided (or not selected by a security manager), the thread group.
+ *
+ * <p> Inherited Access Control Context:
+ * Creating a platform thread {@linkplain AccessController#getContext() captures} the
+ * {@linkplain AccessControlContext caller context} to limit the {@linkplain Permission
+ * permissions} of {@linkplain AccessController#doPrivileged(PrivilegedAction) privileged
+ * actions} performed by code in the thread. Virtual threads have no permissions
+ * when executing code that performs privileged actions.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -901,6 +912,7 @@ public class Thread implements Runnable {
         /**
          * Creates a new {@code Thread} from the current state of the builder and
          * schedules it to execute.
+         *
          * @param task the object to run when the thread executes
          * @return a new started Thread
          * @see <a href="Thread.html#inheritance">Inheritance</a>
@@ -1005,9 +1017,6 @@ public class Thread implements Runnable {
          * A builder for creating a virtual {@link Thread} or {@link ThreadFactory}
          * that creates virtual threads.
          *
-         * <p> Virtual threads created with a builder, or with a {@code ThreadFactory}
-         * created from a builder, have no {@link Permission permissions}.
-         *
          * @see Thread#ofVirtual()
          * @since 19
          */
@@ -1025,11 +1034,6 @@ public class Thread implements Runnable {
             @Override OfVirtual allowSetThreadLocals(boolean allow);
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
-
-            /**
-             * @throws RejectedExecutionException if the scheduler cannot accept a task
-             */
-            @Override Thread start(Runnable task);
         }
     }
 
@@ -1433,8 +1437,6 @@ public class Thread implements Runnable {
     /**
      * Creates a virtual thread to execute a task and schedules it to execute.
      *
-     * <p> The thread has no {@link Permission permissions}.
-     *
      * <p> This method is equivalent to:
      * <pre>{@code Thread.ofVirtual().start(task); }</pre>
      *
@@ -1468,14 +1470,11 @@ public class Thread implements Runnable {
     /**
      * Schedules this thread to begin execution. The thread will execute
      * independently of the current thread.
-     * <p>
-     * It is never legal to start a thread more than once.
-     * In particular, a thread may not be restarted once it has completed
-     * execution.
+     *
+     * <p> A thread can be started at most once. In particular, a thread can not
+     * be restarted after it has terminated.
      *
      * @throws IllegalThreadStateException if the thread was already started
-     * @throws RejectedExecutionException if the thread is virtual and the
-     *         scheduler cannot accept a task
      */
     public void start() {
         synchronized (this) {
@@ -1519,16 +1518,17 @@ public class Thread implements Runnable {
     private native void start0();
 
     /**
-     * Run by the thread when it executes. Subclasses of {@code Thread} may override
-     * this method. When not overridden, and this thread was created with a {@link
-     * Runnable} task, then it invokes the task's {@link Runnable#run() run} method.
-     * When not overridden and this thread was created without a {@code Runnable}
-     * task then this method does nothing.
+     * This method is run by the thread when it executes. Subclasses of {@code
+     * Thread} may override this method.
      *
      * <p> This method is not intended to be invoked directly. If this thread is a
-     * platform thread created with a {@code Runnable} task then invoking this method
+     * platform thread created with a {@link Runnable} task then invoking this method
      * will invoke the task's {@code run} method. If this thread is a virtual thread
      * then invoking this method directly does nothing.
+     *
+     * @implSpec The default implementation executes the {@link Runnable} task that
+     * the {@code Thread} was created with. If the thread was created without a task
+     * then this method does nothing.
      */
     @Override
     public void run() {
@@ -1552,7 +1552,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * This method is called by the system to give a Thread
+     * This method is called by the VM to give a Thread
      * a chance to clean up before it actually exits.
      */
     private void exit() {
@@ -1925,11 +1925,13 @@ public class Thread implements Runnable {
      * with no arguments. This may result in throwing a
      * {@code SecurityException}.
      *
-     * @implNote
-     * If this thread is the current thread, and is a platform thread that isn't
-     * mapped to a native thread attached to the VM with the Java Native Interface
-     * {@code AttachCurrentThread} function, then a best effort attempt is made to
-     * change the operating system thread name too.
+     * @implNote In the JDK Reference Implementation, and this thread is the
+     * current thread, and it's a platform thread that was not attached to the
+     * VM with the Java Native Interface
+     * <a href="{@docRoot}/../specs/jni/invocation.html#attachcurrentthread">
+     * AttachCurrentThread</a> function, then this method will set the operating
+     * system thread name. This may be useful for debugging and troubleshooting
+     * purposes.
      *
      * @param      name   the new name for this thread.
      * @throws     SecurityException  if the current thread cannot modify this
@@ -1959,8 +1961,11 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Returns the thread group to which this thread belongs.
-     * This method returns null if the thread has terminated.
+     * Returns the thread's thread group or {@code null} if the thread has
+     * terminated.
+     *
+     * Virtual threads are not members of a thread group; this method returns a
+     * <em>placeholder</em> thread group when invoked on a virtual thread.
      *
      * @return  this thread's thread group.
      */
@@ -2640,16 +2645,6 @@ public class Thread implements Runnable {
      * The thread ID is unique and remains unchanged during its lifetime.
      *
      * @return this thread's ID
-     * @since 19
-     */
-    public final long threadId() {
-        return tid;
-    }
-
-    /**
-     * Returns the identifier of this Thread obtained by invoking {@link #threadId()}.
-     *
-     * @return this thread's ID
      *
      * @deprecated This method is not final and may be overridden to return a
      * value that is not the thread ID. Use {@link #threadId()} instead.
@@ -2659,6 +2654,18 @@ public class Thread implements Runnable {
     @Deprecated(since="19")
     public long getId() {
         return threadId();
+    }
+
+    /**
+     * Returns the identifier of this Thread.  The thread ID is a positive
+     * {@code long} number generated when this thread was created.
+     * The thread ID is unique and remains unchanged during its lifetime.
+     *
+     * @return this thread's ID
+     * @since 19
+     */
+    public final long threadId() {
+        return tid;
     }
 
     /**
