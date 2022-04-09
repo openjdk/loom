@@ -2269,10 +2269,10 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
   t_oop = t_oop == NULL ? java_thread->threadObj() : t_oop;
   bool is_vt_suspended = java_lang_VirtualThread::is_instance(t_oop) && JvmtiVTSuspender::is_vthread_suspended(t_oop);
 
-  tty->print_cr("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d is_VTMT_disabler: %d, is_in_VTMT = %d",
-                tname, java_thread->name(), java_thread->is_exiting(),
-                java_thread->is_suspended(), java_thread->is_carrier_thread_suspended(), is_vt_suspended,
-                java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
+  log_error(jvmti)("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d is_VTMT_disabler: %d, is_in_VTMT = %d\n",
+                   tname, java_thread->name(), java_thread->is_exiting(),
+                   java_thread->is_suspended(), java_thread->is_carrier_thread_suspended(), is_vt_suspended,
+                   java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
 
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, /* update_map */ true, /* process_frames */ true);
@@ -2280,13 +2280,13 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
     HandleMark hm(current_thread);
     javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
     while (jvf != NULL) {
-      tty->print_cr("  %s:%d",
-                    jvf->method()->external_name(),
-                    jvf->method()->line_number_from_bci(jvf->bci()));
+      log_error(jvmti)("  %s:%d",
+                       jvf->method()->external_name(),
+                       jvf->method()->line_number_from_bci(jvf->bci()));
       jvf = jvf->java_sender();
     }
   }
-  tty->print_cr("");
+  log_error(jvmti)("\n");
 }
 
 void

@@ -227,8 +227,9 @@ volatile bool JvmtiVTMTDisabler::_SR_mode = false;
 #ifdef ASSERT
 void
 JvmtiVTMTDisabler::print_info() {
-  tty->print_cr("_VTMT_disable_count: %d _VTMT_count: %d\n",
-                _VTMT_disable_count, _VTMT_count);
+  log_error(jvmti)("_VTMT_disable_count: %d _VTMT_count: %d\n\n",
+                   _VTMT_disable_count, _VTMT_count);
+  int attempts = 10000;
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *java_thread = jtiwh.next(); ) {
     ResourceMark rm;
     // Handshake with target.
@@ -368,8 +369,8 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, bool is_mount) {
   }
 #ifdef ASSERT
   if (attempts == 0) {
-    tty->print_cr("start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n",
-                  thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(vth()));
+    log_error(jvmti)("start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n\n",
+                     thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(thread_id));
     print_info();
     fatal("stuck in JvmtiVTMTDisabler::start_VTMT");
   }
@@ -398,6 +399,7 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, bool is_mount) {
   }
   // In unmount case the carrier thread is attached after unmount transition.
   // Check and block it if there was external suspend request.
+  int attempts = 10000;
   if (!is_mount && thread->is_carrier_thread_suspended()) {
     while (true) {
       ThreadBlockInVM tbivm(thread);
@@ -408,12 +410,23 @@ JvmtiVTMTDisabler::finish_VTMT(jthread vthread, bool is_mount) {
           (is_mount && JvmtiVTSuspender::is_vthread_suspended(thread_id))
       ) {
         // Block while there are suspend requests.
-        ml.wait(10);
+        if (ml.wait(10)) {
+          attempts--;
+        }
+        DEBUG_ONLY(if (attempts == 0) break;)
         continue;
       }
       break;
     }
   }
+#ifdef ASSERT
+  if (attempts == 0) {
+    log_error(jvmti)("finish_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n\n",
+                     thread->is_suspended(), JvmtiVTSuspender::is_vthread_suspended(thread_id));
+    print_info();
+    fatal("stuck in JvmtiVTMTDisabler::finish_VTMT");
+  }
+#endif
 }
 
 //
