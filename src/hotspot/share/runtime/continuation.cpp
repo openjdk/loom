@@ -1799,14 +1799,16 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
     }
   }
 
+  // assert that chunk is properly initialised
   assert(chunk->stack_size() == (int)stack_size, "");
   assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
+  assert(chunk->sp() == chunk->stack_size(), "");
   assert((intptr_t)chunk->start_address() % 8 == 0, "");
-
+  assert(chunk->max_size() == 0, "");
+  assert(chunk->pc() == nullptr, "");
+  assert(chunk->argsize() == 0, "");
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
-  assert(chunk->max_size() == 0, "");
-  assert(chunk->sp() == chunk->stack_size(), "");
 
   stackChunkOop chunk0 = _cont.tail();
   if (chunk0 != nullptr && chunk0->is_empty()) {
