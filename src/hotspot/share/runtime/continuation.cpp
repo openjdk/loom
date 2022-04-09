@@ -2251,7 +2251,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
     const int frame_size = f.cb()->frame_size();
     argsize = f.stack_argsize();
 
-    f.next(SmallRegisterMap::instance); // note that this finds the next frame's cb; consider perf
+    f.next(SmallRegisterMap::instance, true /* stop */);
     empty = f.is_done();
     assert(!empty || argsize == chunk->argsize(), "");
 
