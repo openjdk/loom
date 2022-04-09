@@ -647,7 +647,7 @@ static inline bool is_sp_in_continuation(const ContinuationEntry* entry, intptr_
 }
 
 bool Continuation::is_frame_in_continuation(const ContinuationEntry* entry, const frame& f) {
-  return f.is_heap_frame() || is_sp_in_continuation(entry, f.unextended_sp());
+  return is_sp_in_continuation(entry, f.unextended_sp());
 }
 
 ContinuationEntry* Continuation::get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp) {
@@ -660,7 +660,7 @@ ContinuationEntry* Continuation::get_continuation_entry_for_sp(JavaThread* threa
 }
 
 bool Continuation::is_frame_in_continuation(JavaThread* thread, const frame& f) {
-  return get_continuation_entry_for_sp(thread, f.unextended_sp()) != nullptr;
+  return f.is_heap_frame() || (get_continuation_entry_for_sp(thread, f.unextended_sp()) != nullptr);
 }
 
 static frame continuation_top_frame(const ContinuationWrapper& cont, RegisterMap* map) {
