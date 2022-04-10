@@ -125,8 +125,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * machine from terminating. Unlike platform threads, virtual threads do not have
  * a thread priority and are not members of a {@linkplain ThreadGroup thread-group}.
  * The {@link #getPriority() getPriority} method returns {@link Thread#NORM_PRIORITY}
- * and {@link #getThreadGroup() getThreadGroup} methods returns a <em>placeholder</em>
- * group.
+ * and {@link #getThreadGroup() getThreadGroup} returns a <em>placeholder</em> group.
  *
  * <h2>Creating and starting threads</h2>
  *
@@ -168,8 +167,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * Creating a platform thread {@linkplain AccessController#getContext() captures} the
  * {@linkplain AccessControlContext caller context} to limit the {@linkplain Permission
  * permissions} of {@linkplain AccessController#doPrivileged(PrivilegedAction) privileged
- * actions} performed by code in the thread. Virtual threads have no permissions
- * when executing code that performs privileged actions.
+ * actions} performed by code in the thread. Creating a virtual thread does not capture
+ * the caller context; virtual threads have no permissions when executing code that
+ * performs privileged actions.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -1965,7 +1965,8 @@ public class Thread implements Runnable {
      * terminated.
      *
      * Virtual threads are not members of a thread group; this method returns a
-     * <em>placeholder</em> thread group when invoked on a virtual thread.
+     * <em>placeholder</em> thread group when invoked on a virtual thread that
+     * has not terminated.
      *
      * @return  this thread's thread group.
      */
