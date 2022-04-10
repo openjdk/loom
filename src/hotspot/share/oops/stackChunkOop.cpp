@@ -268,6 +268,24 @@ void stackChunkOopDesc::relativize_derived_oops() {
   OrderAccess::storestore();
 }
 
+#ifdef ASSERT
+template <ChunkFrames frame_kind, typename RegisterMapT>
+static void assert_relativized_derived_oops_in_frame(const StackChunkFrameStream<frame_kind>& f,
+                                                     const RegisterMapT* map) {
+  class AssertRelativeDerivedOopClosure : public DerivedOopClosure {
+  public:
+    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+      assert(*base_loc == nullptr || is_derived_oop_offset(*(intptr_t*)derived_loc), "");
+    }
+  };
+  assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
+  if (f.is_compiled() && f.oopmap()->has_derived_oops()) {
+    AssertRelativeDerivedOopClosure derived_closure;
+    f.iterate_derived_pointers(&derived_closure, map);
+  }
+}
+#endif
+
 enum class OopKind { Narrow, Wide };
 
 template <OopKind kind>
@@ -385,7 +403,11 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // CodeCache, noting their Methods
   }
 
-  relativize_derived_oops_in_frame(f, map);
+  if (UseZGC) {
+    relativize_derived_oops_in_frame(f, map);
+  } else {
+    DEBUG_ONLY(assert_relativized_derived_oops_in_frame(f, map));
+  }
 
   // The store of the derived oops must be ordered with the store of the base.
   // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
@@ -542,6 +564,15 @@ public:
       // become stable(requires_barriers()), the earlier is_good check should
       // guarantee that all derived oops have been converted too offsets.
       assert(is_derived_oop_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
+    } else {
+      if (is_derived_oop_offset(value)) {
+        intptr_t offset = untag_derived_oop_offset(value); // for assertions
+      } else {
+        // The offset was a non-offset derived pointer that
+        // had not been converted to an offset yet.
+        intptr_t offset = value - cast_from_oop<intptr_t>(base);
+        tag_derived_oop_offset(offset); // for assertions
+      }
     }
 
     // There's not much else we can assert about derived pointers. Their offsets are allowed to

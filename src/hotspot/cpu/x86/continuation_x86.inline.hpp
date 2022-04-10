@@ -205,6 +205,7 @@ inline frame ThawBase::new_entry_frame() {
 
 template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame& caller, bool bottom) {
   assert(FKind::is_instance(hf), "");
+  // The values in the returned frame object will be written into the callee's stack in patch.
 
   if (FKind::interpreted) {
     intptr_t* heap_sp = hf.unextended_sp();
