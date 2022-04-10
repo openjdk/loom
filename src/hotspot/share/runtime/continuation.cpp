@@ -952,7 +952,7 @@ protected:
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
   inline void unwind_frames();
 
-  inline void patch_chunk_pd(intptr_t* frame_sp, intptr_t* heap_sp);
+  inline void patch_stack_pd(intptr_t* frame_sp, intptr_t* heap_sp);
 
 private:
   // slow path
@@ -1165,7 +1165,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
              "should be the continuation return barrier");
       // We copy the fp from the chunk back to the stack because it contains some caller data,
       // including, possibly, an oop that might have gone stale since we thawed.
-      patch_chunk_pd(bottom_sp, chunk->sp_address());
+      patch_stack_pd(bottom_sp, chunk->sp_address());
       // we don't patch the return pc at this time, so as not to make the stack unwalkable for async walks
     } else { // the chunk is empty
       chunk_start_sp = chunk->sp();
@@ -2142,7 +2142,7 @@ protected:
   // fast path
   inline void prefetch_chunk_pd(void* start, int size_words);
   void patch_return(intptr_t* sp, bool is_last);
-  void patch_chunk_pd(intptr_t* sp); // TODO remove
+  void patch_chunk_pd(intptr_t* sp);
 
   // slow path
   NOINLINE intptr_t* thaw_slow(stackChunkOop chunk, bool return_barrier);
@@ -2344,8 +2344,6 @@ void ThawBase::patch_return(intptr_t* sp, bool is_last) {
 
   address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-
-  // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
 }
 
 NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier) {

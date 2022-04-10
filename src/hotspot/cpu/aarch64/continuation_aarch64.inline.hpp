@@ -34,7 +34,7 @@
 
 // Fast path
 
-inline void FreezeBase::patch_chunk_pd(intptr_t* frame_sp, intptr_t* heap_sp) {
+inline void FreezeBase::patch_stack_pd(intptr_t* frame_sp, intptr_t* heap_sp) {
   // copy the spilled fp from the heap to the stack
   *(frame_sp - frame::sender_sp_offset) = *(heap_sp - frame::sender_sp_offset);
 }
