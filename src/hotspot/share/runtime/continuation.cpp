@@ -2744,10 +2744,7 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
     f.print_on(&ls);
   }
 
-  intptr_t* sp = f.sp();
-  address pc = f.raw_pc();
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  ContinuationHelper::Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
+  ContinuationHelper::Frame::patch_pc(f, f.raw_pc()); // in case we want to deopt the frame in a full transition, this is checked.
   ContinuationHelper::push_pd(f);
 
   assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
