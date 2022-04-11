@@ -156,7 +156,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *   ThreadFactory factory = Thread.ofVirtual().factory();
  * }
  *
- * <h2><a id="inheritance">Inheritance</a></h2>
+ * <h2><a id="inheritance">Inheritance when creating threads</a></h2>
  * A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
  * inheritable-thread-local} variables (including the context class loader) from
  * the parent thread values at the time that the child {@code Thread} is created.
@@ -905,7 +905,7 @@ public class Thread implements Runnable {
          * method must be invoked to schedule the thread to execute.
          * @param task the object to run when the thread executes
          * @return a new unstarted Thread
-         * @see <a href="Thread.html#inheritance">Inheritance</a>
+         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
         Thread unstarted(Runnable task);
 
@@ -915,7 +915,7 @@ public class Thread implements Runnable {
          *
          * @param task the object to run when the thread executes
          * @return a new started Thread
-         * @see <a href="Thread.html#inheritance">Inheritance</a>
+         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
         Thread start(Runnable task);
 
@@ -1093,7 +1093,7 @@ public class Thread implements Runnable {
      * <p> This constructor is only useful when extending {@code Thread} to
      * override the {@link #run()} method.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread() {
         this(null, genThreadName(), 0, null, 0, null);
@@ -1114,7 +1114,7 @@ public class Thread implements Runnable {
      *         is started. If {@code null}, this classes {@code run} method does
      *         nothing.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(Runnable task) {
         this(null, genThreadName(), 0, task, 0, null);
@@ -1156,7 +1156,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task) {
         this(group, genThreadName(), 0, task, 0, null);
@@ -1173,7 +1173,7 @@ public class Thread implements Runnable {
      * @param   name
      *          the name of the new thread
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(String name) {
         this(null, checkName(name), 0, null, 0, null);
@@ -1202,7 +1202,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, String name) {
         this(group, checkName(name), 0, null, 0, null);
@@ -1224,7 +1224,7 @@ public class Thread implements Runnable {
      * @param  name
      *         the name of the new thread
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(Runnable task, String name) {
         this(null, checkName(name), 0, task, 0, null);
@@ -1278,7 +1278,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group or cannot override the context class loader methods.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name) {
         this(group, checkName(name), 0, task, 0, null);
@@ -1360,7 +1360,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 1.4
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
         this(group, checkName(name), 0, task, stackSize, null);
@@ -1425,7 +1425,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 9
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name,
                   long stackSize, boolean inheritInheritableThreadLocals) {
@@ -1443,7 +1443,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
      * @throws UnsupportedOperationException if preview features are not enabled
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
