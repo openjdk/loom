@@ -116,11 +116,18 @@ class EPollSelectorImpl extends SelectorImpl {
 
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                long comp = Blocker.begin(blocking);
-                try {
-                    numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, to);
-                } finally {
-                    Blocker.end(comp);
+                if (Poller.useRecursivePoll() && Thread.currentThread().isVirtual()) {
+                    if (timeout != 0) {
+                        Poller.poll(epfd, Net.POLLIN, TimeUnit.MILLISECONDS.toNanos(timeout), this::isOpen);
+                    }
+                    numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+                } else {
+                    long comp = Blocker.begin();
+                    try {
+                        numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, to);
+                    } finally {
+                        Blocker.end(comp);
+                    }
                 }
                 if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout

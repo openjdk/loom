@@ -41,6 +41,10 @@ abstract class PollerProvider {
         return false;
     }
 
+    boolean useRecursivePoll() {
+        return false;
+    }
+
     /**
      * Creates a Poller for read ops.
      */

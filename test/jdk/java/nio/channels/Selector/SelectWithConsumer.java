@@ -24,7 +24,7 @@
 /* @test
  * @summary Unit test for Selector.select/selectNow(Consumer)
  * @bug 8199433 8208780
- * @run testng SelectWithConsumer
+ * @run testng/othervm --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED SelectWithConsumer
  */
 
 /* @test
@@ -518,25 +518,22 @@ public class SelectWithConsumer {
             // select(Consumer)
             sel.select(k -> {
                 assertTrue(k == key);
-                assertTrue(Thread.holdsLock(sel));
-                assertFalse(Thread.holdsLock(sel.keys()));
-                assertTrue(Thread.holdsLock(sel.selectedKeys()));
+                assertTrue(SelectorUtils.mightHoldKeysLock(Thread.currentThread(), sel));
+                assertTrue(SelectorUtils.mightHoldSelectorLock(Thread.currentThread(), sel));
             });
 
             // select(Consumer, timeout)
             sel.select(k -> {
                 assertTrue(k == key);
-                assertTrue(Thread.holdsLock(sel));
-                assertFalse(Thread.holdsLock(sel.keys()));
-                assertTrue(Thread.holdsLock(sel.selectedKeys()));
+                assertTrue(SelectorUtils.mightHoldKeysLock(Thread.currentThread(), sel));
+                assertTrue(SelectorUtils.mightHoldSelectorLock(Thread.currentThread(), sel));
             }, 1000L);
 
             // selectNow(Consumer)
             sel.selectNow(k -> {
                 assertTrue(k == key);
-                assertTrue(Thread.holdsLock(sel));
-                assertFalse(Thread.holdsLock(sel.keys()));
-                assertTrue(Thread.holdsLock(sel.selectedKeys()));
+                assertTrue(SelectorUtils.mightHoldKeysLock(Thread.currentThread(), sel));
+                assertTrue(SelectorUtils.mightHoldSelectorLock(Thread.currentThread(), sel));
             });
         } finally {
             closePipe(p);

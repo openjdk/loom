@@ -41,6 +41,7 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 
@@ -66,6 +67,9 @@ public abstract class SelectorImpl
 
     // used to check for reentrancy
     private boolean inSelect;
+
+    private final ReentrantLock selectorLock = new ReentrantLock();
+    private final ReentrantLock publicSelectedKeysLock = new ReentrantLock();
 
     protected SelectorImpl(SelectorProvider sp) {
         super(sp);
@@ -119,18 +123,21 @@ public abstract class SelectorImpl
     private int lockAndDoSelect(Consumer<SelectionKey> action, long timeout)
         throws IOException
     {
-        synchronized (this) {
+        selectorLock.lock();
+        try {
             ensureOpen();
             if (inSelect)
                 throw new IllegalStateException("select in progress");
             inSelect = true;
+            publicSelectedKeysLock.lock();
             try {
-                synchronized (publicSelectedKeys) {
-                    return doSelect(action, timeout);
-                }
+                return doSelect(action, timeout);
             } finally {
+                publicSelectedKeysLock.unlock();
                 inSelect = false;
             }
+        } finally {
+            selectorLock.unlock();
         }
     }
 
@@ -181,9 +188,11 @@ public abstract class SelectorImpl
     @Override
     public final void implCloseSelector() throws IOException {
         wakeup();
-        synchronized (this) {
+        selectorLock.lock();
+        try {
             implClose();
-            synchronized (publicSelectedKeys) {
+            publicSelectedKeysLock.lock();
+            try {
                 // Deregister channels
                 Iterator<SelectionKey> i = keys.iterator();
                 while (i.hasNext()) {
@@ -196,7 +205,11 @@ public abstract class SelectorImpl
                     i.remove();
                 }
                 assert selectedKeys.isEmpty() && keys.isEmpty();
+            } finally {
+                publicSelectedKeysLock.unlock();
             }
+        } finally {
+            selectorLock.unlock();
         }
     }
 

@@ -24,7 +24,7 @@
 /* @test
  * @bug 8201315
  * @build SelectorUtils
- * @run main RegisterDuringSelect
+ * @run main/othervm --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED  RegisterDuringSelect
  * @summary Test that channels can be registered, interest ops can changed,
  *          and keys cancelled while a selection operation is in progress.
  */

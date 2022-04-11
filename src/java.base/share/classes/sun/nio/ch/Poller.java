@@ -48,6 +48,7 @@ public abstract class Poller {
     private static final Poller[] WRITE_POLLERS;
     private static final int READ_MASK, WRITE_MASK;
     private static final boolean USE_DIRECT_REGISTER;
+    private static final boolean USE_RECURSIVE_POLL;
 
     // true if this is a poller for reading, false for writing
     private final boolean read;
@@ -388,6 +389,12 @@ public abstract class Poller {
         } else {
             USE_DIRECT_REGISTER = "".equals(s) || Boolean.parseBoolean(s);
         }
+        s = GetPropertyAction.privilegedGetProperty("jdk.useRecursivePoll");
+        if (s == null) {
+            USE_RECURSIVE_POLL = provider.useRecursivePoll();
+        } else {
+            USE_RECURSIVE_POLL = "".equals(s) || Boolean.parseBoolean(s);
+        }
         try {
             Poller[] readPollers = createReadPollers(provider);
             READ_POLLERS = readPollers;
@@ -465,5 +472,9 @@ public abstract class Poller {
 
     private Stream<Thread> registeredThreads() {
         return map.values().stream();
+    }
+
+    static boolean useRecursivePoll() {
+        return USE_RECURSIVE_POLL;
     }
 }

@@ -24,29 +24,52 @@
 import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.channels.Selector;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class SelectorUtils {
 
-    /**
-     * tell if the monitor of an Object is held by a Thread.
-     * @param t    the Thread to hold the monitor of the selected-key set
-     * @param lock the Object
-     * @return
-     */
-    public static boolean mightHoldLock(Thread t, Object lock) {
-        long tid = t.getId();
-        int hash = System.identityHashCode(lock);
-        ThreadInfo ti = ManagementFactory.getThreadMXBean().
-                getThreadInfo(new long[]{ tid} , true, false, 100)[0];
-        if (ti != null) {
-            for (MonitorInfo mi : ti.getLockedMonitors()) {
-                if (mi.getIdentityHashCode() == hash)
-                    return true;
-            }
+    private static Field SELECTOR_LOCK;
+    private static Field SELECTOR_SELECTEDKEY_LOCK;
+    private static Method OWNER;
+
+    static {
+        try {
+            SELECTOR_LOCK = Class.forName("sun.nio.ch.SelectorImpl").getDeclaredField("selectorLock");
+            SELECTOR_LOCK.setAccessible(true);
+            SELECTOR_SELECTEDKEY_LOCK = Class.forName("sun.nio.ch.SelectorImpl").getDeclaredField("publicSelectedKeys");
+            SELECTOR_SELECTEDKEY_LOCK.setAccessible(true);
+            OWNER = ReentrantLock.class.getDeclaredMethod("getOwner");
+            OWNER.setAccessible(true);
+        } catch (Exception e) {
+            throw new InternalError(e);
         }
-        return false;
     }
+
+    public static boolean mightHoldSelectorLock(Thread t, Object selector) {
+        try {
+            ReentrantLock lock = (ReentrantLock) SELECTOR_LOCK.get(selector);
+            if (lock == null)
+                return false;
+            return OWNER.invoke(lock) == t;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean mightHoldKeysLock(Thread t, Object selector) {
+        try {
+            ReentrantLock lock = (ReentrantLock) SELECTOR_LOCK.get(selector);
+            if (lock == null)
+                return false;
+            return OWNER.invoke(lock) == t;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
 
     /**
      * Spin until the monitor of the selected-key set is likely held
@@ -57,7 +80,7 @@ public class SelectorUtils {
      * @throws Exception
      */
     public static void spinUntilLocked(Thread t, Selector sel) throws Exception {
-        while (!mightHoldLock(t, sel.selectedKeys())) {
+        while (!mightHoldSelectorLock(t, sel)) {
             Thread.sleep(50);
         }
     }

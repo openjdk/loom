@@ -31,6 +31,12 @@
  *     -Dsun.net.client.defaultConnectTimeout=5000
  *     -Dsun.net.client.defaultReadTimeout=5000
  *     HttpALot
+ * @run main/othervm/timeout=600
+ *     --enable-preview
+ *     -Dsun.net.client.defaultConnectTimeout=5000
+ *     -Dsun.net.client.defaultReadTimeout=5000
+ *     -Djdk.useRecursivePoll=true
+ *     HttpALot
  */
 
 import java.io.IOException;

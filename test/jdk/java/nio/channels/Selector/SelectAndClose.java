@@ -24,7 +24,7 @@
 /* @test
  * @bug 5004077 8203765
  * @build SelectorUtils
- * @run main SelectAndClose
+ * @run main/othervm --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED SelectAndClose
  * @summary Check blocking of select and close
  */
 
