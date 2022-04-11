@@ -104,19 +104,21 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <h2><a id="virtual-threads">Virtual threads</a></h2>
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i>.
  * Virtual threads are typically <i>user-mode threads</i> scheduled by the Java
- * virtual machine rather than the operating system. Virtual threads will typically
- * require few resources and a single Java virtual machine may support millions of
- * virtual threads. Virtual threads are suitable for executing tasks that spend most
- * of the time blocked, often waiting for I/O operations to complete. Virtual threads
+ * runtime rather than the operating system. Virtual threads will typically require
+ * few resources and a single Java virtual machine may support millions of virtual
+ * threads. Virtual threads are suitable for executing tasks that spend most of
+ * the time blocked, often waiting for I/O operations to complete. Virtual threads
  * are not intended for long running CPU intensive operations.
  *
  * <p> Virtual threads typically employ a small set of platform threads used as
- * <em>carrier threads</em>. Locking and I/O operations are examples of <i>scheduling
- * points</i> where a carrier thread may be re-scheduled from one virtual thread to
- * another. Code executing in a virtual thread will usually not be aware of the
- * underlying carrier thread, and in particular, the {@linkplain Thread#currentThread()}
- * method, to obtain a reference to the <i>current thread</i>, will return the {@code
- * Thread} object for the virtual thread, not the underlying carrier thread.
+ * <em>carrier threads</em>. Locking and I/O operations are examples of operations
+ * where a carrier thread may be re-scheduled from one virtual thread to another.
+ * Code executing in a virtual thread is not aware of underlying carrier thread.
+ *
+ *
+ * The {@linkplain Thread#currentThread()} method, used to obtain a reference
+ * to the <i>current thread</i>, will always return the {@code Thread} object
+ * for the virtual thread.
  *
  * <p> Virtual threads do not have a thread name by default. The {@link #getName()
  * getName} method returns the empty string if a thread name is not set.
