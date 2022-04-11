@@ -171,12 +171,13 @@ static void verify_continuation(oop continuation) { Continuation::debug_verify_c
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOop chunk, outputStream* st);
 static void log_frames(JavaThread* thread);
+static void print_frame_layout(const frame& f, outputStream* st = tty);
+
 #else
 static void verify_continuation(oop continuation) { }
 #endif
 
 #ifndef PRODUCT
-static void print_frame_layout(const frame& f, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
 #endif
 
@@ -3000,12 +3001,6 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
 
   return true;
 }
-#endif
-
-#ifndef PRODUCT
-static jlong java_tid(JavaThread* thread) {
-  return java_lang_Thread::thread_id(thread->threadObj());
-}
 
 static void print_frame_layout(const frame& f, outputStream* st) {
   ResourceMark rm;
@@ -3019,6 +3014,12 @@ static void print_frame_layout(const frame& f, outputStream* st) {
   frame::update_map_with_saved_link(&map, ContinuationHelper::Frame::callee_link_address(f));
   const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
+}
+#endif
+
+#ifndef PRODUCT
+static jlong java_tid(JavaThread* thread) {
+  return java_lang_Thread::thread_id(thread->threadObj());
 }
 #endif
 
