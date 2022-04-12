@@ -9,6 +9,8 @@ jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  827
 jdk/jfr/jcmd/TestJcmdDumpPathToGCRoots.java
 jdk/jfr/tool/TestPrintXML.java
 
+java/util/logging/Logger/logrb/TestLogrbResourceBundle.java                  8284779 generic-all
+
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
 java/foreign/handles/Driver.java
