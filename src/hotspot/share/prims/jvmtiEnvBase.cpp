@@ -1275,9 +1275,9 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
 jvmtiError
 JvmtiEnvBase::set_frame_pop(JvmtiThreadState* state, javaVFrame* jvf, jint depth) {
   vframe* vf = jvf;
-  for (int d = 0; vf != NULL && d < depth; d++) { 
-    vf = vf->java_sender(); 
-  } 
+  for (int d = 0; vf != NULL && d < depth; d++) {
+    vf = vf->java_sender();
+  }
   if (vf == NULL) {
     return JVMTI_ERROR_NO_MORE_FRAMES;
   }
