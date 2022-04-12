@@ -251,6 +251,14 @@ import jdk.internal.misc.ThreadFlock;
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
+ * <h2>Memory consistency effects</h2>
+ * <p>Actions in the owner thread of, or a thread contained in, the task scope prior to
+ * {@linkplain #fork forking} of a {@code Runnable} or {@code Callable} task
+ * <a href="package-summary.html#MemoryVisibility"><i>happen-before</i></a>
+ * any actions taken by that task, which in turn <i>happen-before</i> the task result
+ * is retrieved via its {@code Future}, or <i>happen-before</i> any actions taken in
+ * a thread after {@linkplain #join()} joining} of the task scope.
+ *
  * @param <T> the result type of tasks executed in the scope
  * @since 19
  */
@@ -922,11 +930,15 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * Throwable#getCause() cause}. If only cancelled tasks were notified to the {@code
          * handle} method then {@code CancellationException} is thrown.
          *
+         * <p> The behavior of this method is unspecified if called before this task
+         * scope is {@linkplain #join() joined}.
+         *
          * @throws ExecutionException if no tasks completed with a result but a task
          * completed with an exception
          * @throws CancellationException if all tasks were cancelled
          * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
+         * @see #join()
          */
         public T result() throws ExecutionException {
             Future<T> f = firstSuccess;
@@ -949,12 +961,16 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * method then the exception supplying function is invoked with a
          * {@code CancellationException}.
          *
+         * <p> The behavior of this method is unspecified if called before this task
+         * scope is {@linkplain #join() joined}.
+         *
          * @param esf the exception supplying function
          * @param <X> type of the exception to be thrown
          * @return the result of the first task that completed with a result
          * @throws X if no task completed with a result
          * @throws IllegalStateException if the handle method was not invoked with a
          * completed task
+         * @see #join()
          */
         public <X extends Throwable> T result(Function<Throwable, ? extends X> esf) throws X {
             Objects.requireNonNull(esf);
@@ -1097,8 +1113,12 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * is returned. If no tasks completed abnormally then an empty {@code Optional}
          * is returned.
          *
+         * <p> The behavior of this method is unspecified if called before this task
+         * scope is {@linkplain #join() joined}.
+         *
          * @return the exception for a task that completed abnormally or an empty
          * optional if no tasks completed abnormally
+         * @see #join()
          */
         public Optional<Throwable> exception() {
             Future<Object> f = firstFailed;
@@ -1117,9 +1137,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * to the {@code handleComplete} method then {@code CancellationException} is
          * thrown. This method does nothing if no tasks completed abnormally.
          *
+         * <p> The behavior of this method is unspecified if called before this task
+         * scope is {@linkplain #join() joined}.
+         *
          * @throws ExecutionException if a task completed with an exception
          * @throws CancellationException if no tasks completed with an exception but
          * tasks were cancelled
+         * @see #join()
          */
         public void throwIfFailed() throws ExecutionException {
             Future<Object> f = firstFailed;
@@ -1138,9 +1162,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * CancellationException}. The exception returned by the function is thrown.
          * This method does nothing if no tasks completed abnormally.
          *
+         * <p> The behavior of this method is unspecified if called before this task
+         * scope is {@linkplain #join() joined}.
+         *
          * @param esf the exception supplying function
          * @param <X> type of the exception to be thrown
          * @throws X produced by the exception supplying function
+         * @see #join()
          */
         public <X extends Throwable>
         void throwIfFailed(Function<Throwable, ? extends X> esf) throws X {
