@@ -124,10 +124,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * getName} method returns the empty string if a thread name is not set.
  *
  * <p> Virtual threads are daemon threads and so do not prevent the Java virtual
- * machine from terminating. Unlike platform threads, virtual threads do not have
- * a thread priority and are not members of a {@linkplain ThreadGroup thread-group}.
- * The {@link #getPriority() getPriority} method returns {@link Thread#NORM_PRIORITY}
- * and {@link #getThreadGroup() getThreadGroup} returns a <em>placeholder</em> group.
+ * machine from terminating. They have a fixed priority (see {@link #getPriority()
+ * getPriority}). Virtual threads are not members of a thread group (see
+ * {@link #getThreadGroup() getThreadGroup}).
  *
  * <h2>Creating and starting threads</h2>
  *
@@ -162,7 +161,13 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
  * inheritable-thread-local} variables (including the context class loader) from
  * the parent thread values at the time that the child {@code Thread} is created.
- * Platform threads also inherit the daemon status, thread priority, and when not
+ * The 5-param {@linkplain Thread#Thread(ThreadGroup, Runnable, String, long, boolean)
+ * constructor} can be used to create a thread that does not inherit its initial
+ * values from the constructing thread. When using a {@code Thread.Builder}, the
+ * {@link Builder#inheritInheritableThreadLocals(boolean) inheritInheritableThreadLocals}
+ * method can be used to select if the initial values are inherited.
+ *
+ * <p> Platform threads inherit the daemon status, thread priority, and when not
  * provided (or not selected by a security manager), the thread group.
  *
  * <p> Inherited Access Control Context:
@@ -862,10 +867,10 @@ public class Thread implements Runnable {
          * Sets whether the thread is allowed to set values for its copy of {@linkplain
          * ThreadLocal thread-local} variables. The default is to allow. If not allowed,
          * then any attempt by the thread to set a value for a thread-local with the
-         * {@link ThreadLocal#set(Object) set} method throws {@code
+         * {@link ThreadLocal#set(Object)} method throws {@code
          * UnsupportedOperationException}. Any attempt to set the thread's context
          * class loader with {@link Thread#setContextClassLoader(ClassLoader)
-         * setContextClassLoader} also throws. The {@link ThreadLocal#get() get} method
+         * setContextClassLoader} also throws. The {@link ThreadLocal#get()} method
          * always returns the {@linkplain ThreadLocal#initialValue() initial-value}
          * when thread locals are not allowed.
          *
@@ -933,6 +938,9 @@ public class Thread implements Runnable {
         /**
          * A builder for creating a platform {@link Thread} or {@link ThreadFactory}
          * that creates platform threads.
+         *
+         * <p> Unless otherwise specified, passing a null argument to a method in
+         * this interface causes a {@code NullPointerException} to be thrown.
          *
          * @see Thread#ofPlatform()
          * @since 19
@@ -1018,6 +1026,9 @@ public class Thread implements Runnable {
         /**
          * A builder for creating a virtual {@link Thread} or {@link ThreadFactory}
          * that creates virtual threads.
+         *
+         * <p> Unless otherwise specified, passing a null argument to a method in
+         * this interface causes a {@code NullPointerException} to be thrown.
          *
          * @see Thread#ofVirtual()
          * @since 19
@@ -1927,7 +1938,7 @@ public class Thread implements Runnable {
      * with no arguments. This may result in throwing a
      * {@code SecurityException}.
      *
-     * @implNote In the JDK Reference Implementation, and this thread is the
+     * @implNote In the JDK Reference Implementation, if this thread is the
      * current thread, and it's a platform thread that was not attached to the
      * VM with the Java Native Interface
      * <a href="{@docRoot}/../specs/jni/invocation.html#attachcurrentthread">
@@ -1966,11 +1977,26 @@ public class Thread implements Runnable {
      * Returns the thread's thread group or {@code null} if the thread has
      * terminated.
      *
-     * Virtual threads are not members of a thread group; this method returns a
-     * <em>placeholder</em> thread group when invoked on a virtual thread that
-     * has not terminated.
+     * <p> Virtual threads are not members of a thread group. If invoked on a
+     * virtual thread that has not terminated, this method returns a special
+     * thread group that behaves as follows:
+     * <ul>
+     *  <li> There are no {@linkplain ThreadGroup#activeCount() active} virtual
+     *       threads in the thread group. The {@link ThreadGroup#enumerate(Thread[])
+     *       enumerate} method does not enumerate virtual threads.
+     *  <li> There may be active platform threads in the thread group. The thread
+     *       group may be provided when creating a platform thread, the thread group
+     *       may be <a href="Thread.html#inheritance">inherited</a> when a
+     *       virtual thread creates a platform thread, or the thread group may
+     *       be inherited when a platform thread in the thread group creates
+     *       another platform thread.
+     *  <li> The {@linkplain ThreadGroup#getMaxPriority() maximum priority} of
+     *       the thread group is {@link Thread#NORM_PRIORITY} when initially
+     *       created. Changing the maximum priority of the thread group has no
+     *       impact on the priority of virtual threads.
+     * </ul>
      *
-     * @return  this thread's thread group.
+     * @return  this thread's thread group or {@code null}
      */
     public final ThreadGroup getThreadGroup() {
         if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
