@@ -78,6 +78,7 @@
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlagLimit.hpp"
 #include "runtime/deoptimization.hpp"
@@ -2487,6 +2488,12 @@ javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
   }
   return NULL;
 }
+
+oop JavaThread::get_continuation() const {
+  assert(threadObj() != nullptr, "must be set");
+  return java_lang_Thread::continuation(threadObj());
+}
+
 
 Klass* JavaThread::security_get_caller_class(int depth) {
   ResetNoHandleMark rnhm;

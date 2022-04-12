@@ -27,6 +27,7 @@
 
 #include "code/codeBlob.inline.hpp"
 #include "oops/stackChunkOop.inline.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
