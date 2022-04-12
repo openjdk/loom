@@ -110,49 +110,6 @@ int stackChunkOopDesc::num_java_frames() const {
   return n;
 }
 
-// The high-order bit tagging has only been verified to work on these platforms.
-#if (defined(X86) && defined(_LP64)) || defined(AARCH64)
-#define HIGH_ORDER_BIT_TAGGING_SUPPORTED
-#endif
-
-// We use the high-order (sign) bit to tag derived oop offsets.
-// However, we cannot rely on simple nagation, as offsets could hypothetically be zero or even negative
-
-static inline bool is_derived_oop_offset(intptr_t value) {
-  return value < 0;
-}
-
-#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
-static const intptr_t OFFSET_MAX = (intptr_t)((uintptr_t)1 << 35); // 32 bit offset + 3 for jlong (offset in bytes)
-static const intptr_t OFFSET_MIN = -OFFSET_MAX - 1;
-#endif
-
-static inline intptr_t tag_derived_oop_offset(intptr_t untagged) {
-#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
-  assert(untagged <= OFFSET_MAX, "");
-  assert(untagged >= OFFSET_MIN, "");
-  intptr_t tagged = (intptr_t)((uintptr_t)untagged | ((uintptr_t)1 << (BitsPerWord-1)));
-  assert(is_derived_oop_offset(tagged), "");
-  return tagged;
-#else
-  Unimplemented();
-  return 0;
-#endif
-}
-
-static inline intptr_t untag_derived_oop_offset(intptr_t tagged) {
-#ifdef HIGH_ORDER_BIT_TAGGING_SUPPORTED
-  assert(is_derived_oop_offset(tagged), "");
-  intptr_t untagged = (intptr_t)((uintptr_t)tagged << 1) >> 1;  // unsigned left shift; signed right shift
-  assert(untagged <= OFFSET_MAX, "");
-  assert(untagged >= OFFSET_MIN, "");
-  return untagged;
-#else
-  Unimplemented();
-  return 0;
-#endif
-}
-
 template <stackChunkOopDesc::BarrierType barrier>
 class DoBarriersStackClosure {
   const stackChunkOop _chunk;
@@ -176,10 +133,171 @@ void stackChunkOopDesc::do_barriers() {
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Load> ();
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Store>();
 
-// We replace derived oops with offsets; the converse is done in DerelativizeDerivedOopClosure
-class RelativizeDerivedOopClosure : public DerivedOopClosure {
+class DerivedPointersSupportSTW {
 public:
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+  static void relativize(oop* base_loc, derived_pointer* derived_loc) {
+    oop base = *base_loc;
+    if (base == nullptr) {
+      return;
+    }
+    assert(!CompressedOops::is_base(base), "");
+
+    // This is always a full derived pointer
+    intptr_t derived_int_val = *(intptr_t*)derived_loc;
+
+    // Make the pointer an offset (relativize) and store it at the same location
+    intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
+    *(intptr_t*)derived_loc = offset;
+  }
+
+  static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
+    oop base = *base_loc;
+    if (base == nullptr) {
+      return;
+    }
+    assert(!CompressedOops::is_base(base), "");
+
+    // All derived pointers should have been relativized into offsets
+    intptr_t offset = *(intptr_t*)derived_loc;
+
+    // Restore the original derived pointer
+    *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
+  }
+
+  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
+    oop base = (chunk->has_bitmap() && UseCompressedOops)
+                  ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
+                  : Atomic::load((oop*)base_loc);
+    if (base == nullptr) {
+      return;
+    }
+
+    assert(!UseCompressedOops || !CompressedOops::is_base(base), "Should not be the compressed oops base");
+    assert(oopDesc::is_oop(base), "Should be a valid oop");
+
+    // There's not much else we can assert about derived pointers. Their offsets are allowed to
+    // fall outside of their base object, and even be negative.
+  }
+
+  struct RelativizeClosure : public DerivedOopClosure {
+    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+      DerivedPointersSupportSTW::relativize(base_loc, derived_loc);
+    }
+  };
+};
+
+#if INCLUDE_ZGC
+
+// Unlike the STW GCs, ZGC runs the relativize and verification functions
+// concurrently from both GC and Java threads. We use a high-order-bit
+// tagging scheme to differentiate proper derived pointers from those that
+// have been relativized into offsets.
+//
+// We cannot rely on simple negation, as the derived pointers can be be zero
+// or even negative. The compiler can, and will, create derived oops that are
+// negative if the base object (and the heap start) is located low enough in
+// the address space, and the offset from the base is a large negative value.
+class DerivedPointersSupportZGC {
+  // Assume that offsets are bound by the maximum size of Java objects. The
+  // object sizes are described as a int value of words. That max object size
+  // is a little less than INT_MAX * BytesPerWord. So, to describe the max object
+  // size we need 31 bits for the int value, 3 bits for the BytesPerWord, and
+  // 1 bit for both positive and negative offsets.
+  static const int      OFFSET_BITS = 35;
+  static const intptr_t OFFSET_MASK = (intptr_t(1) << OFFSET_BITS) - 1;
+
+  // Limits of a two's complement 35 bits signed number
+  static const intptr_t OFFSET_MAX = OFFSET_MASK >> 1;
+  static const intptr_t OFFSET_MIN = ~OFFSET_MAX;
+
+  // Use last non-sign bit - see is_derived_pointer_offset
+  static const intptr_t OFFSET_TAG = intptr_t(1) << 62;
+
+  static inline intptr_t tag_derived_pointer_offset_raw(intptr_t untagged) {
+    return OFFSET_TAG | (untagged & OFFSET_MASK);
+  }
+
+  static inline intptr_t untag_derived_pointer_offset_raw(intptr_t tagged) {
+    const int non_offset_bits = (64 - OFFSET_BITS);
+
+    // The highest bit in an offset indicates the sign of the untagged offset.
+    // Shift left to place that bit as the 64th bit, and then shift back to
+    // sign-extend. The last operation is implementation-defined and the code
+    // assumes that the implementation is an arithmetic right shift.
+    return intptr_t(uintptr_t(tagged) << non_offset_bits) >> non_offset_bits;
+  }
+
+  static inline bool is_derived_pointer_offset(intptr_t value) {
+    // OFFSET_TAG and this function has been chosen so that we can easily tag,
+    // untag, and check for dervied pointer values that have been converted to
+    // offsets.
+    //
+    // Normal derived pointers can have any of these two layouts:
+    //  positive derived pointers: 0b0000..<non_sign_derived_bits>
+    //  negative derived pointers: 0b1111..<non_sign_derived_bits>
+    //
+    // Derived pointers that have been converted to offsts have this layout:
+    //  offsets                  : 0b0100..<35_signed_offset_bits>
+    //
+    // When looking at given signed value, all offsets will be at least as large
+    // as OFFSET_TAG, and all normal derived pointers will be less.
+    const bool is_offset = value >= OFFSET_TAG;
+
+    // Extra verification
+#ifdef ASSERT
+    if (is_offset) {
+      intptr_t untagged = untag_derived_pointer_offset_raw(value);
+      assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
+      assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
+    } else {
+      // Check that we don't get values that squeeze in between the tag bit
+      // and some aribitrarily high number that we should never go past.
+      assert(value <= (intptr_t(1) << 50), "untagged: " PTR_FORMAT, value);
+      assert(value >= OFFSET_MIN, "untagged: " PTR_FORMAT, value);
+    }
+#endif
+
+    return is_offset;
+  }
+
+  static inline intptr_t tag_derived_pointer_offset(intptr_t untagged) {
+    assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
+    assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
+
+    intptr_t tagged = tag_derived_pointer_offset_raw(untagged);
+
+    assert(is_derived_pointer_offset(tagged), "");
+
+    // Check that the bits can be restored
+#ifdef ASSERT
+    intptr_t restored = untag_derived_pointer_offset_raw(tagged);
+    assert(restored == untagged, "tagged: " PTR_FORMAT " untagged: " PTR_FORMAT " restored: " PTR_FORMAT,
+           tagged, untagged, restored);
+#endif
+
+    return tagged;
+  }
+
+  static inline intptr_t untag_derived_pointer_offset(intptr_t tagged) {
+    assert(is_derived_pointer_offset(tagged), "");
+
+    intptr_t untagged = untag_derived_pointer_offset_raw(tagged);
+
+    assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
+    assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
+
+    // Check that the bits can be restored
+#ifdef ASSERT
+    intptr_t restored = tag_derived_pointer_offset_raw(untagged);
+    assert(restored == tagged, "tagged: " PTR_FORMAT " untagged: " PTR_FORMAT " restored: " PTR_FORMAT,
+        tagged, untagged, restored);
+#endif
+
+    return untagged;
+  }
+
+public:
+  static void relativize(oop* base_loc, derived_pointer* derived_loc) {
     // The ordering in the following is crucial
     OrderAccess::loadload();
 
@@ -188,105 +306,175 @@ public:
     if (base == nullptr) {
       return;
     }
-    assert(!CompressedOops::is_base(base), "");
 
-#if INCLUDE_ZGC
-    if (UseZGC) {
-      // This closure can be concurrently called from both GC marking and from
-      // the mutator. For it to work it is important that the old base value is
-      // used for the offset calculation below. As soon at the base oop has
-      // been updated we must *not* proceed to run the code below this check.
-      //
-      // This code only works if there's only one possible transition from old
-      // to good. This isn't necessarily for oops when objects are marked from
-      // finalizers. In that case oops can go from old to finalizable_marked
-      // to good. This breaks this check, because finalizable_marked are not
-      // considered good, but it's also not the old value. To workaround this
-      // we upgrade finalizable marking through stack chunks to be strong
-      // marking. See: ZMark::follow_object.
-      if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
-        return;
-      }
-    }
-#endif
-#if INCLUDE_SHENANDOAHGC
-    if (UseShenandoahGC) {
-      if (!ShenandoahHeap::heap()->in_collection_set(base)) {
-        return;
-      }
-    }
-#endif
-
-    OrderAccess::loadload();
-    intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
-
-    if (is_derived_oop_offset(derived_int_val)) {
-      // The derived oop had already been converted to an offset.
+    // This closure can be concurrently called from both GC marking and from
+    // the mutator. For it to work it is important that the old base value is
+    // used for the offset calculation below. As soon at the base oop has
+    // been updated we must *not* proceed to run the code below this check.
+    //
+    // This code only works if there's only one possible transition from old
+    // to good. This isn't necessarily for oops when objects are marked from
+    // finalizers. In that case oops can go from old to finalizable_marked
+    // to good. This breaks this check, because finalizable_marked are not
+    // considered good, but it's also not the old value. To workaround this
+    // we upgrade finalizable marking through stack chunks to be strong
+    // marking. See: ZMark::follow_object.
+    if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
       return;
     }
 
-    // At this point, we've seen a non-offset value *after* we've
-    // read the base, but we write the offset *before* fixing the base, so we
-    // are guaranteed that the value in derived_loc is consistent with base.
+    // Order the load of the base and the derived pointer
+    OrderAccess::loadload();
+
+    const intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
+
+    if (is_derived_pointer_offset(derived_int_val)) {
+      // The derived pointer had already been converted to an offset.
+      return;
+    }
+
+    // At this point, we've seen a non-offset value *after* we've read the
+    // base, but we write the offset *before* fixing the base, so we are
+    // guaranteed that the value in derived_loc is consistent with base.
     //
     // Note above how ZGC could be writing the base concurrently with the store
     // and how we handle it by checking the state of the read base oop.
 
-    intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-    Atomic::store((intptr_t*)derived_loc, tag_derived_oop_offset(offset));
+    const intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
+    const intptr_t tagged_offset = tag_derived_pointer_offset(offset);
+
+    Atomic::store((intptr_t*)derived_loc, tagged_offset);
   }
+
+  static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
+    // This function is called on the thread stack frames and not the stack
+    // chunk object, so after a frame has been thawed. There's no racing
+    // threads and therefore no extra barriers.
+    // there's
+
+    oop base = *base_loc;
+    if (base == nullptr) {
+      return;
+    }
+
+    // When we call this function it is expected that all derived pointers
+    // have been relativized, and after that that all oops have been fixed.
+    // If we find a bad base, then that's an indication that we have not
+    // the relativization code + oops processing.
+    assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "At this point all oops should be good");
+
+    // All derived pointers should have been relativized into offsets
+    const intptr_t tagged_offset = *(intptr_t*)derived_loc;
+    assert(is_derived_pointer_offset(tagged_offset), "All dervied pointers should have been relativized");
+
+    // Remove tag bits and restore the original offset
+    const intptr_t offset = untag_derived_pointer_offset(tagged_offset);
+
+    // Store the derelativized derived pointer
+    *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
+  }
+
+  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
+    oop base = Atomic::load((oop*)base_loc);
+    if (base == nullptr) {
+      return;
+    }
+
+    if (!ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
+      // If the base oops has not been fixed, other threads could be fixing
+      // the derived pointers concurrently with this code. Don't proceed with
+      // the verification.
+      return;
+    }
+
+    assert(oopDesc::is_oop(base), "Should be a valid oop");
+
+    // Order the loads of the base oop and the derived pointers
+    OrderAccess::loadload();
+
+    intptr_t value = Atomic::load((intptr_t*)derived_loc);
+    if (chunk->requires_barriers()) {
+      // For ZGC when the chunk has transition to a state where the layout has
+      // become stable (requires_barriers()), the earlier is_good check should
+      // guarantee that all derived pointers have been converted too offsets.
+      assert(is_derived_pointer_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
+    }
+  }
+
+  struct RelativizeClosure : public DerivedOopClosure {
+    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+      DerivedPointersSupportZGC::relativize(base_loc, derived_loc);
+    }
+  };
 };
 
-template <ChunkFrames frame_kind, typename RegisterMapT>
-static void relativize_derived_oops_in_frame(const StackChunkFrameStream<frame_kind>& f,
-                                             const RegisterMapT* map) {
-  assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
-  bool has_derived = f.is_compiled() && f.oopmap()->has_derived_oops();
-  if (has_derived) {
-    RelativizeDerivedOopClosure derived_closure;
-    f.iterate_derived_pointers(&derived_closure, map);
-  }
-}
+#endif // INCLUDE_ZGC
 
-class RelativizeDerivedOopsStackChunkFrameClosure {
+class DerivedPointersSupport {
 public:
+  // Not used - correct implementation used explicitly
+  // static void relativize(oop* base_loc, derived_pointer* derived_loc);
+
+  static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
+#if INCLUDE_ZGC
+    if (UseZGC) {
+      DerivedPointersSupportZGC::derelativize(base_loc, derived_loc);
+      return;
+    }
+#endif
+    DerivedPointersSupportSTW::derelativize(base_loc, derived_loc);
+  }
+
+  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
+#if INCLUDE_ZGC
+    if (UseZGC) {
+      DerivedPointersSupportZGC::verify(chunk, base_loc, derived_loc);
+      return;
+    }
+#endif
+    DerivedPointersSupportSTW::verify(chunk, base_loc, derived_loc);
+  }
+
+  struct DerelativizeClosure : public DerivedOopClosure {
+    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+      DerivedPointersSupport::derelativize(base_loc, derived_loc);
+    }
+  };
+};
+
+template <typename DerivedPointerClosureType>
+class FrameToDerivedPointerClosure {
+  DerivedPointerClosureType* _cl;
+
+public:
+  FrameToDerivedPointerClosure(DerivedPointerClosureType* cl)
+    : _cl(cl) {}
+
   template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    relativize_derived_oops_in_frame(f, map);
+    f.iterate_derived_pointers(_cl, map);
     return true;
   }
 };
 
-void stackChunkOopDesc::relativize_derived_oops() {
+void stackChunkOopDesc::relativize_derived_pointers_concurrently() {
   assert(!is_gc_mode(), "Should only be called once per chunk");
   set_gc_mode(true);
   OrderAccess::storestore();
-  RelativizeDerivedOopsStackChunkFrameClosure closure;
-  iterate_stack(&closure);
 
-  // The store of the derived oops must be ordered with the store of the base.
-  // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
-  // the GC code calling this function will update the base oop.
+  assert(UseZGC, "Only verified to work with ZGC");
+
+#if INCLUDE_ZGC
+  DerivedPointersSupportZGC::RelativizeClosure derived_cl;
+  FrameToDerivedPointerClosure<decltype(derived_cl)> frame_cl(&derived_cl);
+  iterate_stack(&frame_cl);
+
+  // The store of the derived pointers must be ordered with the store of the base.
+  // DerivedPointersSupportZGC::relativize stored the derived pointers, the GC
+  // code calling this function will update the base oop.
   OrderAccess::storestore();
-}
-
-#ifdef ASSERT
-template <ChunkFrames frame_kind, typename RegisterMapT>
-static void assert_relativized_derived_oops_in_frame(const StackChunkFrameStream<frame_kind>& f,
-                                                     const RegisterMapT* map) {
-  class AssertRelativeDerivedOopClosure : public DerivedOopClosure {
-  public:
-    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-      assert(*base_loc == nullptr || is_derived_oop_offset(*(intptr_t*)derived_loc), "");
-    }
-  };
-  assert(!f.is_compiled() || f.oopmap()->has_derived_oops() == f.oopmap()->has_any(OopMapValue::derived_oop_value), "");
-  if (f.is_compiled() && f.oopmap()->has_derived_oops()) {
-    AssertRelativeDerivedOopClosure derived_closure;
-    f.iterate_derived_pointers(&derived_closure, map);
-  }
-}
 #endif
+}
 
 enum class OopKind { Narrow, Wide };
 
@@ -336,10 +524,11 @@ public:
 
   template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    relativize_derived_oops_in_frame(f, map);
+    DerivedPointersSupportSTW::RelativizeClosure derived_cl;
+    f.iterate_derived_pointers(&derived_cl, map);
 
     // This code is called from the STW collectors and don't have concurrent
-    // access to the derived oops. Therefore there's no need to add a
+    // access to the derived pointers. Therefore there's no need to add a
     // storestore barrier here.
     assert(SafepointSynchronize::is_at_safepoint(), "Should only be used by STW collectors");
 
@@ -406,16 +595,18 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // CodeCache, noting their Methods
   }
 
+#if INCLUDE_ZGC
   if (UseZGC) {
-    relativize_derived_oops_in_frame(f, map);
-  } else {
-    DEBUG_ONLY(assert_relativized_derived_oops_in_frame(f, map));
-  }
+    // ZGC needs to relativize concurrently with the GC
+    DerivedPointersSupportZGC::RelativizeClosure cl;
+    f.iterate_derived_pointers(&cl, map);
 
-  // The store of the derived oops must be ordered with the store of the base.
-  // RelativizeDerivedOopsStackChunkFrameClosure stored the derived oops,
-  // the GC code calling this function will update the base oop.
-  OrderAccess::storestore();
+    // The store of the derived pointers must be ordered with the store of the
+    // base. DerivedPointersSupportZGC::relativize stored the derived pointer,
+    // the GC code calling this function will update the base oop.
+    OrderAccess::storestore();
+  }
+#endif
 
   if (has_bitmap() && UseCompressedOops) {
     BarrierClosure<barrier, true> oops_closure(f.sp());
@@ -434,24 +625,6 @@ template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Lo
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<ChunkFrames::Mixed>& f, const SmallRegisterMap* map);
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Load> (const StackChunkFrameStream<ChunkFrames::CompiledOnly>& f, const SmallRegisterMap* map);
 template void stackChunkOopDesc::do_barriers0<stackChunkOopDesc::BarrierType::Store>(const StackChunkFrameStream<ChunkFrames::CompiledOnly>& f, const SmallRegisterMap* map);
-
-class DerelativizeDerivedOopClosure : public DerivedOopClosure {
-public:
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    oop base = *base_loc;
-    if (base != nullptr) {
-      assert(!CompressedOops::is_base(base), "");
-      ZGC_ONLY(assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "");)
-
-      intptr_t offset = *(intptr_t*)derived_loc;
-
-      if (is_derived_oop_offset(offset)) {
-        offset = untag_derived_oop_offset(offset);
-        *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
-      }
-    }
-  }
-};
 
 class UncompressOopsOopClosure : public OopClosure {
 public:
@@ -477,10 +650,9 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
     }
   }
 
-  if ((is_gc_mode() || UseZGC) && f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
-    OrderAccess::loadload();
-    DerelativizeDerivedOopClosure derived_closure;
-    OopMapDo<OopClosure, DerelativizeDerivedOopClosure, SkipNullValue> visitor(nullptr, &derived_closure);
+  if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
+    DerivedPointersSupport::DerelativizeClosure derived_closure;
+    OopMapDo<OopClosure, DerivedPointersSupport::DerelativizeClosure, SkipNullValue> visitor(nullptr, &derived_closure);
     visitor.oops_do(&f, map, f.oop_map());
   }
 }
@@ -532,55 +704,13 @@ public:
 
 class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
   stackChunkOop _chunk;
-  const bool    _requires_barriers;
 
 public:
   StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk)
-    : _chunk(chunk),
-      _requires_barriers(chunk->requires_barriers()) {}
+    : _chunk(chunk) {}
 
   virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    oop base = (_chunk->has_bitmap() && UseCompressedOops)
-                  ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
-                  : Atomic::load((oop*)base_loc);
-    if (base == nullptr) {
-      return;
-    }
-
-#if INCLUDE_ZGC
-    if (UseZGC && !ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
-      // If the base oops has not been fixed, other threads could be fixing
-      // the derived oops concurrently with this code. Don't proceed with the
-      // verification.
-      return;
-    }
-#endif
-
-    assert(!UseCompressedOops || !CompressedOops::is_base(base), "Should not be the compressed oops base");
-    assert(oopDesc::is_oop(base), "Should be a valid oop");
-
-    // Order the loads of the base oop and the derived oop
-    OrderAccess::loadload();
-
-    intptr_t value = Atomic::load((intptr_t*)derived_loc);
-    if (UseZGC && _requires_barriers) {
-      // For ZGC when the _chunk has transition to a state where the layout has
-      // become stable(requires_barriers()), the earlier is_good check should
-      // guarantee that all derived oops have been converted too offsets.
-      assert(is_derived_oop_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
-    } else {
-      if (is_derived_oop_offset(value)) {
-        intptr_t offset = untag_derived_oop_offset(value); // for assertions
-      } else {
-        // The offset was a non-offset derived pointer that
-        // had not been converted to an offset yet.
-        intptr_t offset = value - cast_from_oop<intptr_t>(base);
-        tag_derived_oop_offset(offset); // for assertions
-      }
-    }
-
-    // There's not much else we can assert about derived pointers. Their offsets are allowed to
-    // fall outside of their base object, and even be negative.
+    DerivedPointersSupport::verify(_chunk, base_loc, derived_loc);
   }
 };
 

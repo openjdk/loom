@@ -134,8 +134,8 @@ public:
   template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);
 
-  // Derived oop pointers are relativised, with respect to their oop base.
-  void relativize_derived_oops();
+  // Derived pointers are relativized, with respect to their oop base.
+  void relativize_derived_pointers_concurrently();
   void transform();
 
   inline BitMapView bitmap() const;
