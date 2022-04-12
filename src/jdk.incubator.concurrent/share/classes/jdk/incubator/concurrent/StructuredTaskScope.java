@@ -270,7 +270,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     private final ReentrantLock shutdownLock = new ReentrantLock();
 
     // the set of "tracked" Future objects waiting to be returned by Future.get, created lazily
-    // assigned once-only with FUTURES.compareAndSet, read by any thread
+    // assigned to non-null value in method track, read by any thread
     private volatile Set<Future<?>> futures;
 
     // set when owner calls fork, reset when owner calls join
@@ -346,7 +346,6 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      */
     private void track(Future<?> future) {
         // create the set of Futures if not already created
-        // cannot use double-checked locking since it requires use of a synchronized block
         Set<Future<?>> futures = this.futures;
         if (futures == null) {
             futures = ConcurrentHashMap.newKeySet();
