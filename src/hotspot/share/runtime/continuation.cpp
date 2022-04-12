@@ -171,12 +171,13 @@ static void verify_continuation(oop continuation) { Continuation::debug_verify_c
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, bool barriers, stackChunkOop chunk, outputStream* st);
 static void log_frames(JavaThread* thread);
+static void print_frame_layout(const frame& f, outputStream* st = tty);
+
 #else
 static void verify_continuation(oop continuation) { }
 #endif
 
 #ifndef PRODUCT
-static void print_frame_layout(const frame& f, outputStream* st = tty);
 static jlong java_tid(JavaThread* thread);
 #endif
 
@@ -952,7 +953,7 @@ protected:
   inline void copy_to_chunk(intptr_t* from, intptr_t* to, int size);
   inline void unwind_frames();
 
-  inline void patch_chunk_pd(intptr_t* frame_sp, intptr_t* heap_sp);
+  inline void patch_stack_pd(intptr_t* frame_sp, intptr_t* heap_sp);
 
 private:
   // slow path
@@ -1165,7 +1166,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
              "should be the continuation return barrier");
       // We copy the fp from the chunk back to the stack because it contains some caller data,
       // including, possibly, an oop that might have gone stale since we thawed.
-      patch_chunk_pd(bottom_sp, chunk->sp_address());
+      patch_stack_pd(bottom_sp, chunk->sp_address());
       // we don't patch the return pc at this time, so as not to make the stack unwalkable for async walks
     } else { // the chunk is empty
       chunk_start_sp = chunk->sp();
@@ -2344,7 +2345,6 @@ void ThawBase::patch_return(intptr_t* sp, bool is_last) {
 
   address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-
   // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
 }
 
@@ -2745,10 +2745,7 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
     f.print_on(&ls);
   }
 
-  intptr_t* sp = f.sp();
-  address pc = f.raw_pc();
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  ContinuationHelper::Frame::patch_pc(f, pc); // in case we want to deopt the frame in a full transition, this is checked.
+  ContinuationHelper::Frame::patch_pc(f, f.raw_pc()); // in case we want to deopt the frame in a full transition, this is checked.
   ContinuationHelper::push_pd(f);
 
   assert(ContinuationHelper::Frame::assert_frame_laid_out(f), "");
@@ -3004,12 +3001,6 @@ bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
 
   return true;
 }
-#endif
-
-#ifndef PRODUCT
-static jlong java_tid(JavaThread* thread) {
-  return java_lang_Thread::thread_id(thread->threadObj());
-}
 
 static void print_frame_layout(const frame& f, outputStream* st) {
   ResourceMark rm;
@@ -3023,6 +3014,12 @@ static void print_frame_layout(const frame& f, outputStream* st) {
   frame::update_map_with_saved_link(&map, ContinuationHelper::Frame::callee_link_address(f));
   const_cast<frame&>(f).describe(values, 0, &map);
   values.print_on((JavaThread*)nullptr, st);
+}
+#endif
+
+#ifndef PRODUCT
+static jlong java_tid(JavaThread* thread) {
+  return java_lang_Thread::thread_id(thread->threadObj());
 }
 #endif
 

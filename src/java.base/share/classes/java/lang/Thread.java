@@ -104,28 +104,29 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <h2><a id="virtual-threads">Virtual threads</a></h2>
  * <p> {@code Thread} also supports the creation of <i>virtual threads</i>.
  * Virtual threads are typically <i>user-mode threads</i> scheduled by the Java
- * virtual machine rather than the operating system. Virtual threads will typically
- * require few resources and a single Java virtual machine may support millions of
- * virtual threads. Virtual threads are suitable for executing tasks that spend most
- * of the time blocked, often waiting for I/O operations to complete. Virtual threads
+ * runtime rather than the operating system. Virtual threads will typically require
+ * few resources and a single Java virtual machine may support millions of virtual
+ * threads. Virtual threads are suitable for executing tasks that spend most of
+ * the time blocked, often waiting for I/O operations to complete. Virtual threads
  * are not intended for long running CPU intensive operations.
  *
  * <p> Virtual threads typically employ a small set of platform threads used as
- * <em>carrier threads</em>. Locking and I/O operations are examples of <i>scheduling
- * points</i> where a carrier thread may be re-scheduled from one virtual thread to
- * another. Code executing in a virtual thread will usually not be aware of the
- * underlying carrier thread, and in particular, the {@linkplain Thread#currentThread()}
- * method, to obtain a reference to the <i>current thread</i>, will return the {@code
- * Thread} object for the virtual thread, not the underlying carrier thread.
+ * <em>carrier threads</em>. Locking and I/O operations are examples of operations
+ * where a carrier thread may be re-scheduled from one virtual thread to another.
+ * Code executing in a virtual thread is not aware of underlying carrier thread.
+ *
+ *
+ * The {@linkplain Thread#currentThread()} method, used to obtain a reference
+ * to the <i>current thread</i>, will always return the {@code Thread} object
+ * for the virtual thread.
  *
  * <p> Virtual threads do not have a thread name by default. The {@link #getName()
  * getName} method returns the empty string if a thread name is not set.
  *
  * <p> Virtual threads are daemon threads and so do not prevent the Java virtual
- * machine from terminating. Unlike platform threads, virtual threads do not have
- * a thread priority and are not members of a {@linkplain ThreadGroup thread-group}.
- * The {@link #getPriority() getPriority} method returns {@link Thread#NORM_PRIORITY}
- * and {@link #getThreadGroup() getThreadGroup} returns a <em>placeholder</em> group.
+ * machine from terminating. They have a fixed priority (see {@link #getPriority()
+ * getPriority}). Virtual threads are not members of a thread group (see
+ * {@link #getThreadGroup() getThreadGroup}).
  *
  * <h2>Creating and starting threads</h2>
  *
@@ -156,11 +157,17 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *   ThreadFactory factory = Thread.ofVirtual().factory();
  * }
  *
- * <h2><a id="inheritance">Inheritance</a></h2>
+ * <h2><a id="inheritance">Inheritance when creating threads</a></h2>
  * A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
  * inheritable-thread-local} variables (including the context class loader) from
  * the parent thread values at the time that the child {@code Thread} is created.
- * Platform threads also inherit the daemon status, thread priority, and when not
+ * The 5-param {@linkplain Thread#Thread(ThreadGroup, Runnable, String, long, boolean)
+ * constructor} can be used to create a thread that does not inherit its initial
+ * values from the constructing thread. When using a {@code Thread.Builder}, the
+ * {@link Builder#inheritInheritableThreadLocals(boolean) inheritInheritableThreadLocals}
+ * method can be used to select if the initial values are inherited.
+ *
+ * <p> Platform threads inherit the daemon status, thread priority, and when not
  * provided (or not selected by a security manager), the thread group.
  *
  * <p> Inherited Access Control Context:
@@ -860,10 +867,10 @@ public class Thread implements Runnable {
          * Sets whether the thread is allowed to set values for its copy of {@linkplain
          * ThreadLocal thread-local} variables. The default is to allow. If not allowed,
          * then any attempt by the thread to set a value for a thread-local with the
-         * {@link ThreadLocal#set(Object) set} method throws {@code
+         * {@link ThreadLocal#set(Object)} method throws {@code
          * UnsupportedOperationException}. Any attempt to set the thread's context
          * class loader with {@link Thread#setContextClassLoader(ClassLoader)
-         * setContextClassLoader} also throws. The {@link ThreadLocal#get() get} method
+         * setContextClassLoader} also throws. The {@link ThreadLocal#get()} method
          * always returns the {@linkplain ThreadLocal#initialValue() initial-value}
          * when thread locals are not allowed.
          *
@@ -905,7 +912,7 @@ public class Thread implements Runnable {
          * method must be invoked to schedule the thread to execute.
          * @param task the object to run when the thread executes
          * @return a new unstarted Thread
-         * @see <a href="Thread.html#inheritance">Inheritance</a>
+         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
         Thread unstarted(Runnable task);
 
@@ -915,7 +922,7 @@ public class Thread implements Runnable {
          *
          * @param task the object to run when the thread executes
          * @return a new started Thread
-         * @see <a href="Thread.html#inheritance">Inheritance</a>
+         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
         Thread start(Runnable task);
 
@@ -931,6 +938,9 @@ public class Thread implements Runnable {
         /**
          * A builder for creating a platform {@link Thread} or {@link ThreadFactory}
          * that creates platform threads.
+         *
+         * <p> Unless otherwise specified, passing a null argument to a method in
+         * this interface causes a {@code NullPointerException} to be thrown.
          *
          * @see Thread#ofPlatform()
          * @since 19
@@ -1017,6 +1027,9 @@ public class Thread implements Runnable {
          * A builder for creating a virtual {@link Thread} or {@link ThreadFactory}
          * that creates virtual threads.
          *
+         * <p> Unless otherwise specified, passing a null argument to a method in
+         * this interface causes a {@code NullPointerException} to be thrown.
+         *
          * @see Thread#ofVirtual()
          * @since 19
          */
@@ -1093,7 +1106,7 @@ public class Thread implements Runnable {
      * <p> This constructor is only useful when extending {@code Thread} to
      * override the {@link #run()} method.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread() {
         this(null, genThreadName(), 0, null, 0, null);
@@ -1114,7 +1127,7 @@ public class Thread implements Runnable {
      *         is started. If {@code null}, this classes {@code run} method does
      *         nothing.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(Runnable task) {
         this(null, genThreadName(), 0, task, 0, null);
@@ -1156,7 +1169,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task) {
         this(group, genThreadName(), 0, task, 0, null);
@@ -1173,7 +1186,7 @@ public class Thread implements Runnable {
      * @param   name
      *          the name of the new thread
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(String name) {
         this(null, checkName(name), 0, null, 0, null);
@@ -1202,7 +1215,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, String name) {
         this(group, checkName(name), 0, null, 0, null);
@@ -1224,7 +1237,7 @@ public class Thread implements Runnable {
      * @param  name
      *         the name of the new thread
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(Runnable task, String name) {
         this(null, checkName(name), 0, task, 0, null);
@@ -1278,7 +1291,7 @@ public class Thread implements Runnable {
      *          if the current thread cannot create a thread in the specified
      *          thread group or cannot override the context class loader methods.
      *
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name) {
         this(group, checkName(name), 0, task, 0, null);
@@ -1360,7 +1373,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 1.4
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
         this(group, checkName(name), 0, task, stackSize, null);
@@ -1425,7 +1438,7 @@ public class Thread implements Runnable {
      *          thread group
      *
      * @since 9
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      */
     public Thread(ThreadGroup group, Runnable task, String name,
                   long stackSize, boolean inheritInheritableThreadLocals) {
@@ -1443,7 +1456,7 @@ public class Thread implements Runnable {
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
      * @throws UnsupportedOperationException if preview features are not enabled
-     * @see <a href="#inheritance">Inheritance</a>
+     * @see <a href="#inheritance">Inheritance when creating threads</a>
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
@@ -1925,7 +1938,7 @@ public class Thread implements Runnable {
      * with no arguments. This may result in throwing a
      * {@code SecurityException}.
      *
-     * @implNote In the JDK Reference Implementation, and this thread is the
+     * @implNote In the JDK Reference Implementation, if this thread is the
      * current thread, and it's a platform thread that was not attached to the
      * VM with the Java Native Interface
      * <a href="{@docRoot}/../specs/jni/invocation.html#attachcurrentthread">
@@ -1964,11 +1977,26 @@ public class Thread implements Runnable {
      * Returns the thread's thread group or {@code null} if the thread has
      * terminated.
      *
-     * Virtual threads are not members of a thread group; this method returns a
-     * <em>placeholder</em> thread group when invoked on a virtual thread that
-     * has not terminated.
+     * <p> Virtual threads are not members of a thread group. If invoked on a
+     * virtual thread that has not terminated, this method returns a special
+     * thread group that behaves as follows:
+     * <ul>
+     *  <li> There are no {@linkplain ThreadGroup#activeCount() active} virtual
+     *       threads in the thread group. The {@link ThreadGroup#enumerate(Thread[])
+     *       enumerate} method does not enumerate virtual threads.
+     *  <li> There may be active platform threads in the thread group. The thread
+     *       group may be provided when creating a platform thread, the thread group
+     *       may be <a href="Thread.html#inheritance">inherited</a> when a
+     *       virtual thread creates a platform thread, or the thread group may
+     *       be inherited when a platform thread in the thread group creates
+     *       another platform thread.
+     *  <li> The {@linkplain ThreadGroup#getMaxPriority() maximum priority} of
+     *       the thread group is {@link Thread#NORM_PRIORITY} when initially
+     *       created. Changing the maximum priority of the thread group has no
+     *       impact on the priority of virtual threads.
+     * </ul>
      *
-     * @return  this thread's thread group.
+     * @return  this thread's thread group or {@code null}
      */
     public final ThreadGroup getThreadGroup() {
         if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
