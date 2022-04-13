@@ -240,6 +240,9 @@ JvmtiVTMTDisabler::print_info() {
 #endif
 
 JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
+  if (!Continuations::enabled()) {
+    return; // JvmtiVTMTDisabler is no-op without virtual threads
+  }
   if (Thread::current_or_null() == NULL) {
     return;  // Detached thread, can be a call from Agent_OnLoad.
   }
@@ -248,6 +251,9 @@ JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
 }
 
 JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  if (!Continuations::enabled()) {
+    return; // JvmtiVTMTDisabler is a no-op without virtual threads
+  }
   if (Thread::current_or_null() == NULL) {
     return;  // Detached thread, can be a call from Agent_OnLoad.
   }
