@@ -40,11 +40,6 @@ static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
   *la = new_value;
 }
 
-frame ContinuationEntry::to_frame() const {
-  static CodeBlob* cb = CodeCache::find_blob(entry_pc());
-  return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
-}
-
 ////// Freeze
 
 // Fast path

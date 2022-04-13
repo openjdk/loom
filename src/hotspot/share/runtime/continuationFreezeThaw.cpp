@@ -44,8 +44,9 @@
 #include "oops/stackChunkOop.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/arguments.hpp"
-#include "runtime/continuation.inline.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/continuationHelper.inline.hpp"
+#include "runtime/continuationWrapper.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
@@ -61,6 +62,12 @@
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
 
+#define CONT_JFR false // emit low-level JFR events that count slow/fast path for continuation peformance debugging only
+#if CONT_JFR
+  #define CONT_JFR_ONLY(code) code
+#else
+  #define CONT_JFR_ONLY(code)
+#endif
 
 static const bool TEST_THAW_ONE_CHUNK_FRAME = false; // force thawing frames one-at-a-time for testing
 
@@ -296,27 +303,6 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
   assert(thread->last_frame().cb() != nullptr, "");
 }
 
-NOINLINE static void flush_stack_processing(JavaThread* thread, intptr_t* sp) {
-  log_develop_trace(continuations)("flush_stack_processing");
-  for (StackFrameStream fst(thread, true, true); fst.current()->sp() <= sp; fst.next()) {
-    ;
-  }
-}
-
-inline void maybe_flush_stack_processing(JavaThread* thread, intptr_t* sp) {
-  StackWatermark* sw;
-  uintptr_t watermark;
-  if ((sw = StackWatermarkSet::get(thread, StackWatermarkKind::gc)) != nullptr
-        && (watermark = sw->watermark()) != 0
-        && watermark <= (uintptr_t)sp) {
-    flush_stack_processing(thread, sp);
-  }
-}
-
-inline void maybe_flush_stack_processing(JavaThread* thread, const ContinuationEntry* entry) {
-  maybe_flush_stack_processing(thread, (intptr_t*)((uintptr_t)entry->entry_sp() + ContinuationEntry::size()));
-}
-
 /////////////// FREEZE ////
 
 class FreezeBase : public StackObj {
@@ -456,7 +442,7 @@ void FreezeBase::copy_to_chunk(intptr_t* from, intptr_t* to, int size) {
 // Called _after_ the last possible safepoint during the freeze operation (chunk allocation)
 void FreezeBase::unwind_frames() {
   ContinuationEntry* entry = _cont.entry();
-  maybe_flush_stack_processing(_thread, entry);
+  entry->flush_stack_processing(_thread);
   set_anchor_to_entry(_thread, entry);
 }
 
@@ -2343,49 +2329,7 @@ static void log_frames(JavaThread* thread) {
 
 #include CPU_HEADER_INLINE(continuationFreezeThaw)
 
-/////////////////////////////////////////////
-
-int ContinuationEntry::return_pc_offset = 0;
-nmethod* ContinuationEntry::continuation_enter = nullptr;
-address ContinuationEntry::return_pc = nullptr;
-
-void ContinuationEntry::set_enter_nmethod(nmethod* nm) {
-  assert(return_pc_offset != 0, "");
-  continuation_enter = nm;
-  return_pc = nm->code_begin() + return_pc_offset;
-}
-
-ContinuationEntry* ContinuationEntry::from_frame(const frame& f) {
-  assert(Continuation::is_continuation_enterSpecial(f), "");
-  return (ContinuationEntry*)f.unextended_sp();
-}
-
-void ContinuationEntry::flush_stack_processing(JavaThread* thread) const {
-  maybe_flush_stack_processing(thread, this);
-}
-
-/////////////////////////////////////////////
-
 #ifdef ASSERT
-bool ContinuationWrapper::chunk_invariant(outputStream* st) {
-  // only the topmost chunk can be empty
-  if (_tail == nullptr) {
-    return true;
-  }
-
-  int i = 1;
-  for (stackChunkOop chunk = _tail->parent(); chunk != nullptr; chunk = chunk->parent()) {
-    if (chunk->is_empty()) {
-      assert(chunk != _tail, "");
-      st->print_cr("i: %d", i);
-      chunk->print_on(true, st);
-      return false;
-    }
-    i++;
-  }
-  return true;
-}
-
 static void print_frame_layout(const frame& f, bool callee_complete, outputStream* st) {
   ResourceMark rm;
   FrameValues values;
