@@ -253,8 +253,8 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <h2>Memory consistency effects</h2>
  * <p>Actions in the owner thread of, or a thread contained in, the task scope prior to
- * {@linkplain #fork forking} of a {@code Runnable} or {@code Callable} task
- * <a href="package-summary.html#MemoryVisibility"><i>happen-before</i></a>
+ * {@linkplain #fork forking} of a {@code Callable} task
+ * <a href="../../../../java.base/java/util/concurrent/package-summary.html#MemoryVisibility"><i>happen-before</i></a>
  * any actions taken by that task, which in turn <i>happen-before</i> the task result
  * is retrieved via its {@code Future}, or <i>happen-before</i> any actions taken in
  * a thread after {@linkplain #join()} joining} of the task scope.
