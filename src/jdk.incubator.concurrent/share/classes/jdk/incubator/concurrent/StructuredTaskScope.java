@@ -31,6 +31,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -797,6 +798,19 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
     }
 
+    private static int stateToId(Future.State s) {
+        return switch (s) {
+            case RUNNING -> 0;
+            case CANCELLED -> 1;
+            case FAILED -> 2;
+            case SUCCESS -> 3;
+        };
+    }
+
+    // RUNNING < CANCELLED < FAILED < SUCCESS
+    static final Comparator<Future.State> FUTURE_STATE_COMPARATOR =
+            Comparator.comparingInt(StructuredTaskScope::stateToId);
+
     /**
      * A StructuredTaskScope that captures the result of the first task to complete
      * successfully. Once captured, it invokes the {@linkplain #shutdown() shutdown}
@@ -812,25 +826,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @since 19
      */
     public static final class ShutdownOnSuccess<T> extends StructuredTaskScope<T> {
-        private static final VarHandle FIRST_SUCCESS;
-        private static final VarHandle FIRST_FAILED;
-        private static final VarHandle FIRST_CANCELLED;
+        private static final VarHandle FUTURE;
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_SUCCESS = l.findVarHandle(ShutdownOnSuccess.class,
-                        "firstSuccess", Future.class);
-                FIRST_FAILED = l.findVarHandle(ShutdownOnSuccess.class,
-                        "firstFailed", Future.class);
-                FIRST_CANCELLED = l.findVarHandle(ShutdownOnSuccess.class,
-                        "firstCancelled", Future.class);
+                FUTURE = l.findVarHandle(ShutdownOnSuccess.class,
+                        "future", Future.class);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
-        private volatile Future<T> firstSuccess;
-        private volatile Future<T> firstFailed;
-        private volatile Future<T> firstCancelled;
+
+        private volatile Future<T> future;
 
         /**
          * Constructs a new ShutdownOnSuccess with the given name and thread factory.
@@ -872,26 +879,19 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          */
         @Override
         protected void handleComplete(Future<T> future) {
-            switch (future.state()) {
-                case RUNNING -> throw new IllegalArgumentException("Task is not completed");
-                case SUCCESS -> {
-                    // capture first task to complete normally
-                    if (firstSuccess == null
-                            && FIRST_SUCCESS.compareAndSet(this, null, future)) {
+            Future.State state = future.state();
+            if (state == Future.State.RUNNING) {
+                throw new IllegalArgumentException("Task is not completed");
+            }
+
+            Future<T> currentFuture;
+            while ((currentFuture = this.future) == null ||
+                    FUTURE_STATE_COMPARATOR.compare(currentFuture.state(), state) < 0) {
+                if (FUTURE.compareAndSet(this, currentFuture, future)) {
+                    if (state == Future.State.SUCCESS) {
                         shutdown();
                     }
-                }
-                case FAILED -> {
-                    // capture first task to complete with an exception
-                    if (firstSuccess == null && firstFailed == null) {
-                        FIRST_FAILED.compareAndSet(this, null, future);
-                    }
-                }
-                case CANCELLED ->  {
-                    // capture the first cancelled task
-                    if (firstSuccess == null && firstFailed == null && firstCancelled == null) {
-                        FIRST_CANCELLED.compareAndSet(this, null, future);
-                    }
+                    break;
                 }
             }
         }
@@ -941,14 +941,16 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * @see #join()
          */
         public T result() throws ExecutionException {
-            Future<T> f = firstSuccess;
-            if (f != null)
-                return f.resultNow();
-            if ((f = firstFailed) != null)
-                throw new ExecutionException(f.exceptionNow());
-            if (firstCancelled != null)
-                throw new CancellationException();
-            throw new IllegalStateException("No completed tasks");
+            Future<T> f = future;
+            if (f == null) {
+                throw new IllegalStateException("No completed tasks");
+            }
+            return switch (f.state()) {
+                case SUCCESS -> f.resultNow();
+                case FAILED -> throw new ExecutionException(f.exceptionNow());
+                case CANCELLED -> throw new CancellationException();
+                default -> throw new InternalError("Unexpected value: " + f.state());
+            };
         }
 
         /**
@@ -974,21 +976,22 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          */
         public <X extends Throwable> T result(Function<Throwable, ? extends X> esf) throws X {
             Objects.requireNonNull(esf);
-            Future<T> f = firstSuccess;
-            if (f != null)
+
+            Future<T> f = future;
+            if (f == null) {
+                throw new IllegalStateException("No completed tasks");
+            }
+
+            Future.State state = f.state();
+            if (state == Future.State.SUCCESS) {
                 return f.resultNow();
-            Throwable throwable = null;
-            if ((f = firstFailed) != null) {
-                throwable = f.exceptionNow();
-            } else if (firstCancelled != null) {
-                throwable = new CancellationException();
             }
-            if (throwable != null) {
-                X ex = esf.apply(throwable);
-                Objects.requireNonNull(ex, "esf returned null");
-                throw ex;
-            }
-            throw new IllegalStateException("No tasks completed");
+
+            Throwable throwable = (state == Future.State.FAILED)
+                    ? f.exceptionNow()
+                    : new CancellationException();
+
+            throw Objects.requireNonNull(esf.apply(throwable), "esf returned null");
         }
     }
 
@@ -1005,21 +1008,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @since 19
      */
     public static final class ShutdownOnFailure extends StructuredTaskScope<Object> {
-        private static final VarHandle FIRST_FAILED;
-        private static final VarHandle FIRST_CANCELLED;
+        private static final VarHandle FUTURE;
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_FAILED = l.findVarHandle(ShutdownOnFailure.class,
-                        "firstFailed", Future.class);
-                FIRST_CANCELLED = l.findVarHandle(ShutdownOnFailure.class,
-                        "firstCancelled", Future.class);
+                FUTURE = l.findVarHandle(ShutdownOnFailure.class,
+                        "future", Future.class);
             } catch (Exception e) {
                 throw new InternalError(e);
             }
         }
-        private volatile Future<Object> firstFailed;
-        private volatile Future<Object> firstCancelled;
+
+        private volatile Future<Object> future;
 
         /**
          * Constructs a new ShutdownOnSuccess with the given name and thread factory.
@@ -1062,20 +1062,22 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          */
         @Override
         protected void handleComplete(Future<Object> future) {
-            switch (future.state()) {
-                case RUNNING -> throw new IllegalArgumentException("Task is not completed");
-                case SUCCESS -> { }
-                case FAILED -> {
-                    if (firstFailed == null
-                            && FIRST_FAILED.compareAndSet(this, null, future)) {
-                        shutdown();
-                    }
-                }
-                case CANCELLED -> {
-                    if (firstFailed == null && firstCancelled == null
-                            && FIRST_CANCELLED.compareAndSet(this, null, future)) {
-                        shutdown();
-                    }
+            Future.State state = future.state();
+            if (state == Future.State.RUNNING) {
+                throw new IllegalArgumentException("Task is not completed");
+            }
+
+            if (state == Future.State.SUCCESS) {
+                return;
+            }
+
+            // A cancelled task causes shutdown, a subsequent failed task overrides
+            Future<Object> currentFuture;
+            while ((currentFuture = this.future) == null ||
+                    FUTURE_STATE_COMPARATOR.compare(currentFuture.state(), state) < 0) {
+                if (FUTURE.compareAndSet(this, currentFuture, future)) {
+                    shutdown();
+                    break;
                 }
             }
         }
@@ -1121,12 +1123,14 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * @see #join()
          */
         public Optional<Throwable> exception() {
-            Future<Object> f = firstFailed;
-            if (f != null)
-                return Optional.of(f.exceptionNow());
-            if (firstCancelled != null)
-                return Optional.of(new CancellationException());
-            return Optional.empty();
+            Future<Object> f = future;
+            if (f == null) {
+                return Optional.empty();
+            }
+
+            return Optional.of(f.state() == Future.State.FAILED
+                    ? f.exceptionNow()
+                    : new CancellationException());
         }
 
         /**
@@ -1146,11 +1150,16 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * @see #join()
          */
         public void throwIfFailed() throws ExecutionException {
-            Future<Object> f = firstFailed;
-            if (f != null)
+            Future<Object> f = future;
+            if (f == null) {
+                return;
+            }
+
+            if (f.state() == Future.State.FAILED) {
                 throw new ExecutionException(f.exceptionNow());
-            if (firstCancelled != null)
+            } else {
                 throw new CancellationException();
+            }
         }
 
         /**
@@ -1173,18 +1182,17 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         public <X extends Throwable>
         void throwIfFailed(Function<Throwable, ? extends X> esf) throws X {
             Objects.requireNonNull(esf);
-            Throwable throwable = null;
-            Future<Object> f = firstFailed;
-            if (f != null) {
-                throwable = f.exceptionNow();
-            } else if (firstCancelled != null) {
-                throwable = new CancellationException();
+
+            Future<Object> f = future;
+            if (f == null) {
+                return;
             }
-            if (throwable != null) {
-                X ex = esf.apply(throwable);
-                Objects.requireNonNull(ex, "esf returned null");
-                throw ex;
-            }
+
+            Throwable throwable = f.state() == Future.State.FAILED
+                    ? f.exceptionNow()
+                    : new CancellationException();
+
+            throw Objects.requireNonNull(esf.apply(throwable), "esf returned null");
         }
     }
 
