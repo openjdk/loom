@@ -618,7 +618,7 @@ public:
     LogTarget(Trace, continuations) lt;
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
-      f.print_on(&ls);
+      f.print_value_on(&ls);
     }
     assert(f.pc() != nullptr,
            "young: %d num_frames: %d sp: " INTPTR_FORMAT " start: " INTPTR_FORMAT " end: " INTPTR_FORMAT,
@@ -718,7 +718,9 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
            "argsize(): %d closure.argsize: %d closure.callee_interpreted: %d",
            argsize(), closure._argsize, closure._callee_interpreted);
 
-    int calculated_max_size = closure._size + closure._num_i2c * frame::align_wiggle;
+    int calculated_max_size = closure._size
+                              + closure._num_i2c * frame::align_wiggle
+                              + closure._num_interpreted_frames * frame::align_wiggle;
     assert(max_size() == calculated_max_size,
            "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
            max_size(), calculated_max_size, closure._argsize, closure._num_i2c);

@@ -240,6 +240,9 @@ JvmtiVTMTDisabler::print_info() {
 #endif
 
 JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
+  if (!Continuations::enabled()) {
+    return; // JvmtiVTMTDisabler is no-op without virtual threads
+  }
   if (Thread::current_or_null() == NULL) {
     return;  // Detached thread, can be a call from Agent_OnLoad.
   }
@@ -248,6 +251,9 @@ JvmtiVTMTDisabler::JvmtiVTMTDisabler(bool is_SR) {
 }
 
 JvmtiVTMTDisabler::~JvmtiVTMTDisabler() {
+  if (!Continuations::enabled()) {
+    return; // JvmtiVTMTDisabler is a no-op without virtual threads
+  }
   if (Thread::current_or_null() == NULL) {
     return;  // Detached thread, can be a call from Agent_OnLoad.
   }
@@ -283,18 +289,14 @@ JvmtiVTMTDisabler::disable_VTMT() {
       DEBUG_ONLY(if (attempts == 0) break;)
     }
     assert(!thread->is_VTMT_disabler(), "VTMT sanity check");
-    if (attempts != 0) {
 #ifdef ASSERT
-      thread->set_is_VTMT_disabler(true);
-#endif
+    if (attempts == 0) {
+      print_info();
+      fatal("stuck in JvmtiVTMTDisabler::disable_VTMT");
     }
-  }
-#ifdef ASSERT
-  if (attempts == 0) {
-    print_info();
-    fatal("stuck in JvmtiVTMTDisabler::disable_VTMT");
-  }
+    thread->set_is_VTMT_disabler(true);
 #endif
+  }
 }
 
 void
@@ -360,13 +362,6 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, bool is_mount) {
       break;
     }
   }
-  // Enter VTMT section.
-  assert(!thread->is_in_VTMT(), "VTMT sanity check");
-  thread->set_is_in_VTMT(true);
-  JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
-  if (vstate != NULL) {
-    vstate->set_is_in_VTMT(true);
-  }
 #ifdef ASSERT
   if (attempts == 0) {
     log_error(jvmti)("start_VTMT: thread->is_suspended: %d is_vthread_suspended: %d\n\n",
@@ -375,6 +370,13 @@ JvmtiVTMTDisabler::start_VTMT(jthread vthread, bool is_mount) {
     fatal("stuck in JvmtiVTMTDisabler::start_VTMT");
   }
 #endif
+  // Enter VTMT section.
+  assert(!thread->is_in_VTMT(), "VTMT sanity check");
+  thread->set_is_in_VTMT(true);
+  JvmtiThreadState* vstate = java_lang_Thread::jvmti_thread_state(vth());
+  if (vstate != NULL) {
+    vstate->set_is_in_VTMT(true);
+  }
 }
 
 void

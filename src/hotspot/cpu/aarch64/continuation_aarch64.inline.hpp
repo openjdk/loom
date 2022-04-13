@@ -201,6 +201,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     if ((intptr_t)fp % frame::frame_alignment != 0) {
       fp--;
       frame_sp--;
+      log_develop_trace(continuations)("Adding internal interpreted frame alignment");
     }
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
     assert(frame_sp == unextended_sp, "");
