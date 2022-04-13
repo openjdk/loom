@@ -115,7 +115,7 @@ public final class StreamEncoder extends Writer {
                 locker.unlock();
             }
         } else {
-            synchronized (super.lock) {
+            synchronized (lock) {
                 lockedFlushBuffer();
             }
         }
@@ -143,7 +143,7 @@ public final class StreamEncoder extends Writer {
                 locker.unlock();
             }
         } else {
-            synchronized (super.lock) {
+            synchronized (lock) {
                 lockedWrite(cbuf, off, len);
             }
         }
@@ -180,7 +180,7 @@ public final class StreamEncoder extends Writer {
                     locker.unlock();
                 }
             } else {
-                synchronized (super.lock) {
+                synchronized (lock) {
                     lockedWrite(cb);
                 }
             }
