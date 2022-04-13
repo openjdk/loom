@@ -257,7 +257,7 @@ import jdk.internal.misc.ThreadFlock;
  * <a href="../../../../java.base/java/util/concurrent/package-summary.html#MemoryVisibility"><i>happen-before</i></a>
  * any actions taken by that task, which in turn <i>happen-before</i> the task result
  * is retrieved via its {@code Future}, or <i>happen-before</i> any actions taken in
- * a thread after {@linkplain #join()} joining} of the task scope.
+ * a thread after {@linkplain #join() joining} of the task scope.
  *
  * @param <T> the result type of tasks executed in the scope
  * @since 19
