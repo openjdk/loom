@@ -34,17 +34,17 @@
 
 // TODO: Implement
 
-frame ContinuationEntry::to_frame() const {
+inline frame ContinuationEntry::to_frame() const {
   Unimplemented();
   return frame();
 }
 
-intptr_t* ContinuationEntry::entry_fp() const {
+inline intptr_t* ContinuationEntry::entry_fp() const {
   Unimplemented();
   return nullptr;
 }
 
-void ContinuationEntry::update_register_map(RegisterMap* map) const {
+inline void ContinuationEntry::update_register_map(RegisterMap* map) const {
   Unimplemented();
 }
 

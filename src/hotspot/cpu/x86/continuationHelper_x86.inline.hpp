@@ -60,11 +60,11 @@ inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap*
   frame::update_map_with_saved_link(map, link_address<FKind>(f));
 }
 
-intptr_t* ContinuationEntry::entry_fp() const {
+inline intptr_t* ContinuationEntry::entry_fp() const {
   return (intptr_t*)((address)this + size());
 }
 
-void ContinuationEntry::update_register_map(RegisterMap* map) const {
+inline void ContinuationEntry::update_register_map(RegisterMap* map) const {
   intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
   frame::update_map_with_saved_link(map, fp);
 }
@@ -77,12 +77,12 @@ inline void ContinuationHelper::push_pd(const frame& f) {
   *(intptr_t**)(f.sp() - frame::sender_sp_offset) = f.fp();
 }
 
-void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry) {
+inline void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, ContinuationEntry* entry) {
   anchor->set_last_Java_fp(entry->entry_fp());
 }
 
 #ifdef ASSERT
-void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
+inline void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - frame::sender_sp_offset);
   anchor->set_last_Java_fp(fp);
 }

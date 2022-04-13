@@ -79,6 +79,7 @@
 #include "runtime/atomic.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/continuationEntry.hpp"
+#include "runtime/continuationHelper.inline.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlagLimit.hpp"
 #include "runtime/deoptimization.hpp"
