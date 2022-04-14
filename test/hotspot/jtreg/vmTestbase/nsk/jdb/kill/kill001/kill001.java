@@ -47,10 +47,10 @@
  * @library /vmTestbase
  *          /test/lib
  * @build nsk.jdb.kill.kill001.kill001a
- * @run main/othervm
+ * @run main/othervm/timeout=10
  *      nsk.jdb.kill.kill001.kill001
  *      -arch=${os.family}-${os.simpleArch}
- *      -waittime=5
+ *      -waittime=1
  *      -verbose
  *      -debugee.vmkind=java
  *      -transport.address=dynamic
@@ -119,7 +119,7 @@ public class kill001 extends JdbTest {
         // indicating that an exception was thrown.
         for (int i = 0; i < threads.length; i++) {
             // kill (ThreadReference.stop) is not supproted for vthreads, so we expect an error.
-            String msg = (vthreadMode ? "Illegal thread state" : "killed");
+            String msg = (vthreadMode ? "Operation is not supported" : "killed");
             reply = jdb.receiveReplyForWithMessageWait(JdbCommand.kill + threads[i] + " " +
                                                        DEBUGGEE_EXCEPTIONS + "[" + i + "]",
                                                        msg);

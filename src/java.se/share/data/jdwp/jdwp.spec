@@ -2021,8 +2021,9 @@ JDWP "Java(tm) Debug Wire Protocol"
         (Reply "none"
         )
         (ErrorSet
-            (Error INVALID_THREAD "The thread is null, not a valid thread, the thread "
-                                  "is not alive, or the thread is a virtual thread "
+            (Error INVALID_THREAD "The thread is null, not a valid thread, or the thread "
+                                  "is not alive.")
+            (Error NOT_IMPLEMENTED "The thread is a virtual thread "
                                   "and the target VM does not support stopping it "
                                   "with an asynchronous exception at this time.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
