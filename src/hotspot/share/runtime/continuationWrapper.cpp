@@ -37,28 +37,6 @@
 #include "runtime/stackChunkFrameStream.inline.hpp"
 #include "runtime/thread.inline.hpp"
 
-ContinuationWrapper::ContinuationWrapper(JavaThread* thread, oop continuation)
-  : _thread(thread), _entry(thread->last_continuation()), _continuation(continuation),
-    _e_size(0), _e_num_interpreted_frames(0)
-  {
-  assert(oopDesc::is_oop(_continuation),
-         "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
-  assert(_continuation == _entry->cont_oop(), "cont: " INTPTR_FORMAT " entry: " INTPTR_FORMAT " entry_sp: "
-         INTPTR_FORMAT, p2i((oopDesc*)_continuation), p2i((oopDesc*)_entry->cont_oop()), p2i(entrySP()));
-  disallow_safepoint();
-  read();
-}
-
-ContinuationWrapper::ContinuationWrapper(oop continuation)
-  : _thread(nullptr), _entry(nullptr), _continuation(continuation),
-    _e_size(0), _e_num_interpreted_frames(0)
-  {
-  assert(oopDesc::is_oop(_continuation),
-         "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
-  disallow_safepoint();
-  read();
-}
-
 ContinuationWrapper::ContinuationWrapper(const RegisterMap* map)
   : _thread(map->thread()),
     _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->stack_chunk()->cont())),
