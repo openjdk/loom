@@ -2495,7 +2495,6 @@ oop JavaThread::get_continuation() const {
   return java_lang_Thread::continuation(threadObj());
 }
 
-
 Klass* JavaThread::security_get_caller_class(int depth) {
   ResetNoHandleMark rnhm;
   HandleMark hm(Thread::current());

@@ -25,6 +25,8 @@
 #ifndef SHARE_VM_RUNTIME_CONTINUATIONWRAPPER_INLINE_HPP
 #define SHARE_VM_RUNTIME_CONTINUATIONWRAPPER_INLINE_HPP
 
+// There is no continuationWrapper.hpp file
+
 #include "classfile/javaClasses.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "memory/allocation.hpp"
@@ -90,9 +92,9 @@ public:
     inline ~SafepointOp() { // reload oops
       _cont._continuation = _conth();
       if (_cont._tail != nullptr) {
-          _cont._tail = jdk_internal_vm_Continuation::tail(_cont._continuation);
-        }
-        _cont.disallow_safepoint();
+        _cont._tail = jdk_internal_vm_Continuation::tail(_cont._continuation);
+       }
+       _cont.disallow_safepoint();
     }
   };
 
