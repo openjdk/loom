@@ -40,8 +40,7 @@
 ContinuationWrapper::ContinuationWrapper(const RegisterMap* map)
   : _thread(map->thread()),
     _entry(Continuation::get_continuation_entry_for_continuation(_thread, map->stack_chunk()->cont())),
-    _continuation(map->stack_chunk()->cont()),
-    _e_size(0), _e_num_interpreted_frames(0)
+    _continuation(map->stack_chunk()->cont())
   {
   assert(oopDesc::is_oop(_continuation),"Invalid cont: " INTPTR_FORMAT, p2i((void*)_continuation));
   assert(_entry == nullptr || _continuation == _entry->cont_oop(),
@@ -67,17 +66,6 @@ stackChunkOop ContinuationWrapper::find_chunk_by_address(void* p) const {
     }
   }
   return nullptr;
-}
-
-template<typename Event> void ContinuationWrapper::post_jfr_event(Event* e, JavaThread* jt) {
-  if (e->should_commit()) {
-    log_develop_trace(continuations)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
-    e->set_carrierThread(JFR_JVM_THREAD_ID(jt));
-    e->set_contClass(_continuation->klass());
-    e->set_numIFrames(_e_num_interpreted_frames);
-    e->set_size(_e_size);
-    e->commit();
-  }
 }
 
 #ifndef PRODUCT

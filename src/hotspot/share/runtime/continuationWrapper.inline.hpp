@@ -47,9 +47,6 @@ private:
   oop                _continuation;  // jdk.internal.vm.Continuation instance
   stackChunkOop      _tail;
 
-  short _e_size;
-  short _e_num_interpreted_frames;
-
   ContinuationWrapper(const ContinuationWrapper& cont); // no copy constructor
 
 private:
@@ -134,10 +131,6 @@ public:
   inline stackChunkOop nonempty_chunk(stackChunkOop chunk) const;
   stackChunkOop find_chunk_by_address(void* p) const;
 
-  inline void record_interpreted_frame() { _e_num_interpreted_frames++; }
-  inline void record_size_copied(int size) { _e_size += size << LogBytesPerWord; }
-  template<typename Event> void post_jfr_event(Event *e, JavaThread* jt);
-
 #ifdef ASSERT
   bool is_entry_frame(const frame& f);
   bool chunk_invariant(outputStream* st);
@@ -145,8 +138,7 @@ public:
 };
 
 inline ContinuationWrapper::ContinuationWrapper(JavaThread* thread, oop continuation)
-  : _thread(thread), _entry(thread->last_continuation()), _continuation(continuation),
-    _e_size(0), _e_num_interpreted_frames(0)
+  : _thread(thread), _entry(thread->last_continuation()), _continuation(continuation)
   {
   assert(oopDesc::is_oop(_continuation),
          "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
@@ -157,8 +149,7 @@ inline ContinuationWrapper::ContinuationWrapper(JavaThread* thread, oop continua
 }
 
 inline ContinuationWrapper::ContinuationWrapper(oop continuation)
-  : _thread(nullptr), _entry(nullptr), _continuation(continuation),
-    _e_size(0), _e_num_interpreted_frames(0)
+  : _thread(nullptr), _entry(nullptr), _continuation(continuation)
   {
   assert(oopDesc::is_oop(_continuation),
          "Invalid continuation object: " INTPTR_FORMAT, p2i((void*)_continuation));
