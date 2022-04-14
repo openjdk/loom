@@ -2399,8 +2399,13 @@ public class Thread implements Runnable {
 
     /**
      * Sets the context {@code ClassLoader} for this thread.
-     * The context {@code ClassLoader} may be set by the creator of the thread
+     *
+     * <p> The context {@code ClassLoader} may be set by the creator of the thread
      * for use by code running in this thread when loading classes and resources.
+     *
+     * <p> The context {@code ClassLoader} cannot be set when the thread is
+     * {@linkplain Thread.Builder#allowSetThreadLocals(boolean) not allowed} to have
+     * its own copy of thread local variables.
      *
      * <p> If a security manager is present, its {@link
      * SecurityManager#checkPermission(java.security.Permission) checkPermission}
