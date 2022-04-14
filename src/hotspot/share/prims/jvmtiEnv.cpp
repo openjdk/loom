@@ -1159,9 +1159,35 @@ JvmtiEnv::ResumeAllVirtualThreads(jint except_count, const jthread* except_list)
 } /* end ResumeAllVirtualThreads */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
 jvmtiError
-JvmtiEnv::StopThread(JavaThread* java_thread, jobject exception) {
+JvmtiEnv::StopThread(jthread thread, jobject exception) {
+  JavaThread* current_thread = JavaThread::current();
+  ThreadsListHandle tlh(current_thread);
+  JavaThread* java_thread = NULL;
+  oop thread_oop = NULL;
+
+  if (thread == NULL) {
+    java_thread = JavaThread::current();
+    thread_oop = get_vthread_or_thread_oop(java_thread);
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  } else {
+    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+    if (err != JVMTI_ERROR_NONE) {
+      // We got an error code so we don't have a JavaThread *, but
+      // only return an error from here if we didn't get a valid
+      // thread_oop.
+      if (thread_oop == NULL) {
+        return err;
+      }
+      // We have a valid thread_oop.
+    }
+  }
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    // No support for virtual threads.
+    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
+  }
   oop e = JNIHandles::resolve_external_guard(exception);
   NULL_CHECK(e, JVMTI_ERROR_NULL_POINTER);
 
@@ -1531,7 +1557,7 @@ JvmtiEnv::RunAgentThread(jthread thread, jvmtiStartFunction proc, const void* ar
   }
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // No support for virtual threads.
-    return JVMTI_ERROR_INVALID_THREAD;
+    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
   }
 
   if (priority < JVMTI_THREAD_MIN_PRIORITY || priority > JVMTI_THREAD_MAX_PRIORITY) {
@@ -3850,7 +3876,7 @@ JvmtiEnv::GetCurrentThreadCpuTime(jlong* nanos_ptr) {
   if (thread->is_Java_thread()) {
     if (JavaThread::cast(thread)->is_vthread_mounted()) {
       // No support for virtual threads (yet).
-      return JVMTI_ERROR_INVALID_THREAD;
+      return JVMTI_ERROR_UNSUPPORTED_OPERATION;
     }
   }
   *nanos_ptr = os::current_thread_cpu_time();
@@ -3866,10 +3892,37 @@ JvmtiEnv::GetThreadCpuTimerInfo(jvmtiTimerInfo* info_ptr) {
 } /* end GetThreadCpuTimerInfo */
 
 
-// java_thread - protected by ThreadsListHandle and pre-checked
 // nanos_ptr - pre-checked for NULL
 jvmtiError
-JvmtiEnv::GetThreadCpuTime(JavaThread* java_thread, jlong* nanos_ptr) {
+JvmtiEnv::GetThreadCpuTime(jthread thread, jlong* nanos_ptr) {
+  JavaThread* current_thread = JavaThread::current();
+  ThreadsListHandle tlh(current_thread);
+  JavaThread* java_thread = NULL;
+  oop thread_oop = NULL;
+
+  if (thread == NULL) {
+    java_thread = JavaThread::current();
+    thread_oop = get_vthread_or_thread_oop(java_thread);
+    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
+      return JVMTI_ERROR_INVALID_THREAD;
+    }
+  } else {
+    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+    if (err != JVMTI_ERROR_NONE) {
+      // We got an error code so we don't have a JavaThread *, but
+      // only return an error from here if we didn't get a valid
+      // thread_oop.
+      if (thread_oop == NULL) {
+        return err;
+      }
+      // We have a valid thread_oop.
+    }
+  }
+  if (java_lang_VirtualThread::is_instance(thread_oop)) {
+    // No support for virtual threads.
+    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
+  }
+
   *nanos_ptr = os::thread_cpu_time(java_thread);
   return JVMTI_ERROR_NONE;
 } /* end GetThreadCpuTime */
