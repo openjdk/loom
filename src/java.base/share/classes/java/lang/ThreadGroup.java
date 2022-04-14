@@ -552,8 +552,8 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Interrupts all active (meaning {@linkplain Thread#isAlive() alive}) in
-     * this thread group and its subgroups.
+     * Interrupts all active (meaning {@linkplain Thread#isAlive() alive})
+     * threads in this thread group and its subgroups.
      *
      * @throws     SecurityException  if the current thread is not allowed
      *               to access this thread group or any of the threads in
