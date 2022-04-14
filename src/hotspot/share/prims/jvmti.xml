@@ -2440,8 +2440,7 @@ jvmtiEnv *jvmti;
       <synopsis>Get Thread Group Children</synopsis>
       <description>
         Get the live platform threads and the child thread groups in this
-        thread group.  Virtual threads are not considered live threads in
-        a thread group and not returned by this function.
+        thread group. Virtual threads are not returned by this function.
       </description>
       <origin>jvmdi</origin>
       <capabilities>
