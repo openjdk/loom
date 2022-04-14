@@ -1166,23 +1166,9 @@ JvmtiEnv::StopThread(jthread thread, jobject exception) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
 
-  if (thread == NULL) {
-    java_thread = JavaThread::current();
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
-  } else {
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-    if (err != JVMTI_ERROR_NONE) {
-      // We got an error code so we don't have a JavaThread *, but
-      // only return an error from here if we didn't get a valid
-      // thread_oop.
-      if (thread_oop == NULL) {
-        return err;
-      }
-      // We have a valid thread_oop.
-    }
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // No support for virtual threads.
@@ -3900,23 +3886,9 @@ JvmtiEnv::GetThreadCpuTime(jthread thread, jlong* nanos_ptr) {
   JavaThread* java_thread = NULL;
   oop thread_oop = NULL;
 
-  if (thread == NULL) {
-    java_thread = JavaThread::current();
-    thread_oop = get_vthread_or_thread_oop(java_thread);
-    if (thread_oop == NULL || !thread_oop->is_a(vmClasses::Thread_klass())) {
-      return JVMTI_ERROR_INVALID_THREAD;
-    }
-  } else {
-    jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
-    if (err != JVMTI_ERROR_NONE) {
-      // We got an error code so we don't have a JavaThread *, but
-      // only return an error from here if we didn't get a valid
-      // thread_oop.
-      if (thread_oop == NULL) {
-        return err;
-      }
-      // We have a valid thread_oop.
-    }
+  jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     // No support for virtual threads.
