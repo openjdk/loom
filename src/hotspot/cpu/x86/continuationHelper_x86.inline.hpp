@@ -27,26 +27,10 @@
 
 #include "runtime/continuationHelper.hpp"
 
-#include "runtime/continuationEntry.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/registerMap.hpp"
 #include "utilities/macros.hpp"
-
-inline frame ContinuationEntry::to_frame() const {
-  static CodeBlob* cb = CodeCache::find_blob(entry_pc());
-  return frame(entry_sp(), entry_sp(), entry_fp(), entry_pc(), cb);
-}
-
-
-inline intptr_t* ContinuationEntry::entry_fp() const {
-  return (intptr_t*)((address)this + size());
-}
-
-inline void ContinuationEntry::update_register_map(RegisterMap* map) const {
-  intptr_t** fp = (intptr_t**)(bottom_sender_sp() - frame::sender_sp_offset);
-  frame::update_map_with_saved_link(map, fp);
-}
-
 
 template<typename FKind>
 static inline intptr_t** link_address(const frame& f) {

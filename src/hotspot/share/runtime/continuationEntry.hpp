@@ -25,7 +25,6 @@
 #ifndef SHARE_VM_RUNTIME_CONTINUATIONENTRY_HPP
 #define SHARE_VM_RUNTIME_CONTINUATIONENTRY_HPP
 
-#include "oops/access.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "runtime/continuation.hpp"
@@ -114,10 +113,7 @@ public:
     return sp;
   }
 
-  oop cont_oop() const {
-    oop snapshot = _cont;
-    return NativeAccess<>::oop_load(&snapshot);
-  }
+  inline oop cont_oop() const;
 
   oop scope()     const { return Continuation::continuation_scope(cont_oop()); }
 

@@ -44,7 +44,7 @@
 #include "oops/stackChunkOop.inline.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "runtime/arguments.hpp"
-#include "runtime/continuationEntry.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/continuationHelper.inline.hpp"
 #include "runtime/continuationWrapper.inline.hpp"
 #include "runtime/frame.inline.hpp"

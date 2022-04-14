@@ -25,7 +25,7 @@
 #include "precompiled.hpp"
 #include "code/nmethod.hpp"
 #include "runtime/continuation.hpp"
-#include "runtime/continuationEntry.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackWatermarkSet.inline.hpp"

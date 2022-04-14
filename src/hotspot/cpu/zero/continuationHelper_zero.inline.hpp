@@ -27,27 +27,6 @@
 
 #include "runtime/continuationHelper.hpp"
 
-#include "runtime/continuationEntry.hpp"
-#include "runtime/frame.inline.hpp"
-#include "runtime/registerMap.hpp"
-#include "utilities/macros.hpp"
-
-// TODO: Implement
-
-inline frame ContinuationEntry::to_frame() const {
-  Unimplemented();
-  return frame();
-}
-
-inline intptr_t* ContinuationEntry::entry_fp() const {
-  Unimplemented();
-  return nullptr;
-}
-
-inline void ContinuationEntry::update_register_map(RegisterMap* map) const {
-  Unimplemented();
-}
-
 template<typename FKind> // TODO: maybe do the same CRTP trick with Interpreted and Compiled as with hframe
 static inline intptr_t** link_address(const frame& f) {
   Unimplemented();
