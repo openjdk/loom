@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "jfr/jfrEvents.hpp"
+#include "jfr/support/jfrThreadId.hpp"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
 #include "oops/oopsHierarchy.hpp"

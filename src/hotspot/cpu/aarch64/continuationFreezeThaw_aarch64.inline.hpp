@@ -30,6 +30,18 @@
 #include "runtime/frame.hpp"
 #include "runtime/frame.inline.hpp"
 
+
+static void patch_callee_link(const frame& f, intptr_t* fp) {
+  DEBUG_ONLY(intptr_t* orig = *ContinuationHelper::Frame::callee_link_address(f));
+  *ContinuationHelper::Frame::callee_link_address(f) = fp;
+}
+
+static void patch_callee_link_relative(const frame& f, intptr_t* fp) {
+  intptr_t* la = (intptr_t*)ContinuationHelper::Frame::callee_link_address(f);
+  intptr_t new_value = fp - la;
+  *la = new_value;
+}
+
 ////// Freeze
 
 // Fast path
