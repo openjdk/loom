@@ -800,10 +800,10 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
     private static int stateToInt(Future.State s) {
         return switch (s) {
-            case RUNNING -> 0;
+            case RUNNING   -> 0;
             case CANCELLED -> 1;
-            case FAILED -> 2;
-            case SUCCESS -> 3;
+            case FAILED    -> 2;
+            case SUCCESS   -> 3;
         };
     }
 
@@ -946,10 +946,10 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 throw new IllegalStateException("No completed tasks");
             }
             return switch (f.state()) {
-                case SUCCESS -> f.resultNow();
-                case FAILED -> throw new ExecutionException(f.exceptionNow());
+                case SUCCESS   -> f.resultNow();
+                case FAILED    -> throw new ExecutionException(f.exceptionNow());
                 case CANCELLED -> throw new CancellationException();
-                default -> throw new InternalError("Unexpected value: " + f.state());
+                default        -> throw new InternalError("Unexpected value: " + f.state());
             };
         }
 
