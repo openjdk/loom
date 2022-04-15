@@ -160,6 +160,7 @@
    <!ELEMENT outptr     ((struct|jmethodID|jfieldID|jframeID|jrawMonitorID|jclass|jthread|
                                    jthreadGroup|jobject|jvalue|enum|jchar|jint|jlong|jfloat|jdouble|
                                    jlocation|jboolean|char|uchar|size_t|void), nullok?)>
+   <!ATTLIST outptr impl CDATA #IMPLIED>
 
    <!ELEMENT allocbuf   ((struct|jmethodID|jfieldID|jframeID|jrawMonitorID|jclass|jthread|
                                    jthreadGroup|jobject|jvalue|enum|jint|jlong|jfloat|jdouble|
@@ -11077,7 +11078,7 @@ myInit() {
              </description>
         </param>
         <param id="nanos_ptr">
-          <outptr><jlong/></outptr>
+          <outptr impl="nonullcheck"><jlong/></outptr>
           <description>
             On return, points to the CPU time used by the specified thread
             in nanoseconds.
