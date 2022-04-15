@@ -798,7 +798,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
     }
 
-    private static int stateToId(Future.State s) {
+    private static int stateToInt(Future.State s) {
         return switch (s) {
             case RUNNING -> 0;
             case CANCELLED -> 1;
@@ -809,7 +809,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
     // RUNNING < CANCELLED < FAILED < SUCCESS
     static final Comparator<Future.State> FUTURE_STATE_COMPARATOR =
-            Comparator.comparingInt(StructuredTaskScope::stateToId);
+            Comparator.comparingInt(StructuredTaskScope::stateToInt);
 
     /**
      * A StructuredTaskScope that captures the result of the first task to complete
