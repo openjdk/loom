@@ -2147,14 +2147,12 @@ JDWP "Java(tm) Debug Wire Protocol"
                                      "the thread is not alive.")
             (Error INVALID_OBJECT    "Thread or value is not a known ID.")
             (Error THREAD_NOT_SUSPENDED)
-            (Error OPAQUE_FRAME      "Attempted to return early from "
-                                     "a frame corresponding to a native "
-                                     "method, "
+            (Error OPAQUE_FRAME      "Attempted to return early from a frame "
+                                     "corresponding to a native method, "
                                      "or the thread is a virtual thread and the target "
                                      "VM is unable to force its current frame to return, "
-                                     "or the implementation is "
-                                     "unable to provide this functionality "
-                                     "on this frame.")
+                                     "or the implementation is unable to provide this "
+                                     "functionality on this frame.")
             (Error NO_MORE_FRAMES)
             (Error NOT_IMPLEMENTED)
             (Error TYPE_MISMATCH   "Value is not an appropriate type for the "
