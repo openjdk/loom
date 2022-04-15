@@ -2149,10 +2149,10 @@ JDWP "Java(tm) Debug Wire Protocol"
             (Error THREAD_NOT_SUSPENDED)
             (Error OPAQUE_FRAME      "Attempted to return early from "
                                      "a frame corresponding to a native "
-                                     "method. "
-                                     "The thread is a virtual thread and the target "
-                                     "VM is unable force its current frame to return. "
-                                     "Or the implementation is "
+                                     "method, "
+                                     "or the thread is a virtual thread and the target "
+                                     "VM is unable to force its current frame to return, "
+                                     "or the implementation is "
                                      "unable to provide this functionality "
                                      "on this frame.")
             (Error NO_MORE_FRAMES)
