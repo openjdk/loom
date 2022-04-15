@@ -308,6 +308,7 @@ public final class ProcessTools {
         for (String cmd: command) {
             if (cmd.equals("-m")) {
                 noModule = false;
+                break;
             }
         }
 
