@@ -3894,6 +3894,7 @@ JvmtiEnv::GetThreadCpuTime(jthread thread, jlong* nanos_ptr) {
     // No support for virtual threads.
     return JVMTI_ERROR_UNSUPPORTED_OPERATION;
   }
+  NULL_CHECK(nanos_ptr, JVMTI_ERROR_NULL_POINTER);
 
   *nanos_ptr = os::thread_cpu_time(java_thread);
   return JVMTI_ERROR_NONE;
