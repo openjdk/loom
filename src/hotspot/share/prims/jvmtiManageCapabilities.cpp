@@ -271,10 +271,6 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
   // return the result
   either(current, desired, result);
 
-  // Special case for virtual thread events.
-  // TBD: There can be a performance impact after check for can_support_virtual_threads has been removed.
-  java_lang_VirtualThread::set_notify_jvmti_events(true);
-
   update();
 
   return JVMTI_ERROR_NONE;
