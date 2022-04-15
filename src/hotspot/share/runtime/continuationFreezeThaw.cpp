@@ -1199,12 +1199,10 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   JavaThread* current = _preempt ? JavaThread::current() : _thread;
   assert(current == JavaThread::current(), "should be current");
 
-  oop chunk_oop;
   StackChunkAllocator allocator(klass, size_in_words, stack_size, current);
-  HeapWord* start = current->tlab().allocate(size_in_words);
-  if (start != nullptr) {
-    chunk_oop = allocator.StackChunkAllocator::initialize(start);
-  } else {
+  oop fast_oop = allocator.try_allocate_in_existing_tlab();
+  oop chunk_oop = fast_oop;
+  if (chunk_oop == nullptr) {
     ContinuationWrapper::SafepointOp so(current, _cont);
     assert(_jvmti_event_collector != nullptr, "");
     _jvmti_event_collector->start();  // can safepoint
@@ -1234,7 +1232,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
 
   assert(chunk->parent() == nullptr || chunk->parent()->is_stackChunk(), "");
 
-  if (start != nullptr) {
+  if (fast_oop != nullptr) {
     assert(!chunk->requires_barriers(), "Unfamiliar GC requires barriers on TLAB allocation");
   } else {
     assert(!UseZGC || !chunk->requires_barriers(), "Allocated ZGC object requires barriers");
