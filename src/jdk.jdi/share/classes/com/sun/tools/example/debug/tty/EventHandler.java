@@ -48,7 +48,7 @@ public class EventHandler implements Runnable {
     boolean completed = false;
     String shutdownMessageKey;
     boolean stopOnVMStart;
-    boolean trackVthreads;
+    private final boolean trackVthreads;
 
     EventHandler(EventNotifier notifier, boolean stopOnVMStart, boolean trackVthreads) {
         this.notifier = notifier;
