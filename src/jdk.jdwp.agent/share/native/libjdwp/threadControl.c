@@ -2530,11 +2530,6 @@ threadControl_applicationThreadStatus(jthread thread,
             *pstatus = JDWP_THREAD_STATUS(RUNNING);
         }
     }
-#if 0
-    tty_message("status %s: node(%p) suspendCount(%d) %d %d %s",
-                isVThread(thread) ? "vthread" : "thread",
-                node, node->suspendCount, *pstatus, *statusFlags, node->name);
-#endif
 
     debugMonitorExit(threadLock);
 
