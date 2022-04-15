@@ -2023,8 +2023,8 @@ JDWP "Java(tm) Debug Wire Protocol"
         (ErrorSet
             (Error INVALID_THREAD "The thread is null, not a valid thread, or the thread "
                                   "is not alive.")
-            (Error NOT_IMPLEMENTED "The thread is a virtual thread and the target VM "
-                                  "VM does not support the operation.")
+            (Error NOT_IMPLEMENTED "The thread is a virtual thread and the target "
+                                  "VM does not support the command.")
             (Error INVALID_OBJECT "If thread is not a known ID or the asynchronous "
                                   "exception has been garbage collected.")
             (Error VM_DEAD)
