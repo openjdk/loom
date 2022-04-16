@@ -1224,8 +1224,6 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
 
-  chunk->set_mark(chunk->mark().set_age(15)); // Promote young chunks quickly
-
   // fields are uninitialized
   chunk->set_parent_raw<typename ConfigT::OopT>(_cont.last_nonempty_chunk());
   chunk->set_cont_raw<typename ConfigT::OopT>(_cont.continuation());
@@ -1562,6 +1560,8 @@ private:
   template<typename FKind> bool recurse_thaw_java_frame(frame& caller, int num_frames);
   void finalize_thaw(frame& entry, int argsize);
 
+  inline bool seen_by_gc();
+
   inline void before_thaw_java_frame(const frame& hf, const frame& caller, bool bottom, int num_frame);
   inline void after_thaw_java_frame(const frame& f, bool bottom);
   inline void patch(frame& f, const frame& caller, bool bottom);
@@ -1762,6 +1762,10 @@ void ThawBase::patch_return(intptr_t* sp, bool is_last) {
   // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
 }
 
+inline bool ThawBase::seen_by_gc() {
+  return _barriers | _cont.tail()->is_gc_mode();
+}
+
 NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier) {
   LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
@@ -1926,7 +1930,7 @@ void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
 NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
   assert(hf.is_interpreted_frame(), "");
 
-  if (UNLIKELY(_barriers)) {
+  if (UNLIKELY(seen_by_gc())) {
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
@@ -1986,7 +1990,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   assert(!hf.is_interpreted_frame(), "");
   assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
 
-  if (!stub_caller && UNLIKELY(_barriers)) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
+  if (!stub_caller && UNLIKELY(seen_by_gc())) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
   }
 
@@ -2041,8 +2045,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   }
 
   if (!bottom) {
-    // can only fix caller once this frame is thawed (due to callee saved regs)
-    // This happens on the stack
+    // can only fix caller once this frame is thawed (due to callee saved regs); this happens on the stack
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
     clear_bitmap_bits(heap_sp + ContinuationHelper::CompiledFrame::size(hf), added_argsize);
@@ -2060,7 +2063,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     map.set_include_argument_oops(false);
     _stream.next(&map);
     assert(!_stream.is_done(), "");
-    if (UNLIKELY(_barriers)) { // we're now doing this on the stub's caller
+    if (UNLIKELY(seen_by_gc())) { // we're now doing this on the stub's caller
       _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
     }
     assert(!_stream.is_done(), "");
@@ -2100,7 +2103,7 @@ void ThawBase::finish_thaw(frame& f) {
 
   if (chunk->is_empty()) {
     // Only remove chunk from list if it can't be reused for another freeze
-    if (_barriers) {
+    if (seen_by_gc()) {
       _cont.set_tail(chunk->parent());
     } else {
       chunk->set_has_mixed_frames(false);
