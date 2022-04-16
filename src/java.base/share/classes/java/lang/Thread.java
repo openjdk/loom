@@ -771,12 +771,10 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @throws UnsupportedOperationException if preview features are not enabled
      * @since 19
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
-        PreviewFeatures.ensureEnabled();
         return new ThreadBuilders.PlatformThreadBuilder();
     }
 
