@@ -126,7 +126,7 @@ public class Blocker {
         }
         static long beginCompensatedBlock(ForkJoinPool pool) {
             try {
-                return (long) beginCompensatedBlock.invoke(pool);
+                return (long) beginCompensatedBlock.invokeExact(pool);
             } catch (Throwable e) {
                 U.throwException(e);
             }
@@ -134,7 +134,7 @@ public class Blocker {
         }
         static void endCompensatedBlock(ForkJoinPool pool, long post) {
             try {
-                endCompensatedBlock.invoke(pool, post);
+                endCompensatedBlock.invokeExact(pool, post);
             } catch (Throwable e) {
                 U.throwException(e);
             }
