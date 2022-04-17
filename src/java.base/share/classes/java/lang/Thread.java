@@ -206,7 +206,8 @@ public class Thread implements Runnable {
     @SuppressWarnings("removal")
     private AccessControlContext inheritedAccessControlContext;
 
-    // Additional fields for platform threads
+    // Additional fields for platform threads.
+    // All fields, except task, are accessed directly by the VM.
     private static class FieldHolder {
         final ThreadGroup group;
         final Runnable task;
@@ -598,7 +599,7 @@ public class Thread implements Runnable {
         if (sm == null || isCCLOverridden(parent.getClass())) {
             return parent.getContextClassLoader();
         } else {
-            // getContextClassLoader not trusted
+            // skip call to getContextClassLoader
             ClassLoader cl = parent.contextClassLoader;
             return (isSupportedClassLoader(cl)) ? cl : ClassLoader.getSystemClassLoader();
         }
@@ -1556,7 +1557,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Null out reference after Thread termination (JDK-4006245)
+     * Null out reference after Thread termination.
      */
     void clearReferences() {
         threadLocals = null;
