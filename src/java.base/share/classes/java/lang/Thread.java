@@ -1557,7 +1557,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Null out reference after Thread termination (JDK-4006245)
+     * Null out reference after Thread termination.
      */
     void clearReferences() {
         threadLocals = null;
