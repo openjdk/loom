@@ -42,16 +42,6 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
 gc/whitebox/TestConcMarkCycleWB.java                                    8284404 generic-all
 
-gc/g1/plab/TestPLABPromotion.java                                       8278126 generic-all
-gc/g1/plab/TestPLABResize.java                                          8278126 generic-all
-
-gc/stringdedup/TestStringDeduplicationInterned.java#G1                  8278127 generic-all
-gc/stringdedup/TestStringDeduplicationInterned.java#Parallel            8278127 generic-all
-gc/stringdedup/TestStringDeduplicationInterned.java#Serial              8278127 generic-all
-gc/stringdedup/TestStringDeduplicationInterned.java#Z                   8278127 generic-all
-
-gc/z/TestGarbageCollectorMXBean.java                                    8278129 generic-all
-
 runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 generic-all
 
 serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
