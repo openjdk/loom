@@ -178,7 +178,7 @@ void JvmtiExtensions::register_extensions() {
     { (char*)"GetVirtualThread", JVMTI_KIND_OUT, JVMTI_TYPE_JTHREAD, JNI_FALSE }
   };
   static jvmtiParamInfo func_params2[] = {
-    { (char*)"GetVirtualThread", JVMTI_KIND_IN, JVMTI_TYPE_JTHREAD, JNI_FALSE },
+    { (char*)"GetCarrierThread", JVMTI_KIND_IN, JVMTI_TYPE_JTHREAD, JNI_FALSE },
     { (char*)"GetCarrierThread", JVMTI_KIND_OUT, JVMTI_TYPE_JTHREAD, JNI_FALSE }
   };
 
