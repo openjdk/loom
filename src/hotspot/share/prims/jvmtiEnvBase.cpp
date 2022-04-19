@@ -1231,6 +1231,9 @@ JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
   Thread* current = Thread::current();
   assert(java_thread->is_handshake_safe_for(current),
          "call by myself or at handshake");
+  if (!java_thread->has_last_Java_frame()) {
+    return JVMTI_ERROR_NO_MORE_FRAMES;
+  }
   ResourceMark rm(current);
   HandleMark hm(current);
   RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
