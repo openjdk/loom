@@ -127,21 +127,21 @@ void stackChunkOopDesc::do_barriers() {
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Load> ();
 template void stackChunkOopDesc::do_barriers<stackChunkOopDesc::BarrierType::Store>();
 
-class DerivedPointersSupportSTW {
+class DerivedPointersSupport {
 public:
   static void relativize(oop* base_loc, derived_pointer* derived_loc) {
     oop base = *base_loc;
     if (base == nullptr) {
       return;
     }
-    assert(!CompressedOops::is_base(base), "");
+    assert(!UseCompressedOops || !CompressedOops::is_base(base), "");
 
     // This is always a full derived pointer
-    intptr_t derived_int_val = *(intptr_t*)derived_loc;
+    uintptr_t derived_int_val = *(uintptr_t*)derived_loc;
 
     // Make the pointer an offset (relativize) and store it at the same location
-    intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-    *(intptr_t*)derived_loc = offset;
+    uintptr_t offset = derived_int_val - cast_from_oop<uintptr_t>(base);
+    *(uintptr_t*)derived_loc = offset;
   }
 
   static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
@@ -149,16 +149,23 @@ public:
     if (base == nullptr) {
       return;
     }
-    assert(!CompressedOops::is_base(base), "");
+    assert(!UseCompressedOops || !CompressedOops::is_base(base), "");
 
     // All derived pointers should have been relativized into offsets
-    intptr_t offset = *(intptr_t*)derived_loc;
+    uintptr_t offset = *(uintptr_t*)derived_loc;
 
     // Restore the original derived pointer
-    *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
+    *(uintptr_t*)derived_loc = cast_from_oop<uintptr_t>(base) + offset;
   }
 
   static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
+ #if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
+    if (UseZGC || UseShenandoahGC) {
+      // Can't verify all that much with concurrent GCs
+      return;
+    }
+ #endif
+
     oop base = (chunk->has_bitmap() && UseCompressedOops)
                   ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
                   : Atomic::load((oop*)base_loc);
@@ -175,111 +182,9 @@ public:
 
   struct RelativizeClosure : public DerivedOopClosure {
     virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-      DerivedPointersSupportSTW::relativize(base_loc, derived_loc);
+      DerivedPointersSupport::relativize(base_loc, derived_loc);
     }
   };
-};
-
-// Unlike the STW GCs, ZGC runs the relativize and verification functions
-// concurrently from both GC and Java threads. We use a concurrent hand-off
-// protocol scheme to coordinate processing of derived pointers.
-class DerivedPointersSupportConcGC {
-public:
-  static void relativize(oop* base_loc, derived_pointer* derived_loc) {
-    // Read the base value once and use it for all calculations below
-    oop base = *base_loc;
-    if (base == nullptr) {
-      return;
-    }
-
-    const uintptr_t derived_int_val = *(uintptr_t*)derived_loc;
-    const uintptr_t offset = derived_int_val - cast_from_oop<uintptr_t>(base);
-
-    *(uintptr_t*)derived_loc = offset;
-  }
-
-  static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
-    // This function is called on the thread stack frames and not the stack
-    // chunk object, so after a frame has been thawed. There's no racing
-    // threads and therefore no extra barriers.
-
-    oop base = *base_loc;
-    if (base == nullptr) {
-      return;
-    }
-
-    // When we call this function it is expected that all derived pointers
-    // have been relativized, and after that that all oops have been fixed.
-    // If we find a bad base, then that's an indication that we have not
-    // the relativization code + oops processing.
-
-    // All derived pointers should have been relativized into offsets
-    const uintptr_t offset = *(uintptr_t*)derived_loc;
-
-    // Store the derelativized derived pointer
-    *(uintptr_t*)derived_loc = cast_from_oop<uintptr_t>(base) + offset;
-  }
-
-  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
-    // TODO: implement maybe
-
-    //oop base = Atomic::load((oop*)base_loc);
-    //if (base == nullptr) {
-    //  return;
-    //}
-
-    //if (!ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
-    //  // If the base oops has not been fixed, other threads could be fixing
-    //  // the derived pointers concurrently with this code. Don't proceed with
-    //  // the verification.
-    //  return;
-    //}
-
-    //assert(oopDesc::is_oop(base), "Should be a valid oop");
-
-    //// Order the loads of the base oop and the derived pointers
-    //OrderAccess::loadload();
-
-    //intptr_t value = Atomic::load((intptr_t*)derived_loc);
-    //if (chunk->requires_barriers()) {
-    //  // For ZGC when the chunk has transition to a state where the layout has
-    //  // become stable (requires_barriers()), the earlier is_good check should
-    //  // guarantee that all derived pointers have been converted too offsets.
-    //  assert(is_derived_pointer_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
-    //}
-  }
-
-  struct RelativizeClosure : public DerivedOopClosure {
-    virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-      DerivedPointersSupportConcGC::relativize(base_loc, derived_loc);
-    }
-  };
-};
-
-class DerivedPointersSupport {
-public:
-  // Not used - correct implementation used explicitly
-  // static void relativize(oop* base_loc, derived_pointer* derived_loc);
-
-  static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
-#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
-    if (UseZGC || UseShenandoahGC) {
-      DerivedPointersSupportConcGC::derelativize(base_loc, derived_loc);
-      return;
-    }
-#endif
-    DerivedPointersSupportSTW::derelativize(base_loc, derived_loc);
-  }
-
-  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
-#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
-    if (UseZGC || UseShenandoahGC) {
-      DerivedPointersSupportConcGC::verify(chunk, base_loc, derived_loc);
-      return;
-    }
-#endif
-    DerivedPointersSupportSTW::verify(chunk, base_loc, derived_loc);
-  }
 
   struct DerelativizeClosure : public DerivedOopClosure {
     virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
@@ -364,7 +269,7 @@ void stackChunkOopDesc::relativize_derived_pointers_concurrently() {
     return;
   }
 
-  DerivedPointersSupportConcGC::RelativizeClosure derived_cl;
+  DerivedPointersSupport::RelativizeClosure derived_cl;
   FrameToDerivedPointerClosure<decltype(derived_cl)> frame_cl(&derived_cl);
   iterate_stack(&frame_cl);
 
@@ -419,7 +324,7 @@ public:
 
   template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
-    DerivedPointersSupportSTW::RelativizeClosure derived_cl;
+    DerivedPointersSupport::RelativizeClosure derived_cl;
     f.iterate_derived_pointers(&derived_cl, map);
 
     // This code is called from the STW collectors and don't have concurrent
@@ -525,9 +430,6 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
   if (!(is_gc_mode() || requires_barriers())) {
     return;
   }
-
-  assert(!(UseZGC || UseShenandoahGC) || (is_gc_mode() || requires_barriers()),
-         "The thread should have run the GC barriers");
 
   if (has_bitmap() && UseCompressedOops) {
     UncompressOopsOopClosure oop_closure;
