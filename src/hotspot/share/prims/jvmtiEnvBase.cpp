@@ -1207,56 +1207,11 @@ JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
 }
 
 jvmtiError
-JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
+JvmtiEnvBase::get_frame_location(javaVFrame* jvf, jint depth,
                                  jmethodID* method_ptr, jlocation* location_ptr) {
-  Thread* current_thread = Thread::current();
-  assert(java_thread->is_handshake_safe_for(current_thread),
-         "call by myself or at handshake");
-  ResourceMark rm(current_thread);
-
-  vframe *vf = vframe_for_no_process(java_thread, depth, true /* for cont */);
-  if (vf == NULL) {
-    return JVMTI_ERROR_NO_MORE_FRAMES;
-  }
-
-  // vframeFor should return a java frame. If it doesn't
-  // it means we've got an internal error and we return the
-  // error in product mode. In debug mode we will instead
-  // attempt to cast the vframe to a javaVFrame and will
-  // cause an assertion/crash to allow further diagnosis.
-#ifdef PRODUCT
-  if (!vf->is_java_frame()) {
-    return JVMTI_ERROR_INTERNAL;
-  }
-#endif
-
-  HandleMark hm(current_thread);
-  javaVFrame *jvf = javaVFrame::cast(vf);
-  Method* method = jvf->method();
-  if (method->is_native()) {
-    *location_ptr = -1;
-  } else {
-    *location_ptr = jvf->bci();
-  }
-  *method_ptr = method->jmethod_id();
-
-  return JVMTI_ERROR_NONE;
-}
-
-jvmtiError
-JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
-                                 jmethodID* method_ptr, jlocation* location_ptr) {
-  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
-    return JVMTI_ERROR_THREAD_NOT_ALIVE;
-  }
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
   int cur_depth = 0;
 
   while (jvf != NULL && cur_depth < depth) {
-    Method* method = jvf->method();
     jvf = jvf->java_sender();
     cur_depth++;
   }
@@ -1271,8 +1226,35 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
     *location_ptr = jvf->bci();
   }
   *method_ptr = method->jmethod_id();
-
   return JVMTI_ERROR_NONE;
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
+                                 jmethodID* method_ptr, jlocation* location_ptr) {
+  Thread* current = Thread::current();
+  assert(java_thread->is_handshake_safe_for(current),
+         "call by myself or at handshake");
+  ResourceMark rm(current);
+  HandleMark hm(current);
+  RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
+  javaVFrame* jvf = JvmtiEnvBase::get_cthread_last_java_vframe(java_thread, &reg_map);
+
+  return get_frame_location(jvf, depth, method_ptr, location_ptr);
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
+                                 jmethodID* method_ptr, jlocation* location_ptr) {
+  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
+    return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
+  Thread* current = Thread::current();
+  ResourceMark rm(current);
+  HandleMark hm(current);
+  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
+
+  return get_frame_location(jvf, depth, method_ptr, location_ptr);
 }
 
 jvmtiError

@@ -365,24 +365,26 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static jint get_frame_count(javaVFrame* jvf);
   jvmtiError get_frame_count(JavaThread* java_thread, jint *count_ptr);
   jvmtiError get_frame_count(oop frame_oop, jint *count_ptr);
+  jvmtiError get_frame_location(javaVFrame* jvf, jint depth,
+                                jmethodID* method_ptr, jlocation* location_ptr);
   jvmtiError get_frame_location(JavaThread* java_thread, jint depth,
                                 jmethodID* method_ptr, jlocation* location_ptr);
   jvmtiError get_frame_location(oop vthread_oop, jint depth,
                                 jmethodID* method_ptr, jlocation* location_ptr);
   jvmtiError set_frame_pop(JvmtiThreadState* state, javaVFrame* jvf, jint depth);
-  jvmtiError get_object_monitor_usage(JavaThread *calling_thread,
-                                                    jobject object, jvmtiMonitorUsage* info_ptr);
-  jvmtiError get_stack_trace(javaVFrame *jvf,
+  jvmtiError get_object_monitor_usage(JavaThread* calling_thread,
+                                      jobject object, jvmtiMonitorUsage* info_ptr);
+  jvmtiError get_stack_trace(javaVFrame* jvf,
                              jint stack_depth, jint max_count,
                              jvmtiFrameInfo* frame_buffer, jint* count_ptr);
-  jvmtiError get_stack_trace(JavaThread *java_thread,
-                                           jint stack_depth, jint max_count,
-                                           jvmtiFrameInfo* frame_buffer, jint* count_ptr);
-  jvmtiError get_current_contended_monitor(JavaThread* calling_thread, JavaThread *java_thread,
-                                           jobject *monitor_ptr, bool is_virtual);
+  jvmtiError get_stack_trace(JavaThread* java_thread,
+                             jint stack_depth, jint max_count,
+                             jvmtiFrameInfo* frame_buffer, jint* count_ptr);
+  jvmtiError get_current_contended_monitor(JavaThread* calling_thread, JavaThread* java_thread,
+                                           jobject* monitor_ptr, bool is_virtual);
   jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
-  jvmtiError get_owned_monitors(JavaThread *calling_thread, JavaThread* java_thread, javaVFrame* jvf,
+  jvmtiError get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread, javaVFrame* jvf,
                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list);
   static jvmtiError check_top_frame(Thread* current_thread, JavaThread* java_thread,
                                     jvalue value, TosState tos, Handle* ret_ob_h);
