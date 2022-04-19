@@ -796,11 +796,3 @@ void JvmtiThreadState::set_thread(JavaThread* thread) {
   }
   _thread = thread;
 }
-
-int JvmtiVTMTDisabler::VTMT_disable_count() {
-  return _VTMT_disable_count;
-}
-
-int JvmtiVTMTDisabler::VTMT_count() {
-  return _VTMT_count;
-}
