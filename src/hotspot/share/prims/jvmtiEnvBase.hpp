@@ -326,7 +326,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
                                    GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitors_list,
                                    jint depth);
  public:
-  static vframe* vframe_for_no_process(JavaThread* java_thread, jint depth, bool for_cont = false);
+  static javaVFrame* jvf_for_thread_and_depth(JavaThread* java_thread, jint depth);
 
   // get a field descriptor for the specified class and field
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);

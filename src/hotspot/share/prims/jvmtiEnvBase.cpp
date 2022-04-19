@@ -560,25 +560,21 @@ JvmtiEnvBase::new_jthreadGroupArray(int length, Handle *handles) {
 
 // Return the vframe on the specified thread and depth, NULL if no such frame.
 // The thread and the oops in the returned vframe might not have been processed.
-vframe*
-JvmtiEnvBase::vframe_for_no_process(JavaThread* java_thread, jint depth, bool for_cont) {
+javaVFrame*
+JvmtiEnvBase::jvf_for_thread_and_depth(JavaThread* java_thread, jint depth) {
   if (!java_thread->has_last_Java_frame()) {
     return NULL;
   }
   RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
-  vframe *vf = for_cont ? get_cthread_last_java_vframe(java_thread, &reg_map)
-                        : java_thread->last_java_vframe(&reg_map);
-  if (!for_cont) {
-    vf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, (javaVFrame*)vf);
-  }
-  int d = 0;
-  while ((vf != NULL) && (d < depth)) {
-    vf = vf->java_sender();
-    d++;
-  }
-  return vf;
-}
+  javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
 
+  jvf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, jvf);
+
+  for (int d = 0; jvf != NULL && d < depth; d++) {
+    jvf = jvf->java_sender();
+  }
+  return jvf;
+}
 
 //
 // utilities: JNI objects
@@ -1839,17 +1835,16 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
                               jvalue value, TosState tos, Handle* ret_ob_h) {
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframe_for_no_process(java_thread, 0);
-  NULL_CHECK(vf, JVMTI_ERROR_NO_MORE_FRAMES);
+  javaVFrame* jvf = jvf_for_thread_and_depth(java_thread, 0);
+  NULL_CHECK(jvf, JVMTI_ERROR_NO_MORE_FRAMES);
 
-  javaVFrame *jvf = (javaVFrame*) vf;
-  if (!vf->is_java_frame() || jvf->method()->is_native()) {
+  if (jvf->method()->is_native()) {
     return JVMTI_ERROR_OPAQUE_FRAME;
   }
 
   // If the frame is a compiled one, need to deoptimize it.
-  if (vf->is_compiled_frame()) {
-    if (!vf->fr().can_be_deoptimized()) {
+  if (jvf->is_compiled_frame()) {
+    if (!jvf->fr().can_be_deoptimized()) {
       return JVMTI_ERROR_OPAQUE_FRAME;
     }
     Deoptimization::deoptimize_frame(java_thread, jvf->fr().id());
@@ -2127,7 +2122,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
     // There can be two situations here:
     //  1. There are no more java frames
     //  2. Two top java frames are separated by non-java native frames
-    if (JvmtiEnvBase::vframe_for_no_process(java_thread, 1) == NULL) {
+    if (JvmtiEnvBase::jvf_for_thread_and_depth(java_thread, 1) == NULL) {
       _result = JVMTI_ERROR_NO_MORE_FRAMES;
       return;
     } else {
