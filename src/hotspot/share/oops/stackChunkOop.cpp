@@ -35,12 +35,6 @@
 #include "runtime/registerMap.hpp"
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "runtime/stackChunkFrameStream.inline.hpp"
-#if INCLUDE_SHENANDOAHGC
-#include "gc/shenandoah/shenandoahHeap.inline.hpp"
-#endif
-#if INCLUDE_ZGC
-#include "gc/z/zAddress.inline.hpp"
-#endif
 
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   assert(!is_empty(), "");
@@ -186,171 +180,28 @@ public:
   };
 };
 
-#if INCLUDE_ZGC
-
 // Unlike the STW GCs, ZGC runs the relativize and verification functions
-// concurrently from both GC and Java threads. We use a high-order-bit
-// tagging scheme to differentiate proper derived pointers from those that
-// have been relativized into offsets.
-//
-// We cannot rely on simple negation, as the derived pointers can be be zero
-// or even negative. The compiler can, and will, create derived oops that are
-// negative if the base object (and the heap start) is located low enough in
-// the address space, and the offset from the base is a large negative value.
-class DerivedPointersSupportZGC {
-  // Assume that offsets are bound by the maximum size of Java objects. The
-  // object sizes are described as a int value of words. That max object size
-  // is a little less than INT_MAX * BytesPerWord. So, to describe the max object
-  // size we need 31 bits for the int value, 3 bits for the BytesPerWord, and
-  // 1 bit for both positive and negative offsets.
-  static const int      OFFSET_BITS = 35;
-  static const intptr_t OFFSET_MASK = (intptr_t(1) << OFFSET_BITS) - 1;
-
-  // Limits of a two's complement 35 bits signed number
-  static const intptr_t OFFSET_MAX = OFFSET_MASK >> 1;
-  static const intptr_t OFFSET_MIN = ~OFFSET_MAX;
-
-  // Use last non-sign bit - see is_derived_pointer_offset
-  static const intptr_t OFFSET_TAG = intptr_t(1) << 62;
-
-  static inline intptr_t tag_derived_pointer_offset_raw(intptr_t untagged) {
-    return OFFSET_TAG | (untagged & OFFSET_MASK);
-  }
-
-  static inline intptr_t untag_derived_pointer_offset_raw(intptr_t tagged) {
-    const int non_offset_bits = (64 - OFFSET_BITS);
-
-    // The highest bit in an offset indicates the sign of the untagged offset.
-    // Shift left to place that bit as the 64th bit, and then shift back to
-    // sign-extend. The last operation is implementation-defined and the code
-    // assumes that the implementation is an arithmetic right shift.
-    return intptr_t(uintptr_t(tagged) << non_offset_bits) >> non_offset_bits;
-  }
-
-  static inline bool is_derived_pointer_offset(intptr_t value) {
-    // OFFSET_TAG and this function has been chosen so that we can easily tag,
-    // untag, and check for dervied pointer values that have been converted to
-    // offsets.
-    //
-    // Normal derived pointers can have any of these two layouts:
-    //  positive derived pointers: 0b0000..<non_sign_derived_bits>
-    //  negative derived pointers: 0b1111..<non_sign_derived_bits>
-    //
-    // Derived pointers that have been converted to offsts have this layout:
-    //  offsets                  : 0b0100..<35_signed_offset_bits>
-    //
-    // When looking at given signed value, all offsets will be at least as large
-    // as OFFSET_TAG, and all normal derived pointers will be less.
-    const bool is_offset = value >= OFFSET_TAG;
-
-    // Extra verification
-#ifdef ASSERT
-    if (is_offset) {
-      intptr_t untagged = untag_derived_pointer_offset_raw(value);
-      assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
-      assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
-    } else {
-      // Check that we don't get values that squeeze in between the tag bit
-      // and some aribitrarily high number that we should never go past.
-      assert(value <= (intptr_t(1) << 50), "untagged: " PTR_FORMAT, value);
-      assert(value >= OFFSET_MIN, "untagged: " PTR_FORMAT, value);
-    }
-#endif
-
-    return is_offset;
-  }
-
-  static inline intptr_t tag_derived_pointer_offset(intptr_t untagged) {
-    assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
-    assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
-
-    intptr_t tagged = tag_derived_pointer_offset_raw(untagged);
-
-    assert(is_derived_pointer_offset(tagged), "");
-
-    // Check that the bits can be restored
-#ifdef ASSERT
-    intptr_t restored = untag_derived_pointer_offset_raw(tagged);
-    assert(restored == untagged, "tagged: " PTR_FORMAT " untagged: " PTR_FORMAT " restored: " PTR_FORMAT,
-           tagged, untagged, restored);
-#endif
-
-    return tagged;
-  }
-
-  static inline intptr_t untag_derived_pointer_offset(intptr_t tagged) {
-    assert(is_derived_pointer_offset(tagged), "");
-
-    intptr_t untagged = untag_derived_pointer_offset_raw(tagged);
-
-    assert(untagged <= OFFSET_MAX, "untagged: " PTR_FORMAT, untagged);
-    assert(untagged >= OFFSET_MIN, "untagged: " PTR_FORMAT, untagged);
-
-    // Check that the bits can be restored
-#ifdef ASSERT
-    intptr_t restored = tag_derived_pointer_offset_raw(untagged);
-    assert(restored == tagged, "tagged: " PTR_FORMAT " untagged: " PTR_FORMAT " restored: " PTR_FORMAT,
-        tagged, untagged, restored);
-#endif
-
-    return untagged;
-  }
-
+// concurrently from both GC and Java threads. We use a concurrent hand-off
+// protocol scheme to coordinate processing of derived pointers.
+class DerivedPointersSupportConcGC {
 public:
   static void relativize(oop* base_loc, derived_pointer* derived_loc) {
-    // The ordering in the following is crucial
-    OrderAccess::loadload();
-
     // Read the base value once and use it for all calculations below
-    oop base = Atomic::load((oop*)base_loc);
+    oop base = *base_loc;
     if (base == nullptr) {
       return;
     }
 
-    // This closure can be concurrently called from both GC marking and from
-    // the mutator. For it to work it is important that the old base value is
-    // used for the offset calculation below. As soon at the base oop has
-    // been updated we must *not* proceed to run the code below this check.
-    //
-    // This code only works if there's only one possible transition from old
-    // to good. This isn't necessarily for oops when objects are marked from
-    // finalizers. In that case oops can go from old to finalizable_marked
-    // to good. This breaks this check, because finalizable_marked are not
-    // considered good, but it's also not the old value. To workaround this
-    // we upgrade finalizable marking through stack chunks to be strong
-    // marking. See: ZMark::follow_object.
-    if (ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
-      return;
-    }
+    const uintptr_t derived_int_val = *(uintptr_t*)derived_loc;
+    const uintptr_t offset = derived_int_val - cast_from_oop<uintptr_t>(base);
 
-    // Order the load of the base and the derived pointer
-    OrderAccess::loadload();
-
-    const intptr_t derived_int_val = Atomic::load((intptr_t*)derived_loc);
-
-    if (is_derived_pointer_offset(derived_int_val)) {
-      // The derived pointer had already been converted to an offset.
-      return;
-    }
-
-    // At this point, we've seen a non-offset value *after* we've read the
-    // base, but we write the offset *before* fixing the base, so we are
-    // guaranteed that the value in derived_loc is consistent with base.
-    //
-    // Note above how ZGC could be writing the base concurrently with the store
-    // and how we handle it by checking the state of the read base oop.
-
-    const intptr_t offset = derived_int_val - cast_from_oop<intptr_t>(base);
-    const intptr_t tagged_offset = tag_derived_pointer_offset(offset);
-
-    Atomic::store((intptr_t*)derived_loc, tagged_offset);
+    *(uintptr_t*)derived_loc = offset;
   }
 
   static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
     // This function is called on the thread stack frames and not the stack
     // chunk object, so after a frame has been thawed. There's no racing
     // threads and therefore no extra barriers.
-    // there's
 
     oop base = *base_loc;
     if (base == nullptr) {
@@ -361,54 +212,49 @@ public:
     // have been relativized, and after that that all oops have been fixed.
     // If we find a bad base, then that's an indication that we have not
     // the relativization code + oops processing.
-    assert(ZAddress::is_good(cast_from_oop<uintptr_t>(base)), "At this point all oops should be good");
 
     // All derived pointers should have been relativized into offsets
-    const intptr_t tagged_offset = *(intptr_t*)derived_loc;
-    assert(is_derived_pointer_offset(tagged_offset), "All dervied pointers should have been relativized");
-
-    // Remove tag bits and restore the original offset
-    const intptr_t offset = untag_derived_pointer_offset(tagged_offset);
+    const uintptr_t offset = *(uintptr_t*)derived_loc;
 
     // Store the derelativized derived pointer
-    *(intptr_t*)derived_loc = cast_from_oop<intptr_t>(base) + offset;
+    *(uintptr_t*)derived_loc = cast_from_oop<uintptr_t>(base) + offset;
   }
 
   static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
-    oop base = Atomic::load((oop*)base_loc);
-    if (base == nullptr) {
-      return;
-    }
+    // TODO: implement maybe
 
-    if (!ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
-      // If the base oops has not been fixed, other threads could be fixing
-      // the derived pointers concurrently with this code. Don't proceed with
-      // the verification.
-      return;
-    }
+    //oop base = Atomic::load((oop*)base_loc);
+    //if (base == nullptr) {
+    //  return;
+    //}
 
-    assert(oopDesc::is_oop(base), "Should be a valid oop");
+    //if (!ZAddress::is_good(cast_from_oop<uintptr_t>(base))) {
+    //  // If the base oops has not been fixed, other threads could be fixing
+    //  // the derived pointers concurrently with this code. Don't proceed with
+    //  // the verification.
+    //  return;
+    //}
 
-    // Order the loads of the base oop and the derived pointers
-    OrderAccess::loadload();
+    //assert(oopDesc::is_oop(base), "Should be a valid oop");
 
-    intptr_t value = Atomic::load((intptr_t*)derived_loc);
-    if (chunk->requires_barriers()) {
-      // For ZGC when the chunk has transition to a state where the layout has
-      // become stable (requires_barriers()), the earlier is_good check should
-      // guarantee that all derived pointers have been converted too offsets.
-      assert(is_derived_pointer_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
-    }
+    //// Order the loads of the base oop and the derived pointers
+    //OrderAccess::loadload();
+
+    //intptr_t value = Atomic::load((intptr_t*)derived_loc);
+    //if (chunk->requires_barriers()) {
+    //  // For ZGC when the chunk has transition to a state where the layout has
+    //  // become stable (requires_barriers()), the earlier is_good check should
+    //  // guarantee that all derived pointers have been converted too offsets.
+    //  assert(is_derived_pointer_offset(value), "Unexpected non-offset value: " PTR_FORMAT, value);
+    //}
   }
 
   struct RelativizeClosure : public DerivedOopClosure {
     virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-      DerivedPointersSupportZGC::relativize(base_loc, derived_loc);
+      DerivedPointersSupportConcGC::relativize(base_loc, derived_loc);
     }
   };
 };
-
-#endif // INCLUDE_ZGC
 
 class DerivedPointersSupport {
 public:
@@ -416,9 +262,9 @@ public:
   // static void relativize(oop* base_loc, derived_pointer* derived_loc);
 
   static void derelativize(oop* base_loc, derived_pointer* derived_loc) {
-#if INCLUDE_ZGC
-    if (UseZGC) {
-      DerivedPointersSupportZGC::derelativize(base_loc, derived_loc);
+#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
+    if (UseZGC || UseShenandoahGC) {
+      DerivedPointersSupportConcGC::derelativize(base_loc, derived_loc);
       return;
     }
 #endif
@@ -426,9 +272,9 @@ public:
   }
 
   static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
-#if INCLUDE_ZGC
-    if (UseZGC) {
-      DerivedPointersSupportZGC::verify(chunk, base_loc, derived_loc);
+#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
+    if (UseZGC || UseShenandoahGC) {
+      DerivedPointersSupportConcGC::verify(chunk, base_loc, derived_loc);
       return;
     }
 #endif
@@ -457,23 +303,72 @@ public:
   }
 };
 
-void stackChunkOopDesc::relativize_derived_pointers_concurrently() {
-  assert(!is_gc_mode(), "Should only be called once per chunk");
-  set_gc_mode(true);
+bool stackChunkOopDesc::try_acquire_relativization() {
+  for (;;) {
+    uint8_t flags_before = flags();
+    OrderAccess::loadload();
+    if ((flags_before & FLAG_GC_MODE) != 0) {
+      // Terminal state - relativization is ensured
+      return false;
+    }
+
+    if ((flags_before & FLAG_CLAIM_RELATIVIZE) != 0) {
+      // Someone else has claimed relativization - wait for completion
+      MonitorLocker ml(ContinuationRelativize_lock, Mutex::_no_safepoint_check_flag);
+      uint8_t flags_under_lock = flags();
+      OrderAccess::loadload();
+      if ((flags_under_lock & FLAG_GC_MODE) != 0) {
+        // Terminal state - relativization is ensured
+        return false;
+      }
+
+      if ((flags_under_lock & FLAG_NOTIFY_RELATIVIZE) != 0) {
+        // Relativization is claimed by another thread, and it knows it needs to notify
+        ml.wait();
+      } else if (try_set_flags(flags_under_lock, flags_under_lock | FLAG_NOTIFY_RELATIVIZE)) {
+        // Relativization is claimed by another thread, and it knows it needs to notify
+        ml.wait();
+      }
+      // Failed CAS - rerun the loop
+    } else if (try_set_flags(flags_before, flags_before | FLAG_CLAIM_RELATIVIZE)) {
+      // Claimed relativization - let's do it
+      return true;
+    }
+  }
+}
+
+void stackChunkOopDesc::release_relativization() {
   OrderAccess::storestore();
+  for (;;) {
+    uint8_t flags_before = flags();
+    if ((flags_before & FLAG_NOTIFY_RELATIVIZE) != 0) {
+      MonitorLocker ml(ContinuationRelativize_lock, Mutex::_no_safepoint_check_flag);
+      // No need to CAS the terminal state; nobody else can be racingly mutating here
+      // as both claim and notify flags are already set (and monotonic)
+      uint8_t flags_under_lock = flags();
+      set_flags(flags_under_lock | FLAG_GC_MODE);
+      ml.notify_all();
+      return;
+    }
 
-  assert(UseZGC, "Only verified to work with ZGC");
+    if (try_set_flags(flags_before, flags_before | FLAG_GC_MODE)) {
+      // Successfully set the termnial state; we are done
+      return;
+    }
+  }
+}
 
-#if INCLUDE_ZGC
-  DerivedPointersSupportZGC::RelativizeClosure derived_cl;
+void stackChunkOopDesc::relativize_derived_pointers_concurrently() {
+  if (!try_acquire_relativization()) {
+    // Already relativized
+    return;
+  }
+
+  DerivedPointersSupportConcGC::RelativizeClosure derived_cl;
   FrameToDerivedPointerClosure<decltype(derived_cl)> frame_cl(&derived_cl);
   iterate_stack(&frame_cl);
 
-  // The store of the derived pointers must be ordered with the store of the base.
-  // DerivedPointersSupportZGC::relativize stored the derived pointers, the GC
-  // code calling this function will update the base oop.
-  OrderAccess::storestore();
-#endif
+  release_relativization();
 }
 
 enum class OopKind { Narrow, Wide };
@@ -595,19 +490,6 @@ void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f,
     // CodeCache, noting their Methods
   }
 
-#if INCLUDE_ZGC
-  if (UseZGC) {
-    // ZGC needs to relativize concurrently with the GC
-    DerivedPointersSupportZGC::RelativizeClosure cl;
-    f.iterate_derived_pointers(&cl, map);
-
-    // The store of the derived pointers must be ordered with the store of the
-    // base. DerivedPointersSupportZGC::relativize stored the derived pointer,
-    // the GC code calling this function will update the base oop.
-    OrderAccess::storestore();
-  }
-#endif
-
   if (has_bitmap() && UseCompressedOops) {
     BarrierClosure<barrier, true> oops_closure(f.sp());
     f.iterate_oops(&oops_closure, map);
@@ -643,7 +525,9 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
   if (!(is_gc_mode() || requires_barriers())) {
     return;
   }
-  assert(!UseZGC || requires_barriers(), "The thread should have run the GC barriers");
+
+  assert(!(UseZGC || UseShenandoahGC) || (is_gc_mode() || requires_barriers()),
+         "The thread should have run the GC barriers");
 
   if (has_bitmap() && UseCompressedOops) {
     UncompressOopsOopClosure oop_closure;

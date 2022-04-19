@@ -54,6 +54,11 @@ private:
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1;
   static const uint8_t FLAG_GC_MODE = 1 << 2; // Once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
   static const uint8_t FLAG_HAS_BITMAP = 1 << 3; // Can only be true if FLAG_GC_MODE is true
+  static const uint8_t FLAG_CLAIM_RELATIVIZE = 1 << 4; // Only one thread claims relativization of derived pointers
+  static const uint8_t FLAG_NOTIFY_RELATIVIZE = 1 << 5; // Someone is waiting for relativization to complete
+
+  bool try_acquire_relativization();
+  void release_relativization();
 
 public:
   static inline stackChunkOop cast(oop obj);
@@ -107,6 +112,7 @@ public:
 
   inline bool is_flag(uint8_t flag) const;
   inline void set_flag(uint8_t flag, bool value);
+  inline bool try_set_flags(uint8_t prev_flags, uint8_t new_flags);
   inline void clear_flags();
 
   inline bool has_mixed_frames() const;

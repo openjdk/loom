@@ -66,6 +66,10 @@ inline void stackChunkOopDesc::set_argsize(int value)   { jdk_internal_vm_StackC
 inline uint8_t stackChunkOopDesc::flags() const         { return jdk_internal_vm_StackChunk::flags(as_oop()); }
 inline void stackChunkOopDesc::set_flags(uint8_t value) { jdk_internal_vm_StackChunk::set_flags(this, value); }
 
+inline bool stackChunkOopDesc::try_set_flags(uint8_t prev_flags, uint8_t new_flags) {
+  return jdk_internal_vm_StackChunk::try_set_flags(this, prev_flags, new_flags);
+}
+
 inline int stackChunkOopDesc::max_size() const          { return jdk_internal_vm_StackChunk::maxSize(as_oop()); }
 inline void stackChunkOopDesc::set_max_size(int value)  {
   assert(value >= 0, "size must be >= 0");

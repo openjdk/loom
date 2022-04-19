@@ -133,6 +133,8 @@ Mutex*   UnsafeJlong_lock             = NULL;
 #endif
 Mutex*   CodeHeapStateAnalytics_lock  = NULL;
 
+Monitor* ContinuationRelativize_lock  = NULL;
+
 Mutex*   Metaspace_lock               = NULL;
 Monitor* MetaspaceCritical_lock       = NULL;
 Mutex*   ClassLoaderDataGraph_lock    = NULL;
@@ -316,6 +318,8 @@ void mutex_init() {
 #ifndef SUPPORTS_NATIVE_CX8
   def(UnsafeJlong_lock             , PaddedMutex  , nosafepoint);
 #endif
+
+  def(ContinuationRelativize_lock  , PaddedMonitor, nosafepoint-3);
 
   def(CodeHeapStateAnalytics_lock  , PaddedMutex  , safepoint);
   def(NMethodSweeperStats_lock     , PaddedMutex  , nosafepoint);

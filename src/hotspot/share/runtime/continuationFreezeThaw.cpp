@@ -1797,6 +1797,14 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
     heap_frame.print_value_on(&ls, nullptr);
   }
 
+#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
+  if ((UseZGC || UseShenandoahGC) && !chunk->is_gc_mode()) {
+    _cont.tail()->relativize_derived_pointers_concurrently();
+  }
+  // Ensure that the barriers applied later read oops after the relativization
+  OrderAccess::loadload();
+#endif
+
   frame caller;
   thaw_one_frame(heap_frame, caller, num_frames, true);
   finish_thaw(caller); // caller is now the topmost thawed frame
