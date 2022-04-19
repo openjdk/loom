@@ -40,7 +40,7 @@ inline bool ContinuationGCSupport::relativize_stack_chunk(oop obj) {
   if (!chunk->is_gc_mode()) {
     chunk->relativize_derived_pointers_concurrently();
   }
-
+  OrderAccess::loadload();
   return true;
 }
 

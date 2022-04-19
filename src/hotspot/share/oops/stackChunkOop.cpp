@@ -640,6 +640,11 @@ public:
 
 template <typename RegisterMapT>
 void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map) {
+  if (!(is_gc_mode() || requires_barriers())) {
+    return;
+  }
+  assert(!UseZGC || requires_barriers(), "The thread should have run the GC barriers");
+
   if (has_bitmap() && UseCompressedOops) {
     UncompressOopsOopClosure oop_closure;
     if (f.is_interpreted_frame()) {
