@@ -23,15 +23,7 @@
 
 /**
  * @test
- * @requires vm.debug != true
- * @compile --enable-preview -source ${jdk.version} Skynet.java
- * @run main/othervm --enable-preview Skynet
- * @summary Skynet benchmark
- */
-
- /**
- * @test
- * @requires vm.debug == true
+ * @summary Stress test virtual threads with a variation of the Skynet 1M benchmark
  * @compile --enable-preview -source ${jdk.version} Skynet.java
  * @run main/othervm/timeout=300 --enable-preview Skynet
  */
@@ -41,7 +33,8 @@
  * @requires vm.debug == true
  * @requires vm.gc.Z
  * @compile --enable-preview -source ${jdk.version} Skynet.java
- * @run main/othervm/timeout=300 --enable-preview -XX:+UnlockDiagnosticVMOptions -XX:+ZVerifyViews -XX:ZCollectionInterval=0.01 Skynet
+ * @run main/othervm/timeout=300 --enable-preview -XX:+UnlockDiagnosticVMOptions
+ *     -XX:+ZVerifyViews -XX:ZCollectionInterval=0.01 Skynet
  */
 
 import java.util.concurrent.BlockingQueue;
@@ -50,8 +43,9 @@ import java.util.concurrent.ThreadFactory;
 
 public class Skynet {
     public static final int ITERATIONS = 10;
+
     public static void main(String[] args) {
-        for (int i=0; i<ITERATIONS; i++) {
+        for (int i = 0; i < ITERATIONS; i++) {
             skynet(1_000_000, 499999500000L);
         }
     }

@@ -41,7 +41,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class ScopeLocalsTest {
 
     @DataProvider(name = "factories")
@@ -77,6 +76,7 @@ public class ScopeLocalsTest {
     /**
      * Test exiting a scope local operation should close nested thread flocks.
      */
+    @Test
     public void testStructureViolation1() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         class Box {
@@ -89,7 +89,7 @@ public class ScopeLocalsTest {
                 box.flock1 = ThreadFlock.open(null);
                 box.flock2 = ThreadFlock.open(null);
             });
-            assertTrue(false);
+            fail();
         } catch (StructureViolationException expected) { }
         assertTrue(box.flock1.isClosed());
         assertTrue(box.flock2.isClosed());
@@ -99,6 +99,7 @@ public class ScopeLocalsTest {
      * Test closing a thread flock with enclosing scope local operations and
      * thread flocks. This test closes enclosing flock1.
      */
+    @Test
     public void testStructureViolation2() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
@@ -111,7 +112,7 @@ public class ScopeLocalsTest {
 
                                 try {
                                     flock1.close();
-                                    assertTrue(false);
+                                    fail();
                                 } catch (StructureViolationException expected) { }
 
                                 assertTrue(flock1.isClosed());
@@ -131,6 +132,7 @@ public class ScopeLocalsTest {
      * Test closing a thread flock with enclosing scope local operations and
      * thread flocks. This test closes enclosing flock2.
      */
+    @Test
     public void testStructureViolation3() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
@@ -143,7 +145,7 @@ public class ScopeLocalsTest {
 
                                 try {
                                     flock2.close();
-                                    assertTrue(false);
+                                    fail();
                                 } catch (StructureViolationException expected) { }
 
                                 assertFalse(flock1.isClosed());
@@ -162,6 +164,7 @@ public class ScopeLocalsTest {
      * Test closing a thread flock with enclosing scope local operations and
      * thread flocks. This test closes enclosing flock3.
      */
+    @Test
     public void testStructureViolation4() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
@@ -174,7 +177,7 @@ public class ScopeLocalsTest {
 
                                 try {
                                     flock3.close();
-                                    assertTrue(false);
+                                    fail();
                                 } catch (StructureViolationException expected) { }
 
                                 assertFalse(flock1.isClosed());

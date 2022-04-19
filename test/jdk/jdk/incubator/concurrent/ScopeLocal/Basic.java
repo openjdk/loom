@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -43,7 +43,6 @@ import org.testng.xml.XmlSuite;
 
 import static org.testng.Assert.*;
 
-@Test
 public class Basic {
 
     public static void main(String[] args) {
@@ -55,13 +54,14 @@ public class Basic {
         testNG.run();
     }
 
-    @Test(expectedExceptions = { NoSuchElementException.class })
+    @Test
     public void testUnbound1() {
         ScopeLocal<String> v = ScopeLocal.newInstance();
         assertFalse(v.isBound());
-        v.get();
+        assertThrows(NoSuchElementException.class, () -> v.get());
     }
 
+    @Test
     public void testOrElse() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
@@ -73,6 +73,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testOrElseThrow() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
@@ -84,6 +85,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding1() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -92,6 +94,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding2() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -108,6 +111,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding3() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, null, () -> {
@@ -116,6 +120,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding4() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -132,12 +137,14 @@ public class Basic {
         });
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
+    @Test
     public void testRunWithBinding9() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
-        ScopeLocal.where(name, "fred", (Runnable)null);
+        assertThrows(NullPointerException.class,
+                     () -> ScopeLocal.where(name, "fred", (Runnable) null));
     }
 
+    @Test
     public void testCallWithBinding1() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, "fred", () -> {
@@ -149,6 +156,7 @@ public class Basic {
         assertTrue(result == 1);
     }
 
+    @Test
     public void testCallWithBinding2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
@@ -169,6 +177,7 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
+    @Test
     public void testCallWithBinding3() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, null, () -> {
@@ -179,6 +188,7 @@ public class Basic {
         assertTrue(result == 1);
     }
 
+    @Test
     public void testCallWithBinding4() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
@@ -198,9 +208,10 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
+    @Test
     public void testCallWithBinding9() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
-        ScopeLocal.where(name, "fred", (Callable)null);
+        assertThrows(NullPointerException.class,
+                     () -> ScopeLocal.where(name, "fred", (Callable) null));
     }
 }
