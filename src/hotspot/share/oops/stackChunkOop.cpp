@@ -572,7 +572,7 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
 
   if (is_empty()) {
     assert(argsize() == 0, "");
-    assert(max_size() == 0, "");
+    assert(max_thawing_size() == 0, "");
   }
 
   assert(oopDesc::is_oop_or_null(parent()), "");
@@ -614,9 +614,9 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
     int calculated_max_size = closure._size
                               + closure._num_i2c * frame::align_wiggle
                               + closure._num_interpreted_frames * frame::align_wiggle;
-    assert(max_size() == calculated_max_size,
+    assert(max_thawing_size() == calculated_max_size,
            "max_size(): %d calculated_max_size: %d argsize: %d num_i2c: %d",
-           max_size(), calculated_max_size, closure._argsize, closure._num_i2c);
+           max_thawing_size(), calculated_max_size, closure._argsize, closure._num_i2c);
 
     if (out_size   != nullptr) *out_size   += size;
     if (out_oops   != nullptr) *out_oops   += closure._num_oops;

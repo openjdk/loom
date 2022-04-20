@@ -86,8 +86,8 @@ public:
   inline void set_flags(uint8_t value);
   inline void release_set_flags(uint8_t value);
 
-  inline int max_size() const;
-  inline void set_max_size(int value);
+  inline int max_thawing_size() const;
+  inline void set_max_thawing_size(int value);
 
   inline oop cont() const;
   template<typename P> inline oop cont() const;
@@ -131,6 +131,9 @@ public:
   inline bool has_thaw_slowpath_condition() const;
 
   inline bool requires_barriers();
+
+  inline void clear_chunk();
+  inline int remove_top_compiled_frame(int &argsize);
 
   template <BarrierType>
   void do_barriers();

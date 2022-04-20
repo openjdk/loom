@@ -76,10 +76,10 @@ inline bool stackChunkOopDesc::try_set_flags(uint8_t prev_flags, uint8_t new_fla
   return jdk_internal_vm_StackChunk::try_set_flags(this, prev_flags, new_flags);
 }
 
-inline int stackChunkOopDesc::max_size() const          { return jdk_internal_vm_StackChunk::maxSize(as_oop()); }
-inline void stackChunkOopDesc::set_max_size(int value)  {
+inline int stackChunkOopDesc::max_thawing_size() const          { return jdk_internal_vm_StackChunk::maxThawingSize(as_oop()); }
+inline void stackChunkOopDesc::set_max_thawing_size(int value)  {
   assert(value >= 0, "size must be >= 0");
-  jdk_internal_vm_StackChunk::set_maxSize(this, (jint)value);
+  jdk_internal_vm_StackChunk::set_maxThawingSize(this, (jint)value);
 }
 
 inline oop stackChunkOopDesc::cont() const              { return UseCompressedOops ? cont<narrowOop>() : cont<oop>(); /* jdk_internal_vm_StackChunk::cont(as_oop()); */ }
@@ -165,6 +165,39 @@ inline bool stackChunkOopDesc::has_thaw_slowpath_condition() const { return flag
 
 inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
+}
+
+inline void stackChunkOopDesc::clear_chunk() {
+  set_sp(stack_size());
+  set_argsize(0);
+  set_max_thawing_size(0);
+}
+
+inline int stackChunkOopDesc::remove_top_compiled_frame(int &argsize) {
+  bool empty = false;
+  StackChunkFrameStream<ChunkFrames::CompiledOnly> f(this);
+  intptr_t* const chunk_sp = start_address() + sp();
+  assert(chunk_sp == f.sp(), "");
+  assert(chunk_sp == f.unextended_sp(), "");
+
+  const int frame_size = f.cb()->frame_size();
+  argsize = f.stack_argsize();
+
+  f.next(SmallRegisterMap::instance, true /* stop */);
+  empty = f.is_done();
+  assert(!empty || argsize == this->argsize(), "");
+
+  if (empty) {
+    clear_chunk();
+  } else {
+    set_sp(sp() + frame_size);
+    set_max_thawing_size(max_thawing_size() - frame_size);
+    // We set chunk->pc to the return pc into the next frame
+    set_pc(f.pc());
+    assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
+  }
+  assert(empty == is_empty(), "");
+  return frame_size + argsize;
 }
 
 template <stackChunkOopDesc::BarrierType barrier, ChunkFrames frame_kind, typename RegisterMapT>

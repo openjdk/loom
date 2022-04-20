@@ -567,7 +567,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
       assert(chunk_start_sp <= chunk->stack_size(), "sp not pointing into stack");
 
       // increase max_size by what we're freezing minus the overlap
-      chunk->set_max_size(chunk->max_size() + cont_size - _cont.argsize());
+      chunk->set_max_thawing_size(chunk->max_thawing_size() + cont_size - _cont.argsize());
 
       intptr_t* const bottom_sp = cont_stack_bottom - _cont.argsize();
       assert(bottom_sp == _bottom_address, "");
@@ -584,7 +584,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
 
       assert(chunk_start_sp == chunk->stack_size(), "");
 
-      chunk->set_max_size(cont_size);
+      chunk->set_max_thawing_size(cont_size);
       chunk->set_argsize(_cont.argsize());
     }
   } else { // no chunk; allocate
@@ -598,7 +598,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
       return false;
     }
 
-    chunk->set_max_size(cont_size);
+    chunk->set_max_thawing_size(cont_size);
     chunk->set_argsize(_cont.argsize());
 
     // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
@@ -836,7 +836,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
   stackChunkOop chunk = _cont.tail();
 
-  assert(chunk == nullptr || (chunk->max_size() == 0) == chunk->is_empty(), "");
+  assert(chunk == nullptr || (chunk->max_thawing_size() == 0) == chunk->is_empty(), "");
 
   _size += frame::metadata_words; // for top frame's metadata
 
@@ -904,7 +904,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       chunk->set_sp(sp);
       chunk->set_argsize(argsize);
       _size += overlap;
-      assert(chunk->max_size() == 0, "");
+      assert(chunk->max_thawing_size() == 0, "");
     } DEBUG_ONLY(else empty_chunk = false;)
   }
   chunk->set_has_mixed_frames(true);
@@ -921,7 +921,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   // will either see no continuation or a consistent chunk.
   unwind_frames();
 
-  chunk->set_max_size(chunk->max_size() + _size - frame::metadata_words);
+  chunk->set_max_thawing_size(chunk->max_thawing_size() + _size - frame::metadata_words);
 
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
@@ -1147,7 +1147,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
   chunk->set_sp(chunk->to_offset(top.sp()));
   chunk->set_pc(top.pc());
 
-  chunk->set_max_size(chunk->max_size() + _align_size);
+  chunk->set_max_thawing_size(chunk->max_thawing_size() + _align_size);
 
   if (UNLIKELY(_barriers)) {
     log_develop_trace(continuations)("do barriers on old chunk");
@@ -1226,7 +1226,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->size() >= stack_size, "chunk->size(): %zu size: %zu", chunk->size(), stack_size);
   assert(chunk->sp() == chunk->stack_size(), "");
   assert((intptr_t)chunk->start_address() % 8 == 0, "");
-  assert(chunk->max_size() == 0, "");
+  assert(chunk->max_thawing_size() == 0, "");
   assert(chunk->pc() == nullptr, "");
   assert(chunk->argsize() == 0, "");
   assert(chunk->flags() == 0, "");
@@ -1478,7 +1478,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
 /////////////// THAW ////
 
 static int thaw_size(stackChunkOop chunk) {
-  int size = chunk->max_size();
+  int size = chunk->max_thawing_size();
   size += frame::metadata_words; // For the top pc+fp in push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
   size += 2*frame::align_wiggle; // in case of alignments at the top and bottom
   return size + 200;
@@ -1511,7 +1511,7 @@ static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier)
 
   // Verification
   chunk->verify();
-  assert(chunk->max_size() > 0, "chunk invariant violated; expected to not be empty");
+  assert(chunk->max_thawing_size() > 0, "chunk invariant violated; expected to not be empty");
 
   // Only make space for the last chunk because we only thaw from the last chunk
   int size = thaw_size(chunk) << LogBytesPerWord;
@@ -1626,6 +1626,48 @@ inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
                                         : thaw_slow(chunk, kind != thaw_top);
 }
 
+class ReconstructedStack {
+  intptr_t* _base;  // _cont.entrySP(); // top of the entry frame
+  int _thaw_size;
+  int _argsize;
+public:
+  ReconstructedStack(intptr_t* base, int thaw_size, int argsize) : _base(base), _thaw_size(thaw_size), _argsize(argsize) {
+    // // possibly adds a one-word padding between entrySP and the bottom-most frame's stack args
+    // // The only possible source of misalignment is stack-passed arguments because all compiled
+    // // frames are 16-byte aligned.
+    assert(argsize != 0 || (_base - _thaw_size) == ContinuationHelper::frame_align_pointer(_base - _thaw_size), "");
+  }
+  int thaw_size() const { return _thaw_size; }
+  int argsize() const { return _argsize; }
+
+  // top and bottom stack pointers
+  intptr_t* sp() const { return ContinuationHelper::frame_align_pointer(_base - _thaw_size); }
+  intptr_t* bottom_sp() const { return ContinuationHelper::frame_align_pointer(_base - _argsize); }
+
+  // several operations operate ont the totality of the stack being reconstructed,
+  // including the metadata words
+  intptr_t* top() const { return sp() - frame::metadata_words;  }
+  int total_size() const { return _thaw_size + frame::metadata_words; }
+
+  void patch_return(bool is_last, address entry_pc) {
+    log_develop_trace(continuations)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp()));
+    address pc = !is_last ? StubRoutines::cont_returnBarrier() : entry_pc;
+    *(address*)(bottom_sp() - frame::sender_sp_ret_address_offset()) = pc;
+    // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
+
+    DEBUG_ONLY(address pc2 = *(address*)(bottom_sp() - frame::sender_sp_ret_address_offset());)
+    assert(is_last ? CodeCache::find_blob(pc2)->as_compiled_method()->method()->is_continuation_enter_intrinsic()
+                  : pc2 == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
+  }
+  void verify() {
+    // We assert we have not overwritten the entry frame, but that we're at most
+    // one alignment word away from it.
+    assert(top() + total_size() <= _base, "overwritten entry frame");
+    assert(_base - 1 <= top() + total_size(), "missed entry frame");
+    assert(argsize() != 0 || top() + total_size() == _base, "missed entry frame");
+  }
+};
+
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   assert(chunk == _cont.tail(), "");
@@ -1644,91 +1686,49 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   // Below this heuristic, we thaw the whole chunk, above it we thaw just one frame.
   static const int threshold = 500; // words
 
-  int chunk_start_sp = chunk->sp();
-  const int full_chunk_size = chunk->stack_size() - chunk_start_sp; // this initial size could be reduced if it's a partial thaw
+  const int full_chunk_size = chunk->stack_size() - chunk->sp(); // this initial size could be reduced if it's a partial thaw
   int argsize, thaw_size;
 
-  intptr_t* const chunk_sp = chunk->start_address() + chunk_start_sp;
+  intptr_t* const chunk_sp = chunk->start_address() + chunk->sp();
 
   bool partial, empty;
   if (LIKELY(!TEST_THAW_ONE_CHUNK_FRAME && (full_chunk_size < threshold))) {
     prefetch_chunk_pd(chunk->start_address(), full_chunk_size); // prefetch anticipating memcpy starting at highest address
 
     partial = false;
-
-    argsize = chunk->argsize();
-    empty = true;
-
-    chunk->set_sp(chunk->stack_size());
-    chunk->set_argsize(0);
-    chunk->set_max_size(0);
-
+    argsize = chunk->argsize(); // must be called *before* clearing the chunk
+    chunk->clear_chunk();
     thaw_size = full_chunk_size;
+    empty = true;
   } else { // thaw a single frame
     partial = true;
-
-    StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
-    assert(chunk_sp == f.sp(), "");
-    assert(chunk_sp == f.unextended_sp(), "");
-
-    const int frame_size = f.cb()->frame_size();
-    argsize = f.stack_argsize();
-
-    f.next(SmallRegisterMap::instance, true /* stop */);
-    empty = f.is_done();
-    assert(!empty || argsize == chunk->argsize(), "");
-
-    if (empty) {
-      chunk->set_sp(chunk->stack_size());
-      chunk->set_argsize(0);
-      chunk->set_max_size(0);
-    } else {
-      chunk->set_sp(chunk->sp() + frame_size);
-      chunk->set_max_size(chunk->max_size() - frame_size);
-      // We set chunk->pc to the return pc into the next frame
-      chunk->set_pc(f.pc());
-      assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
-    }
-    assert(empty == chunk->is_empty(), "");
-    thaw_size = frame_size + argsize;
+    thaw_size = chunk->remove_top_compiled_frame(argsize);
+    empty = chunk->is_empty();
   }
 
   // Are we thawing the last frame(s) in the continuation
   const bool is_last = empty && chunk->is_parent_null<typename ConfigT::OopT>();
+  assert(!is_last || argsize == 0, "");
 
   log_develop_trace(continuations)("thaw_fast partial: %d is_last: %d empty: %d size: %d argsize: %d",
                               partial, is_last, empty, thaw_size, argsize);
 
-  intptr_t* stack_sp = _cont.entrySP();
-  intptr_t* bottom_sp = ContinuationHelper::frame_align_pointer(stack_sp - argsize);
+  ReconstructedStack rs(_cont.entrySP(), thaw_size, argsize);
 
-  stack_sp -= thaw_size;
-  // possibly adds a one-word padding between entrySP and the bottom-most frame's stack args
-  // The only possible source of misalignment is stack-passed arguments because all compiled
-  // frames are 16-byte aligned.
-  assert(argsize != 0 || stack_sp == ContinuationHelper::frame_align_pointer(stack_sp), "");
-  stack_sp = ContinuationHelper::frame_align_pointer(stack_sp);
+  // Verify that all sizes and addresses are correct before copying
+  rs.verify();
 
   // also copy metadata words
-  intptr_t* from = chunk_sp - frame::metadata_words;
-  intptr_t* to   = stack_sp - frame::metadata_words;
-  copy_from_chunk(from, to, thaw_size + frame::metadata_words);
-  // We assert we have not overwritten the entry frame, but that we're at most
-  // one alignment word away from it.
-  assert(to + thaw_size + frame::metadata_words <= _cont.entrySP(), "overwritten entry frame");
-  assert(_cont.entrySP() - 1 <= to + thaw_size + frame::metadata_words, "missed entry frame");
-  assert(argsize != 0 || to + thaw_size + frame::metadata_words == _cont.entrySP(), "missed entry frame");
+  copy_from_chunk(chunk_sp - frame::metadata_words, rs.top(), rs.total_size());
 
-  assert(!is_last || argsize == 0, "");
-  _cont.set_argsize(argsize); // sets argsize in ContinuationEntry
+  // update the ContinuationEntry
+  _cont.set_argsize(argsize);
   log_develop_trace(continuations)("setting entry argsize: %d", _cont.argsize());
-  assert(bottom_sp == _cont.entry()->bottom_sender_sp(), "");
+  assert(rs.bottom_sp() == _cont.entry()->bottom_sender_sp(), "");
 
   // install the return barrier if not last frame, or the entry's pc if last
-  patch_return(bottom_sp, is_last);
-  DEBUG_ONLY(address pc = *(address*)(bottom_sp - frame::sender_sp_ret_address_offset());)
-  assert(is_last ? CodeCache::find_blob(pc)->as_compiled_method()->method()->is_continuation_enter_intrinsic()
-                  : pc == StubRoutines::cont_returnBarrier(), "is_last: %d", is_last);
+  rs.patch_return(is_last, _cont.entryPC());
+
   assert(is_last == _cont.is_empty(), "");
   assert(_cont.chunk_invariant(), "");
 
@@ -1743,7 +1743,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 #endif
 
 #ifdef ASSERT
-  set_anchor(_thread, stack_sp);
+  set_anchor(_thread, rs.sp());
   log_frames(_thread);
   if (LoomDeoptAfterThaw) {
     do_deopt_after_thaw(_thread);
@@ -1751,7 +1751,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   clear_anchor(_thread);
 #endif
 
-  return stack_sp;
+  return rs.sp();
 }
 
 void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
@@ -1884,7 +1884,7 @@ void ThawBase::finalize_thaw(frame& entry, int argsize) {
   assert(_stream.is_done() == chunk->is_empty(), "");
 
   int delta = _stream.unextended_sp() - _top_unextended_sp;
-  chunk->set_max_size(chunk->max_size() - delta);
+  chunk->set_max_thawing_size(chunk->max_thawing_size() - delta);
 
   _cont.set_argsize(argsize);
   entry = new_entry_frame();
@@ -2122,12 +2122,12 @@ void ThawBase::finish_thaw(frame& f) {
     } else {
       chunk->set_has_mixed_frames(false);
     }
-    chunk->set_max_size(0);
+    chunk->set_max_thawing_size(0);
     assert(chunk->argsize() == 0, "");
   } else {
-    chunk->set_max_size(chunk->max_size() - _align_size);
+    chunk->set_max_thawing_size(chunk->max_thawing_size() - _align_size);
   }
-  assert(chunk->is_empty() == (chunk->max_size() == 0), "");
+  assert(chunk->is_empty() == (chunk->max_thawing_size() == 0), "");
 
   if ((intptr_t)f.sp() % frame::frame_alignment != 0) {
     assert(f.is_interpreted_frame(), "");
