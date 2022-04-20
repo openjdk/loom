@@ -560,25 +560,21 @@ JvmtiEnvBase::new_jthreadGroupArray(int length, Handle *handles) {
 
 // Return the vframe on the specified thread and depth, NULL if no such frame.
 // The thread and the oops in the returned vframe might not have been processed.
-vframe*
-JvmtiEnvBase::vframe_for_no_process(JavaThread* java_thread, jint depth, bool for_cont) {
+javaVFrame*
+JvmtiEnvBase::jvf_for_thread_and_depth(JavaThread* java_thread, jint depth) {
   if (!java_thread->has_last_Java_frame()) {
     return NULL;
   }
   RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
-  vframe *vf = for_cont ? get_cthread_last_java_vframe(java_thread, &reg_map)
-                        : java_thread->last_java_vframe(&reg_map);
-  if (!for_cont) {
-    vf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, (javaVFrame*)vf);
-  }
-  int d = 0;
-  while ((vf != NULL) && (d < depth)) {
-    vf = vf->java_sender();
-    d++;
-  }
-  return vf;
-}
+  javaVFrame *jvf = java_thread->last_java_vframe(&reg_map);
 
+  jvf = JvmtiEnvBase::check_and_skip_hidden_frames(java_thread, jvf);
+
+  for (int d = 0; jvf != NULL && d < depth; d++) {
+    jvf = jvf->java_sender();
+  }
+  return jvf;
+}
 
 //
 // utilities: JNI objects
@@ -1207,56 +1203,11 @@ JvmtiEnvBase::get_frame_count(oop vthread_oop, jint *count_ptr) {
 }
 
 jvmtiError
-JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
+JvmtiEnvBase::get_frame_location(javaVFrame* jvf, jint depth,
                                  jmethodID* method_ptr, jlocation* location_ptr) {
-  Thread* current_thread = Thread::current();
-  assert(java_thread->is_handshake_safe_for(current_thread),
-         "call by myself or at handshake");
-  ResourceMark rm(current_thread);
-
-  vframe *vf = vframe_for_no_process(java_thread, depth, true /* for cont */);
-  if (vf == NULL) {
-    return JVMTI_ERROR_NO_MORE_FRAMES;
-  }
-
-  // vframeFor should return a java frame. If it doesn't
-  // it means we've got an internal error and we return the
-  // error in product mode. In debug mode we will instead
-  // attempt to cast the vframe to a javaVFrame and will
-  // cause an assertion/crash to allow further diagnosis.
-#ifdef PRODUCT
-  if (!vf->is_java_frame()) {
-    return JVMTI_ERROR_INTERNAL;
-  }
-#endif
-
-  HandleMark hm(current_thread);
-  javaVFrame *jvf = javaVFrame::cast(vf);
-  Method* method = jvf->method();
-  if (method->is_native()) {
-    *location_ptr = -1;
-  } else {
-    *location_ptr = jvf->bci();
-  }
-  *method_ptr = method->jmethod_id();
-
-  return JVMTI_ERROR_NONE;
-}
-
-jvmtiError
-JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
-                                 jmethodID* method_ptr, jlocation* location_ptr) {
-  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
-    return JVMTI_ERROR_THREAD_NOT_ALIVE;
-  }
-  Thread* cur_thread = Thread::current();
-  ResourceMark rm(cur_thread);
-  HandleMark hm(cur_thread);
-  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
   int cur_depth = 0;
 
   while (jvf != NULL && cur_depth < depth) {
-    Method* method = jvf->method();
     jvf = jvf->java_sender();
     cur_depth++;
   }
@@ -1271,8 +1222,38 @@ JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
     *location_ptr = jvf->bci();
   }
   *method_ptr = method->jmethod_id();
-
   return JVMTI_ERROR_NONE;
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_location(JavaThread *java_thread, jint depth,
+                                 jmethodID* method_ptr, jlocation* location_ptr) {
+  Thread* current = Thread::current();
+  assert(java_thread->is_handshake_safe_for(current),
+         "call by myself or at handshake");
+  if (!java_thread->has_last_Java_frame()) {
+    return JVMTI_ERROR_NO_MORE_FRAMES;
+  }
+  ResourceMark rm(current);
+  HandleMark hm(current);
+  RegisterMap reg_map(java_thread, true /* update_map */, false /* process_frames */, true /* walk_cont */);
+  javaVFrame* jvf = JvmtiEnvBase::get_cthread_last_java_vframe(java_thread, &reg_map);
+
+  return get_frame_location(jvf, depth, method_ptr, location_ptr);
+}
+
+jvmtiError
+JvmtiEnvBase::get_frame_location(oop vthread_oop, jint depth,
+                                 jmethodID* method_ptr, jlocation* location_ptr) {
+  if (!JvmtiEnvBase::is_vthread_alive(vthread_oop)) {
+    return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
+  Thread* current = Thread::current();
+  ResourceMark rm(current);
+  HandleMark hm(current);
+  javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(vthread_oop);
+
+  return get_frame_location(jvf, depth, method_ptr, location_ptr);
 }
 
 jvmtiError
@@ -1857,17 +1838,16 @@ JvmtiEnvBase::check_top_frame(Thread* current_thread, JavaThread* java_thread,
                               jvalue value, TosState tos, Handle* ret_ob_h) {
   ResourceMark rm(current_thread);
 
-  vframe *vf = vframe_for_no_process(java_thread, 0);
-  NULL_CHECK(vf, JVMTI_ERROR_NO_MORE_FRAMES);
+  javaVFrame* jvf = jvf_for_thread_and_depth(java_thread, 0);
+  NULL_CHECK(jvf, JVMTI_ERROR_NO_MORE_FRAMES);
 
-  javaVFrame *jvf = (javaVFrame*) vf;
-  if (!vf->is_java_frame() || jvf->method()->is_native()) {
+  if (jvf->method()->is_native()) {
     return JVMTI_ERROR_OPAQUE_FRAME;
   }
 
   // If the frame is a compiled one, need to deoptimize it.
-  if (vf->is_compiled_frame()) {
-    if (!vf->fr().can_be_deoptimized()) {
+  if (jvf->is_compiled_frame()) {
+    if (!jvf->fr().can_be_deoptimized()) {
       return JVMTI_ERROR_OPAQUE_FRAME;
     }
     Deoptimization::deoptimize_frame(java_thread, jvf->fr().id());
@@ -2145,7 +2125,7 @@ UpdateForPopTopFrameClosure::doit(Thread *target, bool self) {
     // There can be two situations here:
     //  1. There are no more java frames
     //  2. Two top java frames are separated by non-java native frames
-    if (JvmtiEnvBase::vframe_for_no_process(java_thread, 1) == NULL) {
+    if (JvmtiEnvBase::jvf_for_thread_and_depth(java_thread, 1) == NULL) {
       _result = JVMTI_ERROR_NO_MORE_FRAMES;
       return;
     } else {

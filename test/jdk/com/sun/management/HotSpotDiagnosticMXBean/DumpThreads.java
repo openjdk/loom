@@ -188,6 +188,9 @@ public class DumpThreads {
         return count(file, expect) > 0;
     }
 
+    /**
+     * Generate a file path with the given suffix to use as an output file.
+     */
     private static Path genOutputPath(String suffix) throws Exception {
         Path dir = Path.of(".").toAbsolutePath();
         Path file = Files.createTempFile(dir, "dump", suffix);
@@ -195,21 +198,31 @@ public class DumpThreads {
         return file;
     }
 
+    /**
+     * Return the count of the number of files in the given file that contain
+     * the given character sequence.
+     */
     static long count(Path file, CharSequence cs) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             return stream.filter(line -> line.contains(cs)).count();
         }
     }
 
-    private static void cat(Path file) throws Exception {
-        try (Stream<String> stream = Files.lines(file)) {
-            stream.forEach(System.out::println);
-        }
-    }
-
+    /**
+     * Return line $n of the given file.
+     */
     private String line(Path file, long n) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             return stream.skip(n).findFirst().orElseThrow();
+        }
+    }
+
+    /**
+     * Print the given file to standard output.
+     */
+    private static void cat(Path file) throws Exception {
+        try (Stream<String> stream = Files.lines(file)) {
+            stream.forEach(System.out::println);
         }
     }
 }
