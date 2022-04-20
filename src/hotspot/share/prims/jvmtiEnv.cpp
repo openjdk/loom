@@ -973,6 +973,12 @@ JvmtiEnv::SuspendThreadList(jint request_count, const jthread* request_list, jvm
       oop thread_oop = NULL;
       jthread thread = request_list[i];
       jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+
+      if (thread_oop != NULL &&
+          java_lang_VirtualThread::is_instance(thread_oop) &&
+          !JvmtiEnvBase::is_vthread_alive(thread_oop)) {
+        err = JVMTI_ERROR_THREAD_NOT_ALIVE;
+      }
       if (err != JVMTI_ERROR_NONE) {
         if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
           results[i] = err;
@@ -1098,6 +1104,12 @@ JvmtiEnv::ResumeThreadList(jint request_count, const jthread* request_list, jvmt
   for (int i = 0; i < request_count; i++) {
     jthread thread = request_list[i];
     jvmtiError err = JvmtiExport::cv_external_thread_to_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+
+    if (thread_oop != NULL &&
+        java_lang_VirtualThread::is_instance(thread_oop) &&
+        !JvmtiEnvBase::is_vthread_alive(thread_oop)) {
+      err = JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
     if (err != JVMTI_ERROR_NONE) {
       if (thread_oop == NULL || err != JVMTI_ERROR_INVALID_THREAD) {
         results[i] = err;
@@ -1175,12 +1187,13 @@ JvmtiEnv::StopThread(jthread thread, jobject exception) {
   NULL_CHECK(thread, JVMTI_ERROR_INVALID_THREAD);
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+
+  if (thread_oop != NULL && java_lang_VirtualThread::is_instance(thread_oop)) {
+    // No support for virtual threads (yet).
+    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
+  }
   if (err != JVMTI_ERROR_NONE) {
     return err;
-  }
-  if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    // No support for virtual threads.
-    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
   }
   oop e = JNIHandles::resolve_external_guard(exception);
   NULL_CHECK(e, JVMTI_ERROR_NULL_POINTER);
@@ -1868,14 +1881,15 @@ JvmtiEnv::PopFrame(jthread thread) {
   JavaThread* java_thread = NULL;
   oop thread_obj = NULL;
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
+
+  if (thread_obj != NULL && java_lang_VirtualThread::is_instance(thread_obj)) {
+    // No support for virtual threads (yet).
+    return JVMTI_ERROR_OPAQUE_FRAME;
+  }
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
 
-  if (java_lang_VirtualThread::is_instance(thread_obj)) {
-    // No support for virtual threads (yet).
-    return JVMTI_ERROR_OPAQUE_FRAME;
-  }
   // retrieve or create the state
   JvmtiThreadState* state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
@@ -3895,12 +3909,13 @@ JvmtiEnv::GetThreadCpuTime(jthread thread, jlong* nanos_ptr) {
   oop thread_oop = NULL;
 
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
+
+  if (thread_oop != NULL && java_lang_VirtualThread::is_instance(thread_oop)) {
+    // No support for virtual threads (yet).
+    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
+  }
   if (err != JVMTI_ERROR_NONE) {
     return err;
-  }
-  if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    // No support for virtual threads.
-    return JVMTI_ERROR_UNSUPPORTED_OPERATION;
   }
   NULL_CHECK(nanos_ptr, JVMTI_ERROR_NULL_POINTER);
 

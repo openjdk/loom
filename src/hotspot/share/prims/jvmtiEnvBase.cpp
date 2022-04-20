@@ -611,8 +611,8 @@ JvmtiEnvBase::get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd
 
 bool
 JvmtiEnvBase::is_vthread_alive(oop vt) {
-  assert(java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW, "sanity check");
-  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
+  return java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::NEW &&
+         java_lang_VirtualThread::state(vt) != java_lang_VirtualThread::TERMINATED;
 }
 
 // Return JavaThread if virtual thread is mounted, NULL otherwise.
@@ -1320,6 +1320,10 @@ JvmtiEnvBase::get_threadOop_and_JavaThread(ThreadsList* t_list, jthread thread,
       java_thread = get_JavaThread_or_null(thread_oop);
     }
   }
+  if (java_lang_VirtualThread::is_instance(thread_oop) &&
+      !JvmtiEnvBase::is_vthread_alive(thread_oop)) {
+    return JVMTI_ERROR_THREAD_NOT_ALIVE;
+  }
   *jt_pp = java_thread;
   *thread_oop_p = thread_oop;
   return JVMTI_ERROR_NONE;
@@ -1904,13 +1908,13 @@ JvmtiEnvBase::force_early_return(jthread thread, jvalue value, TosState tos) {
   JavaThread* java_thread = NULL;
   oop thread_obj = NULL;
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_obj);
-  if (err != JVMTI_ERROR_NONE) {
-    return err;
-  }
 
-  if (java_lang_VirtualThread::is_instance(thread_obj)) {
+  if (thread_obj != NULL && java_lang_VirtualThread::is_instance(thread_obj)) {
     // No support for virtual threads (yet).
     return JVMTI_ERROR_OPAQUE_FRAME;
+  }
+  if (err != JVMTI_ERROR_NONE) {
+    return err;
   }
 
   // retrieve or create the state
