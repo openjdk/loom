@@ -389,7 +389,7 @@ private:
   // slow path
   frame freeze_start_frame();
   frame freeze_start_frame_safepoint_stub(frame f);
-  NOINLINE freeze_result freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top);
+  NOINLINE freeze_result recurse_freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top);
   inline frame freeze_start_frame_yield_stub(frame f);
   template<typename FKind>
   inline freeze_result recurse_freeze_java_frame(const frame& f, frame& caller, int fsize, int argsize);
@@ -705,7 +705,7 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
   }
 
   frame caller;
-  freeze_result res = freeze(f, caller, 0, false, true);
+  freeze_result res = recurse_freeze(f, caller, 0, false, true);
 
   if (res == freeze_ok) {
     finish_freeze(f, caller);
@@ -748,7 +748,7 @@ frame FreezeBase::freeze_start_frame_safepoint_stub(frame f) {
   return f;
 }
 
-NOINLINE freeze_result FreezeBase::freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top) {
+NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top) {
   assert(f.unextended_sp() < _bottom_address, ""); // see recurse_freeze_java_frame
   assert(f.is_interpreted_frame() || ((top && _preempt) == ContinuationHelper::Frame::is_stub(f.cb())), "");
 
@@ -791,7 +791,7 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
   } else {
     frame senderf = sender<FKind>(f);
     assert(FKind::interpreted || senderf.sp() == senderf.unextended_sp(), "");
-    freeze_result result = freeze(senderf, caller, argsize, FKind::interpreted, false); // recursive call
+    freeze_result result = recurse_freeze(senderf, caller, argsize, FKind::interpreted, false); // recursive call
     return result;
   }
 }
@@ -1547,7 +1547,7 @@ protected:
   NOINLINE intptr_t* thaw_slow(stackChunkOop chunk, bool return_barrier);
 
 private:
-  void thaw_one_frame(const frame& heap_frame, frame& caller, int num_frames, bool top);
+  void recurse_thaw(const frame& heap_frame, frame& caller, int num_frames, bool top);
   template<typename FKind> bool recurse_thaw_java_frame(frame& caller, int num_frames);
   void finalize_thaw(frame& entry, int argsize);
 
@@ -1795,7 +1795,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 #endif
 
   frame caller;
-  thaw_one_frame(heap_frame, caller, num_frames, true);
+  recurse_thaw(heap_frame, caller, num_frames, true);
   finish_thaw(caller); // caller is now the topmost thawed frame
   _cont.write();
 
@@ -1809,7 +1809,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   return sp;
 }
 
-void ThawBase::thaw_one_frame(const frame& heap_frame, frame& caller, int num_frames, bool top) {
+void ThawBase::recurse_thaw(const frame& heap_frame, frame& caller, int num_frames, bool top) {
   log_develop_debug(continuations)("thaw num_frames: %d", num_frames);
   assert(!_cont.is_empty(), "no more frames");
   assert(num_frames > 0, "");
@@ -1847,7 +1847,7 @@ bool ThawBase::recurse_thaw_java_frame(frame& caller, int num_frames) {
     finalize_thaw(caller, FKind::interpreted ? 0 : argsize);
     return true; // bottom
   } else { // recurse
-    thaw_one_frame(_stream.to_frame(), caller, num_frames - 1, false);
+    recurse_thaw(_stream.to_frame(), caller, num_frames - 1, false);
     return false;
   }
 }
