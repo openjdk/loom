@@ -176,7 +176,7 @@ inline void stackChunkOopDesc::clear_chunk() {
 inline int stackChunkOopDesc::remove_top_compiled_frame(int &argsize) {
   bool empty = false;
   StackChunkFrameStream<ChunkFrames::CompiledOnly> f(this);
-  intptr_t* const chunk_sp = start_address() + sp();
+  DEBUG_ONLY(intptr_t* const chunk_sp = start_address() + sp();)
   assert(chunk_sp == f.sp(), "");
   assert(chunk_sp == f.unextended_sp(), "");
 
@@ -197,6 +197,8 @@ inline int stackChunkOopDesc::remove_top_compiled_frame(int &argsize) {
     assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
   }
   assert(empty == is_empty(), "");
+  // returns the size required to store the frame on stack, and because it is a
+  // compiled frame, it must include a copy of the arguments passed by the caller
   return frame_size + argsize;
 }
 

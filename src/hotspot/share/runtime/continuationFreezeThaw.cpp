@@ -1626,7 +1626,7 @@ inline intptr_t* Thaw<ConfigT>::thaw(thaw_kind kind) {
                                         : thaw_slow(chunk, kind != thaw_top);
 }
 
-class ReconstructedStack {
+class ReconstructedStack : public StackObj {
   intptr_t* _base;  // _cont.entrySP(); // top of the entry frame
   int _thaw_size;
   int _argsize;
@@ -1644,7 +1644,7 @@ public:
   intptr_t* sp() const { return ContinuationHelper::frame_align_pointer(_base - _thaw_size); }
   intptr_t* bottom_sp() const { return ContinuationHelper::frame_align_pointer(_base - _argsize); }
 
-  // several operations operate ont the totality of the stack being reconstructed,
+  // several operations operate on the totality of the stack being reconstructed,
   // including the metadata words
   intptr_t* top() const { return sp() - frame::metadata_words;  }
   int total_size() const { return _thaw_size + frame::metadata_words; }
