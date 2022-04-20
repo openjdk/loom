@@ -1001,14 +1001,16 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   adjust_interpreted_frame_unextended_sp(f);
 
   intptr_t* const frame_top = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
-  const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
   const int locals = f.interpreter_frame_method()->max_locals();
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= f.fp() + frame::metadata_words + locals, "");// = on x86
   const int fsize = f.fp() + frame::metadata_words + locals - frame_top;
+
+  intptr_t* const frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
+  assert(frame_bottom - frame_top >= fsize, ""); // == on x86
 
   DEBUG_ONLY(verify_frame_top(f, frame_top));
 
   Method* frame_method = ContinuationHelper::Frame::frame_method(f);
+  const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
 
   log_develop_trace(continuations)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
     frame_method->name_and_sig_as_C_string(), _freeze_size, fsize, argsize);
@@ -1028,12 +1030,12 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   _total_align_size += frame::align_wiggle; // add alignment room for internal interpreted frame alignment om AArch64
 
   intptr_t* heap_top = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(hf) == heap_top + fsize, "");
+  intptr_t* heap_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
+  assert(heap_bottom == heap_top + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
-  copy_to_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals,
-                ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals, locals); // copy locals
-  copy_to_chunk(frame_top, heap_top, fsize - locals); // copy rest
+  copy_to_chunk(frame_bottom - locals, heap_bottom - locals, locals); // copy locals
+  copy_to_chunk(frame_top, heap_top, fsize - locals);                 // copy rest
   assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_top + fsize) == (caller.unextended_sp() + argsize), "");
 
   relativize_interpreted_frame_metadata(f, hf);
@@ -1052,8 +1054,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 
 freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
   intptr_t* const frame_top = ContinuationHelper::CompiledFrame::frame_top(f, callee_argsize, callee_interpreted);
+  intptr_t* const frame_bottom = ContinuationHelper::CompiledFrame::frame_bottom(f);
   const int argsize = ContinuationHelper::CompiledFrame::stack_argsize(f);
-  const int fsize = ContinuationHelper::CompiledFrame::frame_bottom(f) + argsize - frame_top;
+  const int fsize = frame_bottom + argsize - frame_top;
 
   log_develop_trace(continuations)("recurse_freeze_compiled_frame %s _size: %d fsize: %d argsize: %d",
                              ContinuationHelper::Frame::frame_method(f) != nullptr ?
@@ -1937,32 +1940,32 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
 
   intptr_t* const frame_top = f.sp();
-  intptr_t* const heap_top = hf.unextended_sp();
   intptr_t* const frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
+  intptr_t* const heap_top = hf.unextended_sp();
+  intptr_t* const heap_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(hf);
 
   assert(hf.is_heap_frame(), "should be");
-  const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - heap_top;
+  const int fsize = heap_bottom - heap_top;
 
   assert(!is_bottom_frame || frame_top + fsize >= _cont.entrySP() - 2, "");
   assert(!is_bottom_frame || frame_top + fsize <= _cont.entrySP(), "");
 
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) == frame_top + fsize, "");
+  assert(frame_bottom == frame_top + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
   const int locals = hf.interpreter_frame_method()->max_locals();
   assert(hf.is_heap_frame(), "should be");
   assert(!f.is_heap_frame(), "should not be");
 
-  copy_from_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals,
-                  ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals, locals); // copy locals
-  copy_from_chunk(heap_top, frame_top, fsize - locals); // copy rest
+  copy_from_chunk(heap_bottom - locals, frame_bottom - locals, locals); // copy locals
+  copy_from_chunk(heap_top, frame_top, fsize - locals);                 // copy rest
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
   derelativize_interpreted_frame_metadata(hf, f);
   patch(f, caller, is_bottom_frame);
 
   assert(f.is_interpreted_frame_valid(_cont.thread()), "invalid thawed frame");
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) <= ContinuationHelper::Frame::frame_top(caller), "");
+  assert(frame_bottom <= ContinuationHelper::Frame::frame_top(caller), "");
 
   CONT_JFR_ONLY(_jfr_info.record_interpreted_frame();)
 
@@ -1973,7 +1976,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && locals > 0) {
     assert(hf.is_heap_frame(), "should be");
-    clear_bitmap_bits(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals, locals);
+    clear_bitmap_bits(heap_bottom - locals, locals);
   }
 
   DEBUG_ONLY(after_thaw_java_frame(f, is_bottom_frame);)
