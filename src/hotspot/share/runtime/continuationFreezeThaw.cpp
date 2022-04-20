@@ -1275,8 +1275,8 @@ static bool monitors_on_stack(JavaThread* thread) {
   RegisterMap map(thread, true, false, false);
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
-    if (f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f) ||
-        f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f)) {
+    if ((f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f)) ||
+        (f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f))) {
       return true;
     }
   }
@@ -1414,7 +1414,7 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   }
 
   while (true) {
-    if (f.is_interpreted_frame() && f.interpreter_frame_method()->is_native() || f.is_native_frame()) {
+    if ((f.is_interpreted_frame() && f.interpreter_frame_method()->is_native()) || f.is_native_frame()) {
       return freeze_pinned_native;
     }
 
