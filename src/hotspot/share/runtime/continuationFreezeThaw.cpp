@@ -1027,14 +1027,14 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   frame hf = new_heap_frame<ContinuationHelper::InterpretedFrame>(f, caller);
   _total_align_size += frame::align_wiggle; // add alignment room for internal interpreted frame alignment om AArch64
 
-  intptr_t* heap_sp = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(hf) == heap_sp + fsize, "");
+  intptr_t* heap_top = ContinuationHelper::InterpretedFrame::frame_top(hf, callee_argsize, callee_interpreted);
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(hf) == heap_top + fsize, "");
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
   copy_to_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals,
                 ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals, locals); // copy locals
-  copy_to_chunk(frame_top, heap_sp, fsize - locals); // copy rest
-  assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_sp + fsize) == (caller.unextended_sp() + argsize), "");
+  copy_to_chunk(frame_top, heap_top, fsize - locals); // copy rest
+  assert(!is_bottom_frame || !caller.is_interpreted_frame() || (heap_top + fsize) == (caller.unextended_sp() + argsize), "");
 
   relativize_interpreted_frame_metadata(f, hf);
 
@@ -1073,10 +1073,10 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   frame hf = new_heap_frame<ContinuationHelper::CompiledFrame>(f, caller);
 
-  intptr_t* heap_sp = ContinuationHelper::CompiledFrame::frame_top(hf, callee_argsize, callee_interpreted);
+  intptr_t* heap_top = ContinuationHelper::CompiledFrame::frame_top(hf, callee_argsize, callee_interpreted);
 
-  copy_to_chunk(frame_top, heap_sp, fsize);
-  assert(!is_bottom_frame || !caller.is_compiled_frame() || (heap_sp + fsize) == (caller.unextended_sp() + argsize), "");
+  copy_to_chunk(frame_top, heap_top, fsize);
+  assert(!is_bottom_frame || !caller.is_compiled_frame() || (heap_top + fsize) == (caller.unextended_sp() + argsize), "");
 
   if (caller.is_interpreted_frame()) {
     _total_align_size += frame::align_wiggle; // See Thaw::align
@@ -1124,8 +1124,8 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false);)
   frame hf = new_heap_frame<ContinuationHelper::StubFrame>(f, caller);
-  intptr_t* heap_sp = ContinuationHelper::StubFrame::frame_top(hf, 0, 0);
-  copy_to_chunk(frame_top, heap_sp, fsize);
+  intptr_t* heap_top = ContinuationHelper::StubFrame::frame_top(hf, 0, 0);
+  copy_to_chunk(frame_top, heap_top, fsize);
   DEBUG_ONLY(after_freeze_java_frame(hf, false);)
 
   caller = hf;
@@ -1937,11 +1937,11 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, is_bottom_frame);
 
   intptr_t* const frame_top = f.sp();
-  intptr_t* const heap_sp = hf.unextended_sp();
+  intptr_t* const heap_top = hf.unextended_sp();
   intptr_t* const frame_bottom = ContinuationHelper::InterpretedFrame::frame_bottom(f);
 
   assert(hf.is_heap_frame(), "should be");
-  const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - heap_sp;
+  const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - heap_top;
 
   assert(!is_bottom_frame || frame_top + fsize >= _cont.entrySP() - 2, "");
   assert(!is_bottom_frame || frame_top + fsize <= _cont.entrySP(), "");
@@ -1955,7 +1955,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
   copy_from_chunk(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - locals,
                   ContinuationHelper::InterpretedFrame::frame_bottom(f) - locals, locals); // copy locals
-  copy_from_chunk(heap_sp, frame_top, fsize - locals); // copy rest
+  copy_from_chunk(heap_top, frame_top, fsize - locals); // copy rest
 
   set_interpreter_frame_bottom(f, frame_bottom); // the copy overwrites the metadata
   derelativize_interpreted_frame_metadata(hf, f);
@@ -2000,13 +2000,13 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
   frame f = new_stack_frame<ContinuationHelper::CompiledFrame>(hf, caller, is_bottom_frame);
   intptr_t* const frame_top = f.sp();
-  intptr_t* const heap_sp = hf.unextended_sp();
+  intptr_t* const heap_top = hf.unextended_sp();
 
   const int added_argsize = (is_bottom_frame || caller.is_interpreted_frame()) ? hf.compiled_frame_stack_argsize() : 0;
   int fsize = ContinuationHelper::CompiledFrame::size(hf) + added_argsize;
   assert(fsize <= (int)(caller.unextended_sp() - f.unextended_sp()), "");
 
-  intptr_t* from = heap_sp - frame::metadata_words;
+  intptr_t* from = heap_top - frame::metadata_words;
   intptr_t* to   = frame_top - frame::metadata_words;
   int sz = fsize + frame::metadata_words;
 
@@ -2042,7 +2042,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     // can only fix caller once this frame is thawed (due to callee saved regs); this happens on the stack
     _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
   } else if (_cont.tail()->has_bitmap() && added_argsize > 0) {
-    clear_bitmap_bits(heap_sp + ContinuationHelper::CompiledFrame::size(hf), added_argsize);
+    clear_bitmap_bits(heap_top + ContinuationHelper::CompiledFrame::size(hf), added_argsize);
   }
 
   DEBUG_ONLY(after_thaw_java_frame(f, is_bottom_frame);)
@@ -2075,9 +2075,9 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
 
   frame f = new_stack_frame<ContinuationHelper::StubFrame>(hf, caller, false);
   intptr_t* frame_top = f.sp();
-  intptr_t* heap_sp = hf.sp();
+  intptr_t* heap_top = hf.sp();
 
-  copy_from_chunk(heap_sp - frame::metadata_words, frame_top - frame::metadata_words,
+  copy_from_chunk(heap_top - frame::metadata_words, frame_top - frame::metadata_words,
                   fsize + frame::metadata_words);
 
   { // can only fix caller once this frame is thawed (due to callee saved regs)
