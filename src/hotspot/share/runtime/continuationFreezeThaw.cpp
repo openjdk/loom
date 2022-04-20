@@ -1798,11 +1798,11 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   }
 
 #if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
-  if ((UseZGC || UseShenandoahGC) && !chunk->is_gc_mode()) {
+  // Read the flags with load_acquire to ensure that relativization is
+  // observed if GC mode is set
+  if ((UseZGC || UseShenandoahGC) && !chunk->is_gc_mode_acquire()) {
     _cont.tail()->relativize_derived_pointers_concurrently();
   }
-  // Ensure that the barriers applied later read oops after the relativization
-  OrderAccess::loadload();
 #endif
 
   frame caller;

@@ -188,8 +188,12 @@ public:
 
 bool stackChunkOopDesc::try_acquire_relativization() {
   for (;;) {
-    uint8_t flags_before = flags();
-    OrderAccess::loadload();
+    // We use an acquiring load when reading the flags to ensure that if we leave this
+    // function thinking that relativization is finished, we know that if another thread
+    // did the relativization, we will still be able to observe the relativized derived
+    // pointers, which is important as subsequent modifications of derived pointers must
+    // happen after relativization.
+    uint8_t flags_before = flags_acquire();
     if ((flags_before & FLAG_GC_MODE) != 0) {
       // Terminal state - relativization is ensured
       return false;
@@ -198,8 +202,7 @@ bool stackChunkOopDesc::try_acquire_relativization() {
     if ((flags_before & FLAG_CLAIM_RELATIVIZE) != 0) {
       // Someone else has claimed relativization - wait for completion
       MonitorLocker ml(ContinuationRelativize_lock, Mutex::_no_safepoint_check_flag);
-      uint8_t flags_under_lock = flags();
-      OrderAccess::loadload();
+      uint8_t flags_under_lock = flags_acquire();
       if ((flags_under_lock & FLAG_GC_MODE) != 0) {
         // Terminal state - relativization is ensured
         return false;
@@ -221,15 +224,17 @@ bool stackChunkOopDesc::try_acquire_relativization() {
 }
 
 void stackChunkOopDesc::release_relativization() {
-  OrderAccess::storestore();
   for (;;) {
     uint8_t flags_before = flags();
     if ((flags_before & FLAG_NOTIFY_RELATIVIZE) != 0) {
       MonitorLocker ml(ContinuationRelativize_lock, Mutex::_no_safepoint_check_flag);
       // No need to CAS the terminal state; nobody else can be racingly mutating here
       // as both claim and notify flags are already set (and monotonic)
+      // We do however need to use a releasing store on the flags, to ensure that
+      // the reader of that value (using load_acquire) will be able to observe
+      // the relativization of the derived pointers
       uint8_t flags_under_lock = flags();
-      set_flags(flags_under_lock | FLAG_GC_MODE);
+      release_set_flags(flags_under_lock | FLAG_GC_MODE);
       ml.notify_all();
       return;
     }
