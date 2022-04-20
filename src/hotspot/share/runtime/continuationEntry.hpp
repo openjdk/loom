@@ -78,6 +78,7 @@ public:
   static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
 
   ContinuationEntry* parent() const { return _parent; }
+  int parent_held_monitor_count() const { return _parent_held_monitor_count; }
 
   static address entry_pc() { return return_pc; }
   intptr_t* entry_sp() const { return (intptr_t*)this; }

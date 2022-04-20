@@ -1269,31 +1269,14 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
 }
 #endif // INCLUDE_JVMTI
 
-static freeze_result is_pinned(const frame& f, RegisterMap* map) {
-  if (f.is_interpreted_frame()) {
-    if (ContinuationHelper::InterpretedFrame::is_owning_locks(f)) {
-      return freeze_pinned_monitor;
-    }
-    if (f.interpreter_frame_method()->is_native()) {
-      return freeze_pinned_native; // interpreter native entry
-    }
-  } else if (f.is_compiled_frame()) {
-    if (ContinuationHelper::CompiledFrame::is_owning_locks(map->thread(), map, f)) {
-      return freeze_pinned_monitor;
-    }
-  } else {
-    return freeze_pinned_native;
-  }
-  return freeze_ok;
-}
-
 #ifdef ASSERT
 static bool monitors_on_stack(JavaThread* thread) {
   ContinuationEntry* ce = thread->last_continuation();
   RegisterMap map(thread, true, false, false);
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
-    if (is_pinned(f, &map) == freeze_pinned_monitor) {
+    if (f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f) ||
+        f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f)) {
       return true;
     }
   }
@@ -1407,6 +1390,8 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   }
   if (entry->is_pinned()) {
     return freeze_pinned_cs;
+  } else if (thread->held_monitor_count() > 0) {
+    return freeze_pinned_monitor;
   }
 
   RegisterMap map(thread, true, false, false);
@@ -1429,9 +1414,8 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   }
 
   while (true) {
-    freeze_result res = is_pinned(f, &map);
-    if (res != freeze_ok) {
-      return res;
+    if (f.is_interpreted_frame() && f.interpreter_frame_method()->is_native() || f.is_native_frame()) {
+      return freeze_pinned_native;
     }
 
     f = f.sender(&map);
@@ -1440,12 +1424,15 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
       if (scope == cont_scope) {
         break;
       }
+      int monitor_count = entry->parent_held_monitor_count();
       entry = entry->parent();
       if (entry == nullptr) {
         break;
       }
       if (entry->is_pinned()) {
         return freeze_pinned_cs;
+      } else if (monitor_count > 0) {
+        return freeze_pinned_monitor;
       }
     }
   }
