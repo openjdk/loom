@@ -312,8 +312,10 @@ public:
 
     // This code is called from the STW collectors and don't have concurrent
     // access to the derived pointers. Therefore there's no need to add a
-    // storestore barrier here.
-    assert(SafepointSynchronize::is_at_safepoint(), "Should only be used by STW collectors");
+    // storestore barrier here. Alternatively, we're called from freeze, when
+    // allocating in old.
+    assert(Thread::current()->is_Java_thread() || SafepointSynchronize::is_at_safepoint(),
+      "Should only be used by STW collectors");
 
     CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
     f.iterate_oops(&cl, map);
