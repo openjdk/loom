@@ -29,6 +29,7 @@
 #include "code/compiledMethod.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/memAllocator.hpp"
@@ -1150,6 +1151,13 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   if (UNLIKELY(_barriers)) {
     log_develop_trace(continuations)("do barriers on old chunk");
+    // ParallelGC can allocate objects directly into the old generation.
+    // Then we want to relativize the derived pointers eagerly so that
+    // old chunks are all in GC mode.
+    assert(!UseG1GC, "G1 can not deal with allocating outside of eden");
+    assert(!UseZGC, "ZGC can not deal with allocating chunks visible to marking");
+    assert(!UseShenandoahGC, "Shenandoah can not deal with allocating chunks visible to marking");
+    ContinuationGCSupport::transform_stack_chunk(_cont.tail());
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>();
   }
 
