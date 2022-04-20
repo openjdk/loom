@@ -240,7 +240,7 @@ void stackChunkOopDesc::release_relativization() {
     }
 
     if (try_set_flags(flags_before, flags_before | FLAG_GC_MODE)) {
-      // Successfully set the termnial state; we are done
+      // Successfully set the terminal state; we are done
       return;
     }
   }

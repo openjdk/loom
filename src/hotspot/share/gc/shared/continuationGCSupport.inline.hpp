@@ -37,12 +37,7 @@ inline bool ContinuationGCSupport::relativize_stack_chunk(oop obj) {
   }
 
   stackChunkOop chunk = stackChunkOopDesc::cast(obj);
-  // We use an acquiring load when reading the flags, to ensure that
-  // relativization of derived pointers is observed to subsequent
-  // accesses that may update base pointers.
-  if (!chunk->is_gc_mode_acquire()) {
-    chunk->relativize_derived_pointers_concurrently();
-  }
+  chunk->relativize_derived_pointers_concurrently();
 
   return true;
 }
