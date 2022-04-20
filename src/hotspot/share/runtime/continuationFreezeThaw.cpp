@@ -1388,8 +1388,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   Freeze<ConfigT> fr(current, cont, false);
 
-  bool fast = can_freeze_fast(current);
-  if (fast && fr.is_chunk_available_for_fast_freeze(sp)) {
+  if (can_freeze_fast(current) && fr.is_chunk_available_for_fast_freeze(sp)) {
     freeze_result res = fr.template try_freeze_fast<true>(sp);
     assert(res == freeze_ok, "");
     CONT_JFR_ONLY(fr.jfr_info().post_jfr_event(&event, oopCont, current);)
@@ -1405,8 +1404,8 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
     JvmtiSampledObjectAllocEventCollector jsoaec(false);
     fr.set_jvmti_event_collector(&jsoaec);
 
-    freeze_result res = fast ? fr.template try_freeze_fast<false>(sp)
-                             : fr.freeze_slow();
+    freeze_result res = can_freeze_fast(current) ? fr.template try_freeze_fast<false>(sp)
+                                                 : fr.freeze_slow();
     CONT_JFR_ONLY(fr.jfr_info().post_jfr_event(&event, oopCont, current);)
     freeze_epilog(current, cont, res);
     cont.done(); // allow safepoint in the transition back to Java
