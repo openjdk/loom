@@ -381,7 +381,6 @@ inline void StackChunkFrameStream<frame_kind>::iterate_derived_pointers(DerivedO
 
     Devirtualizer::do_derived_oop(closure, (oop*)base_loc, (derived_pointer*)derived_loc);
   }
-  OrderAccess::storestore(); // to preserve that we set the offset *before* fixing the base oop
 }
 
 #ifdef ASSERT

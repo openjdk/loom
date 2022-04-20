@@ -158,28 +158,6 @@ public:
     *(uintptr_t*)derived_loc = cast_from_oop<uintptr_t>(base) + offset;
   }
 
-  static void verify(stackChunkOop chunk, oop* base_loc, derived_pointer* derived_loc) {
- #if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
-    if (UseZGC || UseShenandoahGC) {
-      // Can't verify all that much with concurrent GCs
-      return;
-    }
- #endif
-
-    oop base = (chunk->has_bitmap() && UseCompressedOops)
-                  ? CompressedOops::decode(Atomic::load((narrowOop*)base_loc))
-                  : Atomic::load((oop*)base_loc);
-    if (base == nullptr) {
-      return;
-    }
-
-    assert(!UseCompressedOops || !CompressedOops::is_base(base), "Should not be the compressed oops base");
-    assert(oopDesc::is_oop(base), "Should be a valid oop");
-
-    // There's not much else we can assert about derived pointers. Their offsets are allowed to
-    // fall outside of their base object, and even be negative.
-  }
-
   struct RelativizeClosure : public DerivedOopClosure {
     virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
       DerivedPointersSupport::relativize(base_loc, derived_loc);
@@ -493,18 +471,6 @@ public:
   int count() const { return _count; }
 };
 
-class StackChunkVerifyDerivedPointersClosure : public DerivedOopClosure {
-  stackChunkOop _chunk;
-
-public:
-  StackChunkVerifyDerivedPointersClosure(stackChunkOop chunk)
-    : _chunk(chunk) {}
-
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    DerivedPointersSupport::verify(_chunk, base_loc, derived_loc);
-  }
-};
-
 class VerifyStackChunkFrameClosure {
   stackChunkOop _chunk;
 
@@ -561,9 +527,6 @@ public:
     StackChunkVerifyOopsClosure oops_closure(_chunk);
     f.iterate_oops(&oops_closure, map);
     assert(oops_closure.count() == num_oops, "oops: %d oopmap->num_oops(): %d", oops_closure.count(), num_oops);
-
-    StackChunkVerifyDerivedPointersClosure derived_oops_closure(_chunk);
-    f.iterate_derived_pointers(&derived_oops_closure, map);
 
     _callee_interpreted = f.is_interpreted();
     _num_frames++;
