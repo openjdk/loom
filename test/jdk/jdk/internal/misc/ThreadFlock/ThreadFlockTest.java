@@ -639,6 +639,9 @@ public class ThreadFlockTest {
         }
     }
 
+    /**
+     * Test that a thread created with the given factory cannot call awaitAll.
+     */
     private void testAwaitAllConfined(ThreadFlock flock,
                                       Function<Runnable, Thread> factory) throws Exception {
         var exception = new AtomicReference<Exception>();
