@@ -182,8 +182,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 ## regressions in jep-vt
 
 serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java        8279663 windows-all
-serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorVMEventsTest.java#id0  8280914 generic-all
-serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorVMEventsTest.java#id1  8280914 generic-all
 serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1          8283818 generic-all
 # Stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
