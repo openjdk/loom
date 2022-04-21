@@ -418,7 +418,7 @@ class java_lang_Thread : AllStatic {
   static int _tid_offset;
   static int _continuation_offset;
   static int _park_blocker_offset;
-  static int _scopeLocalBindings_offset;
+  static int _extentLocalBindings_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
 
   static void compute_offsets();
@@ -468,7 +468,7 @@ class java_lang_Thread : AllStatic {
   static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
 
   // Clear all scope local bindings on error
-  static void clear_scopeLocalBindings(oop java_thread);
+  static void clear_extentLocalBindings(oop java_thread);
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);

@@ -466,22 +466,22 @@ public interface JavaLangAccess {
     /**
      * Returns the current thread's scope locals cache
      */
-    Object[] scopeLocalCache();
+    Object[] extentLocalCache();
 
     /**
      * Sets the current thread's scope locals cache
      */
-    void setScopeLocalCache(Object[] cache);
+    void setExtentLocalCache(Object[] cache);
 
     /**
      * Return the current thread's scope local bindings.
      */
-    Object scopeLocalBindings();
+    Object extentLocalBindings();
 
     /**
      * Set the current thread's scope local bindings.
      */
-    void setScopeLocalBindings(Object bindings);
+    void setExtentLocalBindings(Object bindings);
 
     /**
      * Returns the innermost mounted continuation

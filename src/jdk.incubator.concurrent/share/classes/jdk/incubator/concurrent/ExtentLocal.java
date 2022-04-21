@@ -35,7 +35,7 @@ import java.util.function.Supplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.ScopeLocalContainer;
+import jdk.internal.vm.ExtentLocalContainer;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
@@ -44,17 +44,17 @@ import jdk.internal.vm.annotation.Stable;
 /**
  * Represents a scoped value.
  *
- * <p> A scope-local value (hereinafter called a scope local) differs from a normal variable in that it is dynamically
+ * <p> A extent-local value (hereinafter called a scope local) differs from a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
- * to a transitive callee without using an explicit parameter. A scope-local value
+ * to a transitive callee without using an explicit parameter. A extent-local value
  * does not have a default/initial value: it is bound, meaning it gets a value,
- * when executing an operation specified to {@link #where(ScopeLocal, Object)}.
+ * when executing an operation specified to {@link #where(ExtentLocal, Object)}.
  * Code executed by the operation
  * uses the {@link #get()} method to get the value of the scope local. The scope local reverts
  * to being unbound (or its previous value) when the operation completes.
  *
  * <p> Access to the value of a scope local is controlled by the accessibility
- * of the {@code ScopeLocal} object. A {@code ScopeLocal} object  will typically be declared
+ * of the {@code ExtentLocal} object. A {@code ExtentLocal} object  will typically be declared
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
@@ -71,10 +71,10 @@ import jdk.internal.vm.annotation.Stable;
  * The following example uses a scope local to make credentials available to callees.
  *
  * <pre>{@code
- *   private static final ScopeLocal<Credentials> CREDENTIALS = ScopeLocal.newInstance();
+ *   private static final ExtentLocal<Credentials> CREDENTIALS = ExtentLocal.newInstance();
  *
  *   Credentials creds = ...
- *   ScopeLocal.where(CREDENTIALS, creds).run(() -> {
+ *   ExtentLocal.where(CREDENTIALS, creds).run(() -> {
  *       :
  *       Connection connection = connectDatabase();
  *       :
@@ -92,12 +92,12 @@ import jdk.internal.vm.annotation.Stable;
  * small thread-local cache. Subsequent invocations of {@link #get} for that
  * scope local will almost always be very fast. However, if a program has many
  * scope locals that it uses cyclically, the cache hit rate will be low and
- * performance will be poor. On the other hand, this design allows scope-local
+ * performance will be poor. On the other hand, this design allows extent-local
  * inheritance by {@link StructuredTaskScope} threads to be
  * very fast: in essence, no more than copying a pointer, and leaving a
- * scope-local binding also requires little more than updating a pointer.
+ * extent-local binding also requires little more than updating a pointer.
  *
- * Because the scope-local per-thread cache is small, you should try to minimize
+ * Because the extent-local per-thread cache is small, you should try to minimize
  * the number of bound scope locals in use. For example, if you need to pass a
  * number of values as scope locals, it makes sense to create a record class to
  * hold those values, and then bind a single scope local to an instance of that
@@ -106,7 +106,7 @@ import jdk.internal.vm.annotation.Stable;
  * @param <T> the scope local's type
  * @since 19
  */
-public final class ScopeLocal<T> {
+public final class ExtentLocal<T> {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     private final @Stable int hash;
@@ -114,7 +114,7 @@ public final class ScopeLocal<T> {
     public final int hashCode() { return hash; }
 
     /**
-     * An immutable map from {@code ScopeLocal} to values.
+     * An immutable map from {@code ExtentLocal} to values.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
      * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -138,7 +138,7 @@ public final class ScopeLocal<T> {
             this.bitmask = 0;
         }
 
-        Object find(ScopeLocal<?> key) {
+        Object find(ExtentLocal<?> key) {
             int bits = key.bitmask();
             for (Snapshot snapshot = this;
                  containsAll(snapshot.bitmask, bits);
@@ -170,8 +170,8 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * An immutable map from a set of ScopeLocals to their bound values.
-     * When map() or call() is invoked, the ScopeLocals bound in this set
+     * An immutable map from a set of ExtentLocals to their bound values.
+     * When map() or call() is invoked, the ExtentLocals bound in this set
      * are bound, such that calling the get() method returns the associated
      * value.
      * @since 19
@@ -180,11 +180,11 @@ public final class ScopeLocal<T> {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache.
         final int bitmask;
-        final ScopeLocal<?> key;
+        final ExtentLocal<?> key;
         final Object value;
         final Carrier prev;
 
-        Carrier(ScopeLocal<?> key, Object value, Carrier prev) {
+        Carrier(ExtentLocal<?> key, Object value, Carrier prev) {
             this.key = key;
             this.value = value;
             this.prev = prev;
@@ -198,7 +198,7 @@ public final class ScopeLocal<T> {
         /**
          * Add a binding to this map, returning a new Carrier instance.
          */
-        private static final <T> Carrier where(ScopeLocal<T> key, T value,
+        private static final <T> Carrier where(ExtentLocal<T> key, T value,
                                                Carrier prev) {
             return new Carrier(key, value, prev);
         }
@@ -206,19 +206,19 @@ public final class ScopeLocal<T> {
         /**
          * Return a new map, which consists of the contents of this map plus a
          * new binding of key and value.
-         * @param key   The ScopeLocal to bind a value to
+         * @param key   The ExtentLocal to bind a value to
          * @param value The new value
-         * @param <T>   The type of the ScopeLocal
+         * @param <T>   The type of the ExtentLocal
          * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
          */
-        public final <T> Carrier where(ScopeLocal<T> key, T value) {
+        public final <T> Carrier where(ExtentLocal<T> key, T value) {
             return where(key, value, this);
         }
 
         /*
          * Return a new set consisting of a single binding.
          */
-        static final <T> Carrier of(ScopeLocal<T> key, T value) {
+        static final <T> Carrier of(ExtentLocal<T> key, T value) {
             return where(key, value, null);
         }
 
@@ -226,20 +226,20 @@ public final class ScopeLocal<T> {
             return value;
         }
 
-        final ScopeLocal<?> getKey() {
+        final ExtentLocal<?> getKey() {
             return key;
         }
 
         /**
          * Search for the value of a binding in this set
-         * @param key the ScopeLocal to find
-         * @param <T> the type of the ScopeLocal
+         * @param key the ExtentLocal to find
+         * @param <T> the type of the ExtentLocal
          * @return the value
          * @throws NoSuchElementException if key is not bound to any value
          *
          */
         @SuppressWarnings("unchecked")
-        public final <T> T get(ScopeLocal<T> key) {
+        public final <T> T get(ExtentLocal<T> key) {
             var bits = key.bitmask();
             for (Carrier carrier = this;
                  carrier != null && containsAll(carrier.bitmask, bits);
@@ -253,7 +253,7 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with some ScopeLocals bound to values.
+         * Run a value-returning operation with some ExtentLocals bound to values.
          * Code executed by the operation can use the {@link #get()} method to
          * get the value of the scope local. The scope locals revert to their previous values or
          * become {@linkplain #isBound() unbound} when the operation completes.
@@ -272,20 +272,20 @@ public final class ScopeLocal<T> {
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            var prevBindings = addScopeLocalBindings(this);
+            var prevBindings = addExtentLocalBindings(this);
             try {
-                return ScopeLocalContainer.call(op);
+                return ExtentLocalContainer.call(op);
             } catch (Throwable t) {
-                setScopeLocalCache(null); // Cache.invalidate();
+                setExtentLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
-                setScopeLocalBindings(prevBindings);
+                setExtentLocalBindings(prevBindings);
                 Cache.invalidate(bitmask);
             }
         }
 
         /**
-         * Run a value-returning operation with this set of ScopeLocals bound to values,
+         * Run a value-returning operation with this set of ExtentLocals bound to values,
          * in the same way as {@code call()}.<p>
          *     If the operation throws an exception, pass it as a single argument to the {@link Function}
          *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
@@ -305,7 +305,7 @@ public final class ScopeLocal<T> {
         }
 
         /**
-         * Runs an operation with some ScopeLocals bound to our values.
+         * Runs an operation with some ExtentLocals bound to our values.
          * Code executed by the operation can use the {@link #get()} method to
          * get the value of the scope local. The scope locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
@@ -321,14 +321,14 @@ public final class ScopeLocal<T> {
         public final void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            var prevBindings = addScopeLocalBindings(this);
+            var prevBindings = addExtentLocalBindings(this);
             try {
-                ScopeLocalContainer.run(op);
+                ExtentLocalContainer.run(op);
             } catch (Throwable t) {
-                setScopeLocalCache(null); // Cache.invalidate();
+                setExtentLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
-                setScopeLocalBindings(prevBindings);
+                setExtentLocalBindings(prevBindings);
                 Cache.invalidate(bitmask);
             }
         }
@@ -336,10 +336,10 @@ public final class ScopeLocal<T> {
         /*
          * Add a list of bindings to the current Thread's set of bound values.
          */
-        private static final Snapshot addScopeLocalBindings(Carrier bindings) {
-            Snapshot prev = scopeLocalBindings();
+        private static final Snapshot addExtentLocalBindings(Carrier bindings) {
+            Snapshot prev = extentLocalBindings();
             var b = new Snapshot(bindings, prev);
-            ScopeLocal.setScopeLocalBindings(b);
+            ExtentLocal.setExtentLocalBindings(b);
             return prev;
         }
 
@@ -356,59 +356,59 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Create a binding for a ScopeLocal instance.
+     * Create a binding for a ExtentLocal instance.
      * That {@link Carrier} may be used later to invoke a {@link Callable} or
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier}
-     * by the {@link Carrier#where(ScopeLocal, Object)} method.
+     * by the {@link Carrier#where(ExtentLocal, Object)} method.
      *
-     * @param key the ScopeLocal to bind
+     * @param key the ExtentLocal to bind
      * @param value The value to bind it to
-     * @param <T> the type of the ScopeLocal
+     * @param <T> the type of the ExtentLocal
      * @return A Carrier instance that contains one binding, that of key and value
      */
-    public static <T> Carrier where(ScopeLocal<T> key, T value) {
+    public static <T> Carrier where(ExtentLocal<T> key, T value) {
         return Carrier.of(key, value);
     }
 
     /**
-     * Creates a binding for a ScopeLocal instance and runs a value-returning
-     * operation with that bound ScopeLocal.
-     * @param key the ScopeLocal to bind
+     * Creates a binding for a ExtentLocal instance and runs a value-returning
+     * operation with that bound ExtentLocal.
+     * @param key the ExtentLocal to bind
      * @param value The value to bind it to
-     * @param <T> the type of the ScopeLocal
+     * @param <T> the type of the ExtentLocal
      * @param <U> the type of the Result
      * @param op the operation to call
      * @return the result
      * @throws Exception if the operation completes with an exception
      */
-    public static <T, U> U where(ScopeLocal<T> key, T value, Callable<U> op) throws Exception {
+    public static <T, U> U where(ExtentLocal<T> key, T value, Callable<U> op) throws Exception {
         return where(key, value).call(op);
     }
 
     /**
-     * Creates a binding for a ScopeLocal instance and runs an
-     * operation with that bound ScopeLocal.
-     * @param key the ScopeLocal to bind
+     * Creates a binding for a ExtentLocal instance and runs an
+     * operation with that bound ExtentLocal.
+     * @param key the ExtentLocal to bind
      * @param value The value to bind it to
-     * @param <T> the type of the ScopeLocal
+     * @param <T> the type of the ExtentLocal
      * @param op the operation to run
      */
-    public static <T> void where(ScopeLocal<T> key, T value, Runnable op) {
+    public static <T> void where(ExtentLocal<T> key, T value, Runnable op) {
         where(key, value).run(op);
     }
 
-    private ScopeLocal() {
+    private ExtentLocal() {
         this.hash = generateKey();
     }
 
     /**
-     * Creates a scope-local handle to refer to a value of type T.
+     * Creates a extent-local handle to refer to a value of type T.
      *
      * @param <T> the type of the scope local's value.
-     * @return a scope-local handle
+     * @return a extent-local handle
      */
-    public static <T> ScopeLocal<T> newInstance() {
-        return new ScopeLocal<T>();
+    public static <T> ExtentLocal<T> newInstance() {
+        return new ExtentLocal<T>();
     }
 
     /**
@@ -420,7 +420,7 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     public T get() {
         Object[] objects;
-        if ((objects = scopeLocalCache()) != null) {
+        if ((objects = extentLocalCache()) != null) {
             // This code should perhaps be in class Cache. We do it
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
@@ -454,7 +454,7 @@ public final class ScopeLocal<T> {
     @SuppressWarnings("unchecked")
     public boolean isBound() {
         // ??? Do we want to search cache for this? In most cases we don't expect
-        // this {@link ScopeLocal} to be bound, so it's not worth it. But I may
+        // this {@link ExtentLocal} to be bound, so it's not worth it. But I may
         // be wrong about that.
 /*
         if (Cache.find(this) != Snapshot.NIL) {
@@ -468,7 +468,7 @@ public final class ScopeLocal<T> {
      * Return the value of the scope local or NIL if not bound.
      */
     private Object findBinding() {
-        Object value = scopeLocalBindings().find(this);
+        Object value = extentLocalBindings().find(this);
         return value;
     }
 
@@ -509,16 +509,16 @@ public final class ScopeLocal<T> {
         }
     }
 
-    private static Object[] scopeLocalCache() {
-        return JLA.scopeLocalCache();
+    private static Object[] extentLocalCache() {
+        return JLA.extentLocalCache();
     }
 
-    private static void setScopeLocalCache(Object[] cache) {
-        JLA.setScopeLocalCache(cache);
+    private static void setExtentLocalCache(Object[] cache) {
+        JLA.setExtentLocalCache(cache);
     }
 
-    private static Snapshot scopeLocalBindings() {
-        Object bindings = JLA.scopeLocalBindings();
+    private static Snapshot extentLocalBindings() {
+        Object bindings = JLA.extentLocalBindings();
         if (bindings != null) {
             return (Snapshot) bindings;
         } else {
@@ -526,8 +526,8 @@ public final class ScopeLocal<T> {
         }
     }
 
-    private static void setScopeLocalBindings(Snapshot bindings) {
-        JLA.setScopeLocalBindings(bindings);
+    private static void setExtentLocalBindings(Snapshot bindings) {
+        JLA.setExtentLocalBindings(bindings);
     }
 
     private static int nextKey = 0xf0f0_f0f0;
@@ -548,9 +548,9 @@ public final class ScopeLocal<T> {
     }
 
     /**
-     * Return a bit mask that may be used to determine if this ScopeLocal is
+     * Return a bit mask that may be used to determine if this ExtentLocal is
      * bound in the current context. Each Carrier holds a bit mask which is
-     * the OR of all the bit masks of the bound ScopeLocals.
+     * the OR of all the bit masks of the bound ExtentLocals.
      * @return the bitmask
      */
     int bitmask() {
@@ -572,19 +572,19 @@ public final class ScopeLocal<T> {
         static final int TABLE_MASK = TABLE_SIZE - 1;
         static final int PRIMARY_MASK = (1 << TABLE_SIZE) - 1;
 
-        static final int primaryIndex(ScopeLocal<?> key) {
+        static final int primaryIndex(ExtentLocal<?> key) {
             return key.hash & TABLE_MASK;
         }
 
-        static final int secondaryIndex(ScopeLocal<?> key) {
+        static final int secondaryIndex(ExtentLocal<?> key) {
             return (key.hash >> INDEX_BITS) & TABLE_MASK;
         }
 
-        static void put(ScopeLocal<?> key, Object value) {
-            Object[] theCache = scopeLocalCache();
+        static void put(ExtentLocal<?> key, Object value) {
+            Object[] theCache = extentLocalCache();
             if (theCache == null) {
                 theCache = new Object[TABLE_SIZE * 2];
-                setScopeLocalCache(theCache);
+                setExtentLocalCache(theCache);
             }
             // Update the cache to replace one entry with the value we just looked up.
             // Each value can be in one of two possible places in the cache.
@@ -602,7 +602,7 @@ public final class ScopeLocal<T> {
 
         private static final void update(Object key, Object value) {
             Object[] objects;
-            if ((objects = scopeLocalCache()) != null) {
+            if ((objects = extentLocalCache()) != null) {
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, key, value);
@@ -616,7 +616,7 @@ public final class ScopeLocal<T> {
 
         private static final void remove(Object key) {
             Object[] objects;
-            if ((objects = scopeLocalCache()) != null) {
+            if ((objects = extentLocalCache()) != null) {
                 int k1 = key.hashCode() & TABLE_MASK;
                 if (getKey(objects, k1) == key) {
                     setKeyAndObjectAt(k1, null, null);
@@ -629,8 +629,8 @@ public final class ScopeLocal<T> {
         }
 
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
-            scopeLocalCache()[n * 2] = key;
-            scopeLocalCache()[n * 2 + 1] = value;
+            extentLocalCache()[n * 2] = key;
+            extentLocalCache()[n * 2 + 1] = value;
         }
 
         private static Object getKey(Object[] objs, int n) {
@@ -655,7 +655,7 @@ public final class ScopeLocal<T> {
 
         @ReservedStackAccess @DontInline
         public static void invalidate() {
-            setScopeLocalCache(null);
+            setExtentLocalCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
@@ -663,7 +663,7 @@ public final class ScopeLocal<T> {
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
-            if ((objects = scopeLocalCache()) != null) {
+            if ((objects = extentLocalCache()) != null) {
                 for (int bits = toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
                     setKeyAndObjectAt(index, null, null);
