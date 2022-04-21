@@ -36,26 +36,19 @@ vmTestbase/nsk/jvmti/scenarios/sampling/SP07/sp07t002/TestDescription.java 82456
 serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 #############################################################################
-# Loom
 
-####
-## Regressions in jep-vt
+# Loom
 
 runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 generic-all
 
-####
-## Failures in jep-vt related to vritual threads functionality
-
+# JVMTI FramePop and stack depth issues using the internal Continuation API directly
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all
 
-####
-## Test problems in jdk/jdk, not loom regressions but not reproduced in jdk/jdk
-
+# test issues that don't reproduce in jdk repo
 serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
 
-####
-## fibers branch only failures, reproduced with --enable-preview only
+#### fibers branch only failures
 
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
 gc/whitebox/TestConcMarkCycleWB.java                                    8284404 generic-all
