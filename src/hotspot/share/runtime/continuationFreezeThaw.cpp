@@ -753,16 +753,9 @@ NOINLINE freeze_result FreezeBase::freeze(frame& f, frame& caller, int callee_ar
       // special native frame
       return freeze_pinned_native;
     }
-    if (UNLIKELY(ContinuationHelper::CompiledFrame::is_owning_locks(_cont.thread(), SmallRegisterMap::instance, f))) {
-      return freeze_pinned_monitor;
-    }
-
     return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
   } else if (f.is_interpreted_frame()) {
     assert((_preempt && top) || !f.interpreter_frame_method()->is_native(), "");
-    if (ContinuationHelper::InterpretedFrame::is_owning_locks(f)) {
-      return freeze_pinned_monitor;
-    }
     if (_preempt && top && f.interpreter_frame_method()->is_native()) {
       // int native entry
       return freeze_pinned_native;
@@ -1110,9 +1103,6 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
     // native frame
     return freeze_pinned_native;
   }
-  if (UNLIKELY(ContinuationHelper::CompiledFrame::is_owning_locks(_cont.thread(), &map, senderf))) {
-    return freeze_pinned_monitor;
-  }
 
   freeze_result result = recurse_freeze_compiled_frame(senderf, caller, 0, 0); // This might be deoptimized
   if (UNLIKELY(result > freeze_ok_bottom)) {
@@ -1287,31 +1277,14 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
 }
 #endif // INCLUDE_JVMTI
 
-static freeze_result is_pinned(const frame& f, RegisterMap* map) {
-  if (f.is_interpreted_frame()) {
-    if (ContinuationHelper::InterpretedFrame::is_owning_locks(f)) {
-      return freeze_pinned_monitor;
-    }
-    if (f.interpreter_frame_method()->is_native()) {
-      return freeze_pinned_native; // interpreter native entry
-    }
-  } else if (f.is_compiled_frame()) {
-    if (ContinuationHelper::CompiledFrame::is_owning_locks(map->thread(), map, f)) {
-      return freeze_pinned_monitor;
-    }
-  } else {
-    return freeze_pinned_native;
-  }
-  return freeze_ok;
-}
-
 #ifdef ASSERT
 static bool monitors_on_stack(JavaThread* thread) {
   ContinuationEntry* ce = thread->last_continuation();
   RegisterMap map(thread, true, false, false);
   map.set_include_argument_oops(false);
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
-    if (is_pinned(f, &map) == freeze_pinned_monitor) {
+    if ((f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f)) ||
+        (f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f))) {
       return true;
     }
   }
@@ -1330,19 +1303,6 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
   return false;
 }
 #endif // ASSERT
-
-static inline bool can_freeze_fast(JavaThread* thread) {
-  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c adapter or called Deoptimization::unpack_frames
-  // Calls from native frames also go through the interpreter (see JavaCalls::call_helper)
-  assert(!thread->cont_fastpath()
-         || (thread->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(thread)), "");
-
-  // We also clear thread->cont_fastpath on deoptimization (notify_deopt) and when we thaw interpreted frames
-  bool fast = thread->cont_fastpath() && UseContinuationFastPath;
-  assert(!fast || monitors_on_stack(thread) == (thread->held_monitor_count() > 0), "");
-  fast = fast && thread->held_monitor_count() == 0;
-  return fast;
-}
 
 static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
@@ -1387,16 +1347,24 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   assert(entry->is_virtual_thread() == (entry->scope() == java_lang_VirtualThread::vthread_scope()), "");
 
-  if (entry->is_pinned()) {
-    log_develop_debug(continuations)("PINNED due to critical section");
+  assert(monitors_on_stack(current) == (current->held_monitor_count() > 0), "");
+
+  if (entry->is_pinned() || current->held_monitor_count() > 0) {
+    log_develop_debug(continuations)("PINNED due to critical section/hold monitor");
     verify_continuation(cont.continuation());
-    log_develop_trace(continuations)("=== end of freeze (fail %d)", freeze_pinned_cs);
-    return freeze_pinned_cs;
+    freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
+    return res;
   }
 
   Freeze<ConfigT> fr(current, cont, false);
 
-  bool fast = can_freeze_fast(current);
+  // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c
+  // adapter or called Deoptimization::unpack_frames. Calls from native frames also go through the interpreter
+  // (see JavaCalls::call_helper).
+  assert(!current->cont_fastpath()
+         || (current->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(current)), "");
+  bool fast = UseContinuationFastPath && current->cont_fastpath();
   if (fast && fr.is_chunk_available_for_fast_freeze(sp)) {
     freeze_result res = fr.template try_freeze_fast<true>(sp);
     assert(res == freeze_ok, "");
@@ -1430,6 +1398,8 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   }
   if (entry->is_pinned()) {
     return freeze_pinned_cs;
+  } else if (thread->held_monitor_count() > 0) {
+    return freeze_pinned_monitor;
   }
 
   RegisterMap map(thread, true, false, false);
@@ -1452,9 +1422,8 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
   }
 
   while (true) {
-    freeze_result res = is_pinned(f, &map);
-    if (res != freeze_ok) {
-      return res;
+    if ((f.is_interpreted_frame() && f.interpreter_frame_method()->is_native()) || f.is_native_frame()) {
+      return freeze_pinned_native;
     }
 
     f = f.sender(&map);
@@ -1463,12 +1432,15 @@ static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoi
       if (scope == cont_scope) {
         break;
       }
+      int monitor_count = entry->parent_held_monitor_count();
       entry = entry->parent();
       if (entry == nullptr) {
         break;
       }
       if (entry->is_pinned()) {
         return freeze_pinned_cs;
+      } else if (monitor_count > 0) {
+        return freeze_pinned_monitor;
       }
     }
   }
