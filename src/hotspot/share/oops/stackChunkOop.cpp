@@ -215,8 +215,11 @@ bool stackChunkOopDesc::try_acquire_relativization() {
         // Relativization is claimed by another thread, and it knows it needs to notify
         ml.wait();
       }
-      // Failed CAS - rerun the loop
-    } else if (try_set_flags(flags_before, flags_before | FLAG_CLAIM_RELATIVIZE)) {
+      // Retry - rerun the loop
+      continue;
+    }
+
+    if (try_set_flags(flags_before, flags_before | FLAG_CLAIM_RELATIVIZE)) {
       // Claimed relativization - let's do it
       return true;
     }
@@ -309,11 +312,6 @@ public:
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
     DerivedPointersSupport::RelativizeClosure derived_cl;
     f.iterate_derived_pointers(&derived_cl, map);
-
-    // This code is called from the STW collectors and don't have concurrent
-    // access to the derived pointers. Therefore there's no need to add a
-    // storestore barrier here.
-    assert(SafepointSynchronize::is_at_safepoint(), "Should only be used by STW collectors");
 
     CompressOopsAndBuildBitmapOopClosure<kind> cl(_chunk);
     f.iterate_oops(&cl, map);

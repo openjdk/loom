@@ -332,7 +332,7 @@ class JvmtiEnvBase : public CHeapObj<mtInternal> {
   static bool get_field_descriptor(Klass* k, jfieldID field, fieldDescriptor* fd);
 
   // check and skip frames hidden in mount/unmount transitions
-  static javaVFrame* check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf);
+  static javaVFrame* check_and_skip_hidden_frames(bool is_in_VTMS_transition, javaVFrame* jvf);
   static javaVFrame* check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf);
   static javaVFrame* check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf);
 
@@ -558,7 +558,7 @@ public:
 };
 
 #ifdef ASSERT
-// HandshakeClosure to print stack trace in JvmtiVTMTDisabler error handling
+// HandshakeClosure to print stack trace in JvmtiVTMSTransitionDisabler error handling.
 class PrintStackTraceClosure : public HandshakeClosure {
  public:
   static void do_thread_impl(Thread *target);
@@ -569,7 +569,7 @@ class PrintStackTraceClosure : public HandshakeClosure {
 };
 #endif
 
-// forward declaration
+// Forward declaration.
 struct StackInfoNode;
 
 // Get stack trace at safepoint or at direct handshake.

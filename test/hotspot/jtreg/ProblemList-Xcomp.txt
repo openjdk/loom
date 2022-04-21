@@ -37,7 +37,18 @@ serviceability/sa/TestJhsdbJstackMixed.java 8248675 linux-aarch64
 
 #############################################################################
 
-# Loom specific
+# Loom
+
+runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 generic-all
+
+# JVMTI FramePop and stack depth issues using the internal Continuation API directly
+serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all
+
+# test issues that don't reproduce in jdk repo
+serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
+
+#### fibers branch only failures
 
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
 gc/whitebox/TestConcMarkCycleWB.java                                    8284404 generic-all
@@ -51,10 +62,3 @@ gc/stringdedup/TestStringDeduplicationInterned.java#Serial              8278127 
 gc/stringdedup/TestStringDeduplicationInterned.java#Z                   8278127 generic-all
 
 gc/z/TestGarbageCollectorMXBean.java                                    8278129 generic-all
-
-runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 generic-all
-
-serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
-
-serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
-serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all

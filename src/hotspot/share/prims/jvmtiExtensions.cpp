@@ -78,7 +78,7 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMSTransitionDisabler disabler;
   ThreadsListHandle tlh(current_thread);
 
   jvmtiError err;
@@ -131,7 +131,7 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMSTransitionDisabler disabler;
 
   ThreadsListHandle tlh(current_thread);
   JavaThread* java_thread;
