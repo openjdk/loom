@@ -215,8 +215,11 @@ bool stackChunkOopDesc::try_acquire_relativization() {
         // Relativization is claimed by another thread, and it knows it needs to notify
         ml.wait();
       }
-      // Failed CAS - rerun the loop
-    } else if (try_set_flags(flags_before, flags_before | FLAG_CLAIM_RELATIVIZE)) {
+      // Retry - rerun the loop
+      continue;
+    }
+
+    if (try_set_flags(flags_before, flags_before | FLAG_CLAIM_RELATIVIZE)) {
       // Claimed relativization - let's do it
       return true;
     }
