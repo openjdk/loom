@@ -1553,6 +1553,8 @@ protected:
     DEBUG_ONLY(_top_stack_address = _cont.entrySP() - thaw_size(cont.tail());)
   }
 
+  void clear_chunk(stackChunkOop chunk);
+  int remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize);
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size);
 
   // fast path
@@ -1697,12 +1699,12 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 
     partial = false;
     argsize = chunk->argsize(); // must be called *before* clearing the chunk
-    chunk->clear_chunk();
+    clear_chunk(chunk);
     thaw_size = full_chunk_size;
     empty = true;
   } else { // thaw a single frame
     partial = true;
-    thaw_size = chunk->remove_top_compiled_frame(argsize);
+    thaw_size = remove_top_compiled_frame_from_chunk(chunk, argsize);
     empty = chunk->is_empty();
   }
 
@@ -1752,6 +1754,41 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 #endif
 
   return rs.sp();
+}
+
+inline void ThawBase::clear_chunk(stackChunkOop chunk) {
+  chunk->set_sp(chunk->stack_size());
+  chunk->set_argsize(0);
+  chunk->set_max_thawing_size(0);
+}
+
+ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize) {
+  bool empty = false;
+  StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
+  DEBUG_ONLY(intptr_t* const chunk_sp = chunk->start_address() + chunk->sp();)
+  assert(chunk_sp == f.sp(), "");
+  assert(chunk_sp == f.unextended_sp(), "");
+
+  const int frame_size = f.cb()->frame_size();
+  argsize = f.stack_argsize();
+
+  f.next(SmallRegisterMap::instance, true /* stop */);
+  empty = f.is_done();
+  assert(!empty || argsize == chunk->argsize(), "");
+
+  if (empty) {
+    clear_chunk(chunk);
+  } else {
+    chunk->set_sp(chunk->sp() + frame_size);
+    chunk->set_max_thawing_size(chunk->max_thawing_size() - frame_size);
+    // We set chunk->pc to the return pc into the next frame
+    chunk->set_pc(f.pc());
+    assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
+  }
+  assert(empty == chunk->is_empty(), "");
+  // returns the size required to store the frame on stack, and because it is a
+  // compiled frame, it must include a copy of the arguments passed by the caller
+  return frame_size + argsize;
 }
 
 void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {

@@ -132,9 +132,6 @@ public:
 
   inline bool requires_barriers();
 
-  inline void clear_chunk();
-  inline int remove_top_compiled_frame(int &argsize);
-
   template <BarrierType>
   void do_barriers();
 

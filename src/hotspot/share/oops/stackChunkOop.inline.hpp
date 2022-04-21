@@ -167,41 +167,6 @@ inline bool stackChunkOopDesc::requires_barriers() {
   return Universe::heap()->requires_barriers(this);
 }
 
-inline void stackChunkOopDesc::clear_chunk() {
-  set_sp(stack_size());
-  set_argsize(0);
-  set_max_thawing_size(0);
-}
-
-inline int stackChunkOopDesc::remove_top_compiled_frame(int &argsize) {
-  bool empty = false;
-  StackChunkFrameStream<ChunkFrames::CompiledOnly> f(this);
-  DEBUG_ONLY(intptr_t* const chunk_sp = start_address() + sp();)
-  assert(chunk_sp == f.sp(), "");
-  assert(chunk_sp == f.unextended_sp(), "");
-
-  const int frame_size = f.cb()->frame_size();
-  argsize = f.stack_argsize();
-
-  f.next(SmallRegisterMap::instance, true /* stop */);
-  empty = f.is_done();
-  assert(!empty || argsize == this->argsize(), "");
-
-  if (empty) {
-    clear_chunk();
-  } else {
-    set_sp(sp() + frame_size);
-    set_max_thawing_size(max_thawing_size() - frame_size);
-    // We set chunk->pc to the return pc into the next frame
-    set_pc(f.pc());
-    assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
-  }
-  assert(empty == is_empty(), "");
-  // returns the size required to store the frame on stack, and because it is a
-  // compiled frame, it must include a copy of the arguments passed by the caller
-  return frame_size + argsize;
-}
-
 template <stackChunkOopDesc::BarrierType barrier, ChunkFrames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   if (frame_kind == ChunkFrames::Mixed) {
