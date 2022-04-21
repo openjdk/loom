@@ -76,7 +76,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   err = jvmti->GetMethodName(method, &methNam, &methSig, NULL);
   if (err != JVMTI_ERROR_NONE) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN0("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
+    COMPLAIN("TEST FAILED: unable to get method name during NativeMethodBind callback\n\n");
     return;
   }
 
@@ -150,7 +150,7 @@ Java_nativemethbind03_registerNative(
   testedCls = jni->FindClass(CLASS_SIG);
   if (testedCls == NULL) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN1("TEST FAILURE: unable to find class \"%s\"\n\n",
+    COMPLAIN("TEST FAILURE: unable to find class \"%s\"\n\n",
                   CLASS_SIG);
     return;
   }
@@ -164,7 +164,7 @@ Java_nativemethbind03_registerNative(
       METHODS[0], METHODS[1], CLASS_SIG);
   if (jni->RegisterNatives(testedCls, &meth, 1) != 0) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN3("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
+    COMPLAIN("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
                   METHODS[0], METHODS[1], CLASS_SIG);
   }
 
@@ -172,7 +172,7 @@ Java_nativemethbind03_registerNative(
                CLASS_SIG);
   if (jni->UnregisterNatives(testedCls) != 0) {
     result = STATUS_FAILED;
-    NSK_COMPLAIN3("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
+    COMPLAIN("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
                   METHODS[1][0], METHODS[1][1], CLASS_SIG);
   }
 }

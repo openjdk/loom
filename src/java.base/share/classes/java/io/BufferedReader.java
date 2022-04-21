@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -98,7 +98,7 @@ public class BufferedReader extends Reader {
      * @throws IllegalArgumentException  If {@code sz <= 0}
      */
     public BufferedReader(Reader in, int sz) {
-        Objects.requireNonNull(in);
+        super(in);
         if (sz <= 0)
             throw new IllegalArgumentException("Buffer size <= 0");
         this.in = in;
@@ -179,18 +179,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedRead();
+                return implRead();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedRead();
+                return implRead();
             }
         }
     }
 
-    private int lockedRead() throws IOException {
+    private int implRead() throws IOException {
         ensureOpen();
         for (;;) {
             if (nextChar >= nChars) {
@@ -294,18 +294,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedRead(cbuf, off, len);
+                return implRead(cbuf, off, len);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedRead(cbuf, off, len);
+                return implRead(cbuf, off, len);
             }
         }
     }
 
-    private int lockedRead(char[] cbuf, int off, int len) throws IOException {
+    private int implRead(char[] cbuf, int off, int len) throws IOException {
         ensureOpen();
         Objects.checkFromIndexSize(off, len, cbuf.length);
         if (len == 0) {
@@ -345,18 +345,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedReadLine(ignoreLF, term);
+                return implReadLine(ignoreLF, term);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedReadLine(ignoreLF, term);
+                return implReadLine(ignoreLF, term);
             }
         }
     }
 
-    private String lockedReadLine(boolean ignoreLF, boolean[] term) throws IOException {
+    private String implReadLine(boolean ignoreLF, boolean[] term) throws IOException {
         StringBuilder s = null;
         int startChar;
 
@@ -448,18 +448,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedSkip(n);
+                return implSkip(n);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedSkip(n);
+                return implSkip(n);
             }
         }
     }
 
-    private long lockedSkip(long n) throws IOException {
+    private long implSkip(long n) throws IOException {
         ensureOpen();
         long r = n;
         while (r > 0) {
@@ -499,18 +499,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                return lockedReady();
+                return implReady();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                return lockedReady();
+                return implReady();
             }
         }
     }
 
-    private boolean lockedReady() throws IOException {
+    private boolean implReady() throws IOException {
         ensureOpen();
 
         /*
@@ -564,18 +564,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedMark(readAheadLimit);
+                implMark(readAheadLimit);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedMark(readAheadLimit);
+                implMark(readAheadLimit);
             }
         }
     }
 
-    private void lockedMark(int readAheadLimit) throws IOException {
+    private void implMark(int readAheadLimit) throws IOException {
         ensureOpen();
         this.readAheadLimit = readAheadLimit;
         markedChar = nextChar;
@@ -593,18 +593,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedReset();
+                implReset();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedReset();
+                implReset();
             }
         }
     }
 
-    private void lockedReset() throws IOException {
+    private void implReset() throws IOException {
         ensureOpen();
         if (markedChar < 0)
             throw new IOException((markedChar == INVALIDATED)
@@ -619,18 +619,18 @@ public class BufferedReader extends Reader {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedClose();
+                implClose();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedClose();
+                implClose();
             }
         }
     }
 
-    private void lockedClose() throws IOException {
+    private void implClose() throws IOException {
         if (in == null)
             return;
         try {

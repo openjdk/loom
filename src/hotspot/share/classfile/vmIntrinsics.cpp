@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,7 +75,7 @@ bool vmIntrinsics::preserves_state(vmIntrinsics::ID id) {
   case vmIntrinsics::_longBitsToDouble:
   case vmIntrinsics::_getClass:
   case vmIntrinsics::_isInstance:
-  case vmIntrinsics::_currentThread0:
+  case vmIntrinsics::_currentCarrierThread:
   case vmIntrinsics::_currentThread:
   case vmIntrinsics::_scopeLocalCache:
   case vmIntrinsics::_dabs:
@@ -124,11 +124,11 @@ bool vmIntrinsics::can_trap(vmIntrinsics::ID id) {
   case vmIntrinsics::_intBitsToFloat:
   case vmIntrinsics::_doubleToRawLongBits:
   case vmIntrinsics::_longBitsToDouble:
-  case vmIntrinsics::_currentThread0:
+  case vmIntrinsics::_currentCarrierThread:
   case vmIntrinsics::_currentThread:
+  case vmIntrinsics::_setCurrentThread:
   case vmIntrinsics::_scopeLocalCache:
   case vmIntrinsics::_setScopeLocalCache:
-  case vmIntrinsics::_setCurrentThread:
   case vmIntrinsics::_dabs:
   case vmIntrinsics::_fabs:
   case vmIntrinsics::_iabs:
@@ -235,7 +235,7 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
     case vmIntrinsics::_loadFence:
     case vmIntrinsics::_storeFence:
     case vmIntrinsics::_fullFence:
-    case vmIntrinsics::_hasNegatives:
+    case vmIntrinsics::_countPositives:
     case vmIntrinsics::_Reference_get:
     case vmIntrinsics::_Continuation_doYield:
       break;
@@ -259,13 +259,13 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_getClass:
     if (!InlineClassNatives) return true;
     break;
-  case vmIntrinsics::_currentThread0:
+  case vmIntrinsics::_currentCarrierThread:
   case vmIntrinsics::_currentThread:
     if (!InlineThreadNatives) return true;
     break;
+  case vmIntrinsics::_setCurrentThread:
   case vmIntrinsics::_scopeLocalCache:
   case vmIntrinsics::_setScopeLocalCache:
-  case vmIntrinsics::_setCurrentThread:
   case vmIntrinsics::_floatToRawIntBits:
   case vmIntrinsics::_intBitsToFloat:
   case vmIntrinsics::_doubleToRawLongBits:

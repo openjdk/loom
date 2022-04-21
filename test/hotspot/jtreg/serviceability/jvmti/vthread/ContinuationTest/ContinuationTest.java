@@ -26,7 +26,7 @@
  * @summary Verifies JVMTI support for Continuations
  * @compile ContinuationTest.java
  * @modules java.base/jdk.internal.vm
- * @run main/othervm/native -agentlib:ContinuationTest ContinuationTest
+ * @run main/othervm/native --enable-preview -agentlib:ContinuationTest ContinuationTest
  */
 
 import jdk.internal.vm.Continuation;
@@ -75,7 +75,7 @@ public class ContinuationTest {
 
                 log("\n<<<< runTest: before foo(): " + ival + ", " + str + ", " + dval + " <<<<");
                 dval += foo(k);
-	        log(  ">>>> runTest:  after foo(): " + ival + ", " + str + ", " + dval + " >>>>");
+            log(  ">>>> runTest:  after foo(): " + ival + ", " + str + ", " + dval + " >>>>");
             }
             log("\n##    cont: finished    ##\n");
         });
@@ -95,7 +95,7 @@ public class ContinuationTest {
         log("\n####   foo: started  ####\n");
         log("foo: before bar(): " + lval + ", " + str1 + ", " + iarg);
         String str2 = bar(iarg + 1);
-	log("foo:  after bar(): " + lval + ", " + str1 + ", " + str2);
+    log("foo:  after bar(): " + lval + ", " + str1 + ", " + str2);
 
         log("\n####   foo: finished ####\n");
         return Integer.parseInt(str2) + 1;

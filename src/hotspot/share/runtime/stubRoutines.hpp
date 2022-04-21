@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -169,12 +169,6 @@ class StubRoutines: AllStatic {
   static address _jlong_disjoint_arraycopy;
   static address _oop_disjoint_arraycopy, _oop_disjoint_arraycopy_uninit;
 
-  static bool _has_word_memcpy;
-  static address _word_memcpy_up;
-  static address _word_memcpy_down;
-  static address _word_memcpy_up_nt;
-  static address _word_memcpy_down_nt;
-
   // arraycopy operands aligned on zero'th element boundary
   // These are identical to the ones aligned aligned on an
   // element type boundary, except that they assume that both
@@ -259,13 +253,13 @@ class StubRoutines: AllStatic {
 
   static RuntimeStub* _cont_doYield_stub;
   static address _cont_doYield;
-  static address _cont_jump_from_sp;
   static address _cont_thaw;
   static address _cont_returnBarrier;
   static address _cont_returnBarrierExc;
-  static address _cont_interpreter_forced_preempt_return;
 
+  JFR_ONLY(static RuntimeStub* _jfr_write_checkpoint_stub;)
   JFR_ONLY(static address _jfr_write_checkpoint;)
+  JFR_ONLY(static RuntimeStub* _jfr_get_event_writer_stub;)
   JFR_ONLY(static address _jfr_get_event_writer;)
 
   // Safefetch stubs.
@@ -345,13 +339,6 @@ class StubRoutines: AllStatic {
   static address jshort_arraycopy() { return _jshort_arraycopy; }
   static address jint_arraycopy()   { return _jint_arraycopy; }
   static address jlong_arraycopy()  { return _jlong_arraycopy; }
-
-  static bool has_word_memcpy()        { return _has_word_memcpy; }
-  static address word_memcpy_up()      { return _word_memcpy_up; }
-  static address word_memcpy_up_nt()   { return _word_memcpy_up_nt; }
-  static address word_memcpy_down()    { return _word_memcpy_down; }
-  static address word_memcpy_down_nt() { return _word_memcpy_down_nt; }
-
   static address oop_arraycopy(bool dest_uninitialized = false) {
     return dest_uninitialized ? _oop_arraycopy_uninit : _oop_arraycopy;
   }
@@ -455,15 +442,12 @@ class StubRoutines: AllStatic {
 
   static RuntimeStub* cont_doYield_stub() { return _cont_doYield_stub; }
   static address cont_doYield()        { return _cont_doYield; }
-  static address cont_jump_from_sp()   { return _cont_jump_from_sp; }
   static address cont_thaw()           { return _cont_thaw; }
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
-  static address cont_interpreter_forced_preempt_return() { return _cont_interpreter_forced_preempt_return; }
 
   JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })
   JFR_ONLY(static address jfr_get_event_writer() { return _jfr_get_event_writer; })
-
 
   static address select_fill_function(BasicType t, bool aligned, const char* &name);
 

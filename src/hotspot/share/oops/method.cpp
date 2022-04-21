@@ -83,6 +83,7 @@ Method* Method::allocate(ClassLoaderData* loader_data,
                          AccessFlags access_flags,
                          InlineTableSizes* sizes,
                          ConstMethod::MethodType method_type,
+                         Symbol* name,
                          TRAPS) {
   assert(!access_flags.is_native() || byte_code_size == 0,
          "native methods should not contain byte codes");
@@ -92,10 +93,10 @@ Method* Method::allocate(ClassLoaderData* loader_data,
                                           method_type,
                                           CHECK_NULL);
   int size = Method::size(access_flags.is_native());
-  return new (loader_data, size, MetaspaceObj::MethodType, THREAD) Method(cm, access_flags);
+  return new (loader_data, size, MetaspaceObj::MethodType, THREAD) Method(cm, access_flags, name);
 }
 
-Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
+Method::Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name) {
   NoSafepointVerifier no_safepoint;
   set_constMethod(xconst);
   set_access_flags(access_flags);
@@ -120,6 +121,8 @@ Method::Method(ConstMethod* xconst, AccessFlags access_flags) {
   }
 
   NOT_PRODUCT(set_compiled_invocation_count(0);)
+  // Name is very useful for debugging.
+  NOT_PRODUCT(_name = name;)
 }
 
 // Release Method*.  The nmethod will be gone when we get here because
@@ -394,6 +397,7 @@ void Method::metaspace_pointers_do(MetaspaceClosure* it) {
   }
   it->push(&_method_data);
   it->push(&_method_counters);
+  NOT_PRODUCT(it->push(&_name);)
 }
 
 // Attempt to return method to original state.  Clear any pointers
@@ -659,6 +663,7 @@ void Method::compute_from_signature(Symbol* sig) {
   // we might as well compute the whole fingerprint.
   Fingerprinter fp(sig, is_static());
   set_size_of_parameters(fp.size_of_parameters());
+  set_num_stack_arg_slots(fp.num_stack_arg_slots());
   constMethod()->set_result_type(fp.return_type());
   constMethod()->set_fingerprint(fp.fingerprint());
 }
@@ -981,6 +986,7 @@ bool Method::is_klass_loaded(int refinfo_index, bool must_be_resolved) const {
   return is_klass_loaded_by_klass_index(klass_index);
 }
 
+
 void Method::set_native_function(address function, bool post_event_flag) {
   assert(function != NULL, "use clear_native_function to unregister natives");
   assert(!is_special_native_intrinsic() || function == SharedRuntime::native_method_throw_unsatisfied_link_error_entry(), "");
@@ -1070,7 +1076,7 @@ void Method::print_made_not_compilable(int comp_level, bool is_osr, bool report,
 
 bool Method::is_always_compilable() const {
   // Generated adapters must be compiled
-  if (is_method_handle_intrinsic() && is_synthetic()) {
+  if (is_special_native_intrinsic() && is_synthetic()) {
     assert(!is_not_c1_compilable(), "sanity check");
     assert(!is_not_c2_compilable(), "sanity check");
     return true;
@@ -1229,8 +1235,6 @@ void Method::link_method(const methodHandle& h_method, TRAPS) {
   // problem we'll make these lazily later.
   (void) make_adapters(h_method, CHECK);
 
-  set_num_stack_arg_slots();
-
   // ONLY USE the h_method now as make_adapter may have blocked
 }
 
@@ -1317,7 +1321,8 @@ void Method::set_code(const methodHandle& mh, CompiledMethod *code) {
   if (!mh->is_method_handle_intrinsic())
     mh->_from_interpreted_entry = mh->get_i2c_entry();
   if (mh->is_continuation_enter_intrinsic()) {
-    mh->_i2i_entry = mh->get_i2c_entry(); // this is the entry used when we're in interpreter-only mode; see InterpreterMacroAssembler::jump_from_interpreted
+    // this is the entry used when we're in interpreter-only mode; see InterpreterMacroAssembler::jump_from_interpreted
+    mh->_i2i_entry = mh->get_i2c_entry();
     mh->_from_interpreted_entry = mh->get_i2c_entry();
   }
 }
@@ -1452,7 +1457,9 @@ methodHandle Method::make_method_handle_intrinsic(vmIntrinsics::ID iid,
     InlineTableSizes sizes;
     Method* m_oop = Method::allocate(loader_data, 0,
                                      accessFlags_from(flags_bits), &sizes,
-                                     ConstMethod::NORMAL, CHECK_(empty));
+                                     ConstMethod::NORMAL,
+                                     name,
+                                     CHECK_(empty));
     m = methodHandle(THREAD, m_oop);
   }
   m->set_constants(cp());
@@ -1532,6 +1539,7 @@ methodHandle Method::clone_with_new_data(const methodHandle& m, u_char* new_code
                                       flags,
                                       &sizes,
                                       m->method_type(),
+                                      m->name(),
                                       CHECK_(methodHandle()));
   methodHandle newm (THREAD, newm_oop);
 
@@ -1764,25 +1772,6 @@ void Method::sort_methods(Array<Method*>* methods, bool set_idnums, method_compa
       }
     }
   }
-}
-
-void Method::set_num_stack_arg_slots() {
-  ResourceMark rm;
-  int sizeargs = size_of_parameters();
-  BasicType* sig_bt = NEW_RESOURCE_ARRAY(BasicType, sizeargs);
-  VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
-
-  int sig_index = 0;
-  if (!is_static()) sig_bt[sig_index++] = T_OBJECT; // 'this'
-  for (SignatureStream ss(signature()); !ss.at_return_type(); ss.next()) {
-    BasicType t = ss.type();
-    assert(type2size[t] == 1 || type2size[t] == 2, "size is 1 or 2");
-    sig_bt[sig_index++] = t;
-    if (type2size[t] == 2) sig_bt[sig_index++] = T_VOID;
-  }
-  assert(sig_index == sizeargs, "");
-
-  _num_stack_arg_slots = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
 }
 
 //-----------------------------------------------------------------------------------
@@ -2296,11 +2285,11 @@ void Method::set_on_stack(const bool value) {
   }
 }
 
-void Method::record_marking_cycle() {
+void Method::record_gc_epoch() {
   // If any method is on the stack in continuations, none of them can be reclaimed,
   // so save the marking cycle to check for the whole class in the cpCache.
   // The cpCache is writeable.
-  constants()->cache()->record_marking_cycle();
+  constants()->cache()->record_gc_epoch();
 }
 
 // Called when the class loader is unloaded to make all methods weak.

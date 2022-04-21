@@ -21,7 +21,6 @@
  * questions.
  *
  */
-
 #include "precompiled.hpp"
 #include "jvm_io.h"
 #include "asm/macroAssembler.hpp"
@@ -548,7 +547,13 @@ void Compile::print_ideal_ir(const char* phase_name) {
                is_osr_compilation() ? " compile_kind='osr'" : "",
                phase_name);
   }
-  root()->dump(9999);
+  if (_output == nullptr) {
+    root()->dump(9999);
+  } else {
+    // Dump the node blockwise if we have a scheduling
+    _output->print_scheduling();
+  }
+
   if (xtty != NULL) {
     xtty->tail("ideal");
   }
@@ -624,7 +629,8 @@ Compile::Compile( ciEnv* ci_env, ciMethod* target, int osr_bci,
                   _replay_inline_data(NULL),
                   _java_calls(0),
                   _inner_loops(0),
-                  _interpreter_frame_size(0)
+                  _interpreter_frame_size(0),
+                  _output(NULL)
 #ifndef PRODUCT
                   , _in_dump_cnt(0)
 #endif
@@ -898,6 +904,7 @@ Compile::Compile( ciEnv* ci_env,
     _java_calls(0),
     _inner_loops(0),
     _interpreter_frame_size(0),
+    _output(NULL),
 #ifndef PRODUCT
     _in_dump_cnt(0),
 #endif
@@ -3493,6 +3500,36 @@ void Compile::final_graph_reshaping_main_switch(Node* n, Final_Reshape_Counts& f
     }
     break;
 
+  case Op_UModI:
+    if (UseDivMod) {
+      // Check if a%b and a/b both exist
+      Node* d = n->find_similar(Op_UDivI);
+      if (d) {
+        // Replace them with a fused unsigned divmod if supported
+        if (Matcher::has_match_rule(Op_UDivModI)) {
+          UDivModINode* divmod = UDivModINode::make(n);
+          d->subsume_by(divmod->div_proj(), this);
+          n->subsume_by(divmod->mod_proj(), this);
+        }
+      }
+    }
+    break;
+
+  case Op_UModL:
+    if (UseDivMod) {
+      // Check if a%b and a/b both exist
+      Node* d = n->find_similar(Op_UDivL);
+      if (d) {
+        // Replace them with a fused unsigned divmod if supported
+        if (Matcher::has_match_rule(Op_UDivModL)) {
+          UDivModLNode* divmod = UDivModLNode::make(n);
+          d->subsume_by(divmod->div_proj(), this);
+          n->subsume_by(divmod->mod_proj(), this);
+        }
+      }
+    }
+    break;
+
   case Op_LoadVector:
   case Op_StoreVector:
   case Op_LoadVectorGather:
@@ -4834,7 +4871,7 @@ void Compile::print_method(CompilerPhaseType cpt, int level, Node* n) {
 #ifndef PRODUCT
   ResourceMark rm;
   stringStream ss;
-  ss.print_raw(CompilerPhaseTypeHelper::to_string(cpt));
+  ss.print_raw(CompilerPhaseTypeHelper::to_description(cpt));
   if (n != nullptr) {
     ss.print(": %d %s ", n->_idx, NodeClassNames[n->Opcode()]);
   }
@@ -4843,8 +4880,8 @@ void Compile::print_method(CompilerPhaseType cpt, int level, Node* n) {
   if (should_print_igv(level)) {
     _igv_printer->print_method(name, level);
   }
-  if (should_print_ideal(level)) {
-    print_ideal_ir(name);
+  if (should_print_phase(cpt)) {
+    print_ideal_ir(CompilerPhaseTypeHelper::to_name(cpt));
   }
 #endif
   C->_latest_stage_start_counter.stamp();
@@ -4872,6 +4909,15 @@ void Compile::end_method() {
     _igv_printer->end_method();
   }
 #endif
+}
+
+bool Compile::should_print_phase(CompilerPhaseType cpt) {
+#ifndef PRODUCT
+  if ((_directive->ideal_phase_mask() & CompilerPhaseTypeHelper::to_bitmask(cpt)) != 0) {
+    return true;
+  }
+#endif
+  return false;
 }
 
 bool Compile::should_print_igv(int level) {

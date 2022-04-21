@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,7 +23,6 @@
  */
 
 #include "precompiled.hpp"
-#include "classfile/javaClasses.hpp"
 #include "jvmtifiles/jvmtiEnv.hpp"
 #include "logging/log.hpp"
 #include "prims/jvmtiExport.hpp"
@@ -270,10 +269,6 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
 
   // return the result
   either(current, desired, result);
-
-  // special case for virtual thread events
-  // TBD: There can be a performance impact after check for can_support_virtual_threads has been removed.
-  java_lang_VirtualThread::set_notify_jvmti_events(true);
 
   update();
 

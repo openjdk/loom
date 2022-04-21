@@ -30,7 +30,7 @@ package java.lang;
  *
  * @since 19
  */
-public class WrongThreadException extends RuntimeException {
+public final class WrongThreadException extends RuntimeException {
     @java.io.Serial
     static final long serialVersionUID = 4676498871006316905L;
 

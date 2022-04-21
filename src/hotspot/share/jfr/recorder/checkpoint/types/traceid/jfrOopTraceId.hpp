@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -31,14 +31,15 @@
 
 template <typename T>
 class JfrOopTraceId : AllStatic {
- private:
-  static bool store(oop ref, traceid value);
-  static bool store_current_epoch(oop ref, traceid id);
  public:
-  static traceid load(oop ref);
-  static traceid epoch(traceid value);
-  static traceid id(traceid value);
-  static bool should_write_checkpoint(oop ref, traceid value);
+  static traceid id(oop ref);
+  static u2 epoch(oop ref);
+  static u2 current_epoch();
+  static void set_epoch(oop ref);
+  static void set_epoch(oop ref, u2 epoch);
+  static bool is_excluded(oop ref);
+  static void exclude(oop ref);
+  static void include(oop ref);
 };
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_HPP

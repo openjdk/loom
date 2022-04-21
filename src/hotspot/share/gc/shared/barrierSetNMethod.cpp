@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,9 +26,13 @@
 #include "code/codeCache.hpp"
 #include "code/nmethod.hpp"
 #include "gc/shared/barrierSet.hpp"
+#include "gc/shared/barrierSetAssembler.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "logging/log.hpp"
+#include "memory/iterator.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/method.hpp"
+#include "runtime/frame.inline.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadWXSetters.inline.hpp"
 #include "utilities/debug.hpp"
@@ -62,9 +66,15 @@ bool BarrierSetNMethod::supports_entry_barrier(nmethod* nm) {
 }
 
 bool BarrierSetNMethod::nmethod_entry_barrier(nmethod* nm) {
-  nm->mark_as_maybe_on_continuation();
+  // If the nmethod is the only thing pointing to the oops, and we are using a
+  // SATB GC, then it is important that this code marks them live. This is done
+  // by the phantom load.
   LoadPhantomOopClosure cl;
   nm->oops_do(&cl);
+
+  // CodeCache sweeper support
+  nm->mark_as_maybe_on_continuation();
+
   disarm(nm);
 
   return true;
@@ -84,7 +94,7 @@ private:
 
 public:
   BarrierSetNMethodArmClosure(int disarm_value) :
-    _disarm_value(disarm_value) { }
+      _disarm_value(disarm_value) {}
 
   virtual void do_thread(Thread* thread) {
     thread->set_nmethod_disarm_value(_disarm_value);
@@ -92,12 +102,18 @@ public:
 };
 
 void BarrierSetNMethod::arm_all_nmethods() {
+  // Change to a new global GC phase. Doing this requires changing the thread-local
+  // disarm value for all threads, to reflect the new GC phase.
   ++_current_phase;
   if (_current_phase == 4) {
     _current_phase = 1;
   }
   BarrierSetNMethodArmClosure cl(_current_phase);
   Threads::threads_do(&cl);
+
+  // We clear the patching epoch when disarming nmethods, so that
+  // the counter won't overflow.
+  AARCH64_PORT_ONLY(BarrierSetAssembler::clear_patching_epoch());
 }
 
 int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
@@ -106,6 +122,7 @@ int BarrierSetNMethod::nmethod_stub_entry_barrier(address* return_address_ptr) {
   MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, Thread::current()));
 
   address return_address = *return_address_ptr;
+  AARCH64_PORT_ONLY(return_address = pauth_strip_pointer(return_address));
   CodeBlob* cb = CodeCache::find_blob(return_address);
   assert(cb != NULL, "invariant");
 

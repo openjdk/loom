@@ -51,7 +51,7 @@ static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
   LOG("Wait for threads to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
 
   /* perform testing */
@@ -79,21 +79,21 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     LOG("Suspend threads list\n");
     jvmtiError err = jvmti->SuspendThreadList(threads_count, threads, results);
     if (err != JVMTI_ERROR_NONE) {
-      nsk_jvmti_setFailStatus();
+      set_agent_fail_status();
       return;
     }
 
     LOG("Check threads results:\n");
     for (i = 0; i < threads_count; i++) {
-      NSK_DISPLAY3("  ... thread #%d: %s (%d)\n",
+      LOG("  ... thread #%d: %s (%d)\n",
                    i, TranslateError(results[i]), (int) results[i]);
       if (results[i] != JVMTI_ERROR_NONE) {
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
       }
     }
 
     LOG("Let threads to run and finish\n");
-    if (!nsk_jvmti_resumeSync())
+    if (!agent_resume_sync())
       return;
 
     LOG("Get state vector for each thread\n");
@@ -108,19 +108,19 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
         LOG("SuspendThreadList() does not turn on flag SUSPENDED for thread #%i:\n"
                       "#   state: %s (%d)", i, TranslateState(state), (int) state);
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
       }
     }
 
     LOG("Resume threads list\n");
     err = jvmti->ResumeThreadList(threads_count, threads, results);
     if (err != JVMTI_ERROR_NONE) {
-      nsk_jvmti_setFailStatus();
+      set_agent_fail_status();
       return;
     }
 
     LOG("Wait for thread to finish\n");
-    if (!nsk_jvmti_waitForSync(timeout))
+    if (!agent_wait_for_sync(timeout))
       return;
 
     LOG("Delete threads references\n");
@@ -137,7 +137,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
   }
 
   LOG("Let debugee to finish\n");
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
 }
 
@@ -164,7 +164,7 @@ static int find_threads_by_name(jvmtiEnv *jvmti, JNIEnv *jni, const char *name, 
     check_jvmti_status(jni, jvmti->GetThreadInfo(threads[i], &info), "");
 
     if (info.name != NULL && strncmp(name, info.name, len) == 0) {
-      NSK_DISPLAY3("  ... found thread #%d: %p (%s)\n",
+      LOG("  ... found thread #%d: %p (%s)\n",
                    found, threads[i], info.name);
       if (found < found_count)
         found_threads[found] = threads[i];
@@ -181,7 +181,7 @@ static int find_threads_by_name(jvmtiEnv *jvmti, JNIEnv *jni, const char *name, 
                   "#   found:    %d"
                   "#   expected: %d",
            name, found, found_count);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return NSK_FALSE;
   }
 
@@ -189,7 +189,7 @@ static int find_threads_by_name(jvmtiEnv *jvmti, JNIEnv *jni, const char *name, 
   for (int i = 0; i < found_count; i++) {
     found_threads[i] = (jthread) jni->NewGlobalRef(found_threads[i]);
     if (found_threads[i] == NULL) {
-      nsk_jvmti_setFailStatus();
+      set_agent_fail_status();
       return NSK_FALSE;
     }
     LOG("  ... thread #%d: %p\n", i, found_threads[i]);
@@ -217,15 +217,13 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-
-  // TODO set somehow configure
   threads_count = 10;
 
   if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
   /* register agent proc and arg */
-  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+  if (!set_agent_proc(agentProc, NULL)) {
     return JNI_ERR;
   }
 

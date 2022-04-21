@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,19 +34,27 @@
 // these inline functions are in a separate file to break an include cycle
 // between Thread and Handle
 
-inline Handle::Handle(Thread* thread, oop obj, bool allocNull) {
+inline Handle::Handle(Thread* thread, oop obj) {
   assert(thread == Thread::current(), "sanity check");
-  if (obj == NULL && !allocNull) {
+  if (obj == NULL) {
     _handle = NULL;
   } else {
     _handle = thread->handle_area()->allocate_handle(obj);
   }
 }
 
+inline void Handle::replace(oop obj) {
+  // Unlike in OopHandle::replace, we shouldn't use a barrier here.
+  // OopHandle has its storage in OopStorage, which is walked concurrently and uses barriers.
+  // Handle is thread private, and iterated by Thread::oops_do, which is why it shouldn't have any barriers at all.
+  assert(_handle != NULL, "should not use replace");
+  *_handle = obj;
+}
+
 // Inline constructors for Specific Handles for different oop types
 #define DEF_HANDLE_CONSTR(type, is_a)                   \
-inline type##Handle::type##Handle (Thread* thread, type##Oop obj, bool allocNull) : Handle(thread, (oop)obj, allocNull) { \
-  assert(is_null() || (allocNull && obj == NULL) || ((oop)obj)->is_a(), "illegal type");                \
+inline type##Handle::type##Handle (Thread* thread, type##Oop obj) : Handle(thread, (oop)obj) { \
+  assert(is_null() || ((oop)obj)->is_a(), "illegal type");                \
 }
 
 DEF_HANDLE_CONSTR(instance , is_instance_noinline )

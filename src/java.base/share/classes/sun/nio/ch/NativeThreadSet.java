@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2012, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,8 +25,6 @@
 
 package sun.nio.ch;
 
-import jdk.internal.vm.Continuation;
-
 // Special-purpose data structure for sets of native threads
 
 
@@ -43,11 +41,9 @@ class NativeThreadSet {
     /**
      * Adds the current native thread to this set, returning its index so that
      * it can efficiently be removed later.
-     *
-     * The current continuation will be pinned until the thread is removed.
      */
     int add() {
-        long th = NativeThread.currentKernelThread();
+        long th = NativeThread.currentNativeThread();
         // 0 and -1 are treated as placeholders, not real thread handles
         if (th == 0)
             th = -1;
@@ -65,7 +61,6 @@ class NativeThreadSet {
                 if (elts[i] == 0) {
                     elts[i] = th;
                     used++;
-                    Continuation.pin();
                     return i;
                 }
             }
@@ -80,8 +75,7 @@ class NativeThreadSet {
      */
     void remove(int i) {
         synchronized (this) {
-            assert (elts[i] == NativeThread.currentKernelThread()) || (elts[i] == -1);
-            Continuation.unpin();
+            assert (elts[i] == NativeThread.currentNativeThread()) || (elts[i] == -1);
             elts[i] = 0;
             used--;
             if (used == 0 && waitingToEmpty)

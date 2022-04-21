@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@
 #include "memory/iterator.hpp"
 
 #include "classfile/classLoaderData.hpp"
+#include "code/nmethod.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.hpp"
@@ -58,8 +59,8 @@ inline void ClaimMetadataVisitingOopIterateClosure::do_nmethod(nmethod* nm) {
 }
 
 inline void ClaimMetadataVisitingOopIterateClosure::do_method(Method* m) {
-  // Mark interpreted frames for marking_cycle
-  m->record_marking_cycle();
+  // Mark interpreted frames for class redefinition
+  m->record_gc_epoch();
 }
 
 // Implementation of the non-virtual do_oop dispatch.
@@ -198,29 +199,12 @@ inline void Devirtualizer::do_derived_oop(DerivedOopClosureType* closure, oop* b
   call_do_derived_oop(&DerivedOopClosureType::do_derived_oop, &DerivedOopClosure::do_derived_oop, closure, base, derived);
 }
 
-template <typename Receiver, typename Base, typename BitMapClosureType>
-static typename EnableIf<IsSame<Receiver, Base>::value, bool>::type
-call_do_bit(bool (Receiver::*)(BitMap::idx_t), bool (Base::*)(BitMap::idx_t), BitMapClosureType* closure, BitMap::idx_t index) {
-  return closure->do_bit(index);
-}
-
-template <typename Receiver, typename Base, typename BitMapClosureType>
-static typename EnableIf<!IsSame<Receiver, Base>::value, bool>::type
-call_do_bit(bool (Receiver::*)(BitMap::idx_t), bool (Base::*)(BitMap::idx_t), BitMapClosureType* closure, BitMap::idx_t index) {
-  return closure->BitMapClosureType::do_bit(index);
-}
-
-template <typename BitMapClosureType>
-inline bool Devirtualizer::do_bit(BitMapClosureType* closure, BitMap::idx_t index) {
-  return call_do_bit(&BitMapClosureType::do_bit, &BitMapClosure::do_bit, closure, index);
-}
-
 // Dispatch table implementation for *Klass::oop_oop_iterate
 //
 // It allows for a single call to do a multi-dispatch to an optimized version
 //   of oop_oop_iterate that statically know all these types:
 //   - OopClosureType    : static type give at call site
-//   - Klass*            : dynamic to static type through Klass::id() -> table index
+//   - Klass*            : dynamic to static type through Klass::kind() -> table index
 //   - UseCompressedOops : dynamic to static value determined once
 //
 // when users call obj->oop_iterate(&cl).
@@ -236,7 +220,7 @@ inline bool Devirtualizer::do_bit(BitMapClosureType* closure, BitMap::idx_t inde
 //   used when calling do_oop.
 //
 // Klass* :
-//   A table mapping from *Klass::ID to function is setup. This happens once
+//   A table mapping from *Klass::Kind to function is setup. This happens once
 //   when the program starts, when the static _table instance is initialized for
 //   the OopOopIterateDispatch specialized with the OopClosureType.
 //
@@ -269,7 +253,7 @@ private:
 
     template <typename KlassType>
     void set_init_function() {
-      _function[KlassType::ID] = &init<KlassType>;
+      _function[KlassType::Kind] = &init<KlassType>;
     }
 
     template <typename KlassType>
@@ -278,20 +262,20 @@ private:
       // when functions pointers are updated.
       STATIC_ASSERT(sizeof(_function[0]) == sizeof(void*));
       if (UseCompressedOops) {
-        _function[KlassType::ID] = &oop_oop_iterate<KlassType, narrowOop>;
+        _function[KlassType::Kind] = &oop_oop_iterate<KlassType, narrowOop>;
       } else {
-        _function[KlassType::ID] = &oop_oop_iterate<KlassType, oop>;
+        _function[KlassType::Kind] = &oop_oop_iterate<KlassType, oop>;
       }
     }
 
     template <typename KlassType>
     void set_resolve_function_and_execute(OopClosureType* cl, oop obj, Klass* k) {
       set_resolve_function<KlassType>();
-      _function[KlassType::ID](cl, obj, k);
+      _function[KlassType::Kind](cl, obj, k);
     }
 
   public:
-    FunctionType _function[KLASS_ID_COUNT];
+    FunctionType _function[KLASS_KIND_COUNT];
 
     Table(){
       set_init_function<InstanceKlass>();
@@ -308,7 +292,7 @@ private:
 public:
 
   static FunctionType function(Klass* klass) {
-    return _table._function[klass->id()];
+    return _table._function[klass->kind()];
   }
 };
 
@@ -335,26 +319,26 @@ private:
 
     template <typename KlassType>
     void set_init_function() {
-      _function[KlassType::ID] = &init<KlassType>;
+      _function[KlassType::Kind] = &init<KlassType>;
     }
 
     template <typename KlassType>
     void set_resolve_function() {
       if (UseCompressedOops) {
-        _function[KlassType::ID] = &oop_oop_iterate_bounded<KlassType, narrowOop>;
+        _function[KlassType::Kind] = &oop_oop_iterate_bounded<KlassType, narrowOop>;
       } else {
-        _function[KlassType::ID] = &oop_oop_iterate_bounded<KlassType, oop>;
+        _function[KlassType::Kind] = &oop_oop_iterate_bounded<KlassType, oop>;
       }
     }
 
     template <typename KlassType>
     void set_resolve_function_and_execute(OopClosureType* cl, oop obj, Klass* k, MemRegion mr) {
       set_resolve_function<KlassType>();
-      _function[KlassType::ID](cl, obj, k, mr);
+      _function[KlassType::Kind](cl, obj, k, mr);
     }
 
   public:
-    FunctionType _function[KLASS_ID_COUNT];
+    FunctionType _function[KLASS_KIND_COUNT];
 
     Table(){
       set_init_function<InstanceKlass>();
@@ -371,7 +355,7 @@ private:
 public:
 
   static FunctionType function(Klass* klass) {
-    return _table._function[klass->id()];
+    return _table._function[klass->kind()];
   }
 };
 
@@ -398,26 +382,26 @@ private:
 
     template <typename KlassType>
     void set_init_function() {
-      _function[KlassType::ID] = &init<KlassType>;
+      _function[KlassType::Kind] = &init<KlassType>;
     }
 
     template <typename KlassType>
     void set_resolve_function() {
       if (UseCompressedOops) {
-        _function[KlassType::ID] = &oop_oop_iterate_backwards<KlassType, narrowOop>;
+        _function[KlassType::Kind] = &oop_oop_iterate_backwards<KlassType, narrowOop>;
       } else {
-        _function[KlassType::ID] = &oop_oop_iterate_backwards<KlassType, oop>;
+        _function[KlassType::Kind] = &oop_oop_iterate_backwards<KlassType, oop>;
       }
     }
 
     template <typename KlassType>
     void set_resolve_function_and_execute(OopClosureType* cl, oop obj, Klass* k) {
       set_resolve_function<KlassType>();
-      _function[KlassType::ID](cl, obj, k);
+      _function[KlassType::Kind](cl, obj, k);
     }
 
   public:
-    FunctionType _function[KLASS_ID_COUNT];
+    FunctionType _function[KLASS_KIND_COUNT];
 
     Table(){
       set_init_function<InstanceKlass>();
@@ -434,7 +418,7 @@ private:
 public:
 
   static FunctionType function(Klass* klass) {
-    return _table._function[klass->id()];
+    return _table._function[klass->kind()];
   }
 };
 

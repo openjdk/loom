@@ -26,7 +26,7 @@
  * @summary Verifies JVMTI support for Continuations
  * @compile ContStackDepthTest.java
  * @modules java.base/jdk.internal.vm
- * @run main/othervm/native -agentlib:ContStackDepthTest ContStackDepthTest
+ * @run main/othervm/native --enable-preview -agentlib:ContStackDepthTest ContStackDepthTest
  */
 
 import java.math.BigInteger;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,7 +30,10 @@ import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
- * A stackable scope.
+ * A stackable scope to support structured constructs. The push method is used to
+ * push a StackableScope to the current thread's scope stack. The tryPop and
+ * popForcefully methods are used to pop the StackableScope from the current thread's
+ * scope stack.
  */
 public class StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -40,6 +43,8 @@ public class StackableScope {
 
     /**
      * Creates a stackable scope.
+     * @param shared true for a shared scope that cannot be pushed to the stack,
+     * false for scope that is owned by the current thread
      */
     StackableScope(boolean shared) {
         if (shared) {
@@ -52,12 +57,12 @@ public class StackableScope {
     /**
      * Creates a stackable scope owned by the current thread.
      */
-    public StackableScope() {
+    protected StackableScope() {
         this(false);
     }
 
     /**
-     * Returns the scope owner or null is not owned.
+     * Returns the scope owner or null if not owned.
      */
     public Thread owner() {
         return owner;
@@ -65,11 +70,11 @@ public class StackableScope {
 
     /**
      * Pushes this scope onto the current thread's scope stack.
+     * @throws WrongThreadException it the current thread is not the owner
      */
     public StackableScope push() {
-        if (owner == null)
-            throw new UnsupportedOperationException();
-        assert Thread.currentThread() == owner;
+        if (Thread.currentThread() != owner)
+            throw new WrongThreadException("Not owner");
         previous = head();
         setHead(this);
         return this;
@@ -79,6 +84,7 @@ public class StackableScope {
      * Pops this scope from the current thread's scope stack if the scope is
      * at the top of stack.
      * @return true if the pop succeeded, false if this scope is not the top of stack
+     * @throws WrongThreadException it the current thread is not the owner
      */
     @DontInline @ReservedStackAccess
     public boolean tryPop() {
@@ -96,7 +102,7 @@ public class StackableScope {
     /**
      * Pops this scope from the current thread's scope stack.
      *
-     * For well behaved usages, this scope is at the top of the stack. It is popped
+     * For well-behaved usages, this scope is at the top of the stack. It is popped
      * from the stack and the method returns {@code true}.
      *
      * If this scope is not at the top of the stack then this method attempts to
@@ -108,6 +114,7 @@ public class StackableScope {
      * on the current thread's scope stack.
      *
      * @return true if this scope was at the top of the stack, otherwise false
+     * @throws WrongThreadException it the current thread is not the owner
      */
     @DontInline @ReservedStackAccess
     public boolean popForcefully() {
@@ -251,5 +258,4 @@ public class StackableScope {
     private static void setHead(StackableScope scope) {
         JLA.setHeadStackableScope(scope);
     }
-
 }

@@ -26,3 +26,5 @@
 # List of quarantined tests for testing in Xcomp mode with wrapper.
 #
 #############################################################################
+
+com/sun/crypto/provider/Cipher/AEAD/GCMBufferTest.java 8283022 generic-all

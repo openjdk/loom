@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -214,10 +214,11 @@ public class FileInputStream extends InputStream
      * @param name the name of the file
      */
     private void open(String name) throws FileNotFoundException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> open0(name));
-        } else {
+        long comp = Blocker.begin();
+        try {
             open0(name);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -230,10 +231,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> read0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return read0();
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -260,10 +262,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read(byte[] b) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes(b, 0, b.length));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return readBytes(b, 0, b.length);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -286,10 +289,11 @@ public class FileInputStream extends InputStream
      * @throws     IOException  if an I/O error occurs.
      */
     public int read(byte[] b, int off, int len) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes(b, off, len));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return readBytes(b, off, len);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -390,19 +394,21 @@ public class FileInputStream extends InputStream
     }
 
     private long length() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> length0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return length0();
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native long length0() throws IOException;
 
     private long position() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> position0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return position0();
+        } finally {
+            Blocker.end(comp);
         }
     }
     private native long position0() throws IOException;
@@ -432,10 +438,11 @@ public class FileInputStream extends InputStream
      *             support seek, or if an I/O error occurs.
      */
     public long skip(long n) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> skip0(n));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return skip0(n);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -459,10 +466,11 @@ public class FileInputStream extends InputStream
      *             {@code close} or an I/O error occurs.
      */
     public int available() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> available0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return available0();
+        } finally {
+            Blocker.end(comp);
         }
     }
 

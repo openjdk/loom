@@ -368,17 +368,16 @@ public class Object {
      * @see        java.lang.Object#notifyAll()
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            try {
-                Blocker.managedBlock(() -> wait0(timeoutMillis));
-            } catch (Exception e) {
-                if (e instanceof InterruptedException)
-                    thread.getAndClearInterrupt();
-                throw e;
-            }
-        } else {
+        long comp = Blocker.begin();
+        try {
             wait0(timeoutMillis);
+        } catch (InterruptedException e) {
+            Thread thread = Thread.currentThread();
+            if (thread.isVirtual())
+                thread.getAndClearInterrupt();
+            throw e;
+        } finally {
+            Blocker.end(comp);
         }
     }
 

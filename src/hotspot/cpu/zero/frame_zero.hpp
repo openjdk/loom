@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2007, 2008, 2009, 2010 Red Hat, Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -30,7 +30,11 @@
 
  public:
   enum {
-    pc_return_offset = 0
+    pc_return_offset = 0,
+    metadata_words   = 0,
+    frame_alignment  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle     =  1
   };
 
  const ImmutableOopMap* get_oop_map() const;
@@ -77,7 +81,6 @@
 
   inline address* sender_pc_addr() const;
 
-  template <bool relative = false>
   inline intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>

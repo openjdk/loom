@@ -118,9 +118,9 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
   /* scaffold objects */
   static jlong timeout = 0;
   LOG("Wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
   LOG("Started.....\n");
 
@@ -128,7 +128,7 @@ agentProc(jvmtiEnv * jvmti, JNIEnv * jni, void * arg) {
     jthread *threads = NULL;
     jint count = 0;
 
-    millisleep(10);
+    sleep_ms(10);
 
     RawMonitorLocker rml(jvmti, jni, monitor);
     if (!is_vm_running) {
@@ -184,25 +184,6 @@ void JNICALL ThreadEnd(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
     check_reset_tls(jvmti, jni, thread, "ThreadEnd");
   }
 }
-/*
-void JNICALL
-MethodEntry(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jmethodID method) {
-
-  int p = ((long) method / 128 % 100);
-  if (p < 1) {
-    RawMonitorLocker rml(jvmti, jni, monitor);
-    if (is_vm_running) {
-      jvmtiThreadInfo thread_info;
-      check_jvmti_status(jni, jvmti->GetThreadInfo(thread, &thread_info), "Error in GetThreadInfo11");
-      if (strcmp("main", thread_info.name) == 0) {
-        // Skip main() method entries
-        return;
-      }
-      check_reset_tls(jvmti, jni, thread, "MethodEntry");
-    }
-  }
-}
-*/
 
 static void JNICALL
 VirtualThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread vthread) {
@@ -264,7 +245,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   callbacks.VMDeath = &VMDeath;
   callbacks.ThreadStart = &ThreadStart;
   callbacks.ThreadEnd = &ThreadEnd;
-  // callbacks.MethodEntry = &MethodEntry;
   callbacks.VirtualThreadStart = &VirtualThreadStart;
   callbacks.VirtualThreadEnd = &VirtualThreadEnd;
 
@@ -279,15 +259,13 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_START, NULL);
   jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VIRTUAL_THREAD_END, NULL);
 
-  //jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_METHOD_ENTRY, NULL);
-
   err = init_agent_data(jvmti, &agent_data);
   if (err != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
 
   /* register agent proc and arg */
-  if (nsk_jvmti_setAgentProc(agentProc, NULL) != NSK_TRUE) {
+  if (set_agent_proc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
   return JNI_OK;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -560,7 +560,6 @@ inline bool ScavengingReleaseOp<Mspace, List>::excise_with_release(typename List
   assert(node->identity() != NULL, "invariant");
   assert(node->empty(), "invariant");
   assert(!node->lease(), "invariant");
-  assert(!node->excluded(), "invariant");
   ++_count;
   _amount += node->total_size();
   node->clear_retired();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -59,12 +59,12 @@ public class BufferedOutputStream extends FilterOutputStream {
     protected int count;
 
     /**
-     * Max size of the internal buffer or -1 if internal buffer cannot be resized.
+     * Max size of the internal buffer.
      */
     private final int maxBufSize;
 
     /**
-     * Returns the buffer size to use when no output buffer size specified
+     * Returns the buffer size to use when no output buffer size specified.
      */
     private static int initialBufferSize() {
         if (VM.isBooted() && Thread.currentThread().isVirtual()) {
@@ -88,13 +88,12 @@ public class BufferedOutputStream extends FilterOutputStream {
             // use InternalLock and resizable buffer when not sub-classed
             this.lock = InternalLock.newLockOrNull();
             this.buf = new byte[initialSize];    // resizable
-            this.maxBufSize = maxSize;
         } else {
             // use monitors and no resizing when sub-classed
             this.lock = null;
             this.buf = new byte[maxSize];
-            this.maxBufSize = -1;
         }
+        this.maxBufSize = maxSize;
     }
 
     /**
@@ -132,15 +131,17 @@ public class BufferedOutputStream extends FilterOutputStream {
      * Grow buf to fit an additional len bytes if needed.
      * If possible, it grows by len+1 to avoid flushing when len bytes
      * are added. A no-op if the buffer is not resizable.
+     *
+     * This method should only be called while holding the lock.
      */
     private void growIfNeeded(int len) {
-        if (maxBufSize > 0) {
-            int neededSize = count + len + 1;
-            int bufSize = buf.length;
-            if (neededSize > bufSize && bufSize < maxBufSize) {
-                int newSize = Math.min(neededSize, maxBufSize);
-                buf = Arrays.copyOf(buf, newSize);
-            }
+        int neededSize = count + len + 1;
+        if (neededSize < 0)
+            neededSize = Integer.MAX_VALUE;
+        int bufSize = buf.length;
+        if (neededSize > bufSize && bufSize < maxBufSize) {
+            int newSize = Math.min(neededSize, maxBufSize);
+            buf = Arrays.copyOf(buf, newSize);
         }
     }
 
@@ -155,18 +156,18 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedWrite(b);
+                implWrite(b);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedWrite(b);
+                implWrite(b);
             }
         }
     }
 
-    private void lockedWrite(int b) throws IOException {
+    private void implWrite(int b) throws IOException {
         growIfNeeded(1);
         if (count >= buf.length) {
             flushBuffer();
@@ -195,20 +196,19 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedWrite(b, off, len);
+                implWrite(b, off, len);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedWrite(b, off, len);
+                implWrite(b, off, len);
             }
         }
     }
 
-    private void lockedWrite(byte[] b, int off, int len) throws IOException {
-        int max = (maxBufSize > 0) ? maxBufSize : buf.length;
-        if (len >= max) {
+    private void implWrite(byte[] b, int off, int len) throws IOException {
+        if (len >= maxBufSize) {
             /* If the request length exceeds the max size of the output buffer,
                flush the output buffer and then write the data directly.
                In this way buffered streams will cascade harmlessly. */
@@ -236,18 +236,18 @@ public class BufferedOutputStream extends FilterOutputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedFlush();
+                implFlush();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedFlush();
+                implFlush();
             }
         }
     }
 
-    private void lockedFlush() throws IOException {
+    private void implFlush() throws IOException {
         flushBuffer();
         out.flush();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -128,7 +128,8 @@ jint init_globals() {
 
   AsyncLogWriter::initialize();
   gc_barrier_stubs_init();  // depends on universe_init, must be before interpreter_init
-  stubRoutines_initContinuationStubs();
+  continuations_init(); // must precede continuation stub generation
+  stubRoutines_initContinuationStubs(); // depends on continuations_init
   interpreter_init_stub();  // before methods get loaded
   accessFlags_init();
   InterfaceSupport_init();
@@ -164,14 +165,11 @@ jint init_globals() {
   stubRoutines_init2(); // note: StubRoutines need 2-phase init
   MethodHandles::generate_adapters();
 
-  continuations_init();
-
   // All the flags that get adjusted by VM_Version_init and os::init_2
   // have been set so dump the flags now.
   if (PrintFlagsFinal || PrintFlagsRanges) {
     JVMFlag::printFlags(tty, false, PrintFlagsRanges);
   }
-
 
   return JNI_OK;
 }

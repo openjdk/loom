@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -273,18 +273,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                return lockedRead();
+                return implRead();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                return lockedRead();
+                return implRead();
             }
         }
     }
 
-    private int lockedRead() throws IOException {
+    private int implRead() throws IOException {
         if (pos >= count) {
             fill();
             if (pos >= count)
@@ -358,18 +358,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                return lockedRead(b, off, len);
+                return implRead(b, off, len);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                return lockedRead(b, off, len);
+                return implRead(b, off, len);
             }
         }
     }
 
-    private int lockedRead(byte[] b, int off, int len) throws IOException {
+    private int implRead(byte[] b, int off, int len) throws IOException {
         getBufIfOpen(); // Check for closed stream
         if ((off | len | (off + len) | (b.length - (off + len))) < 0) {
             throw new IndexOutOfBoundsException();
@@ -405,18 +405,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                return lockedSkip(n);
+                return implSkip(n);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                return lockedSkip(n);
+                return implSkip(n);
             }
         }
     }
 
-    private long lockedSkip(long n) throws IOException {
+    private long implSkip(long n) throws IOException {
         getBufIfOpen(); // Check for closed stream
         if (n <= 0) {
             return 0;
@@ -461,18 +461,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                return lockAvailable();
+                return implAvailable();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                return lockAvailable();
+                return implAvailable();
             }
         }
     }
 
-    private int lockAvailable() throws IOException {
+    private int implAvailable() throws IOException {
         int n = count - pos;
         int avail = getInIfOpen().available();
         return n > (Integer.MAX_VALUE - avail)
@@ -492,18 +492,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedMark(readlimit);
+                implMark(readlimit);
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedMark(readlimit);
+                implMark(readlimit);
             }
         }
     }
 
-    private void lockedMark(int readlimit) {
+    private void implMark(int readlimit) {
         marklimit = readlimit;
         markpos = pos;
     }
@@ -528,18 +528,18 @@ public class BufferedInputStream extends FilterInputStream {
         if (lock != null) {
             lock.lock();
             try {
-                lockedReset();
+                implReset();
             } finally {
                 lock.unlock();
             }
         } else {
             synchronized (this) {
-                lockedReset();
+                implReset();
             }
         }
     }
 
-    private void lockedReset() throws IOException {
+    private void implReset() throws IOException {
         getBufIfOpen(); // Cause exception if closed
         if (markpos < 0)
             throw new IOException("Resetting to invalid mark");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -46,6 +46,7 @@ class frame;
 class RegisterMap;
 class OopClosure;
 class CodeBlob;
+class ImmutableOopMap;
 
 enum class derived_pointer : intptr_t {};
 
@@ -59,7 +60,7 @@ private:
 
 public:
   // Constants
-  enum { type_bits                = 2, // 3
+  enum { type_bits                = 2,
          register_bits            = BitsPerShort - type_bits };
 
   enum { type_shift               = 0,
@@ -75,7 +76,6 @@ public:
          narrowoop_value,
          callee_saved_value,
          derived_oop_value,
-         // live_value,
          unused_value = -1          // Only used as a sentinel value
   };
 
@@ -126,8 +126,6 @@ public:
   bool is_narrowoop()         { return mask_bits(value(), type_mask_in_place) == narrowoop_value; }
   bool is_callee_saved()      { return mask_bits(value(), type_mask_in_place) == callee_saved_value; }
   bool is_derived_oop()       { return mask_bits(value(), type_mask_in_place) == derived_oop_value; }
-  // bool is_live()              { return mask_bits(value(), type_mask_in_place) == live_value; }
-  bool is_oop_or_narrow()     { return is_oop() || is_narrowoop(); }
 
   VMReg reg() const { return VMRegImpl::as_VMReg(mask_bits(value(), register_mask_in_place) >> register_shift); }
   oop_types type() const      { return (oop_types)mask_bits(value(), type_mask_in_place); }
@@ -173,7 +171,6 @@ class OopMap: public ResourceObj {
   CompressedWriteStream* write_stream() const { return _write_stream; }
   void set_write_stream(CompressedWriteStream* value) { _write_stream = value; }
 
- private:
   enum DeepCopyToken { _deep_copy_token };
   OopMap(DeepCopyToken, OopMap* source);  // used only by deep_copy
 
@@ -215,8 +212,6 @@ class OopMap: public ResourceObj {
   bool equals(const OopMap* other) const;
 };
 
-class ImmutableOopMap;
-
 class OopMapSet : public ResourceObj {
   friend class VMStructs;
  private:
@@ -243,21 +238,19 @@ class OopMapSet : public ResourceObj {
   static const ImmutableOopMap* find_map(const frame *fr);
 
   // Iterates through frame for a compiled method
-  static void oops_do            (const frame* fr, const RegisterMap* reg_map,
-                                  OopClosure* f, DerivedOopClosure* df);
-  static void oops_do            (const frame* fr, const RegisterMap* reg_map,
-                                  OopClosure* f, DerivedPointerIterationMode mode);
+  static void oops_do            (const frame* fr,
+                                  const RegisterMap* reg_map,
+                                  OopClosure* f,
+                                  DerivedOopClosure* df);
+  static void oops_do            (const frame* fr,
+                                  const RegisterMap* reg_map,
+                                  OopClosure* f,
+                                  DerivedPointerIterationMode mode);
   static void update_register_map(const frame* fr, RegisterMap *reg_map);
 
 #ifndef PRODUCT
   static void trace_codeblob_maps(const frame *fr, const RegisterMap *reg_map);
 #endif
-
-  // // Iterates through frame for a compiled method for dead ones and values, too
-  // static void all_do(const frame* fr, const RegisterMap* reg_map,
-  //                    OopClosure* oop_fn,
-  //                    DerivedOopClosure* derived_oop_fn,
-  //                    OopClosure* value_fn);
 
   // Printing
   void print_on(outputStream* st) const;
@@ -384,7 +377,6 @@ class OopMapStream : public StackObj {
   int stream_position() const           { return _stream.position(); }
 #endif
 };
-
 
 class ImmutableOopMapBuilder {
 private:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,6 +34,7 @@
 #include "oops/markWord.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/handshake.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
@@ -51,7 +52,6 @@
 #include "runtime/thread.inline.hpp"
 #include "runtime/timer.hpp"
 #include "runtime/vframe.hpp"
-#include "runtime/vframe.inline.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"
 #include "utilities/dtrace.hpp"
@@ -453,7 +453,7 @@ void ObjectSynchronizer::handle_sync_on_value_based_class(Handle obj, JavaThread
 }
 
 static bool useHeavyMonitors() {
-#if defined(X86) || defined(AARCH64) || defined(PPC64)
+#if defined(X86) || defined(AARCH64) || defined(PPC64) || defined(RISCV64)
   return UseHeavyMonitors;
 #else
   return false;
@@ -977,7 +977,7 @@ bool ObjectSynchronizer::current_thread_holds_lock(JavaThread* current,
 
   // Uncontended case, header points to stack
   if (mark.has_locker()) {
-    return current->is_lock_owned((address)mark.locker()); // is_lock_owned_current((address)mark.locker()); see JDK-8281642
+    return current->is_lock_owned((address)mark.locker());
   }
   // Contended case, header points to ObjectMonitor (tagged pointer)
   if (mark.has_monitor()) {

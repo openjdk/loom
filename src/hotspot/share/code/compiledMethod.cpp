@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -118,7 +118,7 @@ const char* CompiledMethod::state() const {
 
 //-----------------------------------------------------------------------------
 void CompiledMethod::mark_for_deoptimization(bool inc_recompile_counts) {
-  // assert (can_be_deoptimized(), ""); // in some places we check before marking, in others not.
+  // assert(can_be_deoptimized(), ""); // in some places we check before marking, in others not.
   MutexLocker ml(CompiledMethod_lock->owned_by_self() ? NULL : CompiledMethod_lock,
                  Mutex::_no_safepoint_check_flag);
   if (_mark_for_deoptimization_status != deoptimize_done) { // can't go backwards
@@ -364,42 +364,46 @@ int CompiledMethod::verify_icholder_relocations() {
 // Method that knows how to preserve outgoing arguments at call. This method must be
 // called with a frame corresponding to a Java invoke
 void CompiledMethod::preserve_callee_argument_oops(frame fr, const RegisterMap *reg_map, OopClosure* f) {
-  if (method() != NULL) {
-    // handle the case of an anchor explicitly set in continuation code that doesn't have a callee
-    JavaThread* thread = reg_map->thread();
-    if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp()) {
-      // if (!method()->is_native()) fr.print_on(tty);
-      // assert (method()->is_native(), "");
-      return;
-    }
+  if (method() == NULL) {
+    return;
+  }
 
-    if (!method()->is_native()) {
-      address pc = fr.pc();
-      bool has_receiver, has_appendix;
-      Symbol* signature;
+  // handle the case of an anchor explicitly set in continuation code that doesn't have a callee
+  JavaThread* thread = reg_map->thread();
+  if (thread->has_last_Java_frame() && fr.sp() == thread->last_Java_sp()) {
+    return;
+  }
 
-      // The method attached by JIT-compilers should be used, if present.
-      // Bytecode can be inaccurate in such case.
-      Method* callee = attached_method_before_pc(pc);
-      if (callee != NULL) {
-        has_receiver = !(callee->access_flags().is_static());
-        has_appendix = false;
-        signature    = callee->signature();
-      } else {
-        SimpleScopeDesc ssd(this, pc);
-        if (ssd.is_optimized_linkToNative()) return; // call was replaced
-        Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
-        has_receiver = call.has_receiver();
-        has_appendix = call.has_appendix();
-        signature    = call.signature();
+  if (!method()->is_native()) {
+    address pc = fr.pc();
+    bool has_receiver, has_appendix;
+    Symbol* signature;
+
+    // The method attached by JIT-compilers should be used, if present.
+    // Bytecode can be inaccurate in such case.
+    Method* callee = attached_method_before_pc(pc);
+    if (callee != NULL) {
+      has_receiver = !(callee->access_flags().is_static());
+      has_appendix = false;
+      signature    = callee->signature();
+    } else {
+      SimpleScopeDesc ssd(this, pc);
+      if (ssd.is_optimized_linkToNative()) {
+        // call was replaced
+        return;
       }
 
-      fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
-    } else if (method()->is_continuation_enter_intrinsic()) {
-      // This method only calls Continuation.enter()
-      Symbol* signature = vmSymbols::continuationEnter_signature();
-      fr.oops_compiled_arguments_do(signature, false, false, reg_map, f);
+      Bytecode_invoke call(methodHandle(Thread::current(), ssd.method()), ssd.bci());
+      has_receiver = call.has_receiver();
+      has_appendix = call.has_appendix();
+      signature    = call.signature();
     }
+
+    fr.oops_compiled_arguments_do(signature, has_receiver, has_appendix, reg_map, f);
+  } else if (method()->is_continuation_enter_intrinsic()) {
+    // This method only calls Continuation.enter()
+    Symbol* signature = vmSymbols::continuationEnter_signature();
+    fr.oops_compiled_arguments_do(signature, false, false, reg_map, f);
   }
 }
 
@@ -628,7 +632,15 @@ void CompiledMethod::cleanup_inline_caches(bool clean_all) {
     }
     // Call this nmethod entry barrier from the sweeper.
     run_nmethod_entry_barrier();
+    if (!clean_all) {
+      MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      CodeCache::Sweep::end();
+    }
     InlineCacheBuffer::refill_ic_stubs();
+    if (!clean_all) {
+      MutexLocker ml(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      CodeCache::Sweep::begin();
+    }
   }
 }
 

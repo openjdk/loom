@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -80,11 +80,11 @@ public class Object {
      *     This integer need not remain consistent from one execution of an
      *     application to another execution of the same application.
      * <li>If two objects are equal according to the {@link
-     *     equals(Object) equals} method, then calling the {@code
+     *     #equals(Object) equals} method, then calling the {@code
      *     hashCode} method on each of the two objects must produce the
      *     same integer result.
      * <li>It is <em>not</em> required that if two objects are unequal
-     *     according to the {@link equals(Object) equals} method, then
+     *     according to the {@link #equals(Object) equals} method, then
      *     calling the {@code hashCode} method on each of the two objects
      *     must produce distinct integer results.  However, the programmer
      *     should be aware that producing distinct integer results for
@@ -149,7 +149,7 @@ public class Object {
      * relation, each equivalence class only has a single element.
      *
      * @apiNote
-     * It is generally necessary to override the {@link hashCode hashCode}
+     * It is generally necessary to override the {@link #hashCode() hashCode}
      * method whenever this method is overridden, so as to maintain the
      * general contract for the {@code hashCode} method, which states
      * that equal objects must have equal hash codes.
@@ -361,17 +361,16 @@ public class Object {
      * @see    #wait(long, int)
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        Thread thread = Thread.currentThread();
-        if (thread.isVirtual()) {
-            try {
-                Blocker.managedBlock(() -> wait0(timeoutMillis));
-            } catch (Exception e) {
-                if (e instanceof InterruptedException)
-                    thread.getAndClearInterrupt();
-                throw e;
-            }
-        } else {
+        long comp = Blocker.begin();
+        try {
             wait0(timeoutMillis);
+        } catch (InterruptedException e) {
+            Thread thread = Thread.currentThread();
+            if (thread.isVirtual())
+                thread.getAndClearInterrupt();
+            throw e;
+        } finally {
+            Blocker.end(comp);
         }
     }
 

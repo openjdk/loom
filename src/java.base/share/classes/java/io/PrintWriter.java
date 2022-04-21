@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -111,7 +111,8 @@ public class PrintWriter extends Writer {
      *                    flush the output buffer
      */
     public PrintWriter(Writer out, boolean autoFlush) {
-        this.out = Objects.requireNonNull(out);
+        super(out);
+        this.out = out;
         this.autoFlush = autoFlush;
     }
 
@@ -399,18 +400,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedFlush();
+                implFlush();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedFlush();
+                implFlush();
             }
         }
     }
 
-    private void lockedFlush() {
+    private void implFlush() {
         try {
             ensureOpen();
             out.flush();
@@ -430,18 +431,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedClose();
+                implClose();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedClose();
+                implClose();
             }
         }
     }
 
-    private void lockedClose() {
+    private void implClose() {
         try {
             if (out != null) {
                 out.close();
@@ -455,9 +456,9 @@ public class PrintWriter extends Writer {
     /**
      * Flushes the stream if it's not closed and checks its error state.
      *
-     * @return {@code true} if the print stream has encountered an error,
-     *          either on the underlying output stream or during a format
-     *          conversion.
+     * @return {@code true} if and only if this stream has encountered an
+     *         {@code IOException}, or the {@code setError} method has been
+     *         invoked
      */
     public boolean checkError() {
         if (out != null) {
@@ -472,7 +473,7 @@ public class PrintWriter extends Writer {
     }
 
     /**
-     * Indicates that an error has occurred.
+     * Sets the error state of the stream to {@code true}.
      *
      * <p> This method will cause subsequent invocations of {@link
      * #checkError()} to return {@code true} until {@link
@@ -509,18 +510,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(c);
+                implWrite(c);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(c);
+                implWrite(c);
             }
         }
     }
 
-    private void lockedWrite(int c) {
+    private void implWrite(int c) {
         try {
             ensureOpen();
             out.write(c);
@@ -547,18 +548,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(buf, off, len);
+                implWrite(buf, off, len);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(buf, off, len);
+                implWrite(buf, off, len);
             }
         }
     }
 
-    private void lockedWrite(char[] buf, int off, int len) {
+    private void implWrite(char[] buf, int off, int len) {
         try {
             ensureOpen();
             out.write(buf, off, len);
@@ -594,18 +595,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedWrite(s, off, len);
+                implWrite(s, off, len);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedWrite(s, off, len);
+                implWrite(s, off, len);
             }
         }
     }
 
-    private void lockedWrite(String s, int off, int len) {
+    private void implWrite(String s, int off, int len) {
         try {
             ensureOpen();
             out.write(s, off, len);
@@ -630,18 +631,18 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedNewLine();
+                implNewLine();
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedNewLine();
+                implNewLine();
             }
         }
     }
 
-    private void lockedNewLine() {
+    private void implNewLine() {
         try {
             ensureOpen();
             out.write(System.lineSeparator());
@@ -1172,19 +1173,19 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedFormat(format, args);
+                implFormat(format, args);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedFormat(format, args);
+                implFormat(format, args);
             }
         }
         return this;
     }
 
-    private void lockedFormat(String format, Object ... args) {
+    private void implFormat(String format, Object ... args) {
         try {
             ensureOpen();
             if ((formatter == null)
@@ -1246,19 +1247,19 @@ public class PrintWriter extends Writer {
         if (lock instanceof InternalLock locker) {
             locker.lock();
             try {
-                lockedFormat(l, format, args);
+                implFormat(l, format, args);
             } finally {
                 locker.unlock();
             }
         } else {
             synchronized (lock) {
-                lockedFormat(l, format, args);
+                implFormat(l, format, args);
             }
         }
         return this;
     }
 
-    private void lockedFormat(Locale l, String format, Object ... args) {
+    private void implFormat(Locale l, String format, Object ... args) {
         try {
             ensureOpen();
             if ((formatter == null) || (formatter.locale() != l))

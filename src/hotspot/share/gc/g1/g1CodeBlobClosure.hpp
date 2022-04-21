@@ -69,12 +69,11 @@ class G1CodeBlobClosure : public CodeBlobClosure {
 
   HeapRegionGatheringOopClosure _oc;
   MarkingOopClosure _marking_oc;
-  bool _strong;
-  bool _keepalive_is_strong;
 
+  bool _strong;
 public:
-  G1CodeBlobClosure(uint worker_id, OopClosure* oc, bool strong, bool keepalive_is_strong) :
-    _oc(oc), _marking_oc(worker_id), _strong(strong), _keepalive_is_strong(keepalive_is_strong) { }
+  G1CodeBlobClosure(uint worker_id, OopClosure* oc, bool strong) :
+    _oc(oc), _marking_oc(worker_id), _strong(strong) { }
 
   void do_evacuation_and_fixup(nmethod* nm);
   void do_marking(nmethod* nm);

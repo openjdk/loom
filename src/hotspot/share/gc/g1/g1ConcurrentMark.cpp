@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -66,6 +66,7 @@
 #include "oops/access.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/globals_extension.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/java.hpp"
@@ -814,7 +815,7 @@ G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1Concu
 void G1ConcurrentMark::pre_concurrent_start(GCCause::Cause cause) {
   assert_at_safepoint_on_vm_thread();
 
-  CodeCache::increment_marking_cycle();
+  G1CollectedHeap::start_codecache_marking_cycle_if_inactive();
 
   G1PreConcurrentStartTask cl(cause, this);
   G1CollectedHeap::heap()->run_batch_task(&cl);
@@ -1300,6 +1301,9 @@ void G1ConcurrentMark::remark() {
     report_object_count(mark_finished);
   }
 
+  Continuations::on_gc_marking_cycle_finish();
+  Continuations::arm_all_nmethods();
+
   // Statistics
   double now = os::elapsedTime();
   _remark_mark_times.add((mark_work_end - start) * 1000.0);
@@ -1307,7 +1311,6 @@ void G1ConcurrentMark::remark() {
   _remark_times.add((now - start) * 1000.0);
 
   policy->record_concurrent_mark_remark_end();
-  CodeCache::increment_marking_cycle();
 }
 
 class G1ReclaimEmptyRegionsTask : public WorkerTask {

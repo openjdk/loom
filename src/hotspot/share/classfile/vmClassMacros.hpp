@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -88,8 +88,7 @@
                                                                                                                 \
   do_klass(Thread_klass,                                java_lang_Thread                                      ) \
   do_klass(Thread_FieldHolder_klass,                    java_lang_Thread_FieldHolder                          ) \
-  do_klass(Thread_VirtualThreads_klass,                 java_lang_Thread_VirtualThreads                       ) \
-  do_klass(Thread_ClassLoaders_klass,                   java_lang_Thread_ClassLoaders                         ) \
+  do_klass(Thread_Constants_klass,                      java_lang_Thread_Constants                            ) \
   do_klass(ThreadGroup_klass,                           java_lang_ThreadGroup                                 ) \
   do_klass(VirtualThread_klass,                         java_lang_VirtualThread                               ) \
   do_klass(Properties_klass,                            java_util_Properties                                  ) \
@@ -145,6 +144,7 @@
   do_klass(ByteArrayInputStream_klass,                  java_io_ByteArrayInputStream                          ) \
   do_klass(URL_klass,                                   java_net_URL                                          ) \
   do_klass(URLClassLoader_klass,                        java_net_URLClassLoader                               ) \
+  do_klass(Enum_klass,                                  java_lang_Enum                                        ) \
   do_klass(Jar_Manifest_klass,                          java_util_jar_Manifest                                ) \
   do_klass(jdk_internal_loader_BuiltinClassLoader_klass,jdk_internal_loader_BuiltinClassLoader                ) \
   do_klass(jdk_internal_loader_ClassLoaders_klass,      jdk_internal_loader_ClassLoaders                      ) \

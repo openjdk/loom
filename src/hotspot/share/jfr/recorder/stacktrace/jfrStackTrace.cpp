@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,9 +29,11 @@
 #include "jfr/recorder/stacktrace/jfrStackTrace.hpp"
 #include "jfr/recorder/storage/jfrBuffer.hpp"
 #include "jfr/support/jfrMethodLookup.hpp"
-
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "memory/allocation.inline.hpp"
 #include "oops/instanceKlass.inline.hpp"
+#include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 
@@ -136,87 +138,29 @@ void JfrStackFrame::write(JfrCheckpointWriter& cpw) const {
 
 class JfrVframeStream : public vframeStreamCommon {
  private:
-  oop _continuation;
-  oop _continuation_scope;
-  bool _continuation_scope_end_condition;
+  const ContinuationEntry* _cont_entry;
   bool _async_mode;
-
-  bool at_continuation_entry_frame() const;
-  bool at_continuation_scope_entry_frame();
-  void set_parent_continuation();
-  void set_continuation_scope();
-  void seek_stable_frame();
-  bool get_sender_frame();
-  void up();
-  DEBUG_ONLY(void assert_continuation_state() const;)
+  bool _vthread;
+  bool step_to_sender();
+  void next_frame();
  public:
-  JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode);
+  JfrVframeStream(JavaThread* jt, const frame& fr, bool stop_at_java_call_stub, bool async_mode);
   void next_vframe();
-  bool continuation_scope_end_condition() const;
 };
 
-inline void JfrVframeStream::seek_stable_frame() {
-  while (!fill_from_frame()) {
-    if (at_continuation_entry_frame()) {
-      set_parent_continuation();
-    }
-    get_sender_frame();
-  }
-}
-
-JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool async_mode) : vframeStreamCommon(RegisterMap(jt, false, false, true)),
-_continuation(jt->last_continuation()->cont_oop()), _continuation_scope(NULL), _continuation_scope_end_condition(false), _async_mode(async_mode) {
+JfrVframeStream::JfrVframeStream(JavaThread* jt, const frame& fr, bool stop_at_java_call_stub, bool async_mode) :
+  vframeStreamCommon(RegisterMap(jt, false, false, true)), _cont_entry(JfrThreadLocal::is_vthread(jt) ? jt->last_continuation() : nullptr),
+    _async_mode(async_mode), _vthread(JfrThreadLocal::is_vthread(jt)) {
+  assert(!_vthread || _cont_entry != nullptr, "invariant");
   _reg_map.set_async(async_mode);
-  _stop_at_java_call_stub = false;
   _frame = fr;
-  seek_stable_frame();
-  if (at_continuation_entry_frame()) {
-    set_parent_continuation();
-    if (get_sender_frame()) {
-      seek_stable_frame();
-    }
-  }
-  set_continuation_scope();
-  DEBUG_ONLY(assert_continuation_state();)
-}
-
-inline bool JfrVframeStream::at_continuation_entry_frame() const {
-  return _continuation != (oop)NULL && Continuation::is_continuation_enterSpecial(_frame);
-}
-
-inline void JfrVframeStream::set_parent_continuation() {
-  _continuation = jdk_internal_vm_Continuation::parent(_continuation);
-}
-
-inline void JfrVframeStream::set_continuation_scope() {
-  if (_continuation != (oop)NULL) {
-    _continuation_scope = jdk_internal_vm_Continuation::scope(_continuation);
+  _stop_at_java_call_stub = stop_at_java_call_stub;
+  while (!fill_from_frame()) {
+    step_to_sender();
   }
 }
 
-#ifdef ASSERT
-void JfrVframeStream::assert_continuation_state() const {
-  assert(_reg_map.cont() == (oop)NULL || (_continuation == _reg_map.cont()),
-    "map.cont: " INTPTR_FORMAT " JfrVframeStream: " INTPTR_FORMAT,
-    p2i((oopDesc*)_reg_map.cont()), p2i((oopDesc*)_continuation));
-}
-#endif
-
-inline bool JfrVframeStream::at_continuation_scope_entry_frame() {
-  assert(_continuation_scope == (oop)NULL || _continuation != (oop)NULL, "must be");
-  if (!at_continuation_entry_frame()) {
-    return false;
-  }
-  if (_continuation_scope != (oop)NULL && jdk_internal_vm_Continuation::scope(_continuation) == _continuation_scope) {
-    return true;
-  }
-  set_parent_continuation();
-  // set_continuation_scope();
-  DEBUG_ONLY(assert_continuation_state();)
-  return false;
-}
-
-inline bool JfrVframeStream::get_sender_frame() {
+inline bool JfrVframeStream::step_to_sender() {
   if (_async_mode && !_frame.safe_for_sender(_thread)) {
     _mode = at_end_mode;
     return false;
@@ -225,14 +169,17 @@ inline bool JfrVframeStream::get_sender_frame() {
   return true;
 }
 
-inline void JfrVframeStream::up() {
+inline void JfrVframeStream::next_frame() {
   do {
-    if (at_continuation_scope_entry_frame()) {
-      _continuation_scope_end_condition = true;
-      _mode = at_end_mode;
-      return;
+    if (_vthread && Continuation::is_continuation_enterSpecial(_frame)) {
+      if (_cont_entry->is_virtual_thread()) {
+        // An entry of a vthread continuation is a termination point.
+        _mode = at_end_mode;
+        break;
+      }
+      _cont_entry = _cont_entry->parent();
     }
-  } while (get_sender_frame() && !fill_from_frame());
+  } while (step_to_sender() && !fill_from_frame());
 }
 
 // Solaris SPARC Compiler1 needs an additional check on the grandparent
@@ -248,19 +195,7 @@ void JfrVframeStream::next_vframe() {
   if (_mode == compiled_mode && fill_in_compiled_inlined_sender()) {
     return;
   }
-  // handle general case
-  up();
-}
-
-inline bool JfrVframeStream::continuation_scope_end_condition() const {
-  assert(_mode == at_end_mode, "invariant");
-  return _continuation_scope_end_condition;
-}
-
-inline bool is_virtual(JavaThread* jt) {
-  assert(jt != NULL, "invariant");
-  assert(jt->threadObj() != (oop)NULL, "invariant");
-  return jt->vthread() != jt->threadObj();
+  next_frame();
 }
 
 static const size_t min_valid_free_size_bytes = 16;
@@ -269,18 +204,17 @@ static inline bool is_full(const JfrBuffer* enqueue_buffer) {
   return enqueue_buffer->free_size() < min_valid_free_size_bytes;
 }
 
-bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtual_thread) {
+bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame) {
   assert(jt != NULL, "invariant");
   Thread* current_thread = Thread::current();
   assert(jt != current_thread, "invariant");
-  assert(virtual_thread != NULL, "invariant");
   // Explicitly monitor the available space of the thread-local buffer used for enqueuing klasses as part of tagging methods.
   // We do this because if space becomes sparse, we cannot rely on the implicit allocation of a new buffer as part of the
   // regular tag mechanism. If the free list is empty, a malloc could result, and the problem with that is that the thread
   // we have suspended could be the holder of the malloc lock. If there is no more available space, the attempt is aborted.
   const JfrBuffer* const enqueue_buffer = JfrTraceIdLoadBarrier::get_enqueue_buffer(current_thread);
-  HandleMark hm(current_thread); // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
-  JfrVframeStream vfs(jt, frame, true);
+  HandleMark hm(current_thread); // RegisterMap uses Handles to support continuations.
+  JfrVframeStream vfs(jt, frame, false, true);
   u4 count = 0;
   _reached_root = true;
   _hash = 1;
@@ -317,7 +251,6 @@ bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtu
     _frames[count] = JfrStackFrame(mid, bci, type, method->line_number_from_bci(bci), method->method_holder());
     count++;
   }
-  *virtual_thread = _reached_root ? vfs.continuation_scope_end_condition() : is_virtual(jt);
   _lineno = true;
   _nr_of_frames = count;
   return count > 0;
@@ -326,8 +259,8 @@ bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame, bool* virtu
 bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
   assert(jt != NULL, "invariant");
   assert(jt == Thread::current(), "invariant");
-  HandleMark hm(jt); // TODO: RegisterMap uses Handles for continuations. But some callers here have NoHandleMark set.
-  JfrVframeStream vfs(jt, frame, false);
+  HandleMark hm(jt); // RegisterMap uses Handles to support continuations.
+  JfrVframeStream vfs(jt, frame, false, false);
   u4 count = 0;
   _reached_root = true;
   for (int i = 0; i < skip; ++i) {

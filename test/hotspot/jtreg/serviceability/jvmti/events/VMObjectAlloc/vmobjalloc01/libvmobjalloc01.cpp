@@ -42,11 +42,11 @@ static int eventsCount = 0;
 /* check if any VMObjectAlloc events received */
 static int checkVMObjectAllocEvents() {
 
-  NSK_DISPLAY1("VMObjectAlloc events received: %d\n", eventsCount);
+  LOG("VMObjectAlloc events received: %d\n", eventsCount);
 
   if (eventsCount == 0) {
-    NSK_DISPLAY0("# WARNING: no VMObjectAlloc events\n");
-    NSK_DISPLAY0("#    (VM might not allocate such objects at all)\n");
+    LOG("# WARNING: no VMObjectAlloc events\n");
+    LOG("#    (VM might not allocate such objects at all)\n");
   }
 
   return NSK_TRUE;
@@ -64,11 +64,11 @@ VMObjectAlloc(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread, jobject object,
 
   err = jvmti->GetClassSignature(object_klass, &signature, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return;
   }
 
-  NSK_DISPLAY2("VMObjectAlloc: \"%s\", size=%ld\n", signature, (long)size);
+  LOG("VMObjectAlloc: \"%s\", size=%ld\n", signature, (long)size);
 
   if (signature != NULL)
     jvmti->Deallocate((unsigned char*)signature);
@@ -85,16 +85,16 @@ static void JNICALL
 agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
 
   /* wait for debuggee start */
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
 
   /* testcase #1: check if any VMObjectAlloc events received*/
-  NSK_DISPLAY0("Testcase #1: check if any VMObjectAlloc events received\n");
+  LOG("Testcase #1: check if any VMObjectAlloc events received\n");
   if (!checkVMObjectAllocEvents())
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
 
   /* resume debugee after last sync */
-  if (!nsk_jvmti_resumeSync())
+  if (!agent_resume_sync())
     return;
 }
 
@@ -120,7 +120,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jint res;
 
   timeout = 60000; // TODO Fix timeout
-  NSK_DISPLAY1("Timeout: %d msc\n", (int)timeout);
+  LOG("Timeout: %d msc\n", (int)timeout);
 
   /* create JVMTI environment */
   res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_9);
@@ -153,7 +153,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  nsk_jvmti_setAgentProc(agentProc, NULL);
+  set_agent_proc(agentProc, NULL);
 
   return JNI_OK;
 }

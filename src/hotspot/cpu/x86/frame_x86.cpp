@@ -55,6 +55,9 @@ void RegisterMap::check_location_valid() {
 // Profiling/safepoint support
 
 bool frame::safe_for_sender(JavaThread *thread) {
+  if (is_heap_frame()) {
+    return true;
+  }
   address   sp = (address)_sp;
   address   fp = (address)_fp;
   address   unextended_sp = (address)_unextended_sp;
@@ -287,7 +290,7 @@ void frame::patch_pc(Thread* thread, address pc) {
   } else {
     _deopt_state = not_deoptimized;
   }
-  assert (!is_compiled_frame() || !_cb->as_compiled_method()->is_deopt_entry(_pc), "must be");
+  assert(!is_compiled_frame() || !_cb->as_compiled_method()->is_deopt_entry(_pc), "must be");
 
 #ifdef ASSERT
   {
@@ -326,12 +329,8 @@ BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return (BasicObjectLock*) addr_at(interpreter_frame_monitor_block_bottom_offset);
 }
 
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::ABSOLUTE>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<frame::addressing::RELATIVE>() const;
-
-template <frame::addressing pointers>
 BasicObjectLock* frame::interpreter_frame_monitor_end() const {
-  BasicObjectLock* result = (BasicObjectLock*) at<pointers>(interpreter_frame_monitor_block_top_offset);
+  BasicObjectLock* result = (BasicObjectLock*) at(interpreter_frame_monitor_block_top_offset);
   // make sure the pointer points inside the frame
   assert(sp() <= (intptr_t*) result, "monitor end should be above the stack pointer");
   assert((intptr_t*) result < fp(),  "monitor end should be strictly below the frame pointer: result: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(result), p2i(fp()));
@@ -593,13 +592,9 @@ BasicType frame::interpreter_frame_result(oop* oop_result, jvalue* value_result)
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::ABSOLUTE>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<frame::addressing::RELATIVE>(jint offset) const;
-
-template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset)/wordSize);
-  return &interpreter_frame_tos_address<pointers>()[index];
+  return &interpreter_frame_tos_address()[index];
 }
 
 #ifndef PRODUCT
@@ -629,18 +624,15 @@ void frame::describe_pd(FrameValues& values, int frame_no) {
 #endif // AMD64
   }
 
-  if (is_java_frame()) {
-    address ret_pc = *(address*)(real_fp() - return_addr_offset);
-    values.describe(frame_no, real_fp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc) ? "return address (return barrier)" : "return address");
-    values.describe(-1, real_fp() - sender_sp_offset, "saved fp", 2);
-  }
+  intptr_t* ret_pc_loc = sp() - return_addr_offset;
+  address ret_pc = *(address*)ret_pc_loc;
+  if (Continuation::is_return_barrier_entry(ret_pc))
+    values.describe(frame_no, ret_pc_loc, "return address (return barrier)");
+  else
+    values.describe(frame_no, ret_pc_loc, err_msg("return address for #%d", frame_no));
+  values.describe(frame_no, sp() - sender_sp_offset, err_msg("saved fp for #%d", frame_no), 0);
 }
 
-void frame::describe_top_pd(FrameValues& values) {
-  address ret_pc_callee = *(address*)(sp() - return_addr_offset);
-  values.describe(-1, sp() - return_addr_offset, Continuation::is_return_barrier_entry(ret_pc_callee) ? "return address (return barrier)" : "return address");
-  values.describe(-1, sp() - sender_sp_offset, "saved fp", 2);
-}
 #endif // !PRODUCT
 
 intptr_t *frame::initial_deoptimization_info() {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ private:
   void deoptimize(nmethod* nm, address* return_addr_ptr);
 
 public:
-  BarrierSetNMethod() : _current_phase(1) { }
+  BarrierSetNMethod() : _current_phase(1) {}
   bool supports_entry_barrier(nmethod* nm);
 
   virtual bool nmethod_entry_barrier(nmethod* nm);

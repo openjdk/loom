@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -71,16 +71,17 @@ class RegisterMap : public StackObj {
     location_valid_size = (reg_count+location_valid_type_size-1)/location_valid_type_size
   };
  private:
-  intptr_t*    _location[reg_count];    // Location of registers (intptr_t* looks better than address in the debugger)
+  intptr_t*         _location[reg_count];     // Location of registers (intptr_t* looks better than address in the debugger)
   LocationValidType _location_valid[location_valid_size];
-  bool        _include_argument_oops;   // Should include argument_oop marked locations for compiler
-  JavaThread* _thread;                  // Reference to current thread
-  stackChunkHandle _chunk;              // The current continuation stack chunk, if any
+  bool              _include_argument_oops;   // Should include argument_oop marked locations for compiler
+  JavaThread*       _thread;                  // Reference to current thread
+  stackChunkHandle  _chunk;                   // The current continuation stack chunk, if any
+  int               _chunk_index;             // incremented whenever a new chunk is set
 
-  bool        _update_map;              // Tells if the register map need to be
-                                        // updated when traversing the stack
-  bool        _process_frames;          // Should frames be processed by stack watermark barriers?
-  bool        _walk_cont;               // whether to walk frames on a continuation stack
+  bool              _update_map;              // Tells if the register map need to be
+                                              // updated when traversing the stack
+  bool              _process_frames;          // Should frames be processed by stack watermark barriers?
+  bool              _walk_cont;               // whether to walk frames on a continuation stack
 
   NOT_PRODUCT(bool  _skip_missing;) // ignore missing registers
   NOT_PRODUCT(bool  _async;)        // walking frames asynchronously, at arbitrary points
@@ -112,7 +113,7 @@ class RegisterMap : public StackObj {
     if (slot_idx > 0) {
       return pd_location(base_reg, slot_idx);
     } else {
-      return location(base_reg, (intptr_t*)NULL);
+      return location(base_reg, nullptr);
     }
   }
 
@@ -147,10 +148,14 @@ class RegisterMap : public StackObj {
   bool process_frames() const { return _process_frames; }
   bool walk_cont()      const { return _walk_cont; }
 
+  void set_walk_cont(bool value) { _walk_cont = value; }
+
   bool in_cont()        const { return _chunk() != NULL; } // Whether we are currently on the hstack; if true, frames are relativized
   oop cont() const;
   stackChunkHandle stack_chunk() const { return _chunk; }
   void set_stack_chunk(stackChunkOop chunk);
+  int stack_chunk_index() const { return _chunk_index; }
+  void set_stack_chunk_index(int index) { _chunk_index = index; }
 
   const RegisterMap* as_RegisterMap() const { return this; }
   RegisterMap* as_RegisterMap() { return this; }

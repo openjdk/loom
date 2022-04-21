@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,7 +53,7 @@
 #include "runtime/signature.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
-#include "runtime/vframe.hpp"
+#include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
 #include "runtime/vmOperations.hpp"
 #include "utilities/exceptions.hpp"
@@ -490,7 +490,7 @@ bool VM_BaseGetOrSetLocal::is_assignable(const char* ty_sign, Klass* klass, Thre
 bool VM_BaseGetOrSetLocal::check_slot_type_lvt(javaVFrame* jvf) {
   Method* method = jvf->method();
   if (!method->has_localvariable_table()) {
-    // Just to check index boundaries
+    // Just to check index boundaries.
     jint extra_slot = (_type == T_LONG || _type == T_DOUBLE) ? 1 : 0;
     if (_index < 0 || _index + extra_slot >= method->max_locals()) {
       _result = JVMTI_ERROR_INVALID_SLOT;
@@ -609,7 +609,8 @@ void VM_BaseGetOrSetLocal::doit() {
     return;
   };
 
-  if (_set && Continuation::is_frame_in_continuation(_jvf->thread(), _jvf->fr())) {
+  frame fr = _jvf->fr();
+  if (_set && _depth != 0 && Continuation::is_frame_in_continuation(_jvf->thread(), fr)) {
     _result = JVMTI_ERROR_OPAQUE_FRAME; // deferred locals currently unsupported in continuations
     return;
   }
@@ -647,6 +648,11 @@ void VM_BaseGetOrSetLocal::doit() {
     // possible the compiler emitted some locals as constant values,
     // meaning they are not mutable.
     if (can_be_deoptimized(_jvf)) {
+      // Continuation can't be unmounted at this point (it was checked/reported in get_java_vframe).
+      if (Continuation::is_frame_in_continuation(_jvf->thread(), fr)) {
+        _result = JVMTI_ERROR_OPAQUE_FRAME; // can't deoptimize for top continuation frame
+        return;
+      }
 
       // Schedule deoptimization so that eventually the local
       // update will be written to an interpreter frame.
@@ -754,7 +760,7 @@ vframe *VM_GetOrSetLocal::get_vframe() {
     return NULL;
   }
   RegisterMap reg_map(_thread, true, true, true);
-  vframe *vf = JvmtiEnvBase::get_last_java_vframe(_thread, &reg_map);
+  vframe *vf = JvmtiEnvBase::get_cthread_last_java_vframe(_thread, &reg_map);
   int d = 0;
   while ((vf != NULL) && (d < _depth)) {
     vf = vf->java_sender();
@@ -818,13 +824,14 @@ VM_VirtualThreadGetOrSetLocal::VM_VirtualThreadGetOrSetLocal(JvmtiEnv* env, Hand
 javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
   Thread* cur_thread = Thread::current();
   oop cont = java_lang_VirtualThread::continuation(_vthread_h());
-  javaVFrame* jvf = NULL;
-
   assert(cont != NULL, "vthread contintuation must not be NULL");
-  if (jdk_internal_vm_Continuation::is_mounted(cont)) {
-    oop carrier_thread = java_lang_VirtualThread::carrier_thread(_vthread_h());
-    JavaThread* java_thread = java_lang_Thread::thread(carrier_thread);
-    vframeStream vfs(java_thread, Handle(cur_thread, Continuation::continuation_scope(cont)));
+
+  javaVFrame* jvf = NULL;
+  JavaThread* java_thread = JvmtiEnvBase::get_JavaThread_or_null(_vthread_h());
+  bool is_cont_mounted = (java_thread != NULL);
+
+  if (is_cont_mounted) {
+    vframeStream vfs(java_thread);
 
     if (!vfs.at_end()) {
       jvf = vfs.asJavaVFrame();
@@ -849,7 +856,7 @@ javaVFrame *VM_VirtualThreadGetOrSetLocal::get_java_vframe() {
     return NULL;
   }
 
-  if (!jvf->is_java_frame()) {
+  if ((_set && !is_cont_mounted) || !jvf->is_java_frame()) {
     _result = JVMTI_ERROR_OPAQUE_FRAME;
     return NULL;
   }

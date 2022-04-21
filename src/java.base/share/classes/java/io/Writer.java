@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1996, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1996, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,10 +25,8 @@
 
 package java.io;
 
-
-import jdk.internal.misc.InternalLock;
-
 import java.util.Objects;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Abstract class for writing to character streams.  The only methods that a
@@ -51,6 +49,16 @@ import java.util.Objects;
  */
 
 public abstract class Writer implements Appendable, Closeable, Flushable {
+
+    /**
+     * Temporary buffer used to hold writes of strings and single characters
+     */
+    private char[] writeBuffer;
+
+    /**
+     * Size of writeBuffer, must be >= 1
+     */
+    private static final int WRITE_BUFFER_SIZE = 1024;
 
     /**
      * Returns a new {@code Writer} which discards all characters.  The
@@ -151,16 +159,21 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      * synchronize on the writer itself.
      */
     protected Writer() {
-        // use InternalLock for trusted classes
-        Class<?> clazz = getClass();
-        if (clazz == OutputStreamWriter.class
-                || clazz == BufferedWriter.class
-                || clazz == FileWriter.class
-                || clazz == PrintWriter.class
-                || clazz == sun.nio.cs.StreamEncoder.class) {
-            this.lock = InternalLock.newLockOr(this);
+        this.lock = this;
+    }
+
+    /**
+     * For use by BufferedWriter to create a character-stream writer that uses an
+     * internal lock when BufferedWriter is not extended and the given writer is
+     * trusted, otherwise critical sections will synchronize on the given writer.
+     */
+    Writer(Writer writer) {
+        Class<?> clazz = writer.getClass();
+        if (getClass() == BufferedWriter.class &&
+                (clazz == OutputStreamWriter.class || clazz == FileWriter.class)) {
+            this.lock = InternalLock.newLockOr(writer);
         } else {
-            this.lock = this;
+            this.lock = writer;
         }
     }
 
@@ -172,7 +185,10 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *         Object to synchronize on
      */
     protected Writer(Object lock) {
-        this.lock = Objects.requireNonNull(lock);
+        if (lock == null) {
+            throw new NullPointerException();
+        }
+        this.lock = lock;
     }
 
     /**
@@ -190,7 +206,25 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(int c) throws IOException {
-        var writeBuffer = new char[1];
+        Object lock = this.lock;
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
+            try {
+                implWrite(c);
+            } finally {
+                locker.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                implWrite(c);
+            }
+        }
+    }
+
+    private void implWrite(int c) throws IOException {
+        if (writeBuffer == null){
+            writeBuffer = new char[WRITE_BUFFER_SIZE];
+        }
         writeBuffer[0] = (char) c;
         write(writeBuffer, 0, 1);
     }
@@ -271,8 +305,31 @@ public abstract class Writer implements Appendable, Closeable, Flushable {
      *          If an I/O error occurs
      */
     public void write(String str, int off, int len) throws IOException {
-        Objects.checkFromIndexSize(off, len, str.length());
-        char cbuf[] = new char[len];
+        Object lock = this.lock;
+        if (lock instanceof InternalLock locker) {
+            locker.lock();
+            try {
+                implWrite(str, off, len);
+            } finally {
+                locker.unlock();
+            }
+        } else {
+            synchronized (lock) {
+                implWrite(str, off, len);
+            }
+        }
+    }
+
+    private void implWrite(String str, int off, int len) throws IOException {
+        char cbuf[];
+        if (len <= WRITE_BUFFER_SIZE) {
+            if (writeBuffer == null) {
+                writeBuffer = new char[WRITE_BUFFER_SIZE];
+            }
+            cbuf = writeBuffer;
+        } else {    // Don't permanently allocate very large buffers.
+            cbuf = new char[len];
+        }
         str.getChars(off, (off + len), cbuf, 0);
         write(cbuf, 0, len);
     }

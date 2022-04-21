@@ -50,6 +50,8 @@ import java.util.random.RandomGenerator;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
+import jdk.internal.access.JavaUtilConcurrentTLRAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.util.random.RandomSupport;
 import jdk.internal.util.random.RandomSupport.*;
 import jdk.internal.misc.Unsafe;
@@ -93,7 +95,7 @@ import jdk.internal.misc.VM;
         i = 64, j = 0, k = 0,
         equidistribution = 1
 )
-public class ThreadLocalRandom extends Random {
+public final class ThreadLocalRandom extends Random {
     /*
      * This class implements the java.util.Random API (and subclasses
      * Random) using a single static instance that accesses 64 bits of
@@ -404,6 +406,19 @@ public class ThreadLocalRandom extends Random {
     private static final AtomicLong seeder
         = new AtomicLong(RandomSupport.mixMurmur64(System.currentTimeMillis()) ^
                          RandomSupport.mixMurmur64(System.nanoTime()));
+
+    // used by ScopeLocal
+    private static class Access {
+        static {
+            SharedSecrets.setJavaUtilConcurrentTLRAccess(
+                new JavaUtilConcurrentTLRAccess() {
+                    public int nextSecondaryThreadLocalRandomSeed() {
+                        return nextSecondarySeed();
+                    }
+                }
+            );
+        }
+    }
 
     // at end of <clinit> to survive static initialization circularity
     static {

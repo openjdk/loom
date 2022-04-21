@@ -43,7 +43,7 @@ static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
   LOG("Wait for thread to start\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
 
   /* perform testing */
@@ -59,7 +59,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     suspend_thread(jvmti, jni, tested_thread);
 
     LOG("Let thread to run and finish\n");
-    if (!nsk_jvmti_resumeSync()) {
+    if (!agent_resume_sync()) {
       return;
     }
 
@@ -71,7 +71,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
         LOG("SuspendThread() does not turn on flag SUSPENDED:\n"
                "#   state: %s (%d)\n", TranslateState(state), (int) state);
-        nsk_jvmti_setFailStatus();
+        set_agent_fail_status();
       }
     }
 
@@ -79,7 +79,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     resume_thread(jvmti, jni, tested_thread);
 
     LOG("Wait for thread to finish\n");
-    if (!nsk_jvmti_waitForSync(timeout)) {
+    if (!agent_wait_for_sync(timeout)) {
       return;
     }
 
@@ -88,7 +88,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
   }
 
   LOG("Let debugee to finish\n");
-  if (!nsk_jvmti_resumeSync()) {
+  if (!agent_resume_sync()) {
     return;
   }
 }
@@ -121,7 +121,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   }
 
   /* register agent proc and arg */
-  if (!nsk_jvmti_setAgentProc(agentProc, NULL)) {
+  if (!set_agent_proc(agentProc, NULL)) {
     return JNI_ERR;
   }
 

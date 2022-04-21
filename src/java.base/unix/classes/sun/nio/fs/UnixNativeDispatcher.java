@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
 
 package sun.nio.fs;
 
+import java.util.function.Function;
 import jdk.internal.misc.Blocker;
 
 /**
@@ -66,10 +67,11 @@ class UnixNativeDispatcher {
      */
     static int open(UnixPath path, int flags, int mode) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> open0(buffer.address(), flags, mode));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return open0(buffer.address(), flags, mode);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -81,10 +83,11 @@ class UnixNativeDispatcher {
      */
     static int openat(int dfd, byte[] path, int flags, int mode) throws UnixException {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> openat0(dfd, buffer.address(), flags, mode));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return openat0(dfd, buffer.address(), flags, mode);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -94,12 +97,30 @@ class UnixNativeDispatcher {
     /**
      * close(int filedes). If fd is -1 this is a no-op.
      */
-    static void close(int fd) {
+    static void close(int fd) throws UnixException {
         if (fd != -1) {
             close0(fd);
         }
     }
-    private static native void close0(int fd);
+    private static native void close0(int fd) throws UnixException;
+
+    /**
+     * close(fd). If close fails then the given exception supplier function is
+     * invoked to produce an exception to throw. If the function returns null
+     * then no exception is thrown. If close fails and the exception supplier
+     * function is null, then no exception is thrown.
+     */
+    static <X extends Throwable>
+    void close(int fd, Function<UnixException, X> mapper) throws X {
+        try {
+            close(fd);
+        } catch (UnixException e) {
+            if (mapper != null) {
+                X ex = mapper.apply(e);
+                if (ex != null) throw ex;
+            }
+        }
+    }
 
     /**
      * void rewind(FILE* stream);
@@ -117,12 +138,11 @@ class UnixNativeDispatcher {
     static void link(UnixPath existing, UnixPath newfile) throws UnixException {
         try (NativeBuffer existingBuffer = copyToNativeBuffer(existing);
              NativeBuffer newBuffer = copyToNativeBuffer(newfile)) {
-            long existingAddress = existingBuffer.address();
-            long newAddress = newBuffer.address();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> link0(existingAddress, newAddress));
-            } else {
-                link0(existingAddress, newAddress);
+            long comp = Blocker.begin();
+            try {
+                link0(existingBuffer.address(), newBuffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -134,10 +154,11 @@ class UnixNativeDispatcher {
      */
     static void unlink(UnixPath path) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> unlink0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 unlink0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -148,10 +169,11 @@ class UnixNativeDispatcher {
      */
     static void unlinkat(int dfd, byte[] path, int flag) throws UnixException {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> unlinkat0(dfd, buffer.address(), flag));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 unlinkat0(dfd, buffer.address(), flag);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -163,10 +185,11 @@ class UnixNativeDispatcher {
      */
     static void mknod(UnixPath path, int mode, long dev) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> mknod0(buffer.address(), mode, dev));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 mknod0(buffer.address(), mode, dev);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -179,12 +202,11 @@ class UnixNativeDispatcher {
     static void rename(UnixPath from, UnixPath to) throws UnixException {
         try (NativeBuffer fromBuffer = copyToNativeBuffer(from);
              NativeBuffer toBuffer = copyToNativeBuffer(to)) {
-            long fromAddress = fromBuffer.address();
-            long toAddress = toBuffer.address();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> rename0(fromAddress, toAddress));
-            } else {
-                rename0(fromAddress, toAddress);
+            long comp = Blocker.begin();
+            try {
+                rename0(fromBuffer.address(), toBuffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -197,12 +219,11 @@ class UnixNativeDispatcher {
     static void renameat(int fromfd, byte[] from, int tofd, byte[] to) throws UnixException {
         try (NativeBuffer fromBuffer = NativeBuffers.asNativeBuffer(from);
              NativeBuffer toBuffer = NativeBuffers.asNativeBuffer(to)) {
-            long fromAddress = fromBuffer.address();
-            long toAddress = toBuffer.address();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> renameat0(fromfd, fromAddress, tofd, toAddress));
-            } else {
-                renameat0(fromfd, fromAddress, tofd, toAddress);
+            long comp = Blocker.begin();
+            try {
+                renameat0(fromfd, fromBuffer.address(), tofd, toBuffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -214,10 +235,11 @@ class UnixNativeDispatcher {
      */
     static void mkdir(UnixPath path, int mode) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> mkdir0(buffer.address(), mode));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 mkdir0(buffer.address(), mode);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -228,10 +250,11 @@ class UnixNativeDispatcher {
      */
     static void rmdir(UnixPath path) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> rmdir0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 rmdir0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -244,10 +267,11 @@ class UnixNativeDispatcher {
      */
     static byte[] readlink(UnixPath path) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> readlink0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return readlink0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -260,10 +284,11 @@ class UnixNativeDispatcher {
      */
     static byte[] realpath(UnixPath path) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> realpath0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return realpath0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -275,12 +300,11 @@ class UnixNativeDispatcher {
     static void symlink(byte[] name1, UnixPath name2) throws UnixException {
         try (NativeBuffer targetBuffer = NativeBuffers.asNativeBuffer(name1);
              NativeBuffer linkBuffer = copyToNativeBuffer(name2)) {
-            long targetAddress = targetBuffer.address();
-            long linkAddress = linkBuffer.address();
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> symlink0(targetAddress, linkAddress));
-            } else {
-                symlink0(targetAddress, linkAddress);
+            long comp = Blocker.begin();
+            try {
+                symlink0(targetBuffer.address(), linkBuffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -292,10 +316,11 @@ class UnixNativeDispatcher {
      */
     static void stat(UnixPath path, UnixFileAttributes attrs) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> stat0(buffer.address(), attrs));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 stat0(buffer.address(), attrs);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -310,10 +335,11 @@ class UnixNativeDispatcher {
      */
     static int stat(UnixPath path) {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> stat1(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return stat1(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -325,10 +351,11 @@ class UnixNativeDispatcher {
      */
     static void lstat(UnixPath path, UnixFileAttributes attrs) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> lstat0(buffer.address(), attrs));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 lstat0(buffer.address(), attrs);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -339,10 +366,11 @@ class UnixNativeDispatcher {
      * fstat(int filedes, struct stat* buf)
      */
     static void fstat(int fd, UnixFileAttributes attrs) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> fstat0(fd, attrs));
-        } else {
+        long comp = Blocker.begin();
+        try {
             fstat0(fd, attrs);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void fstat0(int fd, UnixFileAttributes attrs)
@@ -355,10 +383,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> fstatat0(dfd, buffer.address(), flag, attrs));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 fstatat0(dfd, buffer.address(), flag, attrs);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -370,10 +399,11 @@ class UnixNativeDispatcher {
      */
     static void chown(UnixPath path, int uid, int gid) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> chown0(buffer.address(), uid, gid));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 chown0(buffer.address(), uid, gid);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -385,10 +415,11 @@ class UnixNativeDispatcher {
      */
     static void lchown(UnixPath path, int uid, int gid) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> lchown0(buffer.address(), uid, gid));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 lchown0(buffer.address(), uid, gid);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -399,10 +430,11 @@ class UnixNativeDispatcher {
      * fchown(int filedes, uid_t owner, gid_t group)
      */
     static void fchown(int fd, int uid, int gid) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> fchown0(fd, uid, gid));
-        } else {
+        long comp = Blocker.begin();
+        try {
             fchown0(fd, uid, gid);
+        } finally {
+            Blocker.end(comp);
         }
     }
     static native void fchown0(int fd, int uid, int gid) throws UnixException;
@@ -412,10 +444,11 @@ class UnixNativeDispatcher {
      */
     static void chmod(UnixPath path, int mode) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> chmod0(buffer.address(), mode));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 chmod0(buffer.address(), mode);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -426,10 +459,11 @@ class UnixNativeDispatcher {
      * fchmod(int fildes, mode_t mode)
      */
     static void fchmod(int fd, int mode) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> fchmod0(fd, mode));
-        } else {
+        long comp = Blocker.begin();
+        try {
             fchmod0(fd, mode);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void fchmod0(int fd, int mode) throws UnixException;
@@ -441,10 +475,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> utimes0(buffer.address(), times0, times1));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 utimes0(buffer.address(), times0, times1);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -455,10 +490,11 @@ class UnixNativeDispatcher {
      * futimes(int fildes, const struct timeval times[2])
      */
     static void futimes(int fd, long times0, long times1) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> futimes0(fd, times0, times1));
-        } else {
+        long comp = Blocker.begin();
+        try {
             futimes0(fd, times0, times1);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void futimes0(int fd, long times0, long times1)
@@ -468,10 +504,11 @@ class UnixNativeDispatcher {
      * futimens(int fildes, const struct timespec times[2])
      */
     static void futimens(int fd, long times0, long times1) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> futimens0(fd, times0, times1));
-        } else {
+        long comp = Blocker.begin();
+        try {
             futimens0(fd, times0, times1);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native void futimens0(int fd, long times0, long times1)
@@ -484,10 +521,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> lutimes0(buffer.address(), times0, times1));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 lutimes0(buffer.address(), times0, times1);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -499,10 +537,11 @@ class UnixNativeDispatcher {
      */
     static long opendir(UnixPath path) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> opendir0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return opendir0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -525,10 +564,11 @@ class UnixNativeDispatcher {
      * @return  dirent->d_name
      */
     static byte[] readdir(long dir) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readdir0(dir));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return readdir0(dir);
+        } finally {
+            Blocker.end(comp);
         }
     }
     static native byte[] readdir0(long dir) throws UnixException;
@@ -537,10 +577,11 @@ class UnixNativeDispatcher {
      * size_t read(int fildes, void* buf, size_t nbyte)
      */
     static int read(int fildes, long buf, int nbyte) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> read0(fildes, buf, nbyte));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return read0(fildes, buf, nbyte);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native int read0(int fildes, long buf, int nbyte) throws UnixException;
@@ -549,10 +590,11 @@ class UnixNativeDispatcher {
      * size_t writeint fildes, void* buf, size_t nbyte)
      */
     static int write(int fildes, long buf, int nbyte) throws UnixException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> write0(fildes, buf, nbyte));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return write0(fildes, buf, nbyte);
+        } finally {
+            Blocker.end(comp);
         }
     }
     private static native int write0(int fildes, long buf, int nbyte) throws UnixException;
@@ -562,10 +604,11 @@ class UnixNativeDispatcher {
      */
     static void access(UnixPath path, int amode) throws UnixException {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> access0(buffer.address(), amode));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 access0(buffer.address(), amode);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -578,10 +621,11 @@ class UnixNativeDispatcher {
      */
     static boolean exists(UnixPath path) {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> exists0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return exists0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -608,10 +652,11 @@ class UnixNativeDispatcher {
      */
     static int getpwnam(String name) throws UnixException {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(Util.toBytes(name))) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> getpwnam0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return getpwnam0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -624,10 +669,11 @@ class UnixNativeDispatcher {
      */
     static int getgrnam(String name) throws UnixException {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(Util.toBytes(name))) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() -> getgrnam0(buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return getgrnam0(buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -640,10 +686,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = copyToNativeBuffer(path)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> statvfs0(buffer.address(), attrs));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 statvfs0(buffer.address(), attrs);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -662,11 +709,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(name)) {
-            if (Thread.currentThread().isVirtual()) {
-                return Blocker.managedBlock(() ->
-                        fgetxattr0(filedes, buffer.address(), valueAddress, valueLen));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 return fgetxattr0(filedes, buffer.address(), valueAddress, valueLen);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -681,11 +728,11 @@ class UnixNativeDispatcher {
         throws UnixException
     {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(name)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() ->
-                        fsetxattr0(filedes, buffer.address(), valueAddress, valueLen));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 fsetxattr0(filedes, buffer.address(), valueAddress, valueLen);
+            } finally {
+                Blocker.end(comp);
             }
         }
     }
@@ -698,10 +745,11 @@ class UnixNativeDispatcher {
      */
     static void fremovexattr(int filedes, byte[] name) throws UnixException {
         try (NativeBuffer buffer = NativeBuffers.asNativeBuffer(name)) {
-            if (Thread.currentThread().isVirtual()) {
-                Blocker.managedBlock(() -> fremovexattr0(filedes, buffer.address()));
-            } else {
+            long comp = Blocker.begin();
+            try {
                 fremovexattr0(filedes, buffer.address());
+            } finally {
+                Blocker.end(comp);
             }
         }
     }

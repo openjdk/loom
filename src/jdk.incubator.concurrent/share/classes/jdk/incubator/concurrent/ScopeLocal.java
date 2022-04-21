@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ScopeLocalContainer;
 import jdk.internal.vm.annotation.DontInline;
@@ -85,24 +86,6 @@ import jdk.internal.vm.annotation.Stable;
  *   }
  * }</pre>
  *
- * As an alternative to the lambda expression form used above, {@link ScopeLocal} also supports
- * a <i>try-with-resources</i> form, which looks like this:
- * <pre>{@code}
- *   try (var unused = ScopeLocal.where(CREDENTIALS, creds).bind()) {
- *       :
- *       Connection connection = connectDatabase();
- *       :
- *    }
- * }</pre>
- *
- * This try-with-resources version of {@code bind()} is <i>insecure</i>: it is up
- * to the application programmer to make sure that bindings are closed at the
- * right time, in the right order. While a <i>try-with-resources</i> statement is
- * enough to guarantee this, there is no way to enforce the requirement that
- * {@link Carrier#bind} is only used in a <i>try-with-resources</i> statement.
- * <p>Also, it is not possible to re-bind an already-bound {@link ScopeLocal}
- * with this <i>try-with-resources</i> binding.</p>
- *
  * @implNote Scope locals are designed to be used in fairly small numbers. {@link
  * #get} initially performs a linear search through enclosing scopes to find a
  * scope local's innermost binding. It then caches the result of the search in a
@@ -129,22 +112,6 @@ public final class ScopeLocal<T> {
     private final @Stable int hash;
 
     public final int hashCode() { return hash; }
-
-    /**
-     * The interface for a ScopeLocal try-with-resources binding.
-     * @since 19
-     */
-    public sealed interface Binder extends AutoCloseable permits BinderImpl {
-
-        /**
-         * Closes this {@link ScopeLocal} binding. If this binding was not the most recent binding
-         * created by {@code #Carrier.bind}, throws a {@link StructureViolationException}.
-         * This method is invoked automatically on objects managed by the try-with-resources statement.
-         *
-         * @throws StructureViolationException if the bindings were not closed in the correct order.
-         */
-        public void close();
-    }
 
     /**
      * An immutable map from {@code ScopeLocal} to values.
@@ -386,99 +353,6 @@ public final class ScopeLocal<T> {
                 }
             }
         }
-
-        /**
-         * Create a try-with-resources ScopeLocal binding to be used within
-         * a try-with-resources block.
-         * <p>If any of the {@link ScopeLocal}s bound in this {@link Carrier} are already bound in an outer context,
-         * throw a {@link RuntimeException}.</p>
-         * @return a {@link ScopeLocal.Binder}.
-         *
-         * @implNote Using try-with-resources in this way is more expensive than
-         * using, for example, {@link Carrier#run} (or {@link Carrier#call})
-         * because it has to do consistency checking at runtime in order to
-         * ensure that scope locals are used in a correctly-nested way. Also,
-         * it's necessary to search for existing bindings, so it can fail at
-         * runtime. For those reasons, if your application can use {@link
-         * Carrier#run}, it will probably perform better as well as being more
-         * secure.
-         */
-        public ScopeLocal.Binder bind() {
-            checkNotBound();
-            return (Binder)new BinderImpl(this).push();
-        }
-    }
-
-    /**
-     * An @AutoCloseable that's used to bind a {@code ScopeLocal} in a try-with-resources construct.
-     */
-    static final class BinderImpl
-            extends ScopeLocalContainer implements ScopeLocal.Binder {
-        final Carrier bindings;
-        final int bitmask;
-        final BinderImpl prevBinder;
-        private boolean closed;
-
-        BinderImpl(Carrier bindings) {
-            super();
-            this.bindings = bindings;
-            this.prevBinder = innermostBinder();
-            this.bitmask = bindings.bitmask
-                    | (prevBinder == null ? 0 : prevBinder.bitmask);
-        }
-
-        static BinderImpl innermostBinder() {
-            return ScopeLocalContainer.latest(BinderImpl.class);
-        }
-
-        /**
-         * Close a scope local binding context.
-         *
-         * @throws StructureViolationException if {@code this} isn't the current top binding
-         * @throws WrongThreadException if the current thread is not the owner
-         */
-        public void close() throws RuntimeException {
-            if (Thread.currentThread() != owner())
-                throw new WrongThreadException();
-            if (!closed) {
-                Cache.invalidate(bindings.bitmask);
-                if (!popForcefully()) {
-                    setScopeLocalCache(null); // Cache.invalidate();
-                    closed = true;
-                    throw new StructureViolationException();
-                }
-                closed = true;
-            }
-        }
-
-        protected boolean tryClose() {
-            assert Thread.currentThread() == owner();
-            if (!closed) {
-                closed = true;
-                Cache.invalidate(bindings.bitmask);
-                return true;
-            } else {
-                assert false : "Should not get there";
-                return false;
-            }
-        }
-
-        static Object find(ScopeLocal<?> key) {
-            int bits = key.bitmask();
-            for (BinderImpl b = innermostBinder();
-                 b != null && containsAll(b.bitmask, bits);
-                 b = b.prevBinder) {
-                for (Carrier carrier = b.bindings;
-                     carrier != null && containsAll(carrier.bitmask, bits);
-                     carrier = carrier.prev) {
-                    if (carrier.getKey() == key) {
-                        Object value = carrier.get();
-                        return value;
-                    }
-                }
-            }
-            return Snapshot.NIL;
-        }
     }
 
     /**
@@ -494,28 +368,6 @@ public final class ScopeLocal<T> {
      */
     public static <T> Carrier where(ScopeLocal<T> key, T value) {
         return Carrier.of(key, value);
-    }
-
-
-    /**
-     * Create a try-with-resources ScopeLocal binding to be used within
-     * a try-with-resources block.
-     * <p>If this {@link ScopeLocal} is already bound in an outer context,
-     * throw a {@link RuntimeException}.</p>
-     * @param t The value to bind this to
-     * @return a {@link ScopeLocal.Binder}.
-     *
-     * @implNote Using try-with-resources in this way is more expensive than
-     * using, for example, {@link Carrier#run} (or {@link Carrier#call})
-     * because it has to do consistency checking at runtime in order to
-     * ensure that scope locals are used in a correctly-nested way. Also,
-     * it's necessary to search for existing bindings, so it can fail at
-     * runtime. For those reasons, if your application can use {@link
-     * Carrier#run}, it will probably perform better as well as being more
-     * secure.
-     */
-    public ScopeLocal.Binder bind(T t) {
-        return where(this, t).bind();
     }
 
     /**
@@ -617,10 +469,7 @@ public final class ScopeLocal<T> {
      */
     private Object findBinding() {
         Object value = scopeLocalBindings().find(this);
-        if (value != Snapshot.NIL) {
-            return value;
-        }
-        return BinderImpl.find(this);
+        return value;
     }
 
     /**
@@ -792,26 +641,25 @@ public final class ScopeLocal<T> {
             objs[n * 2] = key;
         }
 
+        private static final JavaUtilConcurrentTLRAccess THREAD_LOCAL_RANDOM_ACCESS
+                = SharedSecrets.getJavaUtilConcurrentTLRAccess();
+
         // Return either true or false, at pseudo-random, with a bias towards true.
         // This chooses either the primary or secondary cache slot, but the
         // primary slot is approximately twice as likely to be chosen as the
         // secondary one.
         private static boolean chooseVictim() {
-            int tmp = JLA.scopeLocalCacheVictims();
-            tmp ^= tmp << 13;
-            tmp ^= tmp >>> 17;
-            tmp ^= tmp << 5;
-            JLA.setScopeLocalCacheVictims(tmp);
-            return (tmp & 15) >= 5;
+            int r = THREAD_LOCAL_RANDOM_ACCESS.nextSecondaryThreadLocalRandomSeed();
+            return (r & 15) >= 5;
         }
 
-        @ReservedStackAccess
+        @ReservedStackAccess @DontInline
         public static void invalidate() {
             setScopeLocalCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
-        @ReservedStackAccess
+        @ReservedStackAccess @DontInline
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -341,10 +341,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *             defined above
      */
     private void open(String name, int mode) throws FileNotFoundException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> open0(name, mode));
-        } else {
+        long comp = Blocker.begin();
+        try {
             open0(name, mode);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -366,10 +367,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *                          end-of-file has been reached.
      */
     public int read() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> read0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return read0();
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -383,10 +385,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws    IOException If an I/O error has occurred.
      */
     private int readBytes(byte[] b, int off, int len) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes0(b, off, len));
-        } else {
+        long comp = Blocker.begin();
+        try {
             return readBytes0(b, off, len);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -418,11 +421,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *             {@code b.length - off}
      */
     public int read(byte[] b, int off, int len) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> readBytes(b, off, len));
-        } else {
-            return readBytes(b, off, len);
-        }
+        return readBytes(b, off, len);
     }
 
     /**
@@ -445,7 +444,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     NullPointerException If {@code b} is {@code null}.
      */
     public int read(byte[] b) throws IOException {
-        return read(b, 0, b.length);
+        return readBytes(b, 0, b.length);
     }
 
     /**
@@ -539,10 +538,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> write0(b));
-        } else {
+        long comp = Blocker.begin();
+        try {
             write0(b);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -557,10 +557,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws    IOException If an I/O error has occurred.
      */
     private void writeBytes(byte[] b, int off, int len) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes0(b, off, len));
-        } else {
+        long comp = Blocker.begin();
+        try {
             writeBytes0(b, off, len);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -574,7 +575,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(byte[] b) throws IOException {
-        write(b, 0, b.length);
+        writeBytes(b, 0, b.length);
     }
 
     /**
@@ -620,10 +621,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
         if (pos < 0) {
             throw new IOException("Negative seek offset");
         }
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> seek0(pos));
-        } else {
+        long comp = Blocker.begin();
+        try {
             seek0(pos);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -636,10 +638,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public long length() throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            return Blocker.managedBlock(() -> length0());
-        } else {
+        long comp = Blocker.begin();
+        try {
             return length0();
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -665,10 +668,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @since      1.2
      */
     public void setLength(long newLength) throws IOException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> setLength0(newLength));
-        } else {
+        long comp = Blocker.begin();
+        try {
             setLength0(newLength);
+        } finally {
+            Blocker.end(comp);
         }
     }
 

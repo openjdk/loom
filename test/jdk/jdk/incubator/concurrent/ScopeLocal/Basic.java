@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,19 +35,33 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+
+import org.testng.TestListenerAdapter;
+import org.testng.TestNG;
 import org.testng.annotations.Test;
+import org.testng.xml.XmlSuite;
+
 import static org.testng.Assert.*;
 
-@Test
 public class Basic {
 
-    @Test(expectedExceptions = { NoSuchElementException.class })
+    public static void main(String[] args) {
+        TestListenerAdapter tla = new TestListenerAdapter();
+        TestNG testNG = new TestNG();
+        testNG.setParallel(XmlSuite.ParallelMode.METHODS);
+        testNG.setTestClasses(new Class[] { Basic.class });
+        testNG.addListener(tla);
+        testNG.run();
+    }
+
+    @Test
     public void testUnbound1() {
         ScopeLocal<String> v = ScopeLocal.newInstance();
         assertFalse(v.isBound());
-        v.get();
+        assertThrows(NoSuchElementException.class, () -> v.get());
     }
 
+    @Test
     public void testOrElse() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
@@ -59,6 +73,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testOrElseThrow() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         assertFalse(name.isBound());
@@ -70,6 +85,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding1() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -78,6 +94,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding2() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -94,6 +111,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding3() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, null, () -> {
@@ -102,6 +120,7 @@ public class Basic {
         });
     }
 
+    @Test
     public void testRunWithBinding4() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         ScopeLocal.where(name, "fred", () -> {
@@ -118,12 +137,14 @@ public class Basic {
         });
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
+    @Test
     public void testRunWithBinding9() {
         ScopeLocal<String> name = ScopeLocal.newInstance();
-        ScopeLocal.where(name, "fred", (Runnable)null);
+        assertThrows(NullPointerException.class,
+                     () -> ScopeLocal.where(name, "fred", (Runnable) null));
     }
 
+    @Test
     public void testCallWithBinding1() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, "fred", () -> {
@@ -135,6 +156,7 @@ public class Basic {
         assertTrue(result == 1);
     }
 
+    @Test
     public void testCallWithBinding2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
@@ -155,6 +177,7 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
+    @Test
     public void testCallWithBinding3() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result = ScopeLocal.where(name, null, () -> {
@@ -165,6 +188,7 @@ public class Basic {
         assertTrue(result == 1);
     }
 
+    @Test
     public void testCallWithBinding4() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         int result1 = ScopeLocal.where(name, "fred", () -> {
@@ -184,177 +208,10 @@ public class Basic {
         assertTrue(result1 == 1);
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
+    @Test
     public void testCallWithBinding9() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
-        ScopeLocal.where(name, "fred", (Callable)null);
-    }
-
-    /**
-     * Basic test of bind method.
-     */
-    public void testTryWithResources1() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var binding = ScopeLocal.where(name, "x").bind()) {
-            assertEquals(name.get(), "x");
-
-            // re-bind should fail
-            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
-            expectThrows(RuntimeException.class, () -> name.bind("y"));
-
-            assertEquals(name.get(), "x");
-        }
-        assertFalse(name.isBound());
-    }
-
-    /**
-     * Basic test of bind method with nested bindings.
-     */
-    public void testTryWithResources2() {
-        ScopeLocal<String> name1 = ScopeLocal.newInstance();
-        ScopeLocal<String> name2 = ScopeLocal.newInstance();
-        try (var binding1 = ScopeLocal.where(name1, "x").bind()) {
-            assertEquals(name1.get(), "x");
-            assertFalse(name2.isBound());
-
-            try (var binding2 = ScopeLocal.where(name2, "y").bind()) {
-                assertEquals(name1.get(), "x");
-                assertEquals(name2.get(), "y");
-            }
-
-            assertEquals(name1.get(), "x");
-            assertFalse(name2.isBound());
-        }
-        assertFalse(name1.isBound());
-    }
-
-    /**
-     * Basic test of re-binding after bind.
-     */
-    public void testTryWithResources3() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var binding = ScopeLocal.where(name, "x").bind()) {
-            assertEquals(name.get(), "x");
-
-            // re-bind
-            ScopeLocal.where(name, "y").run(() -> {
-                assertEquals(name.get(), "y");
-            });
-
-            assertEquals(name.get(), "x");
-        }
-        assertFalse(name.isBound());
-    }
-
-    /**
-     * Basic test that bind cannot re-bind.
-     */
-    public void testTryWithResources4() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        ScopeLocal.where(name, "x").run(() -> {
-            assertEquals(name.get(), "x");
-
-            // re-bind should fail
-            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
-            expectThrows(RuntimeException.class, () -> name.bind("y"));
-
-            assertEquals(name.get(), "x");
-        });
-        assertFalse(name.isBound());
-    }
-
-    /**
-     * Basic test that the shorthand form of bind works.
-     */
-    public void testTryWithResources5() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
-        try (var binding = name.bind("x")) {
-            assertEquals(name.get(), "x");
-
-            // re-bind should fail
-            expectThrows(RuntimeException.class, () -> ScopeLocal.where(name, "y").bind());
-
-            assertEquals(name.get(), "x");
-        }
-        assertFalse(name.isBound());
-    }
-
-    /**
-     * Test closing enclosing binder, should close nested binder.
-     */
-    public void testStructureViolation1() {
-        ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
-        ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
-        try (var binding1 = ScopeLocal.where(NAME1, "x").bind()) {
-            try (var binding2 = ScopeLocal.where(NAME2, "y").bind()) {
-                expectThrows(StructureViolationException.class, binding1::close);
-
-                // binding1 and binding2 should be removed
-                assertFalse(NAME1.isBound());
-                assertFalse(NAME2.isBound());
-            }
-        }
-    }
-
-    /**
-     * Test closing enclosing binder, should not disrupt nested binding
-     * when running an op.
-     */
-    public void testStructureViolation2() {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var binding = ScopeLocal.where(NAME, "x").bind()) {
-            ScopeLocal.where(NAME, "y").run(() -> {
-                expectThrows(StructureViolationException.class, binding::close);
-                assertEquals(NAME.get(), "y");
-            });
-            assertFalse(NAME.isBound());
-        }
-    }
-
-    /**
-     * Test that close is idempotent.
-     */
-    public void testCloseIsIdempotent() {
-        ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
-        ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
-        try (var binding1 = ScopeLocal.where(NAME1, "x").bind()) {
-            try (var binding2 = ScopeLocal.where(NAME2, "y").bind()) {
-
-                assertTrue(NAME1.isBound());
-                assertTrue(NAME2.isBound());
-
-                // call binding2::close several times.
-                for (int i = 0; i < 3; i++) {
-                    binding2.close();
-                    assertTrue(NAME1.isBound());
-                    assertFalse(NAME2.isBound());
-                }
-
-                // call binding1::close several times.
-                for (int i = 0; i < 3; i++) {
-                    binding1.close();
-                    assertFalse(NAME1.isBound());
-                    assertFalse(NAME2.isBound());
-                }
-
-                // call binding2::close again, should not throw
-                binding2.close();
-            }
-        }
-    }
-
-    /**
-     * Test that WrongThreadException if close is invoked by a thread other than the owner.
-     */
-    public void testCloseConfined() {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        try (var binding = ScopeLocal.where(NAME, "x").bind();
-             var executor = Executors.newFixedThreadPool(1)) {
-
-            // attempt to close binding from wrong thread
-            Future<?> future = executor.submit(binding::close);
-            Throwable ex = expectThrows(ExecutionException.class, future::get);
-            assertTrue(ex.getCause() instanceof WrongThreadException);
-        }
+        assertThrows(NullPointerException.class,
+                     () -> ScopeLocal.where(name, "fred", (Callable) null));
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -57,6 +57,7 @@
 #include "prims/methodHandles.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/escapeBarrier.hpp"
 #include "runtime/fieldDescriptor.hpp"
@@ -72,6 +73,7 @@
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/signature.hpp"
 #include "runtime/stackFrameStream.inline.hpp"
+#include "runtime/stackValue.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.hpp"
@@ -82,6 +84,7 @@
 #include "runtime/vframe_hp.hpp"
 #include "runtime/vmOperations.hpp"
 #include "utilities/events.hpp"
+#include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/preserveException.hpp"
 #include "utilities/xmlstream.hpp"
@@ -918,17 +921,14 @@ void Deoptimization::deoptimize_all_marked(nmethod* nmethod_only) {
   ResourceMark rm;
   DeoptimizationMarker dm;
 
-  GrowableArray<CompiledMethod*>* marked = new GrowableArray<CompiledMethod*>();
   // Make the dependent methods not entrant
   if (nmethod_only != NULL) {
     nmethod_only->mark_for_deoptimization();
     nmethod_only->make_not_entrant();
-    marked->append(nmethod_only);
+    CodeCache::make_nmethod_deoptimized(nmethod_only);
   } else {
-    MutexLocker mu(SafepointSynchronize::is_at_safepoint() ? NULL : CodeCache_lock, Mutex::_no_safepoint_check_flag);
-    CodeCache::make_marked_nmethods_not_entrant(marked);
+    CodeCache::make_marked_nmethods_deoptimized();
   }
-  CodeCache::make_marked_nmethods_deoptimized(marked);
 
   DeoptimizeMarkedClosure deopt;
   if (SafepointSynchronize::is_at_safepoint()) {
@@ -941,7 +941,7 @@ void Deoptimization::deoptimize_all_marked(nmethod* nmethod_only) {
 Deoptimization::DeoptAction Deoptimization::_unloaded_action
   = Deoptimization::Action_reinterpret;
 
-#if COMPILER2_OR_JVMCI
+#if INCLUDE_JVMCI
 template<typename CacheType>
 class BoxCacheBase : public CHeapObj<mtCompiler> {
 protected:
@@ -1069,7 +1069,9 @@ oop Deoptimization::get_cached_box(AutoBoxObjectValue* bv, frame* fr, RegisterMa
    }
    return NULL;
 }
+#endif // INCLUDE_JVMCI
 
+#if COMPILER2_OR_JVMCI
 bool Deoptimization::realloc_objects(JavaThread* thread, frame* fr, RegisterMap* reg_map, GrowableArray<ScopeValue*>* objects, TRAPS) {
   Handle pending_exception(THREAD, thread->pending_exception());
   const char* exception_file = thread->exception_file();
@@ -1086,7 +1088,9 @@ bool Deoptimization::realloc_objects(JavaThread* thread, frame* fr, RegisterMap*
     oop obj = NULL;
 
     if (k->is_instance_klass()) {
-      if (sv->is_auto_box()) {
+#if INCLUDE_JVMCI
+      CompiledMethod* cm = fr->cb()->as_compiled_method_or_null();
+      if (cm->is_compiled_by_jvmci() && sv->is_auto_box()) {
         AutoBoxObjectValue* abv = (AutoBoxObjectValue*) sv;
         obj = get_cached_box(abv, fr, reg_map, THREAD);
         if (obj != NULL) {
@@ -1094,6 +1098,7 @@ bool Deoptimization::realloc_objects(JavaThread* thread, frame* fr, RegisterMap*
           abv->set_cached(true);
         }
       }
+#endif // INCLUDE_JVMCI
 
       InstanceKlass* ik = InstanceKlass::cast(k);
       if (obj == NULL) {
@@ -1440,10 +1445,12 @@ void Deoptimization::reassign_fields(frame* fr, RegisterMap* reg_map, GrowableAr
       continue;
     }
 
+#if INCLUDE_JVMCI
     // Don't reassign fields of boxes that came from a cache. Caches may be in CDS.
     if (sv->is_auto_box() && ((AutoBoxObjectValue*) sv)->is_cached()) {
       continue;
     }
+#endif // INCLUDE_JVMCI
 #ifdef COMPILER2
     if (EnableVectorSupport && VectorSupport::is_vector(k)) {
       assert(sv->field_size() == 1, "%s not a vector", k->name()->as_C_string());

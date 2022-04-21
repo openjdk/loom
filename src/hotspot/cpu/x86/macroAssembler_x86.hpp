@@ -26,6 +26,7 @@
 #define CPU_X86_MACROASSEMBLER_X86_HPP
 
 #include "asm/assembler.hpp"
+#include "asm/register.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.hpp"
 #include "utilities/macros.hpp"
@@ -321,8 +322,6 @@ class MacroAssembler: public Assembler {
   // thread in the default location (r15_thread on 64bit)
   void reset_last_Java_frame(bool clear_fp);
 
-  void oopmap_metadata(int index);
-
   // jobjects
   void clear_jweak_tag(Register possibly_jweak);
   void resolve_jobject(Register value, Register thread, Register tmp);
@@ -351,14 +350,14 @@ class MacroAssembler: public Assembler {
   void access_load_at(BasicType type, DecoratorSet decorators, Register dst, Address src,
                       Register tmp1, Register thread_tmp);
   void access_store_at(BasicType type, DecoratorSet decorators, Address dst, Register src,
-                       Register tmp1, Register tmp2);
+                       Register tmp1, Register tmp2, Register tmp3);
 
   void load_heap_oop(Register dst, Address src, Register tmp1 = noreg,
                      Register thread_tmp = noreg, DecoratorSet decorators = 0);
   void load_heap_oop_not_null(Register dst, Address src, Register tmp1 = noreg,
                               Register thread_tmp = noreg, DecoratorSet decorators = 0);
   void store_heap_oop(Address dst, Register src, Register tmp1 = noreg,
-                      Register tmp2 = noreg, DecoratorSet decorators = 0);
+                      Register tmp2 = noreg, Register tmp3 = noreg, DecoratorSet decorators = 0);
 
   // Used for storing NULL. All other oop constants should be
   // stored using routines that take a jobject.
@@ -534,9 +533,34 @@ class MacroAssembler: public Assembler {
   // Round up to a power of two
   void round_to(Register reg, int modulus);
 
-  // Callee saved registers handling
-  void push_callee_saved_registers();
-  void pop_callee_saved_registers();
+private:
+  // General purpose and XMM registers potentially clobbered by native code; there
+  // is no need for FPU or AVX opmask related methods because C1/interpreter
+  // - we save/restore FPU state as a whole always
+  // - do not care about AVX-512 opmask
+  static RegSet call_clobbered_gp_registers();
+  static XMMRegSet call_clobbered_xmm_registers();
+
+  void push_set(XMMRegSet set, int offset);
+  void pop_set(XMMRegSet set, int offset);
+
+public:
+  void push_set(RegSet set, int offset = -1);
+  void pop_set(RegSet set, int offset = -1);
+
+  // Push and pop everything that might be clobbered by a native
+  // runtime call.
+  // Only save the lower 64 bits of each vector register.
+  // Additonal registers can be excluded in a passed RegSet.
+  void push_call_clobbered_registers_except(RegSet exclude, bool save_fpu = true);
+  void pop_call_clobbered_registers_except(RegSet exclude, bool restore_fpu = true);
+
+  void push_call_clobbered_registers(bool save_fpu = true) {
+    push_call_clobbered_registers_except(RegSet(), save_fpu);
+  }
+  void pop_call_clobbered_registers(bool restore_fpu = true) {
+    pop_call_clobbered_registers_except(RegSet(), restore_fpu);
+  }
 
   // allocation
   void eden_allocate(
@@ -902,7 +926,7 @@ class MacroAssembler: public Assembler {
   void fld_x(AddressLiteral src);
 
   void ldmxcsr(Address src) { Assembler::ldmxcsr(src); }
-  void ldmxcsr(AddressLiteral src);
+  void ldmxcsr(AddressLiteral src, Register scratchReg = rscratch1);
 
 #ifdef _LP64
  private:
@@ -1192,16 +1216,6 @@ public:
   void movdqa(XMMRegister dst, Address src)       { Assembler::movdqa(dst, src); }
   void movdqa(XMMRegister dst, XMMRegister src)   { Assembler::movdqa(dst, src); }
   void movdqa(XMMRegister dst, AddressLiteral src);
-
-  // Move Aligned, possibly non-temporal
-  void movqa(Address dst, Register src, bool nt);       // 64-bit
-  void movdqa(Address dst, XMMRegister src, bool nt);   // 128-bit
-  void vmovdqa(Address dst, XMMRegister src, bool nt);  // 256-bit
-  void evmovdqa(Address dst, XMMRegister src, int vector_len, bool nt); // 512-bit
-
-  void movdqa(XMMRegister dst, Address src, bool nt);   // 128-bit
-  void vmovdqa(XMMRegister dst, Address src, bool nt);  // 256-bit
-  void evmovdqa(XMMRegister dst, Address src, int vector_len, bool nt); // 512-bit
 
   void movsd(XMMRegister dst, XMMRegister src) { Assembler::movsd(dst, src); }
   void movsd(Address dst, XMMRegister src)     { Assembler::movsd(dst, src); }
@@ -2000,6 +2014,8 @@ public:
   void convert_d2i(Register dst, XMMRegister src);
   void convert_f2l(Register dst, XMMRegister src);
   void convert_d2l(Register dst, XMMRegister src);
+  void round_double(Register dst, XMMRegister src, Register rtmp, Register rcx);
+  void round_float(Register dst, XMMRegister src, Register rtmp, Register rcx);
 
   void cache_wb(Address line);
   void cache_wbsync(bool is_pre);

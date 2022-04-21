@@ -31,6 +31,7 @@
 #include "oops/stackChunkOop.hpp"
 #include "oops/symbol.hpp"
 #include "runtime/os.hpp"
+#include "utilities/macros.hpp"
 #include "utilities/vmEnums.hpp"
 
 class JvmtiThreadState;
@@ -50,8 +51,7 @@ class RecordComponent;
   f(java_lang_Throwable) \
   f(java_lang_Thread) \
   f(java_lang_Thread_FieldHolder) \
-  f(java_lang_Thread_VirtualThreads) \
-  f(java_lang_Thread_ClassLoaders) \
+  f(java_lang_Thread_Constants) \
   f(java_lang_ThreadGroup) \
   f(java_lang_VirtualThread) \
   f(java_lang_InternalError) \
@@ -399,8 +399,9 @@ class java_lang_Class : AllStatic {
 
 // Interface to java.lang.Thread objects
 
-#define THREAD_INJECTED_FIELDS(macro)                            \
-  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false)
+#define THREAD_INJECTED_FIELDS(macro)                                  \
+  macro(java_lang_Thread, jvmti_thread_state, intptr_signature, false) \
+  JFR_ONLY(macro(java_lang_Thread, jfr_epoch, short_signature, false))
 
 class java_lang_Thread : AllStatic {
   friend class java_lang_VirtualThread;
@@ -418,6 +419,7 @@ class java_lang_Thread : AllStatic {
   static int _continuation_offset;
   static int _park_blocker_offset;
   static int _scopeLocalBindings_offset;
+  JFR_ONLY(static int _jfr_epoch_offset;)
 
   static void compute_offsets();
 
@@ -457,7 +459,7 @@ class java_lang_Thread : AllStatic {
   // Stack size hint
   static jlong stackSize(oop java_thread);
   // Thread ID
-  static jlong thread_id(oop java_thread);
+  static int64_t thread_id(oop java_thread);
   static ByteSize thread_id_offset();
   // Continuation
   static inline oop continuation(oop java_thread);
@@ -481,6 +483,10 @@ class java_lang_Thread : AllStatic {
   // Fill in current stack trace, can cause GC
   static oop async_get_stack_trace(oop java_thread, TRAPS);
 
+  JFR_ONLY(static u2 jfr_epoch(oop java_thread);)
+  JFR_ONLY(static void set_jfr_epoch(oop java_thread, u2 epoch);)
+  JFR_ONLY(static int jfr_epoch_offset() { CHECK_INIT(_jfr_epoch_offset); })
+
   // Debugging
   friend class JavaClasses;
 };
@@ -497,6 +503,7 @@ class java_lang_Thread_FieldHolder : AllStatic {
   static int _thread_status_offset;
 
   static void compute_offsets();
+
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
@@ -519,35 +526,22 @@ class java_lang_Thread_FieldHolder : AllStatic {
   friend class JavaClasses;
 };
 
-// Interface to java.lang.Thread$VirtualThreads objects
+// Interface to java.lang.Thread$Constants objects
 
-class java_lang_Thread_VirtualThreads : AllStatic {
+class java_lang_Thread_Constants : AllStatic {
  private:
-  static int _static_THREAD_GROUP_offset;
+  static int _static_VTHREAD_GROUP_offset;
+  static int _static_NOT_SUPPORTED_CLASSLOADER_offset;
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
+
  public:
-  static oop get_THREAD_GROUP();
+  static oop get_VTHREAD_GROUP();
+  static oop get_NOT_SUPPORTED_CLASSLOADER();
 
   friend class JavaClasses;
 };
-
-
-// Interface to java.lang.Thread$ClassLoaders objects
-
-class java_lang_Thread_ClassLoaders : AllStatic {
- private:
-  static int _static_NOT_SUPPORTED_offset;
-
-  static void compute_offsets();
-  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
- public:
-  static oop get_NOT_SUPPORTED();
-
-  friend class JavaClasses;
-};
-
 
 // Interface to java.lang.ThreadGroup objects
 
@@ -600,7 +594,7 @@ class java_lang_VirtualThread : AllStatic {
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
-
+  JFR_ONLY(static int _jfr_epoch_offset;)
  public:
   enum {
     NEW          = 0,
@@ -631,12 +625,11 @@ class java_lang_VirtualThread : AllStatic {
   static oop vthread_scope();
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
-  static jshort state(oop vthread);
-  static JavaThreadStatus map_state_to_thread_status(jint state);
+  static u2 state(oop vthread);
+  static JavaThreadStatus map_state_to_thread_status(int state);
   static bool notify_jvmti_events();
-  static void set_notify_jvmti_events(jboolean enable);
+  static void set_notify_jvmti_events(bool enable);
   static void init_static_notify_jvmti_events();
-  static jlong set_jfrTraceId(oop vthread, jlong id);
 };
 
 
@@ -1043,9 +1036,9 @@ class java_lang_ref_Reference: AllStatic {
  public:
   // Accessors
   static inline oop weak_referent_no_keepalive(oop ref);
+  static inline oop weak_referent(oop ref);
   static inline oop phantom_referent_no_keepalive(oop ref);
   static inline oop unknown_referent_no_keepalive(oop ref);
-  static inline oop unknown_referent(oop ref);
   static inline void clear_referent(oop ref);
   static inline HeapWord* referent_addr_raw(oop ref);
   static inline oop next(oop ref);
@@ -1110,7 +1103,6 @@ class jdk_internal_vm_Continuation: AllStatic {
   static int _parent_offset;
   static int _yieldInfo_offset;
   static int _tail_offset;
-  static int _cs_offset;
   static int _mounted_offset;
   static int _done_offset;
   static int _preempted_offset;
@@ -1119,23 +1111,26 @@ class jdk_internal_vm_Continuation: AllStatic {
  public:
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
   // Accessors
-  static inline oop scope(oop ref);
-  static inline oop target(oop ref);
-  static inline oop parent(oop ref);
-  static inline oop yieldInfo(oop ref);
-  static inline void set_yieldInfo(oop ref, oop value);
-  static inline stackChunkOop tail(oop ref);
-  static inline void set_tail(oop ref, stackChunkOop value);
-  static inline jshort critical_section(oop ref);
-  static inline void set_critical_section(oop ref, jshort value);
-  static inline bool on_local_stack(oop ref, address adr);
-  static inline bool is_mounted(oop ref);
-  static inline bool done(oop ref);
-  static inline bool is_preempted(oop ref);
-  static inline void set_preempted(oop ref, bool value);
+  static inline oop scope(oop continuation);
+  static inline oop target(oop continuation);
+  static inline oop parent(oop continuation);
+  static inline oop yieldInfo(oop continuation);
+  static inline void set_yieldInfo(oop continuation, oop value);
+  static inline stackChunkOop tail(oop continuation);
+  static inline void set_tail(oop continuation, stackChunkOop value);
+  static inline bool on_local_stack(oop continuation, address adr);
+  static inline bool done(oop continuation);
+  static inline bool is_preempted(oop continuation);
+  static inline void set_preempted(oop continuation, bool value);
 };
 
 // Interface to jdk.internal.vm.StackChunk objects
+#define STACKCHUNK_INJECTED_FIELDS(macro)                                    \
+  macro(jdk_internal_vm_StackChunk, cont,    continuation_signature, false)  \
+  macro(jdk_internal_vm_StackChunk, flags,   byte_signature, false)          \
+  macro(jdk_internal_vm_StackChunk, pc,      intptr_signature, false)        \
+  macro(jdk_internal_vm_StackChunk, maxSize, int_signature, false)           \
+
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
  private:
@@ -1145,10 +1140,9 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _gcSP_offset;
-  static int _markCycle_offset;
   static int _maxSize_offset;
   static int _cont_offset;
+
 
   static void compute_offsets();
  public:
@@ -1158,34 +1152,39 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline int cont_offset()   { return _cont_offset; }
 
   // Accessors
-  static inline oop parent(oop ref);
-  static inline void set_parent(oop ref, oop value);
+  static inline oop parent(oop chunk);
+  static inline void set_parent(oop chunk, oop value);
   template<typename P>
-  static inline bool is_parent_null(oop ref); // bypasses barriers for a faster test
+  static inline bool is_parent_null(oop chunk); // bypasses barriers for a faster test
   template<typename P>
-  static inline void set_parent_raw(oop ref, oop value);
-  static inline jint size(oop ref);
-  static inline void set_size(HeapWord* ref, jint value);
-  static inline jint sp(oop ref);
-  static inline void set_sp(oop ref, jint value);
-  static inline jlong pc(oop ref);
-  static inline void set_pc(oop ref, jlong value);
-  static inline jint argsize(oop ref);
-  static inline void set_argsize(oop ref, jint value);
-  static inline jbyte flags(oop ref);
-  static inline void set_flags(oop ref, jbyte value);
-  static inline jint gc_sp(oop ref);
-  static inline void set_gc_sp(oop ref, jint value);
-  static inline jlong mark_cycle(oop ref);
-  static inline void set_mark_cycle(oop ref, jlong value);
-  static inline jint maxSize(oop ref);
-  static inline void set_maxSize(oop ref, jint value);
-  static inline oop cont(oop ref);
-  static inline void set_cont(oop ref, oop value);
+  static inline void set_parent_raw(oop chunk, oop value);
+
+  static inline int size(oop chunk);
+  static inline void set_size(HeapWord* chunk, int value);
+
+  static inline int sp(oop chunk);
+  static inline void set_sp(oop chunk, int value);
+  static inline void set_sp(HeapWord* chunk, int value); // used while allocating
+  static inline intptr_t pc(oop chunk);
+  static inline void set_pc(oop chunk, intptr_t value);
+  static inline int argsize(oop chunk);
+  static inline void set_argsize(oop chunk, int value);
+  static inline uint8_t flags(oop chunk);
+  static inline void set_flags(oop chunk, uint8_t value);
+  static inline uint8_t flags_acquire(oop chunk);
+  static inline void release_set_flags(oop chunk, uint8_t value);
+  static inline bool try_set_flags(oop chunk, uint8_t expected_value, uint8_t new_value);
+
+  static inline int maxSize(oop chunk);
+  static inline void set_maxSize(oop chunk, int value);
+
+ // cont oop's processing is essential for the chunk's GC protocol
+  static inline oop cont(oop chunk);
+  static inline void set_cont(oop chunk, oop value);
   template<typename P>
-  static inline oop cont_raw(oop ref);
+  static inline oop cont_raw(oop chunk);
   template<typename P>
-  static inline void set_cont_raw(oop ref, oop value);
+  static inline void set_cont_raw(oop chunk, oop value);
 };
 
 // Interface to java.lang.invoke.MethodHandle objects
@@ -1664,7 +1663,6 @@ class java_lang_StackTraceElement: AllStatic {
   static int _methodName_offset;
   static int _fileName_offset;
   static int _lineNumber_offset;
-  static int _contScopeName_offset;
 
   // Setters
   static void set_classLoaderName(oop element, oop value);
@@ -1675,7 +1673,6 @@ class java_lang_StackTraceElement: AllStatic {
   static void set_fileName(oop element, oop value);
   static void set_lineNumber(oop element, int value);
   static void set_declaringClassObject(oop element, oop value);
-  static void set_contScopeName(oop element, oop value);
 
   static void decode_file_and_line(Handle java_mirror, InstanceKlass* holder, int version,
                                    const methodHandle& method, int bci,
@@ -1683,10 +1680,10 @@ class java_lang_StackTraceElement: AllStatic {
 
  public:
   // Create an instance of StackTraceElement
-  static oop create(const methodHandle& method, int bci, Handle contScopeName, TRAPS);
+  static oop create(const methodHandle& method, int bci, TRAPS);
 
   static void fill_in(Handle element, InstanceKlass* holder, const methodHandle& method,
-                      int version, int bci, Symbol* name, Handle contScopeName, TRAPS);
+                      int version, int bci, Symbol* name, TRAPS);
 
   static void compute_offsets();
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
@@ -2008,7 +2005,8 @@ class InjectedField {
   STACKFRAMEINFO_INJECTED_FIELDS(macro)     \
   MODULE_INJECTED_FIELDS(macro)             \
   THREAD_INJECTED_FIELDS(macro)             \
-  INTERNALERROR_INJECTED_FIELDS(macro)
+  INTERNALERROR_INJECTED_FIELDS(macro)      \
+  STACKCHUNK_INJECTED_FIELDS(macro)
 
 
 // Interface to hard-coded offset checking

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,8 +27,8 @@
 #include "prims/jvmtiExport.hpp"
 #include "prims/jvmtiExtensions.hpp"
 #include "prims/jvmtiThreadState.inline.hpp"
-#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 
 // the list of extension functions
@@ -38,9 +38,9 @@ GrowableArray<jvmtiExtensionFunctionInfo*>* JvmtiExtensions::_ext_functions;
 GrowableArray<jvmtiExtensionEventInfo*>* JvmtiExtensions::_ext_events;
 
 
-/*
- * Extension Functions
- */
+//
+// Extension Functions
+//
 static jvmtiError JNICALL IsClassUnloadingEnabled(const jvmtiEnv* env, ...) {
   jboolean* enabled = NULL;
   va_list ap;
@@ -78,12 +78,11 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMSTransitionDisabler disabler;
   ThreadsListHandle tlh(current_thread);
 
   jvmtiError err;
 
-  *vthread_ptr = NULL;
   if (thread == NULL) {
     java_thread = current_thread;
     cthread_oop = java_thread->threadObj();
@@ -99,12 +98,13 @@ static jvmtiError JNICALL GetVirtualThread(const jvmtiEnv* env, ...) {
   if (cthread_oop == NULL || java_lang_VirtualThread::is_instance(cthread_oop)) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
+  *vthread_ptr = NULL;
 
   JvmtiThreadState *state = JvmtiThreadState::state_for(java_thread);
   if (state == NULL) {
     return JVMTI_ERROR_THREAD_NOT_ALIVE;
   }
-  oop vthread_oop = java_thread->mounted_vthread();
+  oop vthread_oop = java_thread->jvmti_vthread();
   if (!java_lang_VirtualThread::is_instance(vthread_oop)) { // not a virtual thread
     vthread_oop = NULL;
   }
@@ -131,7 +131,7 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
   va_end(ap);
 
   ThreadInVMfromNative tiv(current_thread);
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMSTransitionDisabler disabler;
 
   ThreadsListHandle tlh(current_thread);
   JavaThread* java_thread;
@@ -152,9 +152,9 @@ static jvmtiError JNICALL GetCarrierThread(const jvmtiEnv* env, ...) {
     return JVMTI_ERROR_INVALID_THREAD;
   }
   if (thread_ptr == NULL) {
-      return JVMTI_ERROR_NULL_POINTER;
+    return JVMTI_ERROR_NULL_POINTER;
   }
-  VThreadGetThreadClosure op(Handle(current_thread, vthread_oop), thread_ptr);
+  VirtualThreadGetThreadClosure op(Handle(current_thread, vthread_oop), thread_ptr);
   Handshake::execute(&op, &tlh, current_thread);
   return op.result();
 }
@@ -169,7 +169,7 @@ void JvmtiExtensions::register_extensions() {
   _ext_functions = new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiExtensionFunctionInfo*>(1, mtServiceability);
   _ext_events = new (ResourceObj::C_HEAP, mtServiceability) GrowableArray<jvmtiExtensionEventInfo*>(1, mtServiceability);
 
-  // register our extension functions
+  // Register our extension functions.
   static jvmtiParamInfo func_params0[] = {
     { (char*)"IsClassUnloadingEnabled", JVMTI_KIND_OUT, JVMTI_TYPE_JBOOLEAN, JNI_FALSE }
   };
@@ -178,7 +178,7 @@ void JvmtiExtensions::register_extensions() {
     { (char*)"GetVirtualThread", JVMTI_KIND_OUT, JVMTI_TYPE_JTHREAD, JNI_FALSE }
   };
   static jvmtiParamInfo func_params2[] = {
-    { (char*)"GetVirtualThread", JVMTI_KIND_IN, JVMTI_TYPE_JTHREAD, JNI_FALSE },
+    { (char*)"GetCarrierThread", JVMTI_KIND_IN, JVMTI_TYPE_JTHREAD, JNI_FALSE },
     { (char*)"GetCarrierThread", JVMTI_KIND_OUT, JVMTI_TYPE_JTHREAD, JNI_FALSE }
   };
 

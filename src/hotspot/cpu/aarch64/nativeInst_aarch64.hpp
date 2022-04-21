@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2108, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -684,7 +684,7 @@ inline NativePostCallNop* nativePostCallNop_at(address address) {
 
 inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
   NativePostCallNop* nop = (NativePostCallNop*) address;
-  assert (nop->check(), "");
+  assert(nop->check(), "");
   return nop;
 }
 
@@ -701,7 +701,7 @@ class NativeDeoptInstruction: public NativeInstruction {
   void  verify();
 
   static bool is_deopt_at(address instr) {
-    assert (instr != NULL, "");
+    assert(instr != NULL, "");
     uint32_t value = *(uint32_t *) instr;
     return value == 0xd4ade001;
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -101,42 +101,26 @@ class oopDesc {
 
   // Returns the actual oop size of the object in machine words
   inline size_t size();
-  // Returns the size of the object after possible compression during GC promotion/compaction
-  inline size_t compact_size();
-  // Returns the given size in the common case where there is no special compact size
-  inline size_t compact_size(size_t size);
 
   // Sometimes (for complicated concurrency-related reasons), it is useful
   // to be able to figure out the size of an object knowing its klass.
   inline size_t size_given_klass(Klass* klass);
-  // Returns the size of the object after possible compression during GC promotion/compaction
-  inline size_t compact_size_given_klass(Klass* klass);
-  // Returns the given size in the common case where there is no special compact size
-  inline size_t compact_size_given_klass(Klass* klass, size_t size);
-
-  // Copies the object
-  inline size_t copy_disjoint(HeapWord* to);
-  inline size_t copy_conjoint(HeapWord* to);
-  inline size_t copy_disjoint_compact(HeapWord* to);
-  inline size_t copy_conjoint_compact(HeapWord* to);
-  inline size_t copy_disjoint(HeapWord* to, size_t word_size);
-  inline size_t copy_disjoint_compact(HeapWord* to, size_t word_size);
-  inline size_t copy_conjoint(HeapWord* to, size_t word_size);
-  inline size_t copy_conjoint_compact(HeapWord* to, size_t word_size);
 
   // type test operations (inlined in oop.inline.hpp)
-  inline bool is_instance()            const;
-  inline bool is_array()               const;
-  inline bool is_objArray()            const;
-  inline bool is_typeArray()           const;
-  inline bool is_stackChunk()          const;
+  inline bool is_instance()    const;
+  inline bool is_instanceRef() const;
+  inline bool is_stackChunk()  const;
+  inline bool is_array()       const;
+  inline bool is_objArray()    const;
+  inline bool is_typeArray()   const;
 
   // type test operations that don't require inclusion of oop.inline.hpp.
-  bool is_instance_noinline()          const;
-  bool is_array_noinline()             const;
-  bool is_objArray_noinline()          const;
-  bool is_typeArray_noinline()         const;
-  bool is_stackChunk_noinline()        const;
+  bool is_instance_noinline()    const;
+  bool is_instanceRef_noinline() const;
+  bool is_stackChunk_noinline()  const;
+  bool is_array_noinline()       const;
+  bool is_objArray_noinline()    const;
+  bool is_typeArray_noinline()   const;
 
  protected:
   inline oop        as_oop() const { return const_cast<oopDesc*>(this); }

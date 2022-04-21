@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -70,6 +70,7 @@ class InterpreterOopMap;
 class Method : public Metadata {
  friend class VMStructs;
  friend class JVMCIVMStructs;
+ friend class MethodTest;
  private:
   // If you add a new field that points to any metaspace object, you
   // must add this field to Method::metaspace_pointers_do().
@@ -84,14 +85,14 @@ class Method : public Metadata {
 
   // Flags
   enum Flags {
-    _caller_sensitive      = 1 << 0,
-    _force_inline          = 1 << 1,
-    _dont_inline           = 1 << 2,
-    _hidden                = 1 << 3,
-    _has_injected_profile  = 1 << 4,
-    _intrinsic_candidate   = 1 << 5,
-    _reserved_stack_access = 1 << 6,
-    _scoped                = 1 << 7,
+    _caller_sensitive       = 1 << 0,
+    _force_inline           = 1 << 1,
+    _dont_inline            = 1 << 2,
+    _hidden                 = 1 << 3,
+    _has_injected_profile   = 1 << 4,
+    _intrinsic_candidate    = 1 << 5,
+    _reserved_stack_access  = 1 << 6,
+    _scoped                 = 1 << 7,
     _changes_current_thread = 1 << 8,
     _jvmti_mount_transition = 1 << 9,
   };
@@ -101,6 +102,8 @@ class Method : public Metadata {
 
 #ifndef PRODUCT
   int64_t _compiled_invocation_count;
+
+  Symbol* _name;
 #endif
   // Entry point for calling both from and to the interpreter.
   address _i2i_entry;           // All-args-on-stack calling convention
@@ -115,10 +118,8 @@ class Method : public Metadata {
   CompiledMethod* volatile _code;                       // Points to the corresponding piece of native code
   volatile address           _from_interpreted_entry; // Cache of _code ? _adapter->i2c_entry() : _i2i_entry
 
-  int _num_stack_arg_slots;
-
   // Constructor
-  Method(ConstMethod* xconst, AccessFlags access_flags);
+  Method(ConstMethod* xconst, AccessFlags access_flags, Symbol* name);
  public:
 
   static Method* allocate(ClassLoaderData* loader_data,
@@ -126,6 +127,7 @@ class Method : public Metadata {
                           AccessFlags access_flags,
                           InlineTableSizes* sizes,
                           ConstMethod::MethodType method_type,
+                          Symbol* name,
                           TRAPS);
 
   // CDS and vtbl checking can create an empty Method to get vtbl pointer.
@@ -471,7 +473,7 @@ public:
   void unlink_method() NOT_CDS_RETURN;
 
   // the number of argument reg slots that the compiled method uses on the stack.
-  int num_stack_arg_slots() const { return _num_stack_arg_slots;  };
+  int num_stack_arg_slots() const { return constMethod()->num_stack_arg_slots(); }
 
   virtual void metaspace_pointers_do(MetaspaceClosure* iter);
   virtual MetaspaceObj::Type type() const { return MethodType; }
@@ -762,7 +764,7 @@ public:
   bool on_stack() const                             { return access_flags().on_stack(); }
   void set_on_stack(const bool value);
 
-  void record_marking_cycle();
+  void record_gc_epoch();
 
   // see the definition in Method*.cpp for the gory details
   bool should_not_be_cached() const;
@@ -1025,7 +1027,7 @@ public:
   address* native_function_addr() const          { assert(is_native(), "must be native"); return (address*) (this+1); }
   address* signature_handler_addr() const        { return native_function_addr() + 1; }
 
-  void set_num_stack_arg_slots();
+  void set_num_stack_arg_slots(int n) { constMethod()->set_num_stack_arg_slots(n); }
 };
 
 

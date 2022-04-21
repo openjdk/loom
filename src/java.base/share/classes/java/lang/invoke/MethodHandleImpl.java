@@ -44,7 +44,6 @@ import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -449,10 +448,10 @@ abstract class MethodHandleImpl {
         return new AsVarargsCollector(target, arrayType);
     }
 
-    private static final class AsVarargsCollector extends DelegatingMethodHandle {
+    static final class AsVarargsCollector extends DelegatingMethodHandle {
         private final MethodHandle target;
         private final Class<?> arrayType;
-        private @Stable MethodHandle asCollectorCache;
+        private MethodHandle asCollectorCache;
 
         AsVarargsCollector(MethodHandle target, Class<?> arrayType) {
             this(target.type(), target, arrayType);
@@ -706,7 +705,7 @@ abstract class MethodHandleImpl {
      * Behavior in counting and non-counting states is determined by lambda forms produced by
      * countingFormProducer & nonCountingFormProducer respectively.
      */
-    static class CountingWrapper extends DelegatingMethodHandle {
+    static final class CountingWrapper extends DelegatingMethodHandle {
         private final MethodHandle target;
         private int count;
         private Function<MethodHandle, LambdaForm> countingFormProducer;
@@ -1300,7 +1299,7 @@ abstract class MethodHandleImpl {
     }
 
     /** This subclass allows a wrapped method handle to be re-associated with an arbitrary member name. */
-    private static final class WrappedMember extends DelegatingMethodHandle {
+    static final class WrappedMember extends DelegatingMethodHandle {
         private final MethodHandle target;
         private final MemberName member;
         private final Class<?> callerClass;
@@ -1545,11 +1544,6 @@ abstract class MethodHandleImpl {
             @Override
             public Object newMemberName() {
                 return new MemberName();
-            }
-
-            @Override
-            public Object newMemberName(Method method) {
-                return new MemberName(method);
             }
 
             @Override

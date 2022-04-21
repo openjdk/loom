@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,7 +31,7 @@ import java.lang.annotation.*;
  * A method or constructor must be annotated as "changes current
  * thread" if it calls Thread.setCurrentThread. This annotation also
  * disables inlining for the method to which it is applied unless the
- * method being unlined into is also annotated ChangesCurrentThread.
+ * method being inlined into is also annotated ChangesCurrentThread.
 
  * @implNote
  * This annotation only takes effect for methods or constructors of classes

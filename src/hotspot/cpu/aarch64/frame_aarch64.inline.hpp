@@ -26,6 +26,7 @@
 #ifndef CPU_AARCH64_FRAME_AARCH64_INLINE_HPP
 #define CPU_AARCH64_FRAME_AARCH64_INLINE_HPP
 
+#include "code/codeBlob.inline.hpp"
 #include "code/codeCache.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "interpreter/interpreter.hpp"
@@ -45,6 +46,8 @@ inline frame::frame() {
   _cb = NULL;
   _deopt_state = unknown;
   _sp_is_trusted = false;
+  _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 }
 
 static int spin;
@@ -57,12 +60,13 @@ inline void frame::init(intptr_t* sp, intptr_t* fp, address pc) {
   _unextended_sp = sp;
   _fp = fp;
   _pc = pc;
+  _oop_map = NULL;
+  _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
+
   assert(pc != NULL, "no pc?");
   _cb = CodeCache::find_blob(pc);
-
   setup(pc);
-
-  _oop_map = NULL;
 }
 
 inline void frame::setup(address pc) {
@@ -100,24 +104,13 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = cb;
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
+  _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   setup(pc);
 }
 
-inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map) {
-  _sp = sp;
-  _unextended_sp = unextended_sp;
-  _fp = fp;
-  _pc = pc;
-  assert(pc != NULL, "no pc?");
-  _cb = cb;
-  _oop_map = oop_map;
-  assert(_cb != NULL, "pc: " INTPTR_FORMAT, p2i(pc));
-
-  setup(pc);
-}
-
-inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool dummy) {
+inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address pc, CodeBlob* cb, const ImmutableOopMap* oop_map, bool on_heap) {
   _sp = sp;
   _unextended_sp = unextended_sp;
   _fp = fp;
@@ -126,13 +119,20 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _oop_map = oop_map;
   _deopt_state = not_deoptimized;
   _sp_is_trusted = false;
-#ifdef ASSERT
-  // The following assertion has been disabled because it would sometime trap for Continuation.run, which is not *in* a continuation
-  // and therefore does not clear the _cont_fastpath flag, but this is benign even in fast mode (see Freeze::setup_jump)
+  _on_heap = on_heap;
+  DEBUG_ONLY(_frame_index = -1;)
+
+  // In thaw, non-heap frames use this constructor to pass oop_map.  I don't know why.
+  assert(_on_heap || _cb != nullptr, "these frames are always heap frames");
   if (cb != NULL) {
     setup(pc);
-    assert(_pc == pc && _deopt_state == not_deoptimized, "");
   }
+#ifdef ASSERT
+  // The following assertion has been disabled because it would sometime trap for Continuation.run,
+  // which is not *in* a continuation and therefore does not clear the _cont_fastpath flag, but this
+  // is benign even in fast mode (see Freeze::setup_jump)
+  // We might freeze deoptimized frame in slow mode
+  // assert(_pc == pc && _deopt_state == not_deoptimized, "");
 #endif
 }
 
@@ -146,6 +146,8 @@ inline frame::frame(intptr_t* sp, intptr_t* unextended_sp, intptr_t* fp, address
   _cb = CodeCache::find_blob_fast(pc);
   _oop_map = NULL;
   assert(_cb != NULL, "pc: " INTPTR_FORMAT " sp: " INTPTR_FORMAT " unextended_sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT, p2i(pc), p2i(sp), p2i(unextended_sp), p2i(fp));
+  _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   setup(pc);
 }
@@ -159,6 +161,8 @@ inline frame::frame(intptr_t* sp, intptr_t* fp) {
   _unextended_sp = sp;
   _fp = fp;
   _pc = (address)(sp[-1]);
+  _on_heap = false;
+  DEBUG_ONLY(_frame_index = -1;)
 
   // Here's a sticky one. This constructor can be called via AsyncGetCallTrace
   // when last_Java_sp is non-null but the pc fetched is junk. If we are truly
@@ -204,18 +208,17 @@ inline intptr_t* frame::id(void) const { return unextended_sp(); }
 inline bool frame::is_older(intptr_t* id) const   { assert(this->id() != NULL && id != NULL, "NULL frame id");
                                                     return this->id() > id ; }
 
-
-
 inline intptr_t* frame::link() const              { return (intptr_t*) *(intptr_t **)addr_at(link_offset); }
 
+inline intptr_t* frame::link_or_null() const {
+  intptr_t** ptr = (intptr_t **)addr_at(link_offset);
+  return os::is_readable_pointer(ptr) ? *ptr : NULL;
+}
 
-inline intptr_t* frame::unextended_sp() const     { return _unextended_sp; }
-
-inline void frame::set_unextended_sp(intptr_t* value) { _unextended_sp = value; }
-
-inline int frame::offset_unextended_sp() const { return (int)(intptr_t)_unextended_sp; }
-inline void frame::set_offset_unextended_sp(int value) { _unextended_sp = (intptr_t*)(intptr_t)value; }
-
+inline intptr_t* frame::unextended_sp() const          { assert_absolute(); return _unextended_sp; }
+inline void frame::set_unextended_sp(intptr_t* value)  { _unextended_sp = value; }
+inline int  frame::offset_unextended_sp() const        { assert_offset();   return _offset_unextended_sp; }
+inline void frame::set_offset_unextended_sp(int value) { assert_on_heap();  _offset_unextended_sp = value; }
 
 inline intptr_t* frame::real_fp() const {
   if (_cb != NULL) {
@@ -236,19 +239,13 @@ inline int frame::frame_size() const {
     : cb()->frame_size();
 }
 
-inline int frame::num_oops() const {
-  assert (!is_interpreted_frame(), "interpreted");
-  assert (oop_map() != NULL, "");
-  return oop_map()->num_oops() ;
-}
-
 inline int frame::compiled_frame_stack_argsize() const {
-  assert (cb()->is_compiled(), "");
+  assert(cb()->is_compiled(), "");
   return (cb()->as_compiled_method()->method()->num_stack_arg_slots() * VMRegImpl::stack_slot_size) >> LogBytesPerWord;
 }
 
 inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
-  assert (mask != NULL, "");
+  assert(mask != NULL, "");
   Method* m = interpreter_frame_method();
   int   bci = interpreter_frame_bci();
   m->mask_for(bci, mask); // OopMapCache::compute_one_oop_map(m, bci, mask);
@@ -266,9 +263,8 @@ inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**)addr_at(interpreter_frame_locals_offset);
 }
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
-  return (intptr_t*)at<pointers>(interpreter_frame_last_sp_offset);
+  return (intptr_t*)at(interpreter_frame_last_sp_offset);
 }
 
 inline intptr_t* frame::interpreter_frame_bcp_addr() const {
@@ -299,16 +295,15 @@ inline oop* frame::interpreter_frame_mirror_addr() const {
 }
 
 // top of expression stack
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
-  intptr_t* last_sp = interpreter_frame_last_sp<pointers>();
+  intptr_t* last_sp = interpreter_frame_last_sp();
   if (last_sp == NULL) {
     return sp();
   } else {
     // sp() may have been extended or shrunk by an adapter.  At least
     // check that we don't fall behind the legal region.
     // For top deoptimized frame last_sp == interpreter_frame_monitor_end.
-    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end<pointers>(), "bad tos");
+    assert(last_sp <= (intptr_t*) interpreter_frame_monitor_end(), "bad tos");
     return last_sp;
   }
 }
@@ -325,9 +320,8 @@ inline int frame::interpreter_frame_monitor_size() {
 // expression stack
 // (the max_stack arguments are used by the GC; see class FrameClosure)
 
-template <frame::addressing pointers>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
-  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end<pointers>();
+  intptr_t* monitor_end = (intptr_t*) interpreter_frame_monitor_end();
   return monitor_end-1;
 }
 
@@ -347,12 +341,7 @@ inline oop frame::saved_oop_result(RegisterMap* map) const {
   oop* result_adr = (oop *)map->location(r0->as_VMReg(), sp());
   PRAGMA_DIAG_POP
   guarantee(result_adr != NULL, "bad register save location");
-  oop result = *result_adr;
-
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  result = NativeAccess<>::oop_load(&result);
-
-  return result;
+  return *result_adr;
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
@@ -417,6 +406,10 @@ inline frame frame::sender_raw(RegisterMap* map) const {
 
   // Must be native-compiled frame, i.e. the marshaling code for native
   // methods that exists in the core system.
+
+  // Native code may or may not have signed the return address, we have no way to be sure or what
+  // signing methods they used. Instead, just ensure the stripped value is used.
+
   return frame(sender_sp(), link(), sender_pc());
 }
 
@@ -426,13 +419,15 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
   // have to find it relative to the unextended sp
 
   assert(_cb->frame_size() >= 0, "must have non-zero frame size");
-  intptr_t* sender_sp = unextended_sp() + _cb->frame_size();
-  assert (sender_sp == real_fp(), "");
+  intptr_t* l_sender_sp = (!PreserveFramePointer || _sp_is_trusted) ? unextended_sp() + _cb->frame_size()
+                                                                    : sender_sp();
+  assert(!_sp_is_trusted || l_sender_sp == real_fp(), "");
 
   // the return_address is always the word on the stack
-  address sender_pc = (address) *(sender_sp-1);
+  // For ROP protection, C1/C2 will have signed the sender_pc, but there is no requirement to authenticate it here.
+  address sender_pc = pauth_strip_verifiable((address) *(l_sender_sp-1), (address) *(l_sender_sp-2));
 
-  intptr_t** saved_fp_addr = (intptr_t**) (sender_sp - frame::sender_sp_offset);
+  intptr_t** saved_fp_addr = (intptr_t**) (l_sender_sp - frame::sender_sp_offset);
 
   if (map->update_map()) {
     // Tell GC to use argument oopmaps for some runtime stubs that need it.
@@ -444,9 +439,9 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
         _oop_map->update_register_map(this, map);
       }
     } else {
-      assert (!_cb->caller_must_gc_arguments(map->thread()), "");
-      assert (!map->include_argument_oops(), "");
-      assert (oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
+      assert(!_cb->caller_must_gc_arguments(map->thread()), "");
+      assert(!map->include_argument_oops(), "");
+      assert(oop_map() == NULL || !oop_map()->has_any(OopMapValue::callee_saved_value), "callee-saved value in compiled frame");
     }
 
     // Since the prolog does the save and restore of EBP there is no oopmap
@@ -459,12 +454,12 @@ inline frame frame::sender_for_compiled_frame(RegisterMap* map) const {
     if (map->walk_cont()) { // about to walk into an h-stack
       return Continuation::top_frame(*this, map);
     } else {
-      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &sender_sp);
+      Continuation::fix_continuation_bottom_sender(map->thread(), *this, &sender_pc, &l_sender_sp);
     }
   }
 
-  intptr_t* unextended_sp = sender_sp;
-  return frame(sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
+  intptr_t* unextended_sp = l_sender_sp;
+  return frame(l_sender_sp, unextended_sp, *saved_fp_addr, sender_pc);
 }
 
 template <typename RegisterMapT>

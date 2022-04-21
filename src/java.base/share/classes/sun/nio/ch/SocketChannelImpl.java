@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -123,8 +123,12 @@ class SocketChannelImpl
     // Socket adaptor, created on demand
     private Socket socket;
 
-    // lazily set to true when the socket is configured non-blocking
-    private volatile boolean nonBlocking;
+    // True if the channel's socket has been forced into non-blocking mode
+    // by a virtual thread. It cannot be reset. When the channel is in
+    // blocking mode and the channel's socket is in non-blocking mode then
+    // operations that don't complete immediately will poll the socket and
+    // preserve the semantics of blocking operations.
+    private volatile boolean forcedNonBlocking;
 
     // -- End of fields protected by stateLock
 
@@ -417,7 +421,7 @@ class SocketChannelImpl
                 if (isInputClosed)
                     return IOStatus.EOF;
 
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.read(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -461,7 +465,7 @@ class SocketChannelImpl
                 if (isInputClosed)
                     return IOStatus.EOF;
 
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.read(fd, dsts, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -534,7 +538,7 @@ class SocketChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking);
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.write(fd, buf, -1, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -566,7 +570,7 @@ class SocketChannelImpl
             long n = 0;
             try {
                 beginWrite(blocking);
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 n = IOUtil.write(fd, srcs, offset, length, nd);
                 if (blocking) {
                     while (IOStatus.okayToRetry(n) && isOpen()) {
@@ -596,7 +600,7 @@ class SocketChannelImpl
             int n = 0;
             try {
                 beginWrite(blocking);
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 do {
                     n = Net.sendOOB(fd, b);
                 } while (n == IOStatus.INTERRUPTED && isOpen());
@@ -637,21 +641,21 @@ class SocketChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!nonBlocking) {
+            if (!forcedNonBlocking) {
                 IOUtil.configureBlocking(fd, block);
             }
         }
     }
 
     /**
-     * Attempts to adjusts the blocking mode if the channel is open.
+     * Attempts to adjust the blocking mode if the channel is open.
      * @return {@code true} if the blocking mode was adjusted
      */
     private boolean tryLockedConfigureBlocking(boolean block) throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
         synchronized (stateLock) {
             // do nothing if virtual thread has forced the socket to be non-blocking
-            if (!nonBlocking && isOpen()) {
+            if (!forcedNonBlocking && isOpen()) {
                 IOUtil.configureBlocking(fd, block);
                 return true;
             } else {
@@ -661,16 +665,15 @@ class SocketChannelImpl
     }
 
     /**
-     * Ensures that the socket is configured non-blocking when on a virtual
-     * thread.
+     * Ensures that the socket is configured non-blocking when on a virtual thread.
      */
-    private void configureNonBlockingIfNeeded() throws IOException {
+    private void configureSocketNonBlockingIfVirtualThread() throws IOException {
         assert readLock.isHeldByCurrentThread() || writeLock.isHeldByCurrentThread();
-        if (!nonBlocking && Thread.currentThread().isVirtual()) {
+        if (!forcedNonBlocking && Thread.currentThread().isVirtual()) {
             synchronized (stateLock) {
                 ensureOpen();
                 IOUtil.configureBlocking(fd, false);
-                nonBlocking = true;
+                forcedNonBlocking = true;
             }
         }
     }
@@ -869,7 +872,7 @@ class SocketChannelImpl
                     boolean connected = false;
                     try {
                         beginConnect(blocking, sa);
-                        configureNonBlockingIfNeeded();
+                        configureSocketNonBlockingIfVirtualThread();
                         int n;
                         if (isUnixSocket()) {
                             n = UnixDomainSockets.connect(fd, sa);
@@ -1053,12 +1056,12 @@ class SocketChannelImpl
                         || NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal);
                 }
-                if (NativeThread.isKernelThread(reader)
-                        || NativeThread.isKernelThread(writer)) {
+                if (NativeThread.isNativeThread(reader)
+                        || NativeThread.isNativeThread(writer)) {
                     nd.preClose(fd);
-                    if (NativeThread.isKernelThread(reader))
+                    if (NativeThread.isNativeThread(reader))
                         NativeThread.signal(reader);
-                    if (NativeThread.isKernelThread(writer))
+                    if (NativeThread.isNativeThread(writer))
                         NativeThread.signal(writer);
                 }
             }
@@ -1142,7 +1145,7 @@ class SocketChannelImpl
                 long reader = readerThread;
                 if (NativeThread.isVirtualThread(reader)) {
                     Poller.stopPoll(fdVal, Net.POLLIN);
-                } else if (NativeThread.isKernelThread(reader)) {
+                } else if (NativeThread.isNativeThread(reader)) {
                     NativeThread.signal(reader);
                 }
                 isInputClosed = true;
@@ -1162,7 +1165,7 @@ class SocketChannelImpl
                 long writer = writerThread;
                 if (NativeThread.isVirtualThread(writer)) {
                     Poller.stopPoll(fdVal, Net.POLLOUT);
-                } else if (NativeThread.isKernelThread(writer)) {
+                } else if (NativeThread.isNativeThread(writer)) {
                     NativeThread.signal(writer);
                 }
                 isOutputClosed = true;
@@ -1329,7 +1332,7 @@ class SocketChannelImpl
                     }
                 } else {
                     // read, no timeout
-                    configureNonBlockingIfNeeded();
+                    configureSocketNonBlockingIfVirtualThread();
                     n = tryRead(b, off, len);
                     while (IOStatus.okayToRetry(n) && isOpen()) {
                         park(Net.POLLIN);
@@ -1391,7 +1394,7 @@ class SocketChannelImpl
             int end = off + len;
             try {
                 beginWrite(true);
-                configureNonBlockingIfNeeded();
+                configureSocketNonBlockingIfVirtualThread();
                 while (pos < end && isOpen()) {
                     int size = end - pos;
                     int n = tryWrite(b, pos, size);

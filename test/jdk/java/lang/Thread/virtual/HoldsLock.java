@@ -34,6 +34,7 @@ import java.lang.management.LockInfo;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -49,7 +50,7 @@ public class HoldsLock {
     static final Object LOCK1 = new Object();
     static final Object LOCK2 = new Object();
 
-    // @Test Fails: JDK-8281642
+    @Test(enabled=false) // JDK-8281642
     public void testHoldsLock() throws Exception {
         var q = new ArrayBlockingQueue<Runnable>(5);
 
@@ -107,7 +108,8 @@ public class HoldsLock {
             LockInfo lock = info.getLockInfo();
             if (lock != null && lockAsString.equals(lock.toString())) {
                 assert false; // should never get here
-                assert tid == vthreadId : "Actual waiter is: " + info.getThreadName() + " vthread: " + vthread + " carrier: " + carrier;
+                assert tid == vthreadId : "Actual waiter is: " + info.getThreadName()
+                        + " vthread: " + vthread + " carrier: " + carrier;
             }
 
             if (tid == carrierId) {
@@ -143,7 +145,7 @@ public class HoldsLock {
     }
 
     static Thread spawnVirtual(Executor scheduler, Runnable task) {
-       var t = newThread(scheduler, task);
+        var t = newThread(scheduler, task);
         t.start();
         return t;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,28 +28,13 @@ package jdk.internal.vm;
 public final class StackChunk {
     public static void init() {}
 
-    public static final byte FLAG_HAS_INTERPRETED_FRAMES = 1 << 2;
-
-    private Continuation cont; // must not be accessed by Java code, as this oop's processing is essential for the chunk's GC protocol
     private StackChunk parent;
-    private int size; // in words
-    private int sp; // in words
+    private int size;    // in words
+    private int sp;      // in words
     private int argsize; // bottom stack-passed arguments, in words
-    private byte flags;
-    private long pc;
 
-    private int gcSP;
-    private long markCycle;
-
-    private int maxSize; // size when fully thawed on stack
-
-   // the stack itself is appended here by the VM
+    // The stack itself is appended here by the VM, as well as some injected fields
 
     public StackChunk parent() { return parent; }
-    public int size()          { return size; }
-    public int sp()            { return sp; }
-    public int argsize()       { return argsize; }
-    public int maxSize()       { return maxSize; }
     public boolean isEmpty()   { return sp >= (size - argsize); }
-    public boolean isFlag(byte flag) { return (flags & flag) != 0; }
- }
+}

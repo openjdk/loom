@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,13 +35,10 @@
 #include "oops/verifyOopClosure.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/thread.inline.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/macros.hpp"
 
 void oopDesc::print_on(outputStream* st) const {
-  if (this == NULL) {
-    st->print_cr("NULL");
-  } else if (*((juint*)this) == badHeapWordVal) {
+  if (*((juint*)this) == badHeapWordVal) {
     st->print("BAD WORD");
   } else if (*((juint*)this) == badMetaWordVal) {
     st->print("BAD META WORD");
@@ -77,16 +74,12 @@ char* oopDesc::print_value_string() {
 }
 
 void oopDesc::print_value_on(outputStream* st) const {
-  if (this == NULL) {
-    st->print("NULL");
+  oop obj = const_cast<oopDesc*>(this);
+  if (java_lang_String::is_instance(obj)) {
+    java_lang_String::print(obj, st);
+    print_address_on(st);
   } else {
-    oop obj = cast_to_oop(this);
-    if (java_lang_String::is_instance(obj)) {
-      java_lang_String::print(obj, st);
-      print_address_on(st);
-    } else {
-      klass()->oop_print_value_on(obj, st);
-    }
+    klass()->oop_print_value_on(obj, st);
   }
 }
 
@@ -146,11 +139,12 @@ void VerifyOopClosure::do_oop(oop* p)       { VerifyOopClosure::do_oop_work(p); 
 void VerifyOopClosure::do_oop(narrowOop* p) { VerifyOopClosure::do_oop_work(p); }
 
 // type test operations that doesn't require inclusion of oop.inline.hpp.
-bool oopDesc::is_instance_noinline()          const { return is_instance();            }
-bool oopDesc::is_array_noinline()             const { return is_array();               }
-bool oopDesc::is_objArray_noinline()          const { return is_objArray();            }
-bool oopDesc::is_typeArray_noinline()         const { return is_typeArray();           }
-bool oopDesc::is_stackChunk_noinline()        const { return is_stackChunk();          }
+bool oopDesc::is_instance_noinline()    const { return is_instance();    }
+bool oopDesc::is_instanceRef_noinline() const { return is_instanceRef(); }
+bool oopDesc::is_stackChunk_noinline()  const { return is_stackChunk();  }
+bool oopDesc::is_array_noinline()       const { return is_array();       }
+bool oopDesc::is_objArray_noinline()    const { return is_objArray();    }
+bool oopDesc::is_typeArray_noinline()   const { return is_typeArray();   }
 
 bool oopDesc::has_klass_gap() {
   // Only has a klass gap when compressed class pointers are used.

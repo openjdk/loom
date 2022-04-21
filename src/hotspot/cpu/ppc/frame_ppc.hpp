@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2021 SAP SE. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -401,7 +401,6 @@
   inline void interpreter_frame_set_top_frame_sp(intptr_t* top_frame_sp);
   inline void interpreter_frame_set_sender_sp(intptr_t* sender_sp);
 
-  template <bool relative = false>
   inline intptr_t* interpreter_frame_last_sp() const;
 
   template <typename RegisterMapT>
@@ -420,12 +419,16 @@
 
   enum {
     // normal return address is 1 bundle past PC
-    pc_return_offset = 0
+    pc_return_offset = 0,
+    metadata_words   = 0,
+    frame_alignment  = 16,
+    // size, in words, of maximum shift in frame position due to alignment
+    align_wiggle     =  1
   };
 
   static jint interpreter_frame_expression_stack_direction() { return -1; }
 
   // returns the sending frame, without applying any barriers
-  frame sender_raw(RegisterMap* map) const;
+  inline frame sender_raw(RegisterMap* map) const;
 
 #endif // CPU_PPC_FRAME_PPC_HPP

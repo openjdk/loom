@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,7 +35,7 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 
 /**
- * A ForkJoinWorkerThread that can be used as a carrier thread by the default scheduler.
+ * A ForkJoinWorkerThread that can be used as a carrier thread.
  */
 public class CarrierThread extends ForkJoinWorkerThread {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -49,29 +49,37 @@ public class CarrierThread extends ForkJoinWorkerThread {
     private static final long INHERITABLETHREADLOCALS;
     private static final long INHERITEDACCESSCONTROLCONTEXT;
 
-    private boolean blocked;    // true if executing blocker
+    private boolean blocking;    // true if in blocking op
 
     public CarrierThread(ForkJoinPool pool) {
-        super(CARRIER_THREADGROUP, pool);
+        super(CARRIER_THREADGROUP, false, pool);
         U.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
         U.putReference(this, INHERITABLETHREADLOCALS, null);
         U.putReferenceRelease(this, INHERITEDACCESSCONTROLCONTEXT, INNOCUOUS_ACC);
     }
 
     /**
-     * For use by {@link Blocker} to test if the thread is executing a blocking operation.
+     * For use by {@link Blocker} to test if the thread is in a blocking operation.
      */
-    boolean blocked() {
+    boolean inBlocking() {
         //assert JLA.currentCarrierThread() == this;
-        return blocked;
+        return blocking;
     }
 
     /**
-     * For use by {@link Blocker} to set whether the thread is executing a blocking operation.
+     * For use by {@link Blocker} to mark the start of a blocking operation.
      */
-    void blocked(boolean b) {
-        //assert JLA.currentCarrierThread() == this;
-        this.blocked = b;
+    void beginBlocking() {
+        //assert JLA.currentCarrierThread() == this && !blocking;
+        blocking = true;
+    }
+
+    /**
+     * For use by {@link Blocker} to mark the end of a blocking operation.
+     */
+    void endBlocking() {
+        //assert JLA.currentCarrierThread() == this && blocking;
+        blocking = false;
     }
 
     @Override

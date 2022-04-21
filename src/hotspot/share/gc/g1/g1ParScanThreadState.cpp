@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@
 #include "gc/g1/g1StringDedup.hpp"
 #include "gc/g1/g1Trace.hpp"
 #include "gc/g1/g1YoungGCEvacFailureInjector.inline.hpp"
+#include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/partialArrayTaskStepper.inline.hpp"
 #include "gc/shared/preservedMarks.inline.hpp"
 #include "gc/shared/stringdedup/stringDedup.hpp"
@@ -452,7 +453,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // Get the klass once.  We'll need it again later, and this avoids
   // re-decoding when it's compressed.
   Klass* klass = old->klass();
-  const size_t word_sz = old->compact_size_given_klass(klass);
+  const size_t word_sz = old->size_given_klass(klass);
 
   uint age = 0;
   G1HeapRegionAttr dest_attr = next_region_attr(region_attr, old_mark, age);
@@ -485,7 +486,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // We're going to allocate linearly, so might as well prefetch ahead.
   Prefetch::write(obj_ptr, PrefetchCopyIntervalInBytes);
-  old->copy_disjoint_compact(obj_ptr, word_sz);
+  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(old), obj_ptr, word_sz);
 
   const oop obj = cast_to_oop(obj_ptr);
   // Because the forwarding is done with memory_order_relaxed there is no
@@ -525,6 +526,8 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
       }
       return obj;
     }
+
+    ContinuationGCSupport::transform_stack_chunk(obj);
 
     // Check for deduplicating young Strings.
     if (G1StringDedup::is_candidate_from_evacuation(klass,
@@ -630,6 +633,9 @@ oop G1ParScanThreadState::handle_evacuation_failure_par(oop old, markWord m, siz
     }
 
     _preserved_marks->push_if_necessary(old, m);
+
+    ContinuationGCSupport::transform_stack_chunk(old);
+
     _evacuation_failed_info.register_copy_failure(word_sz);
 
     // For iterating objects that failed evacuation currently we can reuse the

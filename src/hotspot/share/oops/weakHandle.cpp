@@ -56,11 +56,6 @@ void WeakHandle::release(OopStorage* storage) const {
   }
 }
 
-WeakHandle WeakHandle::from_raw(oop* raw) {
-  assert(raw != NULL, "can't create from raw with NULL value");
-  return WeakHandle(raw);
-}
-
 void WeakHandle::print() const { print_on(tty); }
 
 void WeakHandle::print_on(outputStream* st) const {

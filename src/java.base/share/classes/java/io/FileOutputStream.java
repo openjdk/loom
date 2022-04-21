@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -290,10 +290,11 @@ public class FileOutputStream extends OutputStream
      * @param append whether the file is to be opened in append mode
      */
     private void open(String name, boolean append) throws FileNotFoundException {
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> open0(name, append));
-        } else {
+        long comp = Blocker.begin();
+        try {
             open0(name, append);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -315,10 +316,11 @@ public class FileOutputStream extends OutputStream
      */
     public void write(int b) throws IOException {
         boolean append = fdAccess.getAppend(fd);
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> write(b, append));
-        } else {
+        long comp = Blocker.begin();
+        try {
             write(b, append);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -343,10 +345,11 @@ public class FileOutputStream extends OutputStream
      */
     public void write(byte[] b) throws IOException {
         boolean append = fdAccess.getAppend(fd);
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes(b, 0, b.length, append));
-        } else {
+        long comp = Blocker.begin();
+        try {
             writeBytes(b, 0, b.length, append);
+        } finally {
+            Blocker.end(comp);
         }
     }
 
@@ -361,10 +364,11 @@ public class FileOutputStream extends OutputStream
      */
     public void write(byte[] b, int off, int len) throws IOException {
         boolean append = fdAccess.getAppend(fd);
-        if (Thread.currentThread().isVirtual()) {
-            Blocker.managedBlock(() -> writeBytes(b, off, len, append));
-        } else {
+        long comp = Blocker.begin();
+        try {
             writeBytes(b, off, len, append);
+        } finally {
+            Blocker.end(comp);
         }
     }
 

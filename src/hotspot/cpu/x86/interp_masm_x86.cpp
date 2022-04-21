@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -821,64 +821,6 @@ void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register 
   jmp(Address(method, Method::from_interpreted_offset()));
 }
 
-// void InterpreterMacroAssembler::resolve_special(Register rmethod, LinkInfo link_info) {
-//   CallInfo callinfo;
-//   LinkResolver::resolve_special_call(callinfo, Handle(), link_info, Thread::current());
-//   methodHandle methodh = callinfo.selected_method();
-//   assert(methodh.not_null(), "should have thrown exception");
-//   Method* method = methodh();
-//   tty->print_cr("call_Java_final method: " INTPTR_FORMAT " name: %s", p2i(method), method->name()->as_C_string());
-//   // tty->print_cr("call_Java_final const: " INTPTR_FORMAT ", params: %d locals %d", p2i(method->constMethod()), method->constMethod()->_size_of_parameters, method->constMethod()->_max_locals);
-
-//   movptr(rmethod, AddressLiteral((address)method, RelocationHolder::none).addr());
-// }
-
-// void InterpreterMacroAssembler::get_entry(Register entry, Register method) {
-//   // TODO: see InterpreterMacroAssembler::jump_from_interpreted for special cases
-//   Label done;
-//   // if (JvmtiExport::can_post_interpreter_events()) {
-//   //   Register temp;
-//   //   Label run_compiled_code;
-//   //   // JVMTI events, such as single-stepping, are implemented partly by avoiding running
-//   //   // compiled code in threads for which the event is enabled.  Check here for
-//   //   // interp_only_mode if these events CAN be enabled.
-//   //   // interp_only is an int, on little endian it is sufficient to test the byte only
-//   //   // Is a cmpl faster?
-//   //   LP64_ONLY(temp = r15_thread;)
-//   //   NOT_LP64(get_thread(temp);)
-//   //   cmpb(Address(temp, JavaThread::interp_only_mode_offset()), 0);
-//   //   jccb(Assembler::zero, run_compiled_code);
-//   //   movptr(entry, Address(method, Method::interpreter_entry_offset()));
-//   //   bind(run_compiled_code);
-//   // }
-//   movptr(entry, Address(method, Method::from_interpreted_offset()));
-//   bind(done);
-// }
-
-// // loads method into rbx
-// void InterpreterMacroAssembler::get_entry(Register entry, LinkInfo link_info) {
-//   resolve_special(rbx, link_info);
-//   get_entry(entry, rbx);
-// }
-
-// void InterpreterMacroAssembler::call_Java_final(LinkInfo link_info) {
-//   Register rentry = rax;
-//   get_entry(rentry, link_info);
-
-//   // profile_call(rax); // ?? rax
-//   // profile_arguments_type(rax, rbx, rbcp, false);
-//   call(rentry);
-// }
-
-// void InterpreterMacroAssembler::jump_Java_final(LinkInfo link_info) {
-//   Register rentry = rax;
-//   get_entry(rentry, link_info);
-
-//   // profile_call(rax); // ?? rax
-//   // profile_arguments_type(rax, rbx, rbcp, false);
-//   jmp(rentry);
-// }
-
 // The following two routines provide a hook so that an implementation
 // can schedule the dispatch in two parts.  x86 does not do this.
 void InterpreterMacroAssembler::dispatch_prolog(TosState state, int step) {
@@ -1342,6 +1284,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     jcc(Assembler::zero, done);
 
     bind(slow_case);
+
     // Call the runtime routine for slow case
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
@@ -1412,6 +1355,7 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
     call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
 
     bind(done);
+
     restore_bcp();
   }
 }
@@ -2034,19 +1978,18 @@ void InterpreterMacroAssembler::verify_FPU(int stack_depth, TosState state) {
 #endif
 }
 
-// Jump if ((*counter_addr += increment) & mask) satisfies the condition.
-void InterpreterMacroAssembler::increment_mask_and_jump(Address counter_addr,
-                                                        int increment, Address mask,
-                                                        Register scratch, bool preloaded,
-                                                        Condition cond, Label* where) {
-  if (!preloaded) {
-    movl(scratch, counter_addr);
-  }
-  incrementl(scratch, increment);
+// Jump if ((*counter_addr += increment) & mask) == 0
+void InterpreterMacroAssembler::increment_mask_and_jump(Address counter_addr, Address mask,
+                                                        Register scratch, Label* where) {
+  // This update is actually not atomic and can lose a number of updates
+  // under heavy contention, but the alternative of using the (contended)
+  // atomic update here penalizes profiling paths too much.
+  movl(scratch, counter_addr);
+  incrementl(scratch, InvocationCounter::count_increment);
   movl(counter_addr, scratch);
   andl(scratch, mask);
   if (where != NULL) {
-    jcc(cond, *where);
+    jcc(Assembler::zero, *where);
   }
 }
 

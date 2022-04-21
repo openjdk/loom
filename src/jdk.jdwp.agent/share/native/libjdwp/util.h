@@ -84,10 +84,8 @@ typedef struct {
     volatile jboolean vmDead; /* Once VM is dead it stays that way - don't put in init */
     jboolean assertOn;
     jboolean assertFatal;
-    jboolean vthreadsSupported; /* If true, debugging support for vthreads is enabled.*/
-    jboolean enumerateVThreads; /* If true, JDWP APIs returns vthreads in thread lists. */
-    jboolean notifyVThreads;    /* If true, all vthread START and DEATH events are sent, subject to filtering. */
-    jboolean trackAllVThreads;  /* If true, track all vthreads. Otherwise just track ones we need to track. */
+    jboolean vthreadsSupported; /* If true, debugging support for vthreads is enabled. */
+    jboolean enumerateVThreads; /* If true, JDWP APIs return vthreads in thread lists. */
     jboolean doerrorexit;
     jboolean modifiedUtf8;
     jboolean quiet;
@@ -112,7 +110,6 @@ typedef struct {
     jmethodID           systemGetProperty;
     jmethodID           setProperty;
     jthreadGroup        systemThreadGroup;
-    jthreadGroup        vthreadThreadGroup;
     jobject             agent_properties;
 
     jint                cachedJvmtiVersion;

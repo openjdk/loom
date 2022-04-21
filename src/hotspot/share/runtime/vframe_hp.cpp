@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,6 +41,7 @@
 #include "runtime/monitorChunk.hpp"
 #include "runtime/registerMap.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/stackValue.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/vframeArray.hpp"
 #include "runtime/vframe_hp.hpp"
@@ -223,11 +224,13 @@ StackValueCollection* compiledVFrame::expressions() const {
 
 StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
   stackChunkOop c = _reg_map.stack_chunk()();
+  int index = _reg_map.stack_chunk_index();
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(_chunk());
 
   StackValue* res = StackValue::create_stack_value(&_fr, register_map(), sv);
 
   const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk(c);
+  const_cast<RegisterMap*>(&_reg_map)->set_stack_chunk_index(index);
   return res;
 }
 

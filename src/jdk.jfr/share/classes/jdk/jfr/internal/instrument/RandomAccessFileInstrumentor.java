@@ -71,6 +71,31 @@ final class RandomAccessFileInstrumentor {
 
     @SuppressWarnings("deprecation")
     @JIInstrumentationMethod
+    public int read(byte b[]) throws IOException {
+        EventHandler handler = Handlers.FILE_READ;
+        if (!handler.isEnabled()) {
+            return read(b);
+        }
+        int bytesRead = 0;
+        long start = 0;
+        try {
+            start = EventHandler.timestamp();
+            bytesRead = read(b);
+        } finally {
+            long duration = EventHandler.timestamp() - start;
+            if (handler.shouldCommit(duration)) {
+                if (bytesRead < 0) {
+                    handler.write(start, duration, path, 0L, true);
+                } else {
+                    handler.write(start, duration, path, bytesRead, false);
+                }
+            }
+        }
+        return bytesRead;
+    }
+
+    @SuppressWarnings("deprecation")
+    @JIInstrumentationMethod
     public int read(byte b[], int off, int len) throws IOException {
         EventHandler handler = Handlers.FILE_READ;
         if (!handler.isEnabled()) {
@@ -110,6 +135,28 @@ final class RandomAccessFileInstrumentor {
             bytesWritten = 1;
         } finally {
             long duration = EventHandler.timestamp() - start;
+            if (handler.shouldCommit(duration)) {
+                handler.write(start, duration, path, bytesWritten);
+            }
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    @JIInstrumentationMethod
+    public void write(byte b[]) throws IOException {
+        EventHandler handler = Handlers.FILE_WRITE;
+        if (!handler.isEnabled()) {
+            write(b);
+            return;
+        }
+        long bytesWritten = 0;
+        long start = 0;
+        try {
+            start = EventHandler.timestamp();
+            write(b);
+            bytesWritten = b.length;
+        } finally {
+            long duration = EventHandler.timestamp();
             if (handler.shouldCommit(duration)) {
                 handler.write(start, duration, path, bytesWritten);
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,7 +22,6 @@
  *
  */
 
-#include "oops/stackChunkOop.hpp"
 #include "precompiled.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/javaThreadStatus.hpp"
@@ -38,6 +37,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/stackChunkOop.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/globals.hpp"
@@ -56,7 +56,7 @@
 
 vframe::vframe(const frame* fr, const RegisterMap* reg_map, JavaThread* thread)
 : _reg_map(reg_map), _thread(thread),
-  _chunk(Thread::current(), reg_map->stack_chunk()(), reg_map->stack_chunk().not_null()) {
+  _chunk(Thread::current(), reg_map->stack_chunk()()) {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
 }
@@ -65,7 +65,7 @@ vframe::vframe(const frame* fr, JavaThread* thread)
 : _reg_map(thread), _thread(thread), _chunk() {
   assert(fr != NULL, "must have frame");
   _fr = *fr;
-  assert (!_reg_map.in_cont(), "");
+  assert(!_reg_map.in_cont(), "");
 }
 
 vframe* vframe::new_vframe(StackFrameStream& fst, JavaThread* thread) {
@@ -114,11 +114,11 @@ vframe* vframe::sender() const {
   if (_fr.is_entry_frame() && _fr.is_first_frame()) return NULL;
   frame s = _fr.real_sender(&temp_map);
   if (s.is_first_frame()) return NULL;
-  if (Continuation::is_continuation_enterSpecial(s)) {
-    if (Continuation::continuation_scope(Continuation::get_continuation_for_frame(temp_map.thread(), _fr)) == java_lang_VirtualThread::vthread_scope())
-      return NULL;
-  }
   return vframe::new_vframe(&s, &temp_map, thread());
+}
+
+bool vframe::is_vthread_entry() const {
+  return _fr.is_first_vthread_frame(register_map()->thread());
 }
 
 vframe* vframe::top() const {
@@ -131,23 +131,12 @@ vframe* vframe::top() const {
 javaVFrame* vframe::java_sender() const {
   vframe* f = sender();
   while (f != NULL) {
-    if (f->is_java_frame() && !javaVFrame::cast(f)->method()->is_continuation_enter_intrinsic()) return javaVFrame::cast(f);
+    if (f->is_vthread_entry()) break;
+    if (f->is_java_frame() && !javaVFrame::cast(f)->method()->is_continuation_enter_intrinsic())
+      return javaVFrame::cast(f);
     f = f->sender();
   }
   return NULL;
-}
-
-extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
-
-void vframe::restore_register_map() const {
-  assert (this != NULL, "");
-  assert (dbg_is_safe(this, -1), "");
-  assert (register_map() != NULL, "");
-  assert (dbg_is_safe(register_map(), -1), "");
-
-  if (_reg_map.stack_chunk()() != stack_chunk()) {
-    const_cast<vframe*>(this)->_reg_map.set_stack_chunk(stack_chunk());
-  }
 }
 
 // ------------- javaVFrame --------------
@@ -303,12 +292,12 @@ u_char* interpretedVFrame::bcp() const {
 }
 
 void interpretedVFrame::set_bcp(u_char* bcp) {
-  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
+  assert(stack_chunk() == NULL, "Not supported for heap frames"); // unsupported for now because seems to be unused
   fr().interpreter_frame_set_bcp(bcp);
 }
 
 intptr_t* interpretedVFrame::locals_addr_at(int offset) const {
-  assert (stack_chunk() == NULL, ""); // unsupported for now because seems to be unused
+  assert(stack_chunk() == NULL, "Not supported for heap frames"); // unsupported for now because seems to be unused
   assert(fr().is_interpreted_frame(), "frame should be an interpreted frame");
   return fr().interpreter_frame_local_at(offset);
 }
@@ -331,7 +320,6 @@ int interpretedVFrame::bci() const {
 }
 
 Method* interpretedVFrame::method() const {
-  // assert ((stack_chunk() != NULL) == register_map()->in_cont(), "_in_cont: %d register_map()->in_cont(): %d", stack_chunk() != NULL, register_map()->in_cont());
   return stack_chunk() == NULL ? fr().interpreter_frame_method() : stack_chunk()->interpreter_frame_method(fr());
 }
 
@@ -564,12 +552,8 @@ vframeStream::vframeStream(JavaThread* thread, Handle continuation_scope, bool s
   }
 
   _frame = _thread->last_frame();
-  _cont = _thread->last_continuation();
+  _cont_entry = _thread->last_continuation();
   while (!fill_from_frame()) {
-    if (Continuation::is_continuation_enterSpecial(_frame)) {
-      assert (_cont != NULL, "");
-      _cont = _cont->parent();
-    }
     _frame = _frame.sender(&_reg_map);
   }
 }
@@ -580,12 +564,11 @@ vframeStream::vframeStream(oop continuation, Handle continuation_scope)
   _stop_at_java_call_stub = false;
   _continuation_scope = continuation_scope;
 
-  if (!Continuation::has_last_Java_frame(continuation)) {
+  if (!Continuation::has_last_Java_frame(continuation, &_frame, &_reg_map)) {
     _mode = at_end_mode;
     return;
   }
 
-  _frame = Continuation::last_frame(continuation, &_reg_map);
   // _chunk = _reg_map.stack_chunk();
   while (!fill_from_frame()) {
     _frame = _frame.sender(&_reg_map);

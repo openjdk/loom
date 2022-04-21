@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -78,14 +78,13 @@ public interface ThreadGroupReference extends ObjectReference {
     void resume();
 
     /**
-     * Returns a List containing a {@link ThreadReference} for each live thread
-     * in this thread group. Virtual threads are not considered live threads in
-     * a thread group and are not included. Only the live threads in this
-     * immediate thread group (and not its subgroups) are returned. A thread is
-     * alive if it has been started and has not yet been stopped.
+     * Returns a List containing a {@link ThreadReference} for each live platform
+     * thread in this thread group. Virtual threads are not included. Only the live
+     * platform threads in this immediate thread group (and not its subgroups) are
+     * returned. A thread is alive if it has been started and has not terminated.
      *
      * @return a List of {@link ThreadReference} objects mirroring the
-     * live threads from this thread group in the target VM.
+     * live platform threads from this thread group in the target VM.
      */
     List<ThreadReference> threads();
 

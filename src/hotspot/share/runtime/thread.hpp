@@ -32,8 +32,6 @@
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopHandle.hpp"
-#include "oops/weakHandle.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/handshake.hpp"
@@ -70,6 +68,7 @@ class OSThread;
 class ThreadStatistics;
 class ConcurrentLocksDump;
 class MonitorInfo;
+class AsyncExceptionHandshake;
 
 class vframeArray;
 class vframe;
@@ -85,6 +84,8 @@ class Metadata;
 class ResourceArea;
 
 class OopStorage;
+
+class ContinuationEntry;
 
 DEBUG_ONLY(class ResourceMark;)
 
@@ -140,15 +141,18 @@ class Thread: public ThreadShadow {
   static THREAD_LOCAL Thread* _thr_current;
 #endif
 
-  int _nmethod_disarm_value;
+  // On AArch64, the high order 32 bits are used by a "patching epoch" number
+  // which reflects if this thread has executed the required fences, after
+  // an nmethod gets disarmed. The low order 32 bit denote the disarm value.
+  uint64_t _nmethod_disarm_value;
 
  public:
   int nmethod_disarm_value() {
-    return _nmethod_disarm_value;
+    return (int)(uint32_t)_nmethod_disarm_value;
   }
 
   void set_nmethod_disarm_value(int value) {
-    _nmethod_disarm_value = value;
+    _nmethod_disarm_value = (uint64_t)(uint32_t)value;
   }
 
   static ByteSize nmethod_disarmed_offset() {
@@ -700,6 +704,7 @@ class JavaThread: public Thread {
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
+  OopHandle      _jvmti_vthread;
   OopHandle      _scopeLocalCache;
 
 #ifdef ASSERT
@@ -732,7 +737,6 @@ class JavaThread: public Thread {
   // will be carried out as soon as possible which, in most cases, is just before deoptimization of
   // the frame, when control returns to it.
   JvmtiDeferredUpdates* _jvmti_deferred_updates;
-  GrowableArray<WeakHandle>* _keepalive_cleanup;
 
   // Handshake value for fixing 6243940. We need a place for the i2c
   // adapter to store the callee Method*. This value is NEVER live
@@ -807,14 +811,11 @@ class JavaThread: public Thread {
   enum SuspendFlags {
     // NOTE: avoid using the sign-bit as cc generates different test code
     //       when the sign-bit is used, and sometimes incorrectly - see CR 6398077
-    _has_async_exception    = 0x00000001U, // there is a pending async exception
     _trace_flag             = 0x00000004U, // call tracing backend
-    _obj_deopt              = 0x00000008U, // suspend for object reallocation and relocking for JVMTI agent
-    _thread_suspended       = 0x00000010U  // non-virtual thread is externally suspended
+    _obj_deopt              = 0x00000008U  // suspend for object reallocation and relocking for JVMTI agent
   };
 
   // various suspension related flags - atomically updated
-  // overloaded with async exceptions so that we do a single check when transitioning from native->Java
   volatile uint32_t _suspend_flags;
 
   inline void set_suspend_flag(SuspendFlags f);
@@ -828,23 +829,25 @@ class JavaThread: public Thread {
   bool is_trace_suspend()      { return (_suspend_flags & _trace_flag) != 0; }
   bool is_obj_deopt_suspend()  { return (_suspend_flags & _obj_deopt) != 0; }
 
-  // Asynchronous exceptions support
+  // Asynchronous exception support
  private:
-  oop     _pending_async_exception;
-#ifdef ASSERT
-  bool    _is_unsafe_access_error;
-#endif
+  friend class InstallAsyncExceptionHandshake;
+  friend class AsyncExceptionHandshake;
+  friend class HandshakeState;
 
-  inline bool clear_async_exception_condition();
+  void install_async_exception(AsyncExceptionHandshake* aec = NULL);
+  void handle_async_exception(oop java_throwable);
  public:
-  bool has_async_exception_condition() {
-    return (_suspend_flags & _has_async_exception) != 0;
-  }
-  inline void set_pending_async_exception(oop e);
+  bool has_async_exception_condition(bool ThreadDeath_only = false);
   inline void set_pending_unsafe_access_error();
   static void send_async_exception(JavaThread* jt, oop java_throwable);
-  void send_thread_stop(oop throwable);
-  void check_and_handle_async_exceptions();
+
+  class NoAsyncExceptionDeliveryMark : public StackObj {
+    friend JavaThread;
+    JavaThread *_target;
+    inline NoAsyncExceptionDeliveryMark(JavaThread *t);
+    inline ~NoAsyncExceptionDeliveryMark();
+  };
 
   // Safepoint support
  public:                                                        // Expose _thread_state for SafeFetchInt()
@@ -916,8 +919,11 @@ class JavaThread: public Thread {
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
 #if INCLUDE_JVMTI
-  bool                  _is_in_VTMT;             // thread is in virtual thread mount transition
-  bool                  _is_VTMT_disabler;       // thread currently disabled VTMT
+  volatile bool         _carrier_thread_suspended;       // Carrier thread is externally suspended
+  bool                  _is_in_VTMS_transition;          // thread is in virtual thread mount state transition
+#ifdef ASSERT
+  bool                  _is_VTMS_transition_disabler;    // thread currently disabled VTMS transitions
+#endif
 #endif
 
   // JNI attach states:
@@ -1040,11 +1046,10 @@ class JavaThread: public Thread {
   int _frames_to_pop_failed_realloc;
 
   ContinuationEntry* _cont_entry;
-  bool _cont_yield; // a continuation yield is in progress
-  bool _cont_preempt;
+  intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the
+                            // continuation that we know about
   int _cont_fastpath_thread_state; // whether global thread state allows continuation fastpath (JVMTI)
-  intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the continuation that we know about
-  int _held_monitor_count; // used by continuations for fast lock detection
+  int _held_monitor_count;  // used by continuations for fast lock detection
 private:
 
   friend class VMThread;
@@ -1058,7 +1063,6 @@ private:
   inline StackWatermarks* stack_watermarks() { return &_stack_watermarks; }
 
  public:
-  oop _mounted_vthread;
   jlong _scopeLocal_hash_table_shift;
 
   void allocate_scopeLocal_hash_table(int count);
@@ -1117,8 +1121,8 @@ private:
   void set_vthread(oop p);
   oop scopeLocalCache() const;
   void set_scopeLocalCache(oop p);
-  oop mounted_vthread() const                    { return _mounted_vthread; }
-  void set_mounted_vthread(oop p)                { _mounted_vthread = p; }
+  oop jvmti_vthread() const;
+  void set_jvmti_vthread(oop p);
 
   // Prepare thread and add to priority queue.  If a priority is
   // not specified, use the priority of the thread object. Threads_lock
@@ -1182,25 +1186,22 @@ private:
   void set_requires_cross_modify_fence(bool val) PRODUCT_RETURN NOT_PRODUCT({ _requires_cross_modify_fence = val; })
 
   // Continuation support
+  oop get_continuation() const;
   ContinuationEntry* last_continuation() const { return _cont_entry; }
-  ContinuationEntry* last_continuation(oop cont_scope) const { return Continuation::last_continuation(this, cont_scope); }
-  bool cont_yield() { return _cont_yield; }
-  void set_cont_yield(bool x) { _cont_yield = x; }
-  void set_cont_fastpath(intptr_t* x) { _cont_fastpath = x; }
-  void push_cont_fastpath(intptr_t* sp) { if (sp > _cont_fastpath) _cont_fastpath = sp; }
-  void set_cont_fastpath_thread_state(bool x) { _cont_fastpath_thread_state = (int)x; }
-  intptr_t* raw_cont_fastpath() { return _cont_fastpath; }
-  bool cont_fastpath() { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
-  bool cont_fastpath_thread_state() { return _cont_fastpath_thread_state != 0; }
-  bool cont_preempt() { return _cont_preempt; }
-  void set_cont_preempt(bool x) { _cont_preempt = x; }
-  int held_monitor_count() { return _held_monitor_count; }
+  void set_cont_fastpath(intptr_t* x)          { _cont_fastpath = x; }
+  void push_cont_fastpath(intptr_t* sp)        { if (sp > _cont_fastpath) _cont_fastpath = sp; }
+  void set_cont_fastpath_thread_state(bool x)  { _cont_fastpath_thread_state = (int)x; }
+  intptr_t* raw_cont_fastpath() const          { return _cont_fastpath; }
+  bool cont_fastpath() const                   { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath_thread_state() const      { return _cont_fastpath_thread_state != 0; }
+
+  int held_monitor_count()        { return _held_monitor_count; }
   void reset_held_monitor_count() { _held_monitor_count = 0; }
-  void inc_held_monitor_count() { _held_monitor_count++; }
-  void dec_held_monitor_count() { assert (_held_monitor_count > 0, ""); _held_monitor_count--; }
+  void inc_held_monitor_count();
+  void dec_held_monitor_count();
 
   inline bool is_vthread_mounted() const;
-  inline ContinuationEntry* vthread_continuation() const;
+  inline const ContinuationEntry* vthread_continuation() const;
 
   enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
   inline CarrierOrVirtual which_stack(address adr) const;
@@ -1225,11 +1226,6 @@ private:
   bool java_resume();
   bool is_suspended()     { return _handshake.is_suspended(); }
 
-  // lower-level blocking logic called by the JVM.  The caller suspends this
-  // thread, does something, and then releases it.
-  bool block_suspend(JavaThread* caller);
-  bool continue_resume(JavaThread* caller);
-
   // Check for async exception in addition to safepoint.
   static void check_special_condition_for_native_trans(JavaThread *thread);
 
@@ -1237,31 +1233,26 @@ private:
   // current thread, i.e. reverts optimizations based on escape analysis.
   void wait_for_object_deoptimization();
 
-  inline void set_thread_suspended();
-  inline void clear_thread_suspended();
+#if INCLUDE_JVMTI
+  inline void set_carrier_thread_suspended();
+  inline void clear_carrier_thread_suspended();
 
-  bool is_thread_suspended() const {
-    return (_suspend_flags & _thread_suspended) != 0;
+  bool is_carrier_thread_suspended() const {
+    return _carrier_thread_suspended;
   }
 
-#if INCLUDE_JVMTI
-  bool is_VTMT_disabler() const                  { return _is_VTMT_disabler; }
-  bool is_in_VTMT() const                        { return _is_in_VTMT; }
-
-  void set_is_in_VTMT(bool val);
-  void set_is_VTMT_disabler(bool val);
+  bool is_in_VTMS_transition() const             { return _is_in_VTMS_transition; }
+  void set_is_in_VTMS_transition(bool val);
+#ifdef ASSERT
+  bool is_VTMS_transition_disabler() const       { return _is_VTMS_transition_disabler; }
+  void set_is_VTMS_transition_disabler(bool val);
+#endif
 #endif
 
-  bool is_cont_force_yield() { return cont_preempt(); }
-
-  // these next two are also used for self-suspension and async exception support
-  void handle_special_runtime_exit_condition(bool check_asyncs = true);
-
-  // Return true if JavaThread has an asynchronous condition or
-  // if external suspension is requested.
+  // Support for object deoptimization and JFR suspension
+  void handle_special_runtime_exit_condition();
   bool has_special_runtime_exit_condition() {
-    return (_suspend_flags & (_has_async_exception | _obj_deopt JFR_ONLY(| _trace_flag))) != 0
-           || is_cont_force_yield();
+    return (_suspend_flags & (_obj_deopt JFR_ONLY(| _trace_flag))) != 0;
   }
 
   // Fast-locking support
@@ -1278,9 +1269,6 @@ private:
   // Side structure for deferring update of java frame locals until deopt occurs
   JvmtiDeferredUpdates* deferred_updates() const      { return _jvmti_deferred_updates; }
   void set_deferred_updates(JvmtiDeferredUpdates* du) { _jvmti_deferred_updates = du; }
-
-  void set_keepalive_cleanup(GrowableArray<WeakHandle>* lst) { _keepalive_cleanup = lst; }
-  GrowableArray<WeakHandle>* keepalive_cleanup() const { return _keepalive_cleanup; }
 
   // These only really exist to make debugging deopt problems simpler
 
@@ -1402,6 +1390,12 @@ private:
   static ByteSize reserved_stack_activation_offset() {
     return byte_offset_of(JavaThread, _stack_overflow_state._reserved_stack_activation);
   }
+  static ByteSize shadow_zone_safe_limit()  {
+    return byte_offset_of(JavaThread, _stack_overflow_state._shadow_zone_safe_limit);
+  }
+  static ByteSize shadow_zone_growth_watermark()  {
+    return byte_offset_of(JavaThread, _stack_overflow_state._shadow_zone_growth_watermark);
+  }
 
   static ByteSize suspend_flags_offset()         { return byte_offset_of(JavaThread, _suspend_flags); }
 
@@ -1414,7 +1408,6 @@ private:
 
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
-  static ByteSize cont_preempt_offset()       { return byte_offset_of(JavaThread, _cont_preempt); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
 
   // Returns the jni environment for this thread
@@ -1425,14 +1418,15 @@ private:
   // external JNI entry points where the JNIEnv is passed into the VM.
   static JavaThread* thread_from_jni_environment(JNIEnv* env) {
     JavaThread* current = (JavaThread*)((intptr_t)env - in_bytes(jni_environment_offset()));
-    // We can't get here in a thread that has completed its execution and so
-    // "is_terminated", but a thread is also considered terminated if the VM
+    // We can't normally get here in a thread that has completed its
+    // execution and so "is_terminated", except when the call is from
+    // AsyncGetCallTrace, which can be triggered by a signal at any point in
+    // a thread's lifecycle. A thread is also considered terminated if the VM
     // has exited, so we have to check this and block in case this is a daemon
     // thread returning to the VM (the JNI DirectBuffer entry points rely on
     // this).
     if (current->is_terminated()) {
       current->block_if_vm_exited();
-      ShouldNotReachHere();
     }
     return current;
   }
@@ -1522,8 +1516,16 @@ private:
   }
   javaVFrame* last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(last_frame(), reg_map); }
 
-  frame vthread_carrier_last_frame(RegisterMap* reg_map);
-  javaVFrame* vthread_carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_carrier_last_frame(reg_map), reg_map); }
+  frame carrier_last_frame(RegisterMap* reg_map);
+  javaVFrame* carrier_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(carrier_last_frame(reg_map), reg_map); }
+
+  frame vthread_last_frame();
+  javaVFrame* vthread_last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(vthread_last_frame(), reg_map); }
+
+  frame platform_thread_last_frame(RegisterMap* reg_map);
+  javaVFrame*  platform_thread_last_java_vframe(RegisterMap* reg_map) {
+    return last_java_vframe(platform_thread_last_frame(reg_map), reg_map);
+  }
 
   javaVFrame* last_java_vframe(const frame f, RegisterMap* reg_map);
 

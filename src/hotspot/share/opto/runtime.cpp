@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -759,15 +759,12 @@ const TypeFunc* OptoRuntime::void_void_Type() {
 
  const TypeFunc* OptoRuntime::jfr_write_checkpoint_Type() {
    // create input type (domain)
-   const Type **fields = TypeTuple::fields(2);
-   fields[TypeFunc::Parms + 0] = TypeLong::LONG;
-   fields[TypeFunc::Parms + 1] = Type::HALF;
-   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms + 2, fields);
+   const Type **fields = TypeTuple::fields(0);
+   const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms, fields);
 
    // create result type (range)
    fields = TypeTuple::fields(0);
-   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms + 0, fields);
-
+   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
    return TypeFunc::make(domain, range);
  }
 
@@ -1522,6 +1519,12 @@ address OptoRuntime::rethrow_C(oopDesc* exception, JavaThread* thread, address r
   // Enable WXWrite: the function called directly by compiled code.
   MACOS_AARCH64_ONLY(ThreadWXEnable wx(WXWrite, thread));
 
+  // ret_pc will have been loaded from the stack, so for AArch64 will be signed.
+  // This needs authenticating, but to do that here requires the fp of the previous frame.
+  // A better way of doing it would be authenticate in the caller by adding a
+  // AuthPAuthNode and using it in GraphKit::gen_stub. For now, just strip it.
+  AARCH64_PORT_ONLY(ret_pc = pauth_strip_pointer(ret_pc));
+
 #ifndef PRODUCT
   SharedRuntime::_rethrow_ctr++;               // count rethrows
 #endif
@@ -1601,7 +1604,7 @@ const TypeFunc *OptoRuntime::register_finalizer_Type() {
 }
 
 #if INCLUDE_JFR
-const TypeFunc *OptoRuntime::get_class_id_intrinsic_Type() {
+const TypeFunc *OptoRuntime::class_id_load_barrier_Type() {
   // create input type (domain)
   const Type **fields = TypeTuple::fields(1);
   fields[TypeFunc::Parms+0] = TypeInstPtr::KLASS;

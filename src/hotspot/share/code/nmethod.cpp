@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,7 +38,7 @@
 #include "compiler/compilerDirectives.hpp"
 #include "compiler/directivesParser.hpp"
 #include "compiler/disassembler.hpp"
-#include "compiler/oopMap.hpp"
+#include "compiler/oopMap.inline.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "gc/shared/collectedHeap.hpp"
@@ -57,6 +57,7 @@
 #include "prims/jvmtiImpl.hpp"
 #include "prims/jvmtiThreadState.hpp"
 #include "prims/methodHandles.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/deoptimization.hpp"
 #include "runtime/flags/flagSetting.hpp"
@@ -599,18 +600,6 @@ nmethod* nmethod::new_nmethod(const methodHandle& method,
   return nm;
 }
 
-  class CountOops : public OopClosure {
-  private:
-    int _nr_oops;
-  public:
-    CountOops() : _nr_oops(0) {}
-    int nr_oops() const { return _nr_oops; }
-
-
-    virtual void do_oop(oop* o) { _nr_oops++; }
-    virtual void do_oop(narrowOop* o) { _nr_oops++; }
-  };
-
 // For native wrappers
 nmethod::nmethod(
   Method* method,
@@ -642,13 +631,13 @@ nmethod::nmethod(
     // values something that will never match a pc like the nmethod vtable entry
     _exception_offset        = 0;
     _orig_pc_offset          = 0;
-    _marking_cycle           = 0;
+    _gc_epoch                = Continuations::gc_epoch();
 
     _consts_offset           = data_offset();
     _stub_offset             = content_offset()      + code_buffer->total_offset_of(code_buffer->stubs());
     _oops_offset             = data_offset();
-    _metadata_offset         = _oops_offset         + align_up(code_buffer->total_oop_size(), oopSize);
-    scopes_data_offset       = _metadata_offset     + align_up(code_buffer->total_metadata_size(), wordSize);
+    _metadata_offset         = _oops_offset          + align_up(code_buffer->total_oop_size(), oopSize);
+    scopes_data_offset       = _metadata_offset      + align_up(code_buffer->total_metadata_size(), wordSize);
     _scopes_pcs_offset       = scopes_data_offset;
     _dependencies_offset     = _scopes_pcs_offset;
     _native_invokers_offset     = _dependencies_offset;
@@ -670,7 +659,7 @@ nmethod::nmethod(
     _pc_desc_container.reset_to(NULL);
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
 
-    _exception_offset        = code_offset()          + offsets->value(CodeOffsets::Exceptions);
+    _exception_offset        = code_offset()         + offsets->value(CodeOffsets::Exceptions);
 
     _scopes_data_begin = (address) this + scopes_data_offset;
     _deopt_handler_begin = (address) this + deoptimize_offset;
@@ -685,6 +674,8 @@ nmethod::nmethod(
     debug_only(Universe::heap()->verify_nmethod(this));
 
     CodeCache::commit(this);
+
+    finalize_relocations();
   }
 
   if (PrintNativeNMethods || PrintDebugInfo || PrintRelocations || PrintDependencies) {
@@ -777,6 +768,7 @@ nmethod::nmethod(
     _comp_level              = comp_level;
     _orig_pc_offset          = orig_pc_offset;
     _hotness_counter         = NMethodSweeper::hotness_counter_reset_val();
+    _gc_epoch                = Continuations::gc_epoch();
 
     // Section offsets
     _consts_offset           = content_offset()      + code_buffer->total_offset_of(code_buffer->consts());
@@ -862,6 +854,8 @@ nmethod::nmethod(
 
     CodeCache::commit(this);
 
+    finalize_relocations();
+
     // Copy contents of ExceptionHandlerTable to nmethod
     handler_table->copy_to(this);
     nul_chk_table->copy_to(this);
@@ -878,19 +872,7 @@ nmethod::nmethod(
     assert(compiler->is_c2() || compiler->is_jvmci() ||
            _method->is_static() == (entry_point() == _verified_entry_point),
            " entry points must be same for static methods and vice versa");
-
-    {
-      CountOops count;
-      this->oops_do(&count, false, true);
-      _nr_oops = count.nr_oops();
-    }
   }
-}
-
-int nmethod::count_oops() {
-  CountOops count;
-  this->oops_do(&count, false, true);
-  return count.nr_oops();
 }
 
 // Print a short set of xml attributes to identify this nmethod.  The
@@ -1120,18 +1102,53 @@ void nmethod::fix_oop_relocations(address begin, address end, bool initialize_im
   }
 }
 
+static void install_post_call_nop_displacement(nmethod* nm, address pc) {
+  NativePostCallNop* nop = nativePostCallNop_at((address) pc);
+  intptr_t cbaddr = (intptr_t) nm;
+  intptr_t offset = ((intptr_t) pc) - cbaddr;
+
+  int oopmap_slot = nm->oop_maps()->find_slot_for_offset((intptr_t) pc - (intptr_t) nm->code_begin());
+  if (oopmap_slot < 0) { // this can happen at asynchronous (non-safepoint) stackwalks
+    log_debug(codecache)("failed to find oopmap for cb: " INTPTR_FORMAT " offset: %d", cbaddr, (int) offset);
+  } else if (((oopmap_slot & 0xff) == oopmap_slot) && ((offset & 0xffffff) == offset)) {
+    jint value = (oopmap_slot << 24) | (jint) offset;
+    nop->patch(value);
+  } else {
+    log_debug(codecache)("failed to encode %d %d", oopmap_slot, (int) offset);
+  }
+}
+
+void nmethod::finalize_relocations() {
+  NoSafepointVerifier nsv;
+
+  // Make sure that post call nops fill in nmethod offsets eagerly so
+  // we don't have to race with deoptimization
+  RelocIterator iter(this);
+  while (iter.next()) {
+    if (iter.type() == relocInfo::post_call_nop_type) {
+      post_call_nop_Relocation* const reloc = iter.post_call_nop_reloc();
+      address pc = reloc->addr();
+      install_post_call_nop_displacement(this, pc);
+    }
+  }
+}
 
 void nmethod::make_deoptimized() {
-  assert (method() == NULL || can_be_deoptimized(), "");
+  if (!Continuations::enabled()) {
+    return;
+  }
+
+  assert(method() == NULL || can_be_deoptimized(), "");
+  assert(!is_zombie(), "");
 
   CompiledICLocker ml(this);
   assert(CompiledICLocker::is_safe(this), "mt unsafe call");
   ResourceMark rm;
   RelocIterator iter(this, oops_reloc_begin());
 
-  while(iter.next()) {
+  while (iter.next()) {
 
-    switch(iter.type()) {
+    switch (iter.type()) {
       case relocInfo::virtual_call_type:
       case relocInfo::opt_virtual_call_type: {
         CompiledIC *ic = CompiledIC_at(&iter);
@@ -1215,18 +1232,17 @@ void nmethod::mark_as_seen_on_stack() {
 
 void nmethod::mark_as_maybe_on_continuation() {
   assert(is_alive(), "Must be an alive method");
-  _marking_cycle = CodeCache::marking_cycle();
+  _gc_epoch = Continuations::gc_epoch();
 }
 
-bool nmethod::is_not_on_continuation_stack() {
-  // Odd marking cycles are found during concurrent marking. Even numbers are found
-  // in nmethods that are marked when GC is inactive (e.g. nmethod entry barriers during
-  // normal execution). Therefore we align up by 2 so that nmethods encountered during
-  // concurrent marking are treated as if they were encountered in the inactive phase
-  // after that concurrent GC. Each GC increments the marking cycle twice - once when
-  // it starts and once when it ends. So we can only be sure there are no new continuations
-  // when they have not been encountered from before a GC to after a GC.
-  return CodeCache::marking_cycle() >= align_up(_marking_cycle, 2) + 2;
+bool nmethod::is_maybe_on_continuation_stack() {
+  if (!Continuations::enabled()) {
+    return false;
+  }
+
+  // If the condition below is true, it means that the nmethod was found to
+  // be alive the previous completed marking cycle.
+  return _gc_epoch >= Continuations::previous_completed_gc_marking_cycle();
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1247,8 +1263,8 @@ bool nmethod::can_convert_to_zombie() {
   // If an is_unloading() nmethod is still not_entrant, then it is not safe to
   // convert it to zombie due to GC unloading interactions. However, if it
   // has become unloaded, then it is okay to convert such nmethods to zombie.
-  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && is_not_on_continuation_stack() &&
-          !is_locked_by_vm() && (!is_unloading() || is_unloaded());
+  return stack_traversal_mark()+1 < NMethodSweeper::traversal_count() && !is_maybe_on_continuation_stack() &&
+         !is_locked_by_vm() && (!is_unloading() || is_unloaded());
 }
 
 void nmethod::inc_decompile_count() {
@@ -1947,7 +1963,7 @@ void nmethod::do_unloading(bool unloading_occurred) {
   }
 }
 
-void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
+void nmethod::oops_do(OopClosure* f, bool allow_dead) {
   // make sure the oops ready to receive visitors
   assert(allow_dead || is_alive(), "should not call follow on dead nmethod: %d", _state);
 
@@ -1963,7 +1979,7 @@ void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
         assert(1 == (r->oop_is_immediate()) +
                (r->oop_addr() >= oops_begin() && r->oop_addr() < oops_end()),
                "oop must be found in exactly one place");
-        if (r->oop_is_immediate() && (r->oop_value() != NULL || allow_null)) {
+        if (r->oop_is_immediate() && r->oop_value() != NULL) {
           f->do_oop(r->oop_addr());
         }
       }
@@ -1979,10 +1995,17 @@ void nmethod::oops_do(OopClosure* f, bool allow_dead, bool allow_null) {
 }
 
 void nmethod::follow_nmethod(OopIterateClosure* cl) {
+  // Process oops in the nmethod
   oops_do(cl);
+
+  // CodeCache sweeper support
   mark_as_maybe_on_continuation();
+
   BarrierSetNMethod* bs_nm = BarrierSet::barrier_set()->barrier_set_nmethod();
   bs_nm->disarm(this);
+
+  // There's an assumption made that this function is not used by GCs that
+  // relocate objects, and therefore we don't call fix_oop_relocations.
 }
 
 nmethod* volatile nmethod::_oops_do_mark_nmethods;

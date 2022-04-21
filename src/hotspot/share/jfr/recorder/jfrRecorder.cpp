@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,7 +32,6 @@
 #include "jfr/periodic/sampling/jfrThreadSampler.hpp"
 #include "jfr/recorder/jfrRecorder.hpp"
 #include "jfr/recorder/checkpoint/jfrCheckpointManager.hpp"
-#include "jfr/recorder/checkpoint/types/traceid/jfrTraceId.hpp"
 #include "jfr/recorder/repository/jfrRepository.hpp"
 #include "jfr/recorder/service/jfrEventThrottler.hpp"
 #include "jfr/recorder/service/jfrOptionSet.hpp"
@@ -42,7 +41,7 @@
 #include "jfr/recorder/storage/jfrStorage.hpp"
 #include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/recorder/stringpool/jfrStringPool.hpp"
-#include "jfr/support/jfrJavaThread.hpp"
+#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "jfr/writers/jfrJavaEventWriter.hpp"
 #include "logging/log.hpp"
@@ -198,10 +197,9 @@ bool JfrRecorder::on_create_vm_2() {
   if (is_cds_dump_requested()) {
     return true;
   }
-  if (!JfrTraceId::initialize()) {
-    return false;
-  }
   JavaThread* const thread = JavaThread::current();
+  JfrThreadLocal::assign_thread_id(thread, thread->jfr_thread_local());
+
   if (!JfrOptionSet::initialize(thread)) {
     return false;
   }
@@ -298,9 +296,6 @@ bool JfrRecorder::create_components() {
   if (!create_event_throttler()) {
     return false;
   }
-  if (!create_virtual_thread_support()) {
-    return false;
-  }
   return true;
 }
 
@@ -376,12 +371,6 @@ bool JfrRecorder::create_thread_sampling() {
 
 bool JfrRecorder::create_event_throttler() {
   return JfrEventThrottler::create();
-}
-
-bool JfrRecorder::create_virtual_thread_support() {
-  // bool parameter, notifyJvmti, enables jvmti events related to VirtualThreads.
-  // Thread start events hooks into some of these callbacks for JFR.
-  return JfrJavaThread::initialize(false);
 }
 
 void JfrRecorder::destroy_components() {

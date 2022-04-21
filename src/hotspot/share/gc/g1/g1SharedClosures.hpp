@@ -45,16 +45,12 @@ public:
   G1ParCopyClosure<G1BarrierNoOptRoots, should_mark> _oops_in_nmethod;
 
   G1CLDScanClosure                _clds;
-  G1CodeBlobClosure               _strong_codeblobs;
-  G1CodeBlobClosure               _weak_codeblobs;
+  G1CodeBlobClosure               _codeblobs;
 
   G1SharedClosures(G1CollectedHeap* g1h, G1ParScanThreadState* pss, bool process_only_dirty) :
     _oops(g1h, pss),
     _oops_in_cld(g1h, pss),
     _oops_in_nmethod(g1h, pss),
     _clds(&_oops_in_cld, process_only_dirty),
-    _strong_codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark, true),
-    _weak_codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark, false)
-
-    {}
+    _codeblobs(pss->worker_id(), &_oops_in_nmethod, should_mark) {}
 };

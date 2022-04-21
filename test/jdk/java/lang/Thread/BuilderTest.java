@@ -39,6 +39,9 @@ import static org.testng.Assert.*;
 
 public class BuilderTest {
 
+    /**
+     * Test Thread.ofPlatform to create platform threads.
+     */
     @Test
     public void testPlatformThread() throws Exception {
         Thread parent = Thread.currentThread();
@@ -87,6 +90,9 @@ public class BuilderTest {
         assertTrue(done3.get());
     }
 
+    /**
+     * Test Thread.ofVirtual to create virtual threads.
+     */
     @Test
     public void testVirtualThread() throws Exception {
         Thread parent = Thread.currentThread();
@@ -97,7 +103,7 @@ public class BuilderTest {
         Thread thread1 = builder.unstarted(() -> done1.set(true));
         assertTrue(thread1.isVirtual());
         assertTrue(thread1.getState() == Thread.State.NEW);
-        assertEquals(thread1.getName(), "<unnamed>");
+        assertTrue(thread1.getName().isEmpty());
         assertTrue(thread1.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread1.isDaemon());
         assertTrue(thread1.getPriority() == Thread.NORM_PRIORITY);
@@ -110,7 +116,7 @@ public class BuilderTest {
         Thread thread2 = builder.start(() -> done2.set(true));
         assertTrue(thread2.isVirtual());
         assertTrue(thread2.getState() != Thread.State.NEW);
-        assertEquals(thread2.getName(), "<unnamed>");
+        assertTrue(thread2.getName().isEmpty());
         assertTrue(thread2.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread2.isDaemon());
         assertTrue(thread2.getPriority() == Thread.NORM_PRIORITY);
@@ -122,7 +128,7 @@ public class BuilderTest {
         Thread thread3 = builder.factory().newThread(() -> done3.set(true));
         assertTrue(thread3.isVirtual());
         assertTrue(thread3.getState() == Thread.State.NEW);
-        assertEquals(thread3.getName(), "<unnamed>");
+        assertTrue(thread3.getName().isEmpty());
         assertTrue(thread3.getContextClassLoader() == parent.getContextClassLoader());
         assertTrue(thread3.isDaemon());
         assertTrue(thread3.getPriority() == Thread.NORM_PRIORITY);
@@ -131,7 +137,9 @@ public class BuilderTest {
         assertTrue(done3.get());
     }
 
-    // thread name
+    /**
+     * Test Thread.Builder.name.
+     */
     @Test
     public void testName1() {
         Thread.Builder builder = Thread.ofPlatform().name("duke");
@@ -202,7 +210,9 @@ public class BuilderTest {
         assertTrue(thread6.getName().equals("duke-105"));
     }
 
-    // ThreadGroup
+    /**
+     * Test Thread.Builder.OfPlatform.group.
+     */
     @Test
     public void testThreadGroup1() {
         ThreadGroup group = new ThreadGroup("groupies");
@@ -247,7 +257,9 @@ public class BuilderTest {
         }
     }
 
-    // priority
+    /**
+     * Test Thread.Builder.OfPlatform.priority.
+     */
     @Test
     public void testPriority1() {
         int priority = Thread.currentThread().getPriority();
@@ -295,17 +307,23 @@ public class BuilderTest {
         assertTrue(thread3.getPriority() == priority);
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
+    @Test
     public void testPriority4() {
-        Thread.ofPlatform().priority(Thread.MIN_PRIORITY - 1);
+        var builder = Thread.ofPlatform();
+        assertThrows(IllegalArgumentException.class,
+                     () -> builder.priority(Thread.MIN_PRIORITY - 1));
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
+    @Test
     public void testPriority5() {
-        Thread.ofPlatform().priority(Thread.MAX_PRIORITY + 1);
+        var builder = Thread.ofPlatform();
+        assertThrows(IllegalArgumentException.class,
+                     () -> builder.priority(Thread.MAX_PRIORITY + 1));
     }
 
-    // daemon status
+    /**
+     * Test Thread.Builder.OfPlatform.daemon.
+     */
     @Test
     public void testDaemon1() {
         Thread.Builder builder = Thread.ofPlatform().daemon(false);
@@ -334,7 +352,7 @@ public class BuilderTest {
 
     @Test
     public void testDaemon3() {
-        Thread.Builder builder = Thread.ofVirtual();
+        Thread.Builder builder = Thread.ofPlatform().daemon();
 
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
@@ -345,11 +363,44 @@ public class BuilderTest {
         assertTrue(thread3.isDaemon());
     }
 
-    // stack size
+    @Test
+    public void testDaemon4() {
+        Thread.Builder builder = Thread.ofPlatform();
+
+        Thread thread1 = builder.unstarted(() -> { });
+        Thread thread2 = builder.start(() -> { });
+        Thread thread3 = builder.factory().newThread(() -> { });
+
+        // daemon status should be inherited
+        boolean d = Thread.currentThread().isDaemon();
+        assertTrue(thread1.isDaemon() == d);
+        assertTrue(thread2.isDaemon() == d);
+        assertTrue(thread3.isDaemon() == d);
+    }
+
+    /**
+     * Test Thread.ofVirtual creates daemon threads.
+     */
+    @Test
+    public void testDaemon5() {
+        Thread.Builder builder = Thread.ofVirtual();
+
+        Thread thread1 = builder.unstarted(() -> { });
+        Thread thread2 = builder.start(() -> { });
+        Thread thread3 = builder.factory().newThread(() -> { });
+
+        // daemon status should always be true
+        assertTrue(thread1.isDaemon());
+        assertTrue(thread2.isDaemon());
+        assertTrue(thread3.isDaemon());
+    }
+
+    /**
+     * Test Thread.Builder.OfPlatform.stackSize.
+     */
     @Test
     public void testStackSize1() {
         Thread.Builder builder = Thread.ofPlatform().stackSize(1024*1024);
-
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
         Thread thread3 = builder.factory().newThread(() -> { });
@@ -358,18 +409,20 @@ public class BuilderTest {
     @Test
     public void testStackSize2() {
         Thread.Builder builder = Thread.ofPlatform().stackSize(0);
-
         Thread thread1 = builder.unstarted(() -> { });
         Thread thread2 = builder.start(() -> { });
         Thread thread3 = builder.factory().newThread(() -> { });
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
+    @Test
     public void testStackSize3() {
-        Thread.ofPlatform().stackSize(-1);
+        var builder = Thread.ofPlatform();
+        assertThrows(IllegalArgumentException.class, () -> builder.stackSize(-1));
     }
 
-    // uncaught exception handler
+    /**
+     * Test Thread.Builder.uncaughtExceptionHandler.
+     */
     @Test
     public void testUncaughtExceptionHandler1() throws Exception {
         class FooException extends RuntimeException { }
@@ -506,6 +559,9 @@ public class BuilderTest {
         assertTrue(done.get());
     }
 
+    /**
+     * Test Thread.Builder creates threads that allow thread locals.
+     */
     @Test
     public void testThreadLocals1() throws Exception {
         Thread.Builder builder = Thread.ofPlatform();
@@ -518,6 +574,10 @@ public class BuilderTest {
         testThreadLocals(builder);
     }
 
+    /**
+     * Test Thread.Builder creating threads that disallow or allow
+     * thread locals.
+     */
     @Test
     public void testThreadLocals3() throws Exception {
         Thread.Builder builder = Thread.ofPlatform();
@@ -576,6 +636,10 @@ public class BuilderTest {
         assertTrue(done.get());
     }
 
+    /**
+     * Tests that a builder creates threads that do not inherit the initial values
+     * of inheritable thread locals.
+     */
     private void testNoInheritedThreadLocals(Thread.Builder builder) throws Exception {
         Object value = new Object();
         INHERITED_LOCAL.set(value);
@@ -604,6 +668,10 @@ public class BuilderTest {
         assertTrue(done.get());
     }
 
+    /**
+     * Test Thread.Builder creating threads that inherit or do not inherit
+     * the initial values of inheritable thread locals.
+     */
     @Test
     public void testInheritedThreadLocals1() throws Exception {
         Thread.Builder builder = Thread.ofPlatform();
@@ -751,6 +819,10 @@ public class BuilderTest {
         }
     }
 
+    /**
+     * Test Thread.Builder creating threads that inherit or do not inherit
+     * the thread context class loader.
+     */
     @Test
     public void testContextClassLoader1() throws Exception {
         Thread.Builder builder = Thread.ofPlatform();
@@ -819,7 +891,9 @@ public class BuilderTest {
         testInheritContextClassLoader(builder);
     }
 
-    // test null parameters
+    /**
+     * Test NullPointerException.
+     */
     @Test
     public void testNulls1() {
         Thread.Builder.OfPlatform builder = Thread.ofPlatform();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2007, 2021, Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -78,32 +78,12 @@ frame frame::sender_for_nonentry_frame(RegisterMap *map) const {
   return frame(zeroframe()->next(), sender_sp());
 }
 
-frame frame::sender(RegisterMap* map) const {
-  // Default is not to follow arguments; the various
-  // sender_for_xxx methods update this accordingly.
-  map->set_include_argument_oops(false);
-
-  frame result = zeroframe()->is_entry_frame() ?
-                 sender_for_entry_frame(map) :
-                 sender_for_nonentry_frame(map);
-
-  if (map->process_frames()) {
-    StackWatermarkSet::on_iteration(map->thread(), result);
-  }
-
-  return result;
-}
-
 BasicObjectLock* frame::interpreter_frame_monitor_begin() const {
   return get_interpreterState()->monitor_base();
 }
 
 // Pointer beyond the "oldest/deepest" BasicObjectLock on stack.
-template BasicObjectLock* frame::interpreter_frame_monitor_end<true>() const;
-template BasicObjectLock* frame::interpreter_frame_monitor_end<false>() const;
-
-template <bool relative>
-inline BasicObjectLock* frame::interpreter_frame_monitor_end() const {
+BasicObjectLock* frame::interpreter_frame_monitor_end() const {
   return (BasicObjectLock*) get_interpreterState()->stack_base();
 }
 
@@ -240,10 +220,6 @@ BasicType frame::interpreter_frame_result(oop* oop_result,
   return type;
 }
 
-template intptr_t* frame::interpreter_frame_tos_at<false>(jint offset) const;
-template intptr_t* frame::interpreter_frame_tos_at<true >(jint offset) const;
-
-template <bool relative>
 intptr_t* frame::interpreter_frame_tos_at(jint offset) const {
   int index = (Interpreter::expr_offset_in_bytes(offset) / wordSize);
   return &interpreter_frame_tos_address()[index];
@@ -436,10 +412,6 @@ void ZeroFrame::identify_vp_word(int       frame_index,
 #ifndef PRODUCT
 
 void frame::describe_pd(FrameValues& values, int frame_no) {
-
-}
-
-void frame::describe_top_pd(FrameValues& values) {
 
 }
 

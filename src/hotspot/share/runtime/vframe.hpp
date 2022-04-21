@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,6 +53,7 @@
 // - BasicLock
 
 class StackFrameStream;
+class ContinuationEntry;
 
 class vframe: public ResourceObj {
  protected:
@@ -82,7 +83,6 @@ class vframe: public ResourceObj {
   const RegisterMap* register_map() const { return &_reg_map; }
   JavaThread*        thread()       const { return _thread;   }
   stackChunkOop      stack_chunk()  const { return _chunk(); /*_reg_map.stack_chunk();*/ }
-  oop                continuation() const { return stack_chunk() != NULL ? stack_chunk()->cont() : (oop)NULL; }
 
   // Returns the sender vframe
   virtual vframe* sender() const;
@@ -90,8 +90,8 @@ class vframe: public ResourceObj {
   // Returns the next javaVFrame on the stack (skipping all other kinds of frame)
   javaVFrame *java_sender() const;
 
-  // Call when resuming a walk (calling [java_]sender) on a frame we'e already walked past
-  void restore_register_map() const;
+  // Is the current frame the entry to a virtual thread's stack
+  bool is_vthread_entry() const;
 
   // Answers if the this is the top vframe in the frame, i.e., if the sender vframe
   // is in the caller frame
@@ -291,7 +291,7 @@ class vframeStreamCommon : StackObj {
   // Cached information
   Method* _method;
   int       _bci;
-  ContinuationEntry* _cont;
+  ContinuationEntry* _cont_entry;
 
   // Should VM activations be ignored or not
   bool _stop_at_java_call_stub;
@@ -329,6 +329,7 @@ class vframeStreamCommon : StackObj {
   }
 
   const RegisterMap* reg_map() { return &_reg_map; }
+  void dont_walk_cont() { _reg_map.set_walk_cont(false); }
 
   javaVFrame* asJavaVFrame();
 

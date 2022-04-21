@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -85,9 +85,10 @@ size_t G1FullGCCompactTask::G1CompactRegionClosure::apply(oop obj) {
 
   // copy object and reinit its mark
   HeapWord* obj_addr = cast_from_oop<HeapWord*>(obj);
-  assert(size <= INT_MAX, "sanity check");
-  assert(obj_addr != destination || size > (size_t)obj->compact_size((int)(uint)size), "everything in this pass should be moving or compressed in place");
-  obj->copy_conjoint_compact(destination); // TODO LOOM: see G1FullGCCompactionPoint::forward; Might want to reconsider compacting here.
+  assert(obj_addr != destination, "everything in this pass should be moving");
+  Copy::aligned_conjoint_words(obj_addr, destination, size);
+
+  // There is no need to transform stack chunks - marking already did that.
   cast_to_oop(destination)->init_mark();
   assert(cast_to_oop(destination)->klass() != NULL, "should have a class");
 

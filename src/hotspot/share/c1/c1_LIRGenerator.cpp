@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1314,17 +1314,6 @@ void LIRGenerator::do_getModifiers(Intrinsic* x) {
   __ branch_destination(L_done->label());
 }
 
-// Example: Thread.currentThread0()
-void LIRGenerator::do_currentThread0(Intrinsic* x) {
-  assert(x->number_of_arguments() == 0, "wrong type");
-  LIR_Opr temp = new_register(T_ADDRESS);
-  LIR_Opr reg = rlock_result(x);
-  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::threadObj_offset()), T_ADDRESS), temp);
-  // threadObj = ((OopHandle)_threadObj)->resolve();
-  access_load(IN_NATIVE, T_OBJECT,
-              LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
-}
-
 void LIRGenerator::do_getObjectSize(Intrinsic* x) {
   assert(x->number_of_arguments() == 3, "wrong type");
   LIR_Opr result_reg = rlock_result(x);
@@ -1429,26 +1418,26 @@ void LIRGenerator::do_getObjectSize(Intrinsic* x) {
 }
 
 void LIRGenerator::do_scopeLocalCache(Intrinsic* x) {
-  assert(x->number_of_arguments() == 0, "wrong type");
-  LIR_Opr temp = new_register(T_ADDRESS);
-  LIR_Opr reg = rlock_result(x);
-  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::scopeLocalCache_offset()), T_ADDRESS), temp);
-  // threadObj = ((OopHandle)_vthread)->resolve();
-  access_load(IN_NATIVE, T_OBJECT,
-              LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
+  do_JavaThreadField(x, JavaThread::scopeLocalCache_offset());
 }
 
+// Example: Thread.currentCarrierThread()
+void LIRGenerator::do_currentCarrierThread(Intrinsic* x) {
+  do_JavaThreadField(x, JavaThread::threadObj_offset());
+}
 
 void LIRGenerator::do_vthread(Intrinsic* x) {
+  do_JavaThreadField(x, JavaThread::vthread_offset());
+}
+
+void LIRGenerator::do_JavaThreadField(Intrinsic* x, ByteSize offset) {
   assert(x->number_of_arguments() == 0, "wrong type");
   LIR_Opr temp = new_register(T_ADDRESS);
   LIR_Opr reg = rlock_result(x);
-  __ move(new LIR_Address(getThreadPointer(), in_bytes(JavaThread::vthread_offset()), T_ADDRESS), temp);
-  // threadObj = ((OopHandle)_vthread)->resolve();
+  __ move(new LIR_Address(getThreadPointer(), in_bytes(offset), T_ADDRESS), temp);
   access_load(IN_NATIVE, T_OBJECT,
               LIR_OprFact::address(new LIR_Address(temp, T_OBJECT)), reg);
 }
-
 
 void LIRGenerator::do_RegisterFinalizer(Intrinsic* x) {
   assert(x->number_of_arguments() == 1, "wrong type");
@@ -2909,7 +2898,6 @@ void LIRGenerator::do_IfOp(IfOp* x) {
 #ifdef JFR_HAVE_INTRINSICS
 
 void LIRGenerator::do_getEventWriter(Intrinsic* x) {
-  LabelObj* L_NULL = new LabelObj();
   BasicTypeList signature(0);
   CallingConvention* cc = frame_map()->c_calling_convention(&signature);
   LIR_Opr reg = result_register_for(x->type());
@@ -2952,7 +2940,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
     do_getEventWriter(x);
     break;
   case vmIntrinsics::_counterTime:
-    do_RuntimeCall(CAST_FROM_FN_PTR(address, JFR_TIME_FUNCTION), x);
+    do_RuntimeCall(CAST_FROM_FN_PTR(address, JfrTime::time_function()), x);
     break;
 #endif
 
@@ -2970,7 +2958,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_getModifiers:   do_getModifiers(x);  break;
   case vmIntrinsics::_getClass:       do_getClass(x);      break;
   case vmIntrinsics::_getObjectSize:  do_getObjectSize(x); break;
-  case vmIntrinsics::_currentThread0: do_currentThread0(x); break;
+  case vmIntrinsics::_currentCarrierThread: do_currentCarrierThread(x); break;
   case vmIntrinsics::_currentThread:  do_vthread(x);       break;
   case vmIntrinsics::_scopeLocalCache: do_scopeLocalCache(x); break;
 

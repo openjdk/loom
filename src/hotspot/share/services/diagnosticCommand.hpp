@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -858,6 +858,28 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class ClassesDCmd : public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _verbose;
+public:
+  ClassesDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "VM.classes";
+  }
+  static const char* description() {
+    return "Print all loaded classes";
+  }
+  static const char* impact() {
+      return "Medium: Depends on number of loaded classes.";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission",
+                        "monitor", NULL};
+    return p;
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 #if INCLUDE_JVMTI
 class DebugOnCmdStartDCmd : public DCmd {
 public:
@@ -902,7 +924,7 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class JavaThreadDumpDCmd : public DCmdWithParser {
+class ThreadDumpToFileDCmd : public DCmdWithParser {
 private:
   void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS);
 protected:
@@ -910,12 +932,12 @@ protected:
   DCmdArgument<char*> _format;
   DCmdArgument<char*> _filepath;
 public:
-  JavaThreadDumpDCmd(outputStream *output, bool heap);
+  ThreadDumpToFileDCmd(outputStream *output, bool heap);
   static const char *name() {
-    return "JavaThread.dump";
+    return "Thread.dump_to_file";
   }
   static const char *description() {
-    return "Java thread dump in plain text or JSON format.";
+    return "Dump threads, with stack traces, to a file in plain text or JSON format.";
   }
   static const char* impact() {
     return "Medium: Depends on the number of threads.";

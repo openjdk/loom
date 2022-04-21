@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
 #include "jvm.h"
 #include "classfile/classLoaderHierarchyDCmd.hpp"
 #include "classfile/classLoaderStats.hpp"
+#include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmClasses.hpp"
@@ -102,6 +103,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassHistogramDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<SystemDictionaryDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassHierarchyDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassesDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<SymboltableDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<StringtableDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<metaspace::MetaspaceDCmd>(full_export, true, false));
@@ -114,6 +116,7 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JVMTIDataDumpDCmd>(full_export, true, false));
 #endif // INCLUDE_JVMTI
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpToFileDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderStatsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
@@ -139,8 +142,6 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStartLocalDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStopRemoteDCmd>(jmx_agent_export_flags, true,false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JMXStatusDCmd>(jmx_agent_export_flags, true,false));
-
-  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<JavaThreadDumpDCmd>(full_export, true, false));
 
   // Debug on cmd (only makes sense with JVMTI since the agentlib needs it).
 #if INCLUDE_JVMTI
@@ -956,6 +957,41 @@ void TouchedMethodsDCmd::execute(DCmdSource source, TRAPS) {
   VMThread::execute(&dumper);
 }
 
+ClassesDCmd::ClassesDCmd(outputStream* output, bool heap) :
+                                     DCmdWithParser(output, heap),
+  _verbose("-verbose",
+           "Dump the detailed content of a Java class. "
+           "Some classes are annotated with flags: "
+           "F = has, or inherits, a non-empty finalize method, "
+           "f = has final method, "
+           "W = methods rewritten, "
+           "C = marked with @Contended annotation, "
+           "R = has been redefined, "
+           "S = is shared class",
+           "BOOLEAN", false, "false") {
+  _dcmdparser.add_dcmd_option(&_verbose);
+}
+
+class VM_PrintClasses : public VM_Operation {
+private:
+  outputStream* _out;
+  bool _verbose;
+public:
+  VM_PrintClasses(outputStream* out, bool verbose) : _out(out), _verbose(verbose) {}
+
+  virtual VMOp_Type type() const { return VMOp_PrintClasses; }
+
+  virtual void doit() {
+    PrintClassClosure closure(_out, _verbose);
+    ClassLoaderDataGraph::classes_do(&closure);
+  }
+};
+
+void ClassesDCmd::execute(DCmdSource source, TRAPS) {
+  VM_PrintClasses vmop(output(), _verbose.is_set());
+  VMThread::execute(&vmop);
+}
+
 #if INCLUDE_CDS
 DumpSharedArchiveDCmd::DumpSharedArchiveDCmd(outputStream* output, bool heap) :
                                      DCmdWithParser(output, heap),
@@ -1052,8 +1088,8 @@ void DebugOnCmdStartDCmd::execute(DCmdSource source, TRAPS) {
 }
 #endif // INCLUDE_JVMTI
 
-JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
-                                       DCmdWithParser(output, heap),
+ThreadDumpToFileDCmd::ThreadDumpToFileDCmd(outputStream* output, bool heap) :
+                                           DCmdWithParser(output, heap),
   _overwrite("-overwrite", "May overwrite existing file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
   _filepath("filepath", "The file path to the output file", "STRING", true) {
@@ -1062,9 +1098,9 @@ JavaThreadDumpDCmd::JavaThreadDumpDCmd(outputStream* output, bool heap) :
   _dcmdparser.add_dcmd_argument(&_filepath);
 }
 
-int JavaThreadDumpDCmd::num_arguments() {
+int ThreadDumpToFileDCmd::num_arguments() {
   ResourceMark rm;
-  JavaThreadDumpDCmd* dcmd = new JavaThreadDumpDCmd(NULL, false);
+  ThreadDumpToFileDCmd* dcmd = new ThreadDumpToFileDCmd(NULL, false);
   if (dcmd != NULL) {
     DCmdMark mark(dcmd);
     return dcmd->_dcmdparser.num_arguments();
@@ -1073,7 +1109,7 @@ int JavaThreadDumpDCmd::num_arguments() {
   }
 }
 
-void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
+void ThreadDumpToFileDCmd::execute(DCmdSource source, TRAPS) {
   bool json = (_format.value() != NULL) && (strcmp(_format.value(), "json") == 0);
   char* path = _filepath.value();
   bool overwrite = _overwrite.value();
@@ -1081,7 +1117,7 @@ void JavaThreadDumpDCmd::execute(DCmdSource source, TRAPS) {
   dumpToFile(name, vmSymbols::string_bool_byte_array_signature(), path, overwrite, CHECK);
 }
 
-void JavaThreadDumpDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS) {
+void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 

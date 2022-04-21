@@ -51,7 +51,7 @@
  *   checkStatus(() {                                                                                    :
  *     enter(data.monitor)                                                                               :
  *     if data.thread_state == NEW {                                                                     :
- *       nsk_jvmti_runAgentThread                                                                        :
+ *       run_agent_thread                                                                        :
  *       :                                          // this set is in the agent wrapper:                 :
  *       :                                          data.thread_state = RUNNABLE                         :
  *       :                                          agentProc() {                                        :

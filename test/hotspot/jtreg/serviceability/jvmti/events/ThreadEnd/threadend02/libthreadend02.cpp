@@ -53,14 +53,14 @@ enableEvent(jvmtiEventMode enable, jvmtiEvent event) {
   jvmtiError err;
 
   if (enable == JVMTI_ENABLE) {
-    NSK_DISPLAY1("enabling %s\n", TranslateEvent(event));
+    LOG("enabling %s\n", TranslateEvent(event));
   } else {
-    NSK_DISPLAY1("disabling %s\n", TranslateEvent(event));
+    LOG("disabling %s\n", TranslateEvent(event));
   }
 
   err = jvmti->SetEventNotificationMode(enable, event, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return NSK_FALSE;
   }
 
@@ -74,9 +74,9 @@ int checkEvents() {
   int result = NSK_TRUE;
 
   if (eventCount == 0) {
-    nsk_jvmti_setFailStatus();
-    NSK_COMPLAIN0("Number of THREAD_END events must be greater than 0\n");
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
+    COMPLAIN("Number of THREAD_END events must be greater than 0\n");
+    set_agent_fail_status();
     result = NSK_FALSE;
   }
 
@@ -107,23 +107,23 @@ setCallBacks() {
 static void JNICALL
 agentProc(jvmtiEnv* jvmti, JNIEnv* agentJNI, void* arg) {
 
-  NSK_DISPLAY0("Wait for debuggee to become ready\n");
-  if (!nsk_jvmti_waitForSync(timeout))
+  LOG("Wait for debuggee to become ready\n");
+  if (!agent_wait_for_sync(timeout))
     return;
 
-  NSK_DISPLAY0("Let debuggee to continue\n");
-  if (!nsk_jvmti_resumeSync())
+  LOG("Let debuggee to continue\n");
+  if (!agent_resume_sync())
     return;
 
-  if (!nsk_jvmti_waitForSync(timeout))
+  if (!agent_wait_for_sync(timeout))
     return;
 
   if (!checkEvents()) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
   }
 
-  NSK_DISPLAY0("Let debuggee to finish\n");
-  if (!nsk_jvmti_resumeSync())
+  LOG("Let debuggee to finish\n");
+  if (!agent_resume_sync())
     return;
 
 }
@@ -165,12 +165,12 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   }
 
   if (!enableEvent(JVMTI_ENABLE, JVMTI_EVENT_THREAD_END)) {
-    NSK_COMPLAIN0("Events could not be enabled");
-    nsk_jvmti_setFailStatus();
+    COMPLAIN("Events could not be enabled");
+    set_agent_fail_status();
     return JNI_ERR;
   }
 
-  nsk_jvmti_setAgentProc(agentProc, NULL);
+  set_agent_proc(agentProc, NULL);
 
   return JNI_OK;
 }

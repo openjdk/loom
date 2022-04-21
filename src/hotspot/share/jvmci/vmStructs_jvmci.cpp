@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -158,7 +158,6 @@
   nonstatic_field(InstanceKlass,               _constants,                                    ConstantPool*)                         \
   nonstatic_field(InstanceKlass,               _init_state,                                   u1)                                    \
   nonstatic_field(InstanceKlass,               _init_thread,                                  Thread*)                               \
-  nonstatic_field(InstanceKlass,               _kind,                                         u1)                                    \
   nonstatic_field(InstanceKlass,               _misc_flags,                                   u2)                                    \
   nonstatic_field(InstanceKlass,               _annotations,                                  Annotations*)                          \
                                                                                                                                      \
@@ -171,8 +170,8 @@
   nonstatic_field(JVMCICompileState,           _jvmti_can_pop_frame,                          jbyte)                                 \
   nonstatic_field(JVMCICompileState,           _compilation_ticks,                            jint)                                  \
                                                                                                                                      \
-  nonstatic_field(JavaThread,                  _threadObj,                                    OopHandle)                                   \
-  nonstatic_field(JavaThread,                  _vthread,                                      OopHandle)                                   \
+  nonstatic_field(JavaThread,                  _threadObj,                                    OopHandle)                             \
+  nonstatic_field(JavaThread,                  _vthread,                                      OopHandle)                             \
   nonstatic_field(JavaThread,                  _anchor,                                       JavaFrameAnchor)                       \
   nonstatic_field(JavaThread,                  _vm_result,                                    oop)                                   \
   nonstatic_field(JavaThread,                  _stack_overflow_state._stack_overflow_limit,   address)                               \
@@ -192,7 +191,7 @@
   nonstatic_field(JavaThread,                  _jni_environment,                              JNIEnv)                                \
   nonstatic_field(JavaThread,                  _poll_data,                                    SafepointMechanism::ThreadData)        \
   nonstatic_field(JavaThread,                  _stack_overflow_state._reserved_stack_activation, address)                            \
-  nonstatic_field(JavaThread,                  _held_monitor_count,                           int)                               \
+  nonstatic_field(JavaThread,                  _held_monitor_count,                           int)                                   \
                                                                                                                                      \
   static_field(java_lang_Class,                _klass_offset,                                 int)                                   \
   static_field(java_lang_Class,                _array_klass_offset,                           int)                                   \
@@ -315,12 +314,16 @@
   static_field(StubRoutines,                _base64_encodeBlock,                              address)                               \
   static_field(StubRoutines,                _base64_decodeBlock,                              address)                               \
   static_field(StubRoutines,                _ghash_processBlocks,                             address)                               \
+  static_field(StubRoutines,                _md5_implCompress,                                address)                               \
+  static_field(StubRoutines,                _md5_implCompressMB,                              address)                               \
   static_field(StubRoutines,                _sha1_implCompress,                               address)                               \
   static_field(StubRoutines,                _sha1_implCompressMB,                             address)                               \
   static_field(StubRoutines,                _sha256_implCompress,                             address)                               \
   static_field(StubRoutines,                _sha256_implCompressMB,                           address)                               \
   static_field(StubRoutines,                _sha512_implCompress,                             address)                               \
   static_field(StubRoutines,                _sha512_implCompressMB,                           address)                               \
+  static_field(StubRoutines,                _sha3_implCompress,                               address)                               \
+  static_field(StubRoutines,                _sha3_implCompressMB,                             address)                               \
   static_field(StubRoutines,                _updateBytesCRC32,                                address)                               \
   static_field(StubRoutines,                _crc_table_adr,                                   address)                               \
   static_field(StubRoutines,                _crc32c_table_addr,                               address)                               \
@@ -744,6 +747,9 @@
 
 #define VM_STRUCTS_CPU(nonstatic_field, static_field, unchecked_nonstatic_field, volatile_nonstatic_field, nonproduct_nonstatic_field, c2_nonstatic_field, unchecked_c1_static_field, unchecked_c2_static_field) \
   static_field(VM_Version, _zva_length, int)                            \
+  static_field(StubRoutines::aarch64, _count_positives, address)        \
+  static_field(StubRoutines::aarch64, _count_positives_long, address)   \
+  static_field(VM_Version, _rop_protection, bool)                       \
   volatile_nonstatic_field(JavaFrameAnchor, _last_Java_fp, intptr_t*)
 
 #define DECLARE_INT_CPU_FEATURE_CONSTANT(id, name, bit) GENERATE_VM_INT_CONSTANT_ENTRY(VM_Version::CPU_##id)

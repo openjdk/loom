@@ -54,24 +54,44 @@ inline void frame::find_codeblob_and_set_pc_and_deopt_state(address pc) {
 // Constructors
 
 // Initialize all fields, _unextended_sp will be adjusted in find_codeblob_and_set_pc_and_deopt_state.
-inline frame::frame() : _sp(NULL), _pc(NULL), _cb(NULL), _deopt_state(unknown), _unextended_sp(NULL), _fp(NULL) {}
+inline frame::frame() : _sp(NULL), _pc(NULL), _cb(NULL), _deopt_state(unknown), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
+                        _unextended_sp(NULL), _fp(NULL) {}
 
-inline frame::frame(intptr_t* sp) : _sp(sp), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
+                        _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)own_abi()->return_pc);
 }
 
-inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _unextended_sp(sp) {
+inline frame::frame(intptr_t* sp, address pc) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                        _frame_index(-1),
+#endif
+                        _unextended_sp(sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // Also sets _fp and adjusts _unextended_sp.
 }
 
-inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp), _unextended_sp(unextended_sp) {
+inline frame::frame(intptr_t* sp, address pc, intptr_t* unextended_sp) : _sp(sp), _on_heap(false),
+#ifdef ASSERT
+                                                                         _frame_index(-1),
+#endif
+                                                                         _unextended_sp(unextended_sp) {
   find_codeblob_and_set_pc_and_deopt_state(pc); // Also sets _fp and adjusts _unextended_sp.
 }
 
 // Generic constructor. Used by pns() in debug.cpp only
 #ifndef PRODUCT
 inline frame::frame(void* sp, void* pc, void* unextended_sp) :
-  _sp((intptr_t*)sp), _pc(NULL), _cb(NULL), _unextended_sp((intptr_t*)unextended_sp) {
+  _sp((intptr_t*)sp), _pc(NULL), _cb(NULL), _on_heap(false),
+#ifdef ASSERT
+  _frame_index(-1),
+#endif
+  _unextended_sp((intptr_t*)unextended_sp) {
   find_codeblob_and_set_pc_and_deopt_state((address)pc); // Also sets _fp and adjusts _unextended_sp.
 }
 #endif
@@ -155,6 +175,10 @@ inline intptr_t* frame::link() const {
   return (intptr_t*) callers_abi()->callers_sp;
 }
 
+inline intptr_t* frame::link_or_null() const {
+  return link();
+}
+
 inline intptr_t** frame::interpreter_frame_locals_addr() const {
   return (intptr_t**) &(ijava_state()->locals);
 }
@@ -168,7 +192,6 @@ inline intptr_t* frame::interpreter_frame_mdp_addr() const {
 }
 
 // Bottom(base) of the expression stack (highest address).
-template <bool relative>
 inline intptr_t* frame::interpreter_frame_expression_stack() const {
   return (intptr_t*)interpreter_frame_monitor_end() - 1;
 }
@@ -202,7 +225,6 @@ inline intptr_t** frame::interpreter_frame_esp_addr() const {
 }
 
 // top of expression stack (lowest address)
-template <bool relative>
 inline intptr_t* frame::interpreter_frame_tos_address() const {
   return *interpreter_frame_esp_addr() + 1;
 }
@@ -270,11 +292,11 @@ inline JavaCallWrapper** frame::entry_frame_call_wrapper_addr() const {
 }
 
 inline oop frame::saved_oop_result(RegisterMap* map) const {
-  return *((oop*) map->location(Z_R2->as_VMReg(), (intptr_t*) NULL));  // R2 is return register.
+  return *((oop*) map->location(Z_R2->as_VMReg(), nullptr));  // R2 is return register.
 }
 
 inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
-  *((oop*) map->location(Z_R2->as_VMReg(), (intptr_t*) NULL)) = obj;  // R2 is return register.
+  *((oop*) map->location(Z_R2->as_VMReg(), nullptr)) = obj;  // R2 is return register.
 }
 
 inline intptr_t* frame::real_fp() const {
@@ -295,7 +317,6 @@ inline void frame::interpreted_frame_oop_map(InterpreterOopMap* mask) const {
   Unimplemented();
 }
 
-template <bool relative>
 inline intptr_t* frame::interpreter_frame_last_sp() const {
   Unimplemented();
   return NULL;
@@ -304,11 +325,6 @@ inline intptr_t* frame::interpreter_frame_last_sp() const {
 inline int frame::sender_sp_ret_address_offset() {
   Unimplemented();
   return 0;
-}
-
-template <typename RegisterMapT>
-void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
-  Unimplemented();
 }
 
 inline void frame::set_unextended_sp(intptr_t* value) {
@@ -321,6 +337,54 @@ inline int frame::offset_unextended_sp() const {
 }
 
 inline void frame::set_offset_unextended_sp(int value) {
+  Unimplemented();
+}
+
+//------------------------------------------------------------------------------
+// frame::sender
+
+inline frame frame::sender(RegisterMap* map) const {
+  // Default is we don't have to follow them. The sender_for_xxx will
+  // update it accordingly.
+  map->set_include_argument_oops(false);
+
+  if (is_entry_frame()) {
+    return sender_for_entry_frame(map);
+  }
+  if (is_interpreted_frame()) {
+    return sender_for_interpreter_frame(map);
+  }
+  assert(_cb == CodeCache::find_blob(pc()),"Must be the same");
+  if (_cb != NULL) return sender_for_compiled_frame(map);
+
+  // Must be native-compiled frame, i.e. the marshaling code for native
+  // methods that exists in the core system.
+  return frame(sender_sp(), sender_pc());
+}
+
+inline frame frame::sender_for_compiled_frame(RegisterMap *map) const {
+  assert(map != NULL, "map must be set");
+  // Frame owned by compiler.
+
+  address pc = *compiled_sender_pc_addr(_cb);
+  frame caller(compiled_sender_sp(_cb), pc);
+
+  // Now adjust the map.
+
+  // Get the rest.
+  if (map->update_map()) {
+    // Tell GC to use argument oopmaps for some runtime stubs that need it.
+    map->set_include_argument_oops(_cb->caller_must_gc_arguments(map->thread()));
+    if (_cb->oop_maps() != NULL) {
+      OopMapSet::update_register_map(this, map);
+    }
+  }
+
+  return caller;
+}
+
+template <typename RegisterMapT>
+void frame::update_map_with_saved_link(RegisterMapT* map, intptr_t** link_addr) {
   Unimplemented();
 }
 

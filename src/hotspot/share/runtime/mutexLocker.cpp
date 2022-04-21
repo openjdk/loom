@@ -53,9 +53,11 @@ Mutex*   JfieldIdCreation_lock        = NULL;
 Monitor* JNICritical_lock             = NULL;
 Mutex*   JvmtiThreadState_lock        = NULL;
 Monitor* EscapeBarrier_lock           = NULL;
-Monitor* JvmtiVTMT_lock               = NULL;
+Monitor* JvmtiVTMSTransition_lock     = NULL;
 Monitor* Heap_lock                    = NULL;
-Mutex*   ExpandHeap_lock              = NULL;
+#ifdef INCLUDE_PARALLELGC
+Mutex*   PSOldGenExpand_lock      = NULL;
+#endif
 Mutex*   AdapterHandlerLibrary_lock   = NULL;
 Mutex*   SignatureHandlerLibrary_lock = NULL;
 Mutex*   VtableStubs_lock             = NULL;
@@ -130,6 +132,8 @@ Monitor* JfrThreadSampler_lock        = NULL;
 Mutex*   UnsafeJlong_lock             = NULL;
 #endif
 Mutex*   CodeHeapStateAnalytics_lock  = NULL;
+
+Monitor* ContinuationRelativize_lock  = NULL;
 
 Mutex*   Metaspace_lock               = NULL;
 Monitor* MetaspaceCritical_lock       = NULL;
@@ -288,7 +292,7 @@ void mutex_init() {
 
   def(JvmtiThreadState_lock        , PaddedMutex  , safepoint);   // Used by JvmtiThreadState/JvmtiEventController
   def(EscapeBarrier_lock           , PaddedMonitor, nosafepoint); // Used to synchronize object reallocation/relocking triggered by JVMTI
-  def(JvmtiVTMT_lock               , PaddedMonitor, nosafepoint); // used for Virtual Thread Mount Transition management
+  def(JvmtiVTMSTransition_lock     , PaddedMonitor, nosafepoint); // used for Virtual Thread Mount State transition management
   def(Management_lock              , PaddedMutex  , safepoint);   // used for JVM management
 
   def(ConcurrentGCBreakpoints_lock , PaddedMonitor, safepoint, true);
@@ -314,6 +318,8 @@ void mutex_init() {
 #ifndef SUPPORTS_NATIVE_CX8
   def(UnsafeJlong_lock             , PaddedMutex  , nosafepoint);
 #endif
+
+  def(ContinuationRelativize_lock  , PaddedMonitor, nosafepoint-3);
 
   def(CodeHeapStateAnalytics_lock  , PaddedMutex  , safepoint);
   def(NMethodSweeperStats_lock     , PaddedMutex  , nosafepoint);
@@ -360,7 +366,11 @@ void mutex_init() {
     defl(G1OldGCCount_lock         , PaddedMonitor, Threads_lock, true);
   }
   defl(CompileTaskAlloc_lock       , PaddedMutex ,  MethodCompileQueue_lock);
-  defl(ExpandHeap_lock             , PaddedMutex ,  Heap_lock, true);
+#ifdef INCLUDE_PARALLELGC
+  if (UseParallelGC) {
+    defl(PSOldGenExpand_lock   , PaddedMutex , Heap_lock, true);
+  }
+#endif
   defl(OopMapCacheAlloc_lock       , PaddedMutex ,  Threads_lock, true);
   defl(Module_lock                 , PaddedMutex ,  ClassLoaderDataGraph_lock);
   defl(SystemDictionary_lock       , PaddedMonitor, Module_lock);

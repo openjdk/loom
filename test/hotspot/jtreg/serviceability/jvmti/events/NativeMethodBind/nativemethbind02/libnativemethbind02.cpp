@@ -94,7 +94,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
   LOG("VMDeath event received\n");
 
   if (wrongBindEv != 0) {
-    NSK_COMPLAIN1(
+    COMPLAIN(
         "TEST FAILED: there are %d NativeMethodBind events\n"
         "sent during non-start or non-live phase of the VM execution\n",
         wrongBindEv);

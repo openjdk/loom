@@ -45,6 +45,8 @@
 #include "oops/compiledICHolder.hpp"
 #include "oops/klass.inline.hpp"
 #include "prims/methodHandles.hpp"
+#include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/jniHandles.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/sharedRuntime.hpp"
@@ -175,10 +177,7 @@ PRAGMA_DIAG_PUSH
 PRAGMA_NONNULL_IGNORED
 OopMap* RegisterSaver::save_live_registers(MacroAssembler* masm, int additional_frame_words, int* total_frame_words, bool save_vectors) {
   int off = 0;
-  int num_xmm_regs = XMMRegisterImpl::number_of_registers;
-  if (UseAVX < 3) {
-    num_xmm_regs = num_xmm_regs/2;
-  }
+  int num_xmm_regs = XMMRegisterImpl::available_xmm_registers();
 #if COMPILER2_OR_JVMCI
   if (save_vectors && UseAVX == 0) {
     save_vectors = false; // vectors larger than 16 byte long are supported only with AVX
@@ -368,10 +367,7 @@ OopMap* RegisterSaver::save_live_registers(MacroAssembler* masm, int additional_
 PRAGMA_DIAG_POP
 
 void RegisterSaver::restore_live_registers(MacroAssembler* masm, bool restore_vectors) {
-  int num_xmm_regs = XMMRegisterImpl::number_of_registers;
-  if (UseAVX < 3) {
-    num_xmm_regs = num_xmm_regs/2;
-  }
+  int num_xmm_regs = XMMRegisterImpl::available_xmm_registers();
   if (frame::arg_reg_save_area_bytes != 0) {
     // Pop arg register save area
     __ addptr(rsp, frame::arg_reg_save_area_bytes);
@@ -1438,9 +1434,10 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots);
 void fill_continuation_entry(MacroAssembler* masm);
 void continuation_enter_cleanup(MacroAssembler* masm);
 
-// enterSpecial(Continuation c, boolean isContinue)
+// enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread)
 // On entry: c_rarg1 -- the continuation object
 //           c_rarg2 -- isContinue
+//           c_rarg3 -- isVirtualThread
 static void gen_continuation_enter(MacroAssembler* masm,
                                  const methodHandle& method,
                                  const BasicType* sig_bt,
@@ -1459,6 +1456,9 @@ static void gen_continuation_enter(MacroAssembler* masm,
   Label call_thaw, exit;
 
   __ push(rbp);
+  if (PreserveFramePointer) {
+    __ mov(rbp, rsp);
+  }
 
   //BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
   //bs->nmethod_entry_barrier(masm);
@@ -1505,7 +1505,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
   exception_offset = __ pc() - start;
 
   continuation_enter_cleanup(masm);
-  __ addptr(rsp, 1*wordSize);
+  __ pop(rbp);
 
   __ movptr(rbx, rax); // save the exception
   __ movptr(c_rarg0, Address(rsp, 0));
@@ -2086,7 +2086,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
 
     // Slow path will re-enter here
     __ bind(lock_done);
-    // __ inc_held_monitor_count(r15_thread);
   }
 
   // Finally just about ready to make the JNI call
@@ -2223,7 +2222,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     }
 
     __ bind(done);
-    // __ dec_held_monitor_count(r15_thread);
   }
   {
     SkipIfEqual skip(masm, &DTraceMethodProbes, false);
@@ -3132,7 +3130,7 @@ RuntimeStub* SharedRuntime::generate_resolve_blob(address destination, const cha
   // allocate space for the code
   ResourceMark rm;
 
-  CodeBuffer buffer(name, 1000, 512);
+  CodeBuffer buffer(name, 1200, 512);
   MacroAssembler* masm                = new MacroAssembler(&buffer);
 
   int frame_size_in_words;

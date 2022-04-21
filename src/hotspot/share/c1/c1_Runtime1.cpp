@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -59,7 +59,6 @@
 #include "oops/oop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "runtime/atomic.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
@@ -324,7 +323,7 @@ const char* Runtime1::name_for_address(address entry) {
   FUNCTION_CASE(entry, is_instance_of);
   FUNCTION_CASE(entry, trace_block_entry);
 #ifdef JFR_HAVE_INTRINSICS
-  FUNCTION_CASE(entry, JFR_TIME_FUNCTION);
+  FUNCTION_CASE(entry, JfrTime::time_function());
   FUNCTION_CASE(entry, StubRoutines::jfr_get_event_writer());
 #endif
   FUNCTION_CASE(entry, StubRoutines::updateBytesCRC32());
@@ -1013,6 +1012,7 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, Runtime1::StubID stub_
         break;
       case Bytecodes::_ldc:
       case Bytecodes::_ldc_w:
+      case Bytecodes::_ldc2_w:
         {
           Bytecode_loadconstant cc(caller_method, bci);
           oop m = cc.resolve_constant(CHECK);
@@ -1157,7 +1157,6 @@ JRT_ENTRY(void, Runtime1::patch_code(JavaThread* current, Runtime1::StubID stub_
               assert(load_klass != NULL, "klass not set");
               n_copy->set_data((intx) (load_klass));
             } else {
-              assert(mirror() != NULL, "klass not set");
               // Don't need a G1 pre-barrier here since we assert above that data isn't an oop.
               n_copy->set_data(cast_from_oop<intx>(mirror()));
             }

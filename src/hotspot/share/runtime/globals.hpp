@@ -686,6 +686,14 @@ const intx ObjectAlignmentInBytes = 8;
                "Disable the use of stack guard pages if the JVM is loaded " \
                "on the primordial process thread")                          \
                                                                             \
+  product(bool, PostVirtualThreadCompatibleLifecycleEvents, true, EXPERIMENTAL, \
+               "Post virtual thread ThreadStart and ThreadEnd events for "  \
+               "virtual thread unaware agents")                             \
+                                                                            \
+  product(bool, DoJVMTIVirtualThreadTransitions, true, EXPERIMENTAL,        \
+               "Do JVMTI virtual thread mount/unmount transitions "         \
+               "(disabling this flag implies no JVMTI events are posted)")  \
+                                                                            \
   /* notice: the max range value here is max_jint, not max_intx  */         \
   /* because of overflow issue                                   */         \
   product(intx, AsyncDeflationInterval, 250, DIAGNOSTIC,                    \
@@ -1522,19 +1530,19 @@ const intx ObjectAlignmentInBytes = 8;
           "Stack space (bytes) required for JVM_InvokeMethod to complete")  \
                                                                             \
   /* code cache parameters                                    */            \
-  develop_pd(uintx, CodeCacheSegmentSize,                                   \
+  product_pd(uintx, CodeCacheSegmentSize, EXPERIMENTAL,                     \
           "Code cache segment size (in bytes) - smallest unit of "          \
           "allocation")                                                     \
           range(1, 1024)                                                    \
           constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo)         \
                                                                             \
-  develop_pd(intx, CodeEntryAlignment,                                      \
+  product_pd(intx, CodeEntryAlignment, EXPERIMENTAL,                        \
           "Code entry alignment for generated code (in bytes)")             \
           constraint(CodeEntryAlignmentConstraintFunc, AfterErgo)           \
                                                                             \
   product_pd(intx, OptoLoopAlignment,                                       \
           "Align inner loops to zero relative to this modulus")             \
-          range(1, 16)                                                      \
+          range(1, 128)                                                     \
           constraint(OptoLoopAlignmentConstraintFunc, AfterErgo)            \
                                                                             \
   product_pd(uintx, InitialCodeCacheSize,                                   \
@@ -1861,16 +1869,18 @@ const intx ObjectAlignmentInBytes = 8;
           "Pause and wait for keypress on exit if a debugger is attached")  \
                                                                             \
   product(bool, ExtendedDTraceProbes,    false,                             \
-          "Enable performance-impacting dtrace probes")                     \
+          "(Deprecated) Enable performance-impacting dtrace probes. "       \
+          "Use the combination of -XX:+DTraceMethodProbes, "                \
+          "-XX:+DTraceAllocProbes and -XX:+DTraceMonitorProbes instead.")   \
                                                                             \
   product(bool, DTraceMethodProbes, false,                                  \
-          "Enable dtrace probes for method-entry and method-exit")          \
+          "Enable dtrace tool probes for method-entry and method-exit")     \
                                                                             \
   product(bool, DTraceAllocProbes, false,                                   \
-          "Enable dtrace probes for object allocation")                     \
+          "Enable dtrace tool probes for object allocation")                \
                                                                             \
   product(bool, DTraceMonitorProbes, false,                                 \
-          "Enable dtrace probes for monitor events")                        \
+          "Enable dtrace tool probes for monitor events")                   \
                                                                             \
   product(bool, RelaxAccessControlCheck, false,                             \
           "Relax the access control checks in the verifier")                \
@@ -1991,26 +2001,20 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
+  product(bool, LoomVM, true,                                               \
+          "Enable Loom Mechanisms in the VM")                               \
+                                                                            \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
                                                                             \
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  product(bool, TrimContinuationChunksInGC, false,                          \
-         "Trim stack chunks when copying objects in GC")                    \
-                                                                            \
-  product(bool, UseChunkBitmaps, false,                                     \
-         "Generate oop bitmaps for continuation chunks")                    \
-                                                                            \
-  product(bool, UseContinuationFastPath, true,                              \
-          "Use fast-path frame walking in continuations")                   \
-                                                                            \
-  product(bool, UseContinuationStreamingCopy, false,                        \
-          "Use streaming memory when copying continuation stack chunks")    \
-                                                                            \
   develop(bool, VerifyContinuations, true,                                  \
           "Verify continuation consistency")                                \
+                                                                            \
+  develop(bool, UseContinuationFastPath, true,                              \
+          "Use fast-path frame walking in continuations")                   \
                                                                             \
   product(intx, ScopeLocalCacheSize, 16,                                    \
           "Size of the cache for scoped values")                            \

@@ -71,47 +71,42 @@ class JvmtiEnvThreadStateIterator : public StackObj {
 
 ///////////////////////////////////////////////////////////////
 //
-// class JvmtiVTMTDisabler
+// class JvmtiVTMSTransitionDisabler
 //
-// Virtual Threads Mount Transition (VTMT) mechanism
+// Virtual Thread Mount State Transition (VTMS transition) mechanism
 //
-class JvmtiVTMTDisabler {
+class JvmtiVTMSTransitionDisabler {
  private:
-  static volatile bool _SR_mode;             // there is an active suspender or resumer
-  static volatile int _VTMT_count;           // current number of VTMT transitions
-  static volatile int _VTMT_disable_count;   // VTMT is disabled while it is non-zero
+  static volatile bool _SR_mode;                      // there is an active suspender or resumer
+  static volatile int _VTMS_transition_count;         // current number of VTMS transitions
+  static volatile int _VTMS_transition_disable_count; // VTMS transitions are disabled while it is non-zero
 
-  bool _is_SR;                               // is suspender or resumer
+  bool _is_SR;                                        // is suspender or resumer
 
-  void disable_VTMT();
-  void enable_VTMT();
+  void disable_VTMS_transitions();
+  void enable_VTMS_transitions();
 
   DEBUG_ONLY(static void print_info();)
  public:
   // parameter is_SR: suspender or resumer
-  JvmtiVTMTDisabler(bool is_SR = false);
-  ~JvmtiVTMTDisabler();
+  JvmtiVTMSTransitionDisabler(bool is_SR = false);
+  ~JvmtiVTMSTransitionDisabler();
 
-  static void start_VTMT(jthread vthread, int callsite_tag);
-  static void finish_VTMT(jthread vthread, int callsite_tag);
-  static int  VTMT_disable_count();
-  static int  VTMT_count();
+  static void start_VTMS_transition(jthread vthread, bool is_mount);
+  static void finish_VTMS_transition(jthread vthread, bool is_mount);
 };
 
 ///////////////////////////////////////////////////////////////
 //
-// class VThreadList
+// class VirtualThreadList
 //
-// Used for Virtual Threads Suspend/Resume management
+// Used for Virtual Threads Suspend/Resume management.
+// It's a list of thread IDs.
 //
-class VThreadList : public GrowableArrayCHeap<OopHandle, mtServiceability> {
+class VirtualThreadList : public GrowableArrayCHeap<int64_t, mtServiceability> {
  public:
-  VThreadList() : GrowableArrayCHeap<OopHandle, mtServiceability>(0) {}
-  void append(oop vt);
-  void remove(oop vt);
-  int  find(oop vt) const;
-  bool contains(oop vt) const;
-  void invalidate();
+  VirtualThreadList() : GrowableArrayCHeap<int64_t, mtServiceability>(0) {}
+  void invalidate() { clear(); }
 };
 
 ///////////////////////////////////////////////////////////////
@@ -130,15 +125,16 @@ class JvmtiVTSuspender : AllStatic {
   } SR_Mode;
 
   static SR_Mode _SR_mode;
-  static VThreadList* _suspended_list;
-  static VThreadList* _not_suspended_list;
+  static VirtualThreadList* _suspended_list;
+  static VirtualThreadList* _not_suspended_list;
 
  public:
   static void register_all_vthreads_suspend();
   static void register_all_vthreads_resume();
-  static bool register_vthread_suspend(oop vt);
-  static bool register_vthread_resume(oop vt);
+  static void register_vthread_suspend(oop vt);
+  static void register_vthread_resume(oop vt);
   static bool is_vthread_suspended(oop vt);
+  static bool is_vthread_suspended(int64_t thread_id);
 };
 
 ///////////////////////////////////////////////////////////////
@@ -155,9 +151,10 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   OopHandle         _thread_oop_h;
   // Jvmti Events that cannot be posted in their current context.
   JvmtiDeferredEventQueue* _jvmti_event_queue;
-  bool              _is_in_VTMT; // saved JavaThread.is_in_VTMT()
-  bool              _is_virtual; // state belongs to a virtual thread
+  bool              _is_in_VTMS_transition; // saved JavaThread.is_in_VTMS_transition()
+  bool              _is_virtual;            // state belongs to a virtual thread
   bool              _hide_single_stepping;
+  bool              _pending_interp_only_mode;
   bool              _pending_step_for_popframe;
   bool              _pending_step_for_earlyret;
   int               _hide_level;
@@ -228,15 +225,20 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
 
   void add_env(JvmtiEnvBase *env);
 
-  void unbind_from(JavaThread* thread);
-  void bind_to(JavaThread* thread);
+  // The pending_interp_only_mode is set when the interp_only_mode is triggered.
+  // It is cleared by EnterInterpOnlyModeClosure handshake.
+  bool is_pending_interp_only_mode() { return _pending_interp_only_mode; }
+  void set_pending_interp_only_mode(bool val) { _pending_interp_only_mode = val; }
 
   // Used by the interpreter for fullspeed debugging support
   bool is_interp_only_mode()                {
-     return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
+    return _thread == NULL ?  _saved_interp_only_mode != 0 : _thread->is_interp_only_mode();
   }
   void enter_interp_only_mode();
   void leave_interp_only_mode();
+
+  static void unbind_from(JvmtiThreadState* state, JavaThread* thread);
+  static void bind_to(JvmtiThreadState* state, JavaThread* thread);
 
   // access to the linked list of all JVMTI thread states
   static JvmtiThreadState *first() {
@@ -266,9 +268,9 @@ class JvmtiThreadState : public CHeapObj<mtInternal> {
   void set_thread(JavaThread* thread);
   oop get_thread_oop();
 
-  // The JavaThread is_in_VTMT() bit saved at unmount to restore at mount.
-  inline bool is_in_VTMT() { return _is_in_VTMT; }
-  inline void set_is_in_VTMT(bool val) { _is_in_VTMT = val; }
+  // The JavaThread is_in_VTMS_transition() bit saved at unmount to restore at mount.
+  inline bool is_in_VTMS_transition() { return _is_in_VTMS_transition; }
+  inline void set_is_in_VTMS_transition(bool val) { _is_in_VTMS_transition = val; }
   inline bool is_virtual() { return _is_virtual; } // the _thread is virtual
 
   inline bool is_exception_detected()  { return _exception_state == ES_DETECTED;  }

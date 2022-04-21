@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -634,7 +634,7 @@ int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
   // If it is, patch return address to be deopt handler.
   if (!signal_was_handled) {
     address pc = os::Posix::ucontext_get_pc(uc);
-    assert (pc != NULL, "");
+    assert(pc != NULL, "");
     if (NativeDeoptInstruction::is_deopt_at(pc)) {
       CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
       if (cb != NULL && cb->is_compiled()) {
@@ -644,7 +644,7 @@ int JVM_HANDLE_XXX_SIGNAL(int sig, siginfo_t* info,
         address deopt = cm->is_method_handle_return(pc) ?
           cm->deopt_mh_handler_begin() :
           cm->deopt_handler_begin();
-        assert (deopt != NULL, "");
+        assert(deopt != NULL, "");
 
         frame fr = os::fetch_frame_from_context(uc);
         cm->set_original_pc(&fr, pc);
@@ -1272,8 +1272,10 @@ void set_signal_handler(int sig, bool do_check = true) {
   }
 #endif
 
-  // Save handler setup for later checking
-  vm_handlers.set(sig, &sigAct);
+  // Save handler setup for possible later checking
+  if (do_check) {
+    vm_handlers.set(sig, &sigAct);
+  }
   do_check_signal_periodically[sig] = do_check;
 
   int ret = sigaction(sig, &sigAct, &oldAct);
@@ -1584,8 +1586,6 @@ void PosixSignals::hotspot_sigmask(Thread* thread) {
 //    - Forte Analyzer: AsyncGetCallTrace()
 //    - StackBanging: get_frame_at_stack_banging_point()
 
-sigset_t SR_sigset;
-
 static void resume_clear_context(OSThread *osthread) {
   osthread->set_ucontext(NULL);
   osthread->set_siginfo(NULL);
@@ -1701,14 +1701,11 @@ int SR_initialize() {
   assert(PosixSignals::SR_signum > SIGSEGV && PosixSignals::SR_signum > SIGBUS,
          "SR_signum must be greater than max(SIGSEGV, SIGBUS), see 4355769");
 
-  sigemptyset(&SR_sigset);
-  sigaddset(&SR_sigset, PosixSignals::SR_signum);
-
   // Set up signal handler for suspend/resume
   act.sa_flags = SA_RESTART|SA_SIGINFO;
   act.sa_handler = (void (*)(int)) SR_handler;
 
-  // SR_signum is blocked by default.
+  // SR_signum is blocked when the handler runs.
   pthread_sigmask(SIG_BLOCK, NULL, &act.sa_mask);
   remove_error_signals_from_set(&(act.sa_mask));
 

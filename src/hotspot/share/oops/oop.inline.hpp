@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -38,7 +38,6 @@
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
 #include "utilities/align.hpp"
-#include "utilities/copy.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -92,14 +91,6 @@ Klass* oopDesc::klass() const {
 
 Klass* oopDesc::klass_or_null() const {
   if (UseCompressedClassPointers) {
-    // narrowKlass v = _metadata._compressed_klass;
-    // if (!CompressedKlassPointers::is_null(v)) {
-    //   Klass* result = CompressedKlassPointers::decode_raw(v);
-    //   if(!check_alignment(result)) {
-    //     tty->print_cr("oop klass unaligned: %p oop: %p",  (void*) result, this);
-    //     return NULL;
-    //   }
-    // }
     return CompressedKlassPointers::decode(_metadata._compressed_klass);
   } else {
     return _metadata._klass;
@@ -186,7 +177,6 @@ size_t oopDesc::size_given_klass(Klass* klass)  {
       // skipping the intermediate round to HeapWordSize.
       s = align_up(size_in_bytes, MinObjAlignmentInBytes) / HeapWordSize;
 
-
       assert(s == klass->oop_size(this) || size_might_change(), "wrong array object size");
     } else {
       // Must be zero, so bite the bullet and take the virtual call.
@@ -199,36 +189,12 @@ size_t oopDesc::size_given_klass(Klass* klass)  {
   return s;
 }
 
-size_t oopDesc::compact_size()  {
-  return compact_size_given_klass(klass());
-}
-
-size_t oopDesc::compact_size(size_t size)  {
-  return compact_size_given_klass(klass(), size);
-}
-
-size_t oopDesc::compact_size_given_klass(Klass* klass) {
-  int lh = klass->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
-    return klass->compact_oop_size(this);
-  }
-  return size_given_klass(klass);
-}
-
-size_t oopDesc::compact_size_given_klass(Klass* klass, size_t size) {
-  int lh = klass->layout_helper();
-  if (lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC) {
-    return klass->compact_oop_size(this);
-  }
-  assert (size == size_given_klass(klass), "");
-  return size;
-}
-
-bool oopDesc::is_instance()  const { return klass()->is_instance_klass();  }
-bool oopDesc::is_array()     const { return klass()->is_array_klass();     }
-bool oopDesc::is_objArray()  const { return klass()->is_objArray_klass();  }
-bool oopDesc::is_typeArray() const { return klass()->is_typeArray_klass(); }
-bool oopDesc::is_stackChunk()const { return klass()->is_instance_klass() && InstanceKlass::cast(klass())->is_stack_chunk_instance_klass(); }
+bool oopDesc::is_instance()    const { return klass()->is_instance_klass();             }
+bool oopDesc::is_instanceRef() const { return klass()->is_reference_instance_klass();   }
+bool oopDesc::is_stackChunk()  const { return klass()->is_stack_chunk_instance_klass(); }
+bool oopDesc::is_array()       const { return klass()->is_array_klass();                }
+bool oopDesc::is_objArray()    const { return klass()->is_objArray_klass();             }
+bool oopDesc::is_typeArray()   const { return klass()->is_typeArray_klass();            }
 
 template<typename T>
 T*       oopDesc::field_addr(int offset)     const { return reinterpret_cast<T*>(cast_from_oop<intptr_t>(as_oop()) + offset); }
@@ -406,70 +372,6 @@ bool oopDesc::mark_must_be_preserved() const {
 
 bool oopDesc::mark_must_be_preserved(markWord m) const {
   return m.must_be_preserved(this);
-}
-
-size_t oopDesc::copy_disjoint(HeapWord* to) {
-  return copy_disjoint(to, size());
-}
-
-size_t oopDesc::copy_conjoint(HeapWord* to) {
-  return copy_conjoint(to, size());
-}
-
-size_t oopDesc::copy_disjoint_compact(HeapWord* to) {
-  return copy_disjoint_compact(to, compact_size());
-}
-
-size_t oopDesc::copy_conjoint_compact(HeapWord* to) {
-  return copy_conjoint_compact(to, compact_size());
-}
-
-size_t oopDesc::copy_disjoint(HeapWord* to, size_t word_size) {
-  // if (is_stackChunk()) tty->print_cr(">>> copy_disjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
-    size_t res = klass()->copy_disjoint(this, to, word_size);
-    assert (word_size == res, "");
-    return res;
-  }
-  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  return word_size;
-}
-
-size_t oopDesc::copy_disjoint_compact(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)compact_size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
-    size_t res = klass()->copy_disjoint_compact(this, to);
-    assert (word_size == res, "");
-    return res;
-  }
-  return copy_disjoint(to, word_size);
-}
-
-size_t oopDesc::copy_conjoint(HeapWord* to, size_t word_size) {
-  // if (is_stackChunk()) tty->print_cr(">>> copy_conjoint from: %p - %p to: %p - %p (word_size: %zu)", cast_from_oop<HeapWord*>(this), cast_from_oop<HeapWord*>(this) + word_size, to, to + word_size, word_size);
-  assert(word_size == (size_t)size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh))) {
-    size_t res = klass()->copy_conjoint(this, to, word_size);
-    assert (word_size == res, "");
-    return res;
-  }
-  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(this), to, word_size);
-  return word_size;
-}
-
-size_t oopDesc::copy_conjoint_compact(HeapWord* to, size_t word_size) {
-  assert(word_size == (size_t)compact_size() || size_might_change(), "");
-  int lh = klass()->layout_helper();
-  if (UNLIKELY(lh > Klass::_lh_neutral_value && Klass::layout_helper_needs_slow_path(lh) && TrimContinuationChunksInGC)) {
-    size_t res = klass()->copy_conjoint_compact(this, to);
-    assert (word_size == res, "");
-    return res;
-  }
-  return copy_conjoint(to, word_size);
 }
 
 #endif // SHARE_OOPS_OOP_INLINE_HPP

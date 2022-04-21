@@ -26,10 +26,14 @@
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
  * @compile --enable-preview -source ${jdk.version} DumpThreads.java
  * @run testng/othervm --enable-preview DumpThreads
+ * @run testng/othervm --enable-preview -Djdk.trackAllThreads DumpThreads
+ * @run testng/othervm --enable-preview -Djdk.trackAllThreads=true DumpThreads
+ * @run testng/othervm --enable-preview -Djdk.trackAllThreadds=false DumpThreads
  */
 
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +47,11 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 public class DumpThreads {
+    private static final boolean TRACK_ALL_THREADS;
+    static {
+        String s = System.getProperty("jdk.trackAllThreads");
+        TRACK_ALL_THREADS = (s != null) && (s.isEmpty() || Boolean.parseBoolean(s));
+    }
 
     /**
      * Thread dump in plain text format.
@@ -53,21 +62,28 @@ public class DumpThreads {
         Path file = genOutputPath("txt");
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Thread vthread = forkParker(executor);
-
-            mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
-            cat(file);
-
-            // virtual thread should be found
             try {
+                mbean.dumpThreads(file.toString(), ThreadDumpFormat.TEXT_PLAIN);
+                cat(file);
+
+                // pid should be on the first line
+                String pid = "" + ProcessHandle.current().pid();
+                assertTrue(line(file, 0).contains(pid));
+
+                // runtime version should be on third line
+                String vs = Runtime.version().toString();
+                assertTrue(line(file, 2).contains(vs));
+
+                // virtual thread should be found
                 assertTrue(isPresent(file, vthread));
+
+                // if the current thread is a platform thread then it should be included
+                Thread currentThread = Thread.currentThread();
+                if (!currentThread.isVirtual() || TRACK_ALL_THREADS) {
+                    assertTrue(isPresent(file, currentThread));
+                }
             } finally {
                 LockSupport.unpark(vthread);
-            }
-
-            // if the current thread is a platform thread then it should be included
-            Thread currentThread = Thread.currentThread();
-            if (!currentThread.isVirtual()) {
-                assertTrue(isPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
@@ -83,53 +99,68 @@ public class DumpThreads {
         Path file = genOutputPath("json");
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Thread vthread = forkParker(executor);
-
-            mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
-            cat(file);
-
-            assertTrue(count(file, "threadDump") >= 1L);
-            assertTrue(count(file, "threadContainers") >= 1L);
-            assertTrue(count(file, "threads") >= 1L);
-
-            // virtual thread should be found
             try {
+                mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
+                cat(file);
+
+                assertTrue(count(file, "threadDump") >= 1L);
+                assertTrue(count(file, "time") >= 1L);
+                assertTrue(count(file, "runtimeVersion") >= 1L);
+                assertTrue(count(file, "threadContainers") >= 1L);
+                assertTrue(count(file, "threads") >= 1L);
+
+                // virtual thread should be found
                 assertTrue(isJsonPresent(file, vthread));
+
+                // if the current thread is a platform thread then it should be included
+                Thread currentThread = Thread.currentThread();
+                if (!currentThread.isVirtual() || TRACK_ALL_THREADS) {
+                    assertTrue(isJsonPresent(file, currentThread));
+                }
+
             } finally {
                 LockSupport.unpark(vthread);
-            }
-
-            // if the current thread is a platform thread then it should be included
-            Thread currentThread = Thread.currentThread();
-            if (!currentThread.isVirtual()) {
-                assertTrue(isJsonPresent(file, currentThread));
             }
         } finally {
             Files.deleteIfExists(file);
         }
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
-    public void testRelativePath1() throws Exception {
+    /**
+     * Test that dumpThreads throws if the output file already exists.
+     */
+    @Test
+    public void testFileAlreadyExsists() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN);
+        String file = Files.createFile(genOutputPath("txt")).toString();
+        assertThrows(FileAlreadyExistsException.class,
+                () -> mbean.dumpThreads(file, ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(FileAlreadyExistsException.class,
+                () -> mbean.dumpThreads(file, ThreadDumpFormat.JSON));
     }
 
-    @Test(expectedExceptions = { IllegalArgumentException.class })
-    public void testRelativePath2() throws Exception {
+    /**
+     * Test that dumpThreads throws if the file path is relative.
+     */
+    @Test
+    public void testRelativePath() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads("threads.json", ThreadDumpFormat.JSON);
+        assertThrows(IllegalArgumentException.class,
+                () -> mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(IllegalArgumentException.class,
+                () -> mbean.dumpThreads("threads.json", ThreadDumpFormat.JSON));
     }
 
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull1() throws Exception {
+    /**
+     * Test that dumpThreads throws with null parameters.
+     */
+    @Test
+    public void testNull() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN);
-    }
-
-    @Test(expectedExceptions = { NullPointerException.class })
-    public void testNull2() throws Exception {
-        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(genOutputPath("txt").toString(), null);
+        assertThrows(NullPointerException.class,
+                () -> mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(NullPointerException.class,
+                () -> mbean.dumpThreads(genOutputPath("txt").toString(), null));
     }
 
     /**
@@ -153,7 +184,7 @@ public class DumpThreads {
      * Returns true if the file contains #<tid>
      */
     private static boolean isPresent(Path file, Thread thread) throws Exception {
-        String expect = "#" + thread.getId();
+        String expect = "#" + thread.threadId();
         return count(file, expect) > 0;
     }
 
@@ -161,10 +192,13 @@ public class DumpThreads {
      * Returns true if the file contains "tid": <tid>
      */
     private static boolean isJsonPresent(Path file, Thread thread) throws Exception {
-        String expect = "\"tid\": " + thread.getId();
+        String expect = "\"tid\": " + thread.threadId();
         return count(file, expect) > 0;
     }
 
+    /**
+     * Generate a file path with the given suffix to use as an output file.
+     */
     private static Path genOutputPath(String suffix) throws Exception {
         Path dir = Path.of(".").toAbsolutePath();
         Path file = Files.createTempFile(dir, "dump", suffix);
@@ -172,12 +206,28 @@ public class DumpThreads {
         return file;
     }
 
+    /**
+     * Return the count of the number of files in the given file that contain
+     * the given character sequence.
+     */
     static long count(Path file, CharSequence cs) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             return stream.filter(line -> line.contains(cs)).count();
         }
     }
 
+    /**
+     * Return line $n of the given file.
+     */
+    private String line(Path file, long n) throws Exception {
+        try (Stream<String> stream = Files.lines(file)) {
+            return stream.skip(n).findFirst().orElseThrow();
+        }
+    }
+
+    /**
+     * Print the given file to standard output.
+     */
     private static void cat(Path file) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             stream.forEach(System.out::println);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -288,7 +288,6 @@ class StackFrameInfo : public CHeapObj<mtInternal> {
  private:
   Method*             _method;
   int                 _bci;
-  OopHandle           _cont_scope_name;
   GrowableArray<OopHandle>* _locked_monitors; // list of object monitors locked by this frame
   // We need to save the mirrors in the backtrace to keep the class
   // from being unloaded while we still have this stack trace.
@@ -300,7 +299,6 @@ class StackFrameInfo : public CHeapObj<mtInternal> {
   ~StackFrameInfo();
   Method*   method() const       { return _method; }
   int       bci()    const       { return _bci; }
-  OopHandle cont_scope_name() const { return _cont_scope_name; }
   void      metadata_do(void f(Metadata*));
 
   int       num_locked_monitors()       { return (_locked_monitors != NULL ? _locked_monitors->length() : 0); }

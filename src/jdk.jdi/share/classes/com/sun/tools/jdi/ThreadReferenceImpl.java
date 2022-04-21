@@ -41,6 +41,7 @@ import com.sun.jdi.Location;
 import com.sun.jdi.MonitorInfo;
 import com.sun.jdi.NativeMethodException;
 import com.sun.jdi.ObjectReference;
+import com.sun.jdi.OpaqueFrameException;
 import com.sun.jdi.ReferenceType;
 import com.sun.jdi.StackFrame;
 import com.sun.jdi.ThreadGroupReference;
@@ -585,7 +586,12 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
         } catch (JDWPException exc) {
             switch (exc.errorCode()) {
             case JDWP.Error.OPAQUE_FRAME:
-                throw new NativeMethodException();
+                if (meth.isNative()) {
+                    throw new NativeMethodException();
+                } else {
+                    assert isVirtual(); // can only happen with virtual threads
+                    throw new OpaqueFrameException();
+                }
             case JDWP.Error.THREAD_NOT_SUSPENDED:
                 throw new IncompatibleThreadStateException(
                          "Thread not suspended");
@@ -605,17 +611,18 @@ public class ThreadReferenceImpl extends ObjectReferenceImpl
     public boolean isVirtual() {
         if (isVirtualCached) {
             return isVirtual;
-        } else {
-            boolean result;
+        }
+        boolean result = false;
+        if (vm.mayCreateVirtualThreads()) {
             try {
                 result = JDWP.ThreadReference.IsVirtual.process(vm, this).isVirtual;
             } catch (JDWPException exc) {
                 throw exc.toJDIException();
             }
-            isVirtual = result;
-            isVirtualCached = true;
-            return result;
         }
+        isVirtual = result;
+        isVirtualCached = true;
+        return result;
     }
 
     public String toString() {

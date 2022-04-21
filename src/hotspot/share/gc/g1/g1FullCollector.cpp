@@ -26,7 +26,6 @@
 #include "classfile/systemDictionary.hpp"
 #include "code/codeCache.hpp"
 #include "compiler/oopMap.hpp"
-#include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1CollectedHeap.hpp"
 #include "gc/g1/g1FullCollector.inline.hpp"
 #include "gc/g1/g1FullGCAdjustTask.hpp"
@@ -45,6 +44,7 @@
 #include "gc/shared/weakProcessor.inline.hpp"
 #include "gc/shared/workerPolicy.hpp"
 #include "logging/log.hpp"
+#include "runtime/continuation.hpp"
 #include "runtime/handles.inline.hpp"
 #include "utilities/debug.hpp"
 
@@ -188,7 +188,7 @@ void G1FullCollector::prepare_collection() {
 }
 
 void G1FullCollector::collect() {
-  CodeCache::increment_marking_cycle();
+  G1CollectedHeap::start_codecache_marking_cycle_if_inactive();
 
   phase1_mark_live_objects();
   verify_after_marking();
@@ -202,7 +202,8 @@ void G1FullCollector::collect() {
 
   phase4_do_compaction();
 
-  CodeCache::increment_marking_cycle();
+  Continuations::on_gc_marking_cycle_finish();
+  Continuations::arm_all_nmethods();
 }
 
 void G1FullCollector::complete_collection() {

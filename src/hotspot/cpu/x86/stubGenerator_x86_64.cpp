@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,6 +42,7 @@
 #include "prims/methodHandles.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
@@ -803,6 +804,21 @@ class StubGenerator: public StubCodeGenerator {
 
     __ ret(0);
 
+    return start;
+  }
+
+  address generate_popcount_avx_lut(const char *stub_name) {
+    __ align64();
+    StubCodeMark mark(this, "StubRoutines", stub_name);
+    address start = __ pc();
+    __ emit_data64(0x0302020102010100, relocInfo::none);
+    __ emit_data64(0x0403030203020201, relocInfo::none);
+    __ emit_data64(0x0302020102010100, relocInfo::none);
+    __ emit_data64(0x0403030203020201, relocInfo::none);
+    __ emit_data64(0x0302020102010100, relocInfo::none);
+    __ emit_data64(0x0403030203020201, relocInfo::none);
+    __ emit_data64(0x0302020102010100, relocInfo::none);
+    __ emit_data64(0x0403030203020201, relocInfo::none);
     return start;
   }
 
@@ -1887,439 +1903,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  // Fast memory copying for continuations
-  // See:
-  // - Intel 64 and IA-32 Architectures Optimization Reference Manual: (https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf)
-  //   - 2.7.6 REP String Enhancement
-  //   - 3.7.5 REP Prefix and Data Movement
-  //   - 3.7.6 Enhanced REP MOVSB and STOSB Operation
-  //   - 8.1 GENERAL PREFETCH CODING GUIDELINES
-  //   - 8.4.1.2 Streaming Non-temporal Stores, 8.4.1.3 Memory Type and Non-temporal Stores
-  //   - 8.5 MEMORY OPTIMIZATION USING PREFETCH, 8.5.6 Software Prefetch Scheduling Distance, 8.5.7 Software Prefetch Concatenation
-  //   - 14.3, MIXING AVX CODE WITH SSE CODE + https://software.intel.com/en-us/articles/intel-avx-state-transitions-migrating-sse-code-to-avx
-  // - Optimizing subroutines in assembly language, 17.9 Moving blocks of data https://www.agner.org/optimize/optimizing_assembly.pdf
-  // - StackOverflow
-  //   - https://stackoverflow.com/q/26246040/750563 What's missing/sub-optimal in this memcpy implementation?
-  //   - https://stackoverflow.com/q/43343231/750563 Enhanced REP MOVSB for memcpy
-  //   - https://stackoverflow.com/q/33902068/750563 What setup does REP do?
-  //   - https://stackoverflow.com/q/8858778/750563  Why are complicated memcpy/memset superior?
-  //   - https://stackoverflow.com/q/1715224/750563  Very fast memcpy for image processing?
-  //   - https://stackoverflow.com/q/17312823/750563 When program will benefit from prefetch & non-temporal load/store?
-  //   - https://stackoverflow.com/q/40096894/750563 Do current x86 architectures support non-temporal loads (from “normal” memory)?
-  //   - https://stackoverflow.com/q/32103968/750563 Non-temporal loads and the hardware prefetcher, do they work together?
-  // - https://docs.roguewave.com/threadspotter/2011.2/manual_html_linux/manual_html/ch05s03.html Non-Temporal Data
-  // - https://blogs.fau.de/hager/archives/2103 A case for the non-temporal store
-  // - https://vgatherps.github.io/2018-09-02-nontemporal/ Optimizing Cache Usage With Nontemporal Accesses
-  // - https://www.reddit.com/r/cpp/comments/9ccb88/optimizing_cache_usage_with_nontemporal_accesses/
-  // - https://lwn.net/Articles/255364/ Memory part 5: What programmers can do
-  // - https://software.intel.com/en-us/forums/intel-isa-extensions/topic/597075 Do Non-Temporal Loads Prefetch?
-  // - https://software.intel.com/en-us/forums/intel-fortran-compiler/topic/275765#comment-1551057 Time to revisit REP;MOVS
-  // - https://lemire.me/blog/2018/09/07/avx-512-when-and-how-to-use-these-new-instructions/ AVX-512: when and how to use these new instructions (explains AVX3Threshold)
-  // - https://travisdowns.github.io/blog/2020/01/17/avxfreq1.html Gathering Intel on Intel AVX-512 Transitions
-
-
-  // Used by continuations to copy from stack
-  // Arguments:
-  //   name - stub name string
-  //   nt   -  use non-temporal stores
-  //
-  // Inputs:
-  //   c_rarg0   - source array address       -- 16-byte aligned
-  //   c_rarg1   - destination array address  --  8-byte aligned
-  //   c_rarg2   - element count, in qwords (8 bytes), >= 2
-  //
-  address generate_disjoint_word_copy_up(bool nt, const char *name) {
-    const bool align = nt;
-
-    __ align(CodeEntryAlignment);
-    StubCodeMark mark(this, "StubRoutines", name);
-    address start = __ pc();
-
-    Label L_copy_bytes, L_copy_8_bytes, L_loop, L_end, L_exit;
-    const Register from        = rdi;  // source array address
-    const Register to          = rsi;  // destination array address
-    const Register count       = rdx;  // elements count
-    const Register qword_count = count;
-    const Register end_from    = from; // source array end address
-    const Register end_to      = to;   // destination array end address
-    const Register alignment   = rcx;
-
-    // End pointers are inclusive, and if count is not zero they point
-    // to the last unit copied:  end_to[0] := end_from[0]
-
-    __ enter(); // required for proper stackwalking of RuntimeStub frame
-    assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
-
-    setup_arg_regs(); // from => rdi, to => rsi, count => rdx
-                      // r9 and r10 may be used to save non-volatile registers
-
-    // Copy from low to high addresses.
-    // By pointing to the end and negating qword_count we:
-    // 1. only update count, not from/tp; 2. don't need another register to hold total count; 3. can jcc right after addptr without cmpptr
-
-    // __ movptr(alignment, to);
-    __ lea(end_from, Address(from, qword_count, Address::times_8, -8));
-    __ lea(end_to,   Address(to,   qword_count, Address::times_8, -8));
-    __ negptr(qword_count); // make the count negative
-    // Address(end_from/to, qword_count, Address::times_8) now points 8 bytes *below* to original from/to
-    // i.e. orig to == Address(end_to, qword_count, Address::times_8, 8)
-
-    // Copy in multi-bytes chunks
-
-    if (UseUnalignedLoadStores) {
-      if (align) { // align target
-        NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
-
-        __ lea(alignment, Address(end_to, qword_count, Address::times_8, 8)); // == original to
-        __ negptr(alignment); // we align by copying from the beginning of to, making it effectively larger
-
-        __ testl(alignment, 8);
-        __ jccb(Assembler::zero, L_aligned_128);
-        __ increment(qword_count);
-        // no need to test because we know qword_count >= 2
-        __ movq(rax, Address(end_from, qword_count, Address::times_8, -0));
-        __ movqa(Address(end_to, qword_count, Address::times_8, -0), rax, nt);
-        __ bind(L_aligned_128);
-
-        if (UseAVX >= 2) {
-          __ testl(alignment, 16);
-          __ jccb(Assembler::zero, L_aligned_256);
-          __ cmpptr(qword_count, -2);
-          if (UseAVX > 2) {
-            __ jcc(Assembler::greater, L_copy_8_bytes);
-          } else {
-            __ jccb(Assembler::greater, L_copy_8_bytes);
-          }
-          __ addptr(qword_count, 2);
-          __ movdqu(xmm0, Address(end_from, qword_count, Address::times_8, -8));
-          __ movdqa(Address(end_to, qword_count, Address::times_8, -8), xmm0, nt);
-          __ bind(L_aligned_256);
-          // we can move from SSE to AVX without penalty, but not the other way around
-        }
-
-        if (UseAVX > 2) {
-          __ testl(alignment, 32);
-          __ jccb(Assembler::zero, L_aligned_512);
-          __ addptr(qword_count, 4);
-          __ jccb(Assembler::less, L_end);
-          __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -24));
-          __ vmovdqa(Address(end_to, qword_count, Address::times_8, -24), xmm0, nt);
-          __ bind(L_aligned_512);
-        }
-      }
-
-      // Copy 64-bytes per iteration
-      if (UseAVX > 2) {
-        Label L_loop_avx512, L_loop_avx2, L_32_byte_head, L_above_threshold, L_below_threshold;
-
-        __ BIND(L_copy_bytes);
-        __ cmpptr(qword_count, (-1 * AVX3Threshold / 8));
-        __ jccb(Assembler::less, L_above_threshold);
-        __ jmpb(L_below_threshold);
-
-        __ align(OptoLoopAlignment);
-        __ bind(L_loop_avx512);
-        __ evmovdqul(xmm0, Address(end_from, qword_count, Address::times_8, -56), Assembler::AVX_512bit);
-        __ evmovdqa(Address(end_to, qword_count, Address::times_8, -56), xmm0, Assembler::AVX_512bit, nt);
-        __ bind(L_above_threshold);
-        __ addptr(qword_count, 8);
-        __ jcc(Assembler::lessEqual, L_loop_avx512);
-        __ jmpb(L_32_byte_head);
-
-        __ bind(L_loop_avx2);
-        __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -56));
-        __ vmovdqa(Address(end_to, qword_count, Address::times_8, -56), xmm0, nt);
-        __ vmovdqu(xmm1, Address(end_from, qword_count, Address::times_8, -24));
-        __ vmovdqa(Address(end_to, qword_count, Address::times_8, -24), xmm1, nt);
-        __ bind(L_below_threshold);
-        __ addptr(qword_count, 8);
-        __ jcc(Assembler::lessEqual, L_loop_avx2);
-
-        __ bind(L_32_byte_head);
-        __ subptr(qword_count, 4);  // sub(8) and add(4)
-        __ jccb(Assembler::greater, L_end);
-      } else {
-        __ jmp(L_copy_bytes);
-        __ align(OptoLoopAlignment);
-        __ BIND(L_loop);
-        if (UseAVX == 2) {
-          __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -56));
-          __ vmovdqa(Address(end_to, qword_count, Address::times_8, -56), xmm0, nt);
-          __ vmovdqu(xmm1, Address(end_from, qword_count, Address::times_8, -24));
-          __ vmovdqa(Address(end_to, qword_count, Address::times_8, -24), xmm1, nt);
-        } else {
-          __ movdqu(xmm0, Address(end_from, qword_count, Address::times_8, -56));
-          __ movdqa(Address(end_to, qword_count, Address::times_8, -56), xmm0, nt);
-          __ movdqu(xmm1, Address(end_from, qword_count, Address::times_8, -40));
-          __ movdqa(Address(end_to, qword_count, Address::times_8, -40), xmm1, nt);
-          __ movdqu(xmm2, Address(end_from, qword_count, Address::times_8, -24));
-          __ movdqa(Address(end_to, qword_count, Address::times_8, -24), xmm2, nt);
-          __ movdqu(xmm3, Address(end_from, qword_count, Address::times_8, - 8));
-          __ movdqa(Address(end_to, qword_count, Address::times_8, - 8), xmm3, nt);
-        }
-
-        __ BIND(L_copy_bytes);
-        __ addptr(qword_count, 8);
-        __ jcc(Assembler::lessEqual, L_loop);
-        __ subptr(qword_count, 4);  // sub(8) and add(4); we added the extra 8 at the end of the loop; we'll subtract the extra 4 right before "copy trailing qwords"
-        __ jccb(Assembler::greater, L_end);
-      }
-      // Copy trailing 32 bytes
-      if (UseAVX >= 2) {
-        __ vmovdqu(xmm0, Address(end_from, qword_count, Address::times_8, -24));
-        __ vmovdqa(Address(end_to, qword_count, Address::times_8, -24), xmm0, nt);
-      } else {
-        __ movdqu(xmm0, Address(end_from, qword_count, Address::times_8, -24));
-        __ movdqa(Address(end_to, qword_count, Address::times_8, -24), xmm0, nt);
-        __ movdqu(xmm1, Address(end_from, qword_count, Address::times_8, - 8));
-        __ movdqa(Address(end_to, qword_count, Address::times_8, - 8), xmm1, nt);
-      }
-      __ addptr(qword_count, 4);
-    } else {
-      // Copy 32-bytes per iteration
-      __ jmp(L_copy_bytes);
-      __ align(OptoLoopAlignment);
-      __ BIND(L_loop);
-      __ movq(rax, Address(end_from, qword_count, Address::times_8, -24));
-      __ movqa(Address(end_to, qword_count, Address::times_8, -24), rax, nt);
-      __ movq(rax, Address(end_from, qword_count, Address::times_8, -16));
-      __ movqa(Address(end_to, qword_count, Address::times_8, -16), rax, nt);
-      __ movq(rax, Address(end_from, qword_count, Address::times_8, - 8));
-      __ movqa(Address(end_to, qword_count, Address::times_8, - 8), rax, nt);
-      __ movq(rax, Address(end_from, qword_count, Address::times_8, - 0));
-      __ movqa(Address(end_to, qword_count, Address::times_8, - 0), rax, nt);
-
-      __ BIND(L_copy_bytes);
-      __ addptr(qword_count, 4);
-      __ jcc(Assembler::lessEqual, L_loop);
-    }
-    __ BIND(L_end);
-    __ subptr(qword_count, 4);
-    __ jccb(Assembler::less, L_copy_8_bytes); // Copy trailing qwords
-
-    __ BIND(L_exit);
-    restore_arg_regs();
-    __ xorptr(rax, rax); // return 0
-    __ vzeroupper();
-    __ leave(); // required for proper stackwalking of RuntimeStub frame
-    __ ret(0);
-
-    // Copy trailing qwords
-    __ BIND(L_copy_8_bytes);
-    __ movq(rax, Address(end_from, qword_count, Address::times_8, 8));
-    __ movqa(Address(end_to, qword_count, Address::times_8, 8), rax, nt);
-    __ increment(qword_count);
-    __ jcc(Assembler::notZero, L_copy_8_bytes);
-    __ jmp(L_exit);
-
-    return start;
-  }
-
-  // Used by continuations to copy to stack
-  // Arguments:
-  //   name    - stub name string
-  //   nt_mode - 0 - none, 1 - use non-temporal prefetches, 2 - use non-temporal loads
-  //
-  // Inputs:
-  //   c_rarg0   - source array address      --  8-byte aligned
-  //   c_rarg1   - destination array address -- 16-byte aligned
-  //   c_rarg2   - element count, in qwords (8 bytes), >= 2
-  //
-  address generate_disjoint_word_copy_down(int nt_mode, const char *name) {
-    const bool prefetchnt = (nt_mode == 1);
-    const bool nt         = (nt_mode == 2);
-    const bool align      = nt;
-
-    __ align(CodeEntryAlignment);
-    StubCodeMark mark(this, "StubRoutines", name);
-    address start = __ pc();
-
-    Label L_copy_bytes, L_copy_8_bytes, L_loop, L_end, L_exit;
-    const Register from        = rdi;  // source array address
-    const Register to          = rsi;  // destination array address
-    const Register count       = rdx;  // elements count
-    const Register qword_count = count;
-    const Register alignment   = rcx; // rbx causes trouble
-
-    __ enter(); // required for proper stackwalking of RuntimeStub frame
-    assert_clean_int(c_rarg2, rax);    // Make sure 'count' is clean int.
-
-    setup_arg_regs(); // from => rdi, to => rsi, count => rdx
-                      // r9 and r10 may be used to save non-volatile registers
-
-    // Copy from high to low addresses.
-
-    // Copy in multi-bytes chunks
-
-    if (UseUnalignedLoadStores) {
-      if (align) { // align source (only useful for nt)
-        NearLabel L_aligned_128, L_aligned_256, L_aligned_512;
-
-        __ lea(alignment, Address(from, qword_count, Address::times_8, 0)); // == original to
-
-        __ testl(alignment, 8);
-        __ jccb(Assembler::zero, L_aligned_128);
-        __ decrement(qword_count);
-        // no need to test because we know qword_count >= 2
-        __ movdqa(xmm0, Address(from, qword_count, Address::times_8, 0), nt); // no 8-byte nt load
-        __ psrldq(xmm0, 8); // movlhps(xmm0, xmm0);
-        __ movdq(rax, xmm0);
-        // __ movq(rax, Address(from, qword_count, Address::times_8, 0));
-        __ movq(Address(to, qword_count, Address::times_8, 0), rax);
-        __ bind(L_aligned_128);
-
-        if (UseAVX >= 2) {
-          __ testl(alignment, 16);
-          __ jccb(Assembler::zero, L_aligned_256);
-          __ cmpptr(qword_count, 2);
-          if (UseAVX > 2) {
-            __ jcc(Assembler::less, L_copy_8_bytes);
-          } else {
-            __ jccb(Assembler::less, L_copy_8_bytes);
-          }
-          __ subptr(qword_count, 2);
-          __ movdqa(xmm0, Address(from, qword_count, Address::times_8, 0), nt);
-          __ movdqu(Address(to, qword_count, Address::times_8, 0), xmm0);
-          __ bind(L_aligned_256);
-          // we can move from SSE to AVX without penalty, but not the other way around
-        }
-
-        if (UseAVX > 2) {
-          __ testl(alignment, 32);
-          __ jccb(Assembler::zero, L_aligned_512);
-          __ subptr(qword_count, 4);
-          __ jccb(Assembler::less, L_end);
-          __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 0), nt);
-          __ vmovdqu(Address(to, qword_count, Address::times_8, 0), xmm0);
-          __ bind(L_aligned_512);
-        }
-      }
-
-      // Copy 64-bytes per iteration
-      const int prefetch_distance = 2 * 64; // prefetch distance of 2
-      if (UseAVX > 2) {
-        Label L_loop_avx512, L_loop_avx2, L_32_byte_head, L_above_threshold, L_below_threshold;
-
-        __ BIND(L_copy_bytes);
-        __ cmpptr(qword_count, (AVX3Threshold / 8));
-        __ jccb(Assembler::greater, L_above_threshold);
-        __ jmpb(L_below_threshold);
-
-        __ align(OptoLoopAlignment);
-        __ BIND(L_loop_avx512);
-        if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
-        }
-        __ evmovdqa(xmm0, Address(from, qword_count, Address::times_8, 0), Assembler::AVX_512bit, nt);
-        __ evmovdqul(Address(to, qword_count, Address::times_8, 0), xmm0, Assembler::AVX_512bit);
-        __ bind(L_above_threshold);
-        __ subptr(qword_count, 8);
-        __ jcc(Assembler::greaterEqual, L_loop_avx512);
-        __ jmpb(L_32_byte_head);
-
-        __ bind(L_loop_avx2);
-        if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
-        }
-        __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 32), nt);
-        __ vmovdqu(Address(to, qword_count, Address::times_8, 32), xmm0);
-        __ vmovdqa(xmm1, Address(from, qword_count, Address::times_8, 0), nt);
-        __ vmovdqu(Address(to, qword_count, Address::times_8, 0), xmm1);
-        __ bind(L_below_threshold);
-        __ subptr(qword_count, 8);
-        __ jcc(Assembler::greaterEqual, L_loop_avx2);
-
-        __ bind(L_32_byte_head);
-        __ addptr(qword_count, 4);  // add(8) and sub(4)
-        __ jccb(Assembler::less, L_end);
-      } else {
-        __ jmp(L_copy_bytes);
-        __ align(OptoLoopAlignment);
-        __ BIND(L_loop);
-        if (prefetchnt) {
-          __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
-        }
-        if (UseAVX == 2) {
-          __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 32), nt);
-          __ vmovdqu(Address(to, qword_count, Address::times_8, 32), xmm0);
-          __ vmovdqa(xmm1, Address(from, qword_count, Address::times_8,  0), nt);
-          __ vmovdqu(Address(to, qword_count, Address::times_8,  0), xmm1);
-        } else {
-          __ movdqa(xmm0, Address(from, qword_count, Address::times_8, 48), nt);
-          __ movdqu(Address(to, qword_count, Address::times_8, 48), xmm0);
-          __ movdqa(xmm1, Address(from, qword_count, Address::times_8, 32), nt);
-          __ movdqu(Address(to, qword_count, Address::times_8, 32), xmm1);
-          __ movdqa(xmm2, Address(from, qword_count, Address::times_8, 16), nt);
-          __ movdqu(Address(to, qword_count, Address::times_8, 16), xmm2);
-          __ movdqa(xmm3, Address(from, qword_count, Address::times_8,  0), nt);
-          __ movdqu(Address(to, qword_count, Address::times_8,  0), xmm3);
-        }
-
-        __ BIND(L_copy_bytes);
-        __ subptr(qword_count, 8);
-        __ jcc(Assembler::greaterEqual, L_loop);
-
-        __ addptr(qword_count, 4);  // add(8) and sub(4)
-        __ jccb(Assembler::less, L_end);
-      }
-      // Copy trailing 32 bytes
-      if (UseAVX >= 2) {
-        __ vmovdqa(xmm0, Address(from, qword_count, Address::times_8, 0), nt);
-        __ vmovdqu(Address(to, qword_count, Address::times_8, 0), xmm0);
-      } else {
-        __ movdqa(xmm0, Address(from, qword_count, Address::times_8, 16), nt);
-        __ movdqu(Address(to, qword_count, Address::times_8, 16), xmm0);
-        __ movdqa(xmm1, Address(from, qword_count, Address::times_8,  0), nt);
-        __ movdqu(Address(to, qword_count, Address::times_8,  0), xmm1);
-      }
-      __ subptr(qword_count, 4);
-    } else {
-      // Copy 32-bytes per iteration
-      const int prefetch_distance = 4 * 32; // prefetch distance of 4
-      __ jmp(L_copy_bytes);
-      __ align(OptoLoopAlignment);
-      __ BIND(L_loop);
-      if (prefetchnt) {
-        __ prefetchnta(Address(from, qword_count, Address::times_8, -prefetch_distance));
-      }
-      __ movq(rax, Address(from, qword_count, Address::times_8, 24));
-      __ movq(Address(to, qword_count, Address::times_8, 24), rax);
-      __ movq(rax, Address(from, qword_count, Address::times_8, 16));
-      __ movq(Address(to, qword_count, Address::times_8, 16), rax);
-      __ movq(rax, Address(from, qword_count, Address::times_8,  8));
-      __ movq(Address(to, qword_count, Address::times_8,  8), rax);
-      __ movq(rax, Address(from, qword_count, Address::times_8,  0));
-      __ movq(Address(to, qword_count, Address::times_8,  0), rax);
-
-      __ BIND(L_copy_bytes);
-      __ subptr(qword_count, 4);
-      __ jcc(Assembler::greaterEqual, L_loop);
-    }
-    __ BIND(L_end);
-    __ addptr(qword_count, 4);
-    __ jccb(Assembler::greater, L_copy_8_bytes); // Copy trailing qwords
-
-    __ BIND(L_exit);
-    restore_arg_regs();
-    __ xorptr(rax, rax); // return 0
-    __ vzeroupper();
-    __ leave(); // required for proper stackwalking of RuntimeStub frame
-    __ ret(0);
-
-    // Copy trailing qwords
-    __ BIND(L_copy_8_bytes);
-    if (nt) {
-      __ prefetchnta(Address(from, qword_count, Address::times_8, -8));
-    }
-    __ movq(rax, Address(from, qword_count, Address::times_8, -8));
-    __ movq(Address(to, qword_count, Address::times_8, -8), rax);
-    __ decrement(qword_count);
-    __ jcc(Assembler::notZero, L_copy_8_bytes);
-    __ jmp(L_exit);
-
-    return start;
-  }
-
   // Arguments:
   //   aligned - true => Input and output aligned on a HeapWord == 8-byte boundary
   //             ignored
@@ -3277,7 +2860,7 @@ class StubGenerator: public StubCodeGenerator {
     __ align(OptoLoopAlignment);
 
     __ BIND(L_store_element);
-    __ store_heap_oop(to_element_addr, rax_oop, noreg, noreg, AS_RAW);  // store the oop
+    __ store_heap_oop(to_element_addr, rax_oop, noreg, noreg, noreg, AS_RAW);  // store the oop
     __ increment(count);               // increment the count toward zero
     __ jcc(Assembler::zero, L_do_card_marks);
 
@@ -3883,12 +3466,6 @@ class StubGenerator: public StubCodeGenerator {
 
     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit    = StubRoutines::_oop_disjoint_arraycopy_uninit;
     StubRoutines::_arrayof_oop_arraycopy_uninit             = StubRoutines::_oop_arraycopy_uninit;
-
-    StubRoutines::_has_word_memcpy     = true;
-    StubRoutines::_word_memcpy_up      = generate_disjoint_word_copy_up  (false, "word_memcpy_up");
-    StubRoutines::_word_memcpy_up_nt   = generate_disjoint_word_copy_up  (true,  "word_memcpy_up_nt");
-    StubRoutines::_word_memcpy_down    = generate_disjoint_word_copy_down(0,     "word_memcpy_down");
-    StubRoutines::_word_memcpy_down_nt = generate_disjoint_word_copy_down(1,     "word_memcpy_down_nt");
   }
 
   // AES intrinsic stubs
@@ -7889,7 +7466,9 @@ address generate_avx_ghash_processBlocks() {
 
   }
 
-RuntimeStub* generate_cont_doYield() {
+  RuntimeStub* generate_cont_doYield() {
+    if (!Continuations::enabled()) return nullptr;
+
     const char *name = "cont_doYield";
 
     enum layout {
@@ -7921,7 +7500,7 @@ RuntimeStub* generate_cont_doYield() {
 
     __ movptr(c_rarg0, r15_thread);
     __ set_last_Java_frame(rsp, rbp, the_pc);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::freeze), 2);
+    __ call_VM_leaf(Continuation::freeze_entry(), 2);
     __ reset_last_Java_frame(true);
 
     Label pinned;
@@ -7940,7 +7519,6 @@ RuntimeStub* generate_cont_doYield() {
     __ ret(0);
 
     OopMap* map = new OopMap(framesize, 1);
-    // map->set_callee_saved(VMRegImpl::stack2reg(rbp_off), rbp->as_VMReg());
     oop_maps->add_gc_map(the_pc - start, map);
 
     RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
@@ -7952,25 +7530,8 @@ RuntimeStub* generate_cont_doYield() {
     return stub;
   }
 
-  address generate_cont_jump_from_safepoint() {
-    StubCodeMark mark(this, "StubRoutines","Continuation jump from safepoint");
-
-    address start = __ pc();
-
-    __ get_thread(r15_thread);
-    __ reset_last_Java_frame(true); // false would be fine, too, I guess
-    __ reinit_heapbase();
-
-    __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-    continuation_enter_cleanup(_masm);
-    __ pop(rbp);
-    __ ret(0);
-
-    return start;
-  }
-
   address generate_cont_thaw(bool return_barrier, bool exception) {
-    assert (return_barrier || !exception, "must be");
+    assert(return_barrier || !exception, "must be");
 
     address start = __ pc();
 
@@ -7995,10 +7556,6 @@ RuntimeStub* generate_cont_doYield() {
       __ pop_d(xmm0); __ pop(rax); // restore return value (no safepoint in the call to thaw, so even an oop return value should be OK)
     }
     assert_asm(_masm, cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #ifdef ASSERT
-  //   __ lea(rcx, Address(rsp, wordSize));
-  //   assert_asm(_masm, cmpptr(rcx, Address(r15_thread, JavaThread::cont_entry_offset())), Assembler::equal, "incorrect rsp");
-  // #endif
 
     Label thaw_success;
     __ testq(rbx, rbx);           // rbx contains the size of the frames to thaw, 0 if overflow or no more frames
@@ -8013,8 +7570,12 @@ RuntimeStub* generate_cont_doYield() {
       __ push(rax); __ push_d(xmm0); // save original return value -- again
     }
 
-    __ movl(c_rarg1, (return_barrier ? 1 : 0) + (exception ? 1 : 0));
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Continuation::thaw), r15_thread, c_rarg1);
+    // If we want, we can templatize thaw by kind, and have three different entries
+    if (exception)           __ movl(c_rarg1, (int32_t)2);
+    else if (return_barrier) __ movl(c_rarg1, (int32_t)1);
+    else                     __ movl(c_rarg1, (int32_t)0);
+
+    __ call_VM_leaf(Continuation::thaw_entry(), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
 
     if (return_barrier) {
@@ -8045,6 +7606,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_thaw() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "Cont thaw");
     address start = __ pc();
     generate_cont_thaw(false, false);
@@ -8052,6 +7615,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier() {
+    if (!Continuations::enabled()) return nullptr;
+
     // TODO: will probably need multiple return barriers depending on return type
     StubCodeMark mark(this, "StubRoutines", "cont return barrier");
     address start = __ pc();
@@ -8062,6 +7627,8 @@ RuntimeStub* generate_cont_doYield() {
   }
 
   address generate_cont_returnBarrier_exception() {
+    if (!Continuations::enabled()) return nullptr;
+
     StubCodeMark mark(this, "StubRoutines", "cont return barrier exception handler");
     address start = __ pc();
 
@@ -8070,83 +7637,102 @@ RuntimeStub* generate_cont_doYield() {
     return start;
   }
 
-  address generate_cont_interpreter_forced_preempt_return() {
-      StubCodeMark mark(this, "StubRoutines", "cont interpreter forced preempt return");
-      address start = __ pc();
-
-      // This is necessary for forced yields, as the return addres (in rbx) is captured in a call_VM, and skips the restoration of rbcp and locals
-      // see InterpreterMacroAssembler::restore_bcp/restore_locals
-      // TODO: use InterpreterMacroAssembler
-      static const Register _locals_register = r14;
-      static const Register _bcp_register    = r13;
-
-      __ pop(rbp);
-
-      __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
-      __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
-      // __ reinit_heapbase();
-
-      __ ret(0);
-
-      return start;
-    }
-
 #if INCLUDE_JFR
 
-  static void jfr_set_last_java_frame(MacroAssembler* _masm) {
-    Register last_java_pc = c_rarg0;
-    Register last_java_sp = c_rarg2;
-    __ movptr(last_java_pc, Address(rsp, 0));
-    __ lea(last_java_sp, Address(rsp, wordSize));
-    __ vzeroupper();
-    __ movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), last_java_pc);
-    __ movptr(Address(r15_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
-  }
-
-  static void jfr_prologue(MacroAssembler* _masm) {
-    jfr_set_last_java_frame(_masm);
+  static void jfr_prologue(address the_pc, MacroAssembler* _masm) {
+    __ set_last_Java_frame(rsp, rbp, the_pc);
     __ movptr(c_rarg0, r15_thread);
   }
 
-  // Handle is dereference here using correct load constructs.
+  // Handle is dereferenced here using correct load constructs.
   static void jfr_epilogue(MacroAssembler* _masm) {
-    __ reset_last_Java_frame(false);
+    __ reset_last_Java_frame(true);
     Label null_jobject;
     __ testq(rax, rax);
     __ jcc(Assembler::zero, null_jobject);
     DecoratorSet decorators = ACCESS_READ | IN_NATIVE;
     BarrierSetAssembler* bs = BarrierSet::barrier_set()->barrier_set_assembler();
-    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg1, r15_thread);
+    bs->load_at(_masm, decorators, T_OBJECT, rax, Address(rax, 0), c_rarg0, r15_thread);
     __ bind(null_jobject);
   }
 
-  // For c2: c_rarg0 is junk, c_rarg1 is the thread id. Call to runtime to write a checkpoint.
-  // Runtime will return a jobject handle to the event writer. The handle is dereferenced and the return value
-  // is the event writer oop.
-  address generate_jfr_write_checkpoint() {
-    StubCodeMark mark(this, "jfr_write_checkpoint", "JFR C2 support for Virtual Threads");
+  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
+  RuntimeStub* generate_jfr_write_checkpoint() {
+    const char* name = "jfr_write_checkpoint";
+
+    enum layout {
+      rbp_off,
+      rbpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+
+    int insts_size = 512;
+    int locs_size = 64;
+    CodeBuffer code(name, insts_size, locs_size);
+    OopMapSet* oop_maps = new OopMapSet();
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* _masm = masm;
 
     address start = __ pc();
-    jfr_prologue(_masm);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_WRITE_CHECKPOINT_FUNCTION), 2);
-    jfr_epilogue(_masm);
+    __ enter();
+    int frame_complete = __ pc() - start;
+    address the_pc = __ pc();
+    jfr_prologue(the_pc, _masm);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint), 1);
+    __ reset_last_Java_frame(true); // no epilogue, not returning anything
+    __ leave();
     __ ret(0);
 
-    return start;
+    OopMap* map = new OopMap(framesize, 1); // rbp
+    oop_maps->add_gc_map(the_pc - start, map);
+
+    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
+      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
+                                    oop_maps, false);
+    return stub;
   }
 
   // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
   // The handle is dereferenced and the return value is the event writer oop.
-  address generate_jfr_get_event_writer() {
-    StubCodeMark mark(this, "jfr_get_event_writer", "JFR C1 support for Virtual Threads");
-    address start = __ pc();
+  RuntimeStub* generate_jfr_get_event_writer() {
+    const char* name = "jfr_get_event_writer";
 
-    jfr_prologue(_masm);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JFR_GET_EVENT_WRITER_FUNCTION), 1);
+    enum layout {
+      rbp_off,
+      rbpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+
+    int insts_size = 512;
+    int locs_size = 64;
+    CodeBuffer code(name, insts_size, locs_size);
+    OopMapSet* oop_maps = new OopMapSet();
+    MacroAssembler* masm = new MacroAssembler(&code);
+    MacroAssembler* _masm = masm;
+
+    address start = __ pc();
+    __ enter();
+    int frame_complete = __ pc() - start;
+    address the_pc = __ pc();
+    jfr_prologue(the_pc, _masm);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer), 1);
     jfr_epilogue(_masm);
+    __ leave();
     __ ret(0);
 
-    return start;
+    OopMap* map = new OopMap(framesize, 1); // rbp
+    oop_maps->add_gc_map(the_pc - start, map);
+
+    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
+      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
+                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
+                                    oop_maps, false);
+    return stub;
   }
 
 #endif // INCLUDE_JFR
@@ -8385,12 +7971,13 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_doYield_stub = generate_cont_doYield();
-    StubRoutines::_cont_doYield    = StubRoutines::_cont_doYield_stub->entry_point();
-    StubRoutines::_cont_jump_from_sp = generate_cont_jump_from_safepoint();
-    StubRoutines::_cont_interpreter_forced_preempt_return = generate_cont_interpreter_forced_preempt_return();
+    StubRoutines::_cont_doYield      = StubRoutines::_cont_doYield_stub == nullptr ? nullptr
+                                        : StubRoutines::_cont_doYield_stub->entry_point();
 
-    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = generate_jfr_write_checkpoint();)
-    JFR_ONLY(StubRoutines::_jfr_get_event_writer = generate_jfr_get_event_writer();)
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint_stub = generate_jfr_write_checkpoint();)
+    JFR_ONLY(StubRoutines::_jfr_write_checkpoint = StubRoutines::_jfr_write_checkpoint_stub->entry_point();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer_stub = generate_jfr_get_event_writer();)
+    JFR_ONLY(StubRoutines::_jfr_get_event_writer = StubRoutines::_jfr_get_event_writer_stub->entry_point();)
   }
 
   void generate_all() {
@@ -8438,6 +8025,11 @@ RuntimeStub* generate_cont_doYield() {
     StubRoutines::x86::_vector_long_shuffle_mask = generate_vector_mask("vector_long_shuffle_mask", 0x0000000100000000);
     StubRoutines::x86::_vector_long_sign_mask = generate_vector_mask("vector_long_sign_mask", 0x8000000000000000);
     StubRoutines::x86::_vector_iota_indices = generate_iota_indices("iota_indices");
+
+    if (UsePopCountInstruction && VM_Version::supports_avx2() && !VM_Version::supports_avx512_vpopcntdq()) {
+      // lut implementation influenced by counting 1s algorithm from section 5-1 of Hackers' Delight.
+      StubRoutines::x86::_vector_popcount_lut = generate_popcount_avx_lut("popcount_lut");
+    }
 
     // support for verify_oop (must happen after universe_init)
     if (VerifyOops) {
@@ -8676,9 +8268,9 @@ void StubGenerator_generate(CodeBuffer* code, int phase) {
 // on exit, rsp points to the ContinuationEntry
 // kills rax
 OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
-  assert (ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
-  assert (in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
+  assert(ContinuationEntry::size() % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::cont_offset())  % VMRegImpl::stack_slot_size == 0, "");
+  assert(in_bytes(ContinuationEntry::chunk_offset()) % VMRegImpl::stack_slot_size == 0, "");
 
   stack_slots += (int)ContinuationEntry::size()/wordSize;
   __ subptr(rsp, (int32_t)ContinuationEntry::size()); // place Continuation metadata
@@ -8695,13 +8287,16 @@ OopMap* continuation_enter_setup(MacroAssembler* masm, int& stack_slots) {
 
 // on entry c_rarg1 points to the continuation
 //          rsp points to ContinuationEntry
+//          c_rarg3 -- isVirtualThread
 // kills rax
 void fill_continuation_entry(MacroAssembler* masm) {
   DEBUG_ONLY(__ movl(Address(rsp, ContinuationEntry::cookie_offset()), 0x1234);)
 
   __ movptr(Address(rsp, ContinuationEntry::cont_offset()), c_rarg1);
+  __ movl  (Address(rsp, ContinuationEntry::flags_offset()), c_rarg3);
   __ movptr(Address(rsp, ContinuationEntry::chunk_offset()), (int32_t)0);
   __ movl(Address(rsp, ContinuationEntry::argsize_offset()), (int32_t)0);
+  __ movl(Address(rsp, ContinuationEntry::pin_count_offset()), (int32_t)0);
 
   __ movptr(rax, Address(r15_thread, JavaThread::cont_fastpath_offset()));
   __ movptr(Address(rsp, ContinuationEntry::parent_cont_fastpath_offset()), rax);

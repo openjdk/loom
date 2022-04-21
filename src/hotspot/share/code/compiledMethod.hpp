@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -327,7 +327,7 @@ public:
   address deopt_mh_handler_begin() const  { return _deopt_mh_handler_begin; }
 
   address deopt_handler_begin() const { return _deopt_handler_begin; }
-  address* deopt_handler_begin_addr()        { return &_deopt_handler_begin; }
+  address* deopt_handler_begin_addr() { return &_deopt_handler_begin; }
   // Deopt
   // Return true is the PC is one would expect if the frame is being deopted.
   inline bool is_deopt_pc(address pc);
@@ -339,6 +339,7 @@ public:
   void    set_original_pc(const frame* fr, address pc) { *orig_pc_addr(fr) = pc; }
 
   virtual int orig_pc_offset() = 0;
+
 private:
   address* orig_pc_addr(const frame* fr);
 

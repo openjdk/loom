@@ -40,15 +40,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.function.Consumer;
 
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Unsafe;
 
 /**
  * Base Selector implementation class.
@@ -57,8 +51,6 @@ import jdk.internal.misc.Unsafe;
 public abstract class SelectorImpl
     extends AbstractSelector
 {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
     // The set of keys registered with this Selector
     private final Set<SelectionKey> keys;
 
@@ -74,9 +66,6 @@ public abstract class SelectorImpl
 
     // used to check for reentrancy
     private boolean inSelect;
-
-    // ManagedBlocker for use by virtual threads to do selection operations
-    private ManagedSelect managedSelect;
 
     protected SelectorImpl(SelectorProvider sp) {
         super(sp);
@@ -182,102 +171,6 @@ public abstract class SelectorImpl
     public final int selectNow(Consumer<SelectionKey> action) throws IOException {
         Objects.requireNonNull(action);
         return lockAndDoSelect(action, 0);
-    }
-
-    /**
-     * ManagedBlocker for use by virtual threads to do selection operations
-     * on the carrier thread.
-     */
-    private static class ManagedSelect
-            implements ForkJoinPool.ManagedBlocker, Callable<Void> {
-        private final SelectorImpl selector;
-        private long timeout;
-        private int numEntries;
-        private boolean done;
-
-        ManagedSelect(SelectorImpl selector) {
-            this.selector = selector;
-        }
-
-        void prepare(long timeout) {
-            this.timeout = timeout;
-        }
-
-        int result() {
-            return numEntries;
-        }
-
-        @Override
-        public boolean block() {
-            try {
-                numEntries = selector.implPoll(timeout);
-            } catch (IOException ioe) {
-                Unsafe.getUnsafe().throwException(ioe);
-            } finally {
-                done = true;
-            }
-            return true;
-        }
-
-        @Override
-        public boolean isReleasable() {
-            return done;
-        }
-
-        @Override
-        public Void call() {
-            done = false;
-            try {
-                ForkJoinPool.managedBlock(this);
-            } catch (InterruptedException e) {
-                throw new InternalError(e);
-            }
-            return null;
-        }
-    }
-
-    /**
-     * Returns the ManagedSelect object for this Selector if running on a virtual
-     * thread and its carrier is a ForkJoinWorkerThread, otherwise returns null.
-     */
-    private ManagedSelect managedSelect() {
-        if (Thread.currentThread().isVirtual()
-                && JLA.currentCarrierThread() instanceof ForkJoinWorkerThread) {
-            if (managedSelect == null)
-                managedSelect = new ManagedSelect(this);
-            return managedSelect;
-        } else {
-            return null;
-        }
-    }
-
-    /**
-     * Invoked by doSelect to poll for file descriptors that are ready for I/O
-     * operations. If invoked on a virtual thread mounted on a ForkJoinWorkerThread
-     * then blocking polls are done in ForkJoinPool.ManagedBlocker.
-     */
-    protected final int poll(long timeout) throws IOException {
-        assert Thread.holdsLock(this);
-        ManagedSelect managedSelect;
-        if (timeout != 0 && (managedSelect = managedSelect()) != null) {
-            managedSelect.prepare(timeout);
-            try {
-                JLA.executeOnCarrierThread(managedSelect);
-            } catch (Exception e) {
-                Unsafe.getUnsafe().throwException(e);
-            }
-            return managedSelect.result();
-        } else {
-            return implPoll(timeout);
-        }
-    }
-
-    /**
-     * Polls for file descriptors that are ready for I/O operations.
-     * This is the low-level/inner most poll, should be invoked by doSelect.
-     */
-    protected int implPoll(long timeout) throws IOException {
-        throw new RuntimeException("Not implemented");
     }
 
     /**

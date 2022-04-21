@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -49,9 +49,10 @@ class UnixDirectoryStream
     private final DirectoryStream.Filter<? super Path> filter;
 
     // used to coordinate closing of directory stream
-    private final ReentrantReadWriteLock streamLock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock streamLock =
+        new ReentrantReadWriteLock(true);
 
-    // indicates if directory stream is open
+    // indicates if directory stream is open (synchronize on closeLock)
     private volatile boolean isClosed;
 
     // directory iterator
@@ -66,7 +67,7 @@ class UnixDirectoryStream
         this.filter = filter;
     }
 
-    protected final UnixPath directory() {
+    final UnixPath directory() {
         return dir;
     }
 
@@ -129,8 +130,6 @@ class UnixDirectoryStream
      * Iterator implementation
      */
     private class UnixDirectoryIterator implements Iterator<Path> {
-        private final ReentrantLock iteratorLock = new ReentrantLock();
-
         // true when at EOF
         private boolean atEof;
 
@@ -154,7 +153,7 @@ class UnixDirectoryStream
 
         // Returns next entry (or null)
         private Path readNextEntry() {
-            assert iteratorLock.isHeldByCurrentThread();
+            assert Thread.holdsLock(this);
 
             for (;;) {
                 byte[] nameAsBytes = null;
@@ -194,34 +193,24 @@ class UnixDirectoryStream
         }
 
         @Override
-        public boolean hasNext() {
-            iteratorLock.tryLock();
-            try {
-                if (nextEntry == null && !atEof)
-                    nextEntry = readNextEntry();
-                return nextEntry != null;
-            } finally {
-                iteratorLock.unlock();
-            }
+        public synchronized boolean hasNext() {
+            if (nextEntry == null && !atEof)
+                nextEntry = readNextEntry();
+            return nextEntry != null;
         }
 
         @Override
-        public Path next() {
-            iteratorLock.tryLock();
-            try {
-                Path result;
-                if (nextEntry == null && !atEof) {
-                    result = readNextEntry();
-                } else {
-                    result = nextEntry;
-                    nextEntry = null;
-                }
-                if (result == null)
-                    throw new NoSuchElementException();
-                return result;
-            } finally {
-                iteratorLock.unlock();
+        public synchronized Path next() {
+            Path result;
+            if (nextEntry == null && !atEof) {
+                result = readNextEntry();
+            } else {
+                result = nextEntry;
+                nextEntry = null;
             }
+            if (result == null)
+                throw new NoSuchElementException();
+            return result;
         }
 
         @Override

@@ -25,22 +25,30 @@
 #ifndef SHARE_VM_RUNTIME_CONTINUATION_HPP
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
-#include "oops/access.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "memory/iterator.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "jni.h"
 
-// The order of this struct matters as it's directly manipulated by assembly code (push/pop)
-
 class ContinuationEntry;
 
-// TODO: remove
 class Continuations : public AllStatic {
+private:
+  static uint64_t _gc_epoch;
+
 public:
-  static void print_statistics();
   static void init();
+  static bool enabled(); // TODO: used while virtual threads are in Preview; remove when GA
+
+  // The GC epoch and marking_cycle code below is there to support sweeping
+  // nmethods in loom stack chunks.
+  static uint64_t gc_epoch();
+  static bool is_gc_marking_cycle_active();
+  static uint64_t previous_completed_gc_marking_cycle();
+  static void on_gc_marking_cycle_start();
+  static void on_gc_marking_cycle_finish();
+  static void arm_all_nmethods();
 };
 
 void continuations_init();
@@ -52,38 +60,41 @@ class Continuation : AllStatic {
 public:
   static void init();
 
-  static int freeze(JavaThread* thread, intptr_t* sp);
+  static address freeze_entry();
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
-  static intptr_t* thaw(JavaThread* thread, int kind);
-  static int try_force_yield(JavaThread* thread, oop cont);
-  static void jump_from_safepoint(JavaThread* thread);
+  static address thaw_entry();
 
-  static ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
-  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop cont);
+  static const ContinuationEntry* last_continuation(const JavaThread* thread, oop cont_scope);
+  static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
+  static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
+
+  static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f) {
+    assert(is_continuation_enterSpecial(f), "");
+    ContinuationEntry* entry = (ContinuationEntry*)f.unextended_sp();
+    assert(entry == get_continuation_entry_for_sp(thread, f.sp()-2), "mismatched entry");
+    return entry;
+  }
+
+  static bool is_continuation_mounted(JavaThread* thread, oop continuation);
+  static bool is_continuation_scope_mounted(JavaThread* thread, oop cont_scope);
 
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);
   static bool is_continuation_enterSpecial(const frame& f);
   static bool is_continuation_entry_frame(const frame& f, const RegisterMap *map);
 
-  static bool is_mounted(JavaThread* thread, oop cont_scope);
-
-  static oop  get_continuation_for_frame(JavaThread* thread, const frame& f);
-
-  static bool is_frame_in_continuation(ContinuationEntry* cont, const frame& f);
+  static bool is_frame_in_continuation(const ContinuationEntry* entry, const frame& f);
   static bool is_frame_in_continuation(JavaThread* thread, const frame& f);
 
-  static bool has_last_Java_frame(oop continuation);
+  static bool has_last_Java_frame(oop continuation, frame* frame, RegisterMap* map);
   static frame last_frame(oop continuation, RegisterMap *map);
   static frame top_frame(const frame& callee, RegisterMap* map);
   static javaVFrame* last_java_vframe(Handle continuation, RegisterMap *map);
   static frame continuation_parent_frame(RegisterMap* map);
 
-  static oop continuation_scope(oop cont);
+  static oop continuation_scope(oop continuation);
   static bool is_scope_bottom(oop cont_scope, const frame& fr, const RegisterMap* map);
 
-  static stackChunkOop last_nonempty_chunk(oop continuation);
-  static stackChunkOop continuation_parent_chunk(stackChunkOop chunk);
   static bool is_in_usable_stack(address addr, const RegisterMap* map);
 
   // pins/unpins the innermost mounted continuation; returns true on success or false if there's no continuation or the operation failed
@@ -103,99 +114,12 @@ public:
 
 private:
   friend class InstanceStackChunkKlass;
-  static void emit_chunk_iterate_event(oop chunk, int num_frames, int num_oops);
 
 #ifdef ASSERT
 public:
-  static bool debug_is_stack_chunk(Klass* klass);
-  static bool debug_is_stack_chunk(oop obj);
-  static bool debug_is_continuation(Klass* klass);
-  static bool debug_is_continuation(oop obj);
-  static bool debug_verify_continuation(oop cont);
-  static void debug_print_continuation(oop cont, outputStream* st = NULL);
-#endif
-};
-
-// Metadata stored in the continuation entry frame
-class ContinuationEntry {
-public:
-#ifdef ASSERT
-  int cookie;
-  static ByteSize cookie_offset() { return byte_offset_of(ContinuationEntry, cookie); }
-  void verify_cookie() { assert(this->cookie == 0x1234, ""); }
-#endif
-
-public:
-  static int return_pc_offset; // friend gen_continuation_enter
-  static void set_enter_nmethod(nmethod* nm); // friend SharedRuntime::generate_native_wrapper
-
-private:
-  static nmethod* continuation_enter;
-  static address return_pc;
-
-private:
-  ContinuationEntry* _parent;
-  oopDesc* _cont;
-  oopDesc* _chunk;
-  int _argsize;
-  intptr_t* _parent_cont_fastpath;
-  int _parent_held_monitor_count;
-
-public:
-  static ByteSize parent_offset()   { return byte_offset_of(ContinuationEntry, _parent); }
-  static ByteSize cont_offset()     { return byte_offset_of(ContinuationEntry, _cont); }
-  static ByteSize chunk_offset()    { return byte_offset_of(ContinuationEntry, _chunk); }
-  static ByteSize argsize_offset()  { return byte_offset_of(ContinuationEntry, _argsize); }
-
-  static void setup_oopmap(OopMap* map) {
-    map->set_oop(VMRegImpl::stack2reg(in_bytes(cont_offset())  / VMRegImpl::stack_slot_size));
-    map->set_oop(VMRegImpl::stack2reg(in_bytes(chunk_offset()) / VMRegImpl::stack_slot_size));
-  }
-
-  static ByteSize parent_cont_fastpath_offset()      { return byte_offset_of(ContinuationEntry, _parent_cont_fastpath); }
-  static ByteSize parent_held_monitor_count_offset() { return byte_offset_of(ContinuationEntry, _parent_held_monitor_count); }
-
-public:
-  static size_t size() { return align_up((int)sizeof(ContinuationEntry), 2*wordSize); }
-
-  ContinuationEntry* parent() { return _parent; }
-
-  static address entry_pc() { return return_pc; }
-  intptr_t* entry_sp() { return (intptr_t*)this; }
-  intptr_t* entry_fp() { return *(intptr_t**)((address)this + size()); } // TODO PD
-
-  int argsize() { return _argsize; }
-  void set_argsize(int value) { _argsize = value; }
-
-  intptr_t* parent_cont_fastpath() { return _parent_cont_fastpath; }
-  void set_parent_cont_fastpath(intptr_t* x) { _parent_cont_fastpath = x; }
-
-  static ContinuationEntry* from_frame(const frame& f);
-  frame to_frame();
-  void update_register_map(RegisterMap* map);
-  void flush_stack_processing(JavaThread* thread);
-
-  intptr_t* bottom_sender_sp() {
-    intptr_t* sp = entry_sp() - argsize();
-#ifdef _LP64
-    sp = align_down(sp, 16);
-#endif
-    return sp;
-  }
-
-  oop continuation() {
-    oop snapshot = _cont;
-    return NativeAccess<>::oop_load(&snapshot);
-  }
-
-  oop cont_oop() { return this != NULL ? continuation() : (oop)NULL; }
-  oop cont_raw() { return _cont; }
-  oop chunk()        { return _chunk; }
-  void set_continuation(oop c) { _cont = c;  }
-  void set_chunk(oop c)        { _chunk = c; }
-
-#ifdef ASSERT
-  static bool assert_entry_frame_laid_out(JavaThread* thread);
+  static void debug_verify_continuation(oop continuation);
+  static void print(oop continuation);
+  static void print_on(outputStream* st, oop continuation);
 #endif
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,15 +45,8 @@
     fflush(stdout); \
   }
 
-#define NSK_DISPLAY0 LOG
-#define NSK_DISPLAY1 LOG
-#define NSK_DISPLAY2 LOG
-#define NSK_DISPLAY3 LOG
+#define COMPLAIN LOG
 
-
-#define NSK_COMPLAIN0 LOG
-#define NSK_COMPLAIN1 LOG
-#define NSK_COMPLAIN3 LOG
 
 const char* TranslateState(jint flags);
 const char* TranslateError(jvmtiError err);
@@ -91,7 +84,6 @@ jlong_to_string(jlong value, char *string) {
 static void
 fatal(JNIEnv* jni, const char* msg) {
   jni->FatalError(msg);
-  fflush(stdout);
 }
 
 
@@ -109,15 +101,15 @@ check_jvmti_status(JNIEnv* jni, jvmtiError err, const char* msg) {
 jrawMonitorID
 create_raw_monitor(jvmtiEnv *jvmti, const char* name) {
   jrawMonitorID lock;
-  jvmtiError err;
-  err = jvmti->CreateRawMonitor(name, &lock);
+  jvmtiError err = jvmti->CreateRawMonitor(name, &lock);
   if (err != JVMTI_ERROR_NONE) {
     return nullptr;
   }
   return lock;
 }
 
-void destroy_raw_monitor(jvmtiEnv *jvmti, JNIEnv *jni, jrawMonitorID lock) {
+void
+destroy_raw_monitor(jvmtiEnv *jvmti, JNIEnv *jni, jrawMonitorID lock) {
   check_jvmti_status(jni, jvmti->DestroyRawMonitor(lock), "DestroyRawMonitor failed.");
 }
 
@@ -126,13 +118,14 @@ class RawMonitorLocker {
   jvmtiEnv* _jvmti;
   JNIEnv* _jni;
   jrawMonitorID _monitor;
+
  public:
   RawMonitorLocker(jvmtiEnv *jvmti,JNIEnv* jni, jrawMonitorID monitor):_jvmti(jvmti), _jni(jni), _monitor(monitor) {
     check_jvmti_status(_jni, _jvmti->RawMonitorEnter(_monitor), "Fatal Error in RawMonitorEnter.");
   }
+
   ~RawMonitorLocker() {
     check_jvmti_status(_jni, _jvmti->RawMonitorExit(_monitor), "Fatal Error in RawMonitorEnter.");
-
   }
 
   void wait(jlong millis) {
@@ -153,15 +146,11 @@ class RawMonitorLocker {
 
 };
 
-
 static void
 deallocate(jvmtiEnv *jvmti, JNIEnv* jni, void* ptr) {
-  jvmtiError err;
-
-  err = jvmti->Deallocate((unsigned char*)ptr);
+  jvmtiError err = jvmti->Deallocate((unsigned char*)ptr);
   check_jvmti_status(jni, err, "deallocate: error in JVMTI Deallocate call");
 }
-
 
 static char*
 get_method_class_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
@@ -258,6 +247,9 @@ get_thread_name(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
 
   memset(&thr_info, 0, sizeof(thr_info));
   err = jvmti->GetThreadInfo(thread, &thr_info);
+  if (err == JVMTI_ERROR_WRONG_PHASE || err == JVMTI_ERROR_THREAD_NOT_ALIVE) {
+    return NULL; // VM or target thread completed its work
+  }
   check_jvmti_status(jni, err, "get_thread_name: error in JVMTI GetThreadInfo call");
 
   return thr_info.name == NULL ? (char*)"<Unnamed thread>" : thr_info.name;
@@ -273,7 +265,6 @@ get_method_name(jvmtiEnv *jvmti, JNIEnv* jni, jmethodID method) {
 
   return mname;
 }
-
 
 static jclass
 find_class(jvmtiEnv *jvmti, JNIEnv *jni, jobject loader, const char* cname) {
@@ -337,9 +328,8 @@ static void
 print_current_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
   jint count = 0;
-  jvmtiError err;
 
-  err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  jvmtiError err = jvmti->GetStackTrace(NULL, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
   LOG("JVMTI Stack Trace for current thread: frame count: %d\n", count);
@@ -354,9 +344,8 @@ print_stack_trace(jvmtiEnv *jvmti, JNIEnv* jni, jthread thread) {
   jvmtiFrameInfo frames[MAX_FRAME_COUNT_PRINT_STACK_TRACE];
   char* tname = get_thread_name(jvmti, jni, thread);
   jint count = 0;
-  jvmtiError err;
 
-  err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
+  jvmtiError err = jvmti->GetStackTrace(thread, 0, MAX_FRAME_COUNT_PRINT_STACK_TRACE, frames, &count);
   check_jvmti_status(jni, err, "print_stack_trace: error in JVMTI GetStackTrace");
 
   LOG("JVMTI Stack Trace for thread %s: frame count: %d\n", tname, count);
@@ -736,13 +725,9 @@ jthread find_thread_by_name(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
   return found_thread;
 }
 
-jthread nsk_jvmti_threadByName(jvmtiEnv* jvmti, JNIEnv* jni, const char name[]) {
-  return find_thread_by_name(jvmti, jni, name);
-}
 /*
  * JVMTI Extension Mechanism
  */
-
 static const jvmtiEvent
   EXT_EVENT_VIRTUAL_THREAD_MOUNT   = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 2),
   EXT_EVENT_VIRTUAL_THREAD_UNMOUNT = (jvmtiEvent)((int)JVMTI_MIN_EVENT_TYPE_VAL - 3);
@@ -845,7 +830,7 @@ set_event_notification_mode(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode mode, j
 }
 
 int
-nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
+enable_events_notifications(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int size, jvmtiEvent list[], jthread thread) {
   for (int i = 0; i < size; i++) {
     check_jvmti_status(jni, jvmti->SetEventNotificationMode(enable, list[i], thread), "");
   }
@@ -853,7 +838,7 @@ nsk_jvmti_enableEvents(jvmtiEnv* jvmti, JNIEnv* jni, jvmtiEventMode enable, int 
 }
 
 void
-millisleep(int millis) {
+sleep_ms(int millis) {
 #ifdef _WIN32
   Sleep(millis);
 #else
@@ -862,7 +847,7 @@ millisleep(int millis) {
 }
 
 void
-nsk_jvmti_sleep(jlong timeout) {
+sleep_sec(jlong timeout) {
   int seconds = (int)((timeout + 999) / 1000);
 #ifdef _WIN32
   Sleep(1000L * seconds);

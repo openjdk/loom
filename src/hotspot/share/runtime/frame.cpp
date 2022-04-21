@@ -36,14 +36,15 @@
 #include "logging/log.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
 #include "oops/markWord.hpp"
 #include "oops/method.hpp"
 #include "oops/methodData.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "oops/verifyOopClosure.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/continuation.hpp"
+#include "runtime/continuationEntry.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
@@ -70,8 +71,9 @@ RegisterMap::RegisterMap(JavaThread *thread, bool update_map, bool process_frame
   NOT_PRODUCT(_async = false;)
 
   if (walk_cont && thread != NULL && thread->last_continuation() != NULL) {
-    _chunk = stackChunkHandle(Thread::current(), NULL, true);
+    _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
   }
+  _chunk_index = -1;
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -88,7 +90,8 @@ RegisterMap::RegisterMap(oop continuation, bool update_map) {
   NOT_PRODUCT(_skip_missing = false;)
   NOT_PRODUCT(_async = false;)
 
-  _chunk = stackChunkHandle(Thread::current(), NULL, true);
+  _chunk = stackChunkHandle(Thread::current()->handle_area()->allocate_null_handle(), true /* dummy */);
+  _chunk_index = -1;
 
 #ifndef PRODUCT
   for (int i = 0; i < reg_count ; i++ ) _location[i] = NULL;
@@ -108,7 +111,8 @@ RegisterMap::RegisterMap(const RegisterMap* map) {
   NOT_PRODUCT(_async = map->_async;)
 
   // only the original RegisterMap's handle lives long enough for StackWalker; this is bound to cause trouble with nested continuations.
-  _chunk = map->_chunk; // stackChunkHandle(Thread::current(), map->_chunk(), map->_chunk.not_null()); //
+  _chunk = map->_chunk;
+  _chunk_index = map->_chunk_index;
 
   pd_initialize_from(map);
   if (update_map()) {
@@ -134,12 +138,16 @@ oop RegisterMap::cont() const {
 }
 
 void RegisterMap::set_stack_chunk(stackChunkOop chunk) {
-  assert (chunk == NULL || _walk_cont, "");
-  assert (chunk == NULL || chunk->is_stackChunk(), "");
-  assert (chunk == NULL || _chunk.not_null(), "");
+  assert(chunk == NULL || _walk_cont, "");
+  assert(chunk == NULL || _chunk.not_null(), "");
   if (_chunk.is_null()) return;
-  log_trace(jvmcont)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
-  *(_chunk.raw_value()) = chunk; // reuse handle. see comment above in the constructor
+  log_trace(continuations)("set_stack_chunk: " INTPTR_FORMAT " this: " INTPTR_FORMAT, p2i((oopDesc*)chunk), p2i(this));
+  _chunk.replace(chunk); // reuse handle. see comment above in the constructor
+  if (chunk == NULL) {
+    _chunk_index = -1;
+  } else {
+    _chunk_index++;
+  }
 }
 
 void RegisterMap::clear() {
@@ -169,7 +177,7 @@ void RegisterMap::print_on(outputStream* st) const {
   for(int i = 0; i < reg_count; i++) {
 
     VMReg r = VMRegImpl::as_VMReg(i);
-    intptr_t* src = (intptr_t*) location(r, (intptr_t*)NULL);
+    intptr_t* src = (intptr_t*) location(r, nullptr);
     if (src != NULL) {
 
       r->print_on(st);
@@ -272,6 +280,10 @@ bool frame::is_first_java_frame() const {
   return s.is_first_frame();
 }
 
+bool frame::is_first_vthread_frame(JavaThread* thread) const {
+  return Continuation::is_continuation_enterSpecial(*this)
+    && Continuation::get_continuation_entry_for_entry_frame(thread, *this)->is_virtual_thread();
+}
 
 bool frame::entry_frame_is_first() const {
   return entry_frame_call_wrapper()->is_first_frame();
@@ -331,19 +343,13 @@ bool frame::can_be_deoptimized() const {
 }
 
 void frame::deoptimize(JavaThread* thread) {
-  // tty->print_cr(">>> frame::deoptimize");
-  // print_on(tty);
   assert(thread == NULL
          || (thread->frame_anchor()->has_last_Java_frame() &&
              thread->frame_anchor()->walkable()), "must be");
   // Schedule deoptimization of an nmethod activation with this frame.
   assert(_cb != NULL && _cb->is_compiled(), "must be");
 
-  // log_develop_trace(jvmcont)(">>>> frame::deoptimize %ld", os::current_thread_id());
-  // tty->print_cr(">>>> frame::deoptimize: %ld", os::current_thread_id()); print_on(tty);
-
-  // If the call site is a MethodHandle call site use the MH deopt
-  // handler.
+  // If the call site is a MethodHandle call site use the MH deopt handler.
   CompiledMethod* cm = (CompiledMethod*) _cb;
   address deopt = cm->is_method_handle_return(pc()) ?
                         cm->deopt_mh_handler_begin() :
@@ -441,14 +447,10 @@ void frame::interpreter_frame_set_mdp(address mdp) {
   *interpreter_frame_mdp_addr() = (intptr_t)mdp;
 }
 
-template BasicObjectLock* frame::next_monitor_in_interpreter_frame<frame::addressing::ABSOLUTE>(BasicObjectLock* current) const;
-template BasicObjectLock* frame::next_monitor_in_interpreter_frame<frame::addressing::RELATIVE>(BasicObjectLock* current) const;
-
-template <frame::addressing pointers>
 BasicObjectLock* frame::next_monitor_in_interpreter_frame(BasicObjectLock* current) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
 #ifdef ASSERT
-  interpreter_frame_verify_monitor<pointers>(current);
+  interpreter_frame_verify_monitor(current);
 #endif
   BasicObjectLock* next = (BasicObjectLock*) (((intptr_t*) current) + interpreter_frame_monitor_size());
   return next;
@@ -466,46 +468,33 @@ BasicObjectLock* frame::previous_monitor_in_interpreter_frame(BasicObjectLock* c
 
 // Interpreter locals and expression stack locations.
 
-template intptr_t* frame::interpreter_frame_local_at<frame::addressing::ABSOLUTE>(int index) const;
-template intptr_t* frame::interpreter_frame_local_at<frame::addressing::RELATIVE>(int index) const;
-
-template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_local_at(int index) const {
   const int n = Interpreter::local_offset_in_bytes(index)/wordSize;
-  intptr_t* first = pointers == addressing::RELATIVE
-                             ? fp() + (intptr_t)*interpreter_frame_locals_addr()
+  intptr_t* first = _on_heap ? fp() + (intptr_t)*interpreter_frame_locals_addr()
                              : *interpreter_frame_locals_addr();
   return &(first[n]);
 }
 
-template intptr_t* frame::interpreter_frame_expression_stack_at<frame::addressing::ABSOLUTE>(jint index) const;
-template intptr_t* frame::interpreter_frame_expression_stack_at<frame::addressing::RELATIVE>(jint index) const;
-
-template <frame::addressing pointers>
 intptr_t* frame::interpreter_frame_expression_stack_at(jint offset) const {
   const int i = offset * interpreter_frame_expression_stack_direction();
   const int n = i * Interpreter::stackElementWords;
-  return &(interpreter_frame_expression_stack<pointers>()[n]);
+  return &(interpreter_frame_expression_stack()[n]);
 }
 
-template jint frame::interpreter_frame_expression_stack_size<frame::addressing::ABSOLUTE>() const;
-template jint frame::interpreter_frame_expression_stack_size<frame::addressing::RELATIVE>() const;
-
-template <frame::addressing pointers>
 jint frame::interpreter_frame_expression_stack_size() const {
   // Number of elements on the interpreter expression stack
   // Callers should span by stackElementWords
   int element_size = Interpreter::stackElementWords;
   size_t stack_size = 0;
   if (frame::interpreter_frame_expression_stack_direction() < 0) {
-    stack_size = (interpreter_frame_expression_stack<pointers>() -
-                  interpreter_frame_tos_address<pointers>() + 1)/element_size;
+    stack_size = (interpreter_frame_expression_stack() -
+                  interpreter_frame_tos_address() + 1)/element_size;
   } else {
-    stack_size = (interpreter_frame_tos_address<pointers>() -
-                  interpreter_frame_expression_stack<pointers>() + 1)/element_size;
+    stack_size = (interpreter_frame_tos_address() -
+                  interpreter_frame_expression_stack() + 1)/element_size;
   }
-  assert( stack_size <= (size_t)max_jint, "stack size too big");
-  return ((jint)stack_size);
+  assert(stack_size <= (size_t)max_jint, "stack size too big");
+  return (jint)stack_size;
 }
 
 
@@ -560,39 +549,33 @@ void frame::print_value_on(outputStream* st, JavaThread *thread) const {
 #endif
 }
 
-
-template void frame::print_on<frame::addressing::ABSOLUTE>(outputStream* st) const;
-template void frame::print_on<frame::addressing::RELATIVE>(outputStream* st) const;
-
-template <frame::addressing pointers>
 void frame::print_on(outputStream* st) const {
   print_value_on(st,NULL);
   if (is_interpreted_frame()) {
-    interpreter_frame_print_on<pointers>(st);
+    interpreter_frame_print_on(st);
   }
 }
 
-template <frame::addressing pointers>
 void frame::interpreter_frame_print_on(outputStream* st) const {
 #ifndef PRODUCT
   assert(is_interpreted_frame(), "Not an interpreted frame");
   jint i;
   for (i = 0; i < interpreter_frame_method()->max_locals(); i++ ) {
-    intptr_t x = *interpreter_frame_local_at<pointers>(i);
+    intptr_t x = *interpreter_frame_local_at(i);
     st->print(" - local  [" INTPTR_FORMAT "]", x);
     st->fill_to(23);
     st->print_cr("; #%d", i);
   }
-  for (i = interpreter_frame_expression_stack_size<pointers>() - 1; i >= 0; --i ) {
-    intptr_t x = *interpreter_frame_expression_stack_at<pointers>(i);
+  for (i = interpreter_frame_expression_stack_size() - 1; i >= 0; --i ) {
+    intptr_t x = *interpreter_frame_expression_stack_at(i);
     st->print(" - stack  [" INTPTR_FORMAT "]", x);
     st->fill_to(23);
     st->print_cr("; #%d", i);
   }
   // locks for synchronization
-  for (BasicObjectLock* current = interpreter_frame_monitor_end<pointers>();
+  for (BasicObjectLock* current = interpreter_frame_monitor_end();
        current < interpreter_frame_monitor_begin();
-       current = next_monitor_in_interpreter_frame<pointers>(current)) {
+       current = next_monitor_in_interpreter_frame(current)) {
     st->print(" - obj    [");
     current->obj()->print_value_on(st);
     st->print_cr("]");
@@ -607,7 +590,7 @@ void frame::interpreter_frame_print_on(outputStream* st) const {
   st->fill_to(23);
   st->print_cr("; @%d", interpreter_frame_bci());
   // locals
-  st->print_cr(" - locals [" INTPTR_FORMAT "]", p2i(interpreter_frame_local_at<pointers>(0)));
+  st->print_cr(" - locals [" INTPTR_FORMAT "]", p2i(interpreter_frame_local_at(0)));
   // method
   st->print(" - method [" INTPTR_FORMAT "]", p2i(interpreter_frame_method()));
   st->fill_to(23);
@@ -759,7 +742,6 @@ void frame::print_on_error(outputStream* st, char* buf, int buflen, bool verbose
   be used. So we save the max_stack value in the FrameClosure object and pass it
   down to the interpreter_frame_expression_stack_at method
 */
-template <frame::addressing pointers>
 class InterpreterFrameClosure : public OffsetClosure {
  private:
   const frame* _fr;
@@ -779,18 +761,18 @@ class InterpreterFrameClosure : public OffsetClosure {
   void offset_do(int offset) {
     oop* addr;
     if (offset < _max_locals) {
-      addr = (oop*) _fr->interpreter_frame_local_at<pointers>(offset);
+      addr = (oop*) _fr->interpreter_frame_local_at(offset);
       assert((intptr_t*)addr >= _fr->sp(), "must be inside the frame");
       _f->do_oop(addr);
     } else {
-      addr = (oop*) _fr->interpreter_frame_expression_stack_at<pointers>((offset - _max_locals));
+      addr = (oop*) _fr->interpreter_frame_expression_stack_at((offset - _max_locals));
       // In case of exceptions, the expression stack is invalid and the esp will be reset to express
       // this condition. Therefore, we call f only if addr is 'inside' the stack (i.e., addr >= esp for Intel).
       bool in_stack;
       if (frame::interpreter_frame_expression_stack_direction() > 0) {
-        in_stack = (intptr_t*)addr <= _fr->interpreter_frame_tos_address<pointers>();
+        in_stack = (intptr_t*)addr <= _fr->interpreter_frame_tos_address();
       } else {
-        in_stack = (intptr_t*)addr >= _fr->interpreter_frame_tos_address<pointers>();
+        in_stack = (intptr_t*)addr >= _fr->interpreter_frame_tos_address();
       }
       if (in_stack) {
         _f->do_oop(addr);
@@ -900,37 +882,15 @@ oop* frame::interpreter_callee_receiver_addr(Symbol* signature) {
 }
 
 oop frame::interpreter_callee_receiver(Symbol* signature) {
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  oop r = *interpreter_callee_receiver_addr(signature);
-  r = NativeAccess<>::oop_load(&r);
-  return r;
+  return *interpreter_callee_receiver_addr(signature);
 }
 
-template <frame::addressing pointers>
 void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const {
-  Thread* current = Thread::current();
-  methodHandle m(current, interpreter_frame_method());
-  jint bci = interpreter_frame_bci();
-
-  ResourceMark rm;
-  InterpreterOopMap mask;
-  if (query_oop_map_cache) {
-    m->mask_for(bci, &mask);
-  } else {
-    OopMapCache::compute_one_oop_map(m, bci, &mask);
-  }
-
-  oops_interpreted_do0<pointers>(f, map, m, bci, mask);
-}
-
-// Initialize explicitly so that these can be used only with definitions.
-// TODO: Rectify as Loom stabilizes...
-template void frame::oops_interpreted_do<frame::addressing::ABSOLUTE>(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
-template void frame::oops_interpreted_do<frame::addressing::RELATIVE>(OopClosure* f, const RegisterMap* map, bool query_oop_map_cache) const;
-
-template <frame::addressing pointers>
-void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHandle m, jint bci, const InterpreterOopMap& mask) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
+  Thread *thread = Thread::current();
+  methodHandle m (thread, interpreter_frame_method());
+  jint      bci = interpreter_frame_bci();
+
   assert(!Universe::heap()->is_in(m()),
           "must be valid oop");
   assert(m->is_method(), "checking frame value");
@@ -940,12 +900,12 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
 
   // Handle the monitor elements in the activation
   for (
-    BasicObjectLock* current = interpreter_frame_monitor_end<pointers>();
+    BasicObjectLock* current = interpreter_frame_monitor_end();
     current < interpreter_frame_monitor_begin();
-    current = next_monitor_in_interpreter_frame<pointers>(current)
+    current = next_monitor_in_interpreter_frame(current)
   ) {
 #ifdef ASSERT
-    interpreter_frame_verify_monitor<pointers>(current);
+    interpreter_frame_verify_monitor(current);
 #endif
     current->oops_do(f);
   }
@@ -971,12 +931,12 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
   // interpreted or compiled frame.
   if (!m->is_native()) {
     Bytecode_invoke call = Bytecode_invoke_check(m, bci);
-    if (call.is_valid()) {
+    if (map != nullptr && call.is_valid()) {
       signature = call.signature();
       has_receiver = call.has_receiver();
-      if (map != NULL && map->include_argument_oops() &&
-          interpreter_frame_expression_stack_size<pointers>() > 0) {
-        // ResourceMark rm(thread);  // is this right ???
+      if (map->include_argument_oops() &&
+          interpreter_frame_expression_stack_size() > 0) {
+        ResourceMark rm(thread);  // is this right ???
         // we are at a call site & the expression stack is not empty
         // => process callee's arguments
         //
@@ -992,10 +952,15 @@ void frame::oops_interpreted_do0(OopClosure* f, const RegisterMap* map, methodHa
     }
   }
 
-  InterpreterFrameClosure<pointers> blk(this, max_locals, m->max_stack(), f);
+  InterpreterFrameClosure blk(this, max_locals, m->max_stack(), f);
 
   // process locals & expression stack
-  // mask.print();
+  InterpreterOopMap mask;
+  if (query_oop_map_cache) {
+    m->mask_for(bci, &mask);
+  } else {
+    OopMapCache::compute_one_oop_map(m, bci, &mask);
+  }
   mask.iterate_oop(&blk);
 }
 
@@ -1054,8 +1019,9 @@ class CompiledArgumentOopFinder: public SignatureIterator {
     oop *loc = _fr.oopmapreg_to_oop_location(reg, _reg_map);
   #ifdef ASSERT
     if (loc == NULL) {
-      if (_reg_map->should_skip_missing())
+      if (_reg_map->should_skip_missing()) {
         return;
+      }
       tty->print_cr("Error walking frame oops:");
       _fr.print_on(tty);
       assert(loc != NULL, "missing register map entry reg: " INTPTR_FORMAT " %s loc: " INTPTR_FORMAT, reg->value(), reg->name(), p2i(loc));
@@ -1119,8 +1085,6 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
     return NULL;
   }
   oop r = *oop_adr;
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  r = NativeAccess<>::oop_load(&r);
   assert(Universe::heap()->is_in_or_null(r), "bad receiver: " INTPTR_FORMAT " (" INTX_FORMAT ")", p2i(r), p2i(r));
   return r;
 }
@@ -1142,8 +1106,6 @@ oop frame::get_native_receiver() {
   int byte_offset = in_bytes(nm->native_receiver_sp_offset());
   assert(byte_offset >= 0, "should not see invalid offset");
   oop owner = ((oop*) sp())[byte_offset / wordSize];
-  // TODO: Erik: remove after integration with concurrent stack scanning
-  owner = NativeAccess<>::oop_load(&owner);
   assert( Universe::heap()->is_in(owner), "bad receiver" );
   return owner;
 }
@@ -1186,8 +1148,7 @@ void frame::oops_do_internal(OopClosure* f, CodeBlobClosure* cf, DerivedOopClosu
   }
 #endif
   if (is_interpreted_frame()) {
-    map->thread() != NULL ? oops_interpreted_do<addressing::ABSOLUTE>(f, map, use_interpreter_oop_map_cache)
-                          : oops_interpreted_do<addressing::RELATIVE>(f, map, use_interpreter_oop_map_cache);
+    oops_interpreted_do(f, map, use_interpreter_oop_map_cache);
   } else if (is_entry_frame()) {
     oops_entry_do(f, map);
   } else if (is_optimized_entry_frame()) {
@@ -1246,6 +1207,11 @@ void frame::verify(const RegisterMap* map) const {
 
 #ifdef ASSERT
 bool frame::verify_return_pc(address x) {
+#ifdef TARGET_ARCH_aarch64
+  if (!pauth_ptr_is_raw(x)) {
+    return false;
+  }
+#endif
   if (StubRoutines::returns_to_call_stub(x)) {
     return true;
   }
@@ -1260,11 +1226,10 @@ bool frame::verify_return_pc(address x) {
 #endif
 
 #ifdef ASSERT
-template <frame::addressing pointers>
 void frame::interpreter_frame_verify_monitor(BasicObjectLock* value) const {
   assert(is_interpreted_frame(), "Not an interpreted frame");
   // verify that the value is in the right part of the frame
-  address low_mark  = (address) interpreter_frame_monitor_end<pointers>();
+  address low_mark  = (address) interpreter_frame_monitor_end();
   address high_mark = (address) interpreter_frame_monitor_begin();
   address current   = (address) value;
 
@@ -1289,6 +1254,7 @@ private:
   GrowableArray<oop*>* _base;
   GrowableArray<derived_pointer*>* _derived;
   NoSafepointVerifier nsv;
+
 public:
   FrameValuesOopClosure() {
     _oops = new (ResourceObj::C_HEAP, mtThread) GrowableArray<oop*>(100, mtThread);
@@ -1302,14 +1268,25 @@ public:
     delete _base;
     delete _derived;
   }
+
+  virtual void do_oop(oop* p) override { _oops->push(p); }
+  virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
+  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
+    _base->push(base_loc);
+    _derived->push(derived_loc);
+  }
+
+  bool is_good(oop* p) {
+    return *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
+  }
   void describe(FrameValues& values, int frame_no) {
     for (int i = 0; i < _oops->length(); i++) {
       oop* p = _oops->at(i);
-      bool good = *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
-      values.describe(frame_no, (intptr_t*)p, err_msg("oop%s for #%d", good ? "" : " (BAD)", frame_no));
+      values.describe(frame_no, (intptr_t*)p, err_msg("oop%s for #%d", is_good(p) ? "" : " (BAD)", frame_no));
     }
     for (int i = 0; i < _narrow_oops->length(); i++) {
       narrowOop* p = _narrow_oops->at(i);
+      // we can't check for bad compressed oops, as decoding them might crash
       values.describe(frame_no, (intptr_t*)p, err_msg("narrow oop for #%d", frame_no));
     }
     assert(_base->length() == _derived->length(), "should be the same");
@@ -1319,16 +1296,6 @@ public:
       values.describe(frame_no, (intptr_t*)derived, err_msg("derived pointer (base: " INTPTR_FORMAT ") for #%d", p2i(base), frame_no));
     }
   }
-  virtual void do_oop(oop* p) override { _oops->push(p); }
-  virtual void do_oop(narrowOop* p) override { _narrow_oops->push(p); }
-  virtual void do_derived_oop(oop* base_loc, derived_pointer* derived_loc) override {
-    // oop base = *base_loc;
-    // intptr_t offset = *(intptr_t*)derived_loc - cast_from_oop<intptr_t>(base);
-    // assert (offset >= 0 && offset <= (intptr_t)(base->size() << LogHeapWordSize), "offset: %ld base->size: %zu relative: %d", offset, base->size() << LogHeapWordSize, *(intptr_t*)derived_loc <= 0);
-
-    _base->push(base_loc);
-    _derived->push(derived_loc);
-  }
 };
 
 class FrameValuesOopMapClosure: public OopMapClosure {
@@ -1337,6 +1304,7 @@ private:
   const RegisterMap* _reg_map;
   FrameValues& _values;
   int _frame_no;
+
 public:
   FrameValuesOopMapClosure(const frame* fr, const RegisterMap* reg_map, FrameValues& values, int frame_no)
    : _fr(fr), _reg_map(reg_map), _values(values), _frame_no(frame_no) {}
@@ -1353,18 +1321,15 @@ public:
         // case OopMapValue::live_value:         type_name = "live";         break;
         default: break;
       }
-      if (type_name != NULL)
+      if (type_name != NULL) {
         _values.describe(_frame_no, p, err_msg("%s for #%d", type_name, _frame_no));
+      }
     }
   }
 };
 
-template void frame::describe<frame::addressing::ABSOLUTE>(FrameValues& values, int frame_no, const RegisterMap* reg_map);
-template void frame::describe<frame::addressing::RELATIVE>(FrameValues& values, int frame_no, const RegisterMap* reg_map);
-
 // callers need a ResourceMark because of name_and_sig_as_C_string() usage,
 // RA allocated string is returned to the caller
-template <frame::addressing pointers>
 void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_map) {
   // boundaries: sp and the 'real' frame pointer
   values.describe(-1, sp(), err_msg("sp for #%d", frame_no), 0);
@@ -1398,22 +1363,23 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
     values.describe(-1, info_address,
                     err_msg("- %d locals %d max stack", m->max_locals(), m->max_stack()), 2);
-    values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
+    // return address will be emitted by caller in describe_pd
+    // values.describe(frame_no, (intptr_t*)sender_pc_addr(), Continuation::is_return_barrier_entry(*sender_pc_addr()) ? "return address (return barrier)" : "return address");
 
     if (m->max_locals() > 0) {
-      intptr_t* l0 = interpreter_frame_local_at<pointers>(0);
-      intptr_t* ln = interpreter_frame_local_at<pointers>(m->max_locals() - 1);
+      intptr_t* l0 = interpreter_frame_local_at(0);
+      intptr_t* ln = interpreter_frame_local_at(m->max_locals() - 1);
       values.describe(-1, MAX2(l0, ln), err_msg("locals for #%d", frame_no), 2);
       // Report each local and mark as owned by this frame
       for (int l = 0; l < m->max_locals(); l++) {
-        intptr_t* l0 = interpreter_frame_local_at<pointers>(l);
+        intptr_t* l0 = interpreter_frame_local_at(l);
         values.describe(frame_no, l0, err_msg("local %d", l), 1);
       }
     }
 
-    if (interpreter_frame_monitor_begin() != interpreter_frame_monitor_end<pointers>()) {
+    if (interpreter_frame_monitor_begin() != interpreter_frame_monitor_end()) {
       values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_begin(), "monitors begin");
-      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_end<pointers>(), "monitors end");
+      values.describe(frame_no, (intptr_t*)interpreter_frame_monitor_end(), "monitors end");
     }
 
     // Compute the actual expression stack size
@@ -1422,8 +1388,8 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     intptr_t* tos = NULL;
     // Report each stack element and mark as owned by this frame
     for (int e = 0; e < mask.expression_stack_size(); e++) {
-      tos = MAX2(tos, interpreter_frame_expression_stack_at<pointers>(e));
-      values.describe(frame_no, interpreter_frame_expression_stack_at<pointers>(e),
+      tos = MAX2(tos, interpreter_frame_expression_stack_at(e));
+      values.describe(frame_no, interpreter_frame_expression_stack_at(e),
                       err_msg("stack %d", e), 1);
     }
     if (tos != NULL) {
@@ -1460,17 +1426,21 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
       VMRegPair* regs   = NEW_RESOURCE_ARRAY(VMRegPair, sizeargs);
       {
         int sig_index = 0;
-        if (!m->is_static()) sig_bt[sig_index++] = T_OBJECT; // 'this'
+        if (!m->is_static()) {
+          sig_bt[sig_index++] = T_OBJECT; // 'this'
+        }
         for (SignatureStream ss(m->signature()); !ss.at_return_type(); ss.next()) {
           BasicType t = ss.type();
           assert(type2size[t] == 1 || type2size[t] == 2, "size is 1 or 2");
           sig_bt[sig_index++] = t;
-          if (type2size[t] == 2) sig_bt[sig_index++] = T_VOID;
+          if (type2size[t] == 2) {
+            sig_bt[sig_index++] = T_VOID;
+          }
         }
         assert(sig_index == sizeargs, "");
       }
       int out_preserve = SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
-      assert (out_preserve ==  m->num_stack_arg_slots(), "");
+      assert(out_preserve ==  m->num_stack_arg_slots(), "");
       int sig_index = 0;
       int arg_index = (m->is_static() ? 0 : -1);
       for (SignatureStream ss(m->signature()); !ss.at_return_type(); ) {
@@ -1480,17 +1450,20 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         assert(t == sig_bt[sig_index], "sigs in sync");
         VMReg fst = regs[sig_index].first();
         if (fst->is_stack()) {
-          assert (((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
+          assert(((int)fst->reg2stack()) >= 0, "reg2stack: " INTPTR_FORMAT, fst->reg2stack());
           int offset = fst->reg2stack() * VMRegImpl::stack_slot_size + stack_slot_offset;
           intptr_t* stack_address = (intptr_t*)((address)unextended_sp() + offset);
-          if (at_this)
+          if (at_this) {
             values.describe(frame_no, stack_address, err_msg("this for #%d", frame_no), 1);
-          else
+          } else {
             values.describe(frame_no, stack_address, err_msg("param %d %s for #%d", arg_index, type2name(t), frame_no), 1);
+          }
         }
         sig_index += type2size[t];
         arg_index += 1;
-        if (!at_this) ss.next();
+        if (!at_this) {
+          ss.next();
+        }
       }
     }
 
@@ -1506,8 +1479,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
           int scvs_length = scvs != NULL ? scvs->length() : 0;
           for (int i = 0; i < scvs_length; i++) {
             intptr_t* stack_address = (intptr_t*)StackValue::stack_value_address(this, reg_map, scvs->at(i));
-            if (stack_address != NULL)
+            if (stack_address != NULL) {
               values.describe(frame_no, stack_address, err_msg("local %d for #%d (scope %d)", i, frame_no, scope_no), 1);
+            }
           }
         }
         { // mark expression stack
@@ -1515,8 +1489,9 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
           int scvs_length = scvs != NULL ? scvs->length() : 0;
           for (int i = 0; i < scvs_length; i++) {
             intptr_t* stack_address = (intptr_t*)StackValue::stack_value_address(this, reg_map, scvs->at(i));
-            if (stack_address != NULL)
+            if (stack_address != NULL) {
               values.describe(frame_no, stack_address, err_msg("stack %d for #%d (scope %d)", i, frame_no, scope_no), 1);
+            }
           }
         }
       }
@@ -1533,13 +1508,8 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
     }
 
     if (cm->method()->is_continuation_enter_intrinsic()) {
-      address usp = (address)unextended_sp();
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_offset())), "parent");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::cont_offset())),   "continuation");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::chunk_offset())),   "chunk");
-      values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::argsize_offset())), "argsize");
-      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_cont_fastpath_offset())),      "parent fastpath");
-      // values.describe(frame_no, (intptr_t*)(usp + in_bytes(ContinuationEntry::parent_held_monitor_count_offset())), "parent held monitor count");
+      ContinuationEntry* ce = Continuation::get_continuation_entry_for_entry_frame(reg_map->thread(), *this); // (ContinuationEntry*)unextended_sp();
+      ce->describe(values, frame_no);
     }
   } else if (is_native_frame()) {
     // For now just label the frame
@@ -1561,9 +1531,6 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   describe_pd(values, frame_no);
 }
 
-void frame::describe_top(FrameValues& values) {
-  describe_top_pd(values);
-}
 #endif
 
 #ifndef PRODUCT
@@ -1633,8 +1600,6 @@ void FrameValues::print_on(JavaThread* thread, outputStream* st) {
 }
 
 void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
-  assert (chunk->is_stackChunk(), "");
-
   _values.sort(compare);
 
   intptr_t* start = chunk->start_address();
@@ -1647,10 +1612,10 @@ void FrameValues::print_on(stackChunkOop chunk, outputStream* st) {
   while (!(start <= v0 && v0 <= end)) v0 = _values.at(++min_index).location;
   while (!(start <= v1 && v1 <= end)) v1 = _values.at(--max_index).location;
 
-  print_on(st, min_index, max_index, v0, v1, frame::addressing::RELATIVE);
+  print_on(st, min_index, max_index, v0, v1, true /* on_heap */);
 }
 
-void FrameValues::print_on(outputStream* st, int min_index, int max_index, intptr_t* v0, intptr_t* v1, frame::addressing pointers) {
+void FrameValues::print_on(outputStream* st, int min_index, int max_index, intptr_t* v0, intptr_t* v1, bool on_heap) {
   intptr_t* min = MIN2(v0, v1);
   intptr_t* max = MAX2(v0, v1);
   intptr_t* cur = max;
@@ -1665,7 +1630,7 @@ void FrameValues::print_on(outputStream* st, int min_index, int max_index, intpt
       const char* spacer = "          " LP64_ONLY("        ");
       st->print_cr(" %s  %s %s", spacer, spacer, fv.description);
     } else {
-      if (pointers == frame::addressing::RELATIVE
+      if (on_heap
           && *fv.location != 0 && *fv.location > -100 && *fv.location < 100
           && (strncmp(fv.description, "interpreter_frame_", 18) == 0 || strstr(fv.description, " method "))) {
         st->print_cr(" " INTPTR_FORMAT ": %18d %s", p2i(fv.location), (int)*fv.location, fv.description);

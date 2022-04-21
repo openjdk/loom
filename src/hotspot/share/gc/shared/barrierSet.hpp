@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2000, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -91,9 +91,6 @@ public:
   // Test whether this object is of the type corresponding to bsn.
   bool is_a(BarrierSet::Name bsn) const { return _fake_rtti.has_tag(bsn); }
 
-  // Loom support
-  static bool requires_barriers(oop obj);
-
   // End of fake RTTI support.
 
 protected:
@@ -137,7 +134,7 @@ public:
   // caller. That locking ensures the operation is "atomic" with the list
   // modification wrto operations that hold the NJTList_lock and either also
   // hold the Threads_lock or are at a safepoint.
-  virtual void on_thread_attach(Thread* thread) {}
+  virtual void on_thread_attach(Thread* thread);
   virtual void on_thread_detach(Thread* thread) {}
 
   virtual void make_parsable(JavaThread* thread) {}

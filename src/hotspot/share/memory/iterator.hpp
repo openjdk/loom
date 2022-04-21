@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -99,11 +99,16 @@ class OopIterateClosure : public OopClosure {
   // 1) do_klass on the header klass pointer.
   // 2) do_klass on the klass pointer in the mirrors.
   // 3) do_cld   on the class loader data in class loaders.
+  //
+  // Used to determine metadata liveness for class unloading GCs.
 
   virtual bool do_metadata() = 0;
   virtual void do_klass(Klass* k) = 0;
   virtual void do_cld(ClassLoaderData* cld) = 0;
+
+  // Class redefinition needs to get notified about methods from stackChunkOops
   virtual void do_method(Method* m) = 0;
+  // The code cache sweeper needs to get notified about methods from stackChunkOops
   virtual void do_nmethod(nmethod* nm) = 0;
 };
 
@@ -269,8 +274,8 @@ class MarkingCodeBlobClosure : public CodeBlobToOopClosure {
   MarkingCodeBlobClosure(OopClosure* cl, bool fix_relocations, bool keepalive_nmethods) :
       CodeBlobToOopClosure(cl, fix_relocations),
       _keepalive_nmethods(keepalive_nmethods) {}
-  // Called for each code blob, but at most once per unique blob.
 
+  // Called for each code blob, but at most once per unique blob.
   virtual void do_code_blob(CodeBlob* cb);
 };
 

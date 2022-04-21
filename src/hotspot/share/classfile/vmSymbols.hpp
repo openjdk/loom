@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -63,8 +63,7 @@
   template(java_lang_StringUTF16,                     "java/lang/StringUTF16")                    \
   template(java_lang_Thread,                          "java/lang/Thread")                         \
   template(java_lang_Thread_FieldHolder,              "java/lang/Thread$FieldHolder")             \
-  template(java_lang_Thread_VirtualThreads,           "java/lang/Thread$VirtualThreads")          \
-  template(java_lang_Thread_ClassLoaders,             "java/lang/Thread$ClassLoaders")            \
+  template(java_lang_Thread_Constants,                "java/lang/Thread$Constants")               \
   template(java_lang_ThreadGroup,                     "java/lang/ThreadGroup")                    \
   template(java_lang_VirtualThread,                   "java/lang/VirtualThread")                  \
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
@@ -72,7 +71,6 @@
   template(java_lang_ClassLoader,                     "java/lang/ClassLoader")                    \
   template(java_lang_ThreadDeath,                     "java/lang/ThreadDeath")                    \
   template(java_lang_Runnable,                        "java/lang/Runnable")                       \
-  /*template(jdk_internal_vm_Continuation,            "jdk/internal/vm/Continuation")           */\
   template(jdk_internal_vm_ContinuationScope,         "jdk/internal/vm/ContinuationScope")        \
   template(jdk_internal_vm_StackChunk,                "jdk/internal/vm/StackChunk")               \
   template(java_lang_Boolean,                         "java/lang/Boolean")                        \
@@ -441,6 +439,7 @@
   template(deadChild_name,                            "deadChild")                                \
   template(getFromClass_name,                         "getFromClass")                             \
   template(dispatch_name,                             "dispatch")                                 \
+  template(bootLoader_name,                           "bootLoader")                               \
   template(getPlatformClassLoader_name,               "getPlatformClassLoader")                   \
   template(getSystemClassLoader_name,                 "getSystemClassLoader")                     \
   template(fillInStackTrace_name,                     "fillInStackTrace")                         \
@@ -451,7 +450,7 @@
   template(contextClassLoader_name,                   "contextClassLoader")                       \
   template(inheritedAccessControlContext_name,        "inheritedAccessControlContext")            \
   template(getClassContext_name,                      "getClassContext")                          \
-  template(wait_name,                                 "wait0")                                     \
+  template(wait_name,                                 "wait0")                                    \
   template(checkPackageAccess_name,                   "checkPackageAccess")                       \
   template(newInstance0_name,                         "newInstance0")                             \
   template(forName_name,                              "forName")                                  \
@@ -493,6 +492,7 @@
   template(signers_name,                              "signers_name")                             \
   template(source_file_name,                          "source_file")                              \
   template(loader_data_name,                          "loader_data")                              \
+  template(cont_name,                                 "cont")                                     \
   template(vmdependencies_name,                       "vmdependencies")                           \
   template(last_cleanup_name,                         "last_cleanup")                             \
   template(loader_name,                               "loader")                                   \
@@ -503,8 +503,6 @@
   template(security_manager_signature,                "Ljava/lang/SecurityManager;")              \
   template(defineOrCheckPackage_name,                 "defineOrCheckPackage")                     \
   template(defineOrCheckPackage_signature,            "(Ljava/lang/String;Ljava/util/jar/Manifest;Ljava/net/URL;)Ljava/lang/Package;") \
-  template(fileToEncodedURL_name,                     "fileToEncodedURL")                         \
-  template(fileToEncodedURL_signature,                "(Ljava/io/File;)Ljava/net/URL;")           \
   template(getProtectionDomain_name,                  "getProtectionDomain")                      \
   template(getProtectionDomain_signature,             "(Ljava/security/CodeSource;)Ljava/security/ProtectionDomain;") \
   template(java_lang_Integer_array_signature,         "[Ljava/lang/Integer;")                     \
@@ -526,6 +524,7 @@
   template(during_unsafe_access_name,                 "during_unsafe_access")                     \
   template(checkIndex_name,                           "checkIndex")                               \
   template(scoped_cache_shift_name,                   "SCOPED_CACHE_SHIFT")                       \
+  template(jfr_epoch_name,                            "jfr_epoch")                                \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
@@ -610,6 +609,7 @@
   template(long_long_void_signature,                  "(JJ)V")                                                    \
   template(void_byte_array_signature,                 "()[B")                                                     \
   template(void_classloader_signature,                "()Ljava/lang/ClassLoader;")                                \
+  template(void_BuiltinClassLoader_signature,         "()Ljdk/internal/loader/BuiltinClassLoader;")               \
   template(void_object_signature,                     "()Ljava/lang/Object;")                                     \
   template(void_class_signature,                      "()Ljava/lang/Class;")                                      \
   template(void_class_array_signature,                "()[Ljava/lang/Class;")                                     \
@@ -749,6 +749,7 @@
   template(dumpSharedArchive_signature,                     "(ZLjava/lang/String;)Ljava/lang/String;")            \
   template(generateLambdaFormHolderClasses,                 "generateLambdaFormHolderClasses")                    \
   template(generateLambdaFormHolderClasses_signature,       "([Ljava/lang/String;)[Ljava/lang/Object;")           \
+  template(java_lang_Enum,                                  "java/lang/Enum")                                     \
   template(java_lang_invoke_Invokers_Holder,                "java/lang/invoke/Invokers$Holder")                   \
   template(java_lang_invoke_DirectMethodHandle_Holder,      "java/lang/invoke/DirectMethodHandle$Holder")         \
   template(java_lang_invoke_LambdaForm_Holder,              "java/lang/invoke/LambdaForm$Holder")                 \
@@ -762,7 +763,7 @@
   template(url_void_signature,                              "(Ljava/net/URL;)V")                                  \
   template(url_array_classloader_void_signature,            "([Ljava/net/URL;Ljava/lang/ClassLoader;)V")          \
                                                                                                                   \
-  /* JavaThread.dump jcmd */                                                                                      \
+  /* Thread.dump_to_file jcmd */                                                                                  \
   template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -71,12 +71,12 @@
   template(GetObjectMonitorUsage)                 \
   template(GetAllStackTraces)                     \
   template(GetThreadListStackTraces)              \
-  template(VThreadGetStackTrace)                  \
-  template(VThreadGetFrameCount)                  \
+  template(VirtualThreadGetStackTrace)            \
+  template(VirtualThreadGetFrameCount)            \
   template(ChangeBreakpoints)                     \
   template(GetOrSetLocal)                         \
   template(VirtualThreadGetOrSetLocal)            \
-  template(VThreadGetCurrentLocation)             \
+  template(VirtualThreadGetCurrentLocation)       \
   template(ChangeSingleStep)                      \
   template(HeapWalkOperation)                     \
   template(HeapIterateOperation)                  \
@@ -100,6 +100,7 @@
   template(CleanClassLoaderDataMetaspaces)        \
   template(PrintCompileQueue)                     \
   template(PrintClassHierarchy)                   \
+  template(PrintClasses)                          \
   template(ICBufferFull)                          \
   template(PrintMetadata)                         \
   template(GTestExecuteAtSafepoint)               \

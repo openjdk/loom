@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1995, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1995, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.spi.URLStreamHandlerProvider;
-import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -46,7 +45,7 @@ import java.util.ServiceLoader;
 
 import jdk.internal.access.JavaNetURLAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Gate;
+import jdk.internal.misc.ThreadTracker;
 import jdk.internal.misc.VM;
 import sun.net.util.IPAddressUtil;
 import sun.security.util.SecurityConstants;
@@ -1344,19 +1343,24 @@ public final class URL implements java.io.Serializable {
         };
     }
 
-    // gate to prevent recursive provider lookups
-    private static class Holder {
-        static final Gate LOOKUP_GATE = Gate.create();
+    private static class ThreadTrackHolder {
+        static final ThreadTracker TRACKER = new ThreadTracker();
     }
 
-    private static Gate gate() {
-        return Holder.LOOKUP_GATE;
+    private static Object tryBeginLookup() {
+        return ThreadTrackHolder.TRACKER.tryBegin();
+    }
+
+    private static void endLookup(Object key) {
+        ThreadTrackHolder.TRACKER.end(key);
     }
 
     @SuppressWarnings("removal")
     private static URLStreamHandler lookupViaProviders(final String protocol) {
-        if (!gate().tryEnter())
+        Object key = tryBeginLookup();
+        if (key == null) {
             throw new Error("Circular loading of URL stream handler providers detected");
+        }
         try {
             return AccessController.doPrivileged(
                 new PrivilegedAction<>() {
@@ -1372,7 +1376,7 @@ public final class URL implements java.io.Serializable {
                     }
                 });
         } finally {
-            gate().exit();
+            endLookup(key);
         }
     }
 

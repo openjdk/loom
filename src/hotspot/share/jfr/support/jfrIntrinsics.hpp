@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -28,23 +28,25 @@
 #include "utilities/macros.hpp"
 
 #if INCLUDE_JFR
-#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
+#include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdMacros.hpp"
+#include "jfr/support/jfrKlassExtension.hpp"
+#include "jfr/support/jfrThreadExtension.hpp"
 #include "jfr/utilities/jfrTime.hpp"
-#include "jfr/utilities/jfrTypes.hpp"
+#include "memory/allocation.hpp"
 
-class JfrIntrinsicSupport {
+class JfrIntrinsicSupport : AllStatic {
  public:
-  static void* get_event_writer(JavaThread* t);
-  static void* write_checkpoint(JavaThread* t, traceid tid);
+  static void* event_writer(JavaThread* jt);
+  static void write_checkpoint(JavaThread* jt);
+  static void load_barrier(const Klass* klass);
+  static address epoch_address();
+  static address signal_address();
+  static address epoch_generation_address();
 };
 
 #define JFR_HAVE_INTRINSICS
-#define JFR_TIME_FUNCTION JfrTime::time_function()
-#define JFR_GET_EVENT_WRITER_FUNCTION JfrIntrinsicSupport::get_event_writer
-#define JFR_WRITE_CHECKPOINT_FUNCTION JfrIntrinsicSupport::write_checkpoint
-#define JFR_EPOCH_GENERATION_FUNCTION JfrTraceIdEpoch::epoch_generation
 
-#define JFR_TEMPLATES(template) \
+#define JFR_TEMPLATES(template)                                                                                   \
   template(jdk_jfr_internal_JVM,                                      "jdk/jfr/internal/JVM")                     \
   template(jdk_jfr_internal_handlers_EventHandler_signature,          "Ljdk/jfr/internal/handlers/EventHandler;") \
   template(eventHandler_name,                                         "eventHandler")                             \
@@ -53,6 +55,8 @@ class JfrIntrinsicSupport {
 #define JFR_INTRINSICS(do_intrinsic, do_class, do_name, do_signature, do_alias)                                   \
   do_intrinsic(_counterTime,        jdk_jfr_internal_JVM, counterTime_name, void_long_signature, F_SN)            \
     do_name(     counterTime_name,                             "counterTime")                                     \
+  do_intrinsic(_getClassId,         jdk_jfr_internal_JVM, getClassId_name, class_long_signature, F_SN)            \
+    do_name(     getClassId_name,                              "getClassId")                                      \
   do_intrinsic(_getEventWriter,   jdk_jfr_internal_JVM, getEventWriter_name, void_eventWriter_signature, F_SN)    \
     do_name(     getEventWriter_name,                          "getEventWriter")                                  \
 

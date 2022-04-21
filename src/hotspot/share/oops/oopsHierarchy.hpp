@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -45,7 +45,7 @@ typedef void* OopOrNarrowOopStar;
 
 typedef class oopDesc*                    oop;
 typedef class   instanceOopDesc*            instanceOop;
-// typedef class  stackChunkOopDesc*          stackChunkOop;
+typedef class     stackChunkOopDesc*          stackChunkOop;
 typedef class   arrayOopDesc*               arrayOop;
 typedef class     objArrayOopDesc*            objArrayOop;
 typedef class     typeArrayOopDesc*           typeArrayOop;
@@ -144,10 +144,10 @@ struct PrimitiveConversions::Translate<oop> : public TrueType {
    };
 
 DEF_OOP(instance);
+DEF_OOP(stackChunk);
 DEF_OOP(array);
 DEF_OOP(objArray);
 DEF_OOP(typeArray);
-//DEF_OOP(stackChunk);
 
 #endif // CHECK_UNHANDLED_OOPS
 

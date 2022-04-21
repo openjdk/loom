@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -280,7 +280,7 @@ public final class StackWalker {
          * reflection frames}. A {@code StackWalker} with this {@code SHOW_HIDDEN_FRAMES}
          * option will show all hidden frames (including reflection frames).
          */
-        SHOW_HIDDEN_FRAMES,
+        SHOW_HIDDEN_FRAMES;
     }
 
     enum ExtendedOption {
@@ -358,7 +358,7 @@ public final class StackWalker {
         return getInstance(EnumSet.of(Objects.requireNonNull(option)));
     }
 
-   /**
+    /**
      * Returns a {@code StackWalker} instance with the given option specifying
      * the stack frame information it can access.
      *

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -27,9 +27,9 @@
 * @modules java.base/jdk.internal.vm
 *
 * @requires vm.gc.G1
-* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xint HumongousStack 5000
-* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
-* @run main/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms1g -Xmx1g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
+* @run main/othervm --enable-preview -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms2g -Xmx2g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xint HumongousStack 5000
+* @run main/othervm --enable-preview -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms2g -Xmx2g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
+* @run main/othervm --enable-preview -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xms2g -Xmx2g -XX:+UseG1GC -XX:G1HeapRegionSize=1m -Xss10m -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,HumongousStack HumongousStack 10000
 */
 
 import jdk.internal.vm.Continuation;
@@ -51,13 +51,17 @@ public class HumongousStack implements Runnable {
 
         Continuation cont = new Continuation(FOO, new HumongousStack(depth));
 
-        Object[] x = null;
-        while (!cont.isDone()) {
-            cont.run();
-            x = fillYoungGen(3);
-        }
+        // remove the try/catch when adding support for humongous stacks
+        try {
+            Object[] x = null;
+            while (!cont.isDone()) {
+                cont.run();
+                x = fillYoungGen(3);
+            }
 
-        System.out.println("done; x:" + java.util.Arrays.hashCode(x));
+            System.out.println("done; x:" + java.util.Arrays.hashCode(x));
+        } catch (StackOverflowError e) {
+        }
     }
 
     public HumongousStack(int depth) { this.DEPTH = depth; }

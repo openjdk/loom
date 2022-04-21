@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,8 +42,9 @@ import static org.testng.Assert.*;
 
 public class Reflection {
 
-    // -- invoke static method --
-
+    /**
+     * Test invoking static method.
+     */
     @Test
     public void testInvokeStatic1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -52,20 +53,26 @@ public class Reflection {
         });
     }
 
-    // InvocationTargetException with cause
+    /**
+     * Test that InvocationTargetException is thrown when a static method throws
+     * exception.
+     */
     @Test
     public void testInvokeStatic2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             try {
                 divideMethod().invoke(null, 20, 0);
-                assertTrue(false);
+                fail();
             } catch (InvocationTargetException e) {
                 assertTrue(e.getCause() instanceof ArithmeticException);
             }
         });
     }
 
-    // IllegalArgumentException
+    /**
+     * Test that IllegalArgumentException is thrown when trying to invoke a static
+     * method with bad parameters.
+     */
     @Test
     public void testInvokeStatic3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -84,14 +91,17 @@ public class Reflection {
         });
     }
 
-    // ExceptionInInitializerError
+    /**
+     * Test that ExceptionInInitializerError is thrown when invoking a static
+     * method triggers its class to be initialized and it fails with exception.
+     */
     @Test
     public void testInvokeStatic4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Method foo = BadClass1.class.getDeclaredMethod("foo");
             try {
                 foo.invoke(null);
-                assertTrue(false);
+                fail();
             } catch (ExceptionInInitializerError e) {
                 assertTrue(e.getCause() instanceof ArithmeticException);
             }
@@ -105,7 +115,10 @@ public class Reflection {
         static void foo() { }
     }
 
-    // <clinit> throws Error, specified behavior?
+    /**
+     * Test that an error is thrown when invoking a static method triggers its
+     * class to be initialized and it fails with an error.
+     */
     @Test
     public void testInvokeStatic5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -121,7 +134,9 @@ public class Reflection {
         static void foo() { }
     }
 
-    // test that invoke does not pin the carrier thread
+    /**
+     * Test that invoking a static method does not pin the carrier thread.
+     */
     @Test
     public void testInvokeStatic6() throws Exception {
         Method parkMethod = Parker.class.getDeclaredMethod("park");
@@ -134,19 +149,23 @@ public class Reflection {
                 } catch (Exception e) { }
             });
             vthread.start();
+            try {
+                // give thread time to be scheduled
+                Thread.sleep(100);
 
-            Thread.sleep(100); // give thread time to be scheduled
-
-            // unpark with another virtual thread, runs on same carrier thread
-            Thread unparker = factory.newThread(() -> LockSupport.unpark(vthread));
-            unparker.start();
-            unparker.join();
+                // unpark with another virtual thread, runs on same carrier thread
+                Thread unparker = factory.newThread(() -> LockSupport.unpark(vthread));
+                unparker.start();
+                unparker.join();
+            } finally {
+                LockSupport.unpark(vthread);  // in case test fails
+            }
         }
     }
 
-
-    // -- invoke instance method --
-
+    /**
+     * Test invoking instance method.
+     */
     @Test
     public void testInvokeInstance1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -156,21 +175,27 @@ public class Reflection {
         });
     }
 
-    // test exception throw by method
+    /**
+     * Test that InvocationTargetException is thrown when an instance method throws
+     * exception.
+     */
     @Test
     public void testInvokeInstance2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             var adder = new Adder();
             try {
                 Adder.addMethod().invoke(adder, -5);
-                assertTrue(false);
+                fail();
             } catch (InvocationTargetException e) {
                 assertTrue(e.getCause() instanceof IllegalArgumentException);
             }
         });
     }
 
-    // NullPointerException/IllegalArgumentException
+    /**
+     * Test that NullPointerException and IllegalArgumentException are thrown when
+     * trying to invoke an instance method with null or bad parameters.
+     */
     @Test
     public void testInvokeInstance3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -189,9 +214,9 @@ public class Reflection {
         });
     }
 
-
-    // -- newInstance to construct objects --
-
+    /**
+     * Test invoking newInstance to create an object.
+     */
     @Test
     public void testNewInstance1() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -201,21 +226,27 @@ public class Reflection {
         });
     }
 
-    // InvocationTargetException with cause
+    /**
+     * Test that InvocationTargetException is thrown when a constructor throws
+     * exception.
+     */
     @Test
     public void testNewInstance2() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = Adder.class.getDeclaredConstructor(long.class);
             try {
                 ctor.newInstance(-10);
-                assertTrue(false);
+                fail();
             } catch (InvocationTargetException e) {
                 assertTrue(e.getCause() instanceof IllegalArgumentException);
             }
         });
     }
 
-    // IllegalArgumentException
+    /**
+     * Test that IllegalArgumentException is thrown when newInstacne is called
+     * with bad parameters.
+     */
     @Test
     public void testNewInstance3() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -234,14 +265,17 @@ public class Reflection {
         });
     }
 
-    // ExceptionInInitializerError
+    /**
+     * Test that ExceptionInInitializerError is thrown when invoking newInstance
+     * triggers the class to be initialized and it fails with exception.
+     */
     @Test
     public void testNewInstance4() throws Exception {
         TestHelper.runInVirtualThread(() -> {
             Constructor<?> ctor = BadClass3.class.getDeclaredConstructor();
             try {
                 ctor.newInstance((Object[])null);
-                assertTrue(false);
+                fail();
             } catch (ExceptionInInitializerError e) {
                 assertTrue(e.getCause() instanceof ArithmeticException);
             }
@@ -255,7 +289,10 @@ public class Reflection {
         static void foo() { }
     }
 
-    // <clinit> throws Error, specified behavior?
+    /**
+     * Test that error is thrown when invoking newInstance triggers the class
+     * to be initialized and it fails with an error.
+     */
     @Test
     public void testNewInstance5() throws Exception {
         TestHelper.runInVirtualThread(() -> {
@@ -271,7 +308,9 @@ public class Reflection {
         static void foo() { }
     }
 
-    // test that newInstance does not pin the carrier thread
+    /**
+     * Test that newInstance does not pin the carrier thread
+     */
     @Test
     public void testNewInstance6() throws Exception {
         Constructor<?> ctor = Parker.class.getDeclaredConstructor();
@@ -333,5 +372,4 @@ public class Reflection {
             LockSupport.park();
         }
     }
-
 }

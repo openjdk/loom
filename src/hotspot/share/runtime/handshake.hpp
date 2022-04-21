@@ -33,9 +33,11 @@
 #include "utilities/filterQueue.hpp"
 
 class HandshakeOperation;
+class AsyncHandshakeOperation;
 class JavaThread;
 class SuspendThreadHandshake;
 class ThreadSelfSuspensionHandshake;
+class UnsafeAccessErrorHandshake;
 class ThreadsListHandle;
 
 // A handshake closure is a callback that is executed for a JavaThread
@@ -51,6 +53,8 @@ class HandshakeClosure : public ThreadClosure, public CHeapObj<mtThread> {
   const char* name() const                         { return _name; }
   virtual bool is_async()                          { return false; }
   virtual bool is_suspend()                        { return false; }
+  virtual bool is_async_exception()                { return false; }
+  virtual bool is_ThreadDeath()                    { return false; }
   virtual void do_thread(Thread* thread) = 0;
   virtual bool can_be_processed_by(Thread* thread) { return true; }
 };
@@ -88,6 +92,7 @@ class JvmtiRawMonitor;
 class HandshakeState {
   friend ThreadSelfSuspensionHandshake;
   friend SuspendThreadHandshake;
+  friend UnsafeAccessErrorHandshake;
   friend JavaThread;
 
   // This a back reference to the JavaThread,
@@ -101,16 +106,13 @@ class HandshakeState {
   // Set to the thread executing the handshake operation.
   Thread* volatile _active_handshaker;
 
-  // Caller of suspension.  Only the caller can resume the thread.
-  JavaThread* _caller;
-
   bool claim_handshake();
   bool possibly_can_process_handshake();
   bool can_process_handshake();
 
   bool have_non_self_executable_operation();
   static bool non_self_queue_filter(HandshakeOperation* op);
-  HandshakeOperation* get_op_for_self(bool allow_suspend);
+  HandshakeOperation* get_op_for_self(bool allow_suspend, bool check_async_exception);
   HandshakeOperation* get_op();
   void remove_op(HandshakeOperation* op);
 
@@ -130,17 +132,16 @@ class HandshakeState {
 
   void add_operation(HandshakeOperation* op);
 
-  bool has_operation() {
-    return !_queue.is_empty();
-  }
-  bool has_a_non_suspend_operation();
+  bool has_operation() { return !_queue.is_empty(); }
+  bool has_operation(bool allow_suspend, bool check_async_exception);
+  bool has_async_exception_operation(bool ThreadDeath_only);
 
   bool operation_pending(HandshakeOperation* op);
 
   // If the method returns true we need to check for a possible safepoint.
   // This is due to a suspension handshake which put the JavaThread in blocked
   // state so a safepoint may be in-progress.
-  bool process_by_self(bool allow_suspend);
+  bool process_by_self(bool allow_suspend, bool check_async_exception);
 
   enum ProcessResult {
     _no_operation = 0,
@@ -154,6 +155,14 @@ class HandshakeState {
 
   Thread* active_handshaker() const { return Atomic::load(&_active_handshaker); }
 
+  // Support for asynchronous exceptions
+ private:
+  bool _async_exceptions_blocked;
+
+  bool async_exceptions_blocked() { return _async_exceptions_blocked; }
+  void set_async_exceptions_blocked(bool b) { _async_exceptions_blocked = b; }
+  void handle_unsafe_access_error();
+
   // Suspend/resume support
  private:
   // This flag is true when the thread owning this
@@ -166,7 +175,7 @@ class HandshakeState {
   bool _async_suspend_handshake;
 
   // Called from the suspend handshake.
-  bool suspend_with_handshake(JavaThread* caller);
+  bool suspend_with_handshake();
 
   // Called from the async handshake (the trap)
   // to stop a thread from continuing execution when suspended.
@@ -177,18 +186,8 @@ class HandshakeState {
   bool has_async_suspend_handshake()        { return _async_suspend_handshake; }
   void set_async_suspend_handshake(bool to) { _async_suspend_handshake = to; }
 
-  void set_caller_thread(JavaThread* caller){ return Atomic::store(&_caller, caller); }
-  JavaThread* caller_thread() const         { return Atomic::load(&_caller); }
-
-  // "blocked" is short for saying "suspended by caller"
-  bool is_blocked() const                   { return caller_thread() != nullptr; }
-  bool is_suspended_or_blocked() const      { return is_suspended() || is_blocked(); }
-
   bool suspend();
   bool resume();
-
-  bool block_suspend(JavaThread* caller);
-  bool continue_resume(JavaThread* caller);
 };
 
 #endif // SHARE_RUNTIME_HANDSHAKE_HPP

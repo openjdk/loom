@@ -1,7 +1,46 @@
 ### Filed bugs
 
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8278569 generic-all
+gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
+vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
 
+##########
+
+# 8282492
+vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_TwoFields_InternedStrings/TestDescription.java
+vmTestbase/vm/gc/compact/Compact_InternedStrings_NonbranchyTree/TestDescription.java
+vmTestbase/vm/gc/compact/Humongous_NonbranchyTree/TestDescription.java
+vmTestbase/vm/gc/compact/Humongous_NonbranchyTree5M/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock02/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock03/TestDescription.java
+vmTestbase/gc/lock/malloc/malloclock04/TestDescription.java
+vmTestbase/gc/lock/jni/jnilock001/TestDescription.java
+vmTestbase/gc/lock/jni/jnilock003/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jniglobalreflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jnireflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jnilocalreflock04/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock01/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock02/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock03/TestDescription.java
+vmTestbase/gc/lock/jniref/jniweakglobalreflock04/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock01/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock02/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock03/TestDescription.java
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock04/TestDescription.java
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
@@ -55,6 +94,7 @@ serviceability/jvmti/negative/getstacktr02/getstacktr02.java
 serviceability/jvmti/negative/frameloc03/frameloc03.java
 
 serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
+serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
 serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java
 
 serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
@@ -132,7 +172,9 @@ runtime/Throwable/StackTraceLogging.java
 runtime/Throwable/TestMaxJavaStackTraceDepth.java
 runtime/Throwable/TestThrowable.java
 serviceability/tmtools/jstack/DaemonThreadTest.java
-serviceability/dcmd/thread/JavaThreadDumpTest.java
+serviceability/dcmd/thread/ThreadDumpToFileTest.java
+serviceability/dcmd/thread/PrintTest.java
+serviceability/dcmd/thread/PrintConcurrentLocksTest.java
 
 ####
 # TODO check what are the cds issues with vthread
@@ -205,6 +247,7 @@ runtime/cds/appcds/VerifierTest_1A.java
 runtime/cds/appcds/VerifierTest_1B.java
 runtime/cds/appcds/VerifierTest_2.java
 runtime/cds/appcds/WideIloadTest.java
+runtime/cds/appcds/TestParallelGCWithCDS.java
 runtime/cds/appcds/XShareAutoWithChangedJar.java
 runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java
 runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java
@@ -215,6 +258,7 @@ runtime/cds/appcds/cacheObject/DifferentHeapSizes.java
 runtime/cds/appcds/cacheObject/GCStressTest.java
 runtime/cds/appcds/cacheObject/HeapFragmentationTest.java
 runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java
+runtime/cds/appcds/cacheObject/ArchivedEnumTest.java
 runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
 runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
 runtime/cds/appcds/cacheObject/RedefineClassTest.java
@@ -282,6 +326,7 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTes
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
 runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
+runtime/cds/appcds/dynamicArchive/ModulePath.java
 runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
 runtime/cds/appcds/javaldr/ArrayTest.java
 runtime/cds/appcds/javaldr/GCDuringDump.java
@@ -424,156 +469,6 @@ gc/g1/plab/TestPLABResize.java
 ## Expected exception is ignored
 
 runtime/condy/BadBSMUseTest.java
-
-
-####
-## Classes not unloaded as expected (TODO, need to check if FJ keep link)
-
-vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java
-
-
-####
-## NSK JVMTI tests failing with wrapper
-
-####
-## Tests for functionality which currently is not supported for virtual threads
-
-vmTestbase/nsk/jvmti/GetCurrentThreadCpuTime/curthrcputime001/TestDescription.java
-vmTestbase/nsk/jvmti/NotifyFramePop/nframepop002/TestDescription.java
-vmTestbase/nsk/jvmti/NotifyFramePop/nframepop003/TestDescription.java
-vmTestbase/nsk/jvmti/PopFrame/popframe004/TestDescription.java
-vmTestbase/nsk/jvmti/StopThread/stopthrd006/TestDescription.java
-vmTestbase/nsk/jvmti/scenarios/events/EM02/em02t012/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal004/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal003/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal002/TestDescription.java
-vmTestbase/nsk/jvmti/SetLocalVariable/setlocal001/TestDescription.java
-vmTestbase/nsk/jvmti/unit/GetLocalVariable/getlocal003/TestDescription.java
-
-####
-## Test fails because expect to find vthread in GetAllThreads
-vmTestbase/nsk/jvmti/scenarios/allocation/AP11/ap11t001/TestDescription.java
-
-####
-## Breakpoint expects name of virtual thread which is set by test.
-
-vmTestbase/nsk/jvmti/Breakpoint/breakpoint001/TestDescription.java
-
-####
-## assert in /scratch/sspitsyn/loom2/open/src/hotspot/share/oops/instanceStackChunkKlass.cpp:1042
-vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage006/TestDescription.java
-
-####
-## NSK JDWP Tests failing with wrapper
-
-
-##########
-## NSK JDB Tests failing with wrapper
-
-####
-## JVMTI PopFrame not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
-
-vmTestbase/nsk/jdb/pop_exception/pop_exception001/pop_exception001.java
-vmTestbase/nsk/jdi/VirtualMachine/redefineClasses/redefineclasses002/TestDescription.java
-
-####
-## The tests expect an NPE to be uncaught, but nsk.share.MainWrapper
-## introduces exception handlers.
-
-vmTestbase/nsk/jdb/uncaught_exception/uncaught_exception002/uncaught_exception002.java 8278470 generic-all
-vmTestbase/nsk/jdb/where/where005/where005.java 8278470 generic-all
-
-###
-# Test expects that the "up" command should print "End of stack" because there are
-# normally no frames above the test's main method. However, nsk.share.MainWrapper
-# introduces more frames above the test's main method, so the test fails.
-
-vmTestbase/nsk/jdb/list/list003/list003.java
-vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java
-
-####
-## NSK JDI tests failing with wrapper
-
-####
-## The test expects an NPE to be uncaught, but nsk.share.MainWrapper
-## introduces exception handlers.
-
-vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
-
-####
-## JVMTI SetLocalXXX() is returning INVALID_THREAD because vthreads are not supported.
-
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue005/setvalue005.java
-vmTestbase/nsk/jdi/StackFrame/_bounds_/bounds002/TestDescription.java
-vmTestbase/nsk/jdb/set/set002/set002.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue001/setvalue001.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue003/setvalue003.java
-vmTestbase/nsk/jdi/StackFrame/setValue/setvalue004/setvalue004.java
-
-####
-## JVMTI PopFrame() is returning INVALID_THREAD because vthreads are not supported.
-
-vmTestbase/nsk/jdi/Scenarios/invokeMethod/popframes001/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc01x002/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc02x001/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc02x002/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc04x001/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc04x002/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc06x001/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc08x001/TestDescription.java
-vmTestbase/nsk/jdi/BScenarios/hotswap/tc10x002/TestDescription.java
-
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes001/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes002/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes003/TestDescription.java
-vmTestbase/nsk/jdi/ThreadReference/popFrames/popframes004/TestDescription.java
-
-####
-## JVMTI ForceEarlyReturn not supported for vthreads (JVMTI_ERROR_INVALID_THREAD)
-
-vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn002/forceEarlyReturn002.java
-vmTestbase/nsk/jdi/ThreadReference/forceEarlyReturn/forceEarlyReturn014/forceEarlyReturn014.java
-vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn001/TestDescription.java
-vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java
-
-###
-# These 2 tests try to create 10 vthreads and have them all block on a synchornized
-# method call, but on some hosts there are not enough cthreads to support pinning
-# all 10 vthreads, so the test deadlocks. -Djdk.defaultScheduler.parallelism=<n>
-# could be used with the debuggee to ensure there are enough vthreads.
-
-vmTestbase/nsk/jdi/EventRequestManager/stepRequests/stepreq002/TestDescription.java
-vmTestbase/nsk/jdi/EventRequestManager/deleteEventRequests/delevtreqs002/TestDescription.java
-
-###
-# This test always times out on windows. This is due to the test forcing OOME in the
-# debuggee, which has the side affect of making the Read-Poller thread exit. Because
-# of this no vthreads can complete their reads, and the test times out as a result.
-
-vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java windows-all
-
-####
-## NSK JMX Tests
-
-####
-## Unsupported functionality
-
-vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_server_default/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_server_custom/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_directly/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_proxy_custom/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadMXBean/GetThreadAllocatedBytes/baseBehaviorTest_proxy_default/TestDescription.java
-
-
-####
-## No ThreadInfo for vthreads
-
-vmTestbase/nsk/monitoring/ThreadInfo/isInNative/isinnative001/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadInfo/getLockOwnerName/getlockownername001/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadInfo/getLockName/getlockname001/TestDescription.java
-vmTestbase/nsk/monitoring/ThreadInfo/from_c/from_c001/TestDescription.java
-vmTestbase/nsk/monitoring/MemoryUsage/from/from001/TestDescription.java
-
 
 ####
 ## JVMCI/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.

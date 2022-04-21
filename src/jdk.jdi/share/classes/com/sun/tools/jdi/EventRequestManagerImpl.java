@@ -301,7 +301,9 @@ class EventRequestManagerImpl extends MirrorImpl
             if (isEnabled() || deleted) {
                 throw invalidState();
             }
-            filters.add(JDWP.EventRequest.Set.Modifier.PlatformThreadsOnly.create());
+            if (vm.mayCreateVirtualThreads()) {
+                filters.add(JDWP.EventRequest.Set.Modifier.PlatformThreadsOnly.create());
+            }
         }
     }
 

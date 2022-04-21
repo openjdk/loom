@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -298,7 +298,7 @@ class JvmtiExport : public AllStatic {
   static void decode_version_values(jint version, int * major, int * minor,
                                     int * micro) NOT_JVMTI_RETURN;
 
-  static void check_suspend_at_safepoint(JavaThread *thread) NOT_JVMTI_RETURN;
+  static void check_vthread_and_suspend_at_safepoint(JavaThread *thread) NOT_JVMTI_RETURN;
 
   // single stepping management methods
   static void at_single_stepping_point(JavaThread *thread, Method* method, address location) NOT_JVMTI_RETURN;
@@ -558,9 +558,12 @@ class JvmtiVMObjectAllocEventCollector : public JvmtiObjectAllocEventCollector {
 //
 class JvmtiSampledObjectAllocEventCollector : public JvmtiObjectAllocEventCollector {
  public:
-  JvmtiSampledObjectAllocEventCollector()  NOT_JVMTI_RETURN;
+  JvmtiSampledObjectAllocEventCollector(bool should_start = true) {
+    JVMTI_ONLY(if (should_start) start();)
+  }
   ~JvmtiSampledObjectAllocEventCollector()  NOT_JVMTI_RETURN;
   bool is_sampled_object_alloc_event()    { return true; }
+  void start() NOT_JVMTI_RETURN;
   static bool object_alloc_is_safe_to_sample() NOT_JVMTI_RETURN_(false);
 };
 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -26,10 +26,9 @@
 * @summary Tests class unloading on virtual threads
 *
 * @compile --enable-preview -source ${jdk.version} ClassUnloading.java
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -XX:-UseCompressedOops ClassUnloading
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -XX:+UseCompressedOops ClassUnloading
-* @run main/othervm --enable-preview -XX:+UseChunkBitmaps -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,ClassUnloading ClassUnloading
-* @run main/othervm --enable-preview -XX:-UseChunkBitmaps ClassUnloading
+* @run main/othervm --enable-preview -XX:-UseCompressedOops ClassUnloading
+* @run main/othervm --enable-preview -XX:+UseCompressedOops ClassUnloading
+* @run main/othervm --enable-preview -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,ClassUnloading ClassUnloading
 */
 
 // @run testng/othervm -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,Basic Basic

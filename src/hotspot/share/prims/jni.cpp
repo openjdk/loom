@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 Red Hat, Inc.
  * Copyright (c) 2021, Azul Systems, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -549,7 +549,9 @@ JNI_END
 
 static void jni_check_async_exceptions(JavaThread *thread) {
   assert(thread == Thread::current(), "must be itself");
-  thread->check_and_handle_async_exceptions();
+  if (thread->has_async_exception_condition()) {
+    SafepointMechanism::process_if_requested_with_exit_check(thread, true /* check asyncs */);
+  }
 }
 
 JNI_ENTRY_NO_PRESERVE(jthrowable, jni_ExceptionOccurred(JNIEnv *env))
@@ -2717,7 +2719,7 @@ JNI_ENTRY(jint, jni_MonitorEnter(JNIEnv *env, jobject jobj))
   ObjectSynchronizer::jni_enter(obj, thread);
   if (!Continuation::pin(thread)) {
     ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
-    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+    THROW_(vmSymbols::java_lang_VirtualMachineError(), JNI_ERR);
   }
   ret = JNI_OK;
   return ret;
@@ -2739,7 +2741,7 @@ JNI_ENTRY(jint, jni_MonitorExit(JNIEnv *env, jobject jobj))
   Handle obj(THREAD, JNIHandles::resolve_non_null(jobj));
   ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
   if (!Continuation::unpin(thread)) {
-    THROW_(vmSymbols::java_lang_IllegalMonitorStateException(), JNI_ERR);
+    ShouldNotReachHere();
   }
   ret = JNI_OK;
   return ret;
@@ -3430,7 +3432,7 @@ struct JNINativeInterface_ jni_NativeInterface = {
 
     jni_GetModule,
 
-    // Loom
+    // Virtual threads
 
     jni_IsVirtualThread
 };
@@ -3507,7 +3509,7 @@ static void post_thread_start_event(const JavaThread* jt) {
   assert(jt != NULL, "invariant");
   EventThreadStart event;
   if (event.should_commit()) {
-    event.set_thread(JFR_THREAD_ID(jt));
+    event.set_thread(JFR_JVM_THREAD_ID(jt));
     event.set_parentThread((traceid)0);
 #if INCLUDE_JFR
     if (EventThreadStart::is_stacktrace_enabled()) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -862,8 +862,9 @@ bool LoadNode::is_immutable_value(Node* adr) {
     };
 
     for (size_t i = 0; i < sizeof offsets / sizeof offsets[0]; i++) {
-      if (offset == offsets[i])
+      if (offset == offsets[i]) {
         return true;
+      }
     }
   }
 
@@ -4764,29 +4765,6 @@ Node *MergeMemNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // the base memory might contribute new slices beyond my req()
   if (old_mbase)  grow_to_match(old_mbase);
 
-  // Look carefully at the base node if it is a phi.
-  PhiNode* phi_base;
-  if (new_base != NULL && new_base->is_Phi())
-    phi_base = new_base->as_Phi();
-  else
-    phi_base = NULL;
-
-  Node*    phi_reg = NULL;
-  uint     phi_len = (uint)-1;
-  if (phi_base != NULL) {
-    phi_reg = phi_base->region();
-    phi_len = phi_base->req();
-    // see if the phi is unfinished
-    for (uint i = 1; i < phi_len; i++) {
-      if (phi_base->in(i) == NULL) {
-        // incomplete phi; do not look at it yet!
-        phi_reg = NULL;
-        phi_len = (uint)-1;
-        break;
-      }
-    }
-  }
-
   // Note:  We do not call verify_sparse on entry, because inputs
   // can normalize to the base_memory via subsume_node or similar
   // mechanisms.  This method repairs that damage.
@@ -4987,7 +4965,6 @@ Node* MergeMemNode::memory_at(uint alias_idx) const {
 
   // Otherwise, it is a narrow slice.
   Node* n = alias_idx < req() ? in(alias_idx) : empty_memory();
-  Compile *C = Compile::current();
   if (is_empty_memory(n)) {
     // the array is sparse; empty slots are the "top" node
     n = base_memory();

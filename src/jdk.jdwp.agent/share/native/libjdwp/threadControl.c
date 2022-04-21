@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -126,7 +126,8 @@ static jvmtiError threadControl_removeDebugThread(jthread thread);
  */
 static ThreadList runningThreads;
 static ThreadList otherThreads;
-static ThreadList runningVThreads; /* VThreads we have seen. */
+static ThreadList runningVThreads; /* VThreads we are tracking (not necessarily all vthreads). */
+static jint       numRunningVThreads;
 
 #define MAX_DEBUG_THREADS 10
 static int debugThreadCount;
@@ -243,7 +244,6 @@ static ThreadNode *
 findThread(ThreadList *list, jthread thread)
 {
     ThreadNode *node;
-    JNIEnv *env = getEnv();
 
     /* Get thread local storage for quick thread -> node access */
     node = getThreadLocalStorage(thread);
@@ -333,6 +333,9 @@ removeNode(ThreadList *list, ThreadNode *node)
     node->next = NULL;
     node->prev = NULL;
     node->list = NULL;
+    if (list == &runningVThreads) {
+        numRunningVThreads--;
+    }
 }
 
 /* Add a ThreadNode to a ThreadList */
@@ -350,6 +353,9 @@ addNode(ThreadList *list, ThreadNode *node)
         list->first = node;
     }
     node->list = list;
+    if (list == &runningVThreads) {
+        numRunningVThreads++;
+    }
 }
 
 static ThreadNode *
@@ -404,7 +410,7 @@ insertThread(JNIEnv *env, ThreadList *list, jthread thread)
             jint vthread_state = 0;
             jvmtiError error = threadState(node->thread, &vthread_state);
             if (error != JVMTI_ERROR_NONE) {
-                EXIT_ERROR(error, "getting thread state");
+                EXIT_ERROR(error, "getting vthread state");
             }
             if (suspendAllCount > 0) {
                 // Assume the suspendAllCount, just like the regular thread case above.
@@ -506,10 +512,6 @@ static void
 moveNode(ThreadList *source, ThreadList *dest, ThreadNode *node)
 {
     removeNode(source, node);
-    // vthread fixme: we should really fix the caller to pass the right list
-    if (node->is_vthread && dest == &runningThreads) {
-        dest = &runningVThreads;
-    }
     JDI_ASSERT(findThread(dest, node->thread) == NULL);
     addNode(dest, node);
 }
@@ -1099,7 +1101,8 @@ resumeThreadByNode(ThreadNode *node)
                 error = JVMTI_ERROR_NONE;
             }
         }
-        // vthread fixme: If this is a vthread and suspendCount == 0, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread and suspendCount == 0,
+        // we should delete the node.
     }
 
     return error;
@@ -1226,7 +1229,7 @@ resumeCopyHelper(JNIEnv *env, ThreadNode *node, void *arg)
      */
     if (node->suspendCount == 1 && (!node->toBeResumed || node->suspendOnStart)) {
         node->suspendCount--;
-        // vthread fixme: If this is a vthread, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread, we should delete the node.
         return JVMTI_ERROR_NONE;
     }
 
@@ -1377,7 +1380,7 @@ commonResumeList(JNIEnv *env)
         node->toBeResumed = JNI_FALSE;
         node->frameGeneration++; /* Increment on each resume */
 
-        // vthread fixme: If this is a vthread, we should delete the node.
+        // TODO - vthread node cleanup: If this is a vthread, we should delete the node.
     }
     deleteArray(results);
     deleteArray(reqList);
@@ -1573,15 +1576,10 @@ threadControl_suspendCount(jthread thread, jint *count)
 {
     jvmtiError  error;
     ThreadNode *node;
-    jboolean is_vthread = isVThread(thread);
 
     debugMonitorEnter(threadLock);
 
-    if (is_vthread) {
-        node = findThread(&runningVThreads, thread);
-    } else {
-        node = findThread(&runningThreads, thread);
-    }
+    node = findRunningThread(thread);
     if (node == NULL) {
         node = findThread(&otherThreads, thread);
     }
@@ -1592,24 +1590,24 @@ threadControl_suspendCount(jthread thread, jint *count)
     } else {
         /*
          * If the node is in neither list, the debugger never suspended
-         * this thread, so the suspend count is 0.
+         * this thread, so the suspend count is 0, unless it is a vthread.
          */
-      if (is_vthread) {
-          jint vthread_state = 0;
-          jvmtiError error = threadState(thread, &vthread_state);
-          if (error != JVMTI_ERROR_NONE) {
-              EXIT_ERROR(error, "getting thread state");
-          }
-          if (vthread_state == 0) {
-              // If state == 0, then this is a new vthread that has not been started yet.
-              *count = 0;
-          } else {
-              // This is a started vthread that we are not tracking. Use suspendAllCount.
-              *count = suspendAllCount;
-          }
-      } else {
-        *count = 0;
-      }
+        if (isVThread(thread)) {
+            jint vthread_state = 0;
+            jvmtiError error = threadState(thread, &vthread_state);
+            if (error != JVMTI_ERROR_NONE) {
+                EXIT_ERROR(error, "getting vthread state");
+            }
+            if (vthread_state == 0) {
+                // If state == 0, then this is a new vthread that has not been started yet.
+                *count = 0;
+            } else {
+                // This is a started vthread that we are not tracking. Use suspendAllCount.
+                *count = suspendAllCount;
+            }
+        } else {
+            *count = 0;
+        }
     }
 
     debugMonitorExit(threadLock);
@@ -1695,7 +1693,7 @@ threadControl_suspendAll(void)
 
             /*
              * Increment suspendCount of each virtual thread that we are tracking. Note the
-             * compliment to this that happens during the resumeAll() is handled by
+             * complement to this that happens during the resumeAll() is handled by
              * commonResumeList(), so it's a bit orthogonal to how we handle incrementing
              * the suspendCount.
              */
@@ -1803,7 +1801,7 @@ threadControl_resumeAll(void)
              * Tell JVMTI to resume all virtual threads except for those we
              * are tracking separately. The commonResumeList() call below will
              * resume any vthread with a suspendCount == 1, and we want to ignore
-             * vthreads with a suspendCount > 0. Therefor we don't want
+             * vthreads with a suspendCount > 0. Therefore we don't want
              * ResumeAllVirtualThreads resuming these vthreads. We must first
              * build a list of them to pass to as the exclude list.
              */
@@ -2322,7 +2320,7 @@ threadControl_onEventHandlerEntry(jbyte sessionID, EventInfo *evinfo, jobject cu
      */
     node = findThread(&otherThreads, thread);
     if (node != NULL) {
-        moveNode(&otherThreads, &runningThreads, node);
+        moveNode(&otherThreads, (node->is_vthread ? &runningVThreads : &runningThreads), node);
         /* Now that we know the thread has started, we can set its TLS.*/
         setThreadLocalStorage(thread, (void*)node);
     } else {
@@ -2532,11 +2530,6 @@ threadControl_applicationThreadStatus(jthread thread,
             *pstatus = JDWP_THREAD_STATUS(RUNNING);
         }
     }
-#if 0
-    tty_message("status %s: node(%p) suspendCount(%d) %d %d %s",
-                isVThread(thread) ? "vthread" : "thread",
-                node, node->suspendCount, *pstatus, *statusFlags, node->name);
-#endif
 
     debugMonitorExit(threadLock);
 
@@ -2548,9 +2541,6 @@ threadControl_interrupt(jthread thread)
 {
     ThreadNode *node;
     jvmtiError  error;
-
-    // vthread fixme: should this work for vthreads?
-    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 
@@ -2643,7 +2633,13 @@ threadControl_setPendingInterrupt(jthread thread)
 {
     ThreadNode *node;
 
-    // vthread fixme: should this work for vthreads?
+    /*
+     * vmTestbase/nsk/jdb/kill/kill001/kill001.java seems to be the only code
+     * that triggers this function. Is uses ThreadReference.Stop.
+     *
+     * Since ThreadReference.Stop is not supported for vthreads, we should never
+     * get here with a vthread.
+     */
     JDI_ASSERT(!isVThread(thread));
 
     debugMonitorEnter(threadLock);
@@ -2661,9 +2657,6 @@ threadControl_stop(jthread thread, jobject throwable)
 {
     ThreadNode *node;
     jvmtiError  error;
-
-    // vthread fixme: should this work for vthreads?
-    JDI_ASSERT(!isVThread(thread));
 
     error = JVMTI_ERROR_NONE;
 
@@ -2864,16 +2857,19 @@ threadControl_allVThreads(jint *numVThreads)
 
     env = getEnv();
     debugMonitorEnter(threadLock);
+    *numVThreads = numRunningVThreads;
 
-    /* Count the number of vthreads */
-    /* vthread fixme: we should keep a running total so no counting is needed. */
-    *numVThreads = 0;
-    for (node = runningVThreads.first; node != NULL; node = node->next) {
-        (*numVThreads)++;
+    if (gdata->assertOn) {
+        /* Count the number of vthreads just to make sure we are tracking the count properly. */
+        jint countedVThreads = 0;
+        for (node = runningVThreads.first; node != NULL; node = node->next) {
+            countedVThreads++;
+        }
+        JDI_ASSERT(countedVThreads == numRunningVThreads);
     }
 
     /* Allocate and fill in the vthreads array. */
-    vthreads = jvmtiAllocate(*numVThreads * sizeof(jthread*));
+    vthreads = jvmtiAllocate(numRunningVThreads * sizeof(jthread*));
     if (vthreads != NULL) {
         int i = 0;
         for (node = runningVThreads.first; node != NULL;  node = node->next) {
@@ -2884,23 +2880,6 @@ threadControl_allVThreads(jint *numVThreads)
     debugMonitorExit(threadLock);
 
     return vthreads;
-}
-
-jboolean threadControl_isKnownVThread(jthread vthread) {
-    ThreadNode *vthreadNode;
-    debugMonitorEnter(threadLock);
-    vthreadNode = findThread(&runningVThreads, vthread);
-    debugMonitorExit(threadLock);
-    return vthreadNode != NULL;
-}
-
-void
-threadControl_addVThread(jthread vthread)
-{
-    ThreadNode *vthreadNode;
-    debugMonitorEnter(threadLock);
-    vthreadNode = insertThread(getEnv(), &runningVThreads, vthread);
-    debugMonitorExit(threadLock);
 }
 
 /***** debugging *****/

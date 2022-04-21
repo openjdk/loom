@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -48,18 +48,7 @@ public class Collectable {
     }
 
     /**
-     * Test that a parked virtual thread can be GC'ed.
-     */
-    @Test
-    public void testParkedThread() {
-        var thread = Thread.ofVirtual().start(LockSupport::park);
-        var ref = new WeakReference<>(thread);
-        thread = null;
-        waitUntilCleared(ref);
-    }
-
-    /**
-     * Ensure that a terminated virtual thread can be GC'ed.
+     * Test that a terminated virtual thread can be GC'ed.
      */
     @Test
     public void testTerminatedThread() throws Exception {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -750,7 +750,7 @@ inline NativePostCallNop* nativePostCallNop_at(address address) {
 
 inline NativePostCallNop* nativePostCallNop_unsafe_at(address address) {
   NativePostCallNop* nop = (NativePostCallNop*) address;
-  assert (nop->check(), "");
+  assert(nop->check(), "");
   return nop;
 }
 

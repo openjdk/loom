@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,9 +27,10 @@
 
 #include "runtime/frame.hpp"
 
+#include "code/codeBlob.inline.hpp"
 #include "code/compiledMethod.inline.hpp"
 #include "interpreter/interpreter.hpp"
-#include "oops/instanceStackChunkKlass.inline.hpp"
+#include "oops/stackChunkOop.inline.hpp"
 #include "oops/method.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/registerMap.hpp"
@@ -103,11 +104,11 @@ inline CodeBlob* frame::get_cb() const {
   return _cb;
 }
 
-// inline void frame::set_cb(CodeBlob* cb) {
-//   if (_cb == NULL) _cb = cb;
-//   assert (_cb == cb, "");
-//   assert (_cb->contains(_pc), "");
-// }
+inline int frame::num_oops() const {
+  assert(!is_interpreted_frame(), "interpreted");
+  assert(oop_map() != NULL, "");
+  return oop_map()->num_oops() ;
+}
 
 
 #endif // SHARE_RUNTIME_FRAME_INLINE_HPP

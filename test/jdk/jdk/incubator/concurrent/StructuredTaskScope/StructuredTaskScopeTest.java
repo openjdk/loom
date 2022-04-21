@@ -63,7 +63,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-@Test
 public class StructuredTaskScopeTest {
     private ScheduledExecutorService scheduler;
 
@@ -203,6 +202,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test fork when the thread factory rejects creating a thread.
      */
+    @Test
     public void testForkReject() throws Exception {
         ThreadFactory factory = task -> null;
         try (var scope = new StructuredTaskScope(null, factory)) {
@@ -307,6 +307,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test that fork inherits a scope-local binding.
      */
+    @Test
     public void testForkInheritsScopeLocals1() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         String value = ScopeLocal.where(NAME, "x").call(() -> {
@@ -325,6 +326,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test that fork inherits a scope-local binding into a grandchild.
      */
+    @Test
     public void testForkInheritsScopeLocals2() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
         String value = ScopeLocal.where(NAME, "x").call(() -> {
@@ -349,6 +351,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test join with no threads.
      */
+    @Test
     public void testJoinWithNoThreads() throws Exception {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
@@ -413,7 +416,7 @@ public class StructuredTaskScopeTest {
             Thread.currentThread().interrupt();
             try {
                 scope.join();
-                assertTrue(false);
+                fail();
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
@@ -439,7 +442,7 @@ public class StructuredTaskScopeTest {
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
             try {
                 scope.join();
-                assertTrue(false);
+                fail();
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
@@ -505,6 +508,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test join after scope is shutdown.
      */
+    @Test
     public void testJoinAfterShutdown() throws Exception {
         try (var scope = new StructuredTaskScope()) {
             scope.shutdown();
@@ -515,6 +519,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test join after scope is closed.
      */
+    @Test
     public void testJoinAfterClose() throws Exception {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
@@ -584,7 +589,7 @@ public class StructuredTaskScopeTest {
                 for (int i = 0; i < 3; i++) {
                     try {
                         scope.joinUntil(Instant.now().plusSeconds(1));
-                        assertTrue(false);
+                        fail();
                     } catch (TimeoutException expected) {
                         assertFalse(future.isDone());
                     }
@@ -613,7 +618,7 @@ public class StructuredTaskScopeTest {
                 // now
                 try {
                     scope.joinUntil(Instant.now());
-                    assertTrue(false);
+                    fail();
                 } catch (TimeoutException expected) {
                     assertFalse(future.isDone());
                 }
@@ -621,7 +626,7 @@ public class StructuredTaskScopeTest {
                 // in the past
                 try {
                     scope.joinUntil(Instant.now().minusSeconds(1));
-                    assertTrue(false);
+                    fail();
                 } catch (TimeoutException expected) {
                     assertFalse(future.isDone());
                 }
@@ -647,7 +652,7 @@ public class StructuredTaskScopeTest {
             Thread.currentThread().interrupt();
             try {
                 scope.joinUntil(Instant.now().plusSeconds(10));
-                assertTrue(false);
+                fail();
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
@@ -673,7 +678,7 @@ public class StructuredTaskScopeTest {
             scheduleInterrupt(Thread.currentThread(), Duration.ofMillis(500));
             try {
                 scope.joinUntil(Instant.now().plusSeconds(10));
-                assertTrue(false);
+                fail();
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
             }
@@ -878,6 +883,7 @@ public class StructuredTaskScopeTest {
      * Test that closing an enclosing scope closes the thread flock of a
      * nested scope.
      */
+    @Test
     public void testStructureViolation1() throws Exception {
         try (var scope1 = new StructuredTaskScope()) {
             try (var scope2 = new StructuredTaskScope()) {
@@ -886,7 +892,7 @@ public class StructuredTaskScopeTest {
                 scope1.join();
                 try {
                     scope1.close();
-                    assertTrue(false);
+                    fail();
                 } catch (StructureViolationException expected) { }
 
                 // underlying flock should be closed, fork should return a cancelled task
@@ -906,6 +912,7 @@ public class StructuredTaskScopeTest {
      * Test exiting a scope local operation closes the thread flock of a
      * nested scope.
      */
+    @Test
     public void testStructureViolation2() throws Exception {
         ScopeLocal<String> name = ScopeLocal.newInstance();
         class Box {
@@ -917,7 +924,7 @@ public class StructuredTaskScopeTest {
                 ScopeLocal.where(name, "x").run(() -> {
                     box.scope = new StructuredTaskScope();
                 });
-                assertTrue(false);
+                fail();
             } catch (StructureViolationException expected) { }
 
             // underlying flock should be closed, fork should return a cancelled task
@@ -943,6 +950,7 @@ public class StructuredTaskScopeTest {
      * Test that fork throws StructureViolationException if scope-local bindings
      * created after StructuredTaskScope is created.
      */
+    @Test
     public void testStructureViolation3() throws Exception {
         ScopeLocal<String> NAME = ScopeLocal.newInstance();
 
@@ -958,6 +966,7 @@ public class StructuredTaskScopeTest {
      * Test that fork throws StructureViolationException if scope-local bindings
      * changed after StructuredTaskScope is created.
      */
+    @Test
     public void testStructureViolation4() throws Exception {
         ScopeLocal<String> NAME1 = ScopeLocal.newInstance();
         ScopeLocal<String> NAME2 = ScopeLocal.newInstance();
@@ -1039,7 +1048,7 @@ public class StructuredTaskScopeTest {
             // timed-get, should timeout
             try {
                 future.get(100, TimeUnit.MICROSECONDS);
-                assertTrue(false);
+                fail();
             } catch (TimeoutException expected) { }
 
             future.cancel(true);
@@ -1117,6 +1126,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test toString includes the scope name.
      */
+    @Test
     public void testToString() throws Exception {
         ThreadFactory factory = Thread.ofVirtual().factory();
         try (var scope = new StructuredTaskScope("xxx", factory)) {
@@ -1137,6 +1147,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test for NullPointerException.
      */
+    @Test
     public void testNulls() throws Exception {
         expectThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
         try (var scope = new StructuredTaskScope()) {
@@ -1162,6 +1173,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with no completed tasks.
      */
+    @Test
     public void testShutdownOnSuccess1() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
             expectThrows(IllegalStateException.class, () -> scope.result());
@@ -1172,6 +1184,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with tasks that completed normally.
      */
+    @Test
     public void testShutdownOnSuccess2() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
 
@@ -1189,6 +1202,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with tasks that completed normally and abnormally.
      */
+    @Test
     public void testShutdownOnSuccess3() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
 
@@ -1205,6 +1219,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with a task that completed with an exception.
      */
+    @Test
     public void testShutdownOnSuccess4() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
 
@@ -1223,6 +1238,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with a cancelled task.
      */
+    @Test
     public void testShutdownOnSuccess5() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
 
@@ -1245,6 +1261,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with no completed tasks.
      */
+    @Test
     public void testShutdownOnFailure1() throws Throwable {
         try (var scope = new ShutdownOnFailure()) {
             assertTrue(scope.exception().isEmpty());
@@ -1256,6 +1273,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with tasks that completed normally.
      */
+    @Test
     public void testShutdownOnFailure2() throws Throwable {
         try (var scope = new ShutdownOnFailure()) {
             scope.fork(() -> "foo");
@@ -1272,6 +1290,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with tasks that completed normally and abnormally.
      */
+    @Test
     public void testShutdownOnFailure3() throws Throwable {
         try (var scope = new ShutdownOnFailure()) {
 
@@ -1295,6 +1314,7 @@ public class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with a cancelled task.
      */
+    @Test
     public void testShutdownOnFailure4() throws Throwable {
         try (var scope = new ShutdownOnFailure()) {
 

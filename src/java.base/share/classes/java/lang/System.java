@@ -2166,12 +2166,10 @@ public final class System {
         // classes are used.
         VM.initializeOSEnvironment();
 
-        // Subsystems that are invoked during initialization can invoke
-        // VM.isBooted() in order to avoid doing things that should
-        // wait until the VM is fully initialized. The initialization level
-        // is incremented from 0 to 1 here to indicate the first phase of
-        // initialization has completed.
-        // IMPORTANT: Ensure that this remains the last initialization action!
+        // start Finalizer and Reference Handler threads
+        SharedSecrets.getJavaLangRefAccess().startThreads();
+
+        // system properties, java.lang and other core classes are now initialized
         VM.initLevel(1);
     }
 
@@ -2559,14 +2557,6 @@ public final class System {
                 Thread.setScopeLocalBindings(bindings);
             }
 
-            public int scopeLocalCacheVictims() {
-                return Thread.scopeLocalCacheVictims();
-            }
-
-            public void setScopeLocalCacheVictims(int victims) {
-                Thread.setScopeLocalCacheVictims(victims);
-            }
-
             public Continuation getContinuation(Thread thread) {
                 return thread.getContinuation();
             }
@@ -2575,16 +2565,24 @@ public final class System {
                 thread.setContinuation(continuation);
             }
 
+            public ContinuationScope virtualThreadContinuationScope() {
+                return VirtualThread.continuationScope();
+            }
+
             public void parkVirtualThread() {
-                ((VirtualThread) Thread.currentThread()).park();
+                VirtualThread.park();
             }
 
             public void parkVirtualThread(long nanos) {
-                ((VirtualThread) Thread.currentThread()).parkNanos(nanos);
+                VirtualThread.parkNanos(nanos);
             }
 
             public void unparkVirtualThread(Thread thread) {
-                ((VirtualThread) thread).unpark();
+                if (thread instanceof VirtualThread vthread) {
+                    vthread.unpark();
+                } else {
+                    throw new IllegalArgumentException("Not a virtual thread");
+                }
             }
 
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,

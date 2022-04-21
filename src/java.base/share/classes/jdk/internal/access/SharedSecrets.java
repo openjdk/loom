@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.module.ModuleDescriptor;
 import java.security.spec.EncodedKeySpec;
 import java.util.ResourceBundle;
+import java.util.concurrent.ForkJoinPool;
 import java.util.jar.JarFile;
 import java.io.Console;
 import java.io.FileDescriptor;
@@ -76,6 +77,8 @@ public class SharedSecrets {
     private static JavaNetURLAccess javaNetURLAccess;
     private static JavaNioAccess javaNioAccess;
     private static JavaUtilCollectionAccess javaUtilCollectionAccess;
+    private static JavaUtilConcurrentTLRAccess javaUtilConcurrentTLRAccess;
+    private static JavaUtilConcurrentFJPAccess javaUtilConcurrentFJPAccess;
     private static JavaUtilJarAccess javaUtilJarAccess;
     private static JavaUtilZipFileAccess javaUtilZipFileAccess;
     private static JavaUtilResourceBundleAccess javaUtilResourceBundleAccess;
@@ -98,6 +101,30 @@ public class SharedSecrets {
             } catch (ClassNotFoundException e) {}
         }
         return access;
+    }
+
+    public static void setJavaUtilConcurrentTLRAccess(JavaUtilConcurrentTLRAccess access) {
+        javaUtilConcurrentTLRAccess = access;
+    }
+
+    public static JavaUtilConcurrentTLRAccess getJavaUtilConcurrentTLRAccess() {
+        if (javaUtilConcurrentTLRAccess == null) {
+            try {
+                Class.forName("java.util.concurrent.ThreadLocalRandom$Access", true, null);
+            } catch (ClassNotFoundException e) {}
+        }
+        return javaUtilConcurrentTLRAccess;
+    }
+
+    public static void setJavaUtilConcurrentFJPAccess(JavaUtilConcurrentFJPAccess access) {
+        javaUtilConcurrentFJPAccess = access;
+    }
+
+    public static JavaUtilConcurrentFJPAccess getJavaUtilConcurrentFJPAccess() {
+        if (javaUtilConcurrentFJPAccess == null) {
+            ensureClassInitialized(ForkJoinPool.class);
+        }
+        return javaUtilConcurrentFJPAccess;
     }
 
     public static JavaUtilJarAccess javaUtilJarAccess() {

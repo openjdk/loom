@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,12 +26,11 @@
 #include "logging/log.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "jfr/periodic/jfrThreadCPULoadEvent.hpp"
-#include "jfr/support/jfrThreadId.hpp"
-#include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrThreadIterator.hpp"
 #include "jfr/utilities/jfrTime.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "runtime/os.hpp"
+#include "runtime/thread.inline.hpp"
 
 jlong JfrThreadCPULoadEvent::get_wallclock_time() {
   return os::javaTimeNanos();
@@ -123,7 +122,7 @@ void JfrThreadCPULoadEvent::send_events() {
       event.set_starttime(event_time);
       if (jt != periodic_thread) {
         // Commit reads the thread id from this thread's trace data, so put it there temporarily
-        JfrThreadLocal::impersonate(periodic_thread, JFR_THREAD_ID(jt));
+        JfrThreadLocal::impersonate(periodic_thread, JFR_JVM_THREAD_ID(jt));
       } else {
         JfrThreadLocal::impersonate(periodic_thread, periodic_thread_id);
       }

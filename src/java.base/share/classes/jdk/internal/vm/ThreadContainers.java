@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import sun.nio.ch.Poller;
+import sun.security.action.GetPropertyAction;
 
 /**
  * This class consists exclusively of static methods to support debugging and
@@ -176,12 +177,21 @@ public class ThreadContainers {
     }
 
     /**
-     * Root container.
+     * Root container that "contains" all platform threads not started in a
+     * container plus some (or all) virtual threads that are started directly
+     * with the Thread API.
      */
-    private static class RootContainer extends ThreadContainer {
-        static final RootContainer INSTANCE = new RootContainer();
-        private static final LongAdder VTHREAD_COUNT = new LongAdder();
-        private RootContainer() {
+    private static abstract class RootContainer extends ThreadContainer {
+        static final RootContainer INSTANCE;
+        static {
+            String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllThreads");
+            if (s != null && (s.isEmpty() || Boolean.parseBoolean(s))) {
+                INSTANCE = new TrackingRootContainer();
+            } else {
+                INSTANCE = new CountingRootContainer();
+            }
+        }
+        protected RootContainer() {
             super(true);
         }
         @Override
@@ -197,41 +207,77 @@ public class ThreadContainers {
             return null;
         }
         @Override
-        public long threadCount() {
-            // platform threads that are not in a container
-            long platformThreadCount = Stream.of(JLA.getAllThreads())
-                    .filter(t -> JLA.threadContainer(t) == null)
-                    .count();
-            return platformThreadCount + VTHREAD_COUNT.sum();
-        }
-        @Override
-        public Stream<Thread> threads() {
-            // platform threads that are not in a container
-            Stream<Thread> s1 = Stream.of(JLA.getAllThreads())
-                    .filter(t -> JLA.threadContainer(t) == null);
-            // virtual threads in the root container that are blocked on I/O
-            Stream<Thread> s2 = Poller.blockedThreads()
-                    .filter(t -> t.isVirtual()
-                            && JLA.threadContainer(t) == this);
-            return Stream.concat(s1, s2);
-        }
-        @Override
         public String toString() {
             return name();
         }
-        @Override
-        public void onStart(Thread thread) {
-            assert thread.isVirtual();
-            VTHREAD_COUNT.add(1L);
-        }
-        @Override
-        public void onExit(Thread thread) {
-            assert thread.isVirtual();
-            VTHREAD_COUNT.add(-11L);
-        }
+
         @Override
         public StackableScope previous() {
             return null;
+        }
+
+        /**
+         * Returns the platform threads that are not in the container as these
+         * threads are considered to be in the root container.
+         */
+        protected Stream<Thread> platformThreads() {
+            return Stream.of(JLA.getAllThreads())
+                    .filter(t -> JLA.threadContainer(t) == null);
+        }
+
+        /**
+         * Root container that tracks all threads.
+         */
+        private static class TrackingRootContainer extends RootContainer {
+            private static final Set<Thread> VTHREADS = ConcurrentHashMap.newKeySet();
+            @Override
+            public void onStart(Thread thread) {
+                assert thread.isVirtual();
+                VTHREADS.add(thread);
+            }
+            @Override
+            public void onExit(Thread thread) {
+                assert thread.isVirtual();
+                VTHREADS.remove(thread);
+            }
+            @Override
+            public long threadCount() {
+                return platformThreads().count() + VTHREADS.size();
+            }
+            @Override
+            public Stream<Thread> threads() {
+                return Stream.concat(platformThreads(), VTHREADS.stream());
+            }
+        }
+
+        /**
+         * Root container that tracks all platform threads and just keeps a
+         * count of the virtual threads.
+         */
+        private static class CountingRootContainer extends RootContainer {
+            private static final LongAdder VTHREAD_COUNT = new LongAdder();
+            @Override
+            public void onStart(Thread thread) {
+                assert thread.isVirtual();
+                VTHREAD_COUNT.add(1L);
+            }
+            @Override
+            public void onExit(Thread thread) {
+                assert thread.isVirtual();
+                VTHREAD_COUNT.add(-1L);
+            }
+            @Override
+            public long threadCount() {
+                return platformThreads().count() + VTHREAD_COUNT.sum();
+            }
+            @Override
+            public Stream<Thread> threads() {
+                // virtual threads in this container that are those blocked on I/O.
+                Stream<Thread> blockedVirtualThreads = Poller.blockedThreads()
+                        .filter(t -> t.isVirtual()
+                                && JLA.threadContainer(t) == this);
+                return Stream.concat(platformThreads(), blockedVirtualThreads);
+            }
         }
     }
 }

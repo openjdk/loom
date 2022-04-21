@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!--
- Copyright (c) 2012, 2021, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2012, 2022, Oracle and/or its affiliates. All rights reserved.
  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 
  This code is free software; you can redistribute it and/or modify it
@@ -74,7 +74,7 @@
   </Event>
 
   <!-- Ordinary and experimental events !-->
-  
+
   <Event name="ThreadStart" category="Java Application" label="Java Thread Start" thread="true" startTime="false" stackTrace="true">
     <Field type="Thread" name="thread" label="New Java Thread" />
     <Field type="Thread" name="parentThread" label="Parent Java Thread" />
@@ -131,13 +131,6 @@
     <Field type="ushort" name="numIFrames" label="Number of interpreted frames" />
     <Field type="ushort" name="numRefs" label="Number of references" />
     <Field type="ushort" name="size" label="Stack size in bytes" />
-  </Event>
-
-  <Event name="ContinuationIterateOops" experimental="true" category="Java Virtual Machine" label="Continuation Iterate OOPs" thread="true" stackTrace="false" startTime="false">
-    <Field type="ulong" name="id" label="Continuation ID" />
-    <Field type="boolean" name="safepoint" label="Safepoint" />
-    <Field type="ushort" name="numFrames" label="Frames" />
-    <Field type="ushort" name="numOops" label="Oops" />
   </Event>
 
   <Event name="ContinuationFreezeYoung" experimental="true" category="Java Virtual Machine" label="Continuation Freeze Young" thread="true" stackTrace="false" startTime="false">

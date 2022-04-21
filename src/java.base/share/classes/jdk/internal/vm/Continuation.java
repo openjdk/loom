@@ -25,6 +25,7 @@
 
 package jdk.internal.vm;
 
+import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -48,6 +49,8 @@ public class Continuation {
     private static final boolean PRESERVE_SCOPE_LOCAL_CACHE;
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
+        PreviewFeatures.ensureEnabled();
+
         StackChunk.init(); // ensure StackChunk class is initialized
 
         String value = GetPropertyAction.privilegedGetProperty("jdk.preserveScopeLocalCache");
@@ -61,11 +64,12 @@ public class Continuation {
         /** Native frame on stack */ NATIVE,
         /** Monitor held */          MONITOR,
         /** In critical section */   CRITICAL_SECTION }
+
     /** Preemption attempt result */
     public enum PreemptStatus {
         /** Success */                                                      SUCCESS(null),
         /** Permanent failure */                                            PERM_FAIL_UNSUPPORTED(null),
-        /** Permanent failure: continuation alreay yielding */              PERM_FAIL_YIELDING(null),
+        /** Permanent failure: continuation already yielding */             PERM_FAIL_YIELDING(null),
         /** Permanent failure: continuation not mounted on the thread */    PERM_FAIL_NOT_MOUNTED(null),
         /** Transient failure: continuation pinned due to a held CS */      TRANSIENT_FAIL_PINNED_CRITICAL_SECTION(Pinned.CRITICAL_SECTION),
         /** Transient failure: continuation pinned due to native frame */   TRANSIENT_FAIL_PINNED_NATIVE(Pinned.NATIVE),
@@ -80,27 +84,13 @@ public class Continuation {
         public Pinned pinned() { return pinned; }
     }
 
-    private static PreemptStatus preemptStatus(int status) {
-        switch (status) {
-            case -5: return PreemptStatus.PERM_FAIL_UNSUPPORTED;
-            case  0: return PreemptStatus.SUCCESS;
-            case -1: return PreemptStatus.PERM_FAIL_NOT_MOUNTED;
-            case -2: return PreemptStatus.PERM_FAIL_YIELDING;
-            case  2: return PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
-            case  3: return PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
-            case  4: return PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
-            default: throw new AssertionError("Unknown status: " + status);
-        }
-    }
-
     private static Pinned pinnedReason(int reason) {
-        switch (reason) {
-            case 2: return Pinned.CRITICAL_SECTION;
-            case 3: return Pinned.NATIVE;
-            case 4: return Pinned.MONITOR;
-            default:
-                throw new AssertionError("Unknown pinned reason: " + reason);
-        }
+        return switch (reason) {
+            case 2 -> Pinned.CRITICAL_SECTION;
+            case 3 -> Pinned.NATIVE;
+            case 4 -> Pinned.MONITOR;
+            default -> throw new AssertionError("Unknown pinned reason: " + reason);
+        };
     }
 
     private static Thread currentCarrierThread() {
@@ -121,7 +111,7 @@ public class Continuation {
         }
     }
 
-    private Runnable target;
+    private final Runnable target;
 
     /* While the native JVM code is aware that every continuation has a scope, it is, for the most part,
      * oblivious to the continuation hierarchy. The only time this hierarchy is traversed in native code
@@ -137,8 +127,6 @@ public class Continuation {
     private volatile boolean mounted = false;
     private Object yieldInfo;
     private boolean preempted;
-
-    private short cs; // critical section semaphore
 
     private Object[] scopeLocalCache;
 
@@ -201,18 +189,6 @@ public class Continuation {
      * @return a new StackWalker
      */
     public StackWalker stackWalker(Set<StackWalker.Option> options, ContinuationScope scope) {
-        // if (scope != null) {
-        //     // verify the given scope exists in this continuation
-        //     Continuation c;
-        //     for (c = innermost(); c != null; c = c.parent) {
-        //         if (c.scope == scope)
-        //             break;
-        //     }
-        //     if (c.scope != scope)
-        //         scope = this.scope; // throw new IllegalArgumentException("Continuation " + this + " not in scope " + scope); -- don't throw exception to have the same behavior as no continuation
-        // } else {
-        //     scope = this.scope;
-        // }
         return JLA.newStackWalkerInstance(options, scope, innermost());
     }
 
@@ -232,10 +208,6 @@ public class Continuation {
         try {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
                 c.mount();
-
-            // if (!inner.isStarted())
-            //     throw new IllegalStateException("Continuation not started");
-
             return walk.get();
         } finally {
             for (Continuation c = inner; c != null && c.scope != scope; c = c.parent)
@@ -253,16 +225,9 @@ public class Continuation {
     private void mount() {
         if (!compareAndSetMounted(false, true))
             throw new IllegalStateException("Mounted!!!!");
-        JLA.setScopeLocalCache(scopeLocalCache);
     }
 
     private void unmount() {
-        if (PRESERVE_SCOPE_LOCAL_CACHE) {
-            scopeLocalCache = JLA.scopeLocalCache();
-        } else {
-            scopeLocalCache = null;
-        }
-        JLA.setScopeLocalCache(null);
         setMounted(false);
     }
 
@@ -272,6 +237,7 @@ public class Continuation {
     public final void run() {
         while (true) {
             mount();
+            JLA.setScopeLocalCache(scopeLocalCache);
 
             if (done)
                 throw new IllegalStateException("Continuation terminated");
@@ -285,16 +251,15 @@ public class Continuation {
             JLA.setContinuation(t, this);
 
             try {
+                boolean isVirtualThread = (scope == JLA.virtualThreadContinuationScope());
                 if (!isStarted()) { // is this the first run? (at this point we know !done)
-                    enterSpecial(this, false);
+                    enterSpecial(this, false, isVirtualThread);
                 } else {
                     assert !isEmpty();
-                    enterSpecial(this, true);
+                    enterSpecial(this, true, isVirtualThread);
                 }
             } finally {
                 fence();
-                StackChunk c = tail;
-
                 try {
                     assert isEmpty() == done : "empty: " + isEmpty() + " done: " + done + " cont: " + Integer.toHexString(System.identityHashCode(this));
                     JLA.setContinuation(currentCarrierThread(), this.parent);
@@ -304,6 +269,12 @@ public class Continuation {
                     postYieldCleanup();
 
                     unmount();
+                    if (PRESERVE_SCOPE_LOCAL_CACHE) {
+                        scopeLocalCache = JLA.scopeLocalCache();
+                    } else {
+                        scopeLocalCache = null;
+                    }
+                    JLA.setScopeLocalCache(null);
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }
             }
             // we're now in the parent continuation
@@ -333,22 +304,22 @@ public class Continuation {
     }
 
     @IntrinsicCandidate
-    private static int doYield() { throw new Error("Intrinsic not installed"); };
+    private static int doYield() { throw new Error("Intrinsic not installed"); }
 
     @IntrinsicCandidate
-    private native static void enterSpecial(Continuation c, boolean isContinue);
+    private native static void enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread);
 
 
     @DontInline
     @IntrinsicCandidate
     private static void enter(Continuation c, boolean isContinue) {
-      // This method runs in the "entry frame".
-      // A yield jumps to this method's caller as if returning from this method.
-      try {
-        c.enter0();
-      } finally {
-        c.finish();
-      }
+        // This method runs in the "entry frame".
+        // A yield jumps to this method's caller as if returning from this method.
+        try {
+            c.enter0();
+        } finally {
+            c.finish();
+        }
     }
 
     private void enter0() {
@@ -386,8 +357,6 @@ public class Continuation {
     }
 
     private boolean yield0(ContinuationScope scope, Continuation child) {
-        // System.out.println(this + " yielding on scope " + scope + ". child: " + child);
-
         preempted = false;
 
         if (scope != this.scope)
@@ -395,9 +364,6 @@ public class Continuation {
         int res = doYield();
         U.storeFence(); // needed to prevent certain transformations by the compiler
 
-        // System.out.println(this + " awake on scope " + scope + " child: " + child + " res: " + res + " yieldInfo: " + yieldInfo);
-
-        try {
         assert scope != this.scope || yieldInfo == null : "scope: " + scope + " this.scope: " + this.scope + " yieldInfo: " + yieldInfo + " res: " + res;
         assert yieldInfo == null || scope == this.scope || yieldInfo instanceof Integer : "scope: " + scope + " this.scope: " + this.scope + " yieldInfo: " + yieldInfo + " res: " + res;
 
@@ -411,8 +377,6 @@ public class Continuation {
                 child.yieldInfo = res;
             }
             this.yieldInfo = null;
-
-            // System.out.println(this + " child.yieldInfo = " + child.yieldInfo);
         } else {
             if (res == 0 && yieldInfo != null) {
                 res = (Integer)yieldInfo;
@@ -423,16 +387,10 @@ public class Continuation {
                 onContinue();
             else
                 onPinned0(res);
-
-            // System.out.println(this + " res: " + res);
         }
         assert yieldInfo == null;
 
         return res == 0;
-        } catch (Throwable t) {
-            t.printStackTrace();
-            throw t;
-        }
     }
 
     private void onPinned0(int reason) {
@@ -454,8 +412,8 @@ public class Continuation {
     }
 
     /**
-     * Tests whether this contiuation is completed
-     * @return whether this contiuation is completed
+     * Tests whether this continuation is completed
+     * @return whether this continuation is completed
      */
     public boolean isDone() {
         return done;
@@ -473,30 +431,14 @@ public class Continuation {
      * Pins the current continuation (enters a critical section).
      * This increments an internal semaphore that, when greater than 0, pins the continuation.
      */
-    public static void pin() {
-        Continuation cont = JLA.getContinuation(currentCarrierThread());
-        if (cont != null) {
-            assert cont.cs >= 0;
-            if (cont.cs == Short.MAX_VALUE)
-                throw new IllegalStateException("Too many pins");
-            cont.cs++;
-        }
-    }
+    public static native void pin();
 
     /**
      * Unpins the current continuation (exits a critical section).
      * This decrements an internal semaphore that, when equal 0, unpins the current continuation
-     * if pinne with {@link #pin()}.
+     * if pinned with {@link #pin()}.
      */
-    public static void unpin() {
-        Continuation cont = JLA.getContinuation(currentCarrierThread());
-        if (cont != null) {
-            assert cont.cs >= 0;
-            if (cont.cs == 0)
-                throw new IllegalStateException("Not pinned");
-            cont.cs--;
-        }
-    }
+    public static native void unpin();
 
     /**
      * Tests whether the given scope is pinned.
@@ -512,20 +454,9 @@ public class Continuation {
 
     static private native int isPinned0(ContinuationScope scope);
 
-    private void clean() {
-        // if (!isStackEmpty())
-        //     clean0();
-    }
-
     private boolean fence() {
         U.storeFence(); // needed to prevent certain transformations by the compiler
         return true;
-    }
-
-    private static Map<Long, Integer> liveNmethods = new ConcurrentHashMap<>();
-
-    private void processNmethods(int before, int after) {
-
     }
 
     private boolean compareAndSetMounted(boolean expectedValue, boolean newValue) {
@@ -534,8 +465,7 @@ public class Continuation {
      }
 
     private void setMounted(boolean newValue) {
-        mounted = newValue;
-        // MOUNTED.setVolatile(this, newValue);
+        mounted = newValue; // MOUNTED.setVolatile(this, newValue);
     }
 
     private String id() {
@@ -543,26 +473,18 @@ public class Continuation {
                 + " [" + currentCarrierThread().threadId() + "]";
     }
 
-    // private native void clean0();
-
     /**
      * Tries to forcefully preempt this continuation if it is currently mounted on the given thread
      * Subclasses may throw an {@link UnsupportedOperationException}, but this does not prevent
      * the continuation from being preempted on a parent scope.
      *
-     * @param thread the thread on which to forecefully preempt this continuation
+     * @param thread the thread on which to forcefully preempt this continuation
      * @return the result of the attempt
      * @throws UnsupportedOperationException if this continuation does not support preemption
      */
     public PreemptStatus tryPreempt(Thread thread) {
-        PreemptStatus res = preemptStatus(tryForceYield0(thread));
-        if (res == PreemptStatus.PERM_FAIL_UNSUPPORTED) {
-            throw new UnsupportedOperationException("Thread-local handshakes disabled");
-        }
-        return res;
+        throw new UnsupportedOperationException("Not implemented");
     }
-
-    private native int tryForceYield0(Thread thread);
 
     // native methods
     private static native void registerNatives();

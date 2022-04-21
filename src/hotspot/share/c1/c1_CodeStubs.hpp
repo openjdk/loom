@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -521,9 +521,6 @@ class SimpleExceptionStub: public CodeStub {
 
 
 class ArrayStoreExceptionStub: public SimpleExceptionStub {
- private:
-  CodeEmitInfo* _info;
-
  public:
   ArrayStoreExceptionStub(LIR_Opr obj, CodeEmitInfo* info): SimpleExceptionStub(Runtime1::throw_array_store_exception_id, obj, info) {}
 #ifndef PRODUCT

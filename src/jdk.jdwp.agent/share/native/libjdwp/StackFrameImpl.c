@@ -448,7 +448,6 @@ popFrames(PacketInputStream *in, PacketOutputStream *out)
     }
 
     fnum = getFrameNumber(frame);
-    /* vthread fixme: add vthread support */
     error = threadControl_popFrames(thread, fnum);
     if (error != JVMTI_ERROR_NONE) {
         serror = map2jdwpError(error);

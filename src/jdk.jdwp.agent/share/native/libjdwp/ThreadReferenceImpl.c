@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -459,14 +459,6 @@ stop(PacketInputStream *in, PacketOutputStream *out)
         return JNI_TRUE;
     }
 
-    /* vthread fixme: We should just call throught to JVMTI and let the failure come from
-       there, but first we need a test that exercises this code for vthreads. */
-    if (isVThread(thread)) {
-        tty_message("ThreadReferenceImpl::stop() not supported.");
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
     error = threadControl_stop(thread, throwable);
     if (error != JVMTI_ERROR_NONE) {
         outStream_setError(out, map2jdwpError(error));
@@ -486,14 +478,6 @@ interrupt(PacketInputStream *in, PacketOutputStream *out)
     }
 
     if (threadControl_isDebugThread(thread)) {
-        outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
-        return JNI_TRUE;
-    }
-
-    /* vthread fixme: This should work. Need to disable this forced failure,
-       but first we need a test that exercises this code for vthreads. */
-    if (isVThread(thread)) {
-        tty_message("ThreadReferenceImpl::interrupt() not supported.");
         outStream_setError(out, JDWP_ERROR(INVALID_THREAD));
         return JNI_TRUE;
     }

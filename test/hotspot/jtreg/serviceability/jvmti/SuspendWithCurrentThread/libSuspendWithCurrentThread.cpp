@@ -92,7 +92,7 @@ Java_SuspendWithCurrentThread_checkTestedThreadsSuspended(JNIEnv *jni, jclass cl
       } else {
         break;
       }
-      millisleep(10);
+      sleep_ms(10);
     }
   }
   // if (is_exited_from_suspend.load()) { // TODO SERGUEI

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,7 +31,6 @@
 #include <ctype.h>
 
 
-
 #ifdef _WIN32
 
 #define LL "I64"
@@ -53,24 +52,24 @@
 extern "C" {
 
 
-#define NSK_STATUS_PASSED       0
-#define NSK_STATUS_FAILED       2
+#define STATUS_PASSED       0
+#define STATUS_FAILED       2
 
 static jvmtiEnv* agent_jvmti_env = NULL;
 static JNIEnv* agent_jni_env = NULL;
 
-static volatile int currentAgentStatus = NSK_STATUS_PASSED;
+static volatile int current_agent_status = STATUS_PASSED;
 
-static jthread agentThread = NULL;
-static jvmtiStartFunction agentThreadProc = NULL;
-static void* agentThreadArg = NULL;
+static jthread jvmti_agent_thread = NULL;
+static jvmtiStartFunction agent_thread_proc = NULL;
+static void* agent_thread_arg = NULL;
 
-void nsk_jvmti_setFailStatus() {
-  currentAgentStatus = NSK_STATUS_FAILED;
+void set_agent_fail_status() {
+  current_agent_status = STATUS_FAILED;
 }
 
-jint nsk_jvmti_getStatus() {
-  return currentAgentStatus;
+jint get_agent_status() {
+  return current_agent_status;
 }
 
 typedef enum { NEW, RUNNABLE, WAITING, SUSPENDED, TERMINATED } thread_state_t;
@@ -81,9 +80,9 @@ typedef struct agent_data_t {
   jrawMonitorID monitor;
 } agent_data_t;
 
-int nsk_jvmti_setAgentProc(jvmtiStartFunction proc, void* arg) {
-  agentThreadProc = proc;
-  agentThreadArg = arg;
+int set_agent_proc(jvmtiStartFunction proc, void* arg) {
+  agent_thread_proc = proc;
+  agent_thread_arg = arg;
   return NSK_TRUE;
 }
 
@@ -92,7 +91,7 @@ static agent_data_t agent_data;
 
 static jvmtiError init_agent_data(jvmtiEnv *jvmti_env, agent_data_t *data) {
   data->thread_state = NEW;
-  data->last_debuggee_status = NSK_STATUS_PASSED;
+  data->last_debuggee_status = STATUS_PASSED;
   agent_jvmti_env = jvmti_env;
   return jvmti_env->CreateRawMonitor("agent_data_monitor", &data->monitor);
 }
@@ -104,7 +103,7 @@ void exitOnError(jvmtiError error) {
 }
 
 /** Wait for sync point with Java code. */
-int nsk_jvmti_waitForSync(jlong timeout) {
+int agent_wait_for_sync(jlong timeout) {
   static const int inc_timeout = 1000;
 
   jlong t = 0;
@@ -131,8 +130,8 @@ int nsk_jvmti_waitForSync(jlong timeout) {
   }
 
   if (agent_data.thread_state == WAITING) {
-      NSK_COMPLAIN1("No status sync occured for timeout: %" LL "d ms\n", timeout);
-    nsk_jvmti_setFailStatus();
+      COMPLAIN("No status sync occured for timeout: %" LL "d ms\n", timeout);
+    set_agent_fail_status();
     result = NSK_FALSE;
   }
 
@@ -140,7 +139,7 @@ int nsk_jvmti_waitForSync(jlong timeout) {
 }
 
 /** Resume java code suspended on sync point. */
-int nsk_jvmti_resumeSync() {
+int agent_resume_sync() {
   int result;
   RawMonitorLocker monitor_locker(agent_jvmti_env, agent_jni_env, agent_data.monitor);
 
@@ -152,8 +151,8 @@ int nsk_jvmti_resumeSync() {
     monitor_locker.notify();
   }
   else {
-    NSK_COMPLAIN0("Debuggee was not suspended on status sync\n");
-    nsk_jvmti_setFailStatus();
+    COMPLAIN("Debuggee was not suspended on status sync\n");
+    set_agent_fail_status();
     result = NSK_FALSE;
   }
 
@@ -161,15 +160,15 @@ int nsk_jvmti_resumeSync() {
 }
 
 /* ============================================================================= */
-static void set_agent_thread_state(thread_state_t value) {
+static void
+set_agent_thread_state(thread_state_t value) {
   RawMonitorLocker monitor_locker(agent_jvmti_env, agent_jni_env, agent_data.monitor);
   agent_data.thread_state = value;
   monitor_locker.notify();
 }
 
 /** Wrapper for user agent thread. */
-static void JNICALL
-agentThreadWrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
+static void JNICALL agent_thread_wrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
   agent_jni_env = agentJNI;
 
   /* run user agent proc */
@@ -177,7 +176,7 @@ agentThreadWrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
     set_agent_thread_state(RUNNABLE);
 
     // TODO was NSK_TRACE
-    (*agentThreadProc)(jvmti_env, agentJNI, agentThreadArg);
+    (*agent_thread_proc)(jvmti_env, agentJNI, agent_thread_arg);
 
     set_agent_thread_state(TERMINATED);
   }
@@ -185,14 +184,14 @@ agentThreadWrapper(jvmtiEnv* jvmti_env, JNIEnv* agentJNI, void* arg) {
   /* finalize agent thread */
   {
     /* gelete global ref for agent thread */
-    agentJNI->DeleteGlobalRef(agentThread);
-    agentThread = NULL;
+    agentJNI->DeleteGlobalRef(jvmti_agent_thread);
+    jvmti_agent_thread = NULL;
   }
 }
 
 
 /** Start wrapper for user agent thread. */
-static jthread startAgentThreadWrapper(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
+static jthread start_agent_thread_wrapper(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
   const jint  THREAD_PRIORITY = JVMTI_THREAD_MAX_PRIORITY;
   const char* THREAD_NAME = "JVMTI agent thread";
   const char* THREAD_CLASS_NAME = "java/lang/Thread";
@@ -231,23 +230,23 @@ static jthread startAgentThreadWrapper(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
     jni_env->DeleteLocalRef(threadObject);
     return NULL;
   }
-  agentThread = (jthread)threadGlobalRef;
+  jvmti_agent_thread = (jthread)threadGlobalRef;
 
-  err = jvmti_env->RunAgentThread(agentThread, &agentThreadWrapper, agentThreadArg, THREAD_PRIORITY);
+  err = jvmti_env->RunAgentThread(jvmti_agent_thread, &agent_thread_wrapper, agent_thread_arg, THREAD_PRIORITY);
   if (err != JVMTI_ERROR_NONE) {
     jni_env->DeleteGlobalRef(threadGlobalRef);
     jni_env->DeleteLocalRef(threadObject);
     return NULL;
   }
-  return agentThread;
+  return jvmti_agent_thread;
 }
 
 /** Run registered user agent thread via wrapper. */
-static jthread nsk_jvmti_runAgentThread(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
+static jthread run_agent_thread(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
   /* start agent thread wrapper */
-  jthread thread = startAgentThreadWrapper(jni_env, jvmti_env);
+  jthread thread = start_agent_thread_wrapper(jni_env, jvmti_env);
   if (thread == NULL) {
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
     return NULL;
   }
 
@@ -255,8 +254,8 @@ static jthread nsk_jvmti_runAgentThread(JNIEnv *jni_env, jvmtiEnv* jvmti_env) {
 }
 
 /** Sync point called from Java code. */
-static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debuggeeStatus) {
-  jint result = NSK_STATUS_FAILED;
+static jint sync_debuggee_status(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debuggeeStatus) {
+  jint result = STATUS_FAILED;
 
   printf("Data %p %p\n", jvmti_env, agent_data.monitor);
   RawMonitorLocker monitor_locker(agent_jvmti_env, agent_jni_env, agent_data.monitor);
@@ -266,7 +265,7 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
 
   /* we don't enter if-stmt in second call */
   if (agent_data.thread_state == NEW) {
-    if (nsk_jvmti_runAgentThread(jni_env, jvmti_env) == NULL) {
+    if (run_agent_thread(jni_env, jvmti_env) == NULL) {
       return result;
     }
 
@@ -289,14 +288,14 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
     /* SP6.2-n - notify to end test */
     monitor_locker.notify();
   } else {
-    NSK_COMPLAIN0("Debuggee status sync aborted because agent thread has finished\n");
+    COMPLAIN("Debuggee status sync aborted because agent thread has finished\n");
     return result;
   }
 
   /* update status from debuggee */
-  if (debuggeeStatus != NSK_STATUS_PASSED) {
+  if (debuggeeStatus != STATUS_PASSED) {
     printf("FAIL: Status is %d\n", debuggeeStatus);
-    nsk_jvmti_setFailStatus();
+    set_agent_fail_status();
   }
 
   while (agent_data.thread_state == SUSPENDED) {
@@ -305,7 +304,7 @@ static jint syncDebuggeeStatus(JNIEnv* jni_env, jvmtiEnv* jvmti_env, jint debugg
     monitor_locker.wait();
   }
 
-  agent_data.last_debuggee_status = nsk_jvmti_getStatus();
+  agent_data.last_debuggee_status = get_agent_status();
   result = agent_data.last_debuggee_status;
   return result;
 }
@@ -315,7 +314,7 @@ JNIEXPORT jint JNICALL
 Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, jint debuggeeStatus) {
   jint status;
   printf("Synchronization point checkStatus(%d) called.\n", debuggeeStatus);
-  status = syncDebuggeeStatus(jni_env, agent_jvmti_env, debuggeeStatus);
+  status = sync_debuggee_status(jni_env, agent_jvmti_env, debuggeeStatus);
   return status;
 }
 
@@ -324,12 +323,12 @@ Java_jdk_test_lib_jvmti_DebugeeClass_checkStatus(JNIEnv* jni_env, jclass cls, ji
 JNIEXPORT void JNICALL
 Java_jdk_test_lib_jvmti_DebugeeClass_resetAgentData(JNIEnv* jni, jclass cls) {
   RawMonitorLocker monitor_locker(agent_jvmti_env, jni, agent_data.monitor);
-  /* wait for agentThreadWrapper() to finish */
+  /* wait for agent_thread_wrapper() to finish */
   while (agent_data.thread_state != TERMINATED) {
     monitor_locker.wait(10);
   }
   agent_data.thread_state = NEW;
-  agent_data.last_debuggee_status = NSK_STATUS_PASSED;
+  agent_data.last_debuggee_status = STATUS_PASSED;
 }
 
 

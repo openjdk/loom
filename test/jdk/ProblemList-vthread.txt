@@ -2,24 +2,14 @@
 
 java/foreign/channels/TestSocketChannels.java                         8272749 windows-all
 java/lang/management/ThreadMXBean/Locks.java                          8278603 generic-all
-java/foreign/StdLibTest.java                                          8278992 generic-all
 
-java/foreign/TestSegmentCopy.java                                     8281222 generic-all
-java/text/Format/DateFormat/SimpleDateFormatPatternTest.java          8281222 generic-all
-
-
-####
 # JFR is not completely fixed to support vthreads
-jdk/jfr/api/consumer/recordingstream/TestRecursive.java               8278713 generic-all
-jdk/jfr/api/consumer/TestRecordedObject.java                          8278713 generic-all
-jdk/jfr/api/consumer/streaming/TestFilledChunks.java
-jdk/jfr/jcmd/TestJcmdStartWithOptions.java
-jdk/jfr/event/runtime/TestDirectBufferStatisticsEvent.java
-jdk/jfr/threading/TestManyVirtualThreads.java
-jdk/jfr/tool/TestPrintXML.java
-
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithDefNew.java            8279836 generic-all
 jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java  8279836 generic-all
+jdk/jfr/jcmd/TestJcmdDumpPathToGCRoots.java
+jdk/jfr/tool/TestPrintXML.java
+
+java/util/logging/Logger/logrb/TestLogrbResourceBundle.java                  8284779 generic-all
 
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
@@ -50,8 +40,6 @@ java/lang/Thread/virtual/HoldsLock.java
 
 jdk/internal/vm/Continuation/HumongousStack.java
 jdk/internal/vm/Continuation/Scoped.java
-jdk/internal/vm/Continuation/PreemptLiveFramesDriver.java
-jdk/internal/vm/Continuation/Preempt.java
 jdk/internal/vm/Continuation/Fuzz.java
 
 ####
@@ -64,20 +52,24 @@ java/lang/Thread/UncaughtExceptionsTest.java
 com/sun/net/httpserver/bugs/B6431193.java
 
 # Test limits default scheduler to 1 carrier thread, can't run with wrapper
-java/lang/Thread/virtual/StackTraceWhenRunnable.java
+java/lang/Thread/virtual/GetStackTraceWhenRunnable.java
 
 # Test requires the main thread to be in a thread group
 java/lang/Thread/MainThreadTest.java
 
 # Test don't expect FJ pool creating thread on demand
 java/lang/management/ThreadMXBean/ThreadLists.java
+java/lang/management/ThreadMXBean/ResetPeakThreadCount.java
 
 ####
-# JFR tests check events for test main thread only or expect to find MainThread
 
+# JFR tests check events for test main thread only or expect to find MainThread
 jdk/jfr/event/io/TestFileStreamEvents.java
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java
 jdk/jfr/event/runtime/TestThreadStartEvent.java
+
+# test expects to find virtual thread frames in thread dump
+jdk/jfr/event/runtime/TestThreadDumpEvent.java
 
 # the VirtualThreadStartEvent is loaded before main() in wrapper
 jdk/jfr/jvm/TestGetAllEventClasses.java

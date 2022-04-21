@@ -201,7 +201,7 @@ void* Klass::operator new(size_t size, ClassLoaderData* loader_data, size_t word
 // which zeros out memory - calloc equivalent.
 // The constructor is also used from CppVtableCloner,
 // which doesn't zero out the memory before calling the constructor.
-Klass::Klass(KlassID id) : _id(id),
+Klass::Klass(KlassKind kind) : _kind(kind),
                            _shared_class_path_index(-1) {
   CDS_ONLY(_shared_class_flags = 0;)
   CDS_JAVA_HEAP_ONLY(_archived_mirror_index = -1;)
@@ -708,24 +708,6 @@ const char* Klass::signature_name() const {
     return result;
   }
   return name()->as_C_string();
-}
-
-size_t Klass::copy_disjoint(oop obj, HeapWord* to, size_t word_size) {
-  Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
-  return word_size;
-}
-
-size_t Klass::copy_conjoint(oop obj, HeapWord* to, size_t word_size) {
-  Copy::aligned_conjoint_words(cast_from_oop<HeapWord*>(obj), to, word_size);
-  return word_size;
-}
-
-size_t Klass::copy_disjoint_compact(oop obj, HeapWord* to) {
-  return obj->copy_disjoint(to);
-}
-
-size_t Klass::copy_conjoint_compact(oop obj, HeapWord* to) {
-  return obj->copy_conjoint(to);
 }
 
 const char* Klass::external_kind() const {

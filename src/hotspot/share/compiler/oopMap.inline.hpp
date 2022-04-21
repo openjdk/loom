@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,10 +25,12 @@
 #ifndef SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 #define SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 
-#include "gc/shared/collectedHeap.hpp"
-#include "gc/shared/gc_globals.hpp"
-#include "memory/universe.hpp"
+#include "compiler/oopMap.hpp"
+
 #include "oops/compressedOops.hpp"
+#include "runtime/frame.inline.hpp"
+#include "runtime/globals.hpp"
+#include "utilities/ostream.hpp"
 
 inline const ImmutableOopMap* ImmutableOopMapSet::find_map_at_slot(int slot, int pc_offset) const {
   assert(slot >= 0 && slot < _count, "bounds count: %d slot: %d", _count, slot);
@@ -50,7 +52,7 @@ template <typename OopFnT, typename DerivedOopFnT, typename ValueFilterT>
 template <typename RegisterMapT>
 void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame *fr, const RegisterMapT *reg_map, const ImmutableOopMap* oopmap) {
   NOT_PRODUCT(if (TraceCodeBlobStacks) OopMapSet::trace_codeblob_maps(fr, reg_map->as_RegisterMap());)
-  assert (fr != NULL, "");
+  assert(fr != NULL, "");
 
   // handle derived pointers first (otherwise base pointer may be
   // changed before derived pointer offset has been collected)
@@ -72,6 +74,11 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
       address loc = fr->oopmapreg_to_location(omv.reg(), reg_map);
 
       DEBUG_ONLY(if (loc == NULL && reg_map->should_skip_missing()) continue;)
+
+      if (loc == NULL) {
+        tty->print("oops reg: "); omv.reg()->print_on(tty); tty->cr();
+        fr->print_on(tty);
+      }
       guarantee(loc != NULL, "missing saved register");
       derived_pointer* derived_loc = (derived_pointer*)loc;
       oop* base_loc = fr->oopmapreg_to_oop_location(omv.content_reg(), reg_map);
@@ -106,6 +113,10 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::iterate_oops_do(const frame 
         fr->print_on(tty);
       }
 #endif
+      if (loc == NULL) {
+        tty->print("oops reg: "); omv.reg()->print_on(tty); tty->cr();
+        fr->print_on(tty);
+      }
       guarantee(loc != NULL, "missing saved register");
       if ( omv.type() == OopMapValue::oop_value ) {
         oop val = *loc;
@@ -142,5 +153,5 @@ void OopMapDo<OopFnT, DerivedOopFnT, ValueFilterT>::oops_do(const frame *fr, con
   iterate_oops_do(fr, reg_map, oopmap);
 }
 
-#endif
+#endif // SHARE_VM_COMPILER_OOPMAP_INLINE_HPP
 

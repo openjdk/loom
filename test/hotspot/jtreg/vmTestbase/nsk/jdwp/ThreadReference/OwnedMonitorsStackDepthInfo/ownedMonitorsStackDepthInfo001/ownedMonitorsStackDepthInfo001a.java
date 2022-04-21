@@ -104,13 +104,13 @@ public class ownedMonitorsStackDepthInfo001a extends AbstractJDWPDebuggee {
     }
 
     static int adjustStackDepth(int depth) {
-        // The stack depth does not take into account the two frames below Thread.sleep() (sleepMillis and sleep0),
-        // so we need to add them to the stack depth. See LockingThread.expectedDepth(), which is where the
+        // The stack depth does not take into account the extra frame below Thread.sleep() (sleep0),
+        // so we need to add it to the stack depth. See LockingThread.expectedDepth(), which is where the
         // depth is calculated.
         if (depth == -1) {
             return -1;
         } else {
-            return depth + 2;
+            return depth + 1;
         }
     }
 

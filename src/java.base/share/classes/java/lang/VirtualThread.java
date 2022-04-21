@@ -24,12 +24,8 @@
  */
 package java.lang;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.security.PrivilegedExceptionAction;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
@@ -65,7 +62,7 @@ import static java.util.concurrent.TimeUnit.*;
  * A thread that is scheduled by the Java virtual machine rather than the operating
  * system.
  */
-class VirtualThread extends Thread {
+final class VirtualThread extends Thread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
@@ -82,9 +79,31 @@ class VirtualThread extends Thread {
     private final Continuation cont;
     private final Runnable runContinuation;
 
-    // virtual thread state, accessed by VM so need to coordinate changes
+    // virtual thread state, accessed by VM
     private volatile int state;
 
+    /*
+     * Virtual thread state and transitions:
+     *
+     *      NEW -> STARTED         // Thread.start
+     *  STARTED -> TERMINATED      // failed to start
+     *  STARTED -> RUNNING         // first run
+     *
+     *  RUNNING -> PARKING         // Thread attempts to park
+     *  PARKING -> PARKED          // cont.yield successful, thread is parked
+     *  PARKING -> PINNED          // cont.yield failed, thread is pinned
+     *
+     *   PARKED -> RUNNABLE        // unpark or interrupted
+     *   PINNED -> RUNNABLE        // unpark or interrupted
+     *
+     * RUNNABLE -> RUNNING         // continue execution
+     *
+     *  RUNNING -> YIELDING        // Thread.yield
+     * YIELDING -> RUNNABLE        // yield successful
+     * YIELDING -> RUNNING         // yield failed
+     *
+     *  RUNNING -> TERMINATED      // done
+     */
     private static final int NEW      = 0;
     private static final int STARTED  = 1;
     private static final int RUNNABLE = 2;     // runnable-unmounted
@@ -100,10 +119,10 @@ class VirtualThread extends Thread {
     private static final int RUNNABLE_SUSPENDED = (RUNNABLE | SUSPENDED);
     private static final int PARKED_SUSPENDED   = (PARKED | SUSPENDED);
 
-    // parking permit, may eventually be merged into state
+    // parking permit
     private volatile boolean parkPermit;
 
-    // carrier thread when mounted
+    // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
 
     // termination object when joining, created lazily if needed
@@ -123,7 +142,7 @@ class VirtualThread extends Thread {
      * default scheduler. If given scheduler is {@code null} and the current
      * thread is a virtual thread then the current thread's scheduler is used.
      *
-     * @param scheduler the scheduler or null.
+     * @param scheduler the scheduler or null
      * @param name thread name
      * @param characteristics characteristics
      * @param task the task to execute
@@ -167,7 +186,7 @@ class VirtualThread extends Thread {
      * Runs or continues execution of the continuation on the current thread.
      */
     private void runContinuation() {
-        // the carrier thread should be a platform thread
+        // the carrier must be a platform thread
         if (Thread.currentThread().isVirtual()) {
             throw new WrongThreadException();
         }
@@ -203,15 +222,14 @@ class VirtualThread extends Thread {
 
     /**
      * Submits the runContinuation task to the scheduler.
-     * In the case of the default scheduler, and the current carrier thread is one
-     * of FJP worker threads, then the task is queued to the current thread's queue.
-     * @param {@code lazySubmit} to lazy submit (don't signal worker) if possible
+     * @param {@code lazySubmit} to lazy submit
      * @throws RejectedExecutionException
+     * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
     private void submitRunContinuation(boolean lazySubmit) {
         try {
             if (lazySubmit && scheduler instanceof ForkJoinPool pool) {
-                ForkJoinPools.externalLazySubmit(pool, ForkJoinTask.adapt(runContinuation));
+                pool.lazySubmit(ForkJoinTask.adapt(runContinuation));
             } else {
                 scheduler.execute(runContinuation);
             }
@@ -236,7 +254,8 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler without signalling.
+     * Submits the runContinuation task to the scheduler and without signalling
+     * any threads if possible.
      * @throws RejectedExecutionException
      */
     private void lazySubmitRunContinuation() {
@@ -247,8 +266,6 @@ class VirtualThread extends Thread {
      * Runs a task in the context of this virtual thread. The virtual thread is
      * mounted on the current (carrier) thread before the task runs. It unmounts
      * from its carrier thread when the task completes.
-     *
-     * When enabled, JVMTI must be notified from this method.
      */
     @ChangesCurrentThread
     private void run(Runnable task) {
@@ -259,7 +276,7 @@ class VirtualThread extends Thread {
         mount();
         if (notifyJvmti) notifyJvmtiMountEnd(true);
 
-        // emit JFR event when starting
+        // emit JFR event if enabled
         if (VirtualThreadStartEvent.isTurnedOn()) {
             var event = new VirtualThreadStartEvent();
             event.javaThreadId = threadId();
@@ -271,42 +288,45 @@ class VirtualThread extends Thread {
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
+            try {
 
-            // pop any remaining scopes from the stack, this may block
-            StackableScope.popAll();
+                // pop any remaining scopes from the stack, this may block
+                StackableScope.popAll();
 
-            // emit JFR event when terminating
-            if (VirtualThreadEndEvent.isTurnedOn()) {
-                var event = new VirtualThreadEndEvent();
-                event.javaThreadId = threadId();
-                event.commit();
+                // emit JFR event if enabled
+                if (VirtualThreadEndEvent.isTurnedOn()) {
+                    var event = new VirtualThreadEndEvent();
+                    event.javaThreadId = threadId();
+                    event.commit();
+                }
+
+            } finally {
+                // last unmount
+                if (notifyJvmti) notifyJvmtiUnmountBegin(true);
+                unmount();
+
+                // final state
+                setState(TERMINATED);
             }
-
-            // last unmount
-            if (notifyJvmti) notifyJvmtiUnmountBegin(true);
-            unmount();
-
-            // final state
-            setState(TERMINATED);
         }
     }
 
     /**
-     * Mounts this virtual thread onto the current carrier thread.
+     * Mounts this virtual thread onto the current platform thread. On
+     * return, the current thread is the virtual thread.
      */
     @ChangesCurrentThread
     private void mount() {
-        //assert this.carrierThread == null;
-
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
-        U.putReferenceRelease(this, CARRIER_THREAD, carrier);
+        setCarrierThread(carrier);
 
         // sync up carrier thread interrupt status if needed
         if (interrupted) {
             carrier.setInterrupt();
         } else if (carrier.isInterrupted()) {
             synchronized (interruptLock) {
+                // need to recheck interrupt status
                 if (!interrupted) {
                     carrier.clearInterrupt();
                 }
@@ -318,19 +338,18 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Unmounts this virtual thread from the current carrier thread.
+     * Unmounts this virtual thread from the carrier. On return, the
+     * current thread is the current platform thread.
      */
     @ChangesCurrentThread
     private void unmount() {
-        //assert this.carrierThread == Thread.currentCarrierThread();
-
-        // set Thread.currentThread() to return the carrier thread
+        // set Thread.currentThread() to return the platform thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
 
-        // break connection to carrier thread
-        synchronized (interruptLock) {   // synchronize with interrupt
-            U.putReferenceRelease(this, CARRIER_THREAD, null);
+        // break connection to carrier thread, synchronized with interrupt
+        synchronized (interruptLock) {
+            setCarrierThread(null);
         }
         carrier.clearInterrupt();
     }
@@ -373,7 +392,7 @@ class VirtualThread extends Thread {
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
-                // lazy submit to continue on this carrier thread if possible
+                // lazy submit to continue on the current thread as carrier if possible
                 lazySubmitRunContinuation();
             }
         } else if (s == YIELDING) {   // Thread.yield
@@ -382,7 +401,7 @@ class VirtualThread extends Thread {
             // notify JVMTI that unmount has completed, thread is runnable
             if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
 
-            // lazy submit to continue on this carrier thread if possible
+            // lazy submit to continue on the current thread as carrier if possible
             lazySubmitRunContinuation();
         }
     }
@@ -413,41 +432,6 @@ class VirtualThread extends Thread {
 
             // clear references to thread locals
             clearReferences();
-        }
-    }
-
-    /**
-     * Parks on the carrier thread up to the given waiting time or until unparked
-     * or interrupted. If the virtual thread is interrupted then the interrupt
-     * status will be propagated to the carrier thread so it will wakeup.
-     * @param timed true for a timed park, false for untimed
-     * @param nanos the waiting time in nanoseconds
-     */
-    private void parkOnCarrierThread(boolean timed, long nanos) {
-        assert state() == PARKING;
-
-        var pinnedEvent = new VirtualThreadPinnedEvent();
-        pinnedEvent.begin();
-
-        setState(PINNED);
-        try {
-            if (!parkPermit) {
-                if (!timed) {
-                    U.park(false, 0);
-                } else if (nanos > 0) {
-                    U.park(false, nanos);
-                }
-            }
-        } finally {
-            setState(RUNNING);
-        }
-
-        // consume parking permit
-        setParkPermit(false);
-
-        // commit event if enabled
-        if (pinnedEvent.isEnabled()) {
-            pinnedEvent.commit();
         }
     }
 
@@ -490,15 +474,28 @@ class VirtualThread extends Thread {
         start(ThreadContainers.root());
     }
 
-    /**
-     * Parks the current virtual thread until it is unparked or interrupted.
-     * If already unparked then the parking permit is consumed and this method
-     * completes immediately (meaning it doesn't yield). It also completes
-     * immediately if the interrupt status is set.
-     */
-    void park() {
-        assert Thread.currentThread() == this;
+    @Override
+    public void run() {
+        // do nothing
+    }
 
+    /**
+     * Parks the current virtual thread until unparked or interrupted.
+     */
+    static void park() {
+        if (currentThread() instanceof VirtualThread vthread) {
+            vthread.doPark();
+        } else {
+            throw new WrongThreadException();
+        }
+    }
+
+    /**
+     * Parks until unparked or interrupted. If already unparked then the parking
+     * permit is consumed and this method completes immediately (meaning it doesn't
+     * yield). It also completes immediately if the interrupt status is set.
+     */
+    private void doPark() {
         // complete immediately if parking permit available or interrupted
         if (getAndSetParkPermit(false) || interrupted)
             return;
@@ -516,15 +513,28 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Parks the current virtual thread up to the given waiting time or until it
-     * is unparked or interrupted. If already unparked then the parking permit is
-     * consumed and this method completes immediately (meaning it doesn't yield).
-     * It also completes immediately if the interrupt status is set or the waiting
-     * time is {@code <= 0}.
+     * Parks the current virtual thread up to the given waiting time or until
+     * unparked or interrupted.
+     *
+     * @param nanos the maximum number of nanoseconds to wait
+     */
+    static void parkNanos(long nanos) {
+        if (currentThread() instanceof VirtualThread vthread) {
+            vthread.doParkNanos(nanos);
+        } else {
+            throw new WrongThreadException();
+        }
+    }
+
+    /**
+     * Parks up to the given waiting time or until unparked or interrupted.
+     * If already unparked then the parking permit is consumed and this method
+     * completes immediately (meaning it doesn't yield). It also completes immediately
+     * if the interrupt status is set or the waiting time is {@code <= 0}.
      *
      * @param nanos the maximum number of nanoseconds to wait.
      */
-    void parkNanos(long nanos) {
+    private void doParkNanos(long nanos) {
         assert Thread.currentThread() == this;
 
         // complete immediately if parking permit available or interrupted
@@ -533,20 +543,20 @@ class VirtualThread extends Thread {
 
         // park the thread for the waiting time
         if (nanos > 0) {
-           long startTime = System.nanoTime();
+            long startTime = System.nanoTime();
 
             boolean yielded;
             Future<?> unparker = scheduleUnpark(nanos);
             setState(PARKING);
             try {
-               yielded = yieldContinuation();
+                yielded = yieldContinuation();
             } finally {
                 assert (Thread.currentThread() == this)
                         && (state() == RUNNING || state() == PARKING);
                 cancel(unparker);
             }
 
-            // park on the carrier thread for remaining time when pinned
+            // park on carrier thread for remaining time when pinned
             if (!yielded) {
                 long deadline = startTime + nanos;
                 if (deadline < 0L)
@@ -557,13 +567,47 @@ class VirtualThread extends Thread {
     }
 
     /**
+     * Parks the current carrier thread up to the given waiting time or until
+     * unparked or interrupted. If the virtual thread is interrupted then the
+     * interrupt status will be propagated to the carrier thread.
+     * @param timed true for a timed park, false for untimed
+     * @param nanos the waiting time in nanoseconds
+     */
+    private void parkOnCarrierThread(boolean timed, long nanos) {
+        assert state() == PARKING;
+
+        var pinnedEvent = new VirtualThreadPinnedEvent();
+        pinnedEvent.begin();
+
+        setState(PINNED);
+        try {
+            if (!parkPermit) {
+                if (!timed) {
+                    U.park(false, 0);
+                } else if (nanos > 0) {
+                    U.park(false, nanos);
+                }
+            }
+        } finally {
+            setState(RUNNING);
+        }
+
+        // consume parking permit
+        setParkPermit(false);
+
+        // commit event if enabled
+        if (pinnedEvent.isEnabled()) {
+            pinnedEvent.commit();
+        }
+    }
+
+    /**
      * Schedules this thread to be unparked after the given delay.
      */
     @ChangesCurrentThread
     private Future<?> scheduleUnpark(long nanos) {
-        //assert Thread.currentThread() == this;
         Thread carrier = this.carrierThread;
-        // need to switch to carrier thread to avoid nested parking
+        // need to switch to current platform thread to avoid nested parking
         carrier.setCurrentThread(carrier);
         try {
             return UNPARKER.schedule(() -> unpark(), nanos, NANOSECONDS);
@@ -577,10 +621,9 @@ class VirtualThread extends Thread {
      */
     @ChangesCurrentThread
     private void cancel(Future<?> future) {
-        //assert Thread.currentThread() == this;
         if (!future.isDone()) {
             Thread carrier = this.carrierThread;
-            // need to switch to carrier thread to avoid nested parking
+            // need to switch to current platform thread to avoid nested parking
             carrier.setCurrentThread(carrier);
             try {
                 future.cancel(false);
@@ -616,7 +659,7 @@ class VirtualThread extends Thread {
                 }
             } else if (s == PINNED) {
                 // unpark carrier thread when pinned.
-                synchronized (interruptLock) {
+                synchronized (carrierThreadAccessLock()) {
                     Thread carrier = carrierThread;
                     if (carrier != null && state() == PINNED) {
                         U.unpark(carrier);
@@ -627,7 +670,7 @@ class VirtualThread extends Thread {
     }
 
     /**
-     * Attempts to yield (Thread.yield).
+     * Attempts to yield the current virtual thread (Thread.yield).
      */
     void tryYield() {
         assert Thread.currentThread() == this;
@@ -639,6 +682,65 @@ class VirtualThread extends Thread {
             if (state() != RUNNING) {
                 assert state() == YIELDING;
                 setState(RUNNING);
+            }
+        }
+    }
+
+    /**
+     * Sleep the current virtual thread for the given sleep time.
+     *
+     * @param nanos the maximum number of nanoseconds to sleep
+     * @throws InterruptedException if interrupted while sleeping
+     */
+    void sleepNanos(long nanos) throws InterruptedException {
+        assert Thread.currentThread() == this;
+        if (nanos >= 0) {
+            if (ThreadSleepEvent.isTurnedOn()) {
+                ThreadSleepEvent event = new ThreadSleepEvent();
+                try {
+                    event.time = nanos;
+                    event.begin();
+                    doSleepNanos(nanos);
+                } finally {
+                    event.commit();
+                }
+            } else {
+                doSleepNanos(nanos);
+            }
+        }
+    }
+
+    /**
+     * Sleep the current thread for the given sleep time (in nanoseconds). If
+     * nanos is 0 then the thread will attempt to yield.
+     *
+     * @implNote This implementation parks the thread for the given sleeping time
+     * and will therefore be observed in PARKED state during the sleep. Parking
+     * will consume the parking permit so this method makes available the parking
+     * permit after the sleep. This may be observed as a spurious, but benign,
+     * wakeup when the thread subsequently attempts to park.
+     */
+    private void doSleepNanos(long nanos) throws InterruptedException {
+        assert nanos >= 0;
+        if (getAndClearInterrupt())
+            throw new InterruptedException();
+        if (nanos == 0) {
+            tryYield();
+        } else {
+            // park for the sleep time
+            try {
+                long remainingNanos = nanos;
+                long startNanos = System.nanoTime();
+                while (remainingNanos > 0) {
+                    parkNanos(remainingNanos);
+                    if (getAndClearInterrupt()) {
+                        throw new InterruptedException();
+                    }
+                    remainingNanos = nanos - (System.nanoTime() - startNanos);
+                }
+            } finally {
+                // may have been unparked while sleeping
+                setParkPermit(true);
             }
         }
     }
@@ -685,7 +787,7 @@ class VirtualThread extends Thread {
                     b.interrupt(this);
                 }
 
-                // interrupt carrier thread
+                // interrupt carrier thread if mounted
                 Thread carrier = carrierThread;
                 if (carrier != null) carrier.setInterrupt();
             }
@@ -713,44 +815,6 @@ class VirtualThread extends Thread {
         }
     }
 
-    /**
-     * Sleep the current thread for the given sleep time (in nanoseconds)
-     *
-     * @implNote This implementation parks the thread for the given sleeping time
-     * and will therefore be observed in PARKED state during the sleep. Parking
-     * will consume the parking permit so this method makes available the parking
-     * permit after the sleep. This will observed as a spurious, but benign, wakeup
-     * when the thread subsequently attempts to park.
-     *
-     * @throws InterruptedException if interrupted while sleeping
-     */
-    void sleepNanos(long nanos) throws InterruptedException {
-        assert Thread.currentThread() == this;
-        if (nanos >= 0) {
-            if (getAndClearInterrupt())
-                throw new InterruptedException();
-            if (nanos == 0) {
-                tryYield();
-            } else {
-                // park for the sleep time
-                try {
-                    long remainingNanos = nanos;
-                    long startNanos = System.nanoTime();
-                    while (remainingNanos > 0) {
-                        parkNanos(remainingNanos);
-                        if (getAndClearInterrupt()) {
-                            throw new InterruptedException();
-                        }
-                        remainingNanos = nanos - (System.nanoTime() - startNanos);
-                    }
-                } finally {
-                    // may have been unparked while sleeping
-                    setParkPermit(true);
-                }
-            }
-        }
-    }
-
     @Override
     Thread.State threadState() {
         switch (state()) {
@@ -763,7 +827,7 @@ class VirtualThread extends Thread {
                 return Thread.State.RUNNABLE;
             case RUNNING:
                 // if mounted then return state of carrier thread
-                synchronized (interruptLock) {
+                synchronized (carrierThreadAccessLock()) {
                     Thread carrierThread = this.carrierThread;
                     if (carrierThread != null) {
                         return carrierThread.threadState();
@@ -828,12 +892,8 @@ class VirtualThread extends Thread {
                 }
                 yield null;
             }
-            case NEW, STARTED, TERMINATED ->  {
-                yield new StackTraceElement[0];   // empty stack
-            }
-            default -> {
-                yield null;
-            }
+            case NEW, STARTED, TERMINATED ->  new StackTraceElement[0];  // empty stack
+            default -> null;
         };
     }
 
@@ -842,7 +902,7 @@ class VirtualThread extends Thread {
         StringBuilder sb = new StringBuilder("VirtualThread[#");
         sb.append(threadId());
         String name = getName();
-        if (!name.isEmpty() && !name.equals("<unnamed>")) {
+        if (!name.isEmpty()) {
             sb.append(",");
             sb.append(name);
         }
@@ -850,7 +910,7 @@ class VirtualThread extends Thread {
         Thread carrier = carrierThread;
         if (carrier != null) {
             // include the carrier thread state and name when mounted
-            synchronized (interruptLock) {
+            synchronized (carrierThreadAccessLock()) {
                 carrier = carrierThread;
                 if (carrier != null) {
                     String stateAsString = carrier.threadState().toString();
@@ -892,7 +952,16 @@ class VirtualThread extends Thread {
         return termination;
     }
 
-    // -- wrappers for VarHandle methods --
+    /**
+     * Returns the lock object to synchronize on when accessing carrierThread.
+     * The lock prevents carrierThread from being reset to null during unmount.
+     */
+    private Object carrierThreadAccessLock() {
+        // return interruptLock as unmount has to coordinate with interrupt
+        return interruptLock;
+    }
+
+    // -- wrappers for get/set of state, parking permit, and carrier thread --
 
     private int state() {
         return state;  // volatile read
@@ -920,6 +989,11 @@ class VirtualThread extends Thread {
         }
     }
 
+    private void setCarrierThread(Thread carrier) {
+        // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
+        this.carrierThread = carrier;
+    }
+
     // -- JVM TI support --
 
     private static volatile boolean notifyJvmtiEvents;  // set by VM
@@ -939,6 +1013,9 @@ class VirtualThread extends Thread {
     private static native void registerNatives();
     static {
         registerNatives();
+
+        // ensure that classes required to produce the Thread.State are initialized
+        var ignore = Thread.currentThread().threadState();
     }
 
     /**
@@ -952,9 +1029,9 @@ class VirtualThread extends Thread {
         };
         PrivilegedAction<ForkJoinPool> pa = () -> {
             int parallelism, maxPoolSize, minRunnable;
-            String parallelismValue = System.getProperty("jdk.defaultScheduler.parallelism");
-            String maxPoolSizeValue = System.getProperty("jdk.defaultScheduler.maxPoolSize");
-            String minRunnableValue = System.getProperty("jdk.defaultScheduler.minRunnable");
+            String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
+            String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
+            String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
             if (parallelismValue != null) {
                 parallelism = Integer.parseInt(parallelismValue);
             } else {
@@ -977,38 +1054,6 @@ class VirtualThread extends Thread {
                          0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
-    }
-
-    /**
-     * Defines static methods to invoke non-public ForkJoinPool methods.
-     */
-    private static class ForkJoinPools {
-        static final MethodHandle externalLazySubmit;
-        static {
-            try {
-                PrivilegedExceptionAction<MethodHandles.Lookup> pa = () ->
-                    MethodHandles.privateLookupIn(ForkJoinPool.class, MethodHandles.lookup());
-                @SuppressWarnings("removal")
-                MethodHandles.Lookup l = AccessController.doPrivileged(pa);
-                MethodType methodType = MethodType.methodType(void.class, ForkJoinTask.class);
-                externalLazySubmit = l.findVirtual(ForkJoinPool.class, "externalLazySubmit", methodType);
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
-        }
-        /**
-         * Invokes the non-public ForkJoinPool.externalLazySubmit method to
-         * submit the task to the current carrier thread's work queue.
-         */
-        static void externalLazySubmit(ForkJoinPool pool, ForkJoinTask<?> task) {
-            try {
-                externalLazySubmit.invoke(pool, task);
-            } catch (RuntimeException | Error e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new InternalError(e);
-            }
-        }
     }
 
     /**

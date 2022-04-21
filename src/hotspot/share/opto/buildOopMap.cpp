@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -343,7 +343,6 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
 
     } else {
       // Other - some reaching non-oop value
-      // omap->set_value( r);
 #ifdef ASSERT
       if( t->isa_rawptr() && C->cfg()->_raw_oops.member(def) ) {
         def->dump();
@@ -393,10 +392,11 @@ OopMap *OopFlow::build_oop_map( Node *n, int max_reg, PhaseRegAlloc *regalloc, i
   int num_oops = 0;
   for (OopMapStream oms2(omap); !oms2.is_done(); oms2.next()) {
     OopMapValue omv = oms2.current();
-    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value)
+    if (omv.type() == OopMapValue::oop_value || omv.type() == OopMapValue::narrowoop_value) {
       num_oops++;
+    }
   }
-  assert (num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
+  assert(num_oops == omap->num_oops(), "num_oops: %d omap->num_oops(): %d", num_oops, omap->num_oops());
 #endif
 
   return omap;

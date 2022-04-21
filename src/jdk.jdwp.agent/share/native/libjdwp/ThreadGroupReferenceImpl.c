@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 
 #include "util.h"
 #include "ThreadGroupReferenceImpl.h"
-#include "threadControl.h"
 #include "inStream.h"
 #include "outStream.h"
 
@@ -90,7 +89,6 @@ children(PacketInputStream *in, PacketOutputStream *out)
 {
      JNIEnv *env;
      jthreadGroup group;
-     jboolean is_vthread_group;
 
      env = getEnv();
 
@@ -99,49 +97,29 @@ children(PacketInputStream *in, PacketOutputStream *out)
          return JNI_TRUE;
      }
 
-     is_vthread_group = isSameObject(env, group, gdata->vthreadThreadGroup);
+     WITH_LOCAL_REFS(env, 1) {
 
-     WITH_LOCAL_REFS(env, 2) {
-
-         jvmtiError error = JVMTI_ERROR_NONE;
+         jvmtiError error;
          jint threadCount;
-         jint vthreadCount = 0;
          jint groupCount;
          jthread *theThreads;
-         jthread *theVThreads = NULL;
          jthread *theGroups;
 
-         if (is_vthread_group) {
-             if (gdata->enumerateVThreads) {
-                 /* Get all the VThreads so we can return them. */
-                 theVThreads = threadControl_allVThreads(&vthreadCount);
-                 if (theVThreads == NULL && vthreadCount != 0) {
-                     error = JVMTI_ERROR_OUT_OF_MEMORY;
-                 }
-             }
-         }
-
-         if (error == JVMTI_ERROR_NONE) {
-             /* Get all the threads in this group so we can return them. */
-             error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadGroupChildren)(gdata->jvmti, group,
+         error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadGroupChildren)(gdata->jvmti, group,
                                               &threadCount,&theThreads,
                                               &groupCount, &theGroups);
-         }
-
          if (error != JVMTI_ERROR_NONE) {
              outStream_setError(out, map2jdwpError(error));
          } else {
+
              int i;
 
              /* Squish out all of the debugger-spawned threads */
              threadCount = filterDebugThreads(theThreads, threadCount);
 
-             (void)outStream_writeInt(out, threadCount + vthreadCount);
+             (void)outStream_writeInt(out, threadCount);
              for (i = 0; i < threadCount; i++) {
                  (void)outStream_writeObjectRef(env, out, theThreads[i]);
-             }
-             for (i = 0; i < vthreadCount; i++) {
-                 (void)outStream_writeObjectRef(env, out, theVThreads[i]);
              }
              (void)outStream_writeInt(out, groupCount);
              for (i = 0; i < groupCount; i++) {
@@ -150,7 +128,6 @@ children(PacketInputStream *in, PacketOutputStream *out)
 
              jvmtiDeallocate(theGroups);
              jvmtiDeallocate(theThreads);
-             jvmtiDeallocate(theVThreads);
          }
 
      } END_WITH_LOCAL_REFS(env);

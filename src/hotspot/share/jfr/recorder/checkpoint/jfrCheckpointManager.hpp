@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,7 +32,6 @@
 #include "jfr/utilities/jfrBlob.hpp"
 #include "jfr/utilities/jfrLinkedList.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
-#include "runtime/thread.hpp"
 
 class JfrCheckpointManager;
 class JfrChunkWriter;
@@ -60,7 +59,7 @@ class JfrCheckpointManager : public JfrCHeapObj {
   typedef JfrCheckpointMspace::NodePtr BufferPtr;
  private:
   JfrCheckpointMspace* _global_mspace;
-  JfrThreadLocalCheckpointMspace* _java_thread_local_mspace;
+  JfrThreadLocalCheckpointMspace* _thread_local_mspace;
   JfrChunkWriter& _chunkwriter;
 
   JfrCheckpointManager(JfrChunkWriter& cw);

@@ -58,6 +58,7 @@ class outputStream;
   LOG_TAG(constantpool) \
   LOG_TAG(constraints) \
   LOG_TAG(container) \
+  LOG_TAG(continuations) \
   LOG_TAG(coops) \
   LOG_TAG(cpu) \
   LOG_TAG(cset) \
@@ -97,7 +98,6 @@ class outputStream;
   LOG_TAG(jit) \
   LOG_TAG(jni) \
   LOG_TAG(jvmci) \
-  LOG_TAG(jvmcont) \
   LOG_TAG(jvmti) \
   LOG_TAG(lambda) \
   LOG_TAG(library) \

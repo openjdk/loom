@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,6 @@ import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-
 import jdk.internal.misc.TerminatingThreadLocal;
 
 /**
@@ -104,7 +103,7 @@ public class ThreadLocal<T> {
     /**
      * Returns the next hash code.
      */
-    static int nextHashCode() {
+    private static int nextHashCode() {
         return nextHashCode.getAndAdd(HASH_INCREMENT);
     }
 
@@ -373,6 +372,7 @@ public class ThreadLocal<T> {
             }
         }
 
+        // Placeholder when thread locals not supported
         static final ThreadLocalMap NOT_SUPPORTED = new ThreadLocalMap();
 
         /**
@@ -417,6 +417,9 @@ public class ThreadLocal<T> {
             return ((i - 1 >= 0) ? i - 1 : len - 1);
         }
 
+        /**
+         * Construct a new map without a table.
+         */
         ThreadLocalMap() {
         }
 

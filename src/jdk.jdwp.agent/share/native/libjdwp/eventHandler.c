@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -588,8 +588,9 @@ filterAndHandleEvent(JNIEnv *env, EventInfo *evinfo, EventIndex ei,
         reportEvents(env, eventSessionID, evinfo->thread, evinfo->ei,
                      evinfo->clazz, evinfo->method, evinfo->location, eventBag);
     }
-    // vthread fixme: if we didn't have any events to report, we should allow the vthread
-    // ThreadNode to be released at this point.
+    // TODO - vthread node cleanup: if we didn't have any events to report, we should allow
+    // the vthread ThreadNode to be released at this point. Need to check if
+    // (bagSize(eventBag) < 1), not just (eventBag == NULL).
 
 }
 
@@ -697,33 +698,7 @@ event_callback(JNIEnv *env, EventInfo *evinfo)
         }
     }
 
-    /* We want the vthread start/end events to mimic thread start/end events */
-    /* vthread fixme: We can remove this now because cbVThreadStart/End set to THREAD_START/END. */
-    if (ei == EI_VIRTUAL_THREAD_START) {
-        ei = EI_THREAD_START;
-        JDI_ASSERT(JNI_FALSE);
-    }
-    if (ei == EI_VIRTUAL_THREAD_END) {
-        ei = EI_THREAD_END;
-        JDI_ASSERT(JNI_FALSE);
-    }
-
-    if (gdata->vthreadsSupported && gdata->trackAllVThreads) {
-        /* Add the vthread if we haven't added it before. */
-        if (evinfo->is_vthread && !threadControl_isKnownVThread(thread)) {
-            // vthread fixme: we can actually get rid of the threadControl_addVThread call now since
-            // the call to threadControl_onEventHandlerEntry above should always end up adding
-            // the vthread. Leave in place with an assert for now just to make sure.
-            JDI_ASSERT(threadControl_isKnownVThread(thread));
-            threadControl_addVThread(thread);
-        }
-    }
-
-    if ((ei == EI_THREAD_START || ei == EI_THREAD_END) && evinfo->is_vthread && !gdata->notifyVThreads) {
-        /* Skip this event since we are not notifying the debugger of vthread START/END events. */
-    } else {
-        filterAndHandleEvent(env, evinfo, ei, eventBag, eventSessionID);
-    }
+    filterAndHandleEvent(env, evinfo, ei, eventBag, eventSessionID);
 
     /* we are continuing after VMDeathEvent - now we are dead */
     if (evinfo->ei == EI_VM_DEATH) {
@@ -920,6 +895,47 @@ cbThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thread)
     } END_CALLBACK();
 
     LOG_MISC(("END cbThreadEnd"));
+}
+
+/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_START */
+static void JNICALL
+cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
+{
+    EventInfo info;
+
+    LOG_CB(("cbVThreadStart: vthread=%p", vthread));
+    JDI_ASSERT(gdata->vthreadsSupported);
+
+    BEGIN_CALLBACK() {
+        (void)memset(&info,0,sizeof(info));
+        /* Convert to THREAD_START event. */
+        info.ei         = EI_THREAD_START;
+        info.thread     = vthread;
+        event_callback(env, &info);
+    } END_CALLBACK();
+
+    LOG_MISC(("END cbVThreadStart"));
+}
+
+/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_END */
+static void JNICALL
+cbVThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
+{
+
+    EventInfo info;
+
+    LOG_CB(("cbVThreadEnd: vthread=%p", vthread));
+    JDI_ASSERT(gdata->vthreadsSupported);
+
+    BEGIN_CALLBACK() {
+        (void)memset(&info,0,sizeof(info));
+        /* Convert to THREAD_END event. */
+        info.ei         = EI_THREAD_END;
+        info.thread     = vthread;
+        event_callback(env, &info);
+    } END_CALLBACK();
+
+    LOG_MISC(("END cbVThreadEnd"));
 }
 
 /* Event callback for JVMTI_EVENT_CLASS_PREPARE */
@@ -1343,72 +1359,6 @@ cbVMDeath(jvmtiEnv *jvmti_env, JNIEnv *env)
     debugLoop_sync();
 
     LOG_MISC(("END cbVMDeath"));
-}
-
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_START */
-static void JNICALL
-cbVThreadStart(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
-{
-    EventInfo info;
-
-    LOG_CB(("cbVThreadStart: vthread=%p", vthread));
-    /*tty_message("cbVThreadStart: vthread=%p", vthread);*/
-    JDI_ASSERT(gdata->vthreadsSupported);
-
-    /*
-     * Now would be a good time to cache the ThreadGroup for vthreads (carrier threads)
-     * if we haven't already.
-     */
-    if (gdata->vthreadThreadGroup == NULL) {
-        jvmtiThreadInfo info;
-        jvmtiError error;
-
-        (void)memset(&info, 0, sizeof(info));
-        error = JVMTI_FUNC_PTR(gdata->jvmti,GetThreadInfo)
-            (gdata->jvmti, vthread, &info);
-
-        if (error != JVMTI_ERROR_NONE) {
-            EXIT_ERROR(error, "could not get vthread ThreadGroup");
-        } else {
-            debugMonitorEnter(callbackBlock); /* vthread fixme: any monitor will do, but there probably is a better choice. */
-            /* Make sure there wasn't a race before setting. saveGlobalRef() will assert if the
-             * target is not NULL. */
-            if (gdata->vthreadThreadGroup == NULL) {
-                saveGlobalRef(env, info.thread_group, &gdata->vthreadThreadGroup);
-            }
-            debugMonitorExit(callbackBlock);
-        }
-    }
-
-    BEGIN_CALLBACK() {
-        (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_THREAD_START;
-        info.thread     = vthread;
-        event_callback(env, &info);
-    } END_CALLBACK();
-
-    LOG_MISC(("END cbVThreadStart"));
-}
-
-/* Event callback for JVMTI_EVENT_VIRTUAL_THREAD_END */
-static void JNICALL
-cbVThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *env, jthread vthread)
-{
-
-    EventInfo info;
-
-    LOG_CB(("cbVThreadEnd: vthread=%p", vthread));
-    /*tty_message("cbVThreadEnd: vthread=%p", vthread);*/
-    JDI_ASSERT(gdata->vthreadsSupported);
-
-    BEGIN_CALLBACK() {
-        (void)memset(&info,0,sizeof(info));
-        info.ei         = EI_THREAD_END;
-        info.thread     = vthread;
-        event_callback(env, &info);
-    } END_CALLBACK();
-
-    LOG_MISC(("END cbVThreadEnd"));
 }
 
 /**

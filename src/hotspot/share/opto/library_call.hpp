@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -234,17 +234,20 @@ class LibraryCallKit : public GraphKit {
   bool inline_unsafe_writeback0();
   bool inline_unsafe_writebackSync0(bool is_pre);
   bool inline_unsafe_copyMemory();
-  bool inline_native_currentThread0();
+
+  bool inline_native_currentCarrierThread();
+  bool inline_native_currentThread();
+  bool inline_native_setCurrentThread();
+
   bool inline_native_scopeLocalCache();
   Node* scopeLocalCache_helper();
   bool inline_native_setScopeLocalCache();
-  bool inline_native_currentThread();
-  bool inline_native_setCurrentThread();
 
   bool inline_native_time_funcs(address method, const char* funcName);
 #ifdef JFR_HAVE_INTRINSICS
   bool inline_native_classID();
   bool inline_native_getEventWriter();
+  void extend_setCurrentThread(Node* jt, Node* thread);
 #endif
   bool inline_native_Class_query(vmIntrinsics::ID id);
   bool inline_native_subtype_check();
@@ -272,6 +275,7 @@ class LibraryCallKit : public GraphKit {
   bool inline_onspinwait();
   bool inline_fp_conversions(vmIntrinsics::ID id);
   bool inline_number_methods(vmIntrinsics::ID id);
+  bool inline_divmod_methods(vmIntrinsics::ID id);
   bool inline_reference_get();
   bool inline_reference_refersTo0(bool is_phantom);
   bool inline_Class_cast();
@@ -304,7 +308,7 @@ class LibraryCallKit : public GraphKit {
   bool inline_updateBytesAdler32();
   bool inline_updateByteBufferAdler32();
   bool inline_multiplyToLen();
-  bool inline_hasNegatives();
+  bool inline_countPositives();
   bool inline_squareToLen();
   bool inline_mulAdd();
   bool inline_montgomeryMultiply();

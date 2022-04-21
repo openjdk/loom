@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -75,11 +75,11 @@ const char* GCCause::to_string(GCCause::Cause cause) {
     case _tenured_generation_full:
       return "Tenured Generation Full";
 
-    case _metadata_GC_threshold:
-      return "Metadata GC Threshold";
-
     case _codecache_GC_threshold:
       return "CodeCache GC Threshold";
+
+    case _metadata_GC_threshold:
+      return "Metadata GC Threshold";
 
     case _metadata_GC_clear_soft_refs:
       return "Metadata GC Clear Soft References";

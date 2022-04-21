@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -90,12 +90,6 @@ address StubRoutines::_jint_disjoint_arraycopy           = CAST_FROM_FN_PTR(addr
 address StubRoutines::_jlong_disjoint_arraycopy          = CAST_FROM_FN_PTR(address, StubRoutines::jlong_copy);
 address StubRoutines::_oop_disjoint_arraycopy            = CAST_FROM_FN_PTR(address, StubRoutines::oop_copy);
 address StubRoutines::_oop_disjoint_arraycopy_uninit     = CAST_FROM_FN_PTR(address, StubRoutines::oop_copy_uninit);
-
-bool    StubRoutines::_has_word_memcpy             = false;
-address StubRoutines::_word_memcpy_up              = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
-address StubRoutines::_word_memcpy_down            = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
-address StubRoutines::_word_memcpy_up_nt           = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
-address StubRoutines::_word_memcpy_down_nt         = NULL; // CAST_FROM_FN_PTR(address, StubRoutines::jint_copy);
 
 address StubRoutines::_arrayof_jbyte_arraycopy  = CAST_FROM_FN_PTR(address, StubRoutines::arrayof_jbyte_copy);
 address StubRoutines::_arrayof_jshort_arraycopy = CAST_FROM_FN_PTR(address, StubRoutines::arrayof_jshort_copy);
@@ -188,13 +182,13 @@ address StubRoutines::_vector_d_math[VectorSupport::NUM_VEC_SIZES][VectorSupport
 
 RuntimeStub* StubRoutines::_cont_doYield_stub = NULL;
 address StubRoutines::_cont_doYield       = NULL;
-address StubRoutines::_cont_jump_from_sp  = NULL;
 address StubRoutines::_cont_thaw          = NULL;
 address StubRoutines::_cont_returnBarrier = NULL;
 address StubRoutines::_cont_returnBarrierExc = NULL;
-address StubRoutines::_cont_interpreter_forced_preempt_return = NULL;
 
+JFR_ONLY(RuntimeStub* StubRoutines::_jfr_write_checkpoint_stub = NULL;)
 JFR_ONLY(address StubRoutines::_jfr_write_checkpoint = NULL;)
+JFR_ONLY(RuntimeStub* StubRoutines::_jfr_get_event_writer_stub = NULL;)
 JFR_ONLY(address StubRoutines::_jfr_get_event_writer = NULL;)
 
 // Initialization
@@ -234,7 +228,10 @@ void StubRoutines::initialize1() {
   if (_code1 == NULL) {
     ResourceMark rm;
     TraceTime timer("StubRoutines generation 1", TRACETIME_LOG(Info, startuptime));
-    _code1 = BufferBlob::create("StubRoutines (1)", code_size1);
+    // Add extra space for large CodeEntryAlignment
+    int max_aligned_stubs = 10;
+    int size = code_size1 + CodeEntryAlignment * max_aligned_stubs;
+    _code1 = BufferBlob::create("StubRoutines (1)", size);
     if (_code1 == NULL) {
       vm_exit_out_of_memory(code_size1, OOM_MALLOC_ERROR, "CodeCache: no room for StubRoutines (1)");
     }
@@ -303,7 +300,10 @@ void StubRoutines::initialize2() {
   if (_code2 == NULL) {
     ResourceMark rm;
     TraceTime timer("StubRoutines generation 2", TRACETIME_LOG(Info, startuptime));
-    _code2 = BufferBlob::create("StubRoutines (2)", code_size2);
+    // Add extra space for large CodeEntryAlignment
+    int max_aligned_stubs = 100;
+    int size = code_size2 + CodeEntryAlignment * max_aligned_stubs;
+    _code2 = BufferBlob::create("StubRoutines (2)", size);
     if (_code2 == NULL) {
       vm_exit_out_of_memory(code_size2, OOM_MALLOC_ERROR, "CodeCache: no room for StubRoutines (2)");
     }

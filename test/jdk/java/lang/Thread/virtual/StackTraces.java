@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,8 +23,8 @@
 
 /**
  * @test
- * @summary Test that the stack traces for carrier threads are hidden by
- *     exceptions and the StackWalker API
+ * @summary Test stack traces in exceptions and stack frames waslked by the StackWalker
+ *     API do not include the carrier stack frames
  * @modules java.management
  * @compile --enable-preview -source ${jdk.version} StackTraces.java
  * @run testng/othervm --enable-preview StackTraces

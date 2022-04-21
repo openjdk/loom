@@ -211,11 +211,6 @@ class InterpreterMacroAssembler: public MacroAssembler {
   // jump to an invoked target
   void prepare_to_jump_from_interpreted();
   void jump_from_interpreted(Register method, Register temp);
-  // void resolve_special(Register rmethod, LinkInfo link_info);
-  // void get_entry(Register entry, Register method);
-  // void get_entry(Register entry, LinkInfo link_info);
-  // void call_Java_final(LinkInfo link_info);
-  // void jump_Java_final(LinkInfo link_info);
 
   // narrow int return value
   void narrow(Register result);
@@ -253,10 +248,8 @@ class InterpreterMacroAssembler: public MacroAssembler {
                              bool decrement = false);
   void increment_mdp_data_at(Register mdp_in, Register reg, int constant,
                              bool decrement = false);
-  void increment_mask_and_jump(Address counter_addr,
-                               int increment, Address mask,
-                               Register scratch, bool preloaded,
-                               Condition cond, Label* where);
+  void increment_mask_and_jump(Address counter_addr, Address mask,
+                               Register scratch, Label* where);
   void set_mdp_flag_at(Register mdp_in, int flag_constant);
   void test_mdp_data_at(Register mdp_in, int offset, Register value,
                         Register test_value_out,

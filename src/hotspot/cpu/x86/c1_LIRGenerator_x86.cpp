@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -339,7 +339,6 @@ void LIRGenerator::do_MonitorExit(MonitorExit* x) {
 
 void LIRGenerator::do_continuation_doYield(Intrinsic* x) {
   BasicTypeList signature(0);
-  // signature.append(T_INT);
   CallingConvention* cc = frame_map()->java_calling_convention(&signature, true);
 
   const LIR_Opr result_reg = result_register_for(x->type());

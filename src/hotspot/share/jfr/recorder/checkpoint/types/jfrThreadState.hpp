@@ -45,7 +45,7 @@ public:
 class JfrThreadName : public AllStatic {
  public:
   // Requires a ResourceMark for get_thread_name/as_utf8
-  static const char* name(const Thread* t, oop vthread = NULL);
+  static const char* name(const Thread* t, int& length, oop vthread = NULL);
 };
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_JFRTHREADSTATE_HPP

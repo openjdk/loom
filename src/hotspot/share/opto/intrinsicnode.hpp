@@ -157,14 +157,15 @@ class AryEqNode: public StrIntrinsicNode {
   virtual const Type* bottom_type() const { return TypeInt::BOOL; }
 };
 
-//------------------------------HasNegatives---------------------------------
-class HasNegativesNode: public StrIntrinsicNode {
+//------------------------------CountPositives------------------------------
+class CountPositivesNode: public StrIntrinsicNode {
  public:
-  HasNegativesNode(Node* control, Node* char_array_mem, Node* s1, Node* c1):
+  CountPositivesNode(Node* control, Node* char_array_mem, Node* s1, Node* c1):
   StrIntrinsicNode(control, char_array_mem, s1, c1, none) {};
   virtual int Opcode() const;
-  virtual const Type* bottom_type() const { return TypeInt::BOOL; }
+  virtual const Type* bottom_type() const { return TypeInt::POS; }
 };
+
 
 //------------------------------EncodeISOArray--------------------------------
 // encode char[] to byte[] in ISO_8859_1 or ASCII

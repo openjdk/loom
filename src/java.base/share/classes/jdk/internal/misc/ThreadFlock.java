@@ -250,9 +250,8 @@ public class ThreadFlock implements AutoCloseable {
     /**
      * Starts the given unstarted thread in this flock.
      *
-     * <p> The thread is started with the {@linkplain ScopeLocal scope-local} bindings
-     * that were captured when opening the flock. The bindings must match the current
-     * thread's bindings.
+     * <p> The thread is started with the scope-local bindings that were captured
+     * when opening the flock. The bindings must match the current thread's bindings.
      *
      * <p> This method may only be invoked by the flock owner or threads {@linkplain
      * #containsThread(Thread) contained} in the flock.
@@ -260,10 +259,11 @@ public class ThreadFlock implements AutoCloseable {
      * @param thread the unstarted thread
      * @return the thread, started
      * @throws IllegalStateException if this flock is shutdown or closed
-     * @throws StructureViolationException if the current scope-local bindings are not
-     * the same as when the flock was created
-     * @throws IllegalThreadStateException if the thread has already started,
-     * or the current thread is not the owner or a thread contained in the flock
+     * @throws IllegalThreadStateException if the given thread was already started
+     * @throws WrongThreadException if the current thread is not the owner or a thread
+     * contained in the flock
+     * @throws jdk.incubator.concurrent.StructureViolationException if the current
+     * scope-local bindings are not the same as when the flock was created
      */
     public Thread start(Thread thread) {
         ensureOwnerOrContainsThread();
@@ -398,13 +398,16 @@ public class ThreadFlock implements AutoCloseable {
      * <p> A ThreadFlock is intended to be used in a <em>structured manner</em>. If
      * this method is called to close a flock before nested flocks are closed then it
      * closes the nested flocks (in the reverse order that they were created in),
-     * closes this flock, and then throws {@link StructureViolationException}.
+     * closes this flock, and then throws {@link
+     * jdk.incubator.concurrent.StructureViolationException}.
      * Similarly, if called to close a flock that <em>encloses</em> {@linkplain
-     * ScopeLocal.Carrier#run(Runnable) operations} with scope-local bindings then
-     * it also throws {@code StructureViolationException} after closing the flock.
+     * jdk.incubator.concurrent.ScopeLocal.Carrier#run(Runnable) operations} with
+     * scope-local bindings then it also throws {@code StructureViolationException}
+     * after closing the flock.
      *
      * @throws WrongThreadException if invoked by a thread that is not the owner
-     * @throws StructureViolationException if a structure violation was detected
+     * @throws jdk.incubator.concurrent.StructureViolationException if a structure
+     * violation was detected
      */
     public void close() {
         ensureOwner();
@@ -586,7 +589,7 @@ public class ThreadFlock implements AutoCloseable {
         }
         @Override
         public ScopeLocalContainer.BindingsSnapshot scopeLocalBindings() {
-            return flock.scopeLocalBindings;
+            return flock.scopeLocalBindings();
         }
     }
 }

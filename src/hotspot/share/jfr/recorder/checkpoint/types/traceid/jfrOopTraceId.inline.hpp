@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
 * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 *
 * This code is free software; you can redistribute it and/or modify it
@@ -26,54 +26,50 @@
 #define SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP
 
 #include "jfr/recorder/checkpoint/types/traceid/jfrOopTraceId.hpp"
+
 #include "jfr/recorder/checkpoint/types/traceid/jfrTraceIdEpoch.hpp"
 
 template <typename T>
-inline bool JfrOopTraceId<T>::store(oop ref, traceid value) {
-  assert(ref != NULL, "invariant");
-  assert(value != 0, "invariant");
-  return T::store(ref, value) == value;
+inline traceid JfrOopTraceId<T>::id(oop ref) {
+  assert(ref != nullptr, "invariant");
+  return T::id(ref);
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::load(oop ref) {
-  assert(ref != NULL, "invariant");
-  return T::load(ref);
+inline u2 JfrOopTraceId<T>::epoch(oop ref) {
+  assert(ref != nullptr, "invariant");
+  return T::epoch(ref);
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::epoch(traceid value) {
-  return value >> jfr_epoch_shift;
+inline u2 JfrOopTraceId<T>::current_epoch() {
+  return JfrTraceIdEpoch::epoch_generation();
 }
 
 template <typename T>
-inline traceid JfrOopTraceId<T>::id(traceid value) {
-  return value & jfr_id_mask;
-}
-
-inline bool is_current(traceid epoch) {
-  return JfrTraceIdEpoch::is_current_epoch_generation(epoch);
-}
-
-inline bool need_checkpoint(traceid epoch) {
-  return !is_current(epoch);
-}
-
-inline traceid embed_current_epoch(traceid id) {
-  return (JfrTraceIdEpoch::epoch_generation() << jfr_epoch_shift) | id;
+inline void JfrOopTraceId<T>::set_epoch(oop ref, u2 epoch) {
+  assert(ref != nullptr, "invariant");
+  T::set_epoch(ref, epoch);
 }
 
 template <typename T>
-inline bool JfrOopTraceId<T>::store_current_epoch(oop ref, traceid id) {
-  assert(ref != NULL, "invariant");
-  assert(id != 0, "invariant");
-  return store(ref, embed_current_epoch(id));
+inline void JfrOopTraceId<T>::set_epoch(oop ref) {
+  set_epoch(ref, JfrTraceIdEpoch::epoch_generation());
 }
 
 template <typename T>
-inline bool JfrOopTraceId<T>::should_write_checkpoint(oop ref, traceid value) {
-  assert(ref != NULL, "invariant");
-  return need_checkpoint(epoch(value)) && store_current_epoch(ref, id(value));
+inline bool JfrOopTraceId<T>::is_excluded(oop ref) {
+  return T::is_excluded(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::exclude(oop ref) {
+  T::exclude(ref);
+}
+
+template <typename T>
+inline void JfrOopTraceId<T>::include(oop ref) {
+  T::include(ref);
 }
 
 #endif // SHARE_JFR_RECORDER_CHECKPOINT_TYPES_TRACEID_JFROOPTRACEID_INLINE_HPP

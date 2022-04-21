@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -191,14 +191,6 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
   if (m->is_setter()) {
     return setter;
   }
-
-  // Symbol* kname = m->klass_name();
-  // Symbol* name = m->name();
-  // if (kname == vmSymbols::jdk_internal_vm_Continuation()) {
-  //   if (name == vmSymbols::enter_name()) {
-  //     return java_lang_continuation_enter;
-  //   }
-  // }
 
   // Note: for now: zero locals for all non-empty methods
   return zerolocals;

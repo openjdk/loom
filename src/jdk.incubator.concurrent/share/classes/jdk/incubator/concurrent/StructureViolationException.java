@@ -29,12 +29,10 @@ package jdk.incubator.concurrent;
  *
  * @see StructuredTaskScope#fork(Callable)
  * @see StructuredTaskScope#close()
- * @see ScopeLocal.Carrier#run(Runnable)
- * @see ScopeLocal.Carrier#call(Callable)
  *
  * @since 19
  */
-public class StructureViolationException extends RuntimeException {
+public final class StructureViolationException extends RuntimeException {
     @java.io.Serial
     private static final long serialVersionUID = -7705327650798235468L;
 

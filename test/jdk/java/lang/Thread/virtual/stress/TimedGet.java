@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,7 +41,7 @@ public class TimedGet {
     static final String RESULT = "foo";
 
     public static void main(String... args) throws InterruptedException {
-        int threadCount = 500_000;
+        int threadCount = 250_000;
         if (args.length > 0) {
             threadCount = Integer.parseInt(args[0]);
         }
