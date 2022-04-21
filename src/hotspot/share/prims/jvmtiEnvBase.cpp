@@ -630,9 +630,9 @@ JavaThread* JvmtiEnvBase::get_JavaThread_or_null(oop vthread) {
 }
 
 javaVFrame*
-JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
+JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMS_transition, javaVFrame* jvf) {
   // The second condition is needed to hide notification methods.
-  if (!is_in_VTMT && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
+  if (!is_in_VTMS_transition && (jvf == NULL || !jvf->method()->jvmti_mount_transition())) {
     return jvf;  // No frames to skip.
   }
   // Find jvf with a method annotated with @JvmtiMountTransition.
@@ -651,7 +651,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(bool is_in_VTMT, javaVFrame* jvf) {
 
 javaVFrame*
 JvmtiEnvBase::check_and_skip_hidden_frames(JavaThread* jt, javaVFrame* jvf) {
-  jvf = check_and_skip_hidden_frames(jt->is_in_VTMT(), jvf);
+  jvf = check_and_skip_hidden_frames(jt->is_in_VTMS_transition(), jvf);
   return jvf;
 }
 
@@ -662,7 +662,7 @@ JvmtiEnvBase::check_and_skip_hidden_frames(oop vthread, javaVFrame* jvf) {
     // nothing to skip
     return jvf;
   }
-  jvf = check_and_skip_hidden_frames(state->is_in_VTMT(), jvf);
+  jvf = check_and_skip_hidden_frames(state->is_in_VTMS_transition(), jvf);
   return jvf;
 }
 
@@ -1538,7 +1538,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
       oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_h());
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
-    // The java_thread can be still blocked in VTMT transition after a previous JVMTI resume call.
+    // The java_thread can be still blocked in VTMS transition after a previous JVMTI resume call.
     // There is no need to suspend the java_thread in this case. After vthread unblocking,
     // it will check for ext_suspend request and suspend itself if necessary.
     if (java_thread == NULL || java_thread->is_suspended()) {
@@ -1563,7 +1563,7 @@ JvmtiEnvBase::suspend_thread(oop thread_oop, JavaThread* java_thread, bool singl
     }
     java_thread->set_carrier_thread_suspended();
   }
-  assert(!java_thread->is_in_VTMT(), "sanity check");
+  assert(!java_thread->is_in_VTMS_transition(), "sanity check");
 
   assert(!single_suspend || (!is_virtual && java_thread->is_carrier_thread_suspended()) ||
           (is_virtual && JvmtiVTSuspender::is_vthread_suspended(thread_h())),
@@ -1606,7 +1606,7 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
       oop carrier_thread = java_lang_VirtualThread::carrier_thread(thread_h());
       java_thread = carrier_thread == NULL ? NULL : java_lang_Thread::thread(carrier_thread);
     }
-    // The java_thread can be still blocked in VTMT transition after a previous JVMTI suspend call.
+    // The java_thread can be still blocked in VTMS transition after a previous JVMTI suspend call.
     // There is no need to resume the java_thread in this case. After vthread unblocking,
     // it will check for is_vthread_suspended request and remain resumed if necessary.
     if (java_thread == NULL || !java_thread->is_suspended()) {
@@ -1630,7 +1630,7 @@ JvmtiEnvBase::resume_thread(oop thread_oop, JavaThread* java_thread, bool single
     }
     java_thread->clear_carrier_thread_suspended();
   }
-  assert(!java_thread->is_in_VTMT(), "sanity check");
+  assert(!java_thread->is_in_VTMS_transition(), "sanity check");
 
   if (!is_passive_cthread) {
     assert(single_resume || is_virtual, "ResumeAllVirtualThreads should never resume non-virtual threads");
@@ -1902,7 +1902,7 @@ JvmtiEnvBase::force_early_return(jthread thread, jvalue value, TosState tos) {
   JavaThread* current_thread = JavaThread::current();
   HandleMark hm(current_thread);
 
-  JvmtiVTMTDisabler vtmt_disabler;
+  JvmtiVTMSTransitionDisabler disabler;
   ThreadsListHandle tlh(current_thread);
 
   JavaThread* java_thread = NULL;
@@ -2246,10 +2246,11 @@ PrintStackTraceClosure::do_thread_impl(Thread *target) {
   t_oop = t_oop == NULL ? java_thread->threadObj() : t_oop;
   bool is_vt_suspended = java_lang_VirtualThread::is_instance(t_oop) && JvmtiVTSuspender::is_vthread_suspended(t_oop);
 
-  log_error(jvmti)("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d is_VTMT_disabler: %d, is_in_VTMT = %d\n",
+  log_error(jvmti)("%s(%s) exiting: %d is_susp: %d is_thread_susp: %d is_vthread_susp: %d "
+                   "is_VTMS_transition_disabler: %d, is_in_VTMS_transition = %d\n",
                    tname, java_thread->name(), java_thread->is_exiting(),
                    java_thread->is_suspended(), java_thread->is_carrier_thread_suspended(), is_vt_suspended,
-                   java_thread->is_VTMT_disabler(), java_thread->is_in_VTMT());
+                   java_thread->is_VTMS_transition_disabler(), java_thread->is_in_VTMS_transition());
 
   if (java_thread->has_last_Java_frame()) {
     RegisterMap reg_map(java_thread, /* update_map */ true, /* process_frames */ true);

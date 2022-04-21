@@ -53,7 +53,7 @@ Mutex*   JfieldIdCreation_lock        = NULL;
 Monitor* JNICritical_lock             = NULL;
 Mutex*   JvmtiThreadState_lock        = NULL;
 Monitor* EscapeBarrier_lock           = NULL;
-Monitor* JvmtiVTMT_lock               = NULL;
+Monitor* JvmtiVTMSTransition_lock     = NULL;
 Monitor* Heap_lock                    = NULL;
 #ifdef INCLUDE_PARALLELGC
 Mutex*   PSOldGenExpand_lock      = NULL;
@@ -292,7 +292,7 @@ void mutex_init() {
 
   def(JvmtiThreadState_lock        , PaddedMutex  , safepoint);   // Used by JvmtiThreadState/JvmtiEventController
   def(EscapeBarrier_lock           , PaddedMonitor, nosafepoint); // Used to synchronize object reallocation/relocking triggered by JVMTI
-  def(JvmtiVTMT_lock               , PaddedMonitor, nosafepoint); // used for Virtual Thread Mount Transition management
+  def(JvmtiVTMSTransition_lock     , PaddedMonitor, nosafepoint); // used for Virtual Thread Mount State transition management
   def(Management_lock              , PaddedMutex  , safepoint);   // used for JVM management
 
   def(ConcurrentGCBreakpoints_lock , PaddedMonitor, safepoint, true);
