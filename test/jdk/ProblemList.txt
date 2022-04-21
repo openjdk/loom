@@ -862,14 +862,10 @@ java/awt/Focus/FrameMinimizeTest/FrameMinimizeTest.java 8016266 linux-x64
 
 
 ############################################################################
+
 # Loom
 
-####
-## regressions in jep-vt
-
-
-####
-## fibers branch only failures
+#### fibers branch only failures
 
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
