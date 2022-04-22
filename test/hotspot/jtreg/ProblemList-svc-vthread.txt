@@ -24,6 +24,8 @@
 ####
 # Bugs
 
+serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
+
 ####
 ## Classes not unloaded as expected (TODO, need to check if FJ keep link)
 
