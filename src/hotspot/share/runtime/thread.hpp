@@ -705,7 +705,7 @@ class JavaThread: public Thread {
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
   OopHandle      _jvmti_vthread;
-  OopHandle      _scopeLocalCache;
+  OopHandle      _extentLocalCache;
 
 #ifdef ASSERT
  private:
@@ -1063,9 +1063,9 @@ private:
   inline StackWatermarks* stack_watermarks() { return &_stack_watermarks; }
 
  public:
-  jlong _scopeLocal_hash_table_shift;
+  jlong _extentLocal_hash_table_shift;
 
-  void allocate_scopeLocal_hash_table(int count);
+  void allocate_extentLocal_hash_table(int count);
 
  public:
   // Constructor
@@ -1119,8 +1119,8 @@ private:
   void set_threadOopHandles(oop p);
   oop vthread() const;
   void set_vthread(oop p);
-  oop scopeLocalCache() const;
-  void set_scopeLocalCache(oop p);
+  oop extentLocalCache() const;
+  void set_extentLocalCache(oop p);
   oop jvmti_vthread() const;
   void set_jvmti_vthread(oop p);
 
@@ -1339,7 +1339,7 @@ private:
   void clr_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = false; }
   bool do_not_unlock(void)                       { return _do_not_unlock_if_synchronized; }
 
-  static ByteSize scopeLocalCache_offset()       { return byte_offset_of(JavaThread, _scopeLocalCache); }
+  static ByteSize extentLocalCache_offset()       { return byte_offset_of(JavaThread, _extentLocalCache); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
@@ -1444,7 +1444,7 @@ private:
   // Checked JNI: is the programmer required to check for exceptions, if so specify
   // which function name. Returning to a Java frame should implicitly clear the
   // pending check, this is done for Native->Java transitions (i.e. user JNI code).
-  // VM->Java transistions are not cleared, it is expected that JNI code enclosed
+  // VM->Java transitions are not cleared, it is expected that JNI code enclosed
   // within ThreadToNativeFromVM makes proper exception checks (i.e. VM internal).
   bool is_pending_jni_exception_check() const { return _pending_jni_exception_check_fn != NULL; }
   void clear_pending_jni_exception_check() { _pending_jni_exception_check_fn = NULL; }

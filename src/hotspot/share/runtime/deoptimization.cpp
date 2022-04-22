@@ -137,7 +137,7 @@ intptr_t* Deoptimization::UnrollBlock::value_addr_at(int register_number) const 
 
 
 int Deoptimization::UnrollBlock::size_of_frames() const {
-  // Acount first for the adjustment of the initial frame
+  // Account first for the adjustment of the initial frame
   int result = _caller_adjustment;
   for (int index = 0; index < number_of_frames(); index++) {
     result += frame_sizes()[index];
@@ -443,11 +443,11 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   vframeArray* array = create_vframeArray(current, deoptee, &map, chunk, realloc_failures);
 #if COMPILER2_OR_JVMCI
   if (realloc_failures) {
-    // FIXME: This very crudely destroys all ScopeLocal bindings. This
+    // FIXME: This very crudely destroys all ExtentLocal bindings. This
     // is better than a bound value escaping, but far from ideal.
     oop java_thread = current->threadObj();
-    current->set_scopeLocalCache(NULL);
-    java_lang_Thread::clear_scopeLocalBindings(java_thread);
+    current->set_extentLocalCache(NULL);
+    java_lang_Thread::clear_extentLocalBindings(java_thread);
     pop_frames_failed_reallocs(current, array);
   }
 #endif
@@ -2728,7 +2728,7 @@ void Deoptimization::print_statistics() {
 
 void
 Deoptimization::update_method_data_from_interpreter(MethodData* trap_mdo, int trap_bci, int reason) {
-  // no udpate
+  // no update
 }
 
 int Deoptimization::trap_state_has_reason(int trap_state, int reason) {

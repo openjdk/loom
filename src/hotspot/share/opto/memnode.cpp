@@ -379,7 +379,7 @@ Node *MemNode::Ideal_common(PhaseGVN *phase, bool can_reshape) {
   Node* old_mem = mem;
 
   // The code which unhooks non-raw memories from complete (macro-expanded)
-  // initializations was removed. After macro-expansion all stores catched
+  // initializations was removed. After macro-expansion all stores caught
   // by Initialize node became raw stores and there is no information
   // which memory slices they modify. So it is unsafe to move any memory
   // operation above these stores. Also in most cases hooked non-raw memories
@@ -858,7 +858,7 @@ bool LoadNode::is_immutable_value(Node* adr) {
       in_bytes(JavaThread::osthread_offset()),
       in_bytes(JavaThread::threadObj_offset()),
       in_bytes(JavaThread::vthread_offset()),
-      in_bytes(JavaThread::scopeLocalCache_offset()),
+      in_bytes(JavaThread::extentLocalCache_offset()),
     };
 
     for (size_t i = 0; i < sizeof offsets / sizeof offsets[0]; i++) {
@@ -1522,7 +1522,7 @@ Node *LoadNode::split_through_phi(PhaseGVN *phase) {
 
   assert((t_oop != NULL) &&
          (t_oop->is_known_instance_field() ||
-          t_oop->is_ptr_to_boxed_value()), "invalide conditions");
+          t_oop->is_ptr_to_boxed_value()), "invalid conditions");
 
   Compile* C = phase->C;
   intptr_t ignore = 0;

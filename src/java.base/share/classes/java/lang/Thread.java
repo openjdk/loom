@@ -45,7 +45,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
-import jdk.internal.vm.ScopeLocalContainer;
+import jdk.internal.vm.ExtentLocalContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -244,34 +244,34 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Scope locals binding are maintained by the ScopeLocal class.
+     * Scope locals binding are maintained by the ExtentLocal class.
      */
-    private Object scopeLocalBindings;
+    private Object extentLocalBindings;
 
-    static Object scopeLocalBindings() {
-        return currentThread().scopeLocalBindings;
+    static Object extentLocalBindings() {
+        return currentThread().extentLocalBindings;
     }
 
-    static void setScopeLocalBindings(Object bindings) {
-        currentThread().scopeLocalBindings = bindings;
+    static void setExtentLocalBindings(Object bindings) {
+        currentThread().extentLocalBindings = bindings;
     }
 
     /**
-     * Inherit the scope-local bindings from the given container.
+     * Inherit the extent-local bindings from the given container.
      * Invoked when starting a thread.
      */
-    void inheritScopeLocalBindings(ThreadContainer container) {
-        ScopeLocalContainer.BindingsSnapshot snapshot;
+    void inheritExtentLocalBindings(ThreadContainer container) {
+        ExtentLocalContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
-                && (snapshot = container.scopeLocalBindings()) != null) {
+                && (snapshot = container.extentLocalBindings()) != null) {
 
             // bindings established for running/calling an operation
-            Object bindings = snapshot.scopeLocalBindings();
-            if (currentThread().scopeLocalBindings != bindings) {
+            Object bindings = snapshot.extentLocalBindings();
+            if (currentThread().extentLocalBindings != bindings) {
                 StructureViolationExceptions.throwException("Scope local bindings have changed");
             }
 
-            this.scopeLocalBindings = bindings;
+            this.extentLocalBindings = bindings;
         }
     }
 
@@ -358,13 +358,13 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     native void setCurrentThread(Thread thread);
 
-    // ScopeLocal support:
+    // ExtentLocal support:
 
     @IntrinsicCandidate
-    static native Object[] scopeLocalCache();
+    static native Object[] extentLocalCache();
 
     @IntrinsicCandidate
-    static native void setScopeLocalCache(Object[] cache);
+    static native void setExtentLocalCache(Object[] cache);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -1517,8 +1517,8 @@ public class Thread implements Runnable {
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // scope locals may be inherited
-                inheritScopeLocalBindings(container);
+                // extent locals may be inherited
+                inheritExtentLocalBindings(container);
 
                 // bind thread to container
                 setThreadContainer(container);
@@ -2582,7 +2582,7 @@ public class Thread implements Runnable {
         // Get a snapshot of the list of all threads
         Thread[] threads = getThreads();
         StackTraceElement[][] traces = dumpThreads(threads);
-        Map<Thread, StackTraceElement[]> m = new HashMap<>(threads.length);
+        Map<Thread, StackTraceElement[]> m = HashMap.newHashMap(threads.length);
         for (int i = 0; i < threads.length; i++) {
             StackTraceElement[] stackTrace = traces[i];
             if (stackTrace != null) {

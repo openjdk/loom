@@ -217,21 +217,21 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> The tree structure supports:
  * <ul>
- *   <li> Inheritance of {@linkplain ScopeLocal scope-local} bindings by threads.
+ *   <li> Inheritance of {@linkplain ExtentLocal extent-local} bindings by threads.
  *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
  *   descriptions means threads started in the task scope or descendant scopes.
  * </ul>
  *
- * <p> The following example demonstrates the inheritance of a scope-local binding. A scope
+ * <p> The following example demonstrates the inheritance of a extent-local binding. A scope
  * local {@code NAME} is bound to the value "duke". A StructuredTaskScope is created and
  * its {@code fork} method invoked to start a thread to execute {@code childTask}. The thread
- * inherits the scope-local binding. The code in {@code childTask} uses the value of the
- * scope-local and so reads the value "duke".
+ * inherits the extent-local binding. The code in {@code childTask} uses the value of the
+ * extent-local and so reads the value "duke".
  * {@snippet lang=java :
- *     private static final ScopeLocal<String> NAME = ScopeLocal.newInstance();
+ *     private static final ExtentLocal<String> NAME = ExtentLocal.newInstance();
  *
- *     // @link substring="where" target="ScopeLocal#where" :
- *     ScopeLocal.where(NAME, "duke").run(() -> {
+ *     // @link substring="where" target="ExtentLocal#where" :
+ *     ExtentLocal.where(NAME, "duke").run(() -> {
  *         try (var scope = new StructuredTaskScope<String>()) {
  *
  *             scope.fork(() -> childTask());           // @highlight substring="fork"
@@ -300,11 +300,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * is used to {@link ThreadFactory#newThread(Runnable) create} threads when tasks are
      * {@linkplain #fork(Callable) forked}. The task scope is owned by the current thread.
      *
-     * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
+     * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
      * bindings for inheritance by threads created in the task scope. The
      * <a href="#TreeStructure">Tree Structure</a> section in the class description
      * details how parent-child relations are established implicitly for the purpose of
-     * inheritance of scope-local bindings.
+     * inheritance of extent-local bindings.
      *
      * @param name the name of the task scope, can be null
      * @param factory the thread factory
@@ -390,7 +390,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Starts a new thread to run the given task.
      *
      * <p> The new thread is created with the task scope's {@link ThreadFactory}. It inherits
-     * the current thread's {@linkplain ScopeLocal scope-local} bindings. The bindings must
+     * the current thread's {@linkplain ExtentLocal extent-local} bindings. The bindings must
      * match the bindings captured when the task scope was created.
      *
      * <p> If the task completes before the task scope is {@link #shutdown() shutdown} then
@@ -419,7 +419,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner or a thread
      * contained in the task scope
-     * @throws StructureViolationException if the current scope-local bindings are not
+     * @throws StructureViolationException if the current extent-local bindings are not
      * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the task
@@ -654,7 +654,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * StructureViolationException}.
      *
      * Similarly, if called to close a task scope that <em>encloses</em> {@linkplain
-     * ScopeLocal.Carrier#run(Runnable) operations} with scope-local bindings then
+     * ExtentLocal.Carrier#run(Runnable) operations} with extent-local bindings then
      * it also throws {@code StructureViolationException} after closing the task scope.
      *
      * @throws IllegalStateException thrown after closing the task scope if the owner
@@ -846,11 +846,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
          * owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
+         * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established implicitly
-         * for the purpose of inheritance of scope-local bindings.
+         * for the purpose of inheritance of extent-local bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
@@ -1028,11 +1028,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
          * owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopeLocal scope-local}
+         * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established implicitly
-         * for the purpose of inheritance of scope-local bindings.
+         * for the purpose of inheritance of extent-local bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory

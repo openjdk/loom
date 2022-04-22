@@ -434,7 +434,7 @@ CodeEmitInfo* LIRGenerator::state_for(Instruction* x, ValueStack* state, bool ig
     } else {
       assert((int)liveness.size() == s->locals_size(), "error in use of liveness");
       for_each_local_value(s, index, value) {
-        assert(value->subst() == value, "missed substition");
+        assert(value->subst() == value, "missed substitution");
         if (liveness.at(index) && !value->type()->is_illegal()) {
           if (!value->is_pinned() && value->as_Constant() == NULL && value->as_Local() == NULL) {
             walk(value);
@@ -1417,8 +1417,8 @@ void LIRGenerator::do_getObjectSize(Intrinsic* x) {
   __ branch_destination(L_done->label());
 }
 
-void LIRGenerator::do_scopeLocalCache(Intrinsic* x) {
-  do_JavaThreadField(x, JavaThread::scopeLocalCache_offset());
+void LIRGenerator::do_extentLocalCache(Intrinsic* x) {
+  do_JavaThreadField(x, JavaThread::extentLocalCache_offset());
 }
 
 // Example: Thread.currentCarrierThread()
@@ -1579,7 +1579,7 @@ void LIRGenerator::do_CompareAndSwap(Intrinsic* x, ValueType* type) {
 //
 // According to the new Java Memory Model (JMM):
 // (1) All volatiles are serialized wrt to each other.
-// ALSO reads & writes act as aquire & release, so:
+// ALSO reads & writes act as acquire & release, so:
 // (2) A read cannot let unrelated NON-volatile memory refs that happen after
 // the read float up to before the read.  It's OK for non-volatile memory refs
 // that happen before the volatile read to float down below it.
@@ -2960,7 +2960,7 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_getObjectSize:  do_getObjectSize(x); break;
   case vmIntrinsics::_currentCarrierThread: do_currentCarrierThread(x); break;
   case vmIntrinsics::_currentThread:  do_vthread(x);       break;
-  case vmIntrinsics::_scopeLocalCache: do_scopeLocalCache(x); break;
+  case vmIntrinsics::_extentLocalCache: do_extentLocalCache(x); break;
 
   case vmIntrinsics::_dlog:           // fall through
   case vmIntrinsics::_dlog10:         // fall through
