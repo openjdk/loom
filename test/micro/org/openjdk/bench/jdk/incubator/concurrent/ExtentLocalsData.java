@@ -23,26 +23,26 @@
 
 package org.openjdk.bench.jdk.incubator.concurrent;
 
-import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.ExtentLocal;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @SuppressWarnings("preview")
-public class ScopeLocalsData {
+public class ExtentLocalsData {
 
-    static final ScopeLocal<Integer> sl1 = ScopeLocal.newInstance();
+    static final ExtentLocal<Integer> sl1 = ExtentLocal.newInstance();
     static final ThreadLocal<Integer> tl1 = new ThreadLocal<>();
 
-    static final ScopeLocal<Integer> sl2 = ScopeLocal.newInstance();
-    static final ScopeLocal<Integer> sl3 = ScopeLocal.newInstance();
-    static final ScopeLocal<Integer> sl4 = ScopeLocal.newInstance();
-    static final ScopeLocal<Integer> sl5 = ScopeLocal.newInstance();
-    static final ScopeLocal<Integer> sl6 = ScopeLocal.newInstance();
-    static final ScopeLocal<AtomicInteger> sl_atomicInt = ScopeLocal.newInstance();
+    static final ExtentLocal<Integer> sl2 = ExtentLocal.newInstance();
+    static final ExtentLocal<Integer> sl3 = ExtentLocal.newInstance();
+    static final ExtentLocal<Integer> sl4 = ExtentLocal.newInstance();
+    static final ExtentLocal<Integer> sl5 = ExtentLocal.newInstance();
+    static final ExtentLocal<Integer> sl6 = ExtentLocal.newInstance();
+    static final ExtentLocal<AtomicInteger> sl_atomicInt = ExtentLocal.newInstance();
 
-    static final ScopeLocal<Integer> unbound = ScopeLocal.newInstance();
+    static final ExtentLocal<Integer> unbound = ExtentLocal.newInstance();
 
-    static final ScopeLocal<AtomicReference<Integer>> sl_atomicRef = ScopeLocal.newInstance();
+    static final ExtentLocal<AtomicReference<Integer>> sl_atomicRef = ExtentLocal.newInstance();
 
     static final ThreadLocal<Integer> tl2 = new ThreadLocal<>();
     static final ThreadLocal<Integer> tl3 = new ThreadLocal<>();
@@ -51,14 +51,14 @@ public class ScopeLocalsData {
     static final ThreadLocal<Integer> tl6 = new ThreadLocal<>();
     static final ThreadLocal<AtomicInteger> tl_atomicInt = new ThreadLocal<>();
 
-    static final ScopeLocal.Carrier VALUES = ScopeLocal
+    static final ExtentLocal.Carrier VALUES = ExtentLocal
             .where(sl1, 42).where(sl2, 2).where(sl3, 3)
             .where(sl4, 4).where(sl5, 5).where(sl6, 6);
 
     public static void run(Runnable action) {
         try {
             tl1.set(42); tl2.set(2); tl3.set(3); tl4.set(4); tl5.set(5); tl6.set(6);
-            tl1.get();  // Create the ScopeLocal cache as a side effect
+            tl1.get();  // Create the ExtentLocal cache as a side effect
             tl_atomicInt.set(new AtomicInteger());
             VALUES.where(sl_atomicInt, new AtomicInteger())
                   .where(sl_atomicRef, new AtomicReference<>())
