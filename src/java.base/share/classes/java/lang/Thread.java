@@ -244,7 +244,7 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Scope locals binding are maintained by the ExtentLocal class.
+     * Extent locals binding are maintained by the ExtentLocal class.
      */
     private Object extentLocalBindings;
 
@@ -268,7 +268,7 @@ public class Thread implements Runnable {
             // bindings established for running/calling an operation
             Object bindings = snapshot.extentLocalBindings();
             if (currentThread().extentLocalBindings != bindings) {
-                StructureViolationExceptions.throwException("Scope local bindings have changed");
+                StructureViolationExceptions.throwException("Extent local bindings have changed");
             }
 
             this.extentLocalBindings = bindings;
