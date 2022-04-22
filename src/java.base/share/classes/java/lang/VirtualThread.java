@@ -452,7 +452,7 @@ final class VirtualThread extends Thread {
         container.onStart(this); // may throw
         try {
             // scope locals may be inherited
-            inheritScopeLocalBindings(container);
+            inheritExtentLocalBindings(container);
 
             // bind thread to container
             setThreadContainer(container);

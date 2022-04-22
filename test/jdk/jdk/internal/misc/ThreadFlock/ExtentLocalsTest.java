@@ -26,22 +26,22 @@
  * @summary Test ThreadFlock with scope locals
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
- * @compile --enable-preview -source ${jdk.version} ScopeLocalsTest.java
- * @run testng/othervm --enable-preview ScopeLocalsTest
+ * @compile --enable-preview -source ${jdk.version} ExtentLocalsTest.java
+ * @run testng/othervm --enable-preview ExtentLocalsTest
  */
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import jdk.internal.misc.ThreadFlock;
-import jdk.incubator.concurrent.ScopeLocal;
+import jdk.incubator.concurrent.ExtentLocal;
 import jdk.incubator.concurrent.StructureViolationException;
 
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ScopeLocalsTest {
+public class ExtentLocalsTest {
 
     @DataProvider(name = "factories")
     public Object[][] factories() {
@@ -57,9 +57,9 @@ public class ScopeLocalsTest {
      * Test inheritance of scope-local bindings.
      */
     @Test(dataProvider = "factories")
-    public void testInheritsScopeLocals(ThreadFactory factory) throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
-        String value = ScopeLocal.where(NAME, "fred").call(() -> {
+    public void testInheritsExtentLocals(ThreadFactory factory) throws Exception {
+        ExtentLocal<String> NAME = ExtentLocal.newInstance();
+        String value = ExtentLocal.where(NAME, "fred").call(() -> {
             var result = new AtomicReference<String>();
             try (var flock = ThreadFlock.open(null)) {
                 Thread thread = factory.newThread(() -> {
@@ -78,14 +78,14 @@ public class ScopeLocalsTest {
      */
     @Test
     public void testStructureViolation1() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
+        ExtentLocal<String> name = ExtentLocal.newInstance();
         class Box {
             ThreadFlock flock1;
             ThreadFlock flock2;
         }
         var box = new Box();
         try {
-            ScopeLocal.where(name, "x1").run(() -> {
+            ExtentLocal.where(name, "x1").run(() -> {
                 box.flock1 = ThreadFlock.open(null);
                 box.flock2 = ThreadFlock.open(null);
             });
@@ -101,13 +101,13 @@ public class ScopeLocalsTest {
      */
     @Test
     public void testStructureViolation2() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
+        ExtentLocal<String> name = ExtentLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
+            ExtentLocal.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
+                    ExtentLocal.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
+                            ExtentLocal.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -134,13 +134,13 @@ public class ScopeLocalsTest {
      */
     @Test
     public void testStructureViolation3() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
+        ExtentLocal<String> name = ExtentLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
+            ExtentLocal.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
+                    ExtentLocal.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
+                            ExtentLocal.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -166,13 +166,13 @@ public class ScopeLocalsTest {
      */
     @Test
     public void testStructureViolation4() {
-        ScopeLocal<String> name = ScopeLocal.newInstance();
+        ExtentLocal<String> name = ExtentLocal.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ScopeLocal.where(name, "x1").run(() -> {
+            ExtentLocal.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ScopeLocal.where(name, "x2").run(() -> {
+                    ExtentLocal.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ScopeLocal.where(name, "x3").run(() -> {
+                            ExtentLocal.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -198,9 +198,9 @@ public class ScopeLocalsTest {
      */
     @Test(dataProvider = "factories")
     public void testStructureViolation5(ThreadFactory factory) throws Exception {
-        ScopeLocal<String> NAME = ScopeLocal.newInstance();
+        ExtentLocal<String> NAME = ExtentLocal.newInstance();
         try (var flock = ThreadFlock.open(null)) {
-            ScopeLocal.where(NAME, "fred").run(() -> {
+            ExtentLocal.where(NAME, "fred").run(() -> {
                 Thread thread = factory.newThread(() -> { });
                 expectThrows(StructureViolationException.class, () -> flock.start(thread));
             });
