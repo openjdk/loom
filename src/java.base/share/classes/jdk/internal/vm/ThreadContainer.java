@@ -90,7 +90,7 @@ public abstract class ThreadContainer extends StackableScope {
     public abstract void onExit(Thread thread);
 
     /**
-     * The scope locals captured when the thread container was created.
+     * The extent locals captured when the thread container was created.
      */
     public ExtentLocalContainer.BindingsSnapshot extentLocalBindings() {
         return null;

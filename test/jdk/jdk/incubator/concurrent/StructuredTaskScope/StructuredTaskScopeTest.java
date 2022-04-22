@@ -305,7 +305,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork inherits a scope-local binding.
+     * Test that fork inherits a extent-local binding.
      */
     @Test
     public void testForkInheritsExtentLocals1() throws Exception {
@@ -324,7 +324,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork inherits a scope-local binding into a grandchild.
+     * Test that fork inherits a extent-local binding into a grandchild.
      */
     @Test
     public void testForkInheritsExtentLocals2() throws Exception {
@@ -909,7 +909,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test exiting a scope local operation closes the thread flock of a
+     * Test exiting a extent local operation closes the thread flock of a
      * nested scope.
      */
     @Test
@@ -947,7 +947,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if scope-local bindings
+     * Test that fork throws StructureViolationException if extent-local bindings
      * created after StructuredTaskScope is created.
      */
     @Test
@@ -963,7 +963,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if scope-local bindings
+     * Test that fork throws StructureViolationException if extent-local bindings
      * changed after StructuredTaskScope is created.
      */
     @Test

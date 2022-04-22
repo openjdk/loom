@@ -24,7 +24,7 @@
  */
 
 /**
- * Defines APIs for structured concurrency and scope locals.
+ * Defines APIs for structured concurrency and extent locals.
  * {@Incubating}
  */
 package jdk.incubator.concurrent;

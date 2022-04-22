@@ -37,7 +37,7 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
  *
  * This class defines static methods to run an operation with a ExtentLocalContainer
  * on the scope stack. It also defines a method to get the latest ExtentLocalContainer
- * and a method to return a snapshot of the scope local bindings.
+ * and a method to return a snapshot of the extent local bindings.
  */
 public class ExtentLocalContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -78,14 +78,14 @@ public class ExtentLocalContainer extends StackableScope {
     }
 
     /**
-     * A snapshot of the scope local bindings. The snapshot includes the bindings
-     * established for the current thread and scope local container.
+     * A snapshot of the extent local bindings. The snapshot includes the bindings
+     * established for the current thread and extent local container.
      */
     public record BindingsSnapshot(Object extentLocalBindings,
                                    ExtentLocalContainer container) { }
 
     /**
-     * Returns a scope local bindings for the current thread.
+     * Returns a extent local bindings for the current thread.
      */
     public static BindingsSnapshot captureBindings() {
         return new BindingsSnapshot(JLA.extentLocalBindings(), latest());

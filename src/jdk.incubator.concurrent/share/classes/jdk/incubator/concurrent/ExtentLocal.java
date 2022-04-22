@@ -44,31 +44,31 @@ import jdk.internal.vm.annotation.Stable;
 /**
  * Represents a scoped value.
  *
- * <p> A extent-local value (hereinafter called a scope local) differs from a normal variable in that it is dynamically
+ * <p> A extent-local value (hereinafter called a extent local) differs from a normal variable in that it is dynamically
  * scoped and intended for cases where context needs to be passed from a caller
  * to a transitive callee without using an explicit parameter. A extent-local value
  * does not have a default/initial value: it is bound, meaning it gets a value,
  * when executing an operation specified to {@link #where(ExtentLocal, Object)}.
  * Code executed by the operation
- * uses the {@link #get()} method to get the value of the scope local. The scope local reverts
+ * uses the {@link #get()} method to get the value of the extent local. The extent local reverts
  * to being unbound (or its previous value) when the operation completes.
  *
- * <p> Access to the value of a scope local is controlled by the accessibility
+ * <p> Access to the value of a extent local is controlled by the accessibility
  * of the {@code ExtentLocal} object. A {@code ExtentLocal} object  will typically be declared
  * in a private static field so that it can only be accessed by code in that class
  * (or other classes within its nest).
  *
- * <p> Scope locals support nested bindings. If a scope local has a value
+ * <p> Scope locals support nested bindings. If a extent local has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
  * another operation with a new value. Code executed by this methods "sees" the new
- * value of the scope local. The scope local reverts to its previous value when the
+ * value of the extent local. The extent local reverts to its previous value when the
  * operation completes.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @apiNote
- * The following example uses a scope local to make credentials available to callees.
+ * The following example uses a extent local to make credentials available to callees.
  *
  * <pre>{@code
  *   private static final ExtentLocal<Credentials> CREDENTIALS = ExtentLocal.newInstance();
@@ -88,22 +88,22 @@ import jdk.internal.vm.annotation.Stable;
  *
  * @implNote Scope locals are designed to be used in fairly small numbers. {@link
  * #get} initially performs a linear search through enclosing scopes to find a
- * scope local's innermost binding. It then caches the result of the search in a
+ * extent local's innermost binding. It then caches the result of the search in a
  * small thread-local cache. Subsequent invocations of {@link #get} for that
- * scope local will almost always be very fast. However, if a program has many
- * scope locals that it uses cyclically, the cache hit rate will be low and
+ * extent local will almost always be very fast. However, if a program has many
+ * extent locals that it uses cyclically, the cache hit rate will be low and
  * performance will be poor. On the other hand, this design allows extent-local
  * inheritance by {@link StructuredTaskScope} threads to be
  * very fast: in essence, no more than copying a pointer, and leaving a
  * extent-local binding also requires little more than updating a pointer.
  *
  * Because the extent-local per-thread cache is small, you should try to minimize
- * the number of bound scope locals in use. For example, if you need to pass a
- * number of values as scope locals, it makes sense to create a record class to
- * hold those values, and then bind a single scope local to an instance of that
+ * the number of bound extent locals in use. For example, if you need to pass a
+ * number of values as extent locals, it makes sense to create a record class to
+ * hold those values, and then bind a single extent local to an instance of that
  * record.
  *
- * @param <T> the scope local's type
+ * @param <T> the extent local's type
  * @since 19
  */
 public final class ExtentLocal<T> {
@@ -255,7 +255,7 @@ public final class ExtentLocal<T> {
         /**
          * Run a value-returning operation with some ExtentLocals bound to values.
          * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the scope local. The scope locals revert to their previous values or
+         * get the value of the extent local. The extent locals revert to their previous values or
          * become {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
@@ -307,7 +307,7 @@ public final class ExtentLocal<T> {
         /**
          * Runs an operation with some ExtentLocals bound to our values.
          * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the scope local. The scope locals revert to their previous values or
+         * get the value of the extent local. The extent locals revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Scope locals are intended to be used in a <em>structured manner</em>. If the
@@ -404,7 +404,7 @@ public final class ExtentLocal<T> {
     /**
      * Creates a extent-local handle to refer to a value of type T.
      *
-     * @param <T> the type of the scope local's value.
+     * @param <T> the type of the extent local's value.
      * @return a extent-local handle
      */
     public static <T> ExtentLocal<T> newInstance() {
@@ -412,9 +412,9 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Returns the value of the scope local.
-     * @return the value of the scope local
-     * @throws NoSuchElementException if the scope local is not bound (exception is TBD)
+     * Returns the value of the extent local.
+     * @return the value of the extent local
+     * @throws NoSuchElementException if the extent local is not bound (exception is TBD)
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -447,9 +447,9 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Returns {@code true} if the scope local is bound to a value.
+     * Returns {@code true} if the extent local is bound to a value.
      *
-     * @return {@code true} if the scope local is bound to a value, otherwise {@code false}
+     * @return {@code true} if the extent local is bound to a value, otherwise {@code false}
      */
     @SuppressWarnings("unchecked")
     public boolean isBound() {
@@ -465,7 +465,7 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the scope local or NIL if not bound.
+     * Return the value of the extent local or NIL if not bound.
      */
     private Object findBinding() {
         Object value = extentLocalBindings().find(this);
@@ -473,9 +473,9 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the scope local if bound, otherwise returns {@code other}.
+     * Return the value of the extent local if bound, otherwise returns {@code other}.
      * @param other the value to return if not bound, can be {@code null}
-     * @return the value of the scope local if bound, otherwise {@code other}
+     * @return the value of the extent local if bound, otherwise {@code other}
      */
     public T orElse(T other) {
         Object obj = findBinding();
@@ -489,13 +489,13 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the scope local if bound, otherwise throw an exception
+     * Return the value of the extent local if bound, otherwise throw an exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces an
      *        exception to be thrown
-     * @return the value of the scope local if bound
-     * @throws X if the scope local is unbound
+     * @return the value of the extent local if bound
+     * @throws X if the extent local is unbound
      */
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         Objects.requireNonNull(exceptionSupplier);
@@ -563,7 +563,7 @@ public final class ExtentLocal<T> {
         return (bitmask & targetBits) == targetBits;
     }
 
-    // A small fixed-size key-value cache. When a scope scope local's get() method
+    // A small fixed-size key-value cache. When a scope extent local's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
     private static class Cache {

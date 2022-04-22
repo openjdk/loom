@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test ThreadFlock with scope locals
+ * @summary Test ThreadFlock with extent locals
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} ExtentLocalsTest.java
@@ -54,7 +54,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test inheritance of scope-local bindings.
+     * Test inheritance of extent-local bindings.
      */
     @Test(dataProvider = "factories")
     public void testInheritsExtentLocals(ThreadFactory factory) throws Exception {
@@ -74,7 +74,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test exiting a scope local operation should close nested thread flocks.
+     * Test exiting a extent local operation should close nested thread flocks.
      */
     @Test
     public void testStructureViolation1() {
@@ -96,7 +96,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing scope local operations and
+     * Test closing a thread flock with enclosing extent local operations and
      * thread flocks. This test closes enclosing flock1.
      */
     @Test
@@ -129,7 +129,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing scope local operations and
+     * Test closing a thread flock with enclosing extent local operations and
      * thread flocks. This test closes enclosing flock2.
      */
     @Test
@@ -161,7 +161,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing scope local operations and
+     * Test closing a thread flock with enclosing extent local operations and
      * thread flocks. This test closes enclosing flock3.
      */
     @Test
@@ -193,7 +193,7 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test that start throws StructureViolationException if scope-local bindings
+     * Test that start throws StructureViolationException if extent-local bindings
      * have changed.
      */
     @Test(dataProvider = "factories")
