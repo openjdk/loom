@@ -1191,7 +1191,7 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 inline bool FreezeBase::stack_overflow() { // detect stack overflow in recursive native code
   JavaThread* t = !_preempt ? _thread : JavaThread::current();
   assert(t == JavaThread::current(), "");
-  if ((address)&t < t->stack_overflow_state()->stack_overflow_limit()) {
+  if (os::current_stack_pointer() < t->stack_overflow_state()->stack_overflow_limit()) {
     if (!_preempt) {
       ContinuationWrapper::SafepointOp so(t, _cont); // could also call _cont.done() instead
       Exceptions::_throw_msg(t, __FILE__, __LINE__, vmSymbols::java_lang_StackOverflowError(), "Stack overflow while freezing");
