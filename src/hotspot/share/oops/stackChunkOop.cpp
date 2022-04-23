@@ -358,9 +358,6 @@ public:
 template <stackChunkOopDesc::BarrierType barrier, ChunkFrames frame_kind, typename RegisterMapT>
 void stackChunkOopDesc::do_barriers0(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
   // We need to invoke the write barriers so as not to miss oops in old chunks that haven't yet been concurrently scanned
-  if (f.is_done()) {
-    return;
-  }
   assert (!f.is_done(), "");
 
   if (f.is_interpreted()) {
