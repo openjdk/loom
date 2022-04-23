@@ -172,8 +172,21 @@ static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, output
 static void log_frames(JavaThread* thread);
 static void print_frame_layout(const frame& f, bool callee_complete, outputStream* st = tty);
 
+#define assert_pfl(p, ...) \
+do {                                           \
+  if (!(p)) {                                  \
+    JavaThread* t = JavaThread::active();      \
+    if (t->has_last_Java_frame()) {            \
+      tty->print_cr("assert(" #p ") failed:"); \
+      t->print_frame_layout();                 \
+    }                                          \
+  }                                            \
+  vmassert(p, __VA_ARGS__);                    \
+} while(0)
+
 #else
 static void verify_continuation(oop continuation) { }
+#define assert_pfl(p, ...)
 #endif
 
 // should match Continuation.preemptStatus() in Continuation.java
