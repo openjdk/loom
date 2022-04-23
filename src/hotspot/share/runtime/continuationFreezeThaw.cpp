@@ -614,7 +614,7 @@ bool Freeze<ConfigT>::freeze_fast(intptr_t* frame_sp) {
     assert(_thread->cont_fastpath(), "");
 
     chunk = allocate_chunk(cont_size + frame::metadata_words);
-    if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/probably humongous
+    if (UNLIKELY(chunk == nullptr || !_thread->cont_fastpath() || _barriers)) { // OOME/old
       log_develop_trace(continuations)("Retrying slow. Barriers: %d", _barriers);
       return false;
     }
@@ -815,7 +815,7 @@ inline void FreezeBase::before_freeze_java_frame(const frame& f, const frame& ca
     LogStream ls(lt);
     ls.print_cr("======== FREEZING FRAME interpreted: %d bottom: %d", f.is_interpreted_frame(), bottom);
     ls.print_cr("fsize: %d argsize: %d", fsize, argsize);
-    f.print_on(&ls);
+    f.print_value_on(&ls, nullptr);
   }
   assert(caller.is_interpreted_frame() == Interpreter::contains(caller.pc()), "");
 }
@@ -1945,7 +1945,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
   DEBUG_ONLY(before_thaw_java_frame(hf, caller, bottom, num_frames);)
 
-  _align_size += frame::align_wiggle; // remove the added alignment room for internal interpreted frame alignment om AArch64
+  _align_size += frame::align_wiggle; // possible added alignment for internal interpreted frame alignment om AArch64
 
   frame f = new_stack_frame<ContinuationHelper::InterpretedFrame>(hf, caller, bottom);
 
