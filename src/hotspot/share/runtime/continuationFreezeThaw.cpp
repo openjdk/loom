@@ -408,6 +408,14 @@ private:
   inline void patch_pd(frame& callee, const frame& caller);
   void adjust_interpreted_frame_unextended_sp(frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
+
+#ifdef ASSERT
+  bool is_empty(stackChunkOop chunk) {
+    // during freeze, the chunk is in an intermediate state (after setting the chunk's argsize but before setting its
+    // ultimate sp) so we use this instead of stackChunkOopDesc::is_empty
+    return chunk->sp() >= chunk->stack_size() - chunk->argsize();
+  }
+#endif
 };
 
 template <typename ConfigT>
@@ -902,7 +910,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     int sp = chunk->stack_size() - argsize;
     chunk->set_sp(sp);
     chunk->set_argsize(argsize);
-    assert(chunk->is_empty(), "");
+    assert(is_empty(chunk), "");
   } else {
     log_develop_trace(continuations)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
     if (chunk->is_empty()) {
@@ -916,11 +924,11 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   chunk->set_has_mixed_frames(true);
 
   assert(chunk->requires_barriers() == _barriers, "");
-  assert(!_barriers || chunk->is_empty(), "");
+  assert(!_barriers || is_empty(chunk), "");
 
   assert(!chunk->has_bitmap(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
-  assert(!chunk->is_empty() || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
+  assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
+  assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
 
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
   // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
@@ -962,7 +970,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bottom) {
   if (bottom) {
     address last_pc = caller.pc();
-    assert((last_pc == nullptr) == _cont.tail()->is_empty(), "");
+    assert((last_pc == nullptr) == is_empty(_cont.tail()), "");
     ContinuationHelper::Frame::patch_pc(caller, last_pc);
   } else {
     assert(!caller.is_empty(), "");

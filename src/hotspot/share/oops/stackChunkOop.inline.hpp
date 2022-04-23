@@ -117,7 +117,10 @@ inline intptr_t* stackChunkOopDesc::from_offset(int offset) const {
 }
 
 inline bool stackChunkOopDesc::is_empty() const {
-  return sp() >= stack_size() - argsize();
+  assert(sp() <= stack_size(), "");
+  assert((sp() == stack_size()) == (sp() >= stack_size() - argsize()),
+    "sp: %d size: %d argsize: %d", sp(), stack_size(), argsize());
+  return sp() == stack_size();
 }
 
 inline bool stackChunkOopDesc::is_in_chunk(void* p) const {
