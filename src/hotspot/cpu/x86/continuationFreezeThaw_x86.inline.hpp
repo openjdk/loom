@@ -214,7 +214,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     frame f(frame_sp, frame_sp, fp, hf.pc());
     // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
     intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
-    assert((int)offset == locals + frame::sender_sp_offset - 1, "");
+    assert((int)offset == frame::sender_sp_offset + locals - 1, "");
     *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + offset;
     return f;
   } else {

@@ -210,19 +210,21 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* frame_sp = caller.unextended_sp() - fsize;
     intptr_t* fp = frame_sp + (hf.fp() - heap_sp);
+    int padding = 0;
     if ((intptr_t)fp % frame::frame_alignment != 0) {
       fp--;
       frame_sp--;
+      padding++;
       log_develop_trace(continuations)("Adding internal interpreted frame alignment");
     }
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
     assert(frame_sp == unextended_sp, "");
     caller.set_sp(fp + frame::sender_sp_offset);
     frame f(frame_sp, frame_sp, fp, hf.pc());
-    // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
+    // it's set again later in set_interpreter_frame_bottom, but we need to set the locals now so that we'll have the frame's bottom
     intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
-    assert((int)offset == locals + frame::sender_sp_offset - 1, "");
-    *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + offset;
+    assert((int)offset == frame::sender_sp_offset + locals - 1, "");
+    *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + padding + offset;
     assert((intptr_t)f.fp() % frame::frame_alignment == 0, "");
     return f;
   } else {
