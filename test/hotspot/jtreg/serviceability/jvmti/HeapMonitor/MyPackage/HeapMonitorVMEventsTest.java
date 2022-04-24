@@ -26,6 +26,7 @@ package MyPackage;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadFactory;
 
 // Graal is not tested here due to Graal not supporting DisableIntrinsic.
 /**
@@ -34,9 +35,8 @@ import java.util.List;
  * @requires vm.jvmti
  * @requires !vm.graal.enabled
  * @build Frame HeapMonitor
- * @compile --enable-preview -source ${jdk.version} HeapMonitorVMEventsTest.java
- * @run main/othervm/native --enable-preview
- *                          -XX:+UnlockDiagnosticVMOptions
+ * @compile HeapMonitorVMEventsTest.java
+ * @run main/othervm/native -XX:+UnlockDiagnosticVMOptions
  *                          -XX:DisableIntrinsic=_clone
  *                          -agentlib:HeapMonitorTest MyPackage.HeapMonitorVMEventsTest platform
  */
@@ -116,12 +116,24 @@ public class HeapMonitorVMEventsTest implements Cloneable {
     HeapMonitor.sampleEverything();
 
     if(args[0].equals("virtual")) {
-        Thread t = Thread.ofVirtual().start(() -> {
-                compareSampledAndVM();
-            });
+        Thread t = virtualThreadFactory().newThread(HeapMonitorVMEventsTest::compareSampledAndVM);
+        t.start();
         t.join();
     } else {
         compareSampledAndVM();
+    }
+  }
+
+  private static ThreadFactory virtualThreadFactory() {
+    try {
+        Object builder = Thread.class.getMethod("ofVirtual").invoke(null);
+        Class<?> clazz = Class.forName("java.lang.Thread$Builder");
+        java.lang.reflect.Method factory = clazz.getMethod("factory");
+        return (ThreadFactory) factory.invoke(builder);
+    } catch (RuntimeException | Error e) {
+        throw e;
+    } catch (Exception e) {
+        throw new RuntimeException(e);
     }
   }
 }
