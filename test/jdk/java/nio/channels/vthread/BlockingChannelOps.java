@@ -23,10 +23,11 @@
 
 /**
  * @test
- * @summary Basic tests for virtual threads doing blocking I/O with NIO channels
- * @compile --enable-preview -source ${jdk.version} NioChannels.java
- * @run testng/othervm/timeout=300 --enable-preview NioChannels
- * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister NioChannels
+ * @summary Basic tests of virtual threads doing blocking I/O with NIO channels
+ * @library /test/lib
+ * @compile --enable-preview -source ${jdk.version} BlockingChannelOps.java
+ * @run testng/othervm/timeout=300 --enable-preview BlockingChannelOps
+ * @run testng/othervm/timeout=300 --enable-preview -Djdk.useDirectRegister BlockingChannelOps
  */
 
 import java.io.Closeable;
@@ -46,10 +47,11 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 
+import jdk.test.lib.thread.VThreadRunner;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class NioChannels {
+public class BlockingChannelOps {
     private static final long DELAY = 4000;
 
     /**
@@ -57,7 +59,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelReadWrite1() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -81,7 +83,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelRead() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -104,7 +106,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelWrite() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -128,7 +130,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelReadAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledCloser.schedule(sc, DELAY);
@@ -145,7 +147,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelReadInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -164,7 +166,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelWriteAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledCloser.schedule(sc, DELAY);
@@ -185,7 +187,7 @@ public class NioChannels {
      */
     @Test
     public void testSocketChannelWriteInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -220,7 +222,7 @@ public class NioChannels {
     }
 
     private void testSocketAdaptorRead(int timeout) throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -246,7 +248,7 @@ public class NioChannels {
      */
     @Test
     public void testServerSocketChannelAccept1() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open(ssc.getLocalAddress());
@@ -263,7 +265,7 @@ public class NioChannels {
      */
     @Test
     public void testServerSocketChannelAccept2() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open();
@@ -281,7 +283,7 @@ public class NioChannels {
      */
     @Test
     public void testServerSocketChannelAcceptAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -300,7 +302,7 @@ public class NioChannels {
      */
     @Test
     public void testServerSocketChannelAcceptInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -333,7 +335,7 @@ public class NioChannels {
     }
 
     private void testSocketChannelAdaptorAccept(int timeout) throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open();
@@ -355,7 +357,7 @@ public class NioChannels {
      */
     @Test
     public void testDatagramChannelSendReceive1() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -380,7 +382,7 @@ public class NioChannels {
      */
     @Test
     public void testDatagramChannelSendReceive2() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -404,7 +406,7 @@ public class NioChannels {
      */
     @Test
     public void testDatagramChannelReceiveAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -422,7 +424,7 @@ public class NioChannels {
      */
     @Test
     public void testDatagramChannelReceiveInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -454,7 +456,7 @@ public class NioChannels {
     }
 
     private void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -481,7 +483,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeReadWrite1() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -505,7 +507,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeReadWrite2() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -528,7 +530,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeReadWrite3() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -552,7 +554,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeReadAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SourceChannel source = p.source()) {
                 ScheduledCloser.schedule(source, DELAY);
@@ -569,7 +571,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeReadInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SourceChannel source = p.source()) {
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
@@ -588,7 +590,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeWriteAsyncClose() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledCloser.schedule(sink, DELAY);
@@ -609,7 +611,7 @@ public class NioChannels {
      */
     @Test
     public void testPipeWriteInterrupt() throws Exception {
-        TestHelper.runInVirtualThread(() -> {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink()) {
                 ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
