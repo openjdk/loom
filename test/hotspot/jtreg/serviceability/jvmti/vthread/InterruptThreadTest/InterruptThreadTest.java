@@ -37,13 +37,15 @@ public class InterruptThreadTest {
 
     native boolean testJvmtiFunctionsInJNICall(Thread vthread);
 
+    volatile private boolean target_is_ready = false;
     private boolean iterrupted = false;
 
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
             do {
                 try {
-                    lock.wait(1);
+                    target_is_ready = true;
+                    lock.wait();
                 } catch (InterruptedException ie) {
                     System.err.println("Virtual thread was interrupted as expected");
                     iterrupted = true;
@@ -54,6 +56,12 @@ public class InterruptThreadTest {
 
     void runTest() throws Exception {
         Thread vthread = Thread.ofVirtual().name("VThread").start(pinnedTask);
+        // wait for target virtual thread to reach the expected waiting state
+        while (!target_is_ready) {
+            synchronized (lock) {
+              lock.wait(1);
+            }
+        }
         testJvmtiFunctionsInJNICall(vthread);
         isJNITestingCompleted.set(true);
         vthread.join();
