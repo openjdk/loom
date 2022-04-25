@@ -47,7 +47,8 @@ public class InterruptThreadTest {
                     target_is_ready = true;
                     lock.wait();
                 } catch (InterruptedException ie) {
-                    iterrupted = true;
+                     System.err.println("Virtual thread was interrupted as expected");
+                     iterrupted = true;
                 }
             } while (!isJNITestingCompleted.get());
         }
