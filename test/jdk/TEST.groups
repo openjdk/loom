@@ -100,6 +100,8 @@ jdk_loom = \
     java/lang/ThreadGroup \
     java/lang/management/ThreadMXBean \
     java/util/concurrent \
+    java/net/vthread \
+    java/nio/channels/vthread \
     jdk/incubator/concurrent \
     jdk/internal/misc/ThreadFlock \
     jdk/internal/vm/Continuation \
