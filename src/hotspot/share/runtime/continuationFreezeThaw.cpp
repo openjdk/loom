@@ -1642,6 +1642,57 @@ public:
   }
 };
 
+inline void ThawBase::clear_chunk(stackChunkOop chunk) {
+  chunk->set_sp(chunk->stack_size());
+  chunk->set_argsize(0);
+  chunk->set_max_thawing_size(0);
+}
+
+ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize) {
+  bool empty = false;
+  StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
+  DEBUG_ONLY(intptr_t* const chunk_sp = chunk->start_address() + chunk->sp();)
+  assert(chunk_sp == f.sp(), "");
+  assert(chunk_sp == f.unextended_sp(), "");
+
+  const int frame_size = f.cb()->frame_size();
+  argsize = f.stack_argsize();
+
+  f.next(SmallRegisterMap::instance, true /* stop */);
+  empty = f.is_done();
+  assert(!empty || argsize == chunk->argsize(), "");
+
+  if (empty) {
+    clear_chunk(chunk);
+  } else {
+    chunk->set_sp(chunk->sp() + frame_size);
+    chunk->set_max_thawing_size(chunk->max_thawing_size() - frame_size);
+    // We set chunk->pc to the return pc into the next frame
+    chunk->set_pc(f.pc());
+    assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
+  }
+  assert(empty == chunk->is_empty(), "");
+  // returns the size required to store the frame on stack, and because it is a
+  // compiled frame, it must include a copy of the arguments passed by the caller
+  return frame_size + argsize;
+}
+
+void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
+  assert(to + size <= _cont.entrySP(), "");
+  _cont.tail()->copy_from_chunk_to_stack(from, to, size);
+  CONT_JFR_ONLY(_jfr_info.record_size_copied(size);)
+  assert(to >= _top_stack_address, "overwrote past thawing space"
+    " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(to), p2i(_top_stack_address));
+}
+
+void ThawBase::patch_return(intptr_t* sp, bool is_last) {
+  log_develop_trace(continuations)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp));
+
+  address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+  // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
+}
+
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   assert(chunk == _cont.tail(), "");
@@ -1726,57 +1777,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 #endif
 
   return rs.sp();
-}
-
-inline void ThawBase::clear_chunk(stackChunkOop chunk) {
-  chunk->set_sp(chunk->stack_size());
-  chunk->set_argsize(0);
-  chunk->set_max_thawing_size(0);
-}
-
- int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize) {
-  bool empty = false;
-  StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
-  DEBUG_ONLY(intptr_t* const chunk_sp = chunk->start_address() + chunk->sp();)
-  assert(chunk_sp == f.sp(), "");
-  assert(chunk_sp == f.unextended_sp(), "");
-
-  const int frame_size = f.cb()->frame_size();
-  argsize = f.stack_argsize();
-
-  f.next(SmallRegisterMap::instance, true /* stop */);
-  empty = f.is_done();
-  assert(!empty || argsize == chunk->argsize(), "");
-
-  if (empty) {
-    clear_chunk(chunk);
-  } else {
-    chunk->set_sp(chunk->sp() + frame_size);
-    chunk->set_max_thawing_size(chunk->max_thawing_size() - frame_size);
-    // We set chunk->pc to the return pc into the next frame
-    chunk->set_pc(f.pc());
-    assert(f.pc() == *(address*)(chunk_sp + frame_size - frame::sender_sp_ret_address_offset()), "unexpected pc");
-  }
-  assert(empty == chunk->is_empty(), "");
-  // returns the size required to store the frame on stack, and because it is a
-  // compiled frame, it must include a copy of the arguments passed by the caller
-  return frame_size + argsize;
-}
-
-void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
-  assert(to + size <= _cont.entrySP(), "");
-  _cont.tail()->copy_from_chunk_to_stack(from, to, size);
-  CONT_JFR_ONLY(_jfr_info.record_size_copied(size);)
-  assert(to >= _top_stack_address, "overwrote past thawing space"
-    " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(to), p2i(_top_stack_address));
-}
-
-void ThawBase::patch_return(intptr_t* sp, bool is_last) {
-  log_develop_trace(continuations)("thaw_fast patching -- sp: " INTPTR_FORMAT, p2i(sp));
-
-  address pc = !is_last ? StubRoutines::cont_returnBarrier() : _cont.entryPC();
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  // patch_chunk_pd(sp); -- TODO: If not needed - remove method; it's not used elsewhere
 }
 
 inline bool ThawBase::seen_by_gc() {
