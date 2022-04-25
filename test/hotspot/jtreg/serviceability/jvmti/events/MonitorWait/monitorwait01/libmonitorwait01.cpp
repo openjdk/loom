@@ -93,10 +93,6 @@ static int clean() {
   if (err != JVMTI_ERROR_NONE) {
     set_agent_fail_status();
   }
-
-  jni->DeleteGlobalRef(expected_object);
-  jni->DeleteGlobalRef(expected_thread);
-
   return NSK_TRUE;
 }
 

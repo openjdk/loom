@@ -1810,12 +1810,15 @@ public class Thread implements Runnable {
      *          {@code false} otherwise.
      */
     public final boolean isAlive() {
-        if (isVirtual()) {
-            State state = threadState();
-            return (state != State.NEW && state != State.TERMINATED);
-        } else {
-            return isAlive0();
-        }
+        return alive();
+    }
+
+    /**
+     * Returns true if this thread is alive.
+     * This method is non-final so it can be overridden.
+     */
+    boolean alive() {
+        return isAlive0();
     }
     private native boolean isAlive0();
 
@@ -1990,10 +1993,10 @@ public class Thread implements Runnable {
      * @return  this thread's thread group or {@code null}
      */
     public final ThreadGroup getThreadGroup() {
-        if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
-            return isVirtual() ? virtualThreadGroup() : holder.group;
+        if (isTerminated()) {
+            return null;
         } else {
-            return null;   // terminated
+            return isVirtual() ? virtualThreadGroup() : holder.group;
         }
     }
 
@@ -2234,7 +2237,7 @@ public class Thread implements Runnable {
             millis += 1L;
         }
         join(millis);
-        return threadState() == State.TERMINATED;
+        return isTerminated();
     }
 
     /**
@@ -2803,12 +2806,18 @@ public class Thread implements Runnable {
 
     /**
      * Returns the state of this thread.
-     *
-     * @apiNote For VirtualThread use as getState may be overridden and run
-     * arbitrary code.
+     * This method can be used instead of getState as getState is not final and
+     * so can be overridden to run arbitrary code.
      */
     State threadState() {
         return jdk.internal.misc.VM.toThreadState(holder.threadStatus);
+    }
+
+    /**
+     * Returns true if the thread has terminated.
+     */
+    boolean isTerminated() {
+        return threadState() == State.TERMINATED;
     }
 
     /**
@@ -2917,7 +2926,7 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
-        if (threadState() == State.TERMINATED) {
+        if (isTerminated()) {
             // uncaughtExceptionHandler may be set to null after thread terminates
             return null;
         } else {

@@ -37,6 +37,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
@@ -440,7 +441,7 @@ public class BlockingChannelOps {
     }
 
     /**
-     * Virtual thread blocks in DatagramSocket adaptor receive
+     * Virtual thread blocks in DatagramSocket adaptor receive.
      */
     @Test
     public void testDatagramSocketAdaptorReceive1() throws Exception {
@@ -448,7 +449,7 @@ public class BlockingChannelOps {
     }
 
     /**
-     * Virtual thread blocks in DatagramSocket adaptor receive with timeout
+     * Virtual thread blocks in DatagramSocket adaptor receive with timeout.
      */
     @Test
     public void testDatagramSocketAdaptorReceive2() throws Exception {
@@ -474,6 +475,81 @@ public class BlockingChannelOps {
                     dc2.socket().setSoTimeout(timeout);
                 dc2.socket().receive(p);
                 assertTrue(p.getLength() == 3 && array[0] == 'X');
+            }
+        });
+    }
+
+    /**
+     * DatagramChannel close while virtual thread blocked in adaptor receive.
+     */
+    @Test
+    public void testDatagramSocketAdaptorReceiveAsyncClose1() throws Exception {
+        testDatagramSocketAdaptorReceiveAsyncClose(0);
+    }
+
+    /**
+     * DatagramChannel close while virtual thread blocked in adaptor receive
+     * with timeout.
+     */
+    @Test
+    public void testDatagramSocketAdaptorReceiveAsyncClose2() throws Exception {
+        testDatagramSocketAdaptorReceiveAsyncClose(60_1000);
+    }
+
+    private void testDatagramSocketAdaptorReceiveAsyncClose(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
+            try (DatagramChannel dc = DatagramChannel.open()) {
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                dc.bind(new InetSocketAddress(lh, 0));
+
+                byte[] array = new byte[100];
+                DatagramPacket p = new DatagramPacket(array, 0, array.length);
+                if (timeout > 0)
+                    dc.socket().setSoTimeout(timeout);
+
+                // schedule channel/socket to be asynchronously closed
+                ScheduledCloser.schedule(dc, DELAY);
+                assertThrows(SocketException.class, () -> dc.socket().receive(p));
+            }
+        });
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in DatagramSocket adaptor receive.
+     */
+    @Test
+    public void testDatagramSocketAdaptorReceiveInterrupt1() throws Exception {
+        testDatagramSocketAdaptorReceiveInterrupt(0);
+    }
+
+    /**
+     * Virtual thread interrupted while blocked in DatagramSocket adaptor receive
+     * with timeout.
+     */
+    @Test
+    public void testDatagramSocketAdaptorReceiveInterrupt2() throws Exception {
+        testDatagramSocketAdaptorReceiveInterrupt(60_1000);
+    }
+
+    private void testDatagramSocketAdaptorReceiveInterrupt(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
+            try (DatagramChannel dc = DatagramChannel.open()) {
+                InetAddress lh = InetAddress.getLoopbackAddress();
+                dc.bind(new InetSocketAddress(lh, 0));
+
+                byte[] array = new byte[100];
+                DatagramPacket p = new DatagramPacket(array, 0, array.length);
+                if (timeout > 0)
+                    dc.socket().setSoTimeout(timeout);
+
+                // receive should block
+                ScheduledInterrupter.schedule(Thread.currentThread(), DELAY);
+                try {
+                    dc.socket().receive(p);
+                    fail();
+                } catch (ClosedByInterruptException expected) {
+                    assertTrue(Thread.interrupted());
+                }
             }
         });
     }
@@ -830,5 +906,4 @@ public class BlockingChannelOps {
             new Thread(new ScheduledSender(dc, buf, address, delay)).start();
         }
     }
-
 }
