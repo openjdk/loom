@@ -87,8 +87,8 @@ public:
   inline void set_flags(uint8_t value);
   inline void release_set_flags(uint8_t value);
 
-  inline int max_size() const;
-  inline void set_max_size(int value);
+  inline int max_thawing_size() const;
+  inline void set_max_thawing_size(int value);
 
   inline oop cont() const;
   template<typename P> inline oop cont() const;
