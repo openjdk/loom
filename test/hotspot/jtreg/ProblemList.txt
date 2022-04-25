@@ -185,9 +185,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 # fails with StackOverflowError on Windows
 serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java        8279663 windows-all
 
-# timeout when testing with virtual threads
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1          8283818 generic-all
-
 # stratum mismatch
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
