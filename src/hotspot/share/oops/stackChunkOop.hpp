@@ -51,6 +51,7 @@ private:
   template <BarrierType barrier> friend class DoBarriersStackClosure;
 
   // Chunk flags.
+  // FLAG_HAS_INTERPRETED_FRAMES actually means "thaw slow because of some content-based chunk condition"
   static const uint8_t FLAG_HAS_INTERPRETED_FRAMES = 1 << 0;
   static const uint8_t FLAG_CLAIM_RELATIVIZE = 1 << 1; // Only one thread claims relativization of derived pointers
   static const uint8_t FLAG_NOTIFY_RELATIVIZE = 1 << 2; // Someone is waiting for relativization to complete
