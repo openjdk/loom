@@ -82,8 +82,10 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
     assert((intptr_t*)f.at(frame::interpreter_frame_last_sp_offset) == nullptr
       || f.unextended_sp() == (intptr_t*)f.at(frame::interpreter_frame_last_sp_offset), "");
     int locals = f.interpreter_frame_method()->max_locals();
+    // If the caller.is_empty(), i.e. we're freezing into an empty chunk, then we set
+    // the chunk's argsize in finalize_freeze and make room for it above the unextended_sp
     bool overlap_caller = caller.is_interpreted_frame() || caller.is_empty();
-    fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ?  ContinuationHelper::InterpretedFrame::stack_argsize(f) : 0);
+    fp = caller.unextended_sp() - (locals + frame::sender_sp_offset) + (overlap_caller ? ContinuationHelper::InterpretedFrame::stack_argsize(f) : 0);
     sp = fp - (f.fp() - f.unextended_sp());
     assert(sp <= fp, "");
     assert(fp <= caller.unextended_sp(), "");
@@ -102,6 +104,8 @@ frame FreezeBase::new_heap_frame(frame& f, frame& caller) {
     int fsize = FKind::size(f);
     sp = caller.unextended_sp() - fsize;
     if (caller.is_interpreted_frame()) {
+      // If the caller is interpreted, our stackargs are not supposed to overlap with it
+      // so we make more room by moving sp down by argsize
       int argsize = FKind::stack_argsize(f);
       sp -= argsize;
     }
@@ -172,6 +176,9 @@ inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
     assert(!caller.is_empty(), "");
     patch_callee_link_relative(caller, caller.fp());
   } else {
+    // If we're the bottom-most frame frozen in this freeze, the caller might have stayed frozen in the chunk,
+    // and its oop-containing fp fixed. We've now just overwritten it, so we must patch it back to its value
+    // as read from the chunk.
     patch_callee_link(caller, caller.fp());
   }
 }

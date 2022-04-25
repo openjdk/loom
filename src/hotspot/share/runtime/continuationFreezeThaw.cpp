@@ -348,7 +348,7 @@ protected:
   JavaThread* const _thread;
   ContinuationWrapper& _cont;
   CONT_JFR_ONLY(FreezeThawJfrInfo _jfr_info;)
-  bool _barriers;
+  bool _barriers; // only set when we allocate a chunk
   const bool _preempt; // used only on the slow path
 
   intptr_t *_bottom_address;
@@ -446,11 +446,11 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, bool preem
   assert(_thread != nullptr, "");
   assert(_thread->last_continuation()->entry_sp() == _cont.entrySP(), "");
 
-  _bottom_address = _cont.entrySP() - _cont.argsize();
   DEBUG_ONLY(_cont.entry()->verify_cookie();)
 
   assert(!Interpreter::contains(_cont.entryPC()), "");
 
+  _bottom_address = _cont.entrySP() - _cont.argsize();
 #ifdef _LP64
   if (((intptr_t)_bottom_address & 0xf) != 0) {
     _bottom_address--;
@@ -516,11 +516,7 @@ freeze_result Freeze<ConfigT>::try_freeze_fast(intptr_t* sp) {
 
 // returns true iff there's room in the chunk for a fast, compiled-frame-only freeze
 template <typename ConfigT>
-bool Freeze<ConfigT>::is_chunk_available_for_fast_freeze(intptr_t* frame_sp
-#ifdef ASSERT
-    , int* out_size
-#endif
-  ) {
+bool Freeze<ConfigT>::is_chunk_available_for_fast_freeze(intptr_t* frame_sp DEBUG_ONLY(COMMA int* out_size)) {
   stackChunkOop chunk = _cont.tail();
   if (chunk == nullptr || chunk->is_gc_mode() || chunk->requires_barriers() || chunk->has_mixed_frames()) {
     log_develop_trace(continuations)("chunk available %s", chunk == nullptr ? "no chunk" : "chunk requires barriers");
@@ -528,19 +524,25 @@ bool Freeze<ConfigT>::is_chunk_available_for_fast_freeze(intptr_t* frame_sp
   }
 
   // assert(CodeCache::find_blob(*(address*)(frame_sp - SENDER_SP_RET_ADDRESS_OFFSET)) == StubRoutines::cont_doYield_stub(), ""); -- fails on Windows
-  assert(StubRoutines::cont_doYield_stub()->frame_size() == frame::metadata_words, "");
-  intptr_t* const stack_top     = frame_sp + frame::metadata_words;
+  static const int doYield_stub_frame_size = frame::metadata_words;
+  assert(StubRoutines::cont_doYield_stub()->frame_size() == doYield_stub_frame_size, "");
+  intptr_t* const stack_top     = frame_sp + doYield_stub_frame_size; // We're not freezeing the stub
   intptr_t* const stack_bottom  = _cont.entrySP() - ContinuationHelper::frame_align_words(_cont.argsize());
 
   int size = stack_bottom - stack_top; // in words
-
-  const int chunk_sp = chunk->sp();
-  if (chunk_sp < chunk->stack_size()) {
+  // argsize can be nonzero if we have a caller, but the caller could be in a non-empty parent chunk,
+  // so we subtract it only if we overlap with the caller, i.e. the current chunk isn't empty.
+  // Consider leaving the chunk's argsize set when emptying it and removing the following branch,
+  // although that would require changing stackChunkOopDesc::is_empty
+  if (!chunk->is_empty()) {
     size -= _cont.argsize();
   }
   assert(size > 0, "");
 
-  bool available = chunk_sp - frame::metadata_words >= size;
+  int chunk_free_room = chunk->sp() - frame::metadata_words;
+
+  bool available = chunk_free_room >= size;
+
   log_develop_trace(continuations)("chunk available: %d size: %d argsize: %d top: " INTPTR_FORMAT " bottom: " INTPTR_FORMAT,
     available, _cont.argsize(), size, p2i(stack_top), p2i(stack_bottom));
   DEBUG_ONLY(if (out_size != nullptr) *out_size = size;)
@@ -799,7 +801,11 @@ inline freeze_result FreezeBase::recurse_freeze_java_frame(const frame& f, frame
   _size += fsize;
   NOT_PRODUCT(_frames++;)
 
-  if (FKind::frame_bottom(f) >= _bottom_address - 1) { // sometimes there's space after enterSpecial
+  assert(FKind::frame_bottom(f) <= _bottom_address, "");
+
+  // We don't use FKind::frame_bottom(f) == _bottom_address because on x64 there's sometimes an extra word between
+  // enterSpecial and an interpreted frame
+  if (FKind::frame_bottom(f) >= _bottom_address - 1) {
     return finalize_freeze(f, caller, argsize); // recursion end
   } else {
     frame senderf = sender<FKind>(f);
@@ -859,12 +865,9 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   if (chunk != nullptr) {
     unextended_sp = chunk->sp();
     if (!chunk->is_empty()) {
+      StackChunkFrameStream<ChunkFrames::Mixed> last(chunk);
+      unextended_sp = chunk->to_offset(StackChunkFrameStream<ChunkFrames::Mixed>(chunk).unextended_sp());
       bool top_interpreted = Interpreter::contains(chunk->pc());
-      unextended_sp = chunk->sp();
-      if (top_interpreted) {
-        StackChunkFrameStream<ChunkFrames::Mixed> last(chunk);
-        unextended_sp += last.unextended_sp() - last.sp(); // can be negative (-1), often with lambda forms
-      }
       if (callee.is_interpreted_frame() == top_interpreted) {
         overlap = argsize;
       }
@@ -875,19 +878,18 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
   _size -= overlap;
   assert(_size >= 0, "");
-
-  assert(chunk == nullptr || chunk->is_empty()
-          || unextended_sp == chunk->to_offset(StackChunkFrameStream<ChunkFrames::Mixed>(chunk).unextended_sp()), "");
   assert(chunk != nullptr || unextended_sp < _size, "");
 
-    // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
-  assert(!_barriers || (unextended_sp >= _size && chunk->is_empty()),
+  // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
+  bool allocated_old_in_freeze_fast = _barriers;
+  assert(!allocated_old_in_freeze_fast || (unextended_sp >= _size && chunk->is_empty()),
+    "Chunk allocated in freeze_fast is of insufficient size "
     "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _size, chunk->is_empty());
+  assert(!allocated_old_in_freeze_fast || (!UseZGC && !UseG1GC), "Unexpected allocation");
 
   DEBUG_ONLY(bool empty_chunk = true);
-  if (unextended_sp < _size || chunk->is_gc_mode() || (!_barriers && chunk->requires_barriers())) {
-    // ALLOCATION
-
+  if (unextended_sp < _size || chunk->is_gc_mode() || (chunk->requires_barriers() && !allocated_old_in_freeze_fast)) {
+    // ALLOCATE NEW CHUNK
     if (lt.develop_is_enabled()) {
       LogStream ls(lt);
       if (chunk == nullptr) {
@@ -912,6 +914,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->set_argsize(argsize);
     assert(is_empty(chunk), "");
   } else {
+    // REUSE EXISTING CHUNK
     log_develop_trace(continuations)("Reusing chunk mixed: %d empty: %d", chunk->has_mixed_frames(), chunk->is_empty());
     if (chunk->is_empty()) {
       int sp = chunk->stack_size() - argsize;
@@ -921,12 +924,13 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       assert(chunk->max_size() == 0, "");
     } DEBUG_ONLY(else empty_chunk = false;)
   }
+  assert(!chunk->is_gc_mode(), "");
+  assert(!chunk->has_bitmap(), "");
   chunk->set_has_mixed_frames(true);
 
   assert(chunk->requires_barriers() == _barriers, "");
   assert(!_barriers || is_empty(chunk), "");
 
-  assert(!chunk->has_bitmap(), "");
   assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
   assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
 
@@ -943,6 +947,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->print_on(&ls);
   }
 
+  // The topmost existing frame in the chunk; or an empty frame if the chunk is empty
   caller = StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame();
 
   DEBUG_ONLY(_last_write = caller.unextended_sp() + (empty_chunk ? argsize : overlap);)
@@ -969,6 +974,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
 
 void FreezeBase::patch(const frame& f, frame& hf, const frame& caller, bool bottom) {
   if (bottom) {
+    // If we're the bottom frame, we need to replace the return barrier with the real
+    // caller's pc.
     address last_pc = caller.pc();
     assert((last_pc == nullptr) == is_empty(_cont.tail()), "");
     ContinuationHelper::Frame::patch_pc(caller, last_pc);
@@ -1010,6 +1017,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
                                                                     bool callee_interpreted) {
   adjust_interpreted_frame_unextended_sp(f);
 
+  // The frame's top never includes the stack arguments to the callee
   intptr_t* const frame_sp = ContinuationHelper::InterpretedFrame::frame_top(f, callee_argsize, callee_interpreted);
   const int argsize = ContinuationHelper::InterpretedFrame::stack_argsize(f);
   const int locals = f.interpreter_frame_method()->max_locals();
@@ -1031,6 +1039,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
   }
 
   bool bottom = result == freeze_ok_bottom;
+  assert(!caller.is_empty() || bottom, "");
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, bottom);)
 
@@ -1061,6 +1070,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 }
 
 freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller, int callee_argsize, bool callee_interpreted) {
+  // The frame's top never includes the stack arguments to the callee
   intptr_t* const frame_sp = ContinuationHelper::CompiledFrame::frame_top(f, callee_argsize, callee_interpreted);
   const int argsize = ContinuationHelper::CompiledFrame::stack_argsize(f);
   const int fsize = ContinuationHelper::CompiledFrame::frame_bottom(f) + argsize - frame_sp;
@@ -1078,6 +1088,7 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
   }
 
   bool bottom = result == freeze_ok_bottom;
+  assert(!caller.is_empty() || bottom, "");
 
   DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, argsize, bottom);)
 
@@ -1160,15 +1171,18 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   chunk->set_max_size(chunk->max_size() + _align_size);
 
+  // At this point the chunk is consistent
+
   if (UNLIKELY(_barriers)) {
     log_develop_trace(continuations)("do barriers on old chunk");
-    // ParallelGC can allocate objects directly into the old generation.
+    // Serial and Parallel GC can allocate objects directly into the old generation.
     // Then we want to relativize the derived pointers eagerly so that
     // old chunks are all in GC mode.
     assert(!UseG1GC, "G1 can not deal with allocating outside of eden");
     assert(!UseZGC, "ZGC can not deal with allocating chunks visible to marking");
     assert(!UseShenandoahGC, "Shenandoah can not deal with allocating chunks visible to marking");
     ContinuationGCSupport::transform_stack_chunk(_cont.tail());
+    // For objects in the old generation we must maintain the remembered set
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>();
   }
 
@@ -1328,6 +1342,8 @@ static bool interpreted_native_or_deoptimized_on_stack(JavaThread* thread) {
 static inline int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont) {
   verify_continuation(cont.continuation());
   assert(!cont.is_empty(), "");
+  // This is done for the sake of the enterSpecial frame
+  StackWatermarkSet::after_unwind(thread);
 
   log_develop_debug(continuations)("=== End of freeze cont ### #" INTPTR_FORMAT, cont.hash());
 
@@ -1387,11 +1403,10 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
          || (current->cont_fastpath_thread_state() && !interpreted_native_or_deoptimized_on_stack(current)), "");
   bool fast = UseContinuationFastPath && current->cont_fastpath();
   if (fast && fr.is_chunk_available_for_fast_freeze(sp)) {
-    freeze_result res = fr.template try_freeze_fast<true>(sp);
-    assert(res == freeze_ok, "");
+    bool succcess = fr.template freeze_fast<true>(sp);
+    assert(succcess, "");
     CONT_JFR_ONLY(fr.jfr_info().post_jfr_event(&event, oopCont, current);)
     freeze_epilog(current, cont);
-    StackWatermarkSet::after_unwind(current);
     return 0;
   }
 
@@ -1407,7 +1422,6 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
     CONT_JFR_ONLY(fr.jfr_info().post_jfr_event(&event, oopCont, current);)
     freeze_epilog(current, cont, res);
     cont.done(); // allow safepoint in the transition back to Java
-    StackWatermarkSet::after_unwind(current);
     return res;
   JRT_BLOCK_END
 }
@@ -1474,7 +1488,7 @@ static int thaw_size(stackChunkOop chunk) {
   int size = chunk->max_size();
   size += frame::metadata_words; // For the top pc+fp in push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
   size += 2*frame::align_wiggle; // in case of alignments at the top and bottom
-  return size + 200;
+  return size;
 }
 
 // make room on the stack for thaw
@@ -1748,11 +1762,11 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 }
 
 void ThawBase::copy_from_chunk(intptr_t* from, intptr_t* to, int size) {
-  assert(to + size <= _cont.entrySP(), "");
-  _cont.tail()->copy_from_chunk_to_stack(from, to, size);
-  CONT_JFR_ONLY(_jfr_info.record_size_copied(size);)
   assert(to >= _top_stack_address, "overwrote past thawing space"
     " to: " INTPTR_FORMAT " top_address: " INTPTR_FORMAT, p2i(to), p2i(_top_stack_address));
+  assert(to + size <= _cont.entrySP(), "overwrote past thawing space");
+  _cont.tail()->copy_from_chunk_to_stack(from, to, size);
+  CONT_JFR_ONLY(_jfr_info.record_size_copied(size);)
 }
 
 void ThawBase::patch_return(intptr_t* sp, bool is_last) {
@@ -1956,10 +1970,8 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
   assert(hf.is_heap_frame(), "should be");
   const int fsize = ContinuationHelper::InterpretedFrame::frame_bottom(hf) - heap_sp;
 
-  assert(!bottom || frame_sp + fsize >= _cont.entrySP() - 2, "");
-  assert(!bottom || frame_sp + fsize <= _cont.entrySP(), "");
-
-  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) == frame_sp + fsize, "");
+  assert(ContinuationHelper::InterpretedFrame::frame_bottom(f) >= frame_sp + fsize
+    && ContinuationHelper::InterpretedFrame::frame_bottom(f) <= frame_sp + fsize + 1, ""); // internal alignment on aarch64
 
   // on AArch64 we add padding between the locals and the rest of the frame to keep the fp 16-byte-aligned
   const int locals = hf.interpreter_frame_method()->max_locals();
