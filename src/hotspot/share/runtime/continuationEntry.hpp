@@ -119,9 +119,6 @@ public:
 
   oop scope()     const { return Continuation::continuation_scope(cont_oop()); }
 
-  oop cont_raw()  const { return _cont; }
-  oop chunk_raw() const { return _chunk; }
-
   bool is_virtual_thread() const { return _flags != 0; }
 
   static oop cont_oop_or_null(const ContinuationEntry* ce) {
