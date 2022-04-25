@@ -42,15 +42,13 @@ public class InterruptThreadTest {
 
     final Runnable pinnedTask = () -> {
         synchronized (lock) {
-            do {
-                try {
-                    target_is_ready = true;
-                    lock.wait();
-                } catch (InterruptedException ie) {
-                     System.err.println("Virtual thread was interrupted as expected");
-                     iterrupted = true;
-                }
-            } while (!isJNITestingCompleted.get());
+            try {
+                target_is_ready = true;
+                lock.wait();
+            } catch (InterruptedException ie) {
+                 System.err.println("Virtual thread was interrupted as expected");
+                 iterrupted = true;
+            }
         }
     };
 
@@ -64,7 +62,6 @@ public class InterruptThreadTest {
             }
         }
         testJvmtiFunctionsInJNICall(vthread);
-        isJNITestingCompleted.set(true);
         vthread.join();
         if (!iterrupted) {
             throw new RuntimeException("Failed: Virtual thread was not interrupted!");
