@@ -44,7 +44,7 @@ public class InterruptThreadTest {
         synchronized (lock) {
             do {
                 try {
-                    target_is_ready = true; 
+                    target_is_ready = true;
                     lock.wait();
                 } catch (InterruptedException ie) {
                     iterrupted = true;
