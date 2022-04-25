@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class InterruptThreadTest {
     private static final String AGENT_LIB = "InterruptThreadTest";
     final Object lock = new Object();
-    final AtomicBoolean isJNITestingCompleted = new AtomicBoolean(false);
 
     native boolean testJvmtiFunctionsInJNICall(Thread vthread);
 
