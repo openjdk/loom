@@ -45,9 +45,6 @@ runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 
 serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java     8278053 generic-all
 serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 generic-all
 
-# test issues that don't reproduce in jdk repo
-serviceability/dcmd/vm/ClassLoaderStatsTest.java                        8278123 generic-all
-
 #### fibers branch only failures
 
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
