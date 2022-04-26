@@ -196,4 +196,3 @@ vmTestbase/gc/gctests/ReferencesGC/ReferencesGC.java                         828
 #### fibers branch only failures
 
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
-serviceability/jvmti/HeapMonitor/MyPackage/HeapMonitorVMEventsTest.java#id1  8280914 generic-all
