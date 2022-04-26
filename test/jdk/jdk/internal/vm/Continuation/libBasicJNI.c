@@ -23,9 +23,9 @@
 
 #include "jni.h"
 
-JNIEXPORT jboolean JNICALL
+JNIEXPORT jint JNICALL
 Java_Basic_nativeBar(JNIEnv* env, jclass klass, jint x) {
     jmethodID nativeBaz = (*env)->GetStaticMethodID(env, klass, "nativeBaz", "(I)I");
-    jint r = (*env)->CallStaticLongMethod(env, klass, nativeBaz, x+1);
+    jint r = (*env)->CallStaticIntMethod(env, klass, nativeBaz, x+1);
     return r + 1;
 }
