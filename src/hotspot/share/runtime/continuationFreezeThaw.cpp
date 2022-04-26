@@ -1561,7 +1561,7 @@ protected:
 
   intptr_t* _fastpath;
   bool _barriers;
-  intptr_t* _top_unextended_sp;
+  intptr_t* _top_unextended_sp_before_thaw;
   int _align_size;
   DEBUG_ONLY(intptr_t* _top_stack_address);
 
@@ -1573,7 +1573,7 @@ protected:
   ThawBase(JavaThread* thread, ContinuationWrapper& cont) :
       _thread(thread), _cont(cont),
       _fastpath(nullptr) {
-    DEBUG_ONLY(_top_unextended_sp = nullptr;)
+    DEBUG_ONLY(_top_unextended_sp_before_thaw = nullptr;)
     assert (cont.tail() != nullptr, "no last chunk");
     DEBUG_ONLY(_top_stack_address = _cont.entrySP() - thaw_size(cont.tail());)
   }
@@ -1836,7 +1836,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   int num_frames = (return_barrier ? 1 : 2);
 
   _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
-  _top_unextended_sp = _stream.unextended_sp();
+  _top_unextended_sp_before_thaw = _stream.unextended_sp();
 
   frame heap_frame = _stream.to_frame();
   if (lt.develop_is_enabled()) {
@@ -1925,9 +1925,8 @@ void ThawBase::finalize_thaw(frame& entry, int argsize) {
   }
   assert(_stream.is_done() == chunk->is_empty(), "");
 
-  // TBD ?????
-  int delta = _stream.unextended_sp() - _top_unextended_sp;
-  chunk->set_max_thawing_size(chunk->max_thawing_size() - delta);
+  int total_thawed = _stream.unextended_sp() - _top_unextended_sp_before_thaw;
+  chunk->set_max_thawing_size(chunk->max_thawing_size() - total_thawed);
 
   _cont.set_argsize(argsize);
   entry = new_entry_frame();
