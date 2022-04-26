@@ -211,10 +211,12 @@ namespace AccessInternal {
     if (VMError::is_error_reported()) {
       return;
     }
+
     Thread* thread = Thread::current();
     if (!thread->is_Java_thread()) {
       return;
     }
+
     JavaThread* java_thread = JavaThread::cast(thread);
     JavaThreadState state = java_thread->thread_state();
     assert(state == _thread_in_vm || state == _thread_in_Java || state == _thread_new,
