@@ -219,9 +219,11 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     assert(frame_sp == unextended_sp, "");
     caller.set_sp(fp + frame::sender_sp_offset);
     frame f(frame_sp, frame_sp, fp, hf.pc());
-    // it's set again later in derelativize_interpreted_frame_metadata, but we need to set the locals now so that we'll have the frame's bottom
+    // it's set again later in set_interpreter_frame_bottom, but we need to set the locals now so that
+    // we could call ContinuationHelper::InterpretedFrame::frame_bottom
     intptr_t offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
     assert((int)offset == frame::sender_sp_offset + locals - 1, "");
+    // derelativize locals
     *(intptr_t**)f.addr_at(frame::interpreter_frame_locals_offset) = fp + offset;
     return f;
   } else {

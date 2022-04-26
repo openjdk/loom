@@ -733,7 +733,7 @@ NOINLINE freeze_result FreezeBase::freeze_slow() {
     f.print_on(&ls);
   }
 
-  frame caller;
+  frame caller; // the frozen caller in the chunk
   freeze_result res = freeze(f, caller, 0, false, true);
 
   if (res == freeze_ok) {
@@ -1813,7 +1813,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
 }
 
 inline bool ThawBase::seen_by_gc() {
-  return _barriers | _cont.tail()->is_gc_mode();
+  return _barriers || _cont.tail()->is_gc_mode();
 }
 
 NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier) {
@@ -1834,7 +1834,6 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   DEBUG_ONLY(_frames = 0;)
   _align_size = 0;
   int num_frames = (return_barrier ? 1 : 2);
-  bool last_interpreted = chunk->has_mixed_frames() && Interpreter::contains(chunk->pc());
 
   _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp = _stream.unextended_sp();
@@ -1849,11 +1848,12 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 
 #if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
   if (UseZGC || UseShenandoahGC) {
+    // TODO ZGC: this is where we'd want to restore color to the oops
     _cont.tail()->relativize_derived_pointers_concurrently();
   }
 #endif
 
-  frame caller;
+  frame caller; // the thawed caller on the stack
   thaw_one_frame(heap_frame, caller, num_frames, true);
   finish_thaw(caller); // caller is now the topmost thawed frame
   _cont.write();
@@ -1925,6 +1925,7 @@ void ThawBase::finalize_thaw(frame& entry, int argsize) {
   }
   assert(_stream.is_done() == chunk->is_empty(), "");
 
+  // TBD ?????
   int delta = _stream.unextended_sp() - _top_unextended_sp;
   chunk->set_max_thawing_size(chunk->max_thawing_size() - delta);
 
@@ -1961,7 +1962,7 @@ inline void ThawBase::after_thaw_java_frame(const frame& f, bool bottom) {
 inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   assert(!bottom || caller.fp() == _cont.entryFP(), "");
   if (bottom) {
-    ContinuationHelper::Frame::patch_pc(caller, _cont.is_empty() ? caller.raw_pc()
+    ContinuationHelper::Frame::patch_pc(caller, _cont.is_empty() ? caller.pc()
                                                                  : StubRoutines::cont_returnBarrier());
   }
 
@@ -1977,6 +1978,7 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
 
 void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
   // we need to clear the bits that correspond to arguments as they reside in the caller frame
+  // or they will keep objects that are otherwise unreachable alive
   log_develop_trace(continuations)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(start+range));
   stackChunkOop chunk = _cont.tail();
   chunk->bitmap().clear_range(chunk->bit_index_for(start),
@@ -2070,16 +2072,14 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   intptr_t* to   = frame_sp - frame::metadata_words;
   int sz = fsize + frame::metadata_words;
 
+  // If we're the bottom-most thawed frame, we're writing to within one word from entrySP
+  // (we might have one padding word for alignment)
   assert(!bottom || (_cont.entrySP() - 1 <= to + sz && to + sz <= _cont.entrySP()), "");
   assert(!bottom || hf.compiled_frame_stack_argsize() != 0 || (to + sz && to + sz == _cont.entrySP()), "");
 
   copy_from_chunk(from, to, sz); // copying good oops because we invoked barriers above
 
   patch(f, caller, bottom);
-
-  if (f.cb()->is_nmethod()) {
-    f.cb()->as_nmethod()->run_nmethod_entry_barrier();
-  }
 
   if (f.is_deoptimized_frame()) {
     maybe_set_fastpath(f.sp());
@@ -2092,7 +2092,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
     log_develop_trace(continuations)("Deoptimizing thawed frame");
     DEBUG_ONLY(ContinuationHelper::Frame::patch_pc(f, nullptr));
 
-    f.deoptimize(nullptr); // we're assuming there are no monitors; this doesn't revoke biased locks
+    f.deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
     assert(f.is_deoptimized_frame(), "");
     assert(ContinuationHelper::Frame::is_deopt_return(f.raw_pc(), f), "");
     maybe_set_fastpath(f.sp());
@@ -2240,9 +2240,8 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const thaw_kind kind) 
   intptr_t* const sp = thw.thaw(kind);
   assert(is_aligned(sp, frame::frame_alignment), "");
 
+  // All the frames have been thawed so we know they don't hold any monitors
   thread->reset_held_monitor_count();
-
-  verify_continuation(cont.continuation());
 
 #ifdef ASSERT
   intptr_t* sp0 = sp;
