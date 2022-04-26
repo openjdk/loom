@@ -112,7 +112,7 @@ void SafepointMechanism::update_poll_values(JavaThread* thread) {
 }
 
 void SafepointMechanism::process(JavaThread *thread, bool allow_suspend, bool check_async_exception) {
-  DEBUG_ONLY(intptr_t* sp_before = thread->last_Java_sp(););
+  DEBUG_ONLY(intptr_t* sp_before = thread->last_Java_sp();)
   // Read global poll and has_handshake after local poll
   OrderAccess::loadload();
 
