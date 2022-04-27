@@ -1192,7 +1192,7 @@ private:
   void push_cont_fastpath(intptr_t* sp)        { if (sp > _cont_fastpath) _cont_fastpath = sp; }
   void set_cont_fastpath_thread_state(bool x)  { _cont_fastpath_thread_state = (int)x; }
   intptr_t* raw_cont_fastpath() const          { return _cont_fastpath; }
-  bool cont_fastpath() const                   { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath() const                   { return _cont_fastpath == NULL && _cont_fastpath_thread_state != 0; }
   bool cont_fastpath_thread_state() const      { return _cont_fastpath_thread_state != 0; }
 
   int held_monitor_count()        { return _held_monitor_count; }
