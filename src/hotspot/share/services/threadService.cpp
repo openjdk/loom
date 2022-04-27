@@ -471,7 +471,7 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
         }
       }
 
-      if (currentThread == NULL) {
+      if (currentThread == NULL || currentThread->is_vthread_mounted()) {
         // No dependency on another thread
         break;
       }
