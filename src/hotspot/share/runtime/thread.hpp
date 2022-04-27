@@ -1203,9 +1203,6 @@ private:
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
 
-  enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
-  inline CarrierOrVirtual which_stack(address adr) const;
-
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -1553,7 +1550,6 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
-  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread
