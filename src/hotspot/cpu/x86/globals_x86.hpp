@@ -68,7 +68,7 @@ define_pd_global(intx, InlineSmallCode,          1000);
 // the min range value to be below that of the default
 #define MIN_STACK_SHADOW_PAGES (NOT_WIN64(10) WIN64_ONLY(7) DEBUG_ONLY(+4))
 #else
-#define DEFAULT_STACK_SHADOW_PAGES (4 DEBUG_ONLY(+4))
+#define DEFAULT_STACK_SHADOW_PAGES (4 DEBUG_ONLY(+5))
 #define MIN_STACK_SHADOW_PAGES DEFAULT_STACK_SHADOW_PAGES
 #endif // _LP64
 
