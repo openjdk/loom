@@ -113,7 +113,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <p> Virtual threads typically employ a small set of platform threads used as
  * <em>carrier threads</em>. Locking and I/O operations are examples of operations
  * where a carrier thread may be re-scheduled from one virtual thread to another.
- * Code executing in a virtual thread is not aware of underlying carrier thread.
+ * Code executing in a virtual thread is not aware of the underlying carrier thread.
  * The {@linkplain Thread#currentThread()} method, used to obtain a reference
  * to the <i>current thread</i>, will always return the {@code Thread} object
  * for the virtual thread.
@@ -3063,7 +3063,7 @@ public class Thread implements Runnable {
     int threadLocalRandomSecondarySeed;
 
     /** The thread container that this thread is in */
-    @Stable private volatile ThreadContainer container;
+    @Stable private ThreadContainer container;
     ThreadContainer threadContainer() {
         return container;
     }

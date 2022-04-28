@@ -206,6 +206,7 @@ static inline bool is_full(const JfrBuffer* enqueue_buffer) {
 
 bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame) {
   assert(jt != NULL, "invariant");
+  assert(!_lineno, "invariant");
   Thread* current_thread = Thread::current();
   assert(jt != current_thread, "invariant");
   // Explicitly monitor the available space of the thread-local buffer used for enqueuing klasses as part of tagging methods.
@@ -259,6 +260,7 @@ bool JfrStackTrace::record_async(JavaThread* jt, const frame& frame) {
 bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
   assert(jt != NULL, "invariant");
   assert(jt == Thread::current(), "invariant");
+  assert(!_lineno, "invariant");
   HandleMark hm(jt); // RegisterMap uses Handles to support continuations.
   JfrVframeStream vfs(jt, frame, false, false);
   u4 count = 0;
@@ -295,10 +297,9 @@ bool JfrStackTrace::record(JavaThread* jt, const frame& frame, int skip) {
     _hash = (_hash * 31) + mid;
     _hash = (_hash * 31) + bci;
     _hash = (_hash * 31) + type;
-    _frames[count] = JfrStackFrame(mid, bci, type, 0, method->method_holder());
+    _frames[count] = JfrStackFrame(mid, bci, type, method->method_holder());
     count++;
   }
-  _lineno = false;
   _nr_of_frames = count;
   return count > 0;
 }

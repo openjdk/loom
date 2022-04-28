@@ -80,6 +80,8 @@ class JvmtiDeferredUpdates;
 class ThreadClosure;
 class ICRefillVerifier;
 
+class JVMCIRuntime;
+
 class Metadata;
 class ResourceArea;
 
@@ -972,6 +974,9 @@ class JavaThread: public Thread {
     address   _alternate_call_target;
   } _jvmci;
 
+  // The JVMCIRuntime in a JVMCI shared library
+  JVMCIRuntime* _libjvmci_runtime;
+
   // Support for high precision, thread sensitive counters in JVMCI compiled code.
   jlong*    _jvmci_counters;
 
@@ -1192,7 +1197,7 @@ private:
   void push_cont_fastpath(intptr_t* sp)        { if (sp > _cont_fastpath) _cont_fastpath = sp; }
   void set_cont_fastpath_thread_state(bool x)  { _cont_fastpath_thread_state = (int)x; }
   intptr_t* raw_cont_fastpath() const          { return _cont_fastpath; }
-  bool cont_fastpath() const                   { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath() const                   { return _cont_fastpath == NULL && _cont_fastpath_thread_state != 0; }
   bool cont_fastpath_thread_state() const      { return _cont_fastpath_thread_state != 0; }
 
   int held_monitor_count()        { return _held_monitor_count; }
@@ -1202,9 +1207,6 @@ private:
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
-
-  enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
-  inline CarrierOrVirtual which_stack(address adr) const;
 
  private:
   DEBUG_ONLY(void verify_frame_info();)
@@ -1309,6 +1311,12 @@ private:
 
   virtual bool in_retryable_allocation() const    { return _in_retryable_allocation; }
   void set_in_retryable_allocation(bool b)        { _in_retryable_allocation = b; }
+
+  JVMCIRuntime* libjvmci_runtime() const          { return _libjvmci_runtime; }
+  void set_libjvmci_runtime(JVMCIRuntime* rt) {
+    assert((_libjvmci_runtime == nullptr && rt != nullptr) || (_libjvmci_runtime != nullptr && rt == nullptr), "must be");
+    _libjvmci_runtime = rt;
+  }
 #endif // INCLUDE_JVMCI
 
   // Exception handling for compiled methods
@@ -1553,7 +1561,6 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
-  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread

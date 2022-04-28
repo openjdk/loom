@@ -6685,7 +6685,7 @@ class StubGenerator: public StubCodeGenerator {
     __ mov(c_rarg0, thread);
   }
 
-  // Handle is dereference here using correct load constructs.
+  // The handle is dereferenced through a load barrier.
   static void jfr_epilogue(MacroAssembler* _masm, Register thread) {
     __ reset_last_Java_frame(true);
     Label null_jobject;
@@ -6696,9 +6696,7 @@ class StubGenerator: public StubCodeGenerator {
     __ bind(null_jobject);
   }
 
-  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
-  RuntimeStub* generate_jfr_write_checkpoint() {
-    const char* name = "jfr_write_checkpoint";
+  static RuntimeStub* generate_jfr_stub(const char* name, address entrypoint) {
 
     enum layout {
       rbp_off,
@@ -6720,47 +6718,7 @@ class StubGenerator: public StubCodeGenerator {
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
     jfr_prologue(the_pc, _masm, rthread);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint), 1);
-    __ reset_last_Java_frame(true); // no epilogue, not returning anything
-    __ leave();
-    __ ret(lr);
-
-    OopMap* map = new OopMap(framesize, 1); // rfp
-    oop_maps->add_gc_map(the_pc - start, map);
-
-    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
-      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
-                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
-                                    oop_maps, false);
-    return stub;
-  }
-
-  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
-  // The handle is dereferenced and the return value is the event writer oop.
-  RuntimeStub* generate_jfr_get_event_writer() {
-    const char* name = "jfr_get_event_writer";
-
-    enum layout {
-      rbp_off,
-      rbpH_off,
-      return_off,
-      return_off2,
-      framesize // inclusive of return address
-    };
-
-    int insts_size = 512;
-    int locs_size = 64;
-    CodeBuffer code(name, insts_size, locs_size);
-    OopMapSet* oop_maps = new OopMapSet();
-    MacroAssembler* masm = new MacroAssembler(&code);
-    MacroAssembler* _masm = masm;
-
-    address start = __ pc();
-    __ enter();
-    int frame_complete = __ pc() - start;
-    address the_pc = __ pc();
-    jfr_prologue(the_pc, _masm, rthread);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer), 1);
+    __ call_VM_leaf(entrypoint, 1);
     jfr_epilogue(_masm, rthread);
     __ leave();
     __ ret(lr);
@@ -6773,6 +6731,21 @@ class StubGenerator: public StubCodeGenerator {
                                     (framesize >> (LogBytesPerWord - LogBytesPerInt)),
                                     oop_maps, false);
     return stub;
+  }
+
+  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
+  // It returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  RuntimeStub* generate_jfr_write_checkpoint() {
+    return generate_jfr_stub("jfr_write_checkpoint",
+                              CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint));
+  }
+
+  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  RuntimeStub* generate_jfr_get_event_writer() {
+    return generate_jfr_stub("jfr_get_event_writer",
+                              CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer));
   }
 
 #endif // INCLUDE_JFR
@@ -7778,7 +7751,9 @@ class StubGenerator: public StubCodeGenerator {
 
   void generate_all() {
     // support for verify_oop (must happen after universe_init)
-    StubRoutines::_verify_oop_subroutine_entry     = generate_verify_oop();
+    if (VerifyOops) {
+      StubRoutines::_verify_oop_subroutine_entry   = generate_verify_oop();
+    }
     StubRoutines::_throw_AbstractMethodError_entry =
       generate_throw_exception("AbstractMethodError throw_exception",
                                CAST_FROM_FN_PTR(address,

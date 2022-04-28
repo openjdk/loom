@@ -74,32 +74,22 @@ public class VirtualThreadDeadlocks {
         Thread.sleep(2000);
 
         ThreadMXBean bean = ManagementFactory.getPlatformMXBean(ThreadMXBean.class);
-        long[] deadlockedThreads = bean.findDeadlockedThreads();
-        if (deadlockedThreads != null)
-            Arrays.sort(deadlockedThreads);
+        long[] deadlockedThreads = sorted(bean.findDeadlockedThreads());
         System.out.println("findDeadlockedThreads => " + Arrays.toString(deadlockedThreads));
 
-        long[] expectedThreads = platformThreadsToIds(thread1, thread2);
+        // deadlocks involving virtual threads are not detected
+        long[] expectedThreads = (!thread1.isVirtual() && !thread2.isVirtual())
+            ? sorted(thread1.threadId(), thread2.threadId())
+            : null;
+
         System.out.println("expected => " + Arrays.toString(expectedThreads));
 
         if (!Arrays.equals(deadlockedThreads, expectedThreads))
             throw new RuntimeException("Unexpected result");
     }
 
-    /**
-     * Return an array of the thread identifiers of the platform threads in the
-     * given array. Returns null if there are no platform threads.
-     */
-    static long[] platformThreadsToIds(Thread... threads) {
-        long[] tids = Stream.of(threads)
-                .filter(t -> !t.isVirtual())
-                .mapToLong(Thread::threadId)
-                .toArray();
-        if (tids.length == 0) {
-            return null;
-        } else {
-            Arrays.sort(tids);
-            return tids;
-        }
+    static long[] sorted(long... array) {
+        if (array != null) Arrays.sort(array);
+        return array;
     }
 }
