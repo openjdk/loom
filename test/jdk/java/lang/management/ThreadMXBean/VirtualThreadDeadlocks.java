@@ -23,7 +23,8 @@
 
 /**
  * @test
- * @summary Test ThredMXBean.findDeadlockedThreads with deadlocked virtual threads
+ * @summary Test ThredMXBean.findMonitorDeadlockedThreads with cycles of
+ *   platform and virtual threads in deadlock
  * @compile --enable-preview -source ${jdk.version} VirtualThreadDeadlocks.java
  * @run main/othervm --enable-preview VirtualThreadDeadlocks PP
  * @run main/othervm --enable-preview VirtualThreadDeadlocks PV
@@ -74,8 +75,8 @@ public class VirtualThreadDeadlocks {
         Thread.sleep(2000);
 
         ThreadMXBean bean = ManagementFactory.getPlatformMXBean(ThreadMXBean.class);
-        long[] deadlockedThreads = sorted(bean.findDeadlockedThreads());
-        System.out.println("findDeadlockedThreads => " + Arrays.toString(deadlockedThreads));
+        long[] deadlockedThreads = sorted(bean.findMonitorDeadlockedThreads());
+        System.out.println("findMonitorDeadlockedThreads => " + Arrays.toString(deadlockedThreads));
 
         // deadlocks involving virtual threads are not detected
         long[] expectedThreads = (!thread1.isVirtual() && !thread2.isVirtual())
