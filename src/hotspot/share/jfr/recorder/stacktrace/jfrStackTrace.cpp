@@ -170,6 +170,8 @@ inline bool JfrVframeStream::step_to_sender() {
 }
 
 inline void JfrVframeStream::next_frame() {
+  static constexpr const u4 loop_max = MAX_STACK_DEPTH * 2;
+  u4 loop_count = 0;
   do {
     if (_vthread && Continuation::is_continuation_enterSpecial(_frame)) {
       if (_cont_entry->is_virtual_thread()) {
@@ -178,6 +180,13 @@ inline void JfrVframeStream::next_frame() {
         break;
       }
       _cont_entry = _cont_entry->parent();
+    }
+    if (_async_mode) {
+      ++loop_count;
+      if (loop_count > loop_max) {
+        _mode = at_end_mode;
+        break;
+      }
     }
   } while (step_to_sender() && !fill_from_frame());
 }
