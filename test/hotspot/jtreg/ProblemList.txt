@@ -190,3 +190,5 @@ runtime/Thread/StopAtExit.java                                               828
 #### fibers branch only failures
 
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
+
+runtime/Thread/TooSmallStackSize.java                                        8285832 windows-x64
