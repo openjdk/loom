@@ -180,9 +180,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom
 
-# fails with StackOverflowError on Windows
-serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java        8279663 windows-all
-
 # stratum mismatch, test running with the wrong class path
 vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
 vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
