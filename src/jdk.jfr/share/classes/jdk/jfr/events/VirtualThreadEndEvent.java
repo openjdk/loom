@@ -32,9 +32,8 @@ import jdk.jfr.Name;
 import jdk.jfr.internal.MirrorEvent;
 
 @Category({"Java Runtime"})
-@Label("Virtual thread end")
+@Label("Virtual Thread End")
 @Name("jdk.VirtualThreadEnd")
-@Description("Virtual thread end")
 @MirrorEvent(className = "jdk.internal.event.VirtualThreadEndEvent")
 public final class VirtualThreadEndEvent extends AbstractJDKEvent {
 

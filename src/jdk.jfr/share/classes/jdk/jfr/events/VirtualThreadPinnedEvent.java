@@ -32,9 +32,8 @@ import jdk.jfr.Name;
 import jdk.jfr.internal.MirrorEvent;
 
 @Category({"Java Runtime"})
-@Label("Virtual thread pinned")
+@Label("Virtual Thread Pinned")
 @Name("jdk.VirtualThreadPinned")
-@Description("Virtual thread pinned")
 @MirrorEvent(className = "jdk.internal.event.VirtualThreadPinnedEvent")
 public final class VirtualThreadPinnedEvent extends AbstractJDKEvent {
 }
