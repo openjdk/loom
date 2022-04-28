@@ -187,9 +187,6 @@ vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            827
 # obsolete test using Thread.stop
 runtime/Thread/StopAtExit.java                                               8283610 generic-all
 
-# test issues that don't reproduce in jdk repo
-vmTestbase/gc/gctests/ReferencesGC/ReferencesGC.java                         8284234 generic-all
-
 #### fibers branch only failures
 
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
