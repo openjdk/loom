@@ -328,8 +328,8 @@ template<typename Event> void FreezeThawJfrInfo::post_jfr_event(Event* e, oop co
   if (e->should_commit()) {
     log_develop_trace(continuations)("JFR event: iframes: %d size: %d", _e_num_interpreted_frames, _e_size);
     e->set_carrierThread(JFR_JVM_THREAD_ID(jt));
-    e->set_contClass(continuation->klass());
-    e->set_numIFrames(_e_num_interpreted_frames);
+    e->set_continuationClass(continuation->klass());
+    e->set_interpretedFrames(_e_num_interpreted_frames);
     e->set_size(_e_size);
     e->commit();
   }

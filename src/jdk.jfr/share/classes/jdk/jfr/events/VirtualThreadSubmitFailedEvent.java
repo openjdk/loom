@@ -31,8 +31,8 @@ import jdk.jfr.Label;
 import jdk.jfr.Name;
 import jdk.jfr.internal.MirrorEvent;
 
-@Category({"Java Runtime"})
-@Label("Virtual thread submit task failed")
+@Category({"Java Development Kit", "Threading"})
+@Label("Virtual Thread Submit Failed")
 @Name("jdk.VirtualThreadSubmitFailed")
 @Description("Submit of task for virtual thread failed")
 @MirrorEvent(className = "jdk.internal.event.VirtualThreadSubmitFailedEvent")
