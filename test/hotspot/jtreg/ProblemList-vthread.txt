@@ -337,6 +337,7 @@ runtime/cds/appcds/javaldr/HumongousDuringDump.java
 runtime/cds/appcds/javaldr/LockDuringDump.java
 runtime/cds/appcds/jigsaw/JigsawOptionsCombo.java
 runtime/cds/appcds/jigsaw/PatchModule/AppClassInCP.java
+runtime/cds/appcds/jigsaw/PatchModule/SubClassOfPatchedClass.java
 runtime/cds/appcds/jigsaw/RedefineClassesInModuleGraph.java
 runtime/cds/appcds/jigsaw/classpathtests/BootAppendTests.java
 runtime/cds/appcds/jigsaw/classpathtests/ClassPathTests.java
@@ -354,6 +355,11 @@ runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java
 runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java
+runtime/cds/appcds/methodHandles/MethodHandlesCastFailureTest.java
+runtime/cds/appcds/methodHandles/MethodHandlesGeneralTest.java
+runtime/cds/appcds/methodHandles/MethodHandlesInvokersTest.java
+runtime/cds/appcds/methodHandles/MethodHandlesPermuteArgumentsTest.java
+runtime/cds/appcds/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/redefineClass/RedefineBasicTest.java
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java
 runtime/cds/appcds/sharedStrings/ExerciseGC.java
