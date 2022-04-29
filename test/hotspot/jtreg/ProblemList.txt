@@ -177,10 +177,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom
 
-# stratum mismatch, test running with the wrong class path
-vmTestbase/vm/mlvm/indy/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
-vmTestbase/vm/mlvm/meth/func/jdi/breakpointOtherStratum/Test.java            8276713 generic-all
-
 # obsolete test using Thread.stop
 runtime/Thread/StopAtExit.java                                               8283610 generic-all
 
