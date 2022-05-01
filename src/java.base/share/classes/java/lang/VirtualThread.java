@@ -596,10 +596,7 @@ final class VirtualThread extends Thread {
         // consume parking permit
         setParkPermit(false);
 
-        // commit event if enabled
-        if (pinnedEvent.isEnabled()) {
-            pinnedEvent.commit();
-        }
+        pinnedEvent.commit();
     }
 
     /**
