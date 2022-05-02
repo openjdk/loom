@@ -115,7 +115,6 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
   jclass cls;
   writable_watch_info watch;
   char *generic;
-  size_t i;
 
   eventsCount++;
   LOG(">>> retrieving access watch info ...\n");
@@ -171,7 +170,7 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
   LOG(">>>      field: \"%s:%s\"\n", watch.f_name, watch.f_sig);
   LOG(">>>     object: 0x%p\n", obj);
 
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
       if (watch.m_cls == NULL ||
           strcmp(watch.m_cls, watches[i].m_cls) != 0) {
@@ -299,7 +298,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 JNIEXPORT void JNICALL Java_fieldacc02_getReady(JNIEnv *jni, jclass clz) {
   jvmtiError err;
   jclass cls;
-  size_t i;
   jthread thread;
 
   LOG(">>> setting field access watches ...\n");
@@ -322,7 +320,7 @@ JNIEXPORT void JNICALL Java_fieldacc02_getReady(JNIEnv *jni, jclass clz) {
   eventsExpected = 0;
   isVirtualExpected = jni->IsVirtualThread(thread);
 
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
       watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);

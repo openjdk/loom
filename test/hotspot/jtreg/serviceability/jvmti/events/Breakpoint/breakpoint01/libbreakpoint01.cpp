@@ -59,24 +59,19 @@ static volatile int callbacksEnabled = NSK_TRUE;
 static jrawMonitorID agent_lock;
 
 static void initCounters() {
-  int i;
-
-  for (i = 0; i < METH_NUM; i++)
+  for (int i = 0; i < METH_NUM; i++) {
     bpEvents[i] = 0;
+  }
 }
 
 static void setBP(jvmtiEnv *jvmti, JNIEnv *jni, jclass klass) {
-  jmethodID mid;
-  jvmtiError err;
-  int i;
-
-  for (i = 0; i < METH_NUM; i++) {
-    mid = jni->GetMethodID(klass, METHODS[i][0], METHODS[i][1]);
+  for (int i = 0; i < METH_NUM; i++) {
+    jmethodID mid = jni->GetMethodID(klass, METHODS[i][0], METHODS[i][1]);
     if (mid == nullptr) {
       jni->FatalError("failed to get ID for the java method\n");
     }
 
-    err = jvmti->SetBreakpoint(mid, 0);
+    jvmtiError err = jvmti->SetBreakpoint(mid, 0);
     if (err != JVMTI_ERROR_NONE) {
       jni->FatalError("failed to set breakpoint\n");
     }
@@ -111,7 +106,6 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
   jvmtiThreadInfo thr_info;
   jvmtiError err;
   int checkStatus = PASSED;
-  int i;
 
   LOG(">>>> Breakpoint event received\n");
 
@@ -178,7 +172,7 @@ Breakpoint(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
     return;
   }
 
-  for (i = 0; i < METH_NUM; i++) {
+  for (int i = 0; i < METH_NUM; i++) {
     if (strcmp(methNam, METHODS[i][0]) == 0 &&
         strcmp(methSig, METHODS[i][1]) == 0) {
       LOG("CHECK PASSED: method name: \"%s\"\tsignature: \"%s\" %d\n", methNam, methSig, i);
@@ -222,9 +216,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 /************************/
 
 JNIEXPORT jint JNICALL Java_breakpoint01_check(JNIEnv *jni, jobject obj) {
-  int i;
-
-  for (i = 0; i < METH_NUM; i++) {
+  for (int i = 0; i < METH_NUM; i++) {
     if (bpEvents[i] != 1) {
       result = STATUS_FAILED;
       LOG(
