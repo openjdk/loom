@@ -102,7 +102,6 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   jfieldID *fields;
   jclass *interfaces;
   char *name, *sig, *generic;
-  int i;
 
   err = jvmti->GetClassSignature(cls, &inf.sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
@@ -152,7 +151,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   LOG(">>>   status: ");
   printStatus(inf.status);
   LOG(">>>   %d methods:", inf.mcount);
-  for (i = 0; i < inf.mcount; i++) {
+  for (int i = 0; i < inf.mcount; i++) {
     if (i > 0) LOG(",");
     if (methods[i] == NULL) {
       LOG(" null");
@@ -167,7 +166,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   }
   LOG("\n");
   LOG(">>>   %d fields:", inf.fcount);
-  for (i = 0; i < inf.fcount; i++) {
+  for (int i = 0; i < inf.fcount; i++) {
     if (i > 0) LOG(",");
     if (fields[i] == NULL) {
       LOG(" null");
@@ -183,7 +182,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   }
   LOG("\n");
   LOG(">>>   %d interfaces:", inf.icount);
-  for (i = 0; i < inf.icount; i++) {
+  for (int i = 0; i < inf.icount; i++) {
     if (i > 0) LOG(",");
     if (interfaces[i] == NULL) {
       LOG(" null");

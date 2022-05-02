@@ -69,7 +69,6 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     /* perform testing */
     {
         jvmtiError* results = NULL;
-        int i;
 
         LOG("Allocate threads array: %d threads\n", threadsCount);
       check_jvmti_status(jni, jvmti->Allocate((threadsCount * sizeof(jthread)),
@@ -94,7 +93,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Check threads results:\n");
-        for (i = 0; i < threadsCount; i++) {
+        for (int i = 0; i < threadsCount; i++) {
             LOG("  ... thread #%d: %s (%d)\n",
                                 i, TranslateError(results[i]), (int)results[i]);
           if (results[i] != JVMTI_ERROR_NONE) {
@@ -118,7 +117,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Check threads results:\n");
-        for (i = 0; i < threadsCount; i++) {
+        for (int i = 0; i < threadsCount; i++) {
             LOG("  ... thread #%d: %s (%d)\n",
                                 i, TranslateError(results[i]), (int)results[i]);
           if (results[i] != JVMTI_ERROR_NONE) {
@@ -151,7 +150,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
             return;
 
         LOG("Delete threads references\n");
-        for (i = 0; i < threadsCount; i++) {
+        for (int i = 0; i < threadsCount; i++) {
             if (threads[i] != NULL)
                 jni->DeleteGlobalRef(threads[i]);
         }
@@ -178,9 +177,8 @@ static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
 
     size_t len = strlen(name);
     int found = 0;
-    int i;
 
-    for (i = 0; i < foundCount; i++) {
+    for (int i = 0; i < foundCount; i++) {
         foundThreads[i] = NULL;
     }
 
@@ -188,7 +186,7 @@ static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
 
 
     found = 0;
-    for (i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         jvmtiThreadInfo info;
 
         check_jvmti_status(jni, jvmti->GetThreadInfo(threads[i], &info), "");
@@ -216,7 +214,7 @@ check_jvmti_status(jni, jvmti->Deallocate((unsigned char*)threads), "");
     }
 
     LOG("Make global references for threads: %d threads\n", foundCount);
-    for (i = 0; i < foundCount; i++) {
+    for (int i = 0; i < foundCount; i++) {
       foundThreads[i] = (jthread) jni->NewGlobalRef(foundThreads[i]);
       if ( foundThreads[i] == NULL) {
         set_agent_fail_status();
@@ -233,13 +231,11 @@ check_jvmti_status(jni, jvmti->Deallocate((unsigned char*)threads), "");
 /** THREAD_END callback. */
 JNIEXPORT void JNICALL
 callbackThreadEnd(jvmtiEnv* jvmti, JNIEnv* jni, jthread thread) {
-    int i = 0;
-
     jvmtiError e = jvmti->RawMonitorEnter(eventsReceivedMtx);
     check_jvmti_status(jni, e, "");
 
     /* check if event is for tested thread */
-    for (i = 0; i < threadsCount; i++) {
+    for (int i = 0; i < threadsCount; i++) {
         if (thread != NULL &&
                 jni->IsSameObject(threads[i], thread)) {
             LOG("  ... received THREAD_END event for thread #%d: %p\n",
@@ -289,7 +285,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   }
 
     eventsReceivedMtx = create_raw_monitor(jvmti, "eventsReceived");
-    // TODO set somhow
     threadsCount = 10;
 
     if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
