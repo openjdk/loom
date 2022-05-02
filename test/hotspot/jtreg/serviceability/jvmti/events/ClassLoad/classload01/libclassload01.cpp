@@ -80,7 +80,6 @@ static jvmtiEventCallbacks callbacks;
 static jrawMonitorID counter_lock;
 
 static void initCounters() {
-
   for (size_t i = 0; i < EXP_SIG_NUM; i++) {
     clsEvents[i] = 0;
   }
@@ -91,7 +90,6 @@ static void initCounters() {
 }
 
 static int findSig(char *sig, int expected) {
-
   for (unsigned int i = 0; i < ((expected == 1) ? EXP_SIG_NUM : UNEXP_SIG_NUM); i++) {
     if (sig != NULL &&
         strcmp(((expected == 1) ? expSigs[i] : unexpSigs[i]), sig) == 0) {
@@ -132,18 +130,14 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
     if (i != -1) {
       result = STATUS_FAILED;
       primClsEvents[i]++;
-      LOG(
-          "TEST FAILED: JVMTI_EVENT_CLASS_LOAD event received for\n"
-          "\t a primitive class/array of primitive types with the signature \"%s\"\n",
-          sig);
+      LOG("TEST FAILED: JVMTI_EVENT_CLASS_LOAD event received for\n"
+          "\t a primitive class/array of primitive types with the signature \"%s\"\n", sig);
     }
   }
 }
-/************************/
 
 JNIEXPORT jint JNICALL
 Java_classload01_check(JNIEnv *jni, jobject obj) {
-
   for (size_t i = 0; i < EXP_SIG_NUM; i++) {
     if (clsEvents[i] != 1) {
       result = STATUS_FAILED;
@@ -160,17 +154,6 @@ Java_classload01_check(JNIEnv *jni, jobject obj) {
   return result;
 }
 
-#ifdef STATIC_BUILD
-JNIEXPORT jint JNICALL Agent_OnLoad_classload01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNICALL Agent_OnAttach_classload01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNI_OnLoad_classload01(JavaVM *jvm, char *options, void *reserved) {
-    return JNI_VERSION_1_8;
-}
-#endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;

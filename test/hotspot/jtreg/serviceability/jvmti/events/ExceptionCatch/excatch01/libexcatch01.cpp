@@ -79,38 +79,33 @@ ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
     cls = jni->GetObjectClass(exception);
     err = jvmti->GetClassSignature(cls, &ex.name, &generic);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(GetClassSignature#e) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(GetClassSignature#e) unexpected error: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
     err = jvmti->GetMethodDeclaringClass(method, &cls);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(GetMethodDeclaringClass) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(GetMethodDeclaringClass) unexpected error: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
     err = jvmti->GetClassSignature(cls, &ex.c_cls, &generic);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(GetClassSignature#c) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(GetClassSignature#c) unexpected error: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
     err = jvmti->GetMethodName(method,
         &ex.c_name, &ex.c_sig, &generic);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(GetMethodName) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(GetMethodName) unexpected error: %s (%d)\n", TranslateError(err), err);
         result = STATUS_FAILED;
         return;
     }
     ex.c_loc = location;
     LOG(">>> %s\n", ex.name);
     LOG(">>>    catch at %s.%s%s:0x%x%08x\n",
-           ex.c_cls, ex.c_name, ex.c_sig,
-           (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
+           ex.c_cls, ex.c_name, ex.c_sig, (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
     LOG(">>> ... done\n");
 
     bool found = false;
@@ -135,23 +130,11 @@ ExceptionCatch(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
         LOG("Unexpected exception catch event:\n");
         LOG("  %s\n", ex.name);
         LOG("     catch at %s.%s%s:0x%x%08x\n",
-               ex.c_cls, ex.c_name, ex.c_sig,
-               (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
+               ex.c_cls, ex.c_name, ex.c_sig, (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
         result = STATUS_FAILED;
     }
 }
 
-#ifdef STATIC_BUILD
-JNIEXPORT jint JNICALL Agent_OnLoad_excatch01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNICALL Agent_OnAttach_excatch01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNI_OnLoad_excatch01(JavaVM *jvm, char *options, void *reserved) {
-    return JNI_VERSION_1_8;
-}
-#endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     jvmtiCapabilities caps;
     jvmtiError err;
@@ -170,15 +153,13 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 
     err = jvmti->AddCapabilities(&caps);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(AddCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(AddCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
         return JNI_ERR;
     }
 
     err = jvmti->GetCapabilities(&caps);
     if (err != JVMTI_ERROR_NONE) {
-        LOG("(GetCapabilities) unexpected error: %s (%d)\n",
-               TranslateError(err), err);
+        LOG("(GetCapabilities) unexpected error: %s (%d)\n", TranslateError(err), err);
         return JNI_ERR;
     }
 
@@ -186,8 +167,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
         callbacks.ExceptionCatch = &ExceptionCatch;
         err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
         if (err != JVMTI_ERROR_NONE) {
-            LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
-                   TranslateError(err), err);
+            LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
             return JNI_ERR;
         }
     } else {
@@ -250,23 +230,20 @@ Java_excatch01_check(JNIEnv *jni, jclass cls) {
 
   eventsCount = 0;
   isVirtualExpected = jni->IsVirtualThread(thread);
+  jni->CallStaticVoidMethod(clz, mid);
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_EXCEPTION_CATCH, NULL);
+  if (err != JVMTI_ERROR_NONE) {
+      LOG("Failed to disable JVMTI_EVENT_EXCEPTION_CATCH: %s (%d)\n",
+             TranslateError(err), err);
+      result = STATUS_FAILED;
+  }
 
-    jni->CallStaticVoidMethod(clz, mid);
-
-    err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
-            JVMTI_EVENT_EXCEPTION_CATCH, NULL);
-    if (err != JVMTI_ERROR_NONE) {
-        LOG("Failed to disable JVMTI_EVENT_EXCEPTION_CATCH: %s (%d)\n",
-               TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
-
-    if (eventsCount != eventsExpected) {
-        LOG("Wrong number of exception catch events: %d, expected: %d\n",
-            eventsCount, eventsExpected);
-        result = STATUS_FAILED;
-    }
-    return result;
+  if (eventsCount != eventsExpected) {
+      LOG("Wrong number of exception catch events: %d, expected: %d\n",
+          eventsCount, eventsExpected);
+      result = STATUS_FAILED;
+  }
+  return result;
 }
 
 

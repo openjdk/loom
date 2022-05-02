@@ -219,7 +219,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   monitor = create_raw_monitor(jvmti, "Monitor");
 
-
   /* add capability to generate compiled method events */
   memset(&caps, 0, sizeof(jvmtiCapabilities));
   caps.can_support_virtual_threads = 1;
@@ -264,7 +263,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  /* register agent proc and arg */
   if (set_agent_proc(agentProc, NULL) != NSK_TRUE) {
     return JNI_ERR;
   }
