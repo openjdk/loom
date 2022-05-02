@@ -158,7 +158,6 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
   jvmtiError err;
   jclass klass;
   char *sig, *generic, *methNam, *methSig;
-  int i;
 
   if (result == STATUS_FAILED) {
     return;
@@ -194,7 +193,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
       return;
     }
 
-    for (i = 0; i < METH_NUM; i++) {
+    for (int i = 0; i < METH_NUM; i++) {
       if ((strcmp(methNam, METHODS[i][0]) == 0) &&
           (strcmp(methSig, METHODS[i][1]) == 0) &&
           (strcmp(sig, CLASS_SIG) == 0)) {

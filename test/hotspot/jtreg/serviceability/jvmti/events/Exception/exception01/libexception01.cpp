@@ -82,7 +82,6 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
   writable_exceptionInfo ex;
   jclass cls;
   char *generic;
-  size_t i;
 
   LOG(">>> retrieving Exception info ...\n");
 
@@ -146,8 +145,8 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
          (jint)(ex.c_loc >> 32), (jint)ex.c_loc);
   LOG(">>> ... done\n");
 
-
-  for (i = 0; i < sizeof(exs)/sizeof(exceptionInfo); i++) {
+  bool found = false;
+  for (size_t i = 0; i < sizeof(exs)/sizeof(exceptionInfo); i++) {
     if (ex.name != NULL && strcmp(ex.name, exs[i].name) == 0
         && ex.t_cls != NULL && strcmp(ex.t_cls, exs[i].t_cls) == 0
         && ex.t_name != NULL && strcmp(ex.t_name, exs[i].t_name) == 0
@@ -163,10 +162,11 @@ Exception(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr,
       } else {
         eventsCount++;
       }
+      found = true;
       break;
     }
   }
-  if (i == sizeof(exs)/sizeof(exceptionInfo)) {
+  if (!found) {
     LOG("Unexpected exception event:\n");
     LOG("  %s\n", ex.name);
     LOG("    thrown at %s.%s%s:0x%x%08x\n",

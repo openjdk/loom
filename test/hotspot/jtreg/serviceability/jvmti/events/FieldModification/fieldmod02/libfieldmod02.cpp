@@ -180,7 +180,6 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
   jclass cls;
   writable_watch_info watch;
   char *generic;
-  size_t i;
 
   eventsCount++;
 
@@ -240,7 +239,7 @@ void JNICALL FieldModification(jvmtiEnv *jvmti, JNIEnv *jni,
   printValue(watch.val, watch.f_sig);
   LOG("\n");
 
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
       if (watch.m_cls == NULL ||
           strcmp(watch.m_cls, watches[i].m_cls) != 0) {
@@ -381,7 +380,6 @@ Java_fieldmod02_getReady(JNIEnv *jni, jclass clz) {
   jmethodID ctor;
   jintArray arr1, arr2;
   jobject obj1, obj2;
-  size_t i;
   jthread thread;
 
   err = jvmti->GetCurrentThread(&thread);
@@ -403,7 +401,7 @@ Java_fieldmod02_getReady(JNIEnv *jni, jclass clz) {
     result = STATUS_FAILED;
     return;
   }
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
       watches[i].fid = jni->GetStaticFieldID(
           cls, watches[i].f_name, watches[i].f_sig);

@@ -80,21 +80,19 @@ static jvmtiEventCallbacks callbacks;
 static jrawMonitorID counter_lock;
 
 static void initCounters() {
-  size_t i;
 
-  for (i = 0; i < EXP_SIG_NUM; i++) {
+  for (size_t i = 0; i < EXP_SIG_NUM; i++) {
     clsEvents[i] = 0;
   }
 
-  for (i = 0; i < UNEXP_SIG_NUM; i++) {
+  for (size_t i = 0; i < UNEXP_SIG_NUM; i++) {
     primClsEvents[i] = 0;
   }
 }
 
 static int findSig(char *sig, int expected) {
-  unsigned int i;
 
-  for (i = 0; i < ((expected == 1) ? EXP_SIG_NUM : UNEXP_SIG_NUM); i++) {
+  for (unsigned int i = 0; i < ((expected == 1) ? EXP_SIG_NUM : UNEXP_SIG_NUM); i++) {
     if (sig != NULL &&
         strcmp(((expected == 1) ? expSigs[i] : unexpSigs[i]), sig) == 0) {
       return i; /* the signature found, return index */
@@ -106,7 +104,6 @@ static int findSig(char *sig, int expected) {
 /** callback functions **/
 void JNICALL
 ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
-  int i = 0;
   char *sig, *generic;
   jvmtiError err;
 
@@ -119,7 +116,7 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
     return;
   }
 
-  i = findSig(sig, 1);
+  int i = findSig(sig, 1);
   if (i != -1) {
     jboolean is_virtual_thread = jni->IsVirtualThread(thread);
     print_thread_info(jvmti, jni, thread);
@@ -146,9 +143,8 @@ ClassLoad(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jclass klass) {
 
 JNIEXPORT jint JNICALL
 Java_classload01_check(JNIEnv *jni, jobject obj) {
-  size_t i;
 
-  for (i = 0; i < EXP_SIG_NUM; i++) {
+  for (size_t i = 0; i < EXP_SIG_NUM; i++) {
     if (clsEvents[i] != 1) {
       result = STATUS_FAILED;
       LOG("TEST FAILED: wrong number of JVMTI_EVENT_CLASS_LOAD events for \"%s\":\n\tgot: %d\texpected: 1\n",
@@ -156,7 +152,7 @@ Java_classload01_check(JNIEnv *jni, jobject obj) {
     }
   }
 
-  for (i = 0; i < UNEXP_SIG_NUM; i++) {
+  for (size_t i = 0; i < UNEXP_SIG_NUM; i++) {
     if (primClsEvents[i] != 0) {
       LOG("TEST FAILED: there are JVMTI_EVENT_CLASS_LOAD events for the primitive classes\n");
     }
@@ -203,7 +199,6 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
     LOG("ERROR: virtual thread support is not implemented.\n");
     return JNI_ERR;
   }
-
 
   initCounters();
 

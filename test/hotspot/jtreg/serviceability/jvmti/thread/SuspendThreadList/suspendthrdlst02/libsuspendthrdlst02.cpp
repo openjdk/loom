@@ -71,7 +71,6 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
     /* perform testing */
     {
         jvmtiError* results = NULL;
-        int i;
 
         LOG("Allocate threads array: %d threads\n", threadsCount);
         check_jvmti_status(jni, jvmti->Allocate((threadsCount * sizeof(jthread)),
@@ -97,7 +96,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Check threads results:\n");
-        for (i = 0; i < threadsCount; i++) {
+        for (int i = 0; i < threadsCount; i++) {
             LOG("  ... thread #%d: %s (%d)\n",
                                 i, TranslateError(results[i]), (int)results[i]);
             if (results[i] != JVMTI_ERROR_NONE) {
@@ -143,7 +142,7 @@ agentProc(jvmtiEnv* jvmti, JNIEnv* jni, void* arg) {
         }
 
         LOG("Delete threads references\n");
-        for (i = 0; i < threadsCount; i++) {
+        for (int i = 0; i < threadsCount; i++) {
             if (threads[i] != NULL) {
               jni->DeleteGlobalRef(threads[i]);
             }
@@ -169,19 +168,17 @@ static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
                             const char name[], int foundCount, jthread foundThreads[]) {
     jint count = 0;
     jthread* threads = NULL;
-
     size_t len = strlen(name);
     int found = 0;
-    int i;
 
-    for (i = 0; i < foundCount; i++) {
+    for (int i = 0; i < foundCount; i++) {
         foundThreads[i] = NULL;
     }
 
     check_jvmti_status(jni, jvmti->GetAllThreads(&count, &threads), "");
 
     found = 0;
-    for (i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         jvmtiThreadInfo info;
 
         check_jvmti_status(jni, jvmti->GetThreadInfo(threads[i], &info), "");
@@ -209,7 +206,7 @@ static int find_threads_by_name(jvmtiEnv* jvmti, JNIEnv* jni,
     }
 
     LOG("Make global references for threads: %d threads\n", foundCount);
-    for (i = 0; i < foundCount; i++) {
+    for (int i = 0; i < foundCount; i++) {
         foundThreads[i] = (jthread) jni->NewGlobalRef(foundThreads[i]);
         if (foundThreads[i] == NULL) {
             set_agent_fail_status();

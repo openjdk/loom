@@ -80,7 +80,6 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
   jclass cls;
   writable_watch_info watch;
   char *generic;
-  size_t i;
 
   eventsCount++;
 
@@ -138,7 +137,7 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
   LOG(">>>     object: 0x%p\n", obj);
   LOG(">>> ... done\n");
 
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
       if (watch.m_cls == NULL ||
           strcmp(watch.m_cls, watches[i].m_cls) != 0) {
@@ -267,7 +266,6 @@ JNIEXPORT void JNICALL
 Java_fieldacc04_getReady(JNIEnv *jni, jclass klass) {
   jvmtiError err;
   jclass cls;
-  size_t i;
   jthread thread;
 
   LOG(">>> setting field access watches ...\n");
@@ -283,7 +281,7 @@ Java_fieldacc04_getReady(JNIEnv *jni, jclass klass) {
   eventsExpected = 0;
   isVirtualExpected = jni->IsVirtualThread(thread);
 
-  for (i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
+  for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     cls = jni->FindClass(watches[i].f_cls);
     if (cls == NULL) {
       LOG("Cannot find %s class!\n", watches[i].f_cls);
