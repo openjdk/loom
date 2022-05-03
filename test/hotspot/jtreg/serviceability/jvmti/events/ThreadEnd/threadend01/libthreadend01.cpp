@@ -105,8 +105,7 @@ Java_threadend01_getReady(JNIEnv *jni, jclass cls, jint i, jstring name) {
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected = i;
   } else {
-    LOG("Failed to enable JVMTI_EVENT_THREAD_END: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to enable JVMTI_EVENT_THREAD_END: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }

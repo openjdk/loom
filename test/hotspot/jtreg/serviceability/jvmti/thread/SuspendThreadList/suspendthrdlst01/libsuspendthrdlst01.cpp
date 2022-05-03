@@ -84,8 +84,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
     LOG("Check threads results:\n");
     for (int i = 0; i < threads_count; i++) {
-      LOG("  ... thread #%d: %s (%d)\n",
-                   i, TranslateError(results[i]), (int) results[i]);
+      LOG("  ... thread #%d: %s (%d)\n", i, TranslateError(results[i]), (int) results[i]);
       if (results[i] != JVMTI_ERROR_NONE) {
         set_agent_fail_status();
       }

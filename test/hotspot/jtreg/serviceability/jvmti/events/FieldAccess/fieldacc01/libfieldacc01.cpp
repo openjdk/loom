@@ -163,19 +163,16 @@ void JNICALL FieldAccess(jvmtiEnv *jvmti, JNIEnv *jni,
 
   for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watch.fid == watches[i].fid) {
-      if (watch.m_cls == NULL ||
-          strcmp(watch.m_cls, watches[i].m_cls) != 0) {
+      if (watch.m_cls == NULL || strcmp(watch.m_cls, watches[i].m_cls) != 0) {
         LOG("(watch#%" PRIuPTR ") wrong class: \"%s\", expected: \"%s\"\n", i, watch.m_cls, watches[i].m_cls);
         result = STATUS_FAILED;
       }
-      if (watch.m_name == NULL ||
-          strcmp(watch.m_name, watches[i].m_name) != 0) {
+      if (watch.m_name == NULL || strcmp(watch.m_name, watches[i].m_name) != 0) {
         LOG("(watch#%" PRIuPTR ") wrong method name: \"%s\"", i, watch.m_name);
         LOG(", expected: \"%s\"\n", watches[i].m_name);
         result = STATUS_FAILED;
       }
-      if (watch.m_sig == NULL ||
-          strcmp(watch.m_sig, watches[i].m_sig) != 0) {
+      if (watch.m_sig == NULL || strcmp(watch.m_sig, watches[i].m_sig) != 0) {
         LOG("(watch#%" PRIuPTR ") wrong method sig: \"%s\"", i, watch.m_sig);
         LOG(", expected: \"%s\"\n", watches[i].m_sig);
         result = STATUS_FAILED;

@@ -346,8 +346,7 @@ Java_fieldacc02_check(JNIEnv *jni, jclass clz, jobject obj) {
   LOG(">>> ... done\n");
 
   if (eventsCount != eventsExpected) {
-    LOG("Wrong number of field access events: %d, expected: %d\n",
-           eventsCount, eventsExpected);
+    LOG("Wrong number of field access events: %d, expected: %d\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
 
@@ -356,8 +355,7 @@ Java_fieldacc02_check(JNIEnv *jni, jclass clz, jobject obj) {
     if (err == JVMTI_ERROR_NONE) {
       eventsExpected++;
     } else {
-      LOG("(ClearFieldAccessWatch#%" PRIuPTR ") unexpected error: %s (%d)\n",
-             i, TranslateError(err), err);
+      LOG("(ClearFieldAccessWatch#%" PRIuPTR ") unexpected error: %s (%d)\n", i, TranslateError(err), err);
       result = STATUS_FAILED;
     }
   }

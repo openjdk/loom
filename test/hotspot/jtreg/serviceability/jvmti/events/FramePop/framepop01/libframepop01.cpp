@@ -218,14 +218,12 @@ Java_framepop01_check(JNIEnv *jni, jclass cls) {
     LOG("Failed to SetBreakpoint: %s (%d)\n", TranslateError(err), err);
     return STATUS_FAILED;
   }
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_FRAME_POP, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FRAME_POP, NULL);
   if (err != JVMTI_ERROR_NONE) {
     LOG("Failed to enable JVMTI_EVENT_FRAME_POP event: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_BREAKPOINT, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_BREAKPOINT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     LOG("Failed to enable BREAKPOINT event: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;

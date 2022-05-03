@@ -274,8 +274,7 @@ Java_fieldacc04_getReady(JNIEnv *jni, jclass klass) {
 JNIEXPORT jint JNICALL
 Java_fieldacc04_check(JNIEnv *jni, jclass clz) {
   if (eventsCount != eventsExpected) {
-    LOG("Wrong number of field access events: %d, expected: %d\n",
-           eventsCount, eventsExpected);
+    LOG("Wrong number of field access events: %d, expected: %d\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
