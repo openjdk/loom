@@ -243,8 +243,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
       return JNI_ERR;
     }
 
-    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                          JVMTI_EVENT_FIELD_ACCESS, NULL);
+    err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_FIELD_ACCESS, NULL);
     if (err != JVMTI_ERROR_NONE) {
       LOG("Failed to enable JVMTI_EVENT_FIELD_ACCESS: %s (%d)\n",
              TranslateError(err), err);
@@ -284,11 +283,9 @@ JNIEXPORT void JNICALL Java_fieldacc02_getReady(JNIEnv *jni, jclass clz) {
 
   for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = jni->GetStaticFieldID(
-          cls, watches[i].f_name, watches[i].f_sig);
+      watches[i].fid = jni->GetStaticFieldID(cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = jni->GetFieldID(
-          cls, watches[i].f_name, watches[i].f_sig);
+      watches[i].fid = jni->GetFieldID(cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
       LOG("Cannot find field \"%s\"!\n", watches[i].f_name);

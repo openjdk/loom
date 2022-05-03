@@ -109,7 +109,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
   eventsCount = 0;
 
   /* resume debugee to catch MonitorContendedEnter event */
-  if (!((agent_resume_sync() == NSK_TRUE) && (agent_wait_for_sync(timeout) ==NSK_TRUE))) {
+  if (!((agent_resume_sync() == NSK_TRUE) && (agent_wait_for_sync(timeout) == NSK_TRUE))) {
     return;
   }
   LOG("Number of MonitorContendedEnter events: %d\n", eventsCount);

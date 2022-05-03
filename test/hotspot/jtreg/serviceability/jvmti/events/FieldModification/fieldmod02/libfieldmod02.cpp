@@ -363,15 +363,12 @@ Java_fieldmod02_getReady(JNIEnv *jni, jclass clz) {
   }
   for (size_t i = 0; i < sizeof(watches)/sizeof(watch_info); i++) {
     if (watches[i].is_static == JNI_TRUE) {
-      watches[i].fid = jni->GetStaticFieldID(
-          cls, watches[i].f_name, watches[i].f_sig);
+      watches[i].fid = jni->GetStaticFieldID(cls, watches[i].f_name, watches[i].f_sig);
     } else {
-      watches[i].fid = jni->GetFieldID(
-          cls, watches[i].f_name, watches[i].f_sig);
+      watches[i].fid = jni->GetFieldID(cls, watches[i].f_name, watches[i].f_sig);
     }
     if (watches[i].fid == NULL) {
-      LOG("Cannot get field ID for \"%s:%s\"\n",
-             watches[i].f_name, watches[i].f_sig);
+      LOG("Cannot get field ID for \"%s:%s\"\n", watches[i].f_name, watches[i].f_sig);
       result = STATUS_FAILED;
       return;
     }

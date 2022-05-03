@@ -93,7 +93,7 @@ NativeMethodBind(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method,
 
   if ((strcmp(methNam, METHOD[0]) == 0) && (strcmp(methSig, METHOD[1]) == 0)) {
     LOG("\tmethod: \"%s %s\"\nRedirecting the method address from 0x%p to 0x%p ...\n",
-                 methNam, methSig, addr, (void *) redirNativeMethod);
+        methNam, methSig, addr, (void *) redirNativeMethod);
     *new_addr = (void *) redirNativeMethod;
   }
 
@@ -125,7 +125,7 @@ Java_nativemethbind04_check(JNIEnv *jni, jobject obj) {
   } else {
     result = STATUS_FAILED;
     COMPLAIN("TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
-        "\t%d calls\texpected: 0\n\n", origCalls);
+             "\t%d calls\texpected: 0\n\n", origCalls);
   }
 
   if (redirCalls == 1) {
@@ -134,7 +134,7 @@ Java_nativemethbind04_check(JNIEnv *jni, jobject obj) {
   } else {
     result = STATUS_FAILED;
     COMPLAIN("TEST FAILED: nativeMethod() has not been redirected by the NativeMethodBind:\n"
-        "\t%d calls of redirected method\texpected: 1\n\n", redirCalls);
+             "\t%d calls of redirected method\texpected: 1\n\n", redirCalls);
   }
 
   return result;

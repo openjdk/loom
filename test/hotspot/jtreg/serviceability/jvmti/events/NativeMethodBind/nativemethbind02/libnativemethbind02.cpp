@@ -94,7 +94,7 @@ VMDeath(jvmtiEnv *jvmti, JNIEnv *jni) {
 
   if (wrongBindEv != 0) {
     COMPLAIN("TEST FAILED: there are %d NativeMethodBind events\n"
-        "sent during non-start or non-live phase of the VM execution\n", wrongBindEv);
+             "sent during non-start or non-live phase of the VM execution\n", wrongBindEv);
   }
 
   if (result == STATUS_FAILED) {

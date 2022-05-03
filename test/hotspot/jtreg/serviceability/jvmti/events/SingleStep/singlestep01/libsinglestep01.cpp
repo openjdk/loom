@@ -187,8 +187,7 @@ SingleStep(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread, jmethodID method, jloca
         result = STATUS_FAILED;
       } else {
         stepEv[1]++;
-        LOG(
-            "CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
+        LOG("CHECK PASSED: SingleStep event received for the method \"%s\" as expected\n"
             "\tdisabling the event generation\n", methNam);
       }
       err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);

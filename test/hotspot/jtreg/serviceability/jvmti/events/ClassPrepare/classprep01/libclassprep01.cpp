@@ -155,7 +155,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s%s\"", name, sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetMethodName: %s (%d)> ", TranslateError(err), err);
       }
     }
   }
@@ -170,7 +170,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s, %s\"", name, sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetFieldName: %s (%d)> ", TranslateError(err), err);
       }
     }
   }
@@ -185,7 +185,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s\"", sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetClassSignature: %s (%d)> ", TranslateError(err), err);
       }
     }
   }

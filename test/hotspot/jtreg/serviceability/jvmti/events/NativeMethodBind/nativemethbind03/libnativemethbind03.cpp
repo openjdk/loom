@@ -137,7 +137,7 @@ Java_nativemethbind03_registerNative(JNIEnv *jni, jobject obj) {
   JNINativeMethod meth;
 
   LOG("Inside the registerNative()\n"
-               "Finding class \"%s\" ...\n", CLASS_SIG);
+      "Finding class \"%s\" ...\n", CLASS_SIG);
   testedCls = jni->FindClass(CLASS_SIG);
   if (testedCls == NULL) {
     result = STATUS_FAILED;
@@ -154,14 +154,14 @@ Java_nativemethbind03_registerNative(JNIEnv *jni, jobject obj) {
   if (jni->RegisterNatives(testedCls, &meth, 1) != 0) {
     result = STATUS_FAILED;
     COMPLAIN("TEST FAILURE: unable to RegisterNatives() \"%s %s\" for class \"%s\"\n\n",
-                  METHODS[0], METHODS[1], CLASS_SIG);
+             METHODS[0], METHODS[1], CLASS_SIG);
   }
 
   LOG("Calling UnregisterNatives() for class \"%s\" ...\n", CLASS_SIG);
   if (jni->UnregisterNatives(testedCls) != 0) {
     result = STATUS_FAILED;
     COMPLAIN("TEST FAILURE: unable to UnregisterNatives() \"%c %c\" for class \"%s\"\n\n",
-                  METHODS[1][0], METHODS[1][1], CLASS_SIG);
+             METHODS[1][0], METHODS[1][1], CLASS_SIG);
   }
 }
 

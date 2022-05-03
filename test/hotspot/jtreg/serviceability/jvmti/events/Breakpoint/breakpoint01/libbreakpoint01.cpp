@@ -215,7 +215,7 @@ JNIEXPORT jint JNICALL Java_breakpoint01_check(JNIEnv *jni, jobject obj) {
           METHODS[i][0], METHODS[i][1], bpEvents[i]);
     } else {
       LOG("CHECK PASSED: %d Breakpoint event(s) for the method \"%s %s\" as expected\n",
-             bpEvents[i], METHODS[i][0], METHODS[i][1]);
+          bpEvents[i], METHODS[i][0], METHODS[i][1]);
     }
   }
 
