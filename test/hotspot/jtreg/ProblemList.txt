@@ -172,9 +172,6 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 # Loom
 
-# obsolete test using Thread.stop
-runtime/Thread/StopAtExit.java                                               8283610 generic-all
-
 #### fibers branch only failures
 
 serviceability/jvmti/Heap/IterateHeapWithEscapeAnalysisEnabled.java          8264699 generic-all
