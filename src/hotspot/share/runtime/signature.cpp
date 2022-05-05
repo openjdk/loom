@@ -116,7 +116,6 @@ ReferenceArgumentCount::ReferenceArgumentCount(Symbol* signature)
   do_parameters_on(this);  // non-virtual template execution
 }
 
-#ifdef ASSERT
 static int compute_num_stack_arg_slots(Symbol* signature, int sizeargs, bool is_static) {
   ResourceMark rm;
   BasicType* sig_bt = NEW_RESOURCE_ARRAY(BasicType, sizeargs);
@@ -138,7 +137,6 @@ static int compute_num_stack_arg_slots(Symbol* signature, int sizeargs, bool is_
 
   return SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
 }
-#endif
 
 void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   // See if we fingerprinted this method already
@@ -177,10 +175,15 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
     _param_size += 1;  // this is the convention for Method::compute_size_of_parameters
   }
 
+#if (defined(AMD64) || defined(AARCH64)) && !defined(ZERO)
   _stack_arg_slots = align_up(_stack_arg_slots, 2);
+
 #ifdef ASSERT
   int dbg_stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
   assert(_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
+#endif
+#else
+  _stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
 #endif
 
   // Detect overflow.  (We counted _param_size correctly.)
