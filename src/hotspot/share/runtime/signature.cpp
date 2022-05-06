@@ -181,7 +181,7 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
 
 #ifdef ASSERT
   int dbg_stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
-#ifndef ZERO
+#if !defined(ZERO) && !defined(ARM32)
   assert(_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
 #endif
 #endif
@@ -219,7 +219,7 @@ void Fingerprinter::initialize_calling_convention(bool static_flag) {
 }
 
 void Fingerprinter::do_type_calling_convention(BasicType type) {
-#if !defined(ZERO)
+#if !defined(ZERO) && !defined(ARM32) // fix arm32
   switch (type) {
   case T_VOID:
     break;
@@ -250,7 +250,7 @@ void Fingerprinter::do_type_calling_convention(BasicType type) {
     ShouldNotReachHere();
     break;
   }
-#else // ZERO
+#else
   if (type != T_VOID) {
     _stack_arg_slots += 2;
   }
