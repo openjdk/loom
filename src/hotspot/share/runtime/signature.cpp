@@ -181,7 +181,7 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
 
 #ifdef ASSERT
   int dbg_stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
-#if !defined(ZERO) && !defined(ARM32)
+#if (defined(AMD64) || defined(AARCH64)) && !defined(ZERO)
   assert(_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
 #endif
 #endif
