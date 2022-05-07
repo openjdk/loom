@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "runtime/arguments.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/continuationEntry.inline.hpp"
 #include "runtime/continuationHelper.inline.hpp"

@@ -836,13 +836,6 @@ class VirtualMachineImpl extends MirrorImpl
         return versionInfo().jdwpMajor >= 19;
     }
 
-    @Override
-    public boolean supportsVirtualThreads() {
-        validateVM();
-        return hasNewCapabilities() &&
-                capabilitiesNew().supportsVirtualThreads;
-    }
-
     public void setDebugTraceMode(int traceFlags) {
         validateVM();
         this.traceFlags = traceFlags;

@@ -792,22 +792,6 @@ public interface VirtualMachine extends Mirror {
     }
 
     /**
-     * Determine if the target VM supports virtual threads.
-     *
-     * @return {@code true} if the feature is supported, {@code false} otherwise
-     *
-     * @apiNote
-     * This is a temporary method to test the capability of the target VM. It
-     * is not intended for the main-line.
-     *
-     * @implSpec
-     * The default implementation returns {@code false}.
-     */
-    default boolean supportsVirtualThreads() {
-        return false;
-    }
-
-    /**
      * Set this VM's default stratum (see {@link Location} for a
      * discussion of strata).  Overrides the per-class default set
      * in the class file.
