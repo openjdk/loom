@@ -45,8 +45,6 @@ serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8278053 
 
 #### fibers branch only failures
 
-runtime/cds/appcds/TestParallelGCWithCDS.java                           8284319 generic-all
-
 gc/g1/mixedgc/TestOldGenCollectionUsage.java                            8284404 generic-all
 gc/whitebox/TestConcMarkCycleWB.java                                    8284404 generic-all
 
