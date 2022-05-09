@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2020, 2021, Red Hat Inc.
+ * Copyright (c) 2020, 2022, Red Hat Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -54,10 +54,9 @@ import sun.security.action.GetPropertyAction;
  * uses the {@link #get()} method to get the value of the extent local. The extent local reverts
  * to being unbound (or its previous value) when the operation completes.
  *
- * <p> Access to the value of an extent local is controlled by the accessibility
- * of the {@code ExtentLocal} object. A {@code ExtentLocal} object  will typically be declared
- * in a private static field so that it can only be accessed by code in that class
- * (or other classes within its nest).
+ * <p> An {@code ExtentLocal} object will typically be declared in a
+ * private static field so that it can only be accessed by code in
+ * that class.
  *
  * <p> Extent locals support nested bindings. If an extent local has a value
  * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
@@ -112,6 +111,12 @@ public final class ExtentLocal<T> {
 
     private final @Stable int hash;
 
+    /**
+     * Returns a hashcode for this {@link ExtentLocal}.
+     *
+     * @return a hashcode for this {@link ExtentLocal}.
+     */
+    @Override
     public final int hashCode() { return hash; }
 
     /**
@@ -171,9 +176,9 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * An immutable map from a set of ExtentLocals to their bound values.
-     * When map() or call() is invoked, the ExtentLocals bound in this set
-     * are bound, such that calling the get() method returns the associated
+     * An immutable map from extent-local variables to values.
+     * When {@link Carrier#run} or {@link Carrier#call} is invoked, the extent-local variable mappings in this set
+     * are bound in the current thread, such that calling the {@link ExtentLocal#get} method returns the associated
      * value.
      * @since 19
      */
@@ -205,12 +210,15 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Return a new map, which consists of the contents of this map plus a
-         * new binding of key and value.
+         * Return a new {@link Carrier}, which consists of the contents of this
+         * {@link Carrier} plus a new mapping from key to value. If
+         * this carrier already a mapping for the extent-local variable {@code key}, the new value
+         * added by this method overrides the previous one. That is to say, if there is a
+         * list of {@code where(...)} clauses, the rightmost clause wins.
          * @param key   The ExtentLocal to bind a value to
          * @param value The new value
          * @param <T>   The type of the ExtentLocal
-         * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
+         * @return A new map, consisting of {@code this} plus a new binding. {@code this} is unchanged.
          */
         public final <T> Carrier where(ExtentLocal<T> key, T value) {
             return where(key, value, this);
@@ -232,7 +240,7 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Search for the value of a binding in this set
+         * Searches for the value of a binding in this {@link Carrier}
          * @param key the ExtentLocal to find
          * @param <T> the type of the ExtentLocal
          * @return the value
@@ -254,21 +262,22 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with some ExtentLocals bound to values.
-         * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the extent local. The extent locals revert to their previous values or
-         * become {@linkplain #isBound() unbound} when the operation completes.
+         * Runs a value-returning operation with some extent-local variables bound to
+         * values.  Code invoked by {@code op} can use the {@link #get()} method to get
+         * the value of the extent local. The extent-local variables revert to their
+         * previous values or become {@linkplain #isBound() unbound} when the operation
+         * completes.
          *
-         * <p> Extent locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link StructuredTaskScope}
-         * but does not close them, then exiting the operation causes the underlying construct
-         * of each executor to be closed (in the reverse order that they were created in), and
-         * {@link StructureViolationException} to be thrown.
+         * <p> Extent-local variables are intended to be used in a <em>structured
+         * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
+         * not close them, then exiting {@code op} causes the underlying construct of each
+         * {@link StructuredTaskScope} to be closed (in the reverse order that they were
+         * created in), and {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run
          * @param <R>   the type of the result of the function
          * @return the result
-         * @throws Exception if the operation completes with an exception
+         * @throws Exception if {@code op} completes with an exception
          */
         public final <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
@@ -286,9 +295,9 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with this set of ExtentLocals bound to values,
+         * Runs a value-returning operation with this set of ExtentLocals bound to values,
          * in the same way as {@code call()}.<p>
-         *     If the operation throws an exception, pass it as a single argument to the {@link Function}
+         *     If {@code op} throws an exception, pass it as a single argument to the {@link Function}
          *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
          * </p>
          * @param op    the operation to run
@@ -308,13 +317,13 @@ public final class ExtentLocal<T> {
         /**
          * Runs an operation with some ExtentLocals bound to our values.
          * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the extent local. The extent locals revert to their previous values or
+         * get the value of the extent local. The extent-local variables revert to their previous values or
          * becomes {@linkplain #isBound() unbound} when the operation completes.
          *
-         * <p> Extent locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link StructuredTaskScope}s
-         * but does not close them, then exiting the operation causes the underlying construct
-         * of each executor to be closed (in the reverse order that they were created in), and
+         * <p> Extent-local variables are intended to be used in a <em>structured manner</em>. If the
+         * operation creates any {@link StructuredTaskScope}s
+         * but does not close them, then exiting {@code op} causes the underlying construct
+         * of each {@link StructuredTaskScope} to be closed (in the reverse order that they were created in), and
          * {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run
@@ -406,7 +415,7 @@ public final class ExtentLocal<T> {
      * Creates an extent-local handle to refer to a value of type T.
      *
      * @param <T> the type of the extent local's value.
-     * @return a extent-local handle
+     * @return an extent-local handle
      */
     public static <T> ExtentLocal<T> newInstance() {
         return new ExtentLocal<T>();
@@ -474,7 +483,7 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the extent local if bound, otherwise returns {@code other}.
+     * Returns the value of the extent local if bound, otherwise returns {@code other}.
      * @param other the value to return if not bound, can be {@code null}
      * @return the value of the extent local if bound, otherwise {@code other}
      */
@@ -490,7 +499,7 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the extent local if bound, otherwise throw an exception
+     * Returns the value of the extent local if bound, otherwise throws an exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces an
