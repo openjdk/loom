@@ -124,6 +124,13 @@ bool EscapeBarrier::deoptimize_objects_all_threads() {
       // These frames are about to be removed. We must not interfere with that and signal failure.
       return false;
     }
+
+    // Skip virtual threads just in the case if they were compiled before EA is disabled
+    // because of jvmti env changes
+    if (jt->vthread() != NULL) {
+      continue;
+    }
+
     if (jt->has_last_Java_frame()) {
       KeepStackGCProcessedMark ksgcpm(jt);
       RegisterMap reg_map(jt, false /* update_map */, false /* process_frames */);
