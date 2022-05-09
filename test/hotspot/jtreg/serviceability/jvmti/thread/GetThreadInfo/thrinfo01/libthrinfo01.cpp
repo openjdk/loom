@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -63,8 +63,8 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   return JNI_OK;
 }
 
-JNIEXPORT jboolean JNICALL Java_thrinfo01_checkInfo0(JNIEnv *jni, jclass cls,
-                                                     jthread thread, jthreadGroup thread_group, jint expected_idx) {
+JNIEXPORT jboolean JNICALL
+Java_thrinfo01_checkInfo0(JNIEnv *jni, jclass cls, jthread thread, jthreadGroup thread_group, jint expected_idx) {
   jboolean result = JNI_TRUE;
   jvmtiThreadInfo inf;
 

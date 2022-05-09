@@ -448,14 +448,15 @@ final class VirtualThread extends Thread {
             throw new IllegalThreadStateException("Already started");
         }
 
+        // bind thread to container
+        setThreadContainer(container);
+
+        // start thread
         boolean started = false;
         container.onStart(this); // may throw
         try {
-            // scope locals may be inherited
-            inheritScopeLocalBindings(container);
-
-            // bind thread to container
-            setThreadContainer(container);
+            // extent locals may be inherited
+            inheritExtentLocalBindings(container);
 
             // submit task to run thread
             submitRunContinuation();
@@ -595,10 +596,7 @@ final class VirtualThread extends Thread {
         // consume parking permit
         setParkPermit(false);
 
-        // commit event if enabled
-        if (pinnedEvent.isEnabled()) {
-            pinnedEvent.commit();
-        }
+        pinnedEvent.commit();
     }
 
     /**
@@ -821,6 +819,12 @@ final class VirtualThread extends Thread {
             case NEW:
                 return Thread.State.NEW;
             case STARTED:
+                // return NEW if thread container not yet set
+                if (threadContainer() == null) {
+                    return Thread.State.NEW;
+                } else {
+                    return Thread.State.RUNNABLE;
+                }
             case RUNNABLE:
             case RUNNABLE_SUSPENDED:
                 // runnable, not mounted
@@ -848,6 +852,17 @@ final class VirtualThread extends Thread {
             default:
                 throw new InternalError();
         }
+    }
+
+    @Override
+    boolean alive() {
+        int s = state;
+        return (s != NEW && s != TERMINATED);
+    }
+
+    @Override
+    boolean isTerminated() {
+        return (state == TERMINATED);
     }
 
     @Override
@@ -1013,9 +1028,6 @@ final class VirtualThread extends Thread {
     private static native void registerNatives();
     static {
         registerNatives();
-
-        // ensure that classes required to produce the Thread.State are initialized
-        var ignore = Thread.currentThread().threadState();
     }
 
     /**

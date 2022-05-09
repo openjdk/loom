@@ -58,6 +58,13 @@ class JavaThread;
 
 class Continuation : AllStatic {
 public:
+
+  enum thaw_kind {
+    thaw_top = 0,
+    thaw_return_barrier = 1,
+    thaw_exception = 2,
+  };
+
   static void init();
 
   static address freeze_entry();
@@ -101,7 +108,7 @@ public:
   static bool pin(JavaThread* current);
   static bool unpin(JavaThread* current);
 
-  static bool fix_continuation_bottom_sender(JavaThread* thread, const frame& callee, address* sender_pc, intptr_t** sender_sp);
+  static frame continuation_bottom_sender(JavaThread* thread, const frame& callee, intptr_t* sender_sp);
   static address get_top_return_pc_post_barrier(JavaThread* thread, address pc);
   static void set_cont_fastpath_thread_state(JavaThread* thread);
   static void notify_deopt(JavaThread* thread, intptr_t* sp);

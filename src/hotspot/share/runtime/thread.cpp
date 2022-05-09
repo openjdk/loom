@@ -789,7 +789,7 @@ void JavaThread::set_threadOopHandles(oop p) {
   _threadObj   = OopHandle(_thread_oop_storage, p);
   _vthread     = OopHandle(_thread_oop_storage, p);
   _jvmti_vthread = OopHandle(_thread_oop_storage, NULL);
-  _scopeLocalCache = OopHandle(_thread_oop_storage, NULL);
+  _extentLocalCache = OopHandle(_thread_oop_storage, NULL);
 }
 
 oop JavaThread::threadObj() const {
@@ -814,13 +814,13 @@ void JavaThread::set_jvmti_vthread(oop p) {
   _jvmti_vthread.replace(p);
 }
 
-oop JavaThread::scopeLocalCache() const {
-  return _scopeLocalCache.resolve();
+oop JavaThread::extentLocalCache() const {
+  return _extentLocalCache.resolve();
 }
 
-void JavaThread::set_scopeLocalCache(oop p) {
+void JavaThread::set_extentLocalCache(oop p) {
   assert(_thread_oop_storage != NULL, "not yet initialized");
-  _scopeLocalCache.replace(p);
+  _extentLocalCache.replace(p);
 }
 
 void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name,
@@ -1060,6 +1060,7 @@ JavaThread::JavaThread() :
   _in_retryable_allocation(false),
   _pending_failed_speculation(0),
   _jvmci{nullptr},
+  _libjvmci_runtime(nullptr),
   _jvmci_counters(nullptr),
   _jvmci_reserved0(0),
   _jvmci_reserved1(0),
@@ -1642,7 +1643,7 @@ void JavaThread::remove_monitor_chunk(MonitorChunk* chunk) {
 
 void JavaThread::handle_special_runtime_exit_condition() {
   if (is_obj_deopt_suspend()) {
-    frame_anchor()->make_walkable(this);
+    frame_anchor()->make_walkable();
     wait_for_object_deoptimization();
   }
   JFR_ONLY(SUSPEND_THREAD_CONDITIONAL(this);)
@@ -1676,11 +1677,11 @@ void JavaThread::handle_async_exception(oop java_throwable) {
     // We cannot call Exceptions::_throw(...) here because we cannot block
     set_pending_exception(java_throwable, __FILE__, __LINE__);
 
-    // Clear any scope-local bindings on ThreadDeath
-    set_scopeLocalCache(NULL);
+    // Clear any extent-local bindings on ThreadDeath
+    set_extentLocalCache(NULL);
     oop threadOop = threadObj();
     assert(threadOop != NULL, "must be");
-    java_lang_Thread::clear_scopeLocalBindings(threadOop);
+    java_lang_Thread::clear_extentLocalBindings(threadOop);
 
     LogTarget(Info, exceptions) lt;
     if (lt.is_enabled()) {
@@ -1734,9 +1735,14 @@ class InstallAsyncExceptionHandshake : public HandshakeClosure {
 public:
   InstallAsyncExceptionHandshake(AsyncExceptionHandshake* aeh) :
     HandshakeClosure("InstallAsyncException"), _aeh(aeh) {}
+  ~InstallAsyncExceptionHandshake() {
+    // If InstallAsyncExceptionHandshake was never executed we need to clean up _aeh.
+    delete _aeh;
+  }
   void do_thread(Thread* thr) {
     JavaThread* target = JavaThread::cast(thr);
     target->install_async_exception(_aeh);
+    _aeh = nullptr;
   }
 };
 
@@ -1925,21 +1931,6 @@ void JavaThread::deoptimize_marked_methods() {
     }
   }
 }
-
-void JavaThread::deoptimize_marked_methods_only_anchors() {
-  if (!has_last_Java_frame()) return;
-  bool java_callee = false;
-  StackFrameStream fst(this, false /* update */, true /* process_frames */);
-  for (; !fst.is_done(); fst.next()) {
-    if (fst.current()->should_be_deoptimized()) {
-      if (!java_callee) {
-        Deoptimization::deoptimize(this, *fst.current());
-      }
-    }
-    java_callee = fst.current()->is_compiled_frame();
-  }
-}
-
 
 #ifdef ASSERT
 void JavaThread::verify_frame_info() {

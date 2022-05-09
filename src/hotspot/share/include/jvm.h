@@ -316,10 +316,10 @@ JNIEXPORT jobjectArray JNICALL
 JVM_DumpThreads(JNIEnv *env, jclass threadClass, jobjectArray threads);
 
 JNIEXPORT jobject JNICALL
-JVM_ScopeLocalCache(JNIEnv *env, jclass threadClass);
+JVM_ExtentLocalCache(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
-JVM_SetScopeLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
+JVM_SetExtentLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
 JNIEXPORT jlong JNICALL
 JVM_GetNextThreadIdOffset(JNIEnv *env, jclass threadClass);
@@ -479,7 +479,7 @@ JVM_LookupDefineClass(JNIEnv *env, jclass lookup, const char *name, const jbyte 
                       jsize len, jobject pd, jboolean init, int flags, jobject classData);
 
 /*
- * Module support funcions
+ * Module support functions
  */
 
 /*

@@ -45,7 +45,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
-import jdk.internal.vm.ScopeLocalContainer;
+import jdk.internal.vm.ExtentLocalContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -113,7 +113,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * <p> Virtual threads typically employ a small set of platform threads used as
  * <em>carrier threads</em>. Locking and I/O operations are examples of operations
  * where a carrier thread may be re-scheduled from one virtual thread to another.
- * Code executing in a virtual thread is not aware of underlying carrier thread.
+ * Code executing in a virtual thread is not aware of the underlying carrier thread.
  * The {@linkplain Thread#currentThread()} method, used to obtain a reference
  * to the <i>current thread</i>, will always return the {@code Thread} object
  * for the virtual thread.
@@ -177,6 +177,35 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
+ *
+ * @implNote
+ * In the JDK Reference Implementation, the virtual thread scheduler may be configured
+ * with the following system properties:
+ * <table class="striped">
+ * <caption style="display:none:">System properties</caption>
+ *   <thead>
+ *   <tr>
+ *     <th scope="col">System property</th>
+ *     <th scope="col">Description</th>
+ *   </tr>
+ *   </thead>
+ *   <tbody>
+ *   <tr>
+ *     <th scope="row">
+ *       {@systemProperty jdk.virtualThreadScheduler.parallelism}
+ *     </th>
+ *     <td> The number of platform threads available for scheduling virtual
+ *       threads. It defaults to the number of available processors. </td>
+ *   </tr>
+ *   <tr>
+ *     <th scope="row">
+ *       {@systemProperty jdk.virtualThreadScheduler.maxPoolSize}
+ *     </th>
+ *     <td> The maximum number of platform threads available to the scheduler.
+ *       It defaults to 256. </td>
+ *   </tr>
+ *   </tbody>
+ * </table>
  *
  * @since   1.0
  */
@@ -244,34 +273,34 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Scope locals binding are maintained by the ScopeLocal class.
+     * Extent locals binding are maintained by the ExtentLocal class.
      */
-    private Object scopeLocalBindings;
+    private Object extentLocalBindings;
 
-    static Object scopeLocalBindings() {
-        return currentThread().scopeLocalBindings;
+    static Object extentLocalBindings() {
+        return currentThread().extentLocalBindings;
     }
 
-    static void setScopeLocalBindings(Object bindings) {
-        currentThread().scopeLocalBindings = bindings;
+    static void setExtentLocalBindings(Object bindings) {
+        currentThread().extentLocalBindings = bindings;
     }
 
     /**
-     * Inherit the scope-local bindings from the given container.
+     * Inherit the extent-local bindings from the given container.
      * Invoked when starting a thread.
      */
-    void inheritScopeLocalBindings(ThreadContainer container) {
-        ScopeLocalContainer.BindingsSnapshot snapshot;
+    void inheritExtentLocalBindings(ThreadContainer container) {
+        ExtentLocalContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
-                && (snapshot = container.scopeLocalBindings()) != null) {
+                && (snapshot = container.extentLocalBindings()) != null) {
 
             // bindings established for running/calling an operation
-            Object bindings = snapshot.scopeLocalBindings();
-            if (currentThread().scopeLocalBindings != bindings) {
-                StructureViolationExceptions.throwException("Scope local bindings have changed");
+            Object bindings = snapshot.extentLocalBindings();
+            if (currentThread().extentLocalBindings != bindings) {
+                StructureViolationExceptions.throwException("Extent local bindings have changed");
             }
 
-            this.scopeLocalBindings = bindings;
+            this.extentLocalBindings = bindings;
         }
     }
 
@@ -358,13 +387,13 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     native void setCurrentThread(Thread thread);
 
-    // ScopeLocal support:
+    // ExtentLocal support:
 
     @IntrinsicCandidate
-    static native Object[] scopeLocalCache();
+    static native Object[] extentLocalCache();
 
     @IntrinsicCandidate
-    static native void setScopeLocalCache(Object[] cache);
+    static native void setExtentLocalCache(Object[] cache);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -1514,14 +1543,15 @@ public class Thread implements Runnable {
             if (holder.threadStatus != 0)
                 throw new IllegalThreadStateException();
 
+            // bind thread to container
+            setThreadContainer(container);
+
+            // start thread
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // scope locals may be inherited
-                inheritScopeLocalBindings(container);
-
-                // bind thread to container
-                setThreadContainer(container);
+                // extent locals may be inherited
+                inheritExtentLocalBindings(container);
 
                 start0();
                 started = true;
@@ -1810,12 +1840,15 @@ public class Thread implements Runnable {
      *          {@code false} otherwise.
      */
     public final boolean isAlive() {
-        if (isVirtual()) {
-            State state = threadState();
-            return (state != State.NEW && state != State.TERMINATED);
-        } else {
-            return isAlive0();
-        }
+        return alive();
+    }
+
+    /**
+     * Returns true if this thread is alive.
+     * This method is non-final so it can be overridden.
+     */
+    boolean alive() {
+        return isAlive0();
     }
     private native boolean isAlive0();
 
@@ -1990,10 +2023,10 @@ public class Thread implements Runnable {
      * @return  this thread's thread group or {@code null}
      */
     public final ThreadGroup getThreadGroup() {
-        if (Thread.currentThread() == this || (threadState() != State.TERMINATED)) {
-            return isVirtual() ? virtualThreadGroup() : holder.group;
+        if (isTerminated()) {
+            return null;
         } else {
-            return null;   // terminated
+            return isVirtual() ? virtualThreadGroup() : holder.group;
         }
     }
 
@@ -2234,7 +2267,7 @@ public class Thread implements Runnable {
             millis += 1L;
         }
         join(millis);
-        return threadState() == State.TERMINATED;
+        return isTerminated();
     }
 
     /**
@@ -2582,7 +2615,7 @@ public class Thread implements Runnable {
         // Get a snapshot of the list of all threads
         Thread[] threads = getThreads();
         StackTraceElement[][] traces = dumpThreads(threads);
-        Map<Thread, StackTraceElement[]> m = new HashMap<>(threads.length);
+        Map<Thread, StackTraceElement[]> m = HashMap.newHashMap(threads.length);
         for (int i = 0; i < threads.length; i++) {
             StackTraceElement[] stackTrace = traces[i];
             if (stackTrace != null) {
@@ -2803,12 +2836,18 @@ public class Thread implements Runnable {
 
     /**
      * Returns the state of this thread.
-     *
-     * @apiNote For VirtualThread use as getState may be overridden and run
-     * arbitrary code.
+     * This method can be used instead of getState as getState is not final and
+     * so can be overridden to run arbitrary code.
      */
     State threadState() {
         return jdk.internal.misc.VM.toThreadState(holder.threadStatus);
+    }
+
+    /**
+     * Returns true if the thread has terminated.
+     */
+    boolean isTerminated() {
+        return threadState() == State.TERMINATED;
     }
 
     /**
@@ -2917,7 +2956,7 @@ public class Thread implements Runnable {
      * @return the uncaught exception handler for this thread
      */
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
-        if (threadState() == State.TERMINATED) {
+        if (isTerminated()) {
             // uncaughtExceptionHandler may be set to null after thread terminates
             return null;
         } else {
@@ -3025,7 +3064,7 @@ public class Thread implements Runnable {
     int threadLocalRandomSecondarySeed;
 
     /** The thread container that this thread is in */
-    @Stable private volatile ThreadContainer container;
+    private volatile ThreadContainer container;  // @Stable candidate?
     ThreadContainer threadContainer() {
         return container;
     }

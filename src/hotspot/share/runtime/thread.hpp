@@ -80,6 +80,8 @@ class JvmtiDeferredUpdates;
 class ThreadClosure;
 class ICRefillVerifier;
 
+class JVMCIRuntime;
+
 class Metadata;
 class ResourceArea;
 
@@ -705,7 +707,7 @@ class JavaThread: public Thread {
   OopHandle      _threadObj;                     // The Java level thread object
   OopHandle      _vthread; // the value returned by Thread.currentThread(): the virtual thread, if mounted, otherwise _threadObj
   OopHandle      _jvmti_vthread;
-  OopHandle      _scopeLocalCache;
+  OopHandle      _extentLocalCache;
 
 #ifdef ASSERT
  private:
@@ -972,6 +974,9 @@ class JavaThread: public Thread {
     address   _alternate_call_target;
   } _jvmci;
 
+  // The JVMCIRuntime in a JVMCI shared library
+  JVMCIRuntime* _libjvmci_runtime;
+
   // Support for high precision, thread sensitive counters in JVMCI compiled code.
   jlong*    _jvmci_counters;
 
@@ -1063,9 +1068,9 @@ private:
   inline StackWatermarks* stack_watermarks() { return &_stack_watermarks; }
 
  public:
-  jlong _scopeLocal_hash_table_shift;
+  jlong _extentLocal_hash_table_shift;
 
-  void allocate_scopeLocal_hash_table(int count);
+  void allocate_extentLocal_hash_table(int count);
 
  public:
   // Constructor
@@ -1119,8 +1124,8 @@ private:
   void set_threadOopHandles(oop p);
   oop vthread() const;
   void set_vthread(oop p);
-  oop scopeLocalCache() const;
-  void set_scopeLocalCache(oop p);
+  oop extentLocalCache() const;
+  void set_extentLocalCache(oop p);
   oop jvmti_vthread() const;
   void set_jvmti_vthread(oop p);
 
@@ -1192,7 +1197,7 @@ private:
   void push_cont_fastpath(intptr_t* sp)        { if (sp > _cont_fastpath) _cont_fastpath = sp; }
   void set_cont_fastpath_thread_state(bool x)  { _cont_fastpath_thread_state = (int)x; }
   intptr_t* raw_cont_fastpath() const          { return _cont_fastpath; }
-  bool cont_fastpath() const                   { return ((_cont_fastpath == NULL) & _cont_fastpath_thread_state) != 0; }
+  bool cont_fastpath() const                   { return _cont_fastpath == NULL && _cont_fastpath_thread_state != 0; }
   bool cont_fastpath_thread_state() const      { return _cont_fastpath_thread_state != 0; }
 
   int held_monitor_count()        { return _held_monitor_count; }
@@ -1202,9 +1207,6 @@ private:
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
-
-  enum class CarrierOrVirtual { NONE, CARRIER, VIRTUAL };
-  inline CarrierOrVirtual which_stack(address adr) const;
 
  private:
   DEBUG_ONLY(void verify_frame_info();)
@@ -1309,6 +1311,12 @@ private:
 
   virtual bool in_retryable_allocation() const    { return _in_retryable_allocation; }
   void set_in_retryable_allocation(bool b)        { _in_retryable_allocation = b; }
+
+  JVMCIRuntime* libjvmci_runtime() const          { return _libjvmci_runtime; }
+  void set_libjvmci_runtime(JVMCIRuntime* rt) {
+    assert((_libjvmci_runtime == nullptr && rt != nullptr) || (_libjvmci_runtime != nullptr && rt == nullptr), "must be");
+    _libjvmci_runtime = rt;
+  }
 #endif // INCLUDE_JVMCI
 
   // Exception handling for compiled methods
@@ -1339,7 +1347,7 @@ private:
   void clr_do_not_unlock(void)                   { _do_not_unlock_if_synchronized = false; }
   bool do_not_unlock(void)                       { return _do_not_unlock_if_synchronized; }
 
-  static ByteSize scopeLocalCache_offset()       { return byte_offset_of(JavaThread, _scopeLocalCache); }
+  static ByteSize extentLocalCache_offset()       { return byte_offset_of(JavaThread, _extentLocalCache); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
@@ -1444,7 +1452,7 @@ private:
   // Checked JNI: is the programmer required to check for exceptions, if so specify
   // which function name. Returning to a Java frame should implicitly clear the
   // pending check, this is done for Native->Java transitions (i.e. user JNI code).
-  // VM->Java transistions are not cleared, it is expected that JNI code enclosed
+  // VM->Java transitions are not cleared, it is expected that JNI code enclosed
   // within ThreadToNativeFromVM makes proper exception checks (i.e. VM internal).
   bool is_pending_jni_exception_check() const { return _pending_jni_exception_check_fn != NULL; }
   void clear_pending_jni_exception_check() { _pending_jni_exception_check_fn = NULL; }
@@ -1511,7 +1519,7 @@ private:
 
   // Accessing frames
   frame last_frame() {
-    _anchor.make_walkable(this);
+    _anchor.make_walkable();
     return pd_last_frame();
   }
   javaVFrame* last_java_vframe(RegisterMap* reg_map) { return last_java_vframe(last_frame(), reg_map); }
@@ -1553,7 +1561,6 @@ private:
   void make_zombies();
 
   void deoptimize_marked_methods();
-  void deoptimize_marked_methods_only_anchors();
 
  public:
   // Returns the running thread as a JavaThread

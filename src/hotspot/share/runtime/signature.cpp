@@ -138,7 +138,7 @@ static int compute_num_stack_arg_slots(Symbol* signature, int sizeargs, bool is_
 
   return SharedRuntime::java_calling_convention(sig_bt, regs, sizeargs);
 }
-#endif
+#endif // ASSERT
 
 void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   // See if we fingerprinted this method already
@@ -178,9 +178,12 @@ void Fingerprinter::compute_fingerprint_and_return_type(bool static_flag) {
   }
 
   _stack_arg_slots = align_up(_stack_arg_slots, 2);
+
 #ifdef ASSERT
   int dbg_stack_arg_slots = compute_num_stack_arg_slots(_signature, _param_size, static_flag);
+#if defined(_LP64) && !defined(ZERO)
   assert(_stack_arg_slots == dbg_stack_arg_slots, "fingerprinter: %d full: %d", _stack_arg_slots, dbg_stack_arg_slots);
+#endif
 #endif
 
   // Detect overflow.  (We counted _param_size correctly.)
@@ -216,7 +219,9 @@ void Fingerprinter::initialize_calling_convention(bool static_flag) {
 }
 
 void Fingerprinter::do_type_calling_convention(BasicType type) {
-#if (defined(AMD64) || defined(AARCH64)) && !defined(ZERO)
+  // We compute the number of slots for stack-passed arguments in compiled calls.
+  // The value computed for 32-bit ports and for zero is bogus, and will need to be fixed.
+#if defined(_LP64) && !defined(ZERO)
   switch (type) {
   case T_VOID:
     break;
@@ -247,7 +252,7 @@ void Fingerprinter::do_type_calling_convention(BasicType type) {
     ShouldNotReachHere();
     break;
   }
-#endif // x64 or aarch64
+#endif
 }
 
 // Implementation of SignatureStream

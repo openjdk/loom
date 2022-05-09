@@ -2259,7 +2259,7 @@ class StubGenerator: public StubCodeGenerator {
   //
   // If 'from' and/or 'to' are aligned on 4-byte boundaries, we let
   // the hardware handle it.  The two dwords within qwords that span
-  // cache line boundaries will still be loaded and stored atomicly.
+  // cache line boundaries will still be loaded and stored atomically.
   //
   // Side Effects:
   //   disjoint_int_copy_entry is set to the no-overlap entry point
@@ -2373,7 +2373,7 @@ class StubGenerator: public StubCodeGenerator {
   //
   // If 'from' and/or 'to' are aligned on 4-byte boundaries, we let
   // the hardware handle it.  The two dwords within qwords that span
-  // cache line boundaries will still be loaded and stored atomicly.
+  // cache line boundaries will still be loaded and stored atomically.
   //
   address generate_conjoint_int_oop_copy(bool aligned, bool is_oop, address nooverlap_target,
                                          address *entry, const char *name,
@@ -3848,46 +3848,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  // Safefetch stubs.
-  void generate_safefetch(const char* name, int size, address* entry,
-                          address* fault_pc, address* continuation_pc) {
-    // safefetch signatures:
-    //   int      SafeFetch32(int*      adr, int      errValue);
-    //   intptr_t SafeFetchN (intptr_t* adr, intptr_t errValue);
-    //
-    // arguments:
-    //   c_rarg0 = adr
-    //   c_rarg1 = errValue
-    //
-    // result:
-    //   PPC_RET  = *adr or errValue
-
-    StubCodeMark mark(this, "StubRoutines", name);
-
-    // Entry point, pc or function descriptor.
-    *entry = __ pc();
-
-    // Load *adr into c_rarg1, may fault.
-    *fault_pc = __ pc();
-    switch (size) {
-      case 4:
-        // int32_t
-        __ movl(c_rarg1, Address(c_rarg0, 0));
-        break;
-      case 8:
-        // int64_t
-        __ movq(c_rarg1, Address(c_rarg0, 0));
-        break;
-      default:
-        ShouldNotReachHere();
-    }
-
-    // return errValue or *adr
-    *continuation_pc = __ pc();
-    __ movq(rax, c_rarg1);
-    __ ret(0);
-  }
-
   // This is a version of CBC/AES Decrypt which does 4 blocks in a loop at a time
   // to hide instruction latency
   //
@@ -3999,7 +3959,7 @@ class StubGenerator: public StubCodeGenerator {
       } else if (k == 2) {
         __ subptr(rsp, 10 * wordSize);
         __ movdqu(Address(rsp, 0), xmm15); //save last_key from xmm15
-        load_key(xmm15, key, 0xd0); // 0xd0; 256-bit key goes upto 0xe0
+        load_key(xmm15, key, 0xd0); // 0xd0; 256-bit key goes up to 0xe0
         __ movdqu(Address(rsp, 6 * wordSize), xmm15);
         load_key(xmm1, key, 0xe0);  // 0xe0;
         __ movdqu(Address(rsp, 8 * wordSize), xmm1);
@@ -4091,11 +4051,11 @@ class StubGenerator: public StubCodeGenerator {
       __ jcc(Assembler::equal, L_exit);
       __ BIND(L_singleBlock_loopTopHead2[k]);
       if (k == 1) {
-        load_key(xmm_key11, key, 0xb0); // 0xb0; 192-bit key goes upto 0xc0
-        load_key(xmm_key12, key, 0xc0); // 0xc0; 192-bit key goes upto 0xc0
+        load_key(xmm_key11, key, 0xb0); // 0xb0; 192-bit key goes up to 0xc0
+        load_key(xmm_key12, key, 0xc0); // 0xc0; 192-bit key goes up to 0xc0
       }
       if (k == 2) {
-        load_key(xmm_key11, key, 0xb0); // 0xb0; 256-bit key goes upto 0xe0
+        load_key(xmm_key11, key, 0xb0); // 0xb0; 256-bit key goes up to 0xe0
       }
       __ align(OptoLoopAlignment);
       __ BIND(L_singleBlock_loopTop[k]);
@@ -5657,7 +5617,7 @@ address generate_avx_ghash_processBlocks() {
       // operation (vpmulhuw) which effectively shifts c right by 6
       // bits and a right by 10 bits.  We similarly mask bits 10-15
       // (d5..d0) and 22-27 (b5..b0) and shift them left by 8 and 4
-      // bits respecively.  This is done using vpmullw.  We end up
+      // bits respectively.  This is done using vpmullw.  We end up
       // with 4 6-bit values, thus splitting the 3 input bytes,
       // ready for encoding:
       //    0 0 d5..d0 0 0 c5..c0 0 0 b5..b0 0 0 a5..a0
@@ -6534,7 +6494,7 @@ address generate_avx_ghash_processBlocks() {
    *   c_rarg1   - byte* buf
    *   c_rarg2   - int length
    *
-   * Ouput:
+   * Output:
    *       rax   - int crc result
    */
   address generate_updateBytesCRC32() {
@@ -6590,7 +6550,7 @@ address generate_avx_ghash_processBlocks() {
   *   c_rarg3   - table_start - optional (present only when doing a library_call,
   *              not used by x86 algorithm)
   *
-  * Ouput:
+  * Output:
   *       rax   - int crc result
   */
   address generate_updateBytesCRC32C(bool is_pclmulqdq_supported) {
@@ -6810,7 +6770,7 @@ address generate_avx_ghash_processBlocks() {
   //    c_rarg0   - x address
   //    c_rarg1   - x length
   //    c_rarg2   - z address
-  //    c_rarg3   - z lenth
+  //    c_rarg3   - z length
    *
    */
   address generate_squareToLen() {
@@ -7571,9 +7531,9 @@ address generate_avx_ghash_processBlocks() {
     }
 
     // If we want, we can templatize thaw by kind, and have three different entries
-    if (exception)           __ movl(c_rarg1, (int32_t)2);
-    else if (return_barrier) __ movl(c_rarg1, (int32_t)1);
-    else                     __ movl(c_rarg1, (int32_t)0);
+    if (exception)           __ movl(c_rarg1, (int32_t)Continuation::thaw_exception);
+    else if (return_barrier) __ movl(c_rarg1, (int32_t)Continuation::thaw_return_barrier);
+    else                     __ movl(c_rarg1, (int32_t)Continuation::thaw_top);
 
     __ call_VM_leaf(Continuation::thaw_entry(), r15_thread, c_rarg1);
     __ movptr(rbx, rax); // rax is the sp of the yielding frame
@@ -7644,7 +7604,7 @@ address generate_avx_ghash_processBlocks() {
     __ movptr(c_rarg0, r15_thread);
   }
 
-  // Handle is dereferenced here using correct load constructs.
+  // The handle is dereferenced through a load barrier.
   static void jfr_epilogue(MacroAssembler* _masm) {
     __ reset_last_Java_frame(true);
     Label null_jobject;
@@ -7656,10 +7616,7 @@ address generate_avx_ghash_processBlocks() {
     __ bind(null_jobject);
   }
 
-  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
-  RuntimeStub* generate_jfr_write_checkpoint() {
-    const char* name = "jfr_write_checkpoint";
-
+  static RuntimeStub* generate_jfr_stub(const char* name, address entrypoint) {
     enum layout {
       rbp_off,
       rbpH_off,
@@ -7680,47 +7637,7 @@ address generate_avx_ghash_processBlocks() {
     int frame_complete = __ pc() - start;
     address the_pc = __ pc();
     jfr_prologue(the_pc, _masm);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint), 1);
-    __ reset_last_Java_frame(true); // no epilogue, not returning anything
-    __ leave();
-    __ ret(0);
-
-    OopMap* map = new OopMap(framesize, 1); // rbp
-    oop_maps->add_gc_map(the_pc - start, map);
-
-    RuntimeStub* stub = // codeBlob framesize is in words (not VMRegImpl::slot_size)
-      RuntimeStub::new_runtime_stub(name, &code, frame_complete,
-                                    (framesize >> (LogBytesPerWord - LogBytesPerInt)),
-                                    oop_maps, false);
-    return stub;
-  }
-
-  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
-  // The handle is dereferenced and the return value is the event writer oop.
-  RuntimeStub* generate_jfr_get_event_writer() {
-    const char* name = "jfr_get_event_writer";
-
-    enum layout {
-      rbp_off,
-      rbpH_off,
-      return_off,
-      return_off2,
-      framesize // inclusive of return address
-    };
-
-    int insts_size = 512;
-    int locs_size = 64;
-    CodeBuffer code(name, insts_size, locs_size);
-    OopMapSet* oop_maps = new OopMapSet();
-    MacroAssembler* masm = new MacroAssembler(&code);
-    MacroAssembler* _masm = masm;
-
-    address start = __ pc();
-    __ enter();
-    int frame_complete = __ pc() - start;
-    address the_pc = __ pc();
-    jfr_prologue(the_pc, _masm);
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer), 1);
+    __ call_VM_leaf(entrypoint, 1);
     jfr_epilogue(_masm);
     __ leave();
     __ ret(0);
@@ -7733,6 +7650,21 @@ address generate_avx_ghash_processBlocks() {
                                     (framesize >> (LogBytesPerWord - LogBytesPerInt)),
                                     oop_maps, false);
     return stub;
+  }
+
+  // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
+  // It returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  RuntimeStub* generate_jfr_write_checkpoint() {
+    return generate_jfr_stub("jfr_write_checkpoint",
+                              CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::write_checkpoint));
+  }
+
+  // For c1: call the corresponding runtime routine, it returns a jobject handle to the event writer.
+  // The handle is dereferenced and the return value is the event writer oop.
+  RuntimeStub* generate_jfr_get_event_writer() {
+    return generate_jfr_stub("jfr_get_event_writer",
+                              CAST_FROM_FN_PTR(address, JfrIntrinsicSupport::event_writer));
   }
 
 #endif // INCLUDE_JFR
@@ -7955,14 +7887,6 @@ address generate_avx_ghash_processBlocks() {
         StubRoutines::_dtan = generate_libmTan();
       }
     }
-
-    // Safefetch stubs.
-    generate_safefetch("SafeFetch32", sizeof(int),     &StubRoutines::_safefetch32_entry,
-                                                       &StubRoutines::_safefetch32_fault_pc,
-                                                       &StubRoutines::_safefetch32_continuation_pc);
-    generate_safefetch("SafeFetchN", sizeof(intptr_t), &StubRoutines::_safefetchN_entry,
-                                                       &StubRoutines::_safefetchN_fault_pc,
-                                                       &StubRoutines::_safefetchN_continuation_pc);
   }
 
   void generate_phase1() {

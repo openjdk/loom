@@ -215,7 +215,7 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   LIR_Opr load_constant(LIR_Const* constant);
 
   // Given an immediate value, return an operand usable in logical ops.
-  LIR_Opr load_immediate(int x, BasicType type);
+  LIR_Opr load_immediate(jlong x, BasicType type);
 
   void  set_result(Value x, LIR_Opr opr)           {
     assert(opr->is_valid(), "must set to valid value");
@@ -257,7 +257,7 @@ class LIRGenerator: public InstructionVisitor, public BlockClosure {
   void do_getClass(Intrinsic* x);
   void do_getObjectSize(Intrinsic* x);
   void do_currentCarrierThread(Intrinsic* x);
-  void do_scopeLocalCache(Intrinsic* x);
+  void do_extentLocalCache(Intrinsic* x);
   void do_vthread(Intrinsic* x);
   void do_JavaThreadField(Intrinsic* x, ByteSize offset);
   void do_FmaIntrinsic(Intrinsic* x);
@@ -639,7 +639,7 @@ class LIRItem: public CompilationResourceObj {
   ValueType* type() const      { return value()->type(); }
   LIR_Opr result()             {
     assert(!_destroys_register || (!_result->is_register() || _result->is_virtual()),
-           "shouldn't use set_destroys_register with physical regsiters");
+           "shouldn't use set_destroys_register with physical registers");
     if (_destroys_register && _result->is_register()) {
       if (_new_result->is_illegal()) {
         _new_result = _gen->new_register(type());

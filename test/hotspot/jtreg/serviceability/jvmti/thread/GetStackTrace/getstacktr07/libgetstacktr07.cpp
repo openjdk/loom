@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -77,7 +77,6 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmetho
 
   check_jvmti_status(jni, jvmti->GetMethodDeclaringClass(method, &klass), "GetMethodDeclaringClass failed.");
 
-
   LOG(">>> redefining class ...\n");
 
   class_def.klass = klass;
@@ -98,7 +97,6 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmetho
   if (!compare_stack_trace(jvmti_env, jni, thread, expected_frames, expected_number_of_stack_frames)) {
     jni->ThrowNew(jni->FindClass("java/lang/RuntimeException"), "Stacktrace differs from expected.");
   }
-
 }
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {

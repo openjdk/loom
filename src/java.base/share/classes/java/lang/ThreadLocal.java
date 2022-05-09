@@ -69,6 +69,7 @@ import jdk.internal.misc.TerminatingThreadLocal;
  * instance is accessible; after a thread goes away, all of its copies of
  * thread-local instances are subject to garbage collection (unless other
  * references to these copies exist).
+ * @param <T> the type of the thread local's value
  *
  * @author  Josh Bloch and Doug Lea
  * @since   1.2
@@ -176,12 +177,16 @@ public class ThreadLocal<T> {
 
     private T get(Thread t) {
         ThreadLocalMap map = getMap(t);
-        if (map != null && map != ThreadLocalMap.NOT_SUPPORTED) {
-            ThreadLocalMap.Entry e = map.getEntry(this);
-            if (e != null) {
-                @SuppressWarnings("unchecked")
-                T result = (T)e.value;
-                return result;
+        if (map != null) {
+            if (map == ThreadLocalMap.NOT_SUPPORTED) {
+                return initialValue();
+            } else {
+                ThreadLocalMap.Entry e = map.getEntry(this);
+                if (e != null) {
+                    @SuppressWarnings("unchecked")
+                    T result = (T) e.value;
+                    return result;
+                }
             }
         }
         return setInitialValue(t);
@@ -213,9 +218,7 @@ public class ThreadLocal<T> {
     private T setInitialValue(Thread t) {
         T value = initialValue();
         ThreadLocalMap map = getMap(t);
-        if (map == ThreadLocalMap.NOT_SUPPORTED) {
-            return value;
-        }
+        assert map != ThreadLocalMap.NOT_SUPPORTED;
         if (map != null) {
             map.set(this, value);
         } else {
@@ -420,7 +423,7 @@ public class ThreadLocal<T> {
         /**
          * Construct a new map without a table.
          */
-        ThreadLocalMap() {
+        private ThreadLocalMap() {
         }
 
         /**

@@ -1789,7 +1789,7 @@ int java_lang_Thread::_interrupted_offset;
 int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
-int java_lang_Thread::_scopeLocalBindings_offset;
+int java_lang_Thread::_extentLocalBindings_offset;
 JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
 
 #define THREAD_FIELDS_DO(macro) \
@@ -1802,7 +1802,7 @@ JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
-  macro(_scopeLocalBindings_offset, k, "scopeLocalBindings", object_signature, false);
+  macro(_extentLocalBindings_offset, k, "extentLocalBindings", object_signature, false);
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -1835,8 +1835,8 @@ void java_lang_Thread::set_jvmti_thread_state(oop java_thread, JvmtiThreadState*
   java_thread->address_field_put(_jvmti_thread_state_offset, (address)state);
 }
 
-void java_lang_Thread::clear_scopeLocalBindings(oop java_thread) {
-  java_thread->obj_field_put(_scopeLocalBindings_offset, NULL);
+void java_lang_Thread::clear_extentLocalBindings(oop java_thread) {
+  java_thread->obj_field_put(_extentLocalBindings_offset, NULL);
 }
 
 oop java_lang_Thread::holder(oop java_thread) {
@@ -2532,7 +2532,7 @@ class BacktraceBuilder: public StackObj {
     _index++;
   }
 
-  void set_has_hidden_top_frame(TRAPS) {
+  void set_has_hidden_top_frame() {
     if (!_has_hidden_top_frame) {
       // It would be nice to add java/lang/Boolean::TRUE here
       // to indicate that this backtrace has a hidden top frame.
@@ -2875,7 +2875,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       assert(skip_fillInStackTrace_check, "logic error in backtrace filtering");
 
       // skip <init> methods of the exception class and superclasses
-      // This is simlar to classic VM.
+      // This is similar to classic VM.
       if (method->name() == vmSymbols::object_initializer_name() &&
           throwable->is_a(method->method_holder())) {
         continue;
@@ -2888,7 +2888,7 @@ void java_lang_Throwable::fill_in_stack_trace(Handle throwable, const methodHand
       if (skip_hidden) {
         if (total_count == 0) {
           // The top frame will be hidden from the stack trace.
-          bt.set_has_hidden_top_frame(CHECK);
+          bt.set_has_hidden_top_frame();
         }
         continue;
       }
@@ -3387,7 +3387,7 @@ void java_lang_reflect_Method::serialize_offsets(SerializeClosure* f) {
 Handle java_lang_reflect_Method::create(TRAPS) {
   assert(Universe::is_fully_initialized(), "Need to find another solution to the reflection problem");
   Klass* klass = vmClasses::reflect_Method_klass();
-  // This class is eagerly initialized during VM initialization, since we keep a refence
+  // This class is eagerly initialized during VM initialization, since we keep a reference
   // to one of the methods
   assert(InstanceKlass::cast(klass)->is_initialized(), "must be initialized");
   return InstanceKlass::cast(klass)->allocate_instance_handle(THREAD);
@@ -4878,8 +4878,6 @@ public:
       mirror->bool_field_put(fd->offset(), _use_unaligned_access);
     } else if (fd->name() == vmSymbols::data_cache_line_flush_size_name()) {
       mirror->int_field_put(fd->offset(), _data_cache_line_flush_size);
-    } else if (fd->name() == vmSymbols::scoped_cache_shift_name()) {
-      mirror->int_field_put(fd->offset(), ScopeLocalCacheSize ? exact_log2(ScopeLocalCacheSize) : -1);
     } else {
       assert(false, "unexpected UnsafeConstants field");
     }
@@ -5062,7 +5060,7 @@ int jdk_internal_vm_StackChunk::_sp_offset;
 int jdk_internal_vm_StackChunk::_pc_offset;
 int jdk_internal_vm_StackChunk::_argsize_offset;
 int jdk_internal_vm_StackChunk::_flags_offset;
-int jdk_internal_vm_StackChunk::_maxSize_offset;
+int jdk_internal_vm_StackChunk::_maxThawingSize_offset;
 int jdk_internal_vm_StackChunk::_cont_offset;
 
 #define STACKCHUNK_FIELDS_DO(macro) \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,35 +36,35 @@ static jvmtiEnv *jvmti = NULL;
 static jint result = PASSED;
 
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
-    jint res;
+  jint res;
 
-    res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
-    if (res != JNI_OK || jvmti == NULL) {
-        LOG("Wrong result of a valid call to GetEnv!\n");
-        return JNI_ERR;
-    }
+  res = jvm->GetEnv((void **) &jvmti, JVMTI_VERSION_1_1);
+  if (res != JNI_OK || jvmti == NULL) {
+    LOG("Wrong result of a valid call to GetEnv!\n");
+    return JNI_ERR;
+  }
 
-    return JNI_OK;
+  return JNI_OK;
 }
 
 JNIEXPORT jint JNICALL
 Java_framecnt03_check(JNIEnv *env, jclass cls) {
-    jvmtiError err;
-    jint countPtr;
+  jvmtiError err;
+  jint countPtr;
 
-    if (jvmti == NULL) {
-        LOG("JVMTI client was not properly loaded!\n");
-        return STATUS_FAILED;
-    }
+  if (jvmti == NULL) {
+      LOG("JVMTI client was not properly loaded!\n");
+      return STATUS_FAILED;
+  }
 
-    err = jvmti->GetFrameCount(cls, &countPtr);
-    if (err != JVMTI_ERROR_INVALID_THREAD) {
-        LOG("Error expected: JVMTI_ERROR_INVALID_THREAD,\n");
-        LOG("        actual: %s (%d)\n", TranslateError(err), err);
-        result = STATUS_FAILED;
-    }
+  err = jvmti->GetFrameCount(cls, &countPtr);
+  if (err != JVMTI_ERROR_INVALID_THREAD) {
+    LOG("Error expected: JVMTI_ERROR_INVALID_THREAD,\n");
+    LOG("        actual: %s (%d)\n", TranslateError(err), err);
+    result = STATUS_FAILED;
+  }
 
-    return result;
+  return result;
 }
 
 }

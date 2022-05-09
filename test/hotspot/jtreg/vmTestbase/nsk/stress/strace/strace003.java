@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -125,6 +125,8 @@ public class strace003 {
             "java.lang.Thread.currentCarrierThread",
             "java.lang.Thread.currentThread",
             "java.lang.Thread.threadContainer",
+            "jdk.internal.misc.Blocker.begin",
+            "jdk.internal.misc.Blocker.currentCarrierThread",
             "jdk.internal.misc.Blocker.end",
             "jdk.internal.vm.StackableScope.head",
             "jdk.internal.vm.StackableScope.popAll",

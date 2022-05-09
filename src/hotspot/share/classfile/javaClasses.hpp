@@ -418,7 +418,7 @@ class java_lang_Thread : AllStatic {
   static int _tid_offset;
   static int _continuation_offset;
   static int _park_blocker_offset;
-  static int _scopeLocalBindings_offset;
+  static int _extentLocalBindings_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
 
   static void compute_offsets();
@@ -467,8 +467,8 @@ class java_lang_Thread : AllStatic {
   static JvmtiThreadState* jvmti_thread_state(oop java_thread);
   static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
 
-  // Clear all scope local bindings on error
-  static void clear_scopeLocalBindings(oop java_thread);
+  // Clear all extent local bindings on error
+  static void clear_extentLocalBindings(oop java_thread);
 
   // Blocker object responsible for thread parking
   static oop park_blocker(oop java_thread);
@@ -1126,10 +1126,10 @@ class jdk_internal_vm_Continuation: AllStatic {
 
 // Interface to jdk.internal.vm.StackChunk objects
 #define STACKCHUNK_INJECTED_FIELDS(macro)                                    \
-  macro(jdk_internal_vm_StackChunk, cont,    continuation_signature, false)  \
-  macro(jdk_internal_vm_StackChunk, flags,   byte_signature, false)          \
-  macro(jdk_internal_vm_StackChunk, pc,      intptr_signature, false)        \
-  macro(jdk_internal_vm_StackChunk, maxSize, int_signature, false)           \
+  macro(jdk_internal_vm_StackChunk, cont,           continuation_signature, false)  \
+  macro(jdk_internal_vm_StackChunk, flags,          byte_signature, false)          \
+  macro(jdk_internal_vm_StackChunk, pc,             intptr_signature, false)        \
+  macro(jdk_internal_vm_StackChunk, maxThawingSize, int_signature, false)           \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
@@ -1140,7 +1140,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _pc_offset;
   static int _argsize_offset;
   static int _flags_offset;
-  static int _maxSize_offset;
+  static int _maxThawingSize_offset;
   static int _cont_offset;
 
 
@@ -1175,8 +1175,8 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static inline void release_set_flags(oop chunk, uint8_t value);
   static inline bool try_set_flags(oop chunk, uint8_t expected_value, uint8_t new_value);
 
-  static inline int maxSize(oop chunk);
-  static inline void set_maxSize(oop chunk, int value);
+  static inline int maxThawingSize(oop chunk);
+  static inline void set_maxThawingSize(oop chunk, int value);
 
  // cont oop's processing is essential for the chunk's GC protocol
   static inline oop cont(oop chunk);

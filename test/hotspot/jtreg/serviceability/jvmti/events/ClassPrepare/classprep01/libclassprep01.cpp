@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -43,32 +43,24 @@ typedef struct {
   jint mcount;
   jint fcount;
   jint icount;
-} writable_class_info;
-
-typedef struct {
-  const char *sig;
-  jint status;
-  jint mcount;
-  jint fcount;
-  jint icount;
 } class_info;
 
 static jvmtiEnv *jvmti = NULL;
 static jvmtiEventCallbacks callbacks;
 static jint result = PASSED;
-static volatile size_t eventsCount = 0; // TODO these 2 vars mofified from different threads in getReady/check. What to DO???
+static size_t eventsCount = 0;
 static size_t eventsExpected = 0;
 
 static class_info *classes;
 
 static class_info kernel_classes[] = {
-    { "Lclassprep01$TestInterface;", EXP_STATUS, 2, 1, 0 },
-    { "Lclassprep01$TestClass;", EXP_STATUS, 3, 2, 1 }
+    { (char *)"Lclassprep01$TestInterface;", EXP_STATUS, 2, 1, 0 },
+    { (char *)"Lclassprep01$TestClass;", EXP_STATUS, 3, 2, 1 }
 };
 
 static class_info virtual_classes[] = {
-    { "Lclassprep01$TestInterfaceVirtual;", EXP_STATUS, 2, 1, 0 },
-    { "Lclassprep01$TestClassVirtual;", EXP_STATUS, 3, 2, 1 }
+    { (char *)"Lclassprep01$TestInterfaceVirtual;", EXP_STATUS, 2, 1, 0 },
+    { (char *)"Lclassprep01$TestClassVirtual;", EXP_STATUS, 3, 2, 1 }
 };
 
 void printStatus(jint status) {
@@ -97,50 +89,44 @@ void printStatus(jint status) {
 
 void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls) {
   jvmtiError err;
-  writable_class_info inf;
+  class_info inf;
   jmethodID *methods;
   jfieldID *fields;
   jclass *interfaces;
   char *name, *sig, *generic;
-  int i;
 
   err = jvmti->GetClassSignature(cls, &inf.sig, &generic);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetClassSignature#%" PRIuPTR ") unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetClassSignature#%" PRIuPTR ") unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
 
   // filter only events for test classes using classprep01 as a prefix
   // there are a lot of classes might be generated and loaded
-  if (strncmp("Lclassprep01", inf.sig, 12) !=0) {
+  if (strncmp("Lclassprep01", inf.sig, 12) != 0) {
     return;
   }
   err = jvmti->GetClassStatus(cls, &inf.status);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetClassStatus#%" PRIuPTR ") unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetClassStatus#%" PRIuPTR ") unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
   err = jvmti->GetClassMethods(cls, &inf.mcount, &methods);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetClassFields(cls, &inf.fcount, &fields);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetClassMethods#%" PRIuPTR ") unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
   err = jvmti->GetImplementedInterfaces(cls, &inf.icount, &interfaces);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetImplementedInterfaces#%" PRIuPTR ") unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetImplementedInterfaces#%" PRIuPTR ") unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
     return;
   }
@@ -152,7 +138,7 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
   LOG(">>>   status: ");
   printStatus(inf.status);
   LOG(">>>   %d methods:", inf.mcount);
-  for (i = 0; i < inf.mcount; i++) {
+  for (int i = 0; i < inf.mcount; i++) {
     if (i > 0) LOG(",");
     if (methods[i] == NULL) {
       LOG(" null");
@@ -161,29 +147,28 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s%s\"", name, sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetMethodName: %s (%d)> ", TranslateError(err), err);
       }
     }
   }
   LOG("\n");
   LOG(">>>   %d fields:", inf.fcount);
-  for (i = 0; i < inf.fcount; i++) {
+  for (int i = 0; i < inf.fcount; i++) {
     if (i > 0) LOG(",");
     if (fields[i] == NULL) {
       LOG(" null");
     } else {
-      err = jvmti->GetFieldName(cls, fields[i],
-                                    &name, &sig, &generic);
+      err = jvmti->GetFieldName(cls, fields[i], &name, &sig, &generic);
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s, %s\"", name, sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetFieldName: %s (%d)> ", TranslateError(err), err);
       }
     }
   }
   LOG("\n");
   LOG(">>>   %d interfaces:", inf.icount);
-  for (i = 0; i < inf.icount; i++) {
+  for (int i = 0; i < inf.icount; i++) {
     if (i > 0) LOG(",");
     if (interfaces[i] == NULL) {
       LOG(" null");
@@ -192,16 +177,15 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
       if (err == JVMTI_ERROR_NONE) {
         LOG(" \"%s\"", sig);
       } else {
-        LOG(" ???");
+        LOG(" <ERRROR in GetClassSignature: %s (%d)> ", TranslateError(err), err);
       }
     }
   }
   LOG("\n");
 
-
   if (eventsCount >= eventsExpected) {
     LOG("(#%" PRIuPTR ") too many events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
-           eventsCount, eventsCount + 1, eventsExpected);
+        eventsCount, eventsCount + 1, eventsExpected);
     result = STATUS_FAILED;
     return;
   }
@@ -225,37 +209,23 @@ void JNICALL ClassPrepare(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jclass cls)
     result = STATUS_FAILED;
   }
   if (inf.mcount != classes[eventsCount].mcount) {
-    LOG("(#%" PRIuPTR ") wrong number of methods: 0x%x",
-           eventsCount, inf.mcount);
+    LOG("(#%" PRIuPTR ") wrong number of methods: 0x%x", eventsCount, inf.mcount);
     LOG(", expected: 0x%x\n", classes[eventsCount].mcount);
     result = STATUS_FAILED;
   }
   if (inf.fcount != classes[eventsCount].fcount) {
-    LOG("(#%" PRIuPTR ") wrong number of fields: 0x%x",
-           eventsCount, inf.fcount);
+    LOG("(#%" PRIuPTR ") wrong number of fields: 0x%x", eventsCount, inf.fcount);
     LOG(", expected: 0x%x\n", classes[eventsCount].fcount);
     result = STATUS_FAILED;
   }
   if (inf.icount != classes[eventsCount].icount) {
-    LOG("(#%" PRIuPTR ") wrong number of interfaces: 0x%x",
-           eventsCount, inf.icount);
+    LOG("(#%" PRIuPTR ") wrong number of interfaces: 0x%x", eventsCount, inf.icount);
     LOG(", expected: 0x%x\n", classes[eventsCount].icount);
     result = STATUS_FAILED;
   }
   eventsCount++;
 }
 
-#ifdef STATIC_BUILD
-JNIEXPORT jint JNICALL Agent_OnLoad_classprep01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNICALL Agent_OnAttach_classprep01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNI_OnLoad_classprep01(JavaVM *jvm, char *options, void *reserved) {
-    return JNI_VERSION_1_8;
-}
-#endif
 jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiCapabilities caps;
   jvmtiError err;
@@ -288,8 +258,7 @@ jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ClassPrepare = &ClassPrepare;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -324,11 +293,9 @@ Java_classprep01_getReady(JNIEnv *jni, jclass cls) {
   LOG("Requesting enabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
   print_thread_info(jvmti, jni, prep_thread);
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_CLASS_PREPARE, prep_thread);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_PREPARE, prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("Failed to enable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to enable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }
@@ -352,17 +319,14 @@ Java_classprep01_check(JNIEnv *jni, jclass cls) {
   LOG("Requesting disabling JVMTI_EVENT_CLASS_PREPARE in thread.\n");
   print_thread_info(jvmti, jni, prep_thread);
 
-  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
-                                        JVMTI_EVENT_CLASS_PREPARE, prep_thread);
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_CLASS_PREPARE, prep_thread);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("Failed to disable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to disable JVMTI_EVENT_CLASS_PREPARE: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (eventsCount != eventsExpected) {
-    LOG("Wrong number of class prepare events: %" PRIuPTR ", expected: %" PRIuPTR "\n",
-           eventsCount, eventsExpected);
+    LOG("Wrong number of class prepare events: %" PRIuPTR ", expected: %" PRIuPTR "\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   return result;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,13 +37,8 @@ static jmethodID mid1;
 
 // If mustPass is false we just check if we have reached the correct instruction location.
 // This is used to wait for the child thread to reach the expected position.
-jboolean checkFrame(jvmtiEnv *jvmti_env,
-                    JNIEnv *jni,
-                    jthread thr,
-                    jmethodID exp_mid,
-                    jlocation exp_loc,
-                    jlocation exp_loc_alternative,
-                    jboolean mustPass) {
+jboolean checkFrame(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thr, jmethodID exp_mid,
+                    jlocation exp_loc, jlocation exp_loc_alternative, jboolean mustPass) {
   jvmtiError err;
   jmethodID mid = NULL;
   jlocation loc = -1;
@@ -70,7 +65,7 @@ jboolean checkFrame(jvmtiEnv *jvmti_env,
     if (!isOk && mustPass) {
       LOG("Method \"%s\" current frame's location", meth);
       LOG(" expected: 0x%x or 0x%x, got: 0x%x%08x\n",
-             (jint) exp_loc, (jint) exp_loc_alternative, (jint) (loc >> 32), (jint) loc);
+          (jint) exp_loc, (jint) exp_loc_alternative, (jint) (loc >> 32), (jint) loc);
       result = STATUS_FAILED;
     }
   }
@@ -81,7 +76,8 @@ void JNICALL
 ExceptionCatch(jvmtiEnv *jvmti_env, JNIEnv *env, jthread thr,
                jmethodID method, jlocation location, jobject exception) {
   if (method == mid1) {
-    checkFrame(jvmti_env, (JNIEnv *) env, thr, method, location, location, JNI_TRUE);
+    checkFrame(jvmti_env, (JNIEnv *) env, thr, method,
+               location, location, JNI_TRUE);
   }
 }
 
@@ -105,31 +101,26 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-
-
   callbacks.ExceptionCatch = &ExceptionCatch;
   err = jvmti_env->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
     LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
-
-
   return JNI_OK;
 }
 
 JNIEXPORT void JNICALL
-Java_frameloc01_getReady(JNIEnv *env, jclass cls, jclass klass) {
+Java_frameloc01_getReady(JNIEnv *jni, jclass cls, jclass klass) {
   jvmtiError err;
-  mid1 = env->GetMethodID(klass, "meth01", "(I)V");
+  mid1 = jni->GetMethodID(klass, "meth01", "(I)V");
   if (mid1 == NULL) {
     LOG("Cannot get jmethodID for method \"meth01\"\n");
     result = STATUS_FAILED;
     return;
   }
 
-  err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_EXCEPTION_CATCH, NULL);
+  err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_EXCEPTION_CATCH, NULL);
   if (err != JVMTI_ERROR_NONE) {
     LOG("(SetEventNotificationMode) unexpected error: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;

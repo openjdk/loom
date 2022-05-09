@@ -1508,7 +1508,7 @@ JVM_ENTRY(jstring, JVM_GetClassSignature(JNIEnv *env, jclass cls))
   JvmtiVMObjectAllocEventCollector oam;
   ResourceMark rm(THREAD);
   oop mirror = JNIHandles::resolve_non_null(cls);
-  // Return null for arrays and primatives
+  // Return null for arrays and primitives
   if (!java_lang_Class::is_primitive(mirror)) {
     Klass* k = java_lang_Class::as_Klass(mirror);
     if (k->is_instance_klass()) {
@@ -3179,22 +3179,22 @@ JVM_ENTRY(void, JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring na
   }
 JVM_END
 
-JVM_ENTRY(jobject, JVM_ScopeLocalCache(JNIEnv* env, jclass threadClass))
-  oop theCache = thread->scopeLocalCache();
+JVM_ENTRY(jobject, JVM_ExtentLocalCache(JNIEnv* env, jclass threadClass))
+  oop theCache = thread->extentLocalCache();
   if (theCache) {
     arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
+    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
   }
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
-JVM_ENTRY(void, JVM_SetScopeLocalCache(JNIEnv* env, jclass threadClass,
+JVM_ENTRY(void, JVM_SetExtentLocalCache(JNIEnv* env, jclass threadClass,
                                        jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
   if (objs != NULL) {
-    assert(objs->length() == ScopeLocalCacheSize * 2, "wrong length");
+    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
   }
-  thread->set_scopeLocalCache(objs);
+  thread->set_extentLocalCache(objs);
 JVM_END
 
 // java.lang.SecurityManager ///////////////////////////////////////////////////////////////////////

@@ -97,6 +97,8 @@
   template(ETYPE_name,                                "ETYPE")                                              \
   template(VLENGTH_name,                              "VLENGTH")                                            \
                                                                                                   \
+  template(jdk_internal_vm_FillerObject,              "jdk/internal/vm/FillerObject")             \
+                                                                                                  \
   template(java_lang_Shutdown,                        "java/lang/Shutdown")                       \
   template(java_lang_ref_Reference,                   "java/lang/ref/Reference")                  \
   template(java_lang_ref_SoftReference,               "java/lang/ref/SoftReference")              \
@@ -346,6 +348,8 @@
   template(findMethodHandleType_signature,       "(Ljava/lang/Class;[Ljava/lang/Class;)Ljava/lang/invoke/MethodType;") \
   template(invokeExact_name,                          "invokeExact")                              \
   template(linkMethodHandleConstant_name,             "linkMethodHandleConstant")                 \
+  template(asFixedArity_name,                         "asFixedArity")                             \
+  template(asFixedArity_signature,                    "()Ljava/lang/invoke/MethodHandle;")        \
   template(linkMethodHandleConstant_signature, "(Ljava/lang/Class;ILjava/lang/Class;Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/invoke/MethodHandle;") \
   template(linkMethod_name,                           "linkMethod")                               \
   template(linkMethod_signature, "(Ljava/lang/Class;ILjava/lang/Class;Ljava/lang/String;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;") \
@@ -523,8 +527,8 @@
   template(data_cache_line_flush_size_name,           "DATA_CACHE_LINE_FLUSH_SIZE")               \
   template(during_unsafe_access_name,                 "during_unsafe_access")                     \
   template(checkIndex_name,                           "checkIndex")                               \
-  template(scoped_cache_shift_name,                   "SCOPED_CACHE_SHIFT")                       \
   template(jfr_epoch_name,                            "jfr_epoch")                                \
+  template(maxThawingSize_name,                       "maxThawingSize")                           \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \

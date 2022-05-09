@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,16 +28,12 @@
 
 extern "C" {
 
-/* ============================================================================= */
-
 /* scaffold objects */
 static jlong timeout = 0;
 
 /* constant names */
 #define THREAD_NAME     "TestedThread"
 #define N_LATE_CALLS    10000
-
-/* ============================================================================= */
 
 /** Agent algorithm. */
 static void JNICALL
@@ -87,8 +83,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
         LOG("SuspendThread() does not turn on flag SUSPENDED:\n"
-               "#   state: %s (%d)\n",
-               TranslateState(state), (int) state);
+            "#   state: %s (%d)\n", TranslateState(state), (int) state);
         set_agent_fail_status();
       }
     }
@@ -127,8 +122,8 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
     LOG("INFO: made %d late calls to JVM/TI SuspendThread()\n", late_count);
     LOG("INFO: N_LATE_CALLS == %d value is %slarge enough to cause a "
-           "SuspendThread() call after thread exit.\n", N_LATE_CALLS,
-           (late_count == N_LATE_CALLS) ? "NOT " : "");
+        "SuspendThread() call after thread exit.\n", N_LATE_CALLS,
+        (late_count == N_LATE_CALLS) ? "NOT " : "");
 
     /* Second part of original agentProc test block starts here: */
     LOG("Wait for thread to finish\n");
@@ -148,8 +143,6 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
   /* Second part of original agentProc test block ends here. */
 }
 
-/* ============================================================================= */
-
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEnv *jvmti = NULL;
 
@@ -161,7 +154,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-
   /* add specific capabilities for suspending thread */
   jvmtiCapabilities suspendCaps;
   memset(&suspendCaps, 0, sizeof(suspendCaps));
@@ -169,7 +161,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   if (jvmti->AddCapabilities(&suspendCaps) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
   }
-
 
   if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
     return JNI_ERR;
@@ -181,7 +172,5 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   return JNI_OK;
 }
-
-/* ============================================================================= */
 
 }

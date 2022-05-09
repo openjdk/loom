@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2004, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,18 +41,21 @@ static jint state[] = {
 };
 
 void printStateFlags(jint flags) {
-  if (flags & JVMTI_THREAD_STATE_SUSPENDED)
-   LOG(" JVMTI_THREAD_STATE_SUSPENDED");
-  if (flags & JVMTI_THREAD_STATE_INTERRUPTED)
-   LOG(" JVMTI_THREAD_STATE_INTERRUPTED");
-  if (flags & JVMTI_THREAD_STATE_IN_NATIVE)
-   LOG(" JVMTI_THREAD_STATE_IN_NATIVE");
+  if (flags & JVMTI_THREAD_STATE_SUSPENDED) {
+    LOG(" JVMTI_THREAD_STATE_SUSPENDED");
+  }
+  if (flags & JVMTI_THREAD_STATE_INTERRUPTED) {
+    LOG(" JVMTI_THREAD_STATE_INTERRUPTED");
+  }
+  if (flags & JVMTI_THREAD_STATE_IN_NATIVE) {
+    LOG(" JVMTI_THREAD_STATE_IN_NATIVE");
+  }
   LOG(" (0x%0x)\n", flags);
 }
 
-void JNICALL VMInit(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thr) {
-  jvmtiError err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE,
-                                            JVMTI_EVENT_THREAD_START, NULL);
+void JNICALL
+VMInit(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thr) {
+  jvmtiError err = jvmti_env->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   check_jvmti_status(jni, err, "Failed to enable THREAD_START event");
 }
 
@@ -99,8 +102,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_VM_INIT, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_VM_INIT, NULL);
   if (err != JVMTI_ERROR_NONE) {
     LOG("Failed to enable VM_INIT event: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
@@ -110,8 +112,7 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_thrstat02_init(JNIEnv *jni, jclass cls,
-                    jint waitTime) {
+Java_thrstat02_init(JNIEnv *jni, jclass cls, jint waitTime) {
   wait_time = waitTime * 60000;
 }
 
@@ -156,8 +157,7 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
       break;
     }
     suspState = thrState & JVMTI_THREAD_STATE_SUSPENDED;
-    if (suspended || (thrState & JVMTI_THREAD_STATE_RUNNABLE) == 0 ||
-        (state[statInd] == JVMTI_THREAD_STATE_RUNNABLE)) {
+    if (suspended || (thrState & JVMTI_THREAD_STATE_RUNNABLE) == 0 || (state[statInd] == JVMTI_THREAD_STATE_RUNNABLE)) {
       timeout_is_reached = JNI_FALSE;
       break;
     }
@@ -176,15 +176,12 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
   }
   if ((thrState & state[statInd]) == 0) {
     LOG("#1: Wrong thread \"tested_thread_thr1\" (0x%p%s) state:\n", thr_ptr, suspStr);
-    LOG("    expected: %s (%d)\n",
-           TranslateState(state[statInd]), state[statInd]);
-    LOG("      actual: %s (%d)\n",
-           TranslateState(thrState), thrState);
+    LOG("    expected: %s (%d)\n", TranslateState(state[statInd]), state[statInd]);
+    LOG("      actual: %s (%d)\n", TranslateState(thrState), thrState);
     result = JNI_FALSE;
   }
   if (suspState != right_stat) {
-    LOG("#2: Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n",
-           thr_ptr, suspStr);
+    LOG("#2: Wrong thread \"tested_thread_thr1\" (0x%p%s) state flags:\n", thr_ptr, suspStr);
     LOG("    expected:");
     printStateFlags(right_stat);
     LOG("    actual:");
@@ -194,10 +191,8 @@ Java_thrstat02_checkStatus0(JNIEnv *jni, jclass cls, jint statInd, jboolean susp
 
   err = jvmti->SuspendThread(thr_ptr);
   if (err != right_ans) {
-    LOG("#3: Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n",
-           thr_ptr, suspStr);
-    LOG("    expected: %s (%d), actual: %s (%d)\n",
-           TranslateError(right_ans), right_ans, TranslateError(err), err);
+    LOG("#3: Wrong result of SuspendThread() for \"tested_thread_thr1\" (0x%p%s):\n", thr_ptr, suspStr);
+    LOG("    expected: %s (%d), actual: %s (%d)\n", TranslateError(right_ans), right_ans, TranslateError(err), err);
     result = JNI_FALSE;
   }
 

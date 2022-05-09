@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,15 +41,14 @@ static int eventsCount = 0;
 static int eventsExpected = 0;
 static const char *prefix = NULL;
 
-void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
-  jvmtiError err;
+void JNICALL
+ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   jvmtiThreadInfo inf;
   char name[32];
 
-  err = jvmti->GetThreadInfo(thread, &inf);
+  jvmtiError err = jvmti->GetThreadInfo(thread, &inf);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(GetThreadInfo#%d) unexpected error: %s (%d)\n",
-           eventsCount, TranslateError(err), err);
+    LOG("(GetThreadInfo#%d) unexpected error: %s (%d)\n", eventsCount, TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
@@ -58,8 +57,7 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   if (inf.name != NULL && strstr(inf.name, prefix) == inf.name) {
     sprintf(name, "%s%d", prefix, eventsCount);
     if (strcmp(name, inf.name) != 0) {
-      LOG("(#%d) wrong thread name: \"%s\"",
-             eventsCount, inf.name);
+      LOG("(#%d) wrong thread name: \"%s\"", eventsCount, inf.name);
       LOG(", expected: \"%s\"\n", name);
       result = STATUS_FAILED;
     }
@@ -67,18 +65,7 @@ void JNICALL ThreadStart(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread) {
   }
 }
 
-#ifdef STATIC_BUILD
-JNIEXPORT jint JNICALL Agent_OnLoad_threadstart01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNICALL Agent_OnAttach_threadstart01(JavaVM *jvm, char *options, void *reserved) {
-    return Agent_Initialize(jvm, options, reserved);
-}
-JNIEXPORT jint JNI_OnLoad_threadstart01(JavaVM *jvm, char *options, void *reserved) {
-    return JNI_VERSION_1_8;
-}
-#endif
-jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
+jint Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   jvmtiError err;
   jint res;
 
@@ -91,8 +78,7 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
   callbacks.ThreadStart = &ThreadStart;
   err = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
   if (err != JVMTI_ERROR_NONE) {
-    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
 
@@ -100,8 +86,7 @@ jint  Agent_Initialize(JavaVM *jvm, char *options, void *reserved) {
 }
 
 JNIEXPORT void JNICALL
-Java_threadstart01_getReady(JNIEnv *jni,
-                                                   jclass cls, jint i, jstring name) {
+Java_threadstart01_getReady(JNIEnv *jni, jclass cls, jint i, jstring name) {
   jvmtiError err;
 
   if (jvmti == NULL) {
@@ -116,13 +101,11 @@ Java_threadstart01_getReady(JNIEnv *jni,
     return;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE,
-                                        JVMTI_EVENT_THREAD_START, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_THREAD_START, NULL);
   if (err == JVMTI_ERROR_NONE) {
     eventsExpected = i;
   } else {
-    LOG("Failed to enable JVMTI_EVENT_THREAD_START: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to enable JVMTI_EVENT_THREAD_START: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 }
@@ -136,17 +119,14 @@ Java_threadstart01_check(JNIEnv *jni, jclass cls) {
     return STATUS_FAILED;
   }
 
-  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE,
-                                        JVMTI_EVENT_THREAD_START, NULL);
+  err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_THREAD_START, NULL);
   if (err != JVMTI_ERROR_NONE) {
-    LOG("Failed to disable JVMTI_EVENT_THREAD_START: %s (%d)\n",
-           TranslateError(err), err);
+    LOG("Failed to disable JVMTI_EVENT_THREAD_START: %s (%d)\n", TranslateError(err), err);
     result = STATUS_FAILED;
   }
 
   if (eventsCount != eventsExpected) {
-    LOG("Wrong number of thread start events: %d, expected: %d\n",
-           eventsCount, eventsExpected);
+    LOG("Wrong number of thread start events: %d, expected: %d\n", eventsCount, eventsExpected);
     result = STATUS_FAILED;
   }
   return result;

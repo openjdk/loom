@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -76,8 +76,7 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
 
       if ((state & JVMTI_THREAD_STATE_SUSPENDED) != 0) {
         LOG("SuspendThread() does not turn off flag SUSPENDED:\n"
-               "#   state:  %s (%d)\n",
-               TranslateState(state), (int) state);
+               "#   state:  %s (%d)\n", TranslateState(state), (int) state);
         set_agent_fail_status();
       }
     }
@@ -99,9 +98,6 @@ agentProc(jvmtiEnv *jvmti, JNIEnv *jni, void *arg) {
     return;
 }
 
-/* ============================================================================= */
-
-/** Agent library initialization. */
 jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
   jvmtiEnv *jvmti = NULL;
 
@@ -114,13 +110,11 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     return JNI_ERR;
   }
 
-  {
-    jvmtiCapabilities caps;
-    memset(&caps, 0, sizeof(caps));
-    caps.can_suspend = 1;
-    if (jvmti->AddCapabilities(&caps) != JVMTI_ERROR_NONE) {
-      return JNI_ERR;
-    }
+  jvmtiCapabilities caps;
+  memset(&caps, 0, sizeof(caps));
+  caps.can_suspend = 1;
+  if (jvmti->AddCapabilities(&caps) != JVMTI_ERROR_NONE) {
+    return JNI_ERR;
   }
 
   if (init_agent_data(jvmti, &agent_data) != JVMTI_ERROR_NONE) {
@@ -133,7 +127,5 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
 
   return JNI_OK;
 }
-
-/* ============================================================================= */
 
 }

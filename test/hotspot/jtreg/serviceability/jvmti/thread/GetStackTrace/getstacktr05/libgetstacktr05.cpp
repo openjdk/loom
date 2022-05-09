@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -56,7 +56,8 @@ static frame_info expected_virtual_frames[] = {
 };
 
 
-void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmethodID method, jlocation location) {
+void JNICALL
+Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmethodID method, jlocation location) {
   jint frame_count = 0;
 
   if (mid != method) {
@@ -81,8 +82,8 @@ void JNICALL Breakpoint(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmetho
 }
 
 
-void JNICALL SingleStep(jvmtiEnv *jvmti_env, JNIEnv *jni,
-                        jthread thread, jmethodID method, jlocation location) {
+void JNICALL
+SingleStep(jvmtiEnv *jvmti_env, JNIEnv *jni, jthread thread, jmethodID method, jlocation location) {
   set_event_notification_mode(jvmti, jni, JVMTI_DISABLE, JVMTI_EVENT_SINGLE_STEP, thread);
   frame_info *expected_frames = jni->IsVirtualThread(thread)
       ? expected_virtual_frames
@@ -122,7 +123,6 @@ jint Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     LOG("(SetEventCallbacks) unexpected error: %s (%d)\n", TranslateError(err), err);
     return JNI_ERR;
   }
-
 
   return JNI_OK;
 }

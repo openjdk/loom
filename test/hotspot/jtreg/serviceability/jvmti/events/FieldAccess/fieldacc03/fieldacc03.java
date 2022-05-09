@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -65,10 +65,10 @@ public class fieldacc03 {
     native static int check();
 
     public static void main(String args[]) {
-        testKernel();
-        testVirtual();
+        testPlatformThread();
+        testVirtualThread();
     }
-    public static void testVirtual() {
+    public static void testVirtualThread() {
         Thread thread = Thread.startVirtualThread(() -> {
             getReady();
             fieldacc03a t = new fieldacc03a();
@@ -85,7 +85,7 @@ public class fieldacc03 {
             throw new RuntimeException("check failed with result " + result);
         }
     }
-    public static void testKernel() {
+    public static void testPlatformThread() {
         getReady();
         fieldacc03a t = new fieldacc03a();
         t.run();
