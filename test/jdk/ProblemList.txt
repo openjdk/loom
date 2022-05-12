@@ -812,7 +812,5 @@ java/awt/Focus/FrameMinimizeTest/FrameMinimizeTest.java 8016266 linux-x64
 
 # Loom, fibers branch
 
-com/sun/jdi/EATests.java#id0                                    8264699 generic-all
-
 java/lang/Thread/virtual/PreviewFeaturesNotEnabled.java         0000000 generic-all
 jdk/incubator/concurrent/ExtentLocal/Stress.java                 0000000 generic-all
