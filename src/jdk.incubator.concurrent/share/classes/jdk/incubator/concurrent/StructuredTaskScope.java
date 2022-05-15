@@ -205,8 +205,8 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <h2><a id="TreeStructure">Tree structure</a></h2>
  *
- * StructuredTaskScopes form a tree where parent-child relations are established implicitly
- * when opening a new task scope:
+ * StructuredTaskScopes form a tree where parent-child relations are established
+ * implicitly when opening a new task scope:
  * <ul>
  *   <li> A parent-child relation is established when a thread started in a task scope
  *   opens its own task scope. A thread started in task scope "A" that opens task scope
@@ -219,16 +219,17 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> The tree structure supports:
  * <ul>
- *   <li> Inheritance of {@linkplain ExtentLocal extent-local} bindings by threads.
+ *   <li> Inheritance of {@linkplain ExtentLocal extent-local} variables across threads.
  *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
  *   descriptions means threads started in the task scope or descendant scopes.
  * </ul>
  *
- * <p> The following example demonstrates the inheritance of a extent-local binding. A
- * scope local {@code NAME} is bound to the value "duke". A StructuredTaskScope is created
- * and its {@code fork} method invoked to start a thread to execute {@code childTask}. The
- * thread inherits the extent-local binding. The code in {@code childTask} uses the value
- * of the extent-local and so reads the value "duke".
+ * <p> The following example demonstrates the inheritance of an extent-local variable. An
+ * extent local {@code NAME} is bound to the value "duke". A StructuredTaskScope is created
+ * and its {@code fork} method invoked to start a thread to execute {@code childTask}.
+ * The thread inherits the extent-local {@linkplain ExtentLocal.Carrier bindings} captured
+ * when creating the task scope. The code in {@code childTask} uses the value of the
+ * extent-local and so reads the value "duke".
  * {@snippet lang=java :
  *     private static final ExtentLocal<String> NAME = ExtentLocal.newInstance();
  *
