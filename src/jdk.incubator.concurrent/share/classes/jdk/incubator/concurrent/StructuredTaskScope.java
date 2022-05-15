@@ -323,6 +323,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * <p> This method is equivalent to invoking the 2-arg constructor with a name of
      * {@code null} and a thread factory that creates virtual threads.
+     *
+     * @throws UnsupportedOperationException if preview features are not enabled
      */
     public StructuredTaskScope() {
         this(null, FactoryHolder.VIRTUAL_THREAD_FACTORY);
