@@ -47,6 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.ThreadFlock;
 
 /**
@@ -327,7 +328,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @throws UnsupportedOperationException if preview features are not enabled
      */
     public StructuredTaskScope() {
-        this(null, FactoryHolder.VIRTUAL_THREAD_FACTORY);
+        PreviewFeatures.ensureEnabled();
+        this.factory = FactoryHolder.virtualThreadFactory();
+        this.flock = ThreadFlock.open(null);
     }
 
     /**
