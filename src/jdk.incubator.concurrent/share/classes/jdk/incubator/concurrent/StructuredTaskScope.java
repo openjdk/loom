@@ -329,7 +329,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      */
     public StructuredTaskScope() {
         PreviewFeatures.ensureEnabled();
-        this.factory = FactoryHolder.virtualThreadFactory();
+        this.factory = FactoryHolder.VIRTUAL_THREAD_FACTORY;
         this.flock = ThreadFlock.open(null);
     }
 
