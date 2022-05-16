@@ -24,10 +24,11 @@
 /*
  * @test
  * @summary Basic tests for StructuredTaskScope
+ * @enablePreview
  * @modules jdk.incubator.concurrent
- * @compile --enable-preview -source ${jdk.version} StructuredTaskScopeTest.java
- * @run testng/othervm --enable-preview StructuredTaskScopeTest
+ * @run testng/othervm StructuredTaskScopeTest
  */
+
 import jdk.incubator.concurrent.StructuredTaskScope;
 import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnSuccess;
 import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnFailure;
