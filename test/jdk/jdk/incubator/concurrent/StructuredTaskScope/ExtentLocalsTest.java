@@ -131,7 +131,7 @@ public class ExtentLocalsTest {
 
         try (var scope = new StructuredTaskScope()) {
             ExtentLocal.where(NAME, "x").run(() -> {
-                expectThrows(StructureViolationException.class,
+                assertThrows(StructureViolationException.class,
                         () -> scope.fork(() -> "foo"));
             });
         }
@@ -150,7 +150,7 @@ public class ExtentLocalsTest {
         ExtentLocal.where(NAME1, "x").run(() -> {
             try (var scope = new StructuredTaskScope()) {
                 ExtentLocal.where(NAME1, "y").run(() -> {
-                    expectThrows(StructureViolationException.class,
+                    assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });
             }
@@ -160,7 +160,7 @@ public class ExtentLocalsTest {
         ExtentLocal.where(NAME1, "x").run(() -> {
             try (var scope = new StructuredTaskScope()) {
                 ExtentLocal.where(NAME2, "y").run(() -> {
-                    expectThrows(StructureViolationException.class,
+                    assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });
             }

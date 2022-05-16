@@ -194,7 +194,7 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope(null, factory)) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.fork(() -> null));
+            assertThrows(IllegalStateException.class, () -> scope.fork(() -> null));
         }
     }
 
@@ -205,7 +205,7 @@ public class StructuredTaskScopeTest {
     public void testForkReject() throws Exception {
         ThreadFactory factory = task -> null;
         try (var scope = new StructuredTaskScope(null, factory)) {
-            expectThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
+            assertThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
             scope.join();
         }
     }
@@ -479,8 +479,8 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.join());
-            expectThrows(IllegalStateException.class, () -> scope.joinUntil(Instant.now()));
+            assertThrows(IllegalStateException.class, () -> scope.join());
+            assertThrows(IllegalStateException.class, () -> scope.joinUntil(Instant.now()));
         }
     }
 
@@ -651,7 +651,7 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.shutdown());
+            assertThrows(IllegalStateException.class, () -> scope.shutdown());
         }
     }
 
@@ -713,7 +713,7 @@ public class StructuredTaskScopeTest {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
-            expectThrows(IllegalStateException.class, scope::close);
+            assertThrows(IllegalStateException.class, scope::close);
             assertTrue(future.isDone() && future.exceptionNow() != null);
         }
     }
@@ -731,7 +731,7 @@ public class StructuredTaskScopeTest {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
-            expectThrows(IllegalStateException.class, scope::close);
+            assertThrows(IllegalStateException.class, scope::close);
             assertTrue(future.isDone() && future.exceptionNow() != null);
         }
     }
@@ -923,7 +923,7 @@ public class StructuredTaskScopeTest {
             } catch (TimeoutException expected) { }
 
             future.cancel(true);
-            expectThrows(CancellationException.class, future::get);
+            assertThrows(CancellationException.class, future::get);
             assertTrue(future.state() == Future.State.CANCELLED);
 
             scope.join();
@@ -1020,24 +1020,24 @@ public class StructuredTaskScopeTest {
      */
     @Test
     public void testNulls() throws Exception {
-        expectThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
+        assertThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
         try (var scope = new StructuredTaskScope()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new ShutdownOnSuccess("", null));
+        assertThrows(NullPointerException.class, () -> new ShutdownOnSuccess("", null));
         try (var scope = new ShutdownOnSuccess<Object>()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            expectThrows(NullPointerException.class, () -> scope.result(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.result(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
+        assertThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
         try (var scope = new ShutdownOnFailure()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            expectThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
         }
     }
 
@@ -1047,8 +1047,8 @@ public class StructuredTaskScopeTest {
     @Test
     public void testShutdownOnSuccess1() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
-            expectThrows(IllegalStateException.class, () -> scope.result());
-            expectThrows(IllegalStateException.class, () -> scope.result(e -> null));
+            assertThrows(IllegalStateException.class, () -> scope.result());
+            assertThrows(IllegalStateException.class, () -> scope.result(e -> null));
         }
     }
 
@@ -1122,7 +1122,7 @@ public class StructuredTaskScopeTest {
 
             scope.join();
 
-            expectThrows(CancellationException.class, () -> scope.result());
+            assertThrows(CancellationException.class, () -> scope.result());
             Throwable ex = expectThrows(FooException.class,
                                         () -> scope.result(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
@@ -1200,7 +1200,7 @@ public class StructuredTaskScopeTest {
             Throwable ex = scope.exception().orElse(null);
             assertTrue(ex instanceof CancellationException);
 
-            expectThrows(CancellationException.class, () -> scope.throwIfFailed());
+            assertThrows(CancellationException.class, () -> scope.throwIfFailed());
 
             ex = expectThrows(FooException.class,
                               () -> scope.throwIfFailed(e -> new FooException(e)));
