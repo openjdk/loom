@@ -222,6 +222,7 @@ runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java
 runtime/cds/appcds/MissingSuperTest.java
 runtime/cds/appcds/MultiProcessSharing.java
 runtime/cds/appcds/MultiReleaseJars.java
+runtime/cds/appcds/NestHostOldInf.java
 runtime/cds/appcds/NonExistClasspath.java
 runtime/cds/appcds/OldClassTest.java
 runtime/cds/appcds/PackageSealing.java
@@ -329,6 +330,7 @@ runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest
 runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
 runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
 runtime/cds/appcds/dynamicArchive/ModulePath.java
+runtime/cds/appcds/dynamicArchive/NestHostOldInf.java
 runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
 runtime/cds/appcds/javaldr/ArrayTest.java
 runtime/cds/appcds/javaldr/GCDuringDump.java

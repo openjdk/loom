@@ -24,12 +24,11 @@
 /*
  * @test
  * @summary Basic tests for StructuredTaskScope
+ * @enablePreview
  * @modules jdk.incubator.concurrent
- * @compile --enable-preview -source ${jdk.version} StructuredTaskScopeTest.java
- * @run testng/othervm --enable-preview StructuredTaskScopeTest
+ * @run testng/othervm StructuredTaskScopeTest
  */
 
-import jdk.incubator.concurrent.ExtentLocal;
 import jdk.incubator.concurrent.StructuredTaskScope;
 import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnSuccess;
 import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnFailure;
@@ -195,7 +194,7 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope(null, factory)) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.fork(() -> null));
+            assertThrows(IllegalStateException.class, () -> scope.fork(() -> null));
         }
     }
 
@@ -206,7 +205,7 @@ public class StructuredTaskScopeTest {
     public void testForkReject() throws Exception {
         ThreadFactory factory = task -> null;
         try (var scope = new StructuredTaskScope(null, factory)) {
-            expectThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
+            assertThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
             scope.join();
         }
     }
@@ -302,50 +301,6 @@ public class StructuredTaskScopeTest {
             assertTrue(future1.isDone());
             assertTrue(scope.futures().count() == 0L);
         }
-    }
-
-    /**
-     * Test that fork inherits a extent-local binding.
-     */
-    @Test
-    public void testForkInheritsExtentLocals1() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-        String value = ExtentLocal.where(NAME, "x").call(() -> {
-            try (var scope = new StructuredTaskScope()) {
-                Future<String> future = scope.fork(() -> {
-                    // child
-                    return NAME.get();
-                });
-                scope.join();
-                return future.resultNow();
-            }
-        });
-        assertEquals(value, "x");
-    }
-
-    /**
-     * Test that fork inherits a extent-local binding into a grandchild.
-     */
-    @Test
-    public void testForkInheritsExtentLocals2() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-        String value = ExtentLocal.where(NAME, "x").call(() -> {
-            try (var scope1 = new StructuredTaskScope()) {
-                Future<String> future1 = scope1.fork(() -> {
-                    try (var scope2 = new StructuredTaskScope()) {
-                        Future<String> future2 = scope2.fork(() -> {
-                            // grandchild
-                            return NAME.get();
-                        });
-                        scope2.join();
-                        return future2.resultNow();
-                    }
-                });
-                scope1.join();
-                return future1.resultNow();
-            }
-        });
-        assertEquals(value, "x");
     }
 
     /**
@@ -524,8 +479,8 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.join());
-            expectThrows(IllegalStateException.class, () -> scope.joinUntil(Instant.now()));
+            assertThrows(IllegalStateException.class, () -> scope.join());
+            assertThrows(IllegalStateException.class, () -> scope.joinUntil(Instant.now()));
         }
     }
 
@@ -696,7 +651,7 @@ public class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope()) {
             scope.join();
             scope.close();
-            expectThrows(IllegalStateException.class, () -> scope.shutdown());
+            assertThrows(IllegalStateException.class, () -> scope.shutdown());
         }
     }
 
@@ -758,7 +713,7 @@ public class StructuredTaskScopeTest {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
-            expectThrows(IllegalStateException.class, scope::close);
+            assertThrows(IllegalStateException.class, scope::close);
             assertTrue(future.isDone() && future.exceptionNow() != null);
         }
     }
@@ -776,7 +731,7 @@ public class StructuredTaskScopeTest {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
-            expectThrows(IllegalStateException.class, scope::close);
+            assertThrows(IllegalStateException.class, scope::close);
             assertTrue(future.isDone() && future.exceptionNow() != null);
         }
     }
@@ -909,90 +864,6 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test exiting a extent local operation closes the thread flock of a
-     * nested scope.
-     */
-    @Test
-    public void testStructureViolation2() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        class Box {
-            StructuredTaskScope<Object> scope;
-        }
-        var box = new Box();
-        try {
-            try {
-                ExtentLocal.where(name, "x").run(() -> {
-                    box.scope = new StructuredTaskScope();
-                });
-                fail();
-            } catch (StructureViolationException expected) { }
-
-            // underlying flock should be closed, fork should return a cancelled task
-            StructuredTaskScope<Object> scope = box.scope;
-            AtomicBoolean ran = new AtomicBoolean();
-            Future<String> future = scope.fork(() -> {
-                ran.set(true);
-                return null;
-            });
-            assertTrue(future.isCancelled());
-            scope.join();
-            assertFalse(ran.get());
-
-        } finally {
-            StructuredTaskScope<Object> scope = box.scope;
-            if (scope != null) {
-                scope.close();
-            }
-        }
-    }
-
-    /**
-     * Test that fork throws StructureViolationException if extent-local bindings
-     * created after StructuredTaskScope is created.
-     */
-    @Test
-    public void testStructureViolation3() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-
-        try (var scope = new StructuredTaskScope()) {
-            ExtentLocal.where(NAME, "x").run(() -> {
-                expectThrows(StructureViolationException.class,
-                             () -> scope.fork(() -> "foo"));
-            });
-        }
-    }
-
-    /**
-     * Test that fork throws StructureViolationException if extent-local bindings
-     * changed after StructuredTaskScope is created.
-     */
-    @Test
-    public void testStructureViolation4() throws Exception {
-        ExtentLocal<String> NAME1 = ExtentLocal.newInstance();
-        ExtentLocal<String> NAME2 = ExtentLocal.newInstance();
-
-        // re-bind
-        ExtentLocal.where(NAME1, "x").run(() -> {
-            try (var scope = new StructuredTaskScope()) {
-                ExtentLocal.where(NAME1, "y").run(() -> {
-                    expectThrows(StructureViolationException.class,
-                                 () -> scope.fork(() -> "foo"));
-                });
-            }
-        });
-
-        // new binding
-        ExtentLocal.where(NAME1, "x").run(() -> {
-            try (var scope = new StructuredTaskScope()) {
-                ExtentLocal.where(NAME2, "y").run(() -> {
-                    expectThrows(StructureViolationException.class,
-                                 () -> scope.fork(() -> "foo"));
-                });
-            }
-        });
-    }
-
-    /**
      * Test Future::get, task completes normally.
      */
     @Test(dataProvider = "factories")
@@ -1052,7 +923,7 @@ public class StructuredTaskScopeTest {
             } catch (TimeoutException expected) { }
 
             future.cancel(true);
-            expectThrows(CancellationException.class, future::get);
+            assertThrows(CancellationException.class, future::get);
             assertTrue(future.state() == Future.State.CANCELLED);
 
             scope.join();
@@ -1149,24 +1020,24 @@ public class StructuredTaskScopeTest {
      */
     @Test
     public void testNulls() throws Exception {
-        expectThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
+        assertThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
         try (var scope = new StructuredTaskScope()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new ShutdownOnSuccess("", null));
+        assertThrows(NullPointerException.class, () -> new ShutdownOnSuccess("", null));
         try (var scope = new ShutdownOnSuccess<Object>()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            expectThrows(NullPointerException.class, () -> scope.result(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.result(null));
         }
 
-        expectThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
+        assertThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
         try (var scope = new ShutdownOnFailure()) {
-            expectThrows(NullPointerException.class, () -> scope.fork(null));
-            expectThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            expectThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
         }
     }
 
@@ -1176,8 +1047,8 @@ public class StructuredTaskScopeTest {
     @Test
     public void testShutdownOnSuccess1() throws Exception {
         try (var scope = new ShutdownOnSuccess<String>()) {
-            expectThrows(IllegalStateException.class, () -> scope.result());
-            expectThrows(IllegalStateException.class, () -> scope.result(e -> null));
+            assertThrows(IllegalStateException.class, () -> scope.result());
+            assertThrows(IllegalStateException.class, () -> scope.result(e -> null));
         }
     }
 
@@ -1251,7 +1122,7 @@ public class StructuredTaskScopeTest {
 
             scope.join();
 
-            expectThrows(CancellationException.class, () -> scope.result());
+            assertThrows(CancellationException.class, () -> scope.result());
             Throwable ex = expectThrows(FooException.class,
                                         () -> scope.result(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
@@ -1329,7 +1200,7 @@ public class StructuredTaskScopeTest {
             Throwable ex = scope.exception().orElse(null);
             assertTrue(ex instanceof CancellationException);
 
-            expectThrows(CancellationException.class, () -> scope.throwIfFailed());
+            assertThrows(CancellationException.class, () -> scope.throwIfFailed());
 
             ex = expectThrows(FooException.class,
                               () -> scope.throwIfFailed(e -> new FooException(e)));

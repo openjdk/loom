@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2020, 2021, Red Hat Inc.
+ * Copyright (c) 2020, 2022, Red Hat Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,7 +31,6 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
@@ -43,27 +42,42 @@ import jdk.internal.vm.annotation.Stable;
 import sun.security.action.GetPropertyAction;
 
 /**
- * Represents a variable that is local to an extent.
+ * Represents a variable that is local to an <em>extent</em>. It is a per-thread variable
+ * that allows context to be set in a caller and read by callees. The <em>extent</em> is
+ * the set of methods that the caller directly invokes, and any methods invoked
+ * transitively. Extent-local variables also provide a way to share immutable data across
+ * threads.
  *
- * <p> An extent-local variable (hereinafter called an extent local) differs from a normal variable in that it is dynamically
- * scoped and intended for cases where context needs to be passed from a caller
- * to a transitive callee without using an explicit parameter. An extent-local variable
- * does not have a default/initial value: it is bound, meaning it gets a value,
- * when executing an operation specified to {@link #where(ExtentLocal, Object)}.
- * Code executed by the operation
- * uses the {@link #get()} method to get the value of the extent local. The extent local reverts
- * to being unbound (or its previous value) when the operation completes.
+ * <p> An extent-local variable is bound, meaning it gets a value, when invoking an
+ * operation with the {@link Carrier#run(Runnable) Carrier.run} or {@link
+ * Carrier#call(Callable) Carrier.call} methods. {@link Carrier Carrier} instances are
+ * created by the static method {@link #where(ExtentLocal, Object)}. The operations
+ * executed by the {@code run} and {@code call} methods use the {@link #get()} method to
+ * read the value of a bound extent local. An extent-local variable reverts to being
+ * unbound (or its previous value) when the operation completes.
  *
- * <p> Access to the value of an extent local is controlled by the accessibility
- * of the {@code ExtentLocal} object. A {@code ExtentLocal} object  will typically be declared
- * in a private static field so that it can only be accessed by code in that class
- * (or other classes within its nest).
+ * <p> An {@code ExtentLocal} object will typically be declared in a {@code private
+ * static final} field so that it can only be accessed by code in that class (or other
+ * classes within its nest).
  *
- * <p> Extent locals support nested bindings. If an extent local has a value
- * then the {@code runWithBinding} or {@code callWithBinding} can be invoked to run
- * another operation with a new value. Code executed by this methods "sees" the new
- * value of the extent local. The extent local reverts to its previous value when the
- * operation completes.
+ * <p> {@link ExtentLocal} bindings are immutable: there is no "{@code set}" method.
+ * There may be cases when an operation might need to use the same extent-local variable
+ * to communicate a different value to the methods that it calls. The requirement is not
+ * to change the original binding but to establish a new binding for nested calls. If an
+ * extent local already has a value, then {@code run} or {@code call} methods may be
+ * invoked to run another operation with a newly-bound value. Code executed by the
+ * operation will read the new value of the extent local. The extent local reverts to its
+ * previous value when the operation completes.
+ *
+ * <h2> Sharing extent-local variables across threads </h2>
+ *
+ * Extent-local variables can be shared across threads when used in conjunction with
+ * {@link StructuredTaskScope}. Creating a {@code StructuredTaskScope} captures the
+ * current thread's extent-local bindings for inheritance by threads {@link
+ * StructuredTaskScope#fork(Callable) forked} in the task scope. This means that a thread
+ * may bind an extent-local variable and share its value in a structured concurrency
+ * context. Threads forked in the task scope that read the extent-local variable will read
+ * the value bound by the thread that created the task scope.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -71,38 +85,71 @@ import sun.security.action.GetPropertyAction;
  * @apiNote
  * The following example uses an extent local to make credentials available to callees.
  *
- * <pre>{@code
+ * {@snippet lang=java :
+ *   // @link substring="newInstance" target="ExtentLocal#newInstance" :
  *   private static final ExtentLocal<Credentials> CREDENTIALS = ExtentLocal.newInstance();
  *
  *   Credentials creds = ...
  *   ExtentLocal.where(CREDENTIALS, creds).run(() -> {
- *       :
+ *       ...
  *       Connection connection = connectDatabase();
- *       :
+ *       ...
  *   });
  *
+ *   ...
+ *
  *   Connection connectDatabase() {
+ *       // @link substring="get" target="ExtentLocal#get" :
  *       Credentials credentials = CREDENTIALS.get();
- *       :
+ *       ...
  *   }
- * }</pre>
+ * }
  *
- * @implNote Extent locals are designed to be used in fairly small numbers. {@link
- * #get} initially performs a linear search through enclosing scopes to find a
- * extent local's innermost binding. It then caches the result of the search in a
- * small thread-local cache. Subsequent invocations of {@link #get} for that
- * extent local will almost always be very fast. However, if a program has many
- * extent locals that it uses cyclically, the cache hit rate will be low and
- * performance will be poor. On the other hand, this design allows extent-local
- * inheritance by {@link StructuredTaskScope} threads to be
- * very fast: in essence, no more than copying a pointer, and leaving a
- * extent-local binding also requires little more than updating a pointer.
+ * @implNote
+ * Extent-local variables are designed to be used in fairly small
+ * numbers. {@link #get} initially performs a search through enclosing
+ * scopes to find an extent-local variable's innermost binding. It
+ * then caches the result of the search in a small thread-local
+ * cache. Subsequent invocations of {@link #get} for that extent local
+ * will almost always be very fast. However, if a program has many
+ * extent-local variables that it uses cyclically, the cache hit rate
+ * will be low and performance will be poor. This design allows
+ * extent-local inheritance by {@link StructuredTaskScope} threads to
+ * be very fast: in essence, no more than copying a pointer, and
+ * leaving an extent-local binding also requires little more than
+ * updating a pointer.
  *
- * Because the extent-local per-thread cache is small, you should try to minimize
- * the number of bound extent locals in use. For example, if you need to pass a
- * number of values as extent locals, it makes sense to create a record class to
- * hold those values, and then bind a single extent local to an instance of that
+ * <p>Because the extent-local per-thread cache is small, you should
+ * try to minimize the number of bound extent-local variables in
+ * use. For example, if you need to pass a number of values in this
+ * way, it makes sense to create a record class to hold those values,
+ * and then bind a single extent-local variable to an instance of that
  * record.
+ *
+ * <p>For this incubator release, we have provided some system properties
+ * to tune the performance of extent-local variables.
+ *
+ * <p>The system property {@code jdk.incubator.concurrent.ExtentLocal.cacheSize}
+ * controls the size of the (per-thread) extent-local cache. This cache is crucial
+ * for the performance of extent-local variables. If it is too small,
+ * the runtime library will repeatedly need to scan for each
+ * {@link #get}. If it is too large, memory will be unnecessarily
+ * consumed. The default extent-local cache size is 16 entries. It may
+ * be varied from 2 to 16 entries in size. {@code ExtentLocal.cacheSize}
+ * must be an integer power of 2.
+ *
+ * <p>For example, you could use {@code -Djdk.incubator.concurrent.ExtentLocal.cacheSize=8}.
+ *
+ * <p>The other system property is {@code jdk.preserveExtentLocalCache}.
+ * This property determines whether the per-thread extent-local
+ * cache is preserved when a virtual thread is blocked. By default
+ * this property is set to {@code true}, meaning that every virtual
+ * thread preserves its extent-local cache when blocked. Like {@code
+ * ExtentLocal.cacheSize}, this is a space versus speed trade-off: if
+ * you have a great many virtual threads that are blocked most of the
+ * time, setting this property to {@code false} might result in a
+ * useful memory saving, but each virtual thread's extent-local cache
+ * would have to be regenerated after a blocking operation.
  *
  * @param <T> the extent local's type
  * @since 19
@@ -112,7 +159,8 @@ public final class ExtentLocal<T> {
 
     private final @Stable int hash;
 
-    public final int hashCode() { return hash; }
+    @Override
+    public int hashCode() { return hash; }
 
     /**
      * An immutable map from {@code ExtentLocal} to values.
@@ -171,10 +219,11 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * An immutable map from a set of ExtentLocals to their bound values.
-     * When map() or call() is invoked, the ExtentLocals bound in this set
-     * are bound, such that calling the get() method returns the associated
-     * value.
+     * An immutable map of extent-local variables to values.
+     * It define the {@link #run(Runnable) run} and {@link #call(Callable) call} methods
+     * to invoke an operation with the extent-local variable mappings bound to the thread
+     * that invokes {@code run} or {@code call}.
+     *
      * @since 19
      */
     public static final class Carrier {
@@ -205,21 +254,25 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Return a new map, which consists of the contents of this map plus a
-         * new binding of key and value.
-         * @param key   The ExtentLocal to bind a value to
-         * @param value The new value
-         * @param <T>   The type of the ExtentLocal
-         * @return A new map, consisting of {@code this}. plus a new binding. {@code this} is unchanged.
+         * Returns a new {@link Carrier Carrier}, which consists of the contents of this
+         * carrier plus a new mapping from {@code key} to {@code value}. If this carrier
+         * already has a mapping for the extent-local variable {@code key} then the new
+         * value added by this method overrides the previous mapping. That is to say, if
+         * there is a list of {@code where(...)} clauses, the rightmost clause wins.
+         * @param key   the ExtentLocal to bind a value to
+         * @param value the new value, can be {@code null}
+         * @param <T>   the type of the ExtentLocal
+         * @return a new carrier, consisting of {@code this} plus a new binding
+         * ({@code this} is unchanged)
          */
-        public final <T> Carrier where(ExtentLocal<T> key, T value) {
+        public <T> Carrier where(ExtentLocal<T> key, T value) {
             return where(key, value, this);
         }
 
         /*
          * Return a new set consisting of a single binding.
          */
-        static final <T> Carrier of(ExtentLocal<T> key, T value) {
+        static <T> Carrier of(ExtentLocal<T> key, T value) {
             return where(key, value, null);
         }
 
@@ -232,15 +285,14 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Search for the value of a binding in this set
-         * @param key the ExtentLocal to find
+         * Returns the value of a variable in this map of extent-local variables.
+         * @param key the ExtentLocal variable
          * @param <T> the type of the ExtentLocal
          * @return the value
          * @throws NoSuchElementException if key is not bound to any value
-         *
          */
         @SuppressWarnings("unchecked")
-        public final <T> T get(ExtentLocal<T> key) {
+        public <T> T get(ExtentLocal<T> key) {
             var bits = key.bitmask();
             for (Carrier carrier = this;
                  carrier != null && containsAll(carrier.bitmask, bits);
@@ -254,23 +306,24 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with some ExtentLocals bound to values.
-         * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the extent local. The extent locals revert to their previous values or
-         * become {@linkplain #isBound() unbound} when the operation completes.
+         * Runs a value-returning operation with this map of extent-local variables bound
+         * to values. Code invoked by {@code op} can use the {@link ExtentLocal#get()
+         * get} method to get the value of the extent local. The extent-local variables
+         * revert to their previous values or become {@linkplain #isBound() unbound} when
+         * the operation completes.
          *
-         * <p> Extent locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link StructuredTaskScope}
-         * but does not close them, then exiting the operation causes the underlying construct
-         * of each executor to be closed (in the reverse order that they were created in), and
-         * {@link StructureViolationException} to be thrown.
+         * <p> Extent-local variables are intended to be used in a <em>structured
+         * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
+         * not close them, then exiting {@code op} causes the underlying construct of each
+         * {@link StructuredTaskScope} to be closed (in the reverse order that they were
+         * created in), and {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run
          * @param <R>   the type of the result of the function
          * @return the result
-         * @throws Exception if the operation completes with an exception
+         * @throws Exception if {@code op} completes with an exception
          */
-        public final <R> R call(Callable<R> op) throws Exception {
+        public <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
             var prevBindings = addExtentLocalBindings(this);
@@ -286,40 +339,40 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Run a value-returning operation with this set of ExtentLocals bound to values,
-         * in the same way as {@code call()}.<p>
-         *     If the operation throws an exception, pass it as a single argument to the {@link Function}
-         *     {@code handler}. {@code handler} must return a value compatible with the type returned by {@code op}.
-         * </p>
+         * Runs a value-returning operation with this map of ExtentLocals bound to values,
+         * in the same way as the {@link #call(Callable) call} method. If the operation
+         * throws an exception this method returns a value produced by a supplying
+         * function that maps the exception to a value.
+         *
          * @param op    the operation to run
          * @param <R>   the type of the result of the function
-         * @param handler the handler to be applied if {code op} threw an exception
+         * @param mapper the function to map an exception to a return value
          * @return the result.
           */
-        public final <R> R callOrElse(Callable<R> op,
-                                      Function<? super Exception, ? extends R> handler) {
+        public <R> R callOrElse(Callable<R> op, Function<? super Exception, ? extends R> mapper) {
+            Objects.requireNonNull(mapper);
             try {
                 return call(op);
             } catch (Exception e) {
-                return handler.apply(e);
+                return mapper.apply(e);
             }
         }
 
         /**
-         * Runs an operation with some ExtentLocals bound to our values.
-         * Code executed by the operation can use the {@link #get()} method to
-         * get the value of the extent local. The extent locals revert to their previous values or
-         * becomes {@linkplain #isBound() unbound} when the operation completes.
+         * Runs an operation with this map of ExtentLocals bound to values. Code executed
+         * by the operation can use the {@link ExtentLocal#get() get()} method to get the
+         * value of the extent local. The extent-local variables revert to their previous
+         * values or becomes {@linkplain #isBound() unbound} when the operation completes.
          *
-         * <p> Extent locals are intended to be used in a <em>structured manner</em>. If the
-         * operation creates {@link StructuredTaskScope}s
-         * but does not close them, then exiting the operation causes the underlying construct
-         * of each executor to be closed (in the reverse order that they were created in), and
-         * {@link StructureViolationException} to be thrown.
+         * <p> Extent-local variables are intended to be used in a <em>structured
+         * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
+         * not close them, then exiting {@code op} causes the underlying construct of each
+         * {@link StructuredTaskScope} to be closed (in the reverse order that they were
+         * created in), and {@link StructureViolationException} to be thrown.
          *
          * @param op    the operation to run
          */
-        public final void run(Runnable op) {
+        public void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
             var prevBindings = addExtentLocalBindings(this);
@@ -357,13 +410,13 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Create a binding for an ExtentLocal instance.
-     * That {@link Carrier} may be used later to invoke a {@link Callable} or
-     * {@link Runnable} instance. More bindings may be added to the {@link Carrier}
-     * by the {@link Carrier#where(ExtentLocal, Object)} method.
+     * Creates a binding for an extent-local variable.
+     * The {@link Carrier Carrier} may be used later to invoke a {@link Callable} or
+     * {@link Runnable} instance. More bindings may be added to the {@link Carrier Carrier}
+     * by further calls to this method.
      *
      * @param key the ExtentLocal to bind
-     * @param value The value to bind it to
+     * @param value the value to bind it to, can be {@code null}
      * @param <T> the type of the ExtentLocal
      * @return A Carrier instance that contains one binding, that of key and value
      */
@@ -372,10 +425,10 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Creates a binding for an ExtentLocal instance and runs a value-returning
-     * operation with that bound ExtentLocal.
+     * Creates a binding for an extent-local variable and runs a
+     * value-returning operation with that {@link ExtentLocal} bound to the value.
      * @param key the ExtentLocal to bind
-     * @param value The value to bind it to
+     * @param value the value to bind it to, can be {@code null}
      * @param <T> the type of the ExtentLocal
      * @param <U> the type of the Result
      * @param op the operation to call
@@ -387,10 +440,10 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Creates a binding for an ExtentLocal instance and runs an
-     * operation with that bound ExtentLocal.
+     * Creates a binding for extent-local variable and runs an
+     * operation with that  {@link ExtentLocal} bound to the value.
      * @param key the ExtentLocal to bind
-     * @param value The value to bind it to
+     * @param value the value to bind it to, can be {@code null}
      * @param <T> the type of the ExtentLocal
      * @param op the operation to run
      */
@@ -403,19 +456,19 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Creates an extent-local handle to refer to a value of type T.
+     * Creates an extent-local variable to refer to a value of type T.
      *
      * @param <T> the type of the extent local's value.
-     * @return a extent-local handle
+     * @return an extent-local variable
      */
     public static <T> ExtentLocal<T> newInstance() {
         return new ExtentLocal<T>();
     }
 
     /**
-     * Returns the value of the extent local.
+     * Returns the current thread's bound value for this extent-local variable.
      * @return the value of the extent local
-     * @throws NoSuchElementException if the extent local is not bound (exception is TBD)
+     * @throws NoSuchElementException if the extent local is not bound
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -448,11 +501,8 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Returns {@code true} if the extent local is bound to a value.
-     *
-     * @return {@code true} if the extent local is bound to a value, otherwise {@code false}
+     * {@return {@code true} if the extent local is bound to a value}
      */
-    @SuppressWarnings("unchecked")
     public boolean isBound() {
         // ??? Do we want to search cache for this? In most cases we don't expect
         // this {@link ExtentLocal} to be bound, so it's not worth it. But I may
@@ -474,7 +524,7 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the extent local if bound, otherwise returns {@code other}.
+     * Returns the value of the extent local if bound, otherwise returns {@code other}.
      * @param other the value to return if not bound, can be {@code null}
      * @return the value of the extent local if bound, otherwise {@code other}
      */
@@ -490,13 +540,12 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return the value of the extent local if bound, otherwise throw an exception
+     * Returns the value of the extent local if bound, otherwise throws the exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
-     * @param exceptionSupplier the supplying function that produces an
-     *        exception to be thrown
+     * @param exceptionSupplier the supplying function that produces the exception to throw
      * @return the value of the extent local if bound
-     * @throws X if the extent local is unbound
+     * @throws X prodouced by the exception suppying function if the extent local is unbound
      */
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         Objects.requireNonNull(exceptionSupplier);
