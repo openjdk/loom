@@ -65,11 +65,6 @@ import static org.testng.Assert.*;
 public class StructuredTaskScopeTest {
     private ScheduledExecutorService scheduler;
 
-    private static class FooException extends RuntimeException {
-        FooException() { }
-        FooException(Throwable cause) { super(cause); }
-    }
-
     @BeforeClass
     public void setUp() throws Exception {
         ThreadFactory factory = (task) -> {
@@ -85,7 +80,10 @@ public class StructuredTaskScopeTest {
         scheduler.shutdown();
     }
 
-    @DataProvider(name = "factories")
+    /**
+     * A provider of ThreadFactory objects for tests.
+     */
+    @DataProvider
     public Object[][] factories() {
         var defaultThreadFactory = Executors.defaultThreadFactory();
         var virtualThreadFactory = Thread.ofVirtual().factory();
@@ -969,7 +967,6 @@ public class StructuredTaskScopeTest {
 
     /**
      * Test Future::cancel throws if invoked by a thread that is not in the tree.
-     * @throws Exception
      */
     @Test(dataProvider = "factories")
     public void testFutureCancelConfined(ThreadFactory factory) throws Exception {
@@ -995,7 +992,7 @@ public class StructuredTaskScopeTest {
     }
 
     /**
-     * Test toString includes the scope name.
+     * Test StructuredTaskScope::toString includes the scope name.
      */
     @Test
     public void testToString() throws Exception {
@@ -1206,6 +1203,14 @@ public class StructuredTaskScopeTest {
                               () -> scope.throwIfFailed(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof CancellationException);
         }
+    }
+
+    /**
+     * A runtime exception for tests.
+     */
+    private static class FooException extends RuntimeException {
+        FooException() { }
+        FooException(Throwable cause) { super(cause); }
     }
 
     /**
