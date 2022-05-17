@@ -4,7 +4,6 @@ vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                  
 gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
 runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0                            8272791 generic-all
-com/sun/jdi/EATests.java#id0                                                                    8264699 generic-all
 
 ##########
 
