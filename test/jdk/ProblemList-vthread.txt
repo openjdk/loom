@@ -11,6 +11,8 @@ jdk/jfr/tool/TestPrintXML.java
 
 java/util/logging/Logger/logrb/TestLogrbResourceBundle.java                  8284779 generic-all
 
+com/sun/jdi/EATests.java#id0                                         8264699 generic-all
+
 ####
 ## Tests failing because of issues with testng import in jtreg with wrapper.
 java/foreign/handles/Driver.java

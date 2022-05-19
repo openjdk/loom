@@ -339,26 +339,6 @@ public final class ExtentLocal<T> {
         }
 
         /**
-         * Runs a value-returning operation with this map of ExtentLocals bound to values,
-         * in the same way as the {@link #call(Callable) call} method. If the operation
-         * throws an exception this method returns a value produced by a supplying
-         * function that maps the exception to a value.
-         *
-         * @param op    the operation to run
-         * @param <R>   the type of the result of the function
-         * @param mapper the function to map an exception to a return value
-         * @return the result.
-          */
-        public <R> R callOrElse(Callable<R> op, Function<? super Exception, ? extends R> mapper) {
-            Objects.requireNonNull(mapper);
-            try {
-                return call(op);
-            } catch (Exception e) {
-                return mapper.apply(e);
-            }
-        }
-
-        /**
          * Runs an operation with this map of ExtentLocals bound to values. Code executed
          * by the operation can use the {@link ExtentLocal#get() get()} method to get the
          * value of the extent local. The extent-local variables revert to their previous
