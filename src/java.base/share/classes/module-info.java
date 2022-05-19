@@ -201,13 +201,13 @@ module java.base {
         jdk.charsets,
         jdk.compiler,
         jdk.crypto.cryptoki,
+        jdk.incubator.concurrent,
         jdk.incubator.vector,
         jdk.jfr,
         jdk.jshell,
         jdk.nio.mapmode,
         jdk.unsupported,
-        jdk.internal.vm.ci,
-        jdk.incubator.concurrent;
+        jdk.internal.vm.ci;
     exports jdk.internal.module to
         java.instrument,
         java.management.rmi,
