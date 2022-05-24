@@ -23,6 +23,7 @@
 
 /**
  * @test
+ * @bug 8284161 8287008
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
  * @enablePreview
  * @library /test/lib
@@ -130,7 +131,8 @@ public class DumpThreads {
                     rootContainer.findThread(currentThread.threadId()).orElseThrow();
                 }
 
-                // find the thread container for the executor
+                // find the thread container for the executor. The name of this executor
+                // is its String representaiton in this case.
                 String name = executor.toString();
                 var container = threadDump.findThreadContainer(name).orElseThrow();
                 assertFalse(container.owner().isPresent());

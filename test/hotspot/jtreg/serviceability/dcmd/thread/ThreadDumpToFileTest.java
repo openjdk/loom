@@ -23,6 +23,7 @@
 
 /*
  * @test
+ * @bug 8284161 8287008
  * @summary Basic test for jcmd Thread.dump_to_file
  * @library /test/lib
  * @run testng/othervm ThreadDumpToFileTest
