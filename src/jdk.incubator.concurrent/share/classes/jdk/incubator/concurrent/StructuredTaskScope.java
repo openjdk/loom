@@ -258,7 +258,7 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <h2>Memory consistency effects</h2>
  *
- * <p>Actions in the owner thread of, or a thread contained in, the task scope prior to
+ * <p> Actions in the owner thread of, or a thread contained in, the task scope prior to
  * {@linkplain #fork forking} of a {@code Callable} task
  * <a href="../../../../java.base/java/util/concurrent/package-summary.html#MemoryVisibility">
  * <i>happen-before</i></a> any actions taken by that task, which in turn <i>happen-before</i>
@@ -385,8 +385,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     /**
      * Invoked when a task completes before the scope is shut down.
      *
-     * <p> The {@code handleComplete} method should be thread safe. It may be
-     * invoked by several threads at around the same.
+     * <p> The {@code handleComplete} method should be thread safe. It may be invoked by
+     * several threads concurrently.
      *
      * @implSpec The default implementation does nothing.
      *
@@ -411,7 +411,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * is cancelled then the {@code handleComplete} method may or may not be invoked.
      *
      * <p> If this task scope is {@linkplain #shutdown() shutdown} (or in the process
-     * of shutting down) then {@code fork} returns a Future representing a {@link
+     * of shutting down) then {@code fork} returns a {@code Future} representing a {@link
      * Future.State#CANCELLED cancelled} task that was not run.
      *
      * <p> This method may only be invoked by the task scope owner or threads contained
@@ -623,8 +623,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * join} or {@code joinUntil} will return immediately.
      * </ul>
      *
-     * <p> When this method completes then the Future objects for all tasks will be
-     * {@linkplain Future#isDone() done}, normally or abnormally. There may still be
+     * <p> When this method completes then the {@code Future} objects for all tasks will
+     * be {@linkplain Future#isDone() done}, normally or abnormally. There may still be
      * threads that have not finished because they are executing code that did not
      * respond (or respond promptly) to thread interrupt. This method does not wait
      * for these threads. When the owner invokes the {@link #close() close} method
