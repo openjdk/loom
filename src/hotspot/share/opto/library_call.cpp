@@ -3471,8 +3471,12 @@ Node* LibraryCallKit::extentLocalCache_helper() {
 
   Node* thread = _gvn.transform(new ThreadLocalNode());
   Node* p = basic_plus_adr(top()/*!oop*/, thread, in_bytes(JavaThread::extentLocalCache_offset()));
-  return _gvn.transform(LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
-        TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered));
+  // We cannot use immutable_memory() because we might flip onto a
+  // different carrier thread, at which point we'll need to use that
+  // carrier thread's cache.
+  // return _gvn.transform(LoadNode::make(_gvn, NULL, immutable_memory(), p, p->bottom_type()->is_ptr(),
+  //       TypeRawPtr::NOTNULL, T_ADDRESS, MemNode::unordered));
+  return make_load(NULL, p, p->bottom_type()->is_ptr(), T_ADDRESS, MemNode::unordered);
 }
 
 //------------------------inline_native_extentLocalCache------------------
