@@ -207,6 +207,7 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java
 java/lang/Class/getResource/ResourcesTest.java
 java/lang/Class/forName/modules/TestDriver.java
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java
+java/foreign/enablenativeaccess/TestEnableNativeAccess.java
 java/security/AccessController/DoPrivAccompliceTest.java
 java/security/AccessController/LimitedDoPrivileged.java
 java/security/Policy/SignedJar/SignedJarTest.java
