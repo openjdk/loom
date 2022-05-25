@@ -376,17 +376,6 @@ public final class ExtentLocal<T> {
             ExtentLocal.setExtentLocalBindings(b);
             return prev;
         }
-
-        /*
-         * Ensure that none of these bindings is already bound.
-         */
-        void checkNotBound() {
-            for (Carrier c = this; c != null; c = c.prev) {
-                if (c.key.isBound()) {
-                    throw new RuntimeException("Extent Local already bound");
-                }
-            }
-        }
     }
 
     /**
@@ -665,34 +654,6 @@ public final class ExtentLocal<T> {
             setKeyAndObjectAt(victim, key, value);
             if (getKey(theCache, other) == key) {
                 setKeyAndObjectAt(other, key, value);
-            }
-        }
-
-        private static final void update(ExtentLocal<?> key, Object value) {
-            Object[] objects;
-            if ((objects = extentLocalCache()) != null) {
-                int k1 = Cache.primarySlot(key);
-                if (getKey(objects, k1) == key) {
-                    setKeyAndObjectAt(k1, key, value);
-                }
-                int k2 = Cache.secondarySlot(key);
-                if (getKey(objects, k2) == key) {
-                    setKeyAndObjectAt(k2, key, value);
-                }
-            }
-        }
-
-        private static final void remove(ExtentLocal<?> key) {
-            Object[] objects;
-            if ((objects = extentLocalCache()) != null) {
-                int k1 = Cache.primarySlot(key);
-                if (getKey(objects, k1) == key) {
-                    setKeyAndObjectAt(k1, null, null);
-                }
-                int k2 = Cache.primarySlot(key);
-                if (getKey(objects, k2) == key) {
-                    setKeyAndObjectAt(k2, null, null);
-                }
             }
         }
 
