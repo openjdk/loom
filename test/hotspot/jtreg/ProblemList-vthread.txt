@@ -250,6 +250,7 @@ runtime/cds/appcds/VerifierTest_1B.java
 runtime/cds/appcds/VerifierTest_2.java
 runtime/cds/appcds/WideIloadTest.java
 runtime/cds/appcds/TestParallelGCWithCDS.java
+runtime/cds/appcds/VerifyObjArrayCloneTest.java
 runtime/cds/appcds/XShareAutoWithChangedJar.java
 runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java
 runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java
@@ -319,6 +320,7 @@ runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java
 runtime/cds/appcds/dynamicArchive/UnusedCPDuringDump.java
 runtime/cds/appcds/dynamicArchive/UsedAllArchivedLambdas.java
 runtime/cds/appcds/dynamicArchive/VerifyWithDynamicArchive.java
+runtime/cds/appcds/dynamicArchive/VerifyObjArrayCloneTest.java
 runtime/cds/appcds/dynamicArchive/WrongTopClasspath.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java
 runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesCastFailureTest.java
@@ -362,6 +364,7 @@ runtime/cds/appcds/methodHandles/MethodHandlesInvokersTest.java
 runtime/cds/appcds/methodHandles/MethodHandlesPermuteArgumentsTest.java
 runtime/cds/appcds/methodHandles/MethodHandlesSpreadArgumentsTest.java
 runtime/cds/appcds/redefineClass/RedefineBasicTest.java
+runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java
 runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java
 runtime/cds/appcds/sharedStrings/ExerciseGC.java
 runtime/cds/appcds/sharedStrings/FlagCombo.java#id0
