@@ -94,19 +94,6 @@ tier4 = \
 build = \
     build
 
-jdk_loom = \
-    com/sun/management/HotSpotDiagnosticMXBean/ \
-    java/lang/Thread \
-    java/lang/ThreadGroup \
-    java/lang/management/ThreadMXBean \
-    java/util/concurrent \
-    java/net/vthread \
-    java/nio/channels/vthread \
-    jdk/incubator/concurrent \
-    jdk/internal/misc/ThreadFlock \
-    jdk/internal/vm/Continuation \
-    jdk/jfr/threading
-
 # java.lang package and VM runtime support
 jdk_lang = \
     java/lang \
@@ -286,6 +273,7 @@ jdk_loom = \
     java/util/concurrent \
     java/net/vthread \
     java/nio/channels/vthread \
+    jdk/incubator/concurrent \
     jdk/internal/misc/ThreadFlock \
     jdk/internal/vm/Continuation \
     jdk/jfr/threading
