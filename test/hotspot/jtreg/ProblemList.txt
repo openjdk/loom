@@ -37,7 +37,7 @@
 # More than one label is allowed but must be on the same line.
 #
 #############################################################################
-
+serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java  8029528 generic-all
 
 #############################################################################
 

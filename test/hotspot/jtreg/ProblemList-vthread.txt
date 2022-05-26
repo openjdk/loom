@@ -8,40 +8,40 @@ runtime/CommandLine/OptionsValidation/TestOptionsWithRanges.java#id0            
 ##########
 
 # 8282492
-vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java
-vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java
-vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java
-vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java
-vmTestbase/vm/gc/compact/Compact_TwoFields_InternedStrings/TestDescription.java
-vmTestbase/vm/gc/compact/Compact_InternedStrings_NonbranchyTree/TestDescription.java
-vmTestbase/vm/gc/compact/Humongous_NonbranchyTree/TestDescription.java
-vmTestbase/vm/gc/compact/Humongous_NonbranchyTree5M/TestDescription.java
-vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java
-vmTestbase/gc/lock/malloc/malloclock02/TestDescription.java
-vmTestbase/gc/lock/malloc/malloclock03/TestDescription.java
-vmTestbase/gc/lock/malloc/malloclock04/TestDescription.java
-vmTestbase/gc/lock/jni/jnilock001/TestDescription.java
-vmTestbase/gc/lock/jni/jnilock003/TestDescription.java
-vmTestbase/gc/lock/jniref/jniglobalreflock01/TestDescription.java
-vmTestbase/gc/lock/jniref/jniglobalreflock02/TestDescription.java
-vmTestbase/gc/lock/jniref/jniglobalreflock03/TestDescription.java
-vmTestbase/gc/lock/jniref/jniglobalreflock04/TestDescription.java
-vmTestbase/gc/lock/jniref/jnireflock01/TestDescription.java
-vmTestbase/gc/lock/jniref/jnireflock02/TestDescription.java
-vmTestbase/gc/lock/jniref/jnireflock03/TestDescription.java
-vmTestbase/gc/lock/jniref/jnireflock04/TestDescription.java
-vmTestbase/gc/lock/jniref/jnilocalreflock01/TestDescription.java
-vmTestbase/gc/lock/jniref/jnilocalreflock02/TestDescription.java
-vmTestbase/gc/lock/jniref/jnilocalreflock03/TestDescription.java
-vmTestbase/gc/lock/jniref/jnilocalreflock04/TestDescription.java
-vmTestbase/gc/lock/jniref/jniweakglobalreflock01/TestDescription.java
-vmTestbase/gc/lock/jniref/jniweakglobalreflock02/TestDescription.java
-vmTestbase/gc/lock/jniref/jniweakglobalreflock03/TestDescription.java
-vmTestbase/gc/lock/jniref/jniweakglobalreflock04/TestDescription.java
-vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock01/TestDescription.java
-vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock02/TestDescription.java
-vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock03/TestDescription.java
-vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock04/TestDescription.java
+vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Compact_NonbranchyTree_TwoFields/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Compact_TwoFields_InternedStrings/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Compact_InternedStrings_NonbranchyTree/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Humongous_NonbranchyTree/TestDescription.java 0000000 generic-all
+vmTestbase/vm/gc/compact/Humongous_NonbranchyTree5M/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/malloc/malloclock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/malloc/malloclock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/malloc/malloclock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/malloc/malloclock04/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jni/jnilock001/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jni/jnilock003/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniglobalreflock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniglobalreflock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniglobalreflock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniglobalreflock04/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnireflock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnireflock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnireflock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnireflock04/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnilocalreflock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnilocalreflock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnilocalreflock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jnilocalreflock04/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniweakglobalreflock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniweakglobalreflock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniweakglobalreflock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jniref/jniweakglobalreflock04/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock01/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock02/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock03/TestDescription.java  0000000 generic-all
+vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock04/TestDescription.java  0000000 generic-all
 
 ##########
 ## Tests failing when main() is executed in additional kernel or virtual thread
@@ -49,445 +49,445 @@ vmTestbase/gc/lock/jvmti/alloc/jvmtialloclock04/TestDescription.java
 ####
 # Virtual thread/Continuation tests
 
-serviceability/jvmti/events/Breakpoint/breakpoint01/breakpoint01.java
-serviceability/jvmti/events/ClassLoad/classload01/classload01.java
-serviceability/jvmti/events/ClassPrepare/classprep01/classprep01.java
-serviceability/jvmti/events/Exception/exception01/exception01.java
-serviceability/jvmti/events/ExceptionCatch/excatch01/excatch01.java
-serviceability/jvmti/events/FieldAccess/fieldacc01/fieldacc01.java
-serviceability/jvmti/events/FieldAccess/fieldacc02/fieldacc02.java
-serviceability/jvmti/events/FieldAccess/fieldacc03/fieldacc03.java
-serviceability/jvmti/events/FieldAccess/fieldacc04/fieldacc04.java
-serviceability/jvmti/events/FieldModification/fieldmod01/fieldmod01.java
-serviceability/jvmti/events/FieldModification/fieldmod02/fieldmod02.java
-serviceability/jvmti/events/FramePop/framepop01/framepop01.java
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id0
-serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1
-serviceability/jvmti/events/MethodEntry/mentry01/mentry01.java
-serviceability/jvmti/events/MethodEntry/mentry02/mentry02.java
-serviceability/jvmti/events/MethodExit/mexit01/mexit01.java
-serviceability/jvmti/events/MethodExit/mexit02/mexit02.java
-serviceability/jvmti/events/MonitorContendedEnter/mcontenter01/mcontenter01.java
-serviceability/jvmti/events/MonitorContendedEntered/mcontentered01/mcontentered01.java
-serviceability/jvmti/events/MonitorWait/monitorwait01/monitorwait01.java
-serviceability/jvmti/events/MonitorWaited/monitorwaited01/monitorwaited01.java
-serviceability/jvmti/events/NativeMethodBind/nativemethbind01/nativemethbind01.java
-serviceability/jvmti/events/NativeMethodBind/nativemethbind02/nativemethbind02.java
-serviceability/jvmti/events/NativeMethodBind/nativemethbind03/nativemethbind03.java
-serviceability/jvmti/events/NativeMethodBind/nativemethbind04/nativemethbind04.java
-serviceability/jvmti/events/SingleStep/singlestep01/singlestep01.java
-serviceability/jvmti/events/SingleStep/singlestep02/singlestep02.java
-serviceability/jvmti/events/SingleStep/singlestep03/singlestep03.java
-serviceability/jvmti/events/ThreadEnd/threadend01/threadend01.java
-serviceability/jvmti/events/ThreadEnd/threadend02/threadend02.java
-serviceability/jvmti/events/ThreadStart/threadstart01/threadstart01.java
-serviceability/jvmti/events/ThreadStart/threadstart02/threadstart02.java
-serviceability/jvmti/events/ThreadStart/threadstart03/threadstart03.java
-serviceability/jvmti/events/VMObjectAlloc/vmobjalloc01/vmobjalloc01.java
+serviceability/jvmti/events/Breakpoint/breakpoint01/breakpoint01.java 0000000 generic-all
+serviceability/jvmti/events/ClassLoad/classload01/classload01.java  0000000 generic-all
+serviceability/jvmti/events/ClassPrepare/classprep01/classprep01.java 0000000 generic-all
+serviceability/jvmti/events/Exception/exception01/exception01.java 0000000 generic-all
+serviceability/jvmti/events/ExceptionCatch/excatch01/excatch01.java 0000000 generic-all
+serviceability/jvmti/events/FieldAccess/fieldacc01/fieldacc01.java 0000000 generic-all
+serviceability/jvmti/events/FieldAccess/fieldacc02/fieldacc02.java 0000000 generic-all
+serviceability/jvmti/events/FieldAccess/fieldacc03/fieldacc03.java 0000000 generic-all
+serviceability/jvmti/events/FieldAccess/fieldacc04/fieldacc04.java 0000000 generic-all
+serviceability/jvmti/events/FieldModification/fieldmod01/fieldmod01.java 0000000 generic-all
+serviceability/jvmti/events/FieldModification/fieldmod02/fieldmod02.java 0000000 generic-all
+serviceability/jvmti/events/FramePop/framepop01/framepop01.java 0000000 generic-all
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id0 0000000 generic-all
+serviceability/jvmti/events/FramePop/framepop02/framepop02.java#id1 0000000 generic-all
+serviceability/jvmti/events/MethodEntry/mentry01/mentry01.java 0000000 generic-all
+serviceability/jvmti/events/MethodEntry/mentry02/mentry02.java 0000000 generic-all
+serviceability/jvmti/events/MethodExit/mexit01/mexit01.java 0000000 generic-all
+serviceability/jvmti/events/MethodExit/mexit02/mexit02.java 0000000 generic-all
+serviceability/jvmti/events/MonitorContendedEnter/mcontenter01/mcontenter01.java 0000000 generic-all
+serviceability/jvmti/events/MonitorContendedEntered/mcontentered01/mcontentered01.java 0000000 generic-all
+serviceability/jvmti/events/MonitorWait/monitorwait01/monitorwait01.java 0000000 generic-all
+serviceability/jvmti/events/MonitorWaited/monitorwaited01/monitorwaited01.java 0000000 generic-all
+serviceability/jvmti/events/NativeMethodBind/nativemethbind01/nativemethbind01.java 0000000 generic-all
+serviceability/jvmti/events/NativeMethodBind/nativemethbind02/nativemethbind02.java 0000000 generic-all
+serviceability/jvmti/events/NativeMethodBind/nativemethbind03/nativemethbind03.java 0000000 generic-all
+serviceability/jvmti/events/NativeMethodBind/nativemethbind04/nativemethbind04.java 0000000 generic-all
+serviceability/jvmti/events/SingleStep/singlestep01/singlestep01.java 0000000 generic-all
+serviceability/jvmti/events/SingleStep/singlestep02/singlestep02.java 0000000 generic-all
+serviceability/jvmti/events/SingleStep/singlestep03/singlestep03.java 0000000 generic-all
+serviceability/jvmti/events/ThreadEnd/threadend01/threadend01.java 0000000 generic-all
+serviceability/jvmti/events/ThreadEnd/threadend02/threadend02.java 0000000 generic-all
+serviceability/jvmti/events/ThreadStart/threadstart01/threadstart01.java 0000000 generic-all
+serviceability/jvmti/events/ThreadStart/threadstart02/threadstart02.java 0000000 generic-all
+serviceability/jvmti/events/ThreadStart/threadstart03/threadstart03.java 0000000 generic-all
+serviceability/jvmti/events/VMObjectAlloc/vmobjalloc01/vmobjalloc01.java 0000000 generic-all
 
-serviceability/jvmti/negative/thrinfo02/thrinfo02.java
-serviceability/jvmti/negative/getstacktr09/getstacktr09.java
-serviceability/jvmti/negative/GetAllThreadsNullTest/GetAllThreadsNullTest.java
-serviceability/jvmti/negative/thrstat04/thrstat04.java
-serviceability/jvmti/negative/framecnt02/framecnt02.java
-serviceability/jvmti/negative/framecnt03/framecnt03.java
-serviceability/jvmti/negative/getstacktr02/getstacktr02.java
-serviceability/jvmti/negative/frameloc03/frameloc03.java
+serviceability/jvmti/negative/thrinfo02/thrinfo02.java 0000000 generic-all
+serviceability/jvmti/negative/getstacktr09/getstacktr09.java 0000000 generic-all
+serviceability/jvmti/negative/GetAllThreadsNullTest/GetAllThreadsNullTest.java 0000000 generic-all
+serviceability/jvmti/negative/thrstat04/thrstat04.java 0000000 generic-all
+serviceability/jvmti/negative/framecnt02/framecnt02.java 0000000 generic-all
+serviceability/jvmti/negative/framecnt03/framecnt03.java 0000000 generic-all
+serviceability/jvmti/negative/getstacktr02/getstacktr02.java 0000000 generic-all
+serviceability/jvmti/negative/frameloc03/frameloc03.java 0000000 generic-all
 
-serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java
-serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java
-serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java
+serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java 0000000 generic-all
+serviceability/jvmti/stress/StackTrace/Suspended/GetStackTraceSuspendedStressTest.java 0000000 generic-all
+serviceability/jvmti/stress/ThreadLocalStorage/SetGetThreadLocalStorageStressTest/SetGetThreadLocalStorageStressTest.java 0000000 generic-all
 
-serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java
-serviceability/jvmti/thread/GetThreadState/thrstat03/thrstat03.java
-serviceability/jvmti/thread/GetThreadState/thrstat05/thrstat05.java
-serviceability/jvmti/thread/GetThreadState/thrstat02/thrstat02.java
-serviceability/jvmti/thread/GetFrameCount/framecnt01/framecnt01.java
-serviceability/jvmti/thread/GetFrameLocation/frameloc01/frameloc01.java
-serviceability/jvmti/thread/GetFrameLocation/frameloc02/frameloc02.java
-serviceability/jvmti/thread/GetThreadInfo/thrinfo01/thrinfo01.java
-serviceability/jvmti/thread/SuspendThread/suspendthrd01/suspendthrd01.java
-serviceability/jvmti/thread/SuspendThread/suspendthrd03/suspendthrd03.java
-serviceability/jvmti/thread/SuspendThread/suspendthrd02/suspendthrd02.java
-serviceability/jvmti/thread/ResumeThreadList/resumethrdlst02/resumethrdlst02.java
-serviceability/jvmti/thread/ResumeThreadList/resumethrdlst01/resumethrdlst01.java
-serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst02/suspendthrdlst02.java
-serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst01/suspendthrdlst01.java
-serviceability/jvmti/thread/GetAllThreads/allthr01/allthr01.java
-serviceability/jvmti/thread/ResumeThread/resumethrd02/resumethrd02.java
-serviceability/jvmti/thread/ResumeThread/resumethrd01/resumethrd01.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr06/getstacktr06.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr01/getstacktr01.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr08/getstacktr08.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr07/getstacktr07.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr05/getstacktr05.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr04/getstacktr04.java
-serviceability/jvmti/thread/GetStackTrace/getstacktr03/getstacktr03.java
+serviceability/jvmti/thread/GetThreadState/thrstat01/thrstat01.java 0000000 generic-all
+serviceability/jvmti/thread/GetThreadState/thrstat03/thrstat03.java 0000000 generic-all
+serviceability/jvmti/thread/GetThreadState/thrstat05/thrstat05.java 0000000 generic-all
+serviceability/jvmti/thread/GetThreadState/thrstat02/thrstat02.java 0000000 generic-all
+serviceability/jvmti/thread/GetFrameCount/framecnt01/framecnt01.java 0000000 generic-all
+serviceability/jvmti/thread/GetFrameLocation/frameloc01/frameloc01.java 0000000 generic-all
+serviceability/jvmti/thread/GetFrameLocation/frameloc02/frameloc02.java 0000000 generic-all
+serviceability/jvmti/thread/GetThreadInfo/thrinfo01/thrinfo01.java 0000000 generic-all
+serviceability/jvmti/thread/SuspendThread/suspendthrd01/suspendthrd01.java 0000000 generic-all
+serviceability/jvmti/thread/SuspendThread/suspendthrd03/suspendthrd03.java 0000000 generic-all
+serviceability/jvmti/thread/SuspendThread/suspendthrd02/suspendthrd02.java 0000000 generic-all
+serviceability/jvmti/thread/ResumeThreadList/resumethrdlst02/resumethrdlst02.java 0000000 generic-all
+serviceability/jvmti/thread/ResumeThreadList/resumethrdlst01/resumethrdlst01.java 0000000 generic-all
+serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst02/suspendthrdlst02.java 0000000 generic-all
+serviceability/jvmti/thread/SuspendThreadList/suspendthrdlst01/suspendthrdlst01.java 0000000 generic-all
+serviceability/jvmti/thread/GetAllThreads/allthr01/allthr01.java 0000000 generic-all
+serviceability/jvmti/thread/ResumeThread/resumethrd02/resumethrd02.java 0000000 generic-all
+serviceability/jvmti/thread/ResumeThread/resumethrd01/resumethrd01.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr06/getstacktr06.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr01/getstacktr01.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr08/getstacktr08.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr07/getstacktr07.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr05/getstacktr05.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr04/getstacktr04.java 0000000 generic-all
+serviceability/jvmti/thread/GetStackTrace/getstacktr03/getstacktr03.java 0000000 generic-all
 
-serviceability/jvmti/vthread/BreakpointInYieldTest/BreakpointInYieldTest.java
-serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java
-serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java
-serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java
-serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java
-serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java
-serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java
-serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java
-serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java
-serviceability/jvmti/vthread/VThreadTest/VThreadTest.java
-serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java
-serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java
-serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.java
-serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java
-serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java
-serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java
+serviceability/jvmti/vthread/BreakpointInYieldTest/BreakpointInYieldTest.java 0000000 generic-all
+serviceability/jvmti/vthread/ContFramePopTest/ContFramePopTest.java 0000000 generic-all
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 0000000 generic-all
+serviceability/jvmti/vthread/ContYieldBreakPointTest/ContYieldBreakPointTest.java 0000000 generic-all
+serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java 8029528 generic-all
+serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java 0000000 generic-all
+serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java 0000000 generic-all
+serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java 0000000 generic-all
+serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java 0000000 generic-all
+serviceability/jvmti/vthread/VThreadTest/VThreadTest.java 0000000 generic-all
+serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java 0000000 generic-all
+serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java 0000000 generic-all
+serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.java 0000000 generic-all
+serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java 0000000 generic-all
+serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java 0000000 generic-all
+serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java 0000000 generic-all
 
 ####
 # JVMTI tests failing to find thread
 
-serviceability/jvmti/GetLocalVariable/GetLocalVars.java
-serviceability/jvmti/GetThreadListStackTraces/OneGetThreadListStackTraces.java
-serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java
+serviceability/jvmti/GetLocalVariable/GetLocalVars.java 0000000 generic-all
+serviceability/jvmti/GetThreadListStackTraces/OneGetThreadListStackTraces.java 0000000 generic-all
+serviceability/jvmti/GetLocalVariable/GetLocalWithoutSuspendTest.java 0000000 generic-all
 
 ####
 # JVMTI tests which generated unexpected events by virtual threads
-serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java
+serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java 0000000 generic-all
 
 ####
 # OOME in unexpected thread
-gc/g1/ihop/TestIHOPStatic.java
-vmTestbase/gc/gctests/MemoryEater/TestDescription.java
-vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java
+gc/g1/ihop/TestIHOPStatic.java 0000000 generic-all
+vmTestbase/gc/gctests/MemoryEater/TestDescription.java 0000000 generic-all
+vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
 
 ####
 # Test failing because of incorrect stacktrace or thread properties for main thread
 
-runtime/condy/staticInit/TestInitException.java
-runtime/handshake/HandshakeWalkStackTest.java
-runtime/handshake/HandshakeWalkStackFallbackTest.java
-runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java
-runtime/ErrorHandling/TestExitOnOutOfMemoryError.java
-runtime/ErrorHandling/TestHeapDumpPath.java
-runtime/ErrorHandling/TestOnOutOfMemoryError.java
-runtime/Thread/ThreadPriorities.java
-runtime/Throwable/StackTraceLogging.java
-runtime/Throwable/TestMaxJavaStackTraceDepth.java
-runtime/Throwable/TestThrowable.java
-serviceability/tmtools/jstack/DaemonThreadTest.java
-serviceability/dcmd/thread/ThreadDumpToFileTest.java
-serviceability/dcmd/thread/PrintTest.java
-serviceability/dcmd/thread/PrintConcurrentLocksTest.java
+runtime/condy/staticInit/TestInitException.java 0000000 generic-all
+runtime/handshake/HandshakeWalkStackTest.java 0000000 generic-all
+runtime/handshake/HandshakeWalkStackFallbackTest.java 0000000 generic-all
+runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java 0000000 generic-all
+runtime/ErrorHandling/TestExitOnOutOfMemoryError.java 0000000 generic-all
+runtime/ErrorHandling/TestHeapDumpPath.java 0000000 generic-all
+runtime/ErrorHandling/TestOnOutOfMemoryError.java 0000000 generic-all
+runtime/Thread/ThreadPriorities.java 0000000 generic-all
+runtime/Throwable/StackTraceLogging.java 0000000 generic-all
+runtime/Throwable/TestMaxJavaStackTraceDepth.java 0000000 generic-all
+runtime/Throwable/TestThrowable.java 0000000 generic-all
+serviceability/tmtools/jstack/DaemonThreadTest.java 0000000 generic-all
+serviceability/dcmd/thread/ThreadDumpToFileTest.java 0000000 generic-all
+serviceability/dcmd/thread/PrintTest.java 0000000 generic-all
+serviceability/dcmd/thread/PrintConcurrentLocksTest.java 0000000 generic-all
 
 ####
 # TODO check what are the cds issues with vthread
-runtime/cds/serviceability/transformRelatedClasses/TransformSuperAndSubClasses.java
-runtime/cds/serviceability/transformRelatedClasses/TransformSuperSubTwoPckgs.java
-runtime/cds/serviceability/ReplaceCriticalClasses.java
-runtime/cds/serviceability/ReplaceCriticalClassesForSubgraphs.java
-runtime/cds/TestInterpreterMethodEntries.java#id0
-runtime/cds/TestInterpreterMethodEntries.java#id1
+runtime/cds/serviceability/transformRelatedClasses/TransformSuperAndSubClasses.java 0000000 generic-all
+runtime/cds/serviceability/transformRelatedClasses/TransformSuperSubTwoPckgs.java 0000000 generic-all
+runtime/cds/serviceability/ReplaceCriticalClasses.java 0000000 generic-all
+runtime/cds/serviceability/ReplaceCriticalClassesForSubgraphs.java 0000000 generic-all
+runtime/cds/TestInterpreterMethodEntries.java#id0 0000000 generic-all
+runtime/cds/TestInterpreterMethodEntries.java#id1 0000000 generic-all
 
 
 ####
 # Something wrong with test.jdk/test.src properties
-runtime/Dictionary/ProtectionDomainCacheTest.java
-runtime/jni/checked/TestCheckedEnsureLocalCapacity.java
-runtime/Dictionary/ProtectionDomainCacheTest.java
+runtime/Dictionary/ProtectionDomainCacheTest.java 0000000 generic-all
+runtime/jni/checked/TestCheckedEnsureLocalCapacity.java 0000000 generic-all
+runtime/Dictionary/ProtectionDomainCacheTest.java 0000000 generic-all
 
 
 ####
 # Don't work with ProcessTools wrapper
-serviceability/sa/ClhsdbCDSCore.java
-serviceability/logging/TestLogRotation.java
-compiler/c2/Test8062950.java
-serviceability/sa/TestObjectMonitorIterate.java
-runtime/cds/appcds/AppendClasspath.java
-runtime/cds/appcds/ArchiveRelocationTest.java
-runtime/cds/appcds/BootClassPathMismatch.java
-runtime/cds/appcds/CDSandJFR.java
-runtime/cds/appcds/ClassPathAttr.java
-runtime/cds/appcds/CommandLineFlagCombo.java
-runtime/cds/appcds/DumpClassList.java
-runtime/cds/appcds/DumpingWithNoCoops.java
-runtime/cds/appcds/ExtraSymbols.java
-runtime/cds/appcds/FieldAnnotationsTest.java
-runtime/cds/appcds/FieldLayoutFlags.java
-runtime/cds/appcds/FreeUnusedMetadata.java
-runtime/cds/appcds/HelloExtTest.java
-runtime/cds/appcds/IgnoreEmptyClassPaths.java
-runtime/cds/appcds/JvmtiAddPath.java
-runtime/cds/appcds/LambdaWithOldClass.java
-runtime/cds/appcds/LambdaWithJavaAgent.java
-runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java
-runtime/cds/appcds/MissingSuperTest.java
-runtime/cds/appcds/MultiProcessSharing.java
-runtime/cds/appcds/MultiReleaseJars.java
-runtime/cds/appcds/NestHostOldInf.java
-runtime/cds/appcds/NonExistClasspath.java
-runtime/cds/appcds/OldClassTest.java
-runtime/cds/appcds/PackageSealing.java
-runtime/cds/appcds/ParallelLoad2.java
-runtime/cds/appcds/ParallelLoadTest.java
-runtime/cds/appcds/ProhibitedPackage.java
-runtime/cds/appcds/ProtectionDomain.java
-runtime/cds/appcds/RelativePath.java
-runtime/cds/appcds/RewriteBytecodesTest.java
-runtime/cds/appcds/SharedArchiveConsistency.java
-runtime/cds/appcds/SharedBaseAddress.java
-runtime/cds/appcds/SharedPackages.java
-runtime/cds/appcds/SharedRegionAlignmentTest.java
-runtime/cds/appcds/SignedJar.java
-runtime/cds/appcds/SpecifySysLoaderProp.java
-runtime/cds/appcds/StaticArchiveWithLambda.java
-runtime/cds/appcds/TestCombinedCompressedFlags.java
-runtime/cds/appcds/TestDumpClassListSource.java
-runtime/cds/appcds/TestWithProfiler.java
-runtime/cds/appcds/TestEpsilonGCWithCDS.java
-runtime/cds/appcds/TestSerialGCWithCDS.java
-runtime/cds/appcds/TestZGCWithCDS.java
-runtime/cds/appcds/UnusedCPDuringDump.java
-runtime/cds/appcds/VerifierTest_1A.java
-runtime/cds/appcds/VerifierTest_1B.java
-runtime/cds/appcds/VerifierTest_2.java
-runtime/cds/appcds/WideIloadTest.java
-runtime/cds/appcds/TestParallelGCWithCDS.java
-runtime/cds/appcds/VerifyObjArrayCloneTest.java
-runtime/cds/appcds/XShareAutoWithChangedJar.java
-runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java
-runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java
-runtime/cds/appcds/cacheObject/ArchivedModuleCompareTest.java
-runtime/cds/appcds/cacheObject/CheckCachedMirrorTest.java
-runtime/cds/appcds/cacheObject/CheckCachedResolvedReferences.java
-runtime/cds/appcds/cacheObject/DifferentHeapSizes.java
-runtime/cds/appcds/cacheObject/GCStressTest.java
-runtime/cds/appcds/cacheObject/HeapFragmentationTest.java
-runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java
-runtime/cds/appcds/cacheObject/ArchivedEnumTest.java
-runtime/cds/appcds/cacheObject/OpenArchiveRegion.java
-runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java
-runtime/cds/appcds/cacheObject/RedefineClassTest.java
-runtime/cds/appcds/cacheObject/VerifyArchivedFields.java
-runtime/cds/appcds/condy/CondyHelloTest.java
-runtime/cds/appcds/customLoader/CustomClassListDump.java
-runtime/cds/appcds/customLoader/HelloCustom.java
-runtime/cds/appcds/customLoader/HelloCustom_JFR.java
-runtime/cds/appcds/customLoader/LoaderSegregationTest.java
-runtime/cds/appcds/customLoader/ParallelTestMultiFP.java
-runtime/cds/appcds/customLoader/ParallelTestSingleFP.java
-runtime/cds/appcds/customLoader/ProtectionDomain.java
-runtime/cds/appcds/customLoader/SameNameInTwoLoadersTest.java
-runtime/cds/appcds/customLoader/UnintendedLoadersTest.java
-runtime/cds/appcds/customLoader/UnloadUnregisteredLoaderTest.java
-runtime/cds/appcds/dynamicArchive/AppendClasspath.java
-runtime/cds/appcds/dynamicArchive/ArchiveConsistency.java
-runtime/cds/appcds/dynamicArchive/ArchivedSuperIf.java
-runtime/cds/appcds/dynamicArchive/ArrayKlasses.java
-runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java
-runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java
-runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java
-runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java
-runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java
-runtime/cds/appcds/dynamicArchive/DynamicFlag.java
-runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java
-runtime/cds/appcds/dynamicArchive/ExcludedClasses.java
-runtime/cds/appcds/dynamicArchive/HelloDynamic.java
-runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java
-runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java
-runtime/cds/appcds/dynamicArchive/JITInteraction.java
-runtime/cds/appcds/dynamicArchive/LambdaContainsOldInf.java
-runtime/cds/appcds/dynamicArchive/LambdaCustomLoader.java
-runtime/cds/appcds/dynamicArchive/LambdaForClassInBaseArchive.java
-runtime/cds/appcds/dynamicArchive/LambdaInBaseArchive.java
-runtime/cds/appcds/dynamicArchive/LambdaProxyCallerIsHidden.java
-runtime/cds/appcds/dynamicArchive/LambdaProxyDuringShutdown.java
-runtime/cds/appcds/dynamicArchive/LinkClassTest.java
-runtime/cds/appcds/dynamicArchive/MethodSorting.java
-runtime/cds/appcds/dynamicArchive/MismatchedBaseArchive.java
-runtime/cds/appcds/dynamicArchive/MissingArchive.java
-runtime/cds/appcds/dynamicArchive/NestTest.java
-runtime/cds/appcds/dynamicArchive/NoClassToArchive.java
-runtime/cds/appcds/dynamicArchive/ParallelLambdaLoadTest.java
-runtime/cds/appcds/dynamicArchive/PredicateTest.java
-runtime/cds/appcds/dynamicArchive/PrintSharedArchiveAndExit.java
-runtime/cds/appcds/dynamicArchive/RegularHiddenClass.java
-runtime/cds/appcds/dynamicArchive/RelativePath.java
-runtime/cds/appcds/dynamicArchive/SharedArchiveFileOption.java
-runtime/cds/appcds/dynamicArchive/SharedBaseAddressOption.java
-runtime/cds/appcds/dynamicArchive/StaticInnerTest.java
-runtime/cds/appcds/dynamicArchive/TestAutoCreateSharedArchive.java
-runtime/cds/appcds/dynamicArchive/UnsafeAndLambda.java
-runtime/cds/appcds/dynamicArchive/UnsafeAnonymous.java
-runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java
-runtime/cds/appcds/dynamicArchive/UnusedCPDuringDump.java
-runtime/cds/appcds/dynamicArchive/UsedAllArchivedLambdas.java
-runtime/cds/appcds/dynamicArchive/VerifyWithDynamicArchive.java
-runtime/cds/appcds/dynamicArchive/VerifyObjArrayCloneTest.java
-runtime/cds/appcds/dynamicArchive/WrongTopClasspath.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesCastFailureTest.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesGeneralTest.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesInvokersTest.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTest.java
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java
-runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java
-runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java
-runtime/cds/appcds/dynamicArchive/ModulePath.java
-runtime/cds/appcds/dynamicArchive/NestHostOldInf.java
-runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java
-runtime/cds/appcds/javaldr/ArrayTest.java
-runtime/cds/appcds/javaldr/GCDuringDump.java
-runtime/cds/appcds/javaldr/GCSharedStringsDuringDump.java
-runtime/cds/appcds/javaldr/HumongousDuringDump.java
-runtime/cds/appcds/javaldr/LockDuringDump.java
-runtime/cds/appcds/jigsaw/JigsawOptionsCombo.java
-runtime/cds/appcds/jigsaw/PatchModule/AppClassInCP.java
-runtime/cds/appcds/jigsaw/PatchModule/SubClassOfPatchedClass.java
-runtime/cds/appcds/jigsaw/RedefineClassesInModuleGraph.java
-runtime/cds/appcds/jigsaw/classpathtests/BootAppendTests.java
-runtime/cds/appcds/jigsaw/classpathtests/ClassPathTests.java
-runtime/cds/appcds/jigsaw/classpathtests/EmptyClassInBootClassPath.java
-runtime/cds/appcds/jigsaw/modulepath/ExportModule.java
-runtime/cds/appcds/jigsaw/modulepath/JvmtiAddPath.java
-runtime/cds/appcds/jigsaw/modulepath/OptimizeModuleHandlingTest.java
-runtime/cds/appcds/jvmti/ClassFileLoadHookTest.java
-runtime/cds/appcds/jvmti/InstrumentationTest.java
-runtime/cds/appcds/jvmti/dumpingWithAgent/DumpingWithJavaAgent.java
-runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java
-runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java
-runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java
+serviceability/sa/ClhsdbCDSCore.java 0000000 generic-all
+serviceability/logging/TestLogRotation.java 0000000 generic-all
+compiler/c2/Test8062950.java 0000000 generic-all
+serviceability/sa/TestObjectMonitorIterate.java 0000000 generic-all
+runtime/cds/appcds/AppendClasspath.java 0000000 generic-all
+runtime/cds/appcds/ArchiveRelocationTest.java 0000000 generic-all
+runtime/cds/appcds/BootClassPathMismatch.java 0000000 generic-all
+runtime/cds/appcds/CDSandJFR.java 0000000 generic-all
+runtime/cds/appcds/ClassPathAttr.java 0000000 generic-all
+runtime/cds/appcds/CommandLineFlagCombo.java 0000000 generic-all
+runtime/cds/appcds/DumpClassList.java 0000000 generic-all
+runtime/cds/appcds/DumpingWithNoCoops.java 0000000 generic-all
+runtime/cds/appcds/ExtraSymbols.java 0000000 generic-all
+runtime/cds/appcds/FieldAnnotationsTest.java 0000000 generic-all
+runtime/cds/appcds/FieldLayoutFlags.java 0000000 generic-all
+runtime/cds/appcds/FreeUnusedMetadata.java 0000000 generic-all
+runtime/cds/appcds/HelloExtTest.java 0000000 generic-all
+runtime/cds/appcds/IgnoreEmptyClassPaths.java 0000000 generic-all
+runtime/cds/appcds/JvmtiAddPath.java 0000000 generic-all
+runtime/cds/appcds/LambdaWithOldClass.java 0000000 generic-all
+runtime/cds/appcds/LambdaWithJavaAgent.java 0000000 generic-all
+runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java 0000000 generic-all
+runtime/cds/appcds/MissingSuperTest.java 0000000 generic-all
+runtime/cds/appcds/MultiProcessSharing.java 0000000 generic-all
+runtime/cds/appcds/MultiReleaseJars.java 0000000 generic-all
+runtime/cds/appcds/NestHostOldInf.java 0000000 generic-all
+runtime/cds/appcds/NonExistClasspath.java 0000000 generic-all
+runtime/cds/appcds/OldClassTest.java 0000000 generic-all
+runtime/cds/appcds/PackageSealing.java 0000000 generic-all
+runtime/cds/appcds/ParallelLoad2.java 0000000 generic-all
+runtime/cds/appcds/ParallelLoadTest.java 0000000 generic-all
+runtime/cds/appcds/ProhibitedPackage.java 0000000 generic-all
+runtime/cds/appcds/ProtectionDomain.java 0000000 generic-all
+runtime/cds/appcds/RelativePath.java 0000000 generic-all
+runtime/cds/appcds/RewriteBytecodesTest.java 0000000 generic-all
+runtime/cds/appcds/SharedArchiveConsistency.java 0000000 generic-all
+runtime/cds/appcds/SharedBaseAddress.java 0000000 generic-all
+runtime/cds/appcds/SharedPackages.java 0000000 generic-all
+runtime/cds/appcds/SharedRegionAlignmentTest.java 0000000 generic-all
+runtime/cds/appcds/SignedJar.java 0000000 generic-all
+runtime/cds/appcds/SpecifySysLoaderProp.java 0000000 generic-all
+runtime/cds/appcds/StaticArchiveWithLambda.java 0000000 generic-all
+runtime/cds/appcds/TestCombinedCompressedFlags.java 0000000 generic-all
+runtime/cds/appcds/TestDumpClassListSource.java 0000000 generic-all
+runtime/cds/appcds/TestWithProfiler.java 0000000 generic-all
+runtime/cds/appcds/TestEpsilonGCWithCDS.java 0000000 generic-all
+runtime/cds/appcds/TestSerialGCWithCDS.java 0000000 generic-all
+runtime/cds/appcds/TestZGCWithCDS.java 0000000 generic-all
+runtime/cds/appcds/UnusedCPDuringDump.java 0000000 generic-all
+runtime/cds/appcds/VerifierTest_1A.java 0000000 generic-all
+runtime/cds/appcds/VerifierTest_1B.java 0000000 generic-all
+runtime/cds/appcds/VerifierTest_2.java 0000000 generic-all
+runtime/cds/appcds/WideIloadTest.java 0000000 generic-all
+runtime/cds/appcds/TestParallelGCWithCDS.java 0000000 generic-all
+runtime/cds/appcds/VerifyObjArrayCloneTest.java 0000000 generic-all
+runtime/cds/appcds/XShareAutoWithChangedJar.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/ArchivedModuleCompareTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/CheckCachedMirrorTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/CheckCachedResolvedReferences.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/DifferentHeapSizes.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/GCStressTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/HeapFragmentationTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/ArchivedEnumTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/OpenArchiveRegion.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/RedefineClassTest.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/VerifyArchivedFields.java 0000000 generic-all
+runtime/cds/appcds/condy/CondyHelloTest.java 0000000 generic-all
+runtime/cds/appcds/customLoader/CustomClassListDump.java 0000000 generic-all
+runtime/cds/appcds/customLoader/HelloCustom.java 0000000 generic-all
+runtime/cds/appcds/customLoader/HelloCustom_JFR.java 0000000 generic-all
+runtime/cds/appcds/customLoader/LoaderSegregationTest.java 0000000 generic-all
+runtime/cds/appcds/customLoader/ParallelTestMultiFP.java 0000000 generic-all
+runtime/cds/appcds/customLoader/ParallelTestSingleFP.java 0000000 generic-all
+runtime/cds/appcds/customLoader/ProtectionDomain.java 0000000 generic-all
+runtime/cds/appcds/customLoader/SameNameInTwoLoadersTest.java 0000000 generic-all
+runtime/cds/appcds/customLoader/UnintendedLoadersTest.java 0000000 generic-all
+runtime/cds/appcds/customLoader/UnloadUnregisteredLoaderTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/AppendClasspath.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ArchiveConsistency.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ArchivedSuperIf.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ArrayKlasses.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/DynamicFlag.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ExcludedClasses.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/HelloDynamic.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/JITInteraction.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaContainsOldInf.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaCustomLoader.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaForClassInBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaInBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaProxyCallerIsHidden.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaProxyDuringShutdown.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LinkClassTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/MethodSorting.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/MismatchedBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/MissingArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/NestTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/NoClassToArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ParallelLambdaLoadTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/PredicateTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/PrintSharedArchiveAndExit.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/RegularHiddenClass.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/RelativePath.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/SharedArchiveFileOption.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/SharedBaseAddressOption.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/StaticInnerTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/TestAutoCreateSharedArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/UnsafeAndLambda.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/UnsafeAnonymous.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/UnusedCPDuringDump.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/UsedAllArchivedLambdas.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/VerifyWithDynamicArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/VerifyObjArrayCloneTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/WrongTopClasspath.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesCastFailureTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesGeneralTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesInvokersTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ModulePath.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/NestHostOldInf.java 0000000 generic-all
+runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java 0000000 generic-all
+runtime/cds/appcds/javaldr/ArrayTest.java 0000000 generic-all
+runtime/cds/appcds/javaldr/GCDuringDump.java 0000000 generic-all
+runtime/cds/appcds/javaldr/GCSharedStringsDuringDump.java 0000000 generic-all
+runtime/cds/appcds/javaldr/HumongousDuringDump.java 0000000 generic-all
+runtime/cds/appcds/javaldr/LockDuringDump.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/JigsawOptionsCombo.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/PatchModule/AppClassInCP.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/PatchModule/SubClassOfPatchedClass.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/RedefineClassesInModuleGraph.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/classpathtests/BootAppendTests.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/classpathtests/ClassPathTests.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/classpathtests/EmptyClassInBootClassPath.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/modulepath/ExportModule.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/modulepath/JvmtiAddPath.java 0000000 generic-all
+runtime/cds/appcds/jigsaw/modulepath/OptimizeModuleHandlingTest.java 0000000 generic-all
+runtime/cds/appcds/jvmti/ClassFileLoadHookTest.java 0000000 generic-all
+runtime/cds/appcds/jvmti/InstrumentationTest.java 0000000 generic-all
+runtime/cds/appcds/jvmti/dumpingWithAgent/DumpingWithJavaAgent.java 0000000 generic-all
+runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java 0000000 generic-all
+runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java 0000000 generic-all
+runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java 0000000 generic-all
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java 0000000 generic-all
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesCastFailureTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesGeneralTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesInvokersTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesPermuteArgumentsTest.java
-runtime/cds/appcds/methodHandles/MethodHandlesSpreadArgumentsTest.java
-runtime/cds/appcds/redefineClass/RedefineBasicTest.java
-runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java
-runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java
-runtime/cds/appcds/sharedStrings/ExerciseGC.java
-runtime/cds/appcds/sharedStrings/FlagCombo.java#id0
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id0
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id1
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id2
-runtime/cds/appcds/sharedStrings/InternSharedString.java
-runtime/cds/appcds/sharedStrings/LargePages.java
-runtime/cds/appcds/sharedStrings/LockSharedStrings.java
-runtime/cds/appcds/sharedStrings/SharedStringsBasicPlus.java
-runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java
-runtime/cds/appcds/sharedStrings/SharedStringsStress.java
-runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java
-runtime/cds/appcds/LambdaContainsOldInf.java
-runtime/cds/appcds/NonJarInClasspath.java
-runtime/cds/appcds/OldInfExtendsInfDefMeth.java
-runtime/cds/appcds/OldSuperClass.java
-runtime/cds/appcds/OldSuperInf.java
-runtime/cds/appcds/OldSuperInfIndirect.java
-runtime/cds/appcds/customLoader/OldClassAndInf.java
-runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java
-runtime/cds/appcds/dynamicArchive/LambdaForOldInfInBaseArchive.java
-runtime/cds/appcds/dynamicArchive/OldClassAndInf.java
-runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java
-runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java
-runtime/cds/appcds/dynamicArchive/OldClassInBaseArchive.java
-runtime/cds/appcds/dynamicArchive/RedefineCallerClassTest.java
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#default-cl
+runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesCastFailureTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesGeneralTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesInvokersTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesPermuteArgumentsTest.java 0000000 generic-all
+runtime/cds/appcds/methodHandles/MethodHandlesSpreadArgumentsTest.java 0000000 generic-all
+runtime/cds/appcds/redefineClass/RedefineBasicTest.java 0000000 generic-all
+runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java 0000000 generic-all
+runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/ExerciseGC.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/FlagCombo.java#id0 0000000 generic-all
+runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id0 0000000 generic-all
+runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id1 0000000 generic-all
+runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id2 0000000 generic-all
+runtime/cds/appcds/sharedStrings/InternSharedString.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/LargePages.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/LockSharedStrings.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/SharedStringsBasicPlus.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/SharedStringsStress.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java 0000000 generic-all
+runtime/cds/appcds/LambdaContainsOldInf.java 0000000 generic-all
+runtime/cds/appcds/NonJarInClasspath.java 0000000 generic-all
+runtime/cds/appcds/OldInfExtendsInfDefMeth.java 0000000 generic-all
+runtime/cds/appcds/OldSuperClass.java 0000000 generic-all
+runtime/cds/appcds/OldSuperInf.java 0000000 generic-all
+runtime/cds/appcds/OldSuperInfIndirect.java 0000000 generic-all
+runtime/cds/appcds/customLoader/OldClassAndInf.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/LambdaForOldInfInBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/OldClassAndInf.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/OldClassInBaseArchive.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/RedefineCallerClassTest.java 0000000 generic-all
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl 0000000 generic-all
+runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl 0000000 generic-all
+runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl 0000000 generic-all
+runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#default-cl 0000000 generic-all
 
 ####
 ## Fails when run even in new kernel thread
-runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java
-runtime/ClassFile/PreviewVersion.java
-runtime/getSysPackage/GetSysPkgTest.java
-runtime/logging/VtablesTest.java
-serviceability/sa/TestCpoolForInvokeDynamic.java
-compiler/ciReplay/TestServerVM.java
-compiler/ciReplay/TestVMNoCompLevel.java
+runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java 0000000 generic-all
+runtime/ClassFile/PreviewVersion.java 0000000 generic-all
+runtime/getSysPackage/GetSysPkgTest.java 0000000 generic-all
+runtime/logging/VtablesTest.java 0000000 generic-all
+serviceability/sa/TestCpoolForInvokeDynamic.java 0000000 generic-all
+compiler/ciReplay/TestServerVM.java 0000000 generic-all
+compiler/ciReplay/TestVMNoCompLevel.java 0000000 generic-all
 
 ####
 # Custom cp adding (overriding -cp)
 
-runtime/verifier/TestMultiANewArray.java
-runtime/verifier/OverriderMsg.java
-runtime/verifier/TestANewArray.java
-runtime/StackTrace/LargeClassTest.java
-runtime/LocalVariableTable/TestLVT.java
-runtime/duplAttributes/DuplAttributesTest.java
-runtime/EnclosingMethodAttr/EnclMethodAttr.java
-runtime/classFileParserBug/TestBadPackageWithInterface.java
-runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java
-runtime/classFileParserBug/ClassFileParserBug.java
-runtime/ClassFile/UnsupportedClassFileVersion.java
-runtime/ClassFile/JsrRewriting.java
-runtime/ClassFile/OomWhileParsingRepeatedJsr.java
-runtime/cds/appcds/ClassLoaderTest.java
-runtime/cds/appcds/HelloTest.java
-runtime/cds/appcds/sharedStrings/SharedStringsBasic.java
-runtime/cds/BootAppendTests.java
-runtime/BootstrapMethod/BSMCalledTwice.java#id0
-runtime/BootstrapMethod/BSMCalledTwice.java#id1
+runtime/verifier/TestMultiANewArray.java 0000000 generic-all
+runtime/verifier/OverriderMsg.java 0000000 generic-all
+runtime/verifier/TestANewArray.java 0000000 generic-all
+runtime/StackTrace/LargeClassTest.java 0000000 generic-all
+runtime/LocalVariableTable/TestLVT.java 0000000 generic-all
+runtime/duplAttributes/DuplAttributesTest.java 0000000 generic-all
+runtime/EnclosingMethodAttr/EnclMethodAttr.java 0000000 generic-all
+runtime/classFileParserBug/TestBadPackageWithInterface.java 0000000 generic-all
+runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java 0000000 generic-all
+runtime/classFileParserBug/ClassFileParserBug.java 0000000 generic-all
+runtime/ClassFile/UnsupportedClassFileVersion.java 0000000 generic-all
+runtime/ClassFile/JsrRewriting.java 0000000 generic-all
+runtime/ClassFile/OomWhileParsingRepeatedJsr.java 0000000 generic-all
+runtime/cds/appcds/ClassLoaderTest.java 0000000 generic-all
+runtime/cds/appcds/HelloTest.java 0000000 generic-all
+runtime/cds/appcds/sharedStrings/SharedStringsBasic.java 0000000 generic-all
+runtime/cds/BootAppendTests.java 0000000 generic-all
+runtime/BootstrapMethod/BSMCalledTwice.java#id0 0000000 generic-all
+runtime/BootstrapMethod/BSMCalledTwice.java#id1 0000000 generic-all
 
 
 ####
 # dont run classname (-version/empty)
 
-runtime/symboltable/ShortLivedSymbolCleanup.java
-runtime/logging/LoaderConstraintsTest.java
-runtime/NMT/NMTInitializationTest.java#default_long-detail
-runtime/NMT/NMTInitializationTest.java#default_long-off
-runtime/NMT/NMTInitializationTest.java#normal-detail
-runtime/NMT/NMTInitializationTest.java#normal-off
+runtime/symboltable/ShortLivedSymbolCleanup.java 0000000 generic-all
+runtime/logging/LoaderConstraintsTest.java 0000000 generic-all
+runtime/NMT/NMTInitializationTest.java#default_long-detail 0000000 generic-all
+runtime/NMT/NMTInitializationTest.java#default_long-off 0000000 generic-all
+runtime/NMT/NMTInitializationTest.java#normal-detail 0000000 generic-all
+runtime/NMT/NMTInitializationTest.java#normal-off 0000000 generic-all
 
 ####
 # Seems module patching doesn't work with wrapper
 
-runtime/modules/PatchModule/PatchModuleTestJarDir.java
-runtime/modules/PatchModule/PatchModuleJavaBase.java
-runtime/modules/PatchModule/PatchModuleTestJar.java
-runtime/modules/PatchModule/PatchModuleTest.java
-runtime/modules/PatchModule/PatchModuleClassList.java
+runtime/modules/PatchModule/PatchModuleTestJarDir.java 0000000 generic-all
+runtime/modules/PatchModule/PatchModuleJavaBase.java 0000000 generic-all
+runtime/modules/PatchModule/PatchModuleTestJar.java 0000000 generic-all
+runtime/modules/PatchModule/PatchModuleTest.java 0000000 generic-all
+runtime/modules/PatchModule/PatchModuleClassList.java 0000000 generic-all
 
 
 ####
 # GC tests failing because test expected results differ with vthread
 
-gc/TestAgeOutput.java#id1
-gc/TestAgeOutput.java#id0
-gc/arguments/TestUseCompressedOopsErgo.java#id0
-gc/arguments/TestUseCompressedOopsErgo.java#id1
-gc/arguments/TestUseCompressedOopsErgo.java#id2
-gc/arguments/TestSerialHeapSizeFlags.java
-gc/arguments/TestParallelHeapSizeFlags.java
-gc/arguments/TestMinInitialErgonomics.java
-gc/arguments/TestMaxRAMFlags.java
-gc/arguments/TestG1HeapSizeFlags.java
-gc/arguments/TestNewSizeThreadIncrease.java
-gc/g1/TestSkipRebuildRemsetPhase.java
-gc/g1/TestStringDeduplicationYoungGC.java
-gc/g1/TestStringDeduplicationTableRehash.java
-gc/g1/TestStringDeduplicationTableResize.java
-gc/g1/TestStringDeduplicationPrintOptions.java
-gc/g1/TestStringDeduplicationFullGC.java
-gc/g1/TestStringDeduplicationAgeThreshold.java
-gc/g1/TestRemsetLoggingPerRegion.java
-gc/g1/TestRemsetLogging.java
-gc/g1/TestMixedGCLiveThreshold.java#25percent
-gc/g1/plab/TestPLABResize.java
+gc/TestAgeOutput.java#id1 0000000 generic-all
+gc/TestAgeOutput.java#id0 0000000 generic-all
+gc/arguments/TestUseCompressedOopsErgo.java#id0 0000000 generic-all
+gc/arguments/TestUseCompressedOopsErgo.java#id1 0000000 generic-all
+gc/arguments/TestUseCompressedOopsErgo.java#id2 0000000 generic-all
+gc/arguments/TestSerialHeapSizeFlags.java 0000000 generic-all
+gc/arguments/TestParallelHeapSizeFlags.java 0000000 generic-all
+gc/arguments/TestMinInitialErgonomics.java 0000000 generic-all
+gc/arguments/TestMaxRAMFlags.java 0000000 generic-all
+gc/arguments/TestG1HeapSizeFlags.java 0000000 generic-all
+gc/arguments/TestNewSizeThreadIncrease.java 0000000 generic-all
+gc/g1/TestSkipRebuildRemsetPhase.java 0000000 generic-all
+gc/g1/TestStringDeduplicationYoungGC.java 0000000 generic-all
+gc/g1/TestStringDeduplicationTableRehash.java 0000000 generic-all
+gc/g1/TestStringDeduplicationTableResize.java 0000000 generic-all
+gc/g1/TestStringDeduplicationPrintOptions.java 0000000 generic-all
+gc/g1/TestStringDeduplicationFullGC.java 0000000 generic-all
+gc/g1/TestStringDeduplicationAgeThreshold.java 0000000 generic-all
+gc/g1/TestRemsetLoggingPerRegion.java 0000000 generic-all
+gc/g1/TestRemsetLogging.java 0000000 generic-all
+gc/g1/TestMixedGCLiveThreshold.java#25percent 0000000 generic-all
+gc/g1/plab/TestPLABResize.java 0000000 generic-all
 
 ####
 ## Expected exception is ignored
 
-runtime/condy/BadBSMUseTest.java
+runtime/condy/BadBSMUseTest.java 0000000 generic-all
 
 ####
 ## JVMCI/Graal tests. Need to re-review when start fixing support of JVMCI/Graal.
 
-compiler/jvmci/compilerToVM/DebugOutputTest.java
-compiler/jvmci/compilerToVM/DebugOutputTest.java
-compiler/jvmci/compilerToVM/DebugOutputTest.java
-compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java
-compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java
-compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java
+compiler/jvmci/compilerToVM/DebugOutputTest.java 0000000 generic-all
+compiler/jvmci/compilerToVM/DebugOutputTest.java 0000000 generic-all
+compiler/jvmci/compilerToVM/DebugOutputTest.java 0000000 generic-all
+compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java 0000000 generic-all
+compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java 0000000 generic-all
+compiler/jvmci/compilerToVM/MaterializeVirtualObjectTest.java 0000000 generic-all
