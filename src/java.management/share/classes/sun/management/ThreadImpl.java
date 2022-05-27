@@ -444,6 +444,8 @@ public class ThreadImpl implements ThreadMXBean {
     private long[] threadsToIds(Thread[] threads) {
         if (threads != null) {
             long[] tids = Stream.of(threads)
+                    // FakeVirtualThread objects may be list returned by the VM
+                    .filter(t -> !isVirtual(t))
                     .mapToLong(Thread::threadId)
                     .toArray();
             if (tids.length > 0) {

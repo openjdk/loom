@@ -53,6 +53,7 @@ import java.util.stream.Stream;
 import java.nio.channels.Selector;
 
 import jdk.test.lib.thread.VThreadRunner;
+import org.testng.SkipException;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
@@ -1087,7 +1088,9 @@ public class ThreadAPI {
     public void testYield1() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilderOrNull(scheduler);
+            if (builder == null)
+                throw new SkipException("No support for custom schedulers");
             ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
@@ -1114,7 +1117,9 @@ public class ThreadAPI {
     public void testYield2() throws Exception {
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilderOrNull(scheduler);
+            if (builder == null)
+                throw new SkipException("No support for custom schedulers");
             ThreadFactory factory = builder.factory();
             var thread = factory.newThread(() -> {
                 list.add("A");
@@ -1689,7 +1694,9 @@ public class ThreadAPI {
     public void testGetState3() throws Exception {
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilderOrNull(scheduler);
+            if (builder == null)
+                throw new SkipException("No support for custom schedulers");
             Thread t1 = builder.start(() -> {
                 Thread t2 = builder.unstarted(LockSupport::park);
                 assertTrue(t2.getState() == Thread.State.NEW);
@@ -1873,6 +1880,9 @@ public class ThreadAPI {
                         // thread did not run
                         target = vthread;
                     }
+                    if (threads.size() >= 100) {
+                        throw new SkipException("Unable to pin all threads");
+                    }
                 }
             }
 
@@ -1923,7 +1933,9 @@ public class ThreadAPI {
                 });
             };
 
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilderOrNull(scheduler);
+            if (builder == null)
+                throw new SkipException("No support for custom schedulers");
             Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
@@ -2019,7 +2031,9 @@ public class ThreadAPI {
                 });
             };
 
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilderOrNull(scheduler);
+            if (builder == null)
+                throw new SkipException("No support for custom schedulers");
             Thread vthread = builder.start(() -> {
                 synchronized (lock) {
                     try {
@@ -2270,7 +2284,6 @@ public class ThreadAPI {
         thread.join();
         assertTrue(thread.toString().contains("fred"));
     }
-
 
     /**
      * Schedule a thread to be interrupted after a delay.

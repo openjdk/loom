@@ -33,8 +33,11 @@ import java.security.ProtectionDomain;
 import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.PreviewFeatures;
@@ -736,8 +739,9 @@ public class Thread implements Runnable {
      *
      * @param name thread name, can be null
      * @param characteristics thread characteristics
+     * @param createFileHolder true to create a FieldHolder object
      */
-    Thread(String name, int characteristics) {
+    Thread(String name, int characteristics, boolean createFileHolder) {
         this.tid = ThreadIdentifiers.next();
         this.name = (name != null) ? name : "";
         this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
@@ -767,8 +771,14 @@ public class Thread implements Runnable {
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
-        // no additional fields
-        this.holder = null;
+        // create a FieldHolder object, needed when implemented on a platform thread
+        if (createFileHolder) {
+            ThreadGroup g = Constants.VTHREAD_GROUP;
+            int pri = NORM_PRIORITY;
+            this.holder = new FieldHolder(g, null, -1, pri, true);
+        } else {
+            this.holder = null;
+        }
     }
 
     /**
@@ -1495,8 +1505,9 @@ public class Thread implements Runnable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
+        Objects.requireNonNull(task);
         PreviewFeatures.ensureEnabled();
-        var thread = new VirtualThread(null, null, 0, task);
+        var thread = ThreadBuilders.newVirtualThread(null, null, 0, task);
         thread.start();
         return thread;
     }
@@ -1511,7 +1522,7 @@ public class Thread implements Runnable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
-        return (this instanceof VirtualThread);
+        return (this instanceof BaseVirtualThread);
     }
 
     /**
@@ -2617,8 +2628,10 @@ public class Thread implements Runnable {
         StackTraceElement[][] traces = dumpThreads(threads);
         Map<Thread, StackTraceElement[]> m = HashMap.newHashMap(threads.length);
         for (int i = 0; i < threads.length; i++) {
+            Thread thread = threads[i];
             StackTraceElement[] stackTrace = traces[i];
-            if (stackTrace != null) {
+            // FakeVirtualThread objects may be list returned by the VM
+            if (!thread.isVirtual() && stackTrace != null) {
                 m.put(threads[i], stackTrace);
             }
             // else terminated so we don't put it in the map
@@ -2688,7 +2701,11 @@ public class Thread implements Runnable {
      * Return an array of all live threads.
      */
     static Thread[] getAllThreads() {
-        return getThreads();
+        Thread[] threads = getThreads();
+        return Stream.of(threads)
+                // FakeVirtualThread objects may be list returned by the VM
+                .filter(Predicate.not(Thread::isVirtual))
+                .toArray(Thread[]::new);
     }
 
     private static native StackTraceElement[][] dumpThreads(Thread[] threads);

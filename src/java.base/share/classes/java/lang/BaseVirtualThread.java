@@ -22,13 +22,35 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+package java.lang;
 
-#include "jni.h"
-#include "jvm.h"
+/**
+ * Base interface for virtual thread implementations.
+ */
+sealed interface BaseVirtualThread
+        permits VirtualThread, ThreadBuilders.FakeVirtualThread {
 
-#include "jdk_internal_misc_PreviewFeatures.h"
+    /**
+     * Parks the current virtual thread until the parking permit is available or
+     * the thread is interrupted.
+     *
+     * The behavior of this method when the current thread is not this thread
+     * is not defined.
+     */
+    void park();
 
-JNIEXPORT jboolean JNICALL
-Java_jdk_internal_misc_PreviewFeatures_isPreviewEnabled(JNIEnv *env, jclass cls) {
-    return JVM_IsPreviewEnabled();
+    /**
+     * Parks current virtual thread up to the given waiting time until the parking
+     * permit is available or the thread is interrupted.
+     *
+     * The behavior of this method when the current thread is not this thread
+     * is not defined.
+     */
+    void parkNanos(long nanos);
+
+    /**
+     * Makes available the parking permit to the given this virtual thread.
+     */
+    void unpark();
 }
+
