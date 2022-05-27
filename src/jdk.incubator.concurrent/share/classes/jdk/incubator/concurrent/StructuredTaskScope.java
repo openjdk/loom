@@ -662,7 +662,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * unfinished tasks to finish. If interrupted then this method will continue to
      * wait for the threads to finish before completing with the interrupt status set.
      *
-     * <p> This method may only be invoked by the task scope owner.
+     * <p> This method may only be invoked by the task scope owner. If the task cscope
+     * is already closed then the owner invoking this method has no effect.
      *
      * <p> A {@code StructuredTaskScope} is intended to be used in a <em>structured
      * manner</em>. If this method is called to close a task scope before nested task
@@ -711,8 +712,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             sb.append(name);
             sb.append('/');
         }
-        String id = getClass().getName() + "@" + System.identityHashCode(this);
-        sb.append(id);
+        sb.append(Objects.toIdentityString(this));
         int s = state;
         if (s == CLOSED)
             sb.append("/closed");
