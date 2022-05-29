@@ -31,6 +31,15 @@
  * @run testng/othervm/timeout=300 ThreadAPI
  */
 
+/**
+ * @test
+ * @requires vm.continuations
+ * @enablePreview
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run testng/othervm/timeout=300 -XX:-VMContinuations ThreadAPI
+ */
+
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.ArrayList;
