@@ -411,6 +411,10 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
   DeadlockCycle* cycle = new DeadlockCycle();
   for (JavaThread* jt = jti.first(); jt != NULL; jt = jti.next()) {
     if (is_virtual_or_carrier_thread(jt)) {
+      // skip virtual and carrier threads
+      continue;
+    }
+    if (jt->depth_first_number() >= 0) {
       // this thread was already visited
       continue;
     }
