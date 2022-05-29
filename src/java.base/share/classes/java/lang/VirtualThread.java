@@ -486,7 +486,7 @@ final class VirtualThread extends BaseVirtualThread {
      * yield). It also completes immediately if the interrupt status is set.
      */
     @Override
-    public void park() {
+    void park() {
         assert Thread.currentThread() == this;
 
         // complete immediately if parking permit available or interrupted
@@ -514,7 +514,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @param nanos the maximum number of nanoseconds to wait.
      */
     @Override
-    public void parkNanos(long nanos) {
+    void parkNanos(long nanos) {
         assert Thread.currentThread() == this;
 
         // complete immediately if parking permit available or interrupted
@@ -619,7 +619,7 @@ final class VirtualThread extends BaseVirtualThread {
      */
     @Override
     @ChangesCurrentThread
-    public void unpark() {
+    void unpark() {
         Thread currentThread = Thread.currentThread();
         if (!getAndSetParkPermit(true) && currentThread != this) {
             int s = state();

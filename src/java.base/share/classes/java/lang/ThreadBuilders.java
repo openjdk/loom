@@ -414,17 +414,17 @@ class ThreadBuilders {
         }
 
         @Override
-        public void park() {
+        void park() {
             U.park(false, 0L);
         }
 
         @Override
-        public void parkNanos(long nanos) {
+        void parkNanos(long nanos) {
             U.park(false, nanos);
         }
 
         @Override
-        public void unpark() {
+        void unpark() {
             U.unpark(this);
         }
 
