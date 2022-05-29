@@ -739,9 +739,9 @@ public class Thread implements Runnable {
      *
      * @param name thread name, can be null
      * @param characteristics thread characteristics
-     * @param createFileHolder true to create a FieldHolder object
+     * @param bound true when bound to an OS thread
      */
-    Thread(String name, int characteristics, boolean createFileHolder) {
+    Thread(String name, int characteristics, boolean bound) {
         this.tid = ThreadIdentifiers.next();
         this.name = (name != null) ? name : "";
         this.inheritedAccessControlContext = Constants.NO_PERMISSIONS_ACC;
@@ -771,8 +771,8 @@ public class Thread implements Runnable {
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
-        // create a FieldHolder object, needed when implemented on a platform thread
-        if (createFileHolder) {
+        // create a FieldHolder object, needed when bound to an OS thread
+        if (bound) {
             ThreadGroup g = Constants.VTHREAD_GROUP;
             int pri = NORM_PRIORITY;
             this.holder = new FieldHolder(g, null, -1, pri, true);
@@ -2630,7 +2630,7 @@ public class Thread implements Runnable {
         for (int i = 0; i < threads.length; i++) {
             Thread thread = threads[i];
             StackTraceElement[] stackTrace = traces[i];
-            // FakeVirtualThread objects may be list returned by the VM
+            // BoundVirtualThread objects may be in list returned by the VM
             if (!thread.isVirtual() && stackTrace != null) {
                 m.put(threads[i], stackTrace);
             }
@@ -2703,7 +2703,7 @@ public class Thread implements Runnable {
     static Thread[] getAllThreads() {
         Thread[] threads = getThreads();
         return Stream.of(threads)
-                // FakeVirtualThread objects may be list returned by the VM
+                // BoundVirtualThread objects may be in list returned by the VM
                 .filter(Predicate.not(Thread::isVirtual))
                 .toArray(Thread[]::new);
     }

@@ -385,7 +385,7 @@ class ThreadBuilders {
         } else {
             if (scheduler != null)
                 throw new UnsupportedOperationException();
-            return new FakeVirtualThread(name, characteristics, task);
+            return new BoundVirtualThread(name, characteristics, task);
         }
     }
 
@@ -394,12 +394,12 @@ class ThreadBuilders {
      * is intended for platforms that don't have the underlying VM support for
      * continuations. It can also be used for testing.
      */
-    static final class FakeVirtualThread extends Thread implements BaseVirtualThread {
+    static final class BoundVirtualThread extends BaseVirtualThread {
         private static final Unsafe U = Unsafe.getUnsafe();
         private final Runnable task;
         private boolean runInvoked;
 
-        FakeVirtualThread(String name, int characteristics, Runnable task) {
+        BoundVirtualThread(String name, int characteristics, Runnable task) {
             super(name, characteristics, true);
             this.task = task;
         }

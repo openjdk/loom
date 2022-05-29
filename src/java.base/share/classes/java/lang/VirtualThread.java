@@ -62,7 +62,7 @@ import static java.util.concurrent.TimeUnit.*;
  * A thread that is scheduled by the Java virtual machine rather than the operating
  * system.
  */
-final class VirtualThread extends Thread implements BaseVirtualThread {
+final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
@@ -148,7 +148,7 @@ final class VirtualThread extends Thread implements BaseVirtualThread {
      * @param task the task to execute
      */
     VirtualThread(Executor scheduler, String name, int characteristics, Runnable task) {
-        super(name, characteristics, false);
+        super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
         // choose scheduler if not specified

@@ -25,10 +25,21 @@
 package java.lang;
 
 /**
- * Base interface for virtual thread implementations.
+ * Base class for virtual thread implementations.
  */
-sealed interface BaseVirtualThread
-        permits VirtualThread, ThreadBuilders.FakeVirtualThread {
+sealed abstract class BaseVirtualThread extends Thread
+        permits VirtualThread, ThreadBuilders.BoundVirtualThread {
+
+    /**
+     * Initializes a virtual Thread.
+     *
+     * @param name thread name, can be null
+     * @param characteristics thread characteristics
+     * @param bound true when bound to an OS thread
+     */
+    BaseVirtualThread(String name, int characteristics, boolean bound) {
+        super(name, characteristics, bound);
+    }
 
     /**
      * Parks the current virtual thread until the parking permit is available or
@@ -37,7 +48,7 @@ sealed interface BaseVirtualThread
      * The behavior of this method when the current thread is not this thread
      * is not defined.
      */
-    void park();
+    abstract void park();
 
     /**
      * Parks current virtual thread up to the given waiting time until the parking
@@ -46,11 +57,11 @@ sealed interface BaseVirtualThread
      * The behavior of this method when the current thread is not this thread
      * is not defined.
      */
-    void parkNanos(long nanos);
+    abstract void parkNanos(long nanos);
 
     /**
      * Makes available the parking permit to the given this virtual thread.
      */
-    void unpark();
+    abstract void unpark();
 }
 
