@@ -3181,19 +3181,12 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_ExtentLocalCache(JNIEnv* env, jclass threadClass))
   oop theCache = thread->extentLocalCache();
-  if (theCache) {
-    arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
-  }
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetExtentLocalCache(JNIEnv* env, jclass threadClass,
                                        jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
-  if (objs != NULL) {
-    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
-  }
   thread->set_extentLocalCache(objs);
 JVM_END
 
