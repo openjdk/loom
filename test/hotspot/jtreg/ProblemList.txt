@@ -251,3 +251,5 @@ serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java                  
 #############################################################################
 
 # Loom, fibers branch
+
+serviceability/jvmti/vthread/GetSetLocalTest/GetSetLocalTest.java       0000000 generic-all
