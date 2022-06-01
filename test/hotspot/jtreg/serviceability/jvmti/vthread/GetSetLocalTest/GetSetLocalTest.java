@@ -34,8 +34,7 @@ import java.util.concurrent.*;
 public class GetSetLocalTest {
     private static final String agentLib = "GetSetLocalTest";
 
-    static final int MSG_COUNT = 600*1000;
-    static final SynchronousQueue<String> QUEUE = new SynchronousQueue<>();
+    static SynchronousQueue<String> QUEUE;
     static native boolean completed();
     static native void enableEvents(Thread thread);
     static native void testSuspendedVirtualThreads(Thread thread);
@@ -55,19 +54,17 @@ public class GetSetLocalTest {
 
     static final Runnable PRODUCER = () -> {
         try {
-            for (int i = 0; i < MSG_COUNT; i++) {
-                if (completed()) {
-                    consumer.interrupt();
-                    break;
-                }
+            while (!completed()) {
                 producer("msg: ");
             }
-        } catch (InterruptedException e) { }
+            consumer.interrupt();
+        } catch (InterruptedException e) {
+        }
     };
 
     static final Runnable CONSUMER = () -> {
         try {
-            for (int i = 0; i < MSG_COUNT; i++) {
+            while(true) {
                 String s = QUEUE.take();
             }
         } catch (InterruptedException e) {
@@ -76,6 +73,7 @@ public class GetSetLocalTest {
     };
 
     public static void test1() throws Exception {
+        QUEUE = new SynchronousQueue<>();
         producer = Thread.ofVirtual().name("VThread-Producer").start(PRODUCER);
         consumer = Thread.ofVirtual().name("VThread-Consumer").start(CONSUMER);
 
@@ -100,6 +98,10 @@ public class GetSetLocalTest {
         }
 
         GetSetLocalTest obj = new GetSetLocalTest();
-        obj.runTest();
+
+        for (int i = 0; i < 1000; i++) {
+            obj.runTest();
+        }
+
     }
 }
