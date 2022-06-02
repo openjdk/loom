@@ -159,6 +159,8 @@ module java.base {
         jdk.jlink,
         jdk.net,
         jdk.incubator.concurrent;
+    exports jdk.internal.foreign to
+        jdk.incubator.vector;
     exports jdk.internal.event to
         jdk.jfr;
     exports jdk.internal.jimage to
