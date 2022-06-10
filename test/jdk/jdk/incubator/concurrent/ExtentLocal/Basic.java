@@ -36,23 +36,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.testng.TestListenerAdapter;
-import org.testng.TestNG;
 import org.testng.annotations.Test;
-import org.testng.xml.XmlSuite;
 
 import static org.testng.Assert.*;
 
 public class Basic {
-
-    public static void main(String[] args) {
-        TestListenerAdapter tla = new TestListenerAdapter();
-        TestNG testNG = new TestNG();
-        testNG.setParallel(XmlSuite.ParallelMode.METHODS);
-        testNG.setTestClasses(new Class[] { Basic.class });
-        testNG.addListener(tla);
-        testNG.run();
-    }
 
     @Test
     public void testUnbound1() {
