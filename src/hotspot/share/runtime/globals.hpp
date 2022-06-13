@@ -1291,10 +1291,11 @@ const intx ObjectAlignmentInBytes = 8;
   develop(bool, DebugDeoptimization, false,                                 \
           "Tracing various information while debugging deoptimization")     \
                                                                             \
-  product(intx, SelfDestructTimer, 0,                                       \
-          "Will cause VM to terminate after a given time (in minutes) "     \
-          "(0 means off)")                                                  \
-          range(0, max_intx)                                                \
+  product(double, SelfDestructTimer, 0.0,                                   \
+          "Will cause VM to terminate after a given time "                  \
+          "(in fractional minutes) "                                        \
+          "(0.0 means off)")                                                \
+          range(0.0, (double)max_intx)                                      \
                                                                             \
   product(intx, MaxJavaStackTraceDepth, 1024,                               \
           "The maximum number of lines in the stack trace for Java "        \
@@ -1999,8 +2000,8 @@ const intx ObjectAlignmentInBytes = 8;
           "Path to the directory where a temporary file will be created "   \
           "to use as the backing store for Java Heap.")                     \
                                                                             \
-  product(bool, LoomVM, true,                                               \
-          "Enable Loom Mechanisms in the VM")                               \
+  product_pd(bool, VMContinuations, EXPERIMENTAL,                           \
+          "Enable VM continuations support")                                \
                                                                             \
   develop(bool, LoomDeoptAfterThaw, false,                                  \
           "Deopt stack after thaw")                                         \
@@ -2013,11 +2014,6 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   develop(bool, UseContinuationFastPath, true,                              \
           "Use fast-path frame walking in continuations")                   \
-                                                                            \
-  product(intx, ExtentLocalCacheSize, 16,                                   \
-          "Size of the cache for scoped values")                            \
-           range(0, max_intx)                                               \
-           constraint(ExtentLocalCacheSizeConstraintFunc, AtParse)          \
                                                                             \
   develop(int, VerifyMetaspaceInterval, DEBUG_ONLY(500) NOT_DEBUG(0),       \
                "Run periodic metaspace verifications (0 - none, "           \

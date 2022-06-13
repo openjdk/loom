@@ -3181,19 +3181,12 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_ExtentLocalCache(JNIEnv* env, jclass threadClass))
   oop theCache = thread->extentLocalCache();
-  if (theCache) {
-    arrayOop objs = arrayOop(theCache);
-    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
-  }
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetExtentLocalCache(JNIEnv* env, jclass threadClass,
                                        jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
-  if (objs != NULL) {
-    assert(objs->length() == ExtentLocalCacheSize * 2, "wrong length");
-  }
   thread->set_extentLocalCache(objs);
 JVM_END
 
@@ -3487,10 +3480,13 @@ JVM_LEAF(jboolean, JVM_IsSupportedJNIVersion(jint version))
 JVM_END
 
 
-JVM_LEAF(jboolean, JVM_IsPreviewEnabled(JNIEnv *env))
+JVM_LEAF(jboolean, JVM_IsPreviewEnabled(void))
   return Arguments::enable_preview() ? JNI_TRUE : JNI_FALSE;
 JVM_END
 
+JVM_LEAF(jboolean, JVM_IsContinuationsSupported(void))
+  return VMContinuations ? JNI_TRUE : JNI_FALSE;
+JVM_END
 
 // String support ///////////////////////////////////////////////////////////////////////////
 
