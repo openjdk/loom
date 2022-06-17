@@ -1965,6 +1965,8 @@ inline void ThawBase::patch(frame& f, const frame& caller, bool bottom) {
   if (bottom) {
     ContinuationHelper::Frame::patch_pc(caller, _cont.is_empty() ? caller.pc()
                                                                  : StubRoutines::cont_returnBarrier());
+  } else {
+    ContinuationHelper::Frame::patch_pc(caller, caller.raw_pc());
   }
 
   patch_pd(f, caller);
