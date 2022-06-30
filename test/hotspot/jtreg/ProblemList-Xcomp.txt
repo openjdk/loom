@@ -39,6 +39,8 @@ vmTestbase/vm/mlvm/mixed/stress/regression/b6969574/INDIFY_Test.java 8265295 lin
 
 serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java 8288430 generic-all
 
+serviceability/jvmti/vthread/ContStackDepthTest/ContStackDepthTest.java 8288949 generic-all
+
 ############################################################################
 
 # Loom, fibers branch
