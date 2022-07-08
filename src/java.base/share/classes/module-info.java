@@ -233,7 +233,8 @@ module java.base {
         jdk.management,
         jdk.jfr;
     exports jdk.internal.ref to
-        java.desktop;
+        java.desktop,
+        java.net.http;
     exports jdk.internal.reflect to
         java.logging,
         java.sql,

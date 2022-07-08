@@ -184,12 +184,6 @@ javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java 
 com/sun/jdi/ProcessAttachTest.java 0000000 generic-all
 java/util/ResourceBundle/modules/cache/CacheTest.java 0000000 generic-all
 java/util/logging/modules/GetResourceBundleTest.java 0000000 generic-all
-
-
-#####
-# Following tests failing of ProcessTools wrapper
-# custom classpath, jars, no main class etc
-
 jdk/modules/etc/DefaultModules.java 0000000 generic-all
 jdk/modules/incubator/ServiceBinding.java 0000000 generic-all
 jdk/internal/misc/VM/RuntimeArguments.java 0000000 generic-all
@@ -207,6 +201,8 @@ java/lang/ClassLoader/getResource/automaticmodules/Driver.java 0000000 generic-a
 java/lang/Class/getResource/ResourcesTest.java 0000000 generic-all
 java/lang/Class/forName/modules/TestDriver.java 0000000 generic-all
 java/lang/ClassLoader/getResource/modules/ResourcesTest.java 0000000 generic-all
+java/lang/Thread/jni/AttachCurrentThread/AttachTest.java#id0 0000000 generic-all
+java/lang/Thread/jni/AttachCurrentThread/AttachTest.java#id1 0000000 generic-all
 java/foreign/enablenativeaccess/TestEnableNativeAccess.java 0000000 generic-all
 java/security/AccessController/DoPrivAccompliceTest.java 0000000 generic-all
 java/security/AccessController/LimitedDoPrivileged.java 0000000 generic-all
