@@ -168,6 +168,7 @@ runtime/ErrorHandling/TestCrashOnOutOfMemoryError.java 0000000 generic-all
 runtime/ErrorHandling/TestExitOnOutOfMemoryError.java 0000000 generic-all
 runtime/ErrorHandling/TestHeapDumpPath.java 0000000 generic-all
 runtime/ErrorHandling/TestOnOutOfMemoryError.java 0000000 generic-all
+runtime/ErrorHandling/MachCodeFramesInErrorFile.java 0000000 generic-all
 runtime/Thread/ThreadPriorities.java 0000000 generic-all
 runtime/Throwable/StackTraceLogging.java 0000000 generic-all
 runtime/Throwable/TestMaxJavaStackTraceDepth.java 0000000 generic-all
