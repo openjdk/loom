@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,34 +21,31 @@
  * questions.
  */
 
-package org.openjdk.bench.vm.compiler;
+/*
+ * @test
+ * @bug 8260892
+ * @summary Compilation fails: lambda parameter not visible in body when generics involved
+ * @compile ScopeCopyCanGetAlteredTest.java
+ */
 
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Param;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.State;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 
-@State(Scope.Benchmark)
-public class RangeCheckHoisting {
-
-    private static final int SIZE = 65536;
-
-    @Param("6789") private int count;
-
-    private static int[] a = new int[SIZE];
-    private static int[] b = new int[SIZE];
-
-    @Benchmark
-    public void ivScaled3() {
-        for (int i = 0; i < count; i++) {
-            b[3 * i] = a[3 * i];
-        }
+class ScopeCopyCanGetAlteredTest {
+    interface GenericOp<A> {
+        <B> A apply(IntFunction<B> func1, Function<B, A> func2);
     }
 
-    @Benchmark
-    public void ivScaled7() {
-        for (int i = 0; i < count; i++) {
-            b[7 * i] = a[7 * i];
-        }
+    static <A> GenericOp<A> foo(IntFunction<GenericOp<A>> f) {
+        return null;
+    }
+
+    static <A> GenericOp<A> bar() {
+        return foo((int arg) -> new GenericOp<>() {
+            @Override
+            public <B> A apply(IntFunction<B> func1, Function<B, A> func2) {
+                return func2.apply(func1.apply(arg));
+            }
+        });
     }
 }
