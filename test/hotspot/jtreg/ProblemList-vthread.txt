@@ -218,6 +218,7 @@ runtime/cds/appcds/IgnoreEmptyClassPaths.java 0000000 generic-all
 runtime/cds/appcds/JvmtiAddPath.java 0000000 generic-all
 runtime/cds/appcds/LambdaWithOldClass.java 0000000 generic-all
 runtime/cds/appcds/LambdaWithJavaAgent.java 0000000 generic-all
+runtime/cds/appcds/LambdaWithUseImplMethodHandle.java 0000000 generic-all
 runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java 0000000 generic-all
 runtime/cds/appcds/MissingSuperTest.java 0000000 generic-all
 runtime/cds/appcds/MultiProcessSharing.java 0000000 generic-all
@@ -287,6 +288,7 @@ runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/DynamicLambdaWithUseImplMethodHandle.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicFlag.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/ExcludedClasses.java 0000000 generic-all
