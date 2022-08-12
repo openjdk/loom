@@ -63,6 +63,10 @@ java/lang/Thread/MainThreadTest.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ThreadLists.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 
+# Test assumes main thread is a platform thread
+java/lang/management/ThreadMXBean/VirtualThreads.java#id0 0000000 generic-all
+java/lang/management/ThreadMXBean/VirtualThreads.java#id1 0000000 generic-all
+
 ####
 
 # JFR tests check events for test main thread only or expect to find MainThread
@@ -324,3 +328,9 @@ com/sun/jdi/sde/SourceDebugExtensionTest.java 0000000 generic-all
 
 # Tests using Thread.stop(), not supported on virtual threads
 jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all
+
+
+###
+
+# wrapper runs with the wrong version of TestNG
+javax/xml/jaxp/unittest/xpath/XPathNodeSetFnTest.java 0000000 generic-all
