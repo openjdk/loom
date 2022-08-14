@@ -329,8 +329,3 @@ com/sun/jdi/sde/SourceDebugExtensionTest.java 0000000 generic-all
 # Tests using Thread.stop(), not supported on virtual threads
 jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all
 
-
-###
-
-# wrapper runs with the wrong version of TestNG
-javax/xml/jaxp/unittest/xpath/XPathNodeSetFnTest.java 0000000 generic-all
