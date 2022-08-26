@@ -2139,6 +2139,9 @@ public final class System {
      */
     private static void initPhase1() {
 
+        // Deferred initialization of internal threads.
+        // java.lang.ref.Reference.startThreads();
+
         // register the shared secrets - do this first, since SystemProps.initProperties
         // might initialize CharsetDecoders that rely on it
         setJavaLangAccess();

@@ -96,7 +96,7 @@ InstanceKlass* SystemDictionaryShared::load_shared_class_for_builtin_loader(
       PackageEntry* pkg_entry = CDSProtectionDomain::get_package_entry_from_class(ik, class_loader);
       Handle protection_domain =
         CDSProtectionDomain::init_security_info(class_loader, ik, pkg_entry, CHECK_NULL);
-      return load_shared_class(ik, class_loader, protection_domain, nullptr, pkg_entry, THREAD);
+      return load_shared_class(ik, class_loader, protection_domain, nullptr, pkg_entry, false /* !boot-class */, THREAD);
     }
   }
   return nullptr;
@@ -169,7 +169,7 @@ InstanceKlass* SystemDictionaryShared::acquire_class_for_current_thread(
 
   // Load and check super/interfaces, restore unshareable info
   InstanceKlass* shared_klass = load_shared_class(ik, class_loader, protection_domain,
-                                                  cfs, pkg_entry, THREAD);
+                                                  cfs, pkg_entry, false /* !boot-class */, THREAD);
   if (shared_klass == nullptr || HAS_PENDING_EXCEPTION) {
     // TODO: clean up <ik> so it can be used again
     return nullptr;

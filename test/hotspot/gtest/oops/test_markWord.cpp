@@ -68,7 +68,7 @@ class LockerThread : public JavaTestThread {
     // while an ObjectMonitor is "busy" and being locked is the most "busy"
     // state we have...
     ObjectLocker ol(h_obj, THREAD);
-    ol.notify_all(THREAD);
+    ol.notify_all();
     assert_test_pattern(h_obj, "monitor");
   }
 };
@@ -106,7 +106,7 @@ TEST_VM(markWord, printing) {
     st = new LockerThread(&done, h_obj());
     st->doit();
 
-    ol.wait(THREAD);
+    ol.wait();
     assert_test_pattern(h_obj, "monitor");
     done.wait_with_safepoint_check(THREAD);  // wait till the thread is done.
   }

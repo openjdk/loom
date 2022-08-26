@@ -150,6 +150,9 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
       case vmIntrinsics::_dsqrt:             return java_lang_math_sqrt;
       case vmIntrinsics::_dsqrt_strict:      return native;
       case vmIntrinsics::_Reference_get:     return java_lang_ref_reference_get;
+      case vmIntrinsics::_Object_caller_frame_id:     return java_lang_Object_callerFrameId;
+      case vmIntrinsics::_Monitor_get_lock_state:     return java_lang_Monitor_getLockState;
+      case vmIntrinsics::_Monitor_cas_lock_state:     return java_lang_Monitor_casLockState;
       case vmIntrinsics::_Object_init:
         if (RegisterFinalizersAtInit && m->code_size() == 1) {
           // We need to execute the special return bytecode to check for

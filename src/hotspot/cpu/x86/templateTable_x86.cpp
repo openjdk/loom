@@ -2761,9 +2761,15 @@ void TemplateTable::jvmti_post_field_access(Register cache,
                                             bool is_static,
                                             bool has_tos) {
   if (JvmtiExport::can_post_field_access()) {
+    Label L1;
+    const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
+    NOT_LP64(__ get_thread(java_thread));
+
+    __ cmpl(Address(java_thread, JavaThread::system_java_offset()), 0);
+    __ jcc(Assembler::notEqual, L1);
+
     // Check to see if a field access watch has been set before we take
     // the time to call into the VM.
-    Label L1;
     assert_different_registers(cache, index, rax);
     __ mov32(rax, ExternalAddress((address) JvmtiExport::get_field_access_count_addr()));
     __ testl(rax,rax);
@@ -2972,6 +2978,13 @@ void TemplateTable::jvmti_post_field_mod(Register cache, Register index, bool is
     // Check to see if a field modification watch has been set before
     // we take the time to call into the VM.
     Label L1;
+
+    const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
+    NOT_LP64(__ get_thread(java_thread));
+
+    __ cmpl(Address(java_thread, JavaThread::system_java_offset()), 0);
+    __ jcc(Assembler::notEqual, L1);
+
     assert_different_registers(cache, index, rax);
     __ mov32(rax, ExternalAddress((address)JvmtiExport::get_field_modification_count_addr()));
     __ testl(rax, rax);
@@ -3267,6 +3280,13 @@ void TemplateTable::jvmti_post_fast_field_mod() {
     // Check to see if a field modification watch has been set before
     // we take the time to call into the VM.
     Label L2;
+
+    const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
+    NOT_LP64(__ get_thread(java_thread));
+
+    __ cmpl(Address(java_thread, JavaThread::system_java_offset()), 0);
+    __ jcc(Assembler::notEqual, L2);
+
     __ mov32(scratch, ExternalAddress((address)JvmtiExport::get_field_modification_count_addr()));
     __ testl(scratch, scratch);
     __ jcc(Assembler::zero, L2);
@@ -3413,6 +3433,13 @@ void TemplateTable::fast_accessfield(TosState state) {
     // Check to see if a field access watch has been set before we
     // take the time to call into the VM.
     Label L1;
+
+    const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
+    NOT_LP64(__ get_thread(java_thread));
+
+    __ cmpl(Address(java_thread, JavaThread::system_java_offset()), 0);
+    __ jcc(Assembler::notEqual, L1);
+
     __ mov32(rcx, ExternalAddress((address) JvmtiExport::get_field_access_count_addr()));
     __ testl(rcx, rcx);
     __ jcc(Assembler::zero, L1);
@@ -4248,6 +4275,35 @@ void TemplateTable::athrow() {
 // ...
 // [saved rbp    ] <--- rbp
 void TemplateTable::monitorenter() {
+  if (ObjectMonitorMode::java()) {
+    assert(Bytecodes::_monitorenter == bytecode(), "Bad BC");
+
+    transition(vtos, vtos);
+
+    Register method = rbx;
+    Register flags = rdx;
+
+    __ save_bcp();
+
+    // set system java
+    __ incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+    const address addr = (address) Interpreter::monitor_enter_return_entry_adr();
+    ExternalAddress entry(addr);
+    __ lea(flags, entry);
+    __ push(flags);
+
+    ExternalAddress fetch_addr((address) Universe::object_monitorEnter_addr());
+    __ movptr(method, fetch_addr);
+
+    __ profile_call(rax);
+    __ profile_arguments_type(rax, rbx, rbcp, false);
+
+    __ jump_from_interpreted(method, rdx);
+
+    return;
+  }
+
   transition(atos, vtos);
 
   // check for NULL object
@@ -4345,6 +4401,33 @@ void TemplateTable::monitorenter() {
 }
 
 void TemplateTable::monitorexit() {
+
+  if (ObjectMonitorMode::java()) {
+    transition(vtos, vtos);
+
+    Register method = rbx;
+    Register flags = rdx;
+
+    __ save_bcp();
+
+    // set system java
+    __ incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+    const address addr = (address) Interpreter::monitor_exit_return_entry_adr();
+    ExternalAddress entry(addr);
+    __ lea(flags, entry);
+    __ push(flags);
+
+    ExternalAddress fetch_addr((address) Universe::object_monitorExit_addr());
+    __ movptr(method, fetch_addr);
+
+    __ profile_call(rax);
+    __ profile_arguments_type(rax, rbx, rbcp, false);
+
+    __ jump_from_interpreted(rbx, rdx);
+    return;
+  }
+
   transition(atos, vtos);
 
   // check for NULL object

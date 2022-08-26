@@ -166,6 +166,16 @@ final class Finalizer extends FinalReference<Object> { /* Package-private; must 
             if (running)
                 return;
 
+            // Finalizer thread starts before System.initializeSystemClass
+            // is called.  Wait until JavaLangAccess is available
+            while (VM.initLevel() == 0) {
+                // delay until VM completes initialization
+                try {
+                    VM.awaitInitLevel(1);
+                } catch (InterruptedException x) {
+                    // ignore and continue
+                }
+            }
             final JavaLangAccess jla = SharedSecrets.getJavaLangAccess();
             running = true;
             for (;;) {

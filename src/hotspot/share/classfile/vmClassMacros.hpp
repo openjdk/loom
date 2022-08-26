@@ -193,6 +193,10 @@
   /* GC support */                                                                                              \
   do_klass(FillerObject_klass,                          jdk_internal_vm_FillerObject                          ) \
                                                                                                                 \
+  /* support for Java Object Monitors */                                                                        \
+  do_klass(Monitor_klass,                               java_lang_Monitor                                     ) \
+  do_klass(Monitor$Node_klass,                          java_lang_Monitor$Node                                ) \
+                                                                                        \
   /*end*/
 
 #endif // SHARE_CLASSFILE_VMCLASSMACROS_HPP

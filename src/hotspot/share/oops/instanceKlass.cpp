@@ -737,10 +737,19 @@ objArrayOop InstanceKlass::signers() const {
 // Note: implementation moved to static method to expose the this pointer.
 void InstanceKlass::initialize(TRAPS) {
   if (this->should_be_initialized()) {
+    if (log_is_enabled(Debug, class, init)) {
+      ResourceMark rm(THREAD);
+      log_debug(class, init)("[Initialization of %s commencing (%s)]", external_name(),
+                             Threads::number_of_threads() == 1 ? "no-locking" : "locking");
+    }
     initialize_impl(CHECK);
     // Note: at this point the class may be initialized
     //       OR it may be in the state of being initialized
     //       in case of recursive initialization!
+    if (log_is_enabled(Debug, class, init)) {
+      ResourceMark rm(THREAD);
+      log_debug(class, init)("[Initialization of %s done]", external_name());
+    }
   } else {
     assert(is_initialized(), "sanity check");
   }

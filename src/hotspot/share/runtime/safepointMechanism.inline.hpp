@@ -80,12 +80,12 @@ void SafepointMechanism::process_if_requested(JavaThread* thread, bool allow_sus
   thread->check_possible_safepoint();
 
   if (local_poll_armed(thread)) {
-    process(thread, allow_suspend, check_async_exception);
+    process(thread, allow_suspend, check_async_exception && thread->no_async_exception());
   }
 }
 
 void SafepointMechanism::process_if_requested_with_exit_check(JavaThread* thread, bool check_async_exception) {
-  process_if_requested(thread, true /* allow_suspend */, check_async_exception);
+  process_if_requested(thread, true /* allow_suspend */, check_async_exception && thread->no_async_exception());
   if (thread->has_special_runtime_exit_condition()) {
     thread->handle_special_runtime_exit_condition();
   }

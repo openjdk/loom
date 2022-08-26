@@ -346,6 +346,7 @@ protected:
                                           Handle protection_domain,
                                           const ClassFileStream *cfs,
                                           PackageEntry* pkg_entry,
+                                          bool is_boot_class,
                                           TRAPS);
   static Handle get_loader_lock_or_null(Handle class_loader);
   static InstanceKlass* find_or_define_instance_class(Symbol* class_name,

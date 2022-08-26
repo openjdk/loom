@@ -1,0 +1,109 @@
+The java/lang/Process/WaitFor.java test failed with the following assertion:
+
+#  assert(h_exception.not_null()) failed: NULL exceptions should be handled by athrow
+
+Here is a simple reproducer:
+
+public class ExceptionInSync {
+    public static void main(String[] args)  throws Throwable {
+        new ExceptionInSync().test();
+    }
+
+    boolean doThrow = true;
+
+    synchronized int test() throws Throwable {
+
+        Thread t = new Thread() {
+                public void run() {
+                    // This will trigger inflation
+                    synchronized(ExceptionInSync.this) {
+                        System.out.println("Done");
+                    }
+                }
+            };
+
+        t.start();
+        Thread.sleep(50); // let it block
+
+        if (doThrow)
+            throw new IllegalThreadStateException();
+
+        return 1;
+    }
+}
+
+The problem is a basic design incompatibility between the interpreter and the
+injection of Java calls at unexpected places. When the interpreter calls into
+the runtime it uses the JavaThread::_vm_result field to communicate the result.
+This field is used to hold the exception oop while it is propagating. When we
+call remove_activation and unlock the monitor we then execute Java code and the
+interpretation of that may require a second runtime call and at that point we
+overwrite the value of _vm_result! For normal call_VM calls from the interpreter
+the epilog code transfers the value of _vm_result to a local and then clears
+_vm_result. So here is our failure scenario:
+
+1. Exception is thrown during a synchronized method and there is no local handler
+2. Exception gets stashed in _vm_result and we call remove_activation
+3. remove_activation invokes monitorExit and as there is contention we have to inflate.
+4. Inflation allocates a new Monitor.
+5. Allocation takes the slowpath and calls back into the runtime to
+   InterpreterRuntime::_new, which stores the result in _vm_result and we've
+   lost the exception oop.
+6. The call_VM used for the new then clears _vm_result
+7. When we get back to continuing with the exception propogation we grab it
+   from _vm_result but that is now NULL and so we hit the assert.
+
+The conceptual fix for this is to turn _vm_result into a stack of results that
+are pushed and popped, but such a fix would be tricky to incorporate into the
+existing usages and would be a lot more complex to handle from the interpreter.
+Further, there is a problem that the oop in _vm_result is not visible to the GC
+and there is an implicit expectation that no safepoint can be reached while there
+is a live oop in _vm_result. Our Java code execution violates that so we have to
+ensure the oop is visible to the GC - either by updating the oopmap (which is
+itself a very complex task) or by some other means.
+
+On reflection we think that this _vm_result problem only arises in the context of
+exception propagation for synchronized methods as all other cases are handled by
+bytecode (i.e. the implicit finally block associated with monitorenter will do
+monitorexit and then athrow to propagate the exception). So we don't actually need
+a _vm_result stack, which just need to be able to handle two inflight _vm_result
+values.
+
+One simple proposed solution just uses the intepreter stack to hold the exception
+oop:
+
++   get_vm_result(rcx, rthread);
++   push(rcx);
+
+    unlock_object();
+
++   pop(rcx);
++   movptr(Address(rthread, JavaThread::vm_result_offset()), rcx);
+
+and this seems to functionally work. However, we do not think the oop is visible
+to the GC without modifying the oopmap (which is non-trivial as previously stated).
+Further, we are unsure what happens in the case of a native synchronized method.
+Do we even have an expression stack to use?
+
+The current implemented solution is somewhat of a workaround, rather than what
+might be considered a long term fix. We simply make a call back to the VM from the
+Java monitor code to read _vm_result before the actual monitor exit and then make
+a second call into the VM to restore it afterwards:
+
+    static void slowExitOnRemoveActivation(Thread current, Object o) {
+        Object vmResult = getVMResult();
+        slowExit(current, o);
+        if (vmResult != null) {
+            storeVMResult(vmResult);
+        }
+    }
+
+this is simple and has no GC issues, but there is potentially a lot of overhead
+(though we could intrinsify the calls in the inetrpreter) and it is not very
+clean to have to expose this internal VM implementation detail at the Java level.
+
+A third option that we have discussed but not implemented is to just add a second
+field, _vm_result2, and use that to preserve _vm_result in remove_activation. We
+would also have to add the field to the oops_do logic to make it visible to GC.
+
+There are also implications for Loom here - see vm_result_loom.txt.

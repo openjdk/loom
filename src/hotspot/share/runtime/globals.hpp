@@ -1064,6 +1064,14 @@ const int ObjectAlignmentInBytes = 8;
           "Checks that no stack locking happens when using "                \
           "+UseHeavyMonitors")                                              \
                                                                             \
+  product(ccstr, ObjectSynchronizerMode, "fast",                            \
+          "ObjectSynchronizer modes: "                                      \
+          "legacy: legacy native system; "                                  \
+          "native: java entry with native monitors; "                       \
+          "heavy: java entry with always inflated Java monitors; "          \
+          "fast: java entry with fast-locks and"                            \
+          "      inflate-on-demand Java monitors; ")                        \
+                                                                            \
   product(bool, PrintStringTableStatistics, false,                          \
           "print statistics about the StringTable and SymbolTable")         \
                                                                             \

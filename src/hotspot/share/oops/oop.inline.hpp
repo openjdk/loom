@@ -38,6 +38,7 @@
 #include "oops/oopsHierarchy.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/globals.hpp"
+#include "runtime/synchronizer.hpp"
 #include "utilities/align.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
@@ -294,6 +295,9 @@ oop oopDesc::forwardee() const {
 
 // The following method needs to be MT safe.
 uint oopDesc::age() const {
+  if (ObjectMonitorMode::fast()) {  // fast-locks
+    return mark().age();
+  }
   assert(!mark().is_marked(), "Attempt to read age from forwarded mark");
   if (has_displaced_mark()) {
     return displaced_mark().age();
@@ -303,6 +307,10 @@ uint oopDesc::age() const {
 }
 
 void oopDesc::incr_age() {
+  if (ObjectMonitorMode::fast()) {  // fast-locks
+    set_mark(mark().incr_age());
+    return;
+  }
   assert(!mark().is_marked(), "Attempt to increment age of forwarded mark");
   if (has_displaced_mark()) {
     set_displaced_mark(displaced_mark().incr_age());

@@ -120,6 +120,7 @@ class outputStream;
   LOG_TAG(mirror) \
   LOG_TAG(mmu) \
   LOG_TAG(module) \
+  LOG_TAG(monitor) \
   LOG_TAG(monitorinflation) \
   LOG_TAG(monitormismatch) \
   LOG_TAG(nestmates) \

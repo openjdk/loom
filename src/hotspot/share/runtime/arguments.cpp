@@ -3030,6 +3030,17 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     set_mode_flags(_int);
   }
 
+  if (!ObjectMonitorMode::initialize()) {
+    warning("ObjectSynchronizerMode=%s is invalid", ObjectSynchronizerMode);
+    vm_exit_during_initialization("ObjectSynchronizerMode not set to valid value");
+  }
+
+  if (ObjectMonitorMode::java()) {
+    //  TieredStopAtLevel=1;
+    set_mode_flags(_int);
+    log_info(monitor)("Using new monitors with policy %s", ObjectMonitorMode::as_string());
+  }
+
   // CompileThresholdScaling == 0.0 is same as -Xint: Disable compilation (enable interpreter-only mode),
   // but like -Xint, leave compilation thresholds unaffected.
   // With tiered compilation disabled, setting CompileThreshold to 0 disables compilation as well.
@@ -4033,6 +4044,11 @@ jint Arguments::apply_ergo() {
   jint code = set_aggressive_opts_flags();
   if (code != JNI_OK) {
     return code;
+  }
+
+  if (ObjectMonitorMode::java()) {
+    X86_ONLY(UseRTMLocking = false;)
+    //    FLAG_SET_DEFAULT(ProfileInterpreter, false);
   }
 
 #ifdef ZERO

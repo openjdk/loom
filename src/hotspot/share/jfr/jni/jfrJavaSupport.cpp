@@ -149,12 +149,13 @@ void JfrJavaSupport::call_virtual(JfrJavaArguments* args, TRAPS) {
 void JfrJavaSupport::notify_all(jobject object, TRAPS) {
   assert(object != NULL, "invariant");
   DEBUG_ONLY(check_java_thread_in_vm(THREAD));
+  JavaThread* jt = (JavaThread*) THREAD;
   HandleMark hm(THREAD);
   Handle h_obj(THREAD, resolve_non_null(object));
   assert(h_obj.not_null(), "invariant");
-  ObjectSynchronizer::jni_enter(h_obj, THREAD);
-  ObjectSynchronizer::notifyall(h_obj, THREAD);
-  ObjectSynchronizer::jni_exit(h_obj(), THREAD);
+  ObjectSynchronizer::jni_enter(h_obj, jt);
+  ObjectSynchronizer::notifyall(h_obj, jt);
+  ObjectSynchronizer::jni_exit(h_obj, jt);
   DEBUG_ONLY(check_java_thread_in_vm(THREAD));
 }
 

@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2003, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -25,6 +26,7 @@
 #include "precompiled.hpp"
 #include "asm/macroAssembler.hpp"
 #include "classfile/javaClasses.hpp"
+#include "classfile/vmSymbols.hpp"
 #include "compiler/compiler_globals.hpp"
 #include "compiler/disassembler.hpp"
 #include "gc/shared/barrierSetAssembler.hpp"
@@ -227,17 +229,49 @@ address TemplateInterpreterGenerator::generate_return_entry_for(TosState state, 
   __ andl(flags, ConstantPoolCacheEntry::parameter_size_mask);
   __ lea(rsp, Address(rsp, flags, Interpreter::stackElementScale()));
 
-   const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
-   if (JvmtiExport::can_pop_frame()) {
-     NOT_LP64(__ get_thread(java_thread));
-     __ check_and_handle_popframe(java_thread);
-   }
-   if (JvmtiExport::can_force_early_return()) {
-     NOT_LP64(__ get_thread(java_thread));
-     __ check_and_handle_earlyret(java_thread);
-   }
+  Label SysJava;
+  const Register java_thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
+  NOT_LP64(__ get_thread(java_thread));
+
+  __ cmpl(Address(java_thread, JavaThread::system_java_offset()), 0);
+  __ jcc(Assembler::notEqual, SysJava);
+
+  if (JvmtiExport::can_pop_frame()) {
+    NOT_LP64(__ get_thread(java_thread));
+    __ check_and_handle_popframe(java_thread);
+  }
+  if (JvmtiExport::can_force_early_return()) {
+    NOT_LP64(__ get_thread(java_thread));
+    __ check_and_handle_earlyret(java_thread);
+  }
+
+  __ bind(SysJava);
 
   __ dispatch_next(state, step);
+
+  return entry;
+}
+
+address TemplateInterpreterGenerator::generate_return_entry_for_monitor(int step) {
+  assert(ObjectMonitorMode::java(), "must be");
+  address entry = __ pc();
+
+  NOT_LP64(__ empty_FPU_stack();)  // remove possible return value from FPU-stack, otherwise stack could overflow
+
+  // Restore stack bottom in case i2c adjusted stack
+  __ movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  // and NULL it as marker that esp is now tos until next java call
+  __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
+
+  __ restore_bcp();
+  __ restore_locals();
+
+  __ pop(rax);
+
+  // clear system java
+  __ decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  __ dispatch_next(vtos, step, false);
 
   return entry;
 }
@@ -260,32 +294,36 @@ address TemplateInterpreterGenerator::generate_deopt_entry_for(TosState state, i
   __ restore_locals();
   const Register thread = NOT_LP64(rcx) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread));
+
+  if (ObjectMonitorMode::legacy()) {
 #if INCLUDE_JVMCI
-  // Check if we need to take lock at entry of synchronized method.  This can
-  // only occur on method entry so emit it only for vtos with step 0.
-  if (EnableJVMCI && state == vtos && step == 0) {
-    Label L;
-    __ cmpb(Address(thread, JavaThread::pending_monitorenter_offset()), 0);
-    __ jcc(Assembler::zero, L);
-    // Clear flag.
-    __ movb(Address(thread, JavaThread::pending_monitorenter_offset()), 0);
-    // Satisfy calling convention for lock_method().
-    __ get_method(rbx);
-    // Take lock.
-    lock_method();
-    __ bind(L);
-  } else {
-#ifdef ASSERT
-    if (EnableJVMCI) {
+    // Check if we need to take lock at entry of synchronized method.  This can
+    // only occur on method entry so emit it only for vtos with step 0.
+    if (EnableJVMCI && state == vtos && step == 0) {
       Label L;
-      __ cmpb(Address(r15_thread, JavaThread::pending_monitorenter_offset()), 0);
+      __ cmpb(Address(thread, JavaThread::pending_monitorenter_offset()), 0);
       __ jcc(Assembler::zero, L);
-      __ stop("unexpected pending monitor in deopt entry");
+      // Clear flag.
+      __ movb(Address(thread, JavaThread::pending_monitorenter_offset()), 0);
+      // Satisfy calling convention for lock_method().
+      __ get_method(rbx);
+      // Take lock.
+      lock_method();
       __ bind(L);
+    } else {
+#ifdef ASSERT
+      if (EnableJVMCI) {
+        Label L;
+        __ cmpb(Address(r15_thread, JavaThread::pending_monitorenter_offset()), 0);
+        __ jcc(Assembler::zero, L);
+        __ stop("unexpected pending monitor in deopt entry");
+        __ bind(L);
+      }
+#endif
     }
 #endif
-  }
-#endif
+  } // UseNewMonitors
+
   // handle exceptions
   {
     Label L;
@@ -597,14 +635,23 @@ void TemplateInterpreterGenerator::lock_method() {
     __ bind(done);
   }
 
-  // add space for monitor & lock
-  __ subptr(rsp, entry_size); // add space for a monitor entry
-  __ movptr(monitor_block_top, rsp);  // set new monitor block top
-  // store object
-  __ movptr(Address(rsp, BasicObjectLock::obj_offset_in_bytes()), rax);
-  const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
-  __ movptr(lockreg, rsp); // object address
-  __ lock_object(lockreg);
+  if (ObjectMonitorMode::legacy()) {
+    // add space for monitor & lock
+    __ subptr(rsp, entry_size); // add space for a monitor entry
+    __ movptr(monitor_block_top, rsp);  // set new monitor block top
+    // store object
+    __ movptr(Address(rsp, BasicObjectLock::obj_offset_in_bytes()), rax);
+    const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
+    __ movptr(lockreg, rsp); // object address
+    __ lock_object(lockreg);
+  } else {
+    __ lock_object();
+  }
+}
+
+void TemplateInterpreterGenerator::unlock_method() {
+  assert(ObjectMonitorMode::java(), "must be");
+  __ unlock_object();
 }
 
 // Generate a fixed interpreter frame. This is identical setup for
@@ -851,8 +898,10 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   const Register thread1 = NOT_LP64(rax) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread1));
   const Address do_not_unlock_if_synchronized(thread1,
-        in_bytes(JavaThread::do_not_unlock_if_synchronized_offset()));
-  __ movbool(do_not_unlock_if_synchronized, true);
+                in_bytes(JavaThread::do_not_unlock_if_synchronized_offset()));
+  if (ObjectMonitorMode::legacy()) {
+    __ movbool(do_not_unlock_if_synchronized, true);
+  }
 
   // increment invocation count & check for overflow
   Label invocation_counter_overflow;
@@ -865,9 +914,10 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   bang_stack_shadow_pages(true);
 
-  // reset the _do_not_unlock_if_synchronized flag
-  NOT_LP64(__ get_thread(thread1));
-  __ movbool(do_not_unlock_if_synchronized, false);
+  if (ObjectMonitorMode::legacy()) {
+    // reset the _do_not_unlock_if_synchronized flag
+    __ movbool(do_not_unlock_if_synchronized, false);
+  }
 
   // check for synchronized methods
   // Must happen AFTER invocation_counter check and stack overflow check,
@@ -1222,7 +1272,16 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   }
 
   // do unlocking if necessary
-  {
+  if (ObjectMonitorMode::java()) {
+    Label L;
+    __ movl(t, Address(method, Method::access_flags_offset()));
+    __ testl(t, JVM_ACC_SYNCHRONIZED);
+    __ jcc(Assembler::zero, L);
+    // the code below should be shared with interpreter macro
+    // assembler implementation
+    unlock_method();
+    __ bind(L);
+  } else {
     Label L;
     __ movl(t, Address(method, Method::access_flags_offset()));
     __ testl(t, JVM_ACC_SYNCHRONIZED);
@@ -1402,8 +1461,10 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   const Register thread = NOT_LP64(rax) LP64_ONLY(r15_thread);
   NOT_LP64(__ get_thread(thread));
   const Address do_not_unlock_if_synchronized(thread,
-        in_bytes(JavaThread::do_not_unlock_if_synchronized_offset()));
-  __ movbool(do_not_unlock_if_synchronized, true);
+                in_bytes(JavaThread::do_not_unlock_if_synchronized_offset()));
+  if (ObjectMonitorMode::legacy()) {
+    __ movbool(do_not_unlock_if_synchronized, true);
+  }
 
   __ profile_parameters_type(rax, rcx, rdx);
   // increment invocation count & check for overflow
@@ -1418,9 +1479,10 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
   // check for synchronized interpreted methods
   bang_stack_shadow_pages(false);
 
-  // reset the _do_not_unlock_if_synchronized flag
-  NOT_LP64(__ get_thread(thread));
-  __ movbool(do_not_unlock_if_synchronized, false);
+  if (ObjectMonitorMode::legacy()) {
+    // reset the _do_not_unlock_if_synchronized flag
+    __ movbool(do_not_unlock_if_synchronized, false);
+  }
 
   // check for synchronized methods
   // Must happen AFTER invocation_counter check and stack overflow check,
@@ -1574,10 +1636,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
                                            popframe_preserve_args),
                           thread, rax, rlocals);
 
-    __ remove_activation(vtos, rdx,
-                         /* throw_monitor_exception */ false,
-                         /* install_monitor_exception */ false,
-                         /* notify_jvmdi */ false);
+    __ remove_activation_pop_frame(vtos, rdx);
 
     // Inform deoptimization that it is responsible for restoring
     // these arguments
@@ -1591,10 +1650,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
     __ bind(caller_not_deoptimized);
   }
 
-  __ remove_activation(vtos, rdx, /* rdx result (retaddr) is not used */
-                       /* throw_monitor_exception */ false,
-                       /* install_monitor_exception */ false,
-                       /* notify_jvmdi */ false);
+  __ remove_activation_pop_frame(vtos, rdx /* rdx result (retaddr) is not used */);
 
   // Finish with popframe handling
   // A previous I2C followed by a deoptimization might have moved the
@@ -1667,7 +1723,7 @@ void TemplateInterpreterGenerator::generate_throw_exception() {
   __ dispatch_next(vtos);
   // end of PopFrame support
 
-  Interpreter::_remove_activation_entry = __ pc();
+  Interpreter::_remove_activation_exception_handler_entry = __ pc();
 
   // preserve exception over this code sequence
   __ pop_ptr(rax);

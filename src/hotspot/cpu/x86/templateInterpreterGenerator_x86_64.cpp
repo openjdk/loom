@@ -460,3 +460,75 @@ address TemplateInterpreterGenerator::generate_currentThread() {
   return entry_point;
 }
 
+address TemplateInterpreterGenerator::generate_caller_frame_id() {
+
+  address entry_point = __ pc();
+
+  __ movptr(rax, Address(rbp, frame::link_offset * wordSize));
+
+  __ pop(rcx);
+  __ mov(rsp, r13);
+  __ jmp(rcx);
+
+  return entry_point;
+}
+
+
+address TemplateInterpreterGenerator::generate_get_lock_state() {
+
+  address entry_point = __ pc();
+
+  __ movptr(rax, Address(rsp, wordSize));
+  __ movptr(rax, Address(rax, oopDesc::mark_offset_in_bytes()));
+  __ andptr(rax, markWord::lock_mask_in_place);
+
+  __ pop(rcx);
+  __ mov(rsp, r13);
+  __ jmp(rcx);
+
+  return entry_point;
+}
+
+address TemplateInterpreterGenerator::generate_cas_lock_state() {
+  Label lock_done;
+
+  address entry_point = __ pc();
+
+  const Register robj   = rcx;
+  const Register rtmp   = r8;
+  const Register rto    = r10;
+  const Register rr2tmp = r11;
+  const Register rfrom  = rax; // Must be rax
+
+  __ movptr(robj,   Address(rsp, 3*wordSize));
+  __ movptr(rto,    Address(rsp, 2*wordSize));
+  __ movptr(rfrom,  Address(rsp, 1*wordSize));
+
+  __ movptr(rtmp, Address(robj, oopDesc::mark_offset_in_bytes()));
+
+  __ movq(rr2tmp, markWord::lock_mask_in_place);
+  __ notq(rr2tmp);
+
+  __ andptr(rtmp, rr2tmp);
+
+  // Clean MW in rtmp
+  __ orptr(rto,   rtmp);
+  __ orptr(rfrom, rtmp);
+
+  __ movq(rtmp, 1);
+
+  __ lock();
+  __ cmpxchgptr(rto, Address(robj, oopDesc::mark_offset_in_bytes()));
+
+  __ jcc(Assembler::equal, lock_done);
+  __ movq(rtmp, 0);
+
+  __ bind(lock_done);
+  __ movq(rax, rtmp);
+
+  __ pop(rcx);
+  __ mov(rsp, r13);
+  __ jmp(rcx);
+
+  return entry_point;
+}

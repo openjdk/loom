@@ -23,11 +23,13 @@
  */
 
 #include "precompiled.hpp"
+#include "classfile/javaClasses.hpp"
 #include "compiler/compiler_globals.hpp"
 #include "interp_masm_x86.hpp"
 #include "interpreter/interpreter.hpp"
 #include "interpreter/interpreterRuntime.hpp"
 #include "logging/log.hpp"
+#include "memory/universe.hpp"
 #include "oops/arrayOop.hpp"
 #include "oops/markWord.hpp"
 #include "oops/methodData.hpp"
@@ -875,6 +877,7 @@ void InterpreterMacroAssembler::dispatch_base(TosState state,
     Label no_safepoint;
     const Register thread = rcx;
     get_thread(thread);
+
     testb(Address(thread, JavaThread::polling_word_offset()), SafepointMechanism::poll_bit());
 
     jccb(Assembler::zero, no_safepoint);
@@ -976,7 +979,152 @@ void InterpreterMacroAssembler::narrow(Register result) {
 //       installs IllegalMonitorStateException
 //    Else
 //       no error processing
-void InterpreterMacroAssembler::remove_activation(
+void InterpreterMacroAssembler::remove_activation_java(
+        TosState state,
+        Register ret_addr,
+        bool throw_monitor_exception,
+        bool install_monitor_exception,
+        bool notify_jvmdi) {
+  // Note: Registers rdx xmm0 may be in use for the
+  // result check if synchronized method
+  Label unlock, no_unlock;
+
+  const Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rcx);
+  const Register robj    = LP64_ONLY(c_rarg1) NOT_LP64(rdx);
+  const Register rmon    = LP64_ONLY(c_rarg1) NOT_LP64(rcx);
+                              // monitor pointers need different register
+                              // because rdx may have the result in it
+  NOT_LP64(get_thread(rthread);)
+
+  // get the value of _do_not_unlock_if_synchronized into rdx
+  const Address do_not_unlock_if_synchronized(rthread,
+    in_bytes(JavaThread::do_not_unlock_if_synchronized_offset()));
+  movbool(rbx, do_not_unlock_if_synchronized);
+  movbool(do_not_unlock_if_synchronized, false); // reset the flag
+
+  // Don't unlock anything if the _do_not_unlock_if_synchronized flag
+  // is set.
+  testbool(rbx);
+  jcc(Assembler::notZero, no_unlock);
+
+  // get method access flags
+  movptr(rcx, Address(rbp, frame::interpreter_frame_method_offset * wordSize));
+  movl(rcx, Address(rcx, Method::access_flags_offset()));
+  testl(rcx, JVM_ACC_SYNCHRONIZED);
+  jcc(Assembler::notZero, unlock);
+
+  // #################################################
+  Label no_thread_or_done;
+
+  // Verify no
+  push(rax);
+  movptr(rax, Address(r15_thread, JavaThread::threadObj_offset()));
+  testq(rax, rax);
+  jcc(Assembler::zero, no_thread_or_done);
+
+  // Get thread obj
+  resolve_oop_handle(rax, rscratch1);
+
+  // NUll check thread obj
+  testq(rax, rax);
+  jcc(Assembler::zero, no_thread_or_done);
+
+  movq(rdx, rax);
+  // thread obj in rdx and rax
+
+  access_load_at(T_INT, IN_HEAP, rax, Address(rax, java_lang_Thread::lock_stack_pos_offset()), noreg, noreg);
+  // rax: index+1
+
+  // No locks
+  testq(rax, rax);
+  jcc(Assembler::zero, no_thread_or_done);
+
+  decrementq(rax, 1);
+  // rax: index
+
+  load_heap_oop(rdx, Address(rdx, java_lang_Thread::frame_id_offset()), rscratch1);
+  // rdx: array
+
+  testq(rdx, rdx); // temp null check on array
+  jcc(Assembler::zero, no_thread_or_done);
+
+  // noreg dst is rax
+  access_load_at(T_LONG, IN_HEAP | IS_ARRAY, noreg , Address(rdx, rax, Address::times_8, arrayOopDesc::base_offset_in_bytes(T_LONG)), noreg, noreg);
+
+  // compare it
+  cmpq(rax, rbp);
+  jcc(Assembler::notEqual, no_thread_or_done);
+
+  pop(rax);
+  jmp(unlock);
+
+  // no unlock needed
+  bind(no_thread_or_done);
+  pop(rax);
+  jmp(no_unlock);
+
+  // unlock monitor
+  bind(unlock);
+  push(state); // save result
+  unlock_object();
+  pop(state);
+
+  bind(no_unlock);
+
+  // The below poll is for the stack watermark barrier. It allows fixing up frames lazily,
+  // that would normally not be safe to use. Such bad returns into unsafe territory of
+  // the stack, will call InterpreterRuntime::at_unwind.
+  // This needs to happen after the Java upcalls are done for unlocking.
+  Label slow_path;
+  Label fast_path;
+  safepoint_poll(slow_path, rthread, true /* at_return */, false /* in_nmethod */);
+  jmp(fast_path);
+  bind(slow_path);
+  push(state);
+  set_last_Java_frame(rthread, noreg, rbp, (address)pc(), rscratch1);
+  super_call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::at_unwind), rthread);
+  NOT_LP64(get_thread(rthread);) // call_VM clobbered it, restore
+  reset_last_Java_frame(rthread, true);
+  pop(state);
+  bind(fast_path);
+
+  // jvmti support
+  if (notify_jvmdi) {
+    notify_method_exit(state, NotifyJVMTI);    // preserve TOSCA
+  } else {
+    notify_method_exit(state, SkipNotifyJVMTI); // preserve TOSCA
+  }
+
+  // remove activation
+  // get sender sp
+  movptr(rbx, Address(rbp, frame::interpreter_frame_sender_sp_offset * wordSize));
+  if (StackReservedPages > 0) {
+    // testing if reserved zone needs to be re-enabled
+    Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rcx);
+    Label no_reserved_zone_enabling;
+
+    NOT_LP64(get_thread(rthread);)
+
+    cmpl(Address(rthread, JavaThread::stack_guard_state_offset()), StackOverflow::stack_guard_enabled);
+    jcc(Assembler::equal, no_reserved_zone_enabling);
+
+    cmpptr(rbx, Address(rthread, JavaThread::reserved_stack_activation_offset()));
+    jcc(Assembler::lessEqual, no_reserved_zone_enabling);
+
+    call_VM_leaf(
+      CAST_FROM_FN_PTR(address, SharedRuntime::enable_stack_reserved_zone), rthread);
+    call_VM(noreg, CAST_FROM_FN_PTR(address,
+                   InterpreterRuntime::throw_delayed_StackOverflowError));
+    should_not_reach_here();
+
+    bind(no_reserved_zone_enabling);
+  }
+  leave();                           // remove frame anchor
+  pop(ret_addr);                     // get return address
+  mov(rsp, rbx);                     // set sp to sender sp
+}
+
+void InterpreterMacroAssembler::remove_activation_legacy(
         TosState state,
         Register ret_addr,
         bool throw_monitor_exception,
@@ -1015,7 +1163,7 @@ void InterpreterMacroAssembler::remove_activation(
   movbool(rbx, do_not_unlock_if_synchronized);
   movbool(do_not_unlock_if_synchronized, false); // reset the flag
 
- // get method access flags
+// get method access flags
   movptr(rcx, Address(rbp, frame::interpreter_frame_method_offset * wordSize));
   movl(rcx, Address(rcx, Method::access_flags_offset()));
   testl(rcx, JVM_ACC_SYNCHRONIZED);
@@ -1076,9 +1224,9 @@ void InterpreterMacroAssembler::remove_activation(
     Label loop, exception, entry, restart;
     const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
     const Address monitor_block_top(
-        rbp, frame::interpreter_frame_monitor_block_top_offset * wordSize);
+       rbp, frame::interpreter_frame_monitor_block_top_offset * wordSize);
     const Address monitor_block_bot(
-        rbp, frame::interpreter_frame_initial_sp_offset * wordSize);
+       rbp, frame::interpreter_frame_initial_sp_offset * wordSize);
 
     bind(restart);
     // We use c_rarg1 so that if we go slow path it will be the correct
@@ -1096,8 +1244,8 @@ void InterpreterMacroAssembler::remove_activation(
       // Throw exception
       NOT_LP64(empty_FPU_stack();)
       MacroAssembler::call_VM(noreg,
-                              CAST_FROM_FN_PTR(address, InterpreterRuntime::
-                                   throw_illegal_monitor_state_exception));
+                              CAST_FROM_FN_PTR(address,
+                                   InterpreterRuntime::throw_illegal_monitor_state_exception));
       should_not_reach_here();
     } else {
       // Stack unrolling. Unlock object and install illegal_monitor_exception.
@@ -1193,6 +1341,7 @@ void InterpreterMacroAssembler::get_method_counters(Register method,
 // Kills:
 //      rax, rbx
 void InterpreterMacroAssembler::lock_object(Register lock_reg) {
+  assert(ObjectMonitorMode::legacy(), "must be");
   assert(lock_reg == LP64_ONLY(c_rarg1) NOT_LP64(rdx),
          "The argument is only for looks. It must be c_rarg1");
 
@@ -1304,6 +1453,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
 //      rscratch1 (scratch reg)
 // rax, rbx, rcx, rdx
 void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
+  assert(ObjectMonitorMode::legacy(), "must be");
   assert(lock_reg == LP64_ONLY(c_rarg1) NOT_LP64(rdx),
          "The argument is only for looks. It must be c_rarg1");
 
@@ -1359,6 +1509,115 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
     restore_bcp();
   }
 }
+
+// Robbin's direct Java monitor support
+//
+
+void InterpreterMacroAssembler::lock_object() {
+  assert(ObjectMonitorMode::java(), "Must be");
+  Label do_synch, synch_completed;
+  jmp(do_synch);
+
+  // ##################################################################
+  // return entry for monitor enter
+  address return_adr = pc();
+
+  NOT_LP64(empty_FPU_stack();)  // remove possible return value from FPU-stack, otherwise stack could overflow
+
+  // clear system java
+  decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  // Restore stack bottom in case i2c adjusted stack
+  movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  // and NULL it as marker that esp is now tos until next java call
+  movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
+
+  pop(rax);
+
+  restore_bcp();
+  restore_locals();
+
+  jmp(synch_completed);
+  // ##################################################################
+
+  bind(do_synch);
+
+  Register method = rbx;
+
+  // save 'interpreter return address'
+  save_bcp();
+
+  // set system java
+  incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  push(rax);
+
+  InternalAddress radr(return_adr);
+  lea(method, radr);
+  push(method);
+
+  ExternalAddress fetch_addr((address) Universe::object_monitorEnter_addr());
+  movptr(method, fetch_addr);
+
+  profile_call(rax);
+  profile_arguments_type(rax, rbx, LP64_ONLY(r13) NOT_LP64(rsi), false);
+
+  jump_from_interpreted(rbx, rdx);
+
+  bind(synch_completed);
+}
+
+void InterpreterMacroAssembler::unlock_object() {
+  assert(ObjectMonitorMode::java(), "Must be");
+  Label do_synch, synch_completed;
+  jmp(do_synch);
+
+  // ##################################################################
+  // return entry for monitor exit
+  address return_adr = pc();
+
+  NOT_LP64(empty_FPU_stack();)  // remove possible return value from FPU-stack, otherwise stack could overflow
+
+  // clear system java
+  decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  // Restore stack bottom in case i2c adjusted stack
+  movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  // and NULL it as marker that esp is now tos until next java call
+  movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
+
+  restore_bcp();
+  restore_locals();
+
+  jmp(synch_completed);
+  // ##################################################################
+
+  bind(do_synch);
+
+  Register method = rbx;
+  Register flags = rdx;
+
+  // save 'interpreter return address'
+  save_bcp();
+
+  // set system jav
+  incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  InternalAddress radr(return_adr);
+  lea(method, radr);
+  push(method);
+
+  ExternalAddress fetch_addr((address) Universe::object_monitorExitVoid_addr()); // no obj param
+  movptr(method, fetch_addr);
+
+  profile_call(rax);
+  profile_arguments_type(rax, rbx, LP64_ONLY(r13) NOT_LP64(rsi), false);
+
+  jump_from_interpreted(rbx, rdx);
+
+  bind(synch_completed);
+}
+// END Robbin's monitors
 
 void InterpreterMacroAssembler::test_method_data_pointer(Register mdp,
                                                          Label& zero_continue) {
@@ -1998,6 +2257,13 @@ void InterpreterMacroAssembler::notify_method_entry() {
   // track stack depth.  If it is possible to enter interp_only_mode we add
   // the code to check if the event should be sent.
   Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rcx);
+
+  Label SysJava;
+  NOT_LP64(get_thread(rthread));
+  cmpl(Address(rthread, JavaThread::system_java_offset()), 0);
+  jcc(Assembler::notEqual, SysJava);
+
+
   Register rarg = LP64_ONLY(c_rarg1) NOT_LP64(rbx);
   if (JvmtiExport::can_post_interpreter_events()) {
     Label L;
@@ -2026,6 +2292,8 @@ void InterpreterMacroAssembler::notify_method_entry() {
       CAST_FROM_FN_PTR(address, SharedRuntime::rc_trace_method_entry),
       rthread, rarg);
   }
+
+  bind(SysJava);
 }
 
 
@@ -2035,6 +2303,12 @@ void InterpreterMacroAssembler::notify_method_exit(
   // track stack depth.  If it is possible to enter interp_only_mode we add
   // the code to check if the event should be sent.
   Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rcx);
+
+  Label SysJava;
+  NOT_LP64(get_thread(rthread));
+  cmpl(Address(rthread, JavaThread::system_java_offset()), 0);
+  jcc(Assembler::notEqual, SysJava);
+
   Register rarg = LP64_ONLY(c_rarg1) NOT_LP64(rbx);
   if (mode == NotifyJVMTI && JvmtiExport::can_post_interpreter_events()) {
     Label L;
@@ -2064,4 +2338,6 @@ void InterpreterMacroAssembler::notify_method_exit(
                  rthread, rarg);
     pop(state);
   }
+
+  bind(SysJava);
 }

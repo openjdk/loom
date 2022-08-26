@@ -121,6 +121,26 @@ class Universe: AllStatic {
   static LatestMethodCache* _throw_no_such_method_error_cache; // Unsafe.throwNoSuchMethodError() method
   static LatestMethodCache* _do_stack_walk_cache;      // method for stack walker callback
 
+  static LatestMethodCache* _object_monitorEnter_cache; // java.lang.Object::monitorEnter(obj)
+  static LatestMethodCache* _object_monitorEnterFrameId_cache; // java.lang.Object::monitorEnter(obj)
+  static LatestMethodCache* _object_monitorExit_cache;  // java.lang.Object::monitorExit(obj)
+  static LatestMethodCache* _object_monitorExitFrameId_cache;  // java.lang.Object::monitorExit(obj)
+  static LatestMethodCache* _object_monitorExitVoid_cache;  // java.lang.Object::monitorExit()
+  static LatestMethodCache* _object_monitorNotifyAll_cache;  // java.lang.Object::monitorNotifyAll(obj)
+  static LatestMethodCache* _object_monitorWaitUninterruptibly_cache;  // java.lang.Object::monitorWaitUninterruptibly(obj)
+  static LatestMethodCache* _object_monitorJNIEnter_cache; // java.lang.Object::monitorEnter(obj)
+  static LatestMethodCache* _object_monitorJNIExit_cache;  // java.lang.Object::monitorExit(obj)
+
+  static Method* _object_monitorEnter; // java.lang.Object::monitorEnter(obj)
+  static Method* _object_monitorEnterFrameId; // java.lang.Object::monitorEnter(obj)
+  static Method* _object_monitorExit;  // java.lang.Object::monitorExit(obj)
+  static Method* _object_monitorExitFrameId;  // java.lang.Object::monitorExit(obj)
+  static Method* _object_monitorExitVoid;  // java.lang.Object::monitorExit()
+  static Method* _object_monitorNotifyAll;  // java.lang.Object::monitorNotifyAll(obj)
+  static Method* _object_monitorWaitUninterruptibly;  // java.lang.Object::monitorWaitUninterruptibly(obj)
+  static Method* _object_monitorJNIEnter; // java.lang.Object::monitorEnter(obj)
+  static Method* _object_monitorJNIExit;  // java.lang.Object::monitorExit(obj)
+
   static Array<int>*            _the_empty_int_array;            // Canonicalized int array
   static Array<u2>*             _the_empty_short_array;          // Canonicalized short array
   static Array<Klass*>*         _the_empty_klass_array;          // Canonicalized klass array
@@ -272,6 +292,21 @@ class Universe: AllStatic {
   static Method*      throw_no_such_method_error()    { return _throw_no_such_method_error_cache->get_method(); }
 
   static Method*      do_stack_walk_method()          { return _do_stack_walk_cache->get_method(); }
+
+  static Method*      object_monitorEnter_method()        { return _object_monitorEnter_cache->get_method(); }
+  static Method*      object_monitorEnterFrameId_method() { return _object_monitorEnterFrameId_cache->get_method(); }
+  static Method*      object_monitorExit_method()         { return _object_monitorExit_cache->get_method(); }
+  static Method*      object_monitorExitFrameId_method()  { return _object_monitorExitFrameId_cache->get_method(); }
+  static Method*      object_monitorExitVoid_method()     { return _object_monitorExitVoid_cache->get_method(); }
+  static Method**     object_monitorEnter_addr()          { return &_object_monitorEnter; }
+  static Method**     object_monitorExit_addr()           { return &_object_monitorExit; }
+  static Method**     object_monitorExitVoid_addr()       { return &_object_monitorExitVoid; }
+  static Method*      object_monitorNotifyAll_method()    { return _object_monitorNotifyAll_cache->get_method(); }
+  static Method**     object_monitorNotifyAll_addr()      { return &_object_monitorNotifyAll; }
+  static Method*      object_monitorWaitUninterruptibly_method()    { return _object_monitorWaitUninterruptibly_cache->get_method(); }
+  static Method**     object_monitorWaitUninterruptibly_addr()      { return &_object_monitorWaitUninterruptibly; }
+  static Method*      object_monitorJNIEnter_method()   { return _object_monitorJNIEnter_cache->get_method(); }
+  static Method*      object_monitorJNIExit_method()    { return _object_monitorJNIExit_cache->get_method(); }
 
   static oop          the_null_sentinel();
   static address      the_null_sentinel_addr()        { return (address) &_the_null_sentinel;  }

@@ -468,6 +468,11 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
   // into the interpreter. Any deferred stack processing is notified of
   // the event via the StackWatermarkSet.
   StackWatermarkSet::after_unwind(current);
+  // If an exception was thrown from system java
+  // lets clear it here when looking up the handler.
+  if (current->system_java()) {
+    current->clear_system_java();
+  }
 
   LastFrameAccessor last_frame(current);
   Handle             h_exception(current, exception);
@@ -485,19 +490,21 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
     // If the method is synchronized we already unlocked the monitor
     // during deoptimization so the interpreter needs to skip it when
     // the frame is popped.
-    current->set_do_not_unlock_if_synchronized(true);
-    return Interpreter::remove_activation_entry();
+    if (ObjectMonitorMode::legacy()) {
+      current->set_do_not_unlock_if_synchronized(true);
+    }
+    return Interpreter::remove_activation_exception_handler_entry();
   }
 
   // Need to do this check first since when _do_not_unlock_if_synchronized
   // is set, we don't want to trigger any classloading which may make calls
   // into java, or surprisingly find a matching exception handler for bci 0
   // since at this moment the method hasn't been "officially" entered yet.
-  if (current->do_not_unlock_if_synchronized()) {
+  if (ObjectMonitorMode::legacy() && current->do_not_unlock_if_synchronized()) {
     ResourceMark rm;
     assert(current_bci == 0,  "bci isn't zero for do_not_unlock_if_synchronized");
     current->set_vm_result(exception);
-    return Interpreter::remove_activation_entry();
+    return Interpreter::remove_activation_exception_handler_entry();
   }
 
   do {
@@ -569,7 +576,7 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
     // Forward exception to callee (leaving bci/bcp untouched) because (a) no
     // handler in this method, or (b) after a stack overflow there is not yet
     // enough stack space available to reprotect the stack.
-    continuation = Interpreter::remove_activation_entry();
+    continuation = Interpreter::remove_activation_exception_handler_entry();
 #if COMPILER2_OR_JVMCI
     // Count this for compilation purposes
     h_method->interpreter_throwout_increment(THREAD);
@@ -786,7 +793,6 @@ JRT_ENTRY(void, InterpreterRuntime::new_illegal_monitor_state_exception(JavaThre
   exception = get_preinitialized_exception(vmClasses::IllegalMonitorStateException_klass(), CATCH);
   current->set_vm_result(exception());
 JRT_END
-
 
 //------------------------------------------------------------------------------------------------------------------------
 // Invokes
@@ -1126,7 +1132,7 @@ JRT_ENTRY(void, InterpreterRuntime::at_safepoint(JavaThread* current))
     JvmtiExport::check_vthread_and_suspend_at_safepoint(current);
   }
 
-  if (JvmtiExport::should_post_single_step()) {
+  if (!current->system_java() && JvmtiExport::should_post_single_step()) {
     // This function is called by the interpreter when single stepping. Such single
     // stepping could unwind a frame. Then, it is important that we process any frames
     // that we might return into.

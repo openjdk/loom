@@ -2405,6 +2405,15 @@ public final class Unsafe {
     public native void park(boolean isAbsolute, long time);
 
     /**
+     * Unblocks the given thread blocked on Monitor.enter or Monitor.await
+     *
+     * @param thread the thread to unpark
+     */
+    public native void unparkMonitor(Thread thread);
+    public native void parkMonitor();
+    public native void parkMonitorNanos(long nanos);
+
+    /**
      * Gets the load average in the system run queue assigned
      * to the available processors averaged over various periods of time.
      * This method retrieves the given {@code nelem} samples and

@@ -137,6 +137,10 @@ class JavaThread: public Thread {
 
   Method*       _callee_target;
 
+  // Set to > 0 if this thread is executing in system java mode.
+  // This means a debugger have very limited access to any bytecodes executed with this flag.
+  jint         _system_java;
+
   // Used to pass back results to the interpreter or generated code running Java code.
   oop           _vm_result;    // oop result is GC-preserved
   Metadata*     _vm_result_2;  // non-oop result
@@ -312,6 +316,9 @@ class JavaThread: public Thread {
   volatile bool         _doing_unsafe_access;    // Thread may fault due to unsafe access
   bool                  _do_not_unlock_if_synchronized;  // Do not unlock the receiver of a synchronized method (since it was
                                                          // never locked) when throwing an exception. Used by interpreter only.
+
+  bool                  _no_async_exception; // Do not throw async exception on this thread.
+
 #if INCLUDE_JVMTI
   volatile bool         _carrier_thread_suspended;       // Carrier thread is externally suspended
   bool                  _is_in_VTMS_transition;          // thread is in virtual thread mount state transition
@@ -379,6 +386,10 @@ class JavaThread: public Thread {
   oop        _jvmci_reserved_oop0;
 
  public:
+
+  bool no_async_exception() { return _no_async_exception; }
+  void set_no_async_exception(bool value) { _no_async_exception = value; }
+
   static jlong* _jvmci_old_thread_counters;
   static void collect_counters(jlong* array, int length);
 
@@ -743,6 +754,13 @@ private:
   // Misc. accessors/mutators
   static ByteSize scopedValueCache_offset()       { return byte_offset_of(JavaThread, _scopedValueCache); }
 
+  // Accessors
+  bool system_java() { return _system_java != 0; }
+  jint current_system_java() { return _system_java; }
+  void set_system_java(jint v) { _system_java = v; }
+  void set_system_java() { ++_system_java; assert(_system_java == 1, "Must be"); }
+  void clear_system_java() { --_system_java; assert(_system_java == 0, "Must be"); }
+
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }
   static ByteSize vthread_offset()               { return byte_offset_of(JavaThread, _vthread); }
@@ -759,6 +777,7 @@ private:
   static ByteSize frame_anchor_offset() {
     return byte_offset_of(JavaThread, _anchor);
   }
+  static ByteSize system_java_offset()           { return byte_offset_of(JavaThread, _system_java); }
   static ByteSize callee_target_offset()         { return byte_offset_of(JavaThread, _callee_target); }
   static ByteSize vm_result_offset()             { return byte_offset_of(JavaThread, _vm_result); }
   static ByteSize vm_result_2_offset()           { return byte_offset_of(JavaThread, _vm_result_2); }

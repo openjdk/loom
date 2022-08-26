@@ -35,13 +35,19 @@
 class JvmtiThreadState;
 class RecordComponent;
 
+
 #define CHECK_INIT(offset)  assert(offset != 0, "should be initialized"); return offset;
 
 // Interface to java.lang.Object objects
 
 class java_lang_Object : AllStatic {
+  static int _static_sync_enabled_offset;
  public:
+  static void compute_offsets();
+  static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
   static void register_natives(TRAPS);
+  static void set_sync_enabled();
+  static jint sync_enabled();
 };
 
 // Interface to java.lang.String objects
@@ -357,6 +363,8 @@ class java_lang_Thread : AllStatic {
   static int _park_blocker_offset;
   static int _scopedValueBindings_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
+  static int _frame_id_offset;
+  static int _lock_stack_pos_offset;
 
   static void compute_offsets();
 
@@ -425,6 +433,9 @@ class java_lang_Thread : AllStatic {
   JFR_ONLY(static u2 jfr_epoch(oop java_thread);)
   JFR_ONLY(static void set_jfr_epoch(oop java_thread, u2 epoch);)
   JFR_ONLY(static int jfr_epoch_offset() { CHECK_INIT(_jfr_epoch_offset); })
+
+  static int lock_stack_pos_offset() { CHECK_INIT(_lock_stack_pos_offset); }
+  static int frame_id_offset()       { CHECK_INIT(_frame_id_offset); }
 
   // Debugging
   friend class JavaClasses;

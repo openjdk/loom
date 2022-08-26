@@ -1366,8 +1366,16 @@ void GenerateOopMap::interp1(BytecodeStream *itr) {
         _report_result_for_send = true;
         break;
       default:
-       fill_stackmap_for_opcodes(itr, vars(), stack(), _stack_top);
-       break;
+        // For UseNewMonitors the monitor codes act like invokes
+        if (ObjectMonitorMode::java() && (itr->code() == Bytecodes::_monitorenter ||
+                                                   itr->code() == Bytecodes::_monitorexit)) {
+        _itr_send = itr;
+        _report_result_for_send = true;
+
+        } else {
+          fill_stackmap_for_opcodes(itr, vars(), stack(), _stack_top);
+        }
+        break;
     }
   }
 
@@ -1612,8 +1620,18 @@ void GenerateOopMap::interp1(BytecodeStream *itr) {
     case Bytecodes::_checkcast:         do_checkcast(); break;
     case Bytecodes::_arraylength:
     case Bytecodes::_instanceof:        pp(rCTS, vCTS); break;
-    case Bytecodes::_monitorenter:      do_monitorenter(itr->bci()); break;
-    case Bytecodes::_monitorexit:       do_monitorexit(itr->bci()); break;
+    case Bytecodes::_monitorenter:      if (ObjectMonitorMode::java()) {
+                                          do_monitor_enter();
+                                        } else {
+                                          do_monitorenter(itr->bci());
+                                        }
+                                        break;
+    case Bytecodes::_monitorexit:       if (ObjectMonitorMode::java()) {
+                                          do_monitor_exit();
+                                        } else {
+                                          do_monitorexit(itr->bci());
+                                        }
+                                        break;
 
     case Bytecodes::_athrow:            // handled by do_exception_edge() BUT ...
                                         // vlh(apple): do_exception_edge() does not get
@@ -1875,6 +1893,51 @@ void GenerateOopMap::do_return_monitor_check() {
     }
   }
 }
+
+// For UseNewMonitors
+
+void GenerateOopMap::do_monitor_enter() {
+  assert(ObjectMonitorMode::java(), "must be");
+ // Dig up signature for field in constant pool
+  Symbol* signature = vmSymbols::object_void_signature();
+
+  // Parse method signature
+  CellTypeState out[4];
+  CellTypeState in[MAXARGSIZE+1];   // Includes result
+  ComputeCallStack cse(signature);
+
+  // Compute return type
+  int res_length =  cse.compute_for_returntype(out);
+
+  // Temporary hack.
+  if (out[0].equal(CellTypeState::ref) && out[1].equal(CellTypeState::bottom)) {
+    fatal("Here");
+  }
+
+  assert(res_length<=4, "max value should be vv");
+
+  // Compute arguments
+  int arg_length = cse.compute_for_parameters(true, in);
+  assert(arg_length<=MAXARGSIZE, "too many locals");
+
+  // Pop arguments
+  for (int i = arg_length - 1; i >= 0; i--) ppop1(in[i]);// Do args in reverse order.
+
+  // Report results
+  if (_report_result_for_send == true) {
+     fill_stackmap_for_opcodes(_itr_send, vars(), stack(), _stack_top);
+     _report_result_for_send = false;
+  }
+
+  // Push return address
+  ppush(out);
+}
+
+void GenerateOopMap::do_monitor_exit() {
+  assert(ObjectMonitorMode::java(), "must be");
+  do_monitor_enter();
+}
+
 
 void GenerateOopMap::do_jsr(int targ_bci) {
   push(CellTypeState::make_addr(targ_bci));

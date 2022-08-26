@@ -75,8 +75,51 @@ JVM_MonitorNotify(JNIEnv *env, jobject obj);
 JNIEXPORT void JNICALL
 JVM_MonitorNotifyAll(JNIEnv *env, jobject obj);
 
+JNIEXPORT void JNICALL
+JVM_MonitorEnter(JNIEnv *env, jclass unused, jobject obj);
+
+JNIEXPORT void JNICALL
+JVM_MonitorExit(JNIEnv *env, jclass unused, jobject obj);
+
+JNIEXPORT jint JNICALL
+JVM_MonitorPolicy(void);
+
+JNIEXPORT jlong JNICALL
+JVM_CallerFrameId(JNIEnv* env, jclass ignored);
+
 JNIEXPORT jobject JNICALL
 JVM_Clone(JNIEnv *env, jobject obj);
+
+/*
+ * java.lang.Monitor
+ */
+JNIEXPORT void JNICALL
+JVM_Monitor_abort(JNIEnv* env, jclass ignored, jstring estr);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg);
+
+JNIEXPORT jboolean JNICALL
+JVM_Monitor_casLockState(JNIEnv* env, jclass ignored, jobject handle, jint to, jint from);
+
+JNIEXPORT jint JNICALL
+JVM_Monitor_getLockState(JNIEnv* env, jclass ignored, jobject handle);
+
+JNIEXPORT jobject JNICALL
+JVM_Monitor_getVMResult(JNIEnv* env, jclass ignored);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_storeVMResult(JNIEnv* env, jclass ignored, jobject handle);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id, jobject jthread, jobject obj,
+                           jlong ms, jboolean timedOut);
 
 /*
  * java.lang.String

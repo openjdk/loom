@@ -113,11 +113,14 @@ class methodHandle;
    do_name(     getClass_name,                                   "getClass")                                            \
   do_intrinsic(_clone,                    java_lang_Object,       clone_name, void_object_signature,             F_RN)  \
    do_name(     clone_name,                                      "clone")                                               \
-  do_intrinsic(_notify,                   java_lang_Object,       notify_name, void_method_signature,            F_RN)  \
-   do_name(     notify_name,                                     "notify")                                              \
-  do_intrinsic(_notifyAll,                java_lang_Object,       notifyAll_name, void_method_signature,         F_RN)  \
-   do_name(     notifyAll_name,                                  "notifyAll")                                           \
-                                                                                                                        \
+  do_intrinsic(_notify,                   java_lang_Object,       notify0_name, void_method_signature,           F_RN)   \
+   do_name(     notify0_name,                                    "notify0")                                             \
+  do_intrinsic(_notifyAll,                java_lang_Object,       notifyAll0_name, void_method_signature,        F_RN)   \
+   do_name(     notifyAll0_name,                                 "notifyAll0")                                          \
+  do_intrinsic(_monitorEnterLegacy,       java_lang_Object,      monitorEnter0_name, object_void_signature,      F_SN)  \
+   do_name(     monitorEnter0_name,                              "monitorEnter0")                                       \
+  do_intrinsic(_monitorExitLegacy,         java_lang_Object,      monitorExit0_name, object_void_signature,       F_SN)  \
+   do_name(     monitorExit0_name,                               "monitorExit0")                                        \
   /* Math & StrictMath intrinsics are defined in terms of just a few signatures: */                                     \
   do_class(java_lang_Math,                "java/lang/Math")                                                             \
   do_class(java_lang_StrictMath,          "java/lang/StrictMath")                                                       \
@@ -645,7 +648,7 @@ class methodHandle;
   do_signature(putShort_signature,        "(Ljava/lang/Object;JS)V")                                                    \
   do_signature(getChar_signature,         "(Ljava/lang/Object;J)C")                                                     \
   do_signature(putChar_signature,         "(Ljava/lang/Object;JC)V")                                                    \
-  do_signature(getInt_signature,          "(Ljava/lang/Object;J)I")                                                     \
+  do_alias(getInt_signature,              object_long_int_signature)                                                    \
   do_signature(putInt_signature,          "(Ljava/lang/Object;JI)V")                                                    \
   do_signature(getLong_signature,         "(Ljava/lang/Object;J)J")                                                     \
   do_signature(putLong_signature,         "(Ljava/lang/Object;JJ)V")                                                    \
@@ -1256,6 +1259,16 @@ class methodHandle;
                                                                                                                           \
   do_intrinsic(_Object_init,              java_lang_Object, object_initializer_name, void_method_signature,        F_R)   \
   /*    (symbol object_initializer_name defined above) */                                                                 \
+                                                                                                                          \
+  do_intrinsic(_Object_caller_frame_id,  java_lang_Object, object_caller_frame_id, void_long_signature,           F_SN)   \
+   do_name(     object_caller_frame_id, "getCallerFrameId")                                                               \
+                                                                                                                          \
+  do_intrinsic(_Monitor_get_lock_state,    java_lang_Monitor, monitor_get_lock_state_name, object_int_signature,   F_SN)  \
+   do_name(     monitor_get_lock_state_name, "getLockState")                                                              \
+                                                                                                                          \
+  do_intrinsic(_Monitor_cas_lock_state, java_lang_Monitor, monitor_cas_lock_state_name, object_int_int_bool_signature, F_SN)  \
+   do_name(     monitor_cas_lock_state_name, "casLockState")                                                              \
+   do_signature(object_int_int_bool_signature, "(Ljava/lang/Object;II)Z" )                                                \
                                                                                                                           \
   do_intrinsic(_invoke,                   java_lang_reflect_Method, invoke_name, object_object_array_object_signature, F_R) \
   /*   (symbols invoke_name and invoke_signature defined above) */                                                      \

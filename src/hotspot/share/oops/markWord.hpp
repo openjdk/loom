@@ -245,6 +245,24 @@ class markWord {
 
   // Recover address of oop from encoded form used in mark
   inline void* decode_pointer() { return (void*)clear_lock_bits().value(); }
+
+  // ------------------------
+  // Java Monitor support for fast locking
+  //   - only the lock bits are set or read:
+  //     00 - locked
+  //     01 - unlocked
+  //     10 - inflated (monitor is found via Java code)
+  //     11 - Not used
+  // ------------------------
+
+  markWord with_lock_state(uintptr_t state) const {
+    return markWord((value() & ~lock_mask_in_place) | state);
+  }
+
+  uintptr_t lock_state() const {
+    return value() & lock_mask_in_place;
+  }
+
 };
 
 // Support atomic operations.

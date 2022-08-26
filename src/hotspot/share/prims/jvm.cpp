@@ -644,6 +644,55 @@ JVM_ENTRY(void, JVM_MonitorNotifyAll(JNIEnv* env, jobject handle))
   ObjectSynchronizer::notifyall(obj, CHECK);
 JVM_END
 
+JVM_ENTRY(void, JVM_MonitorEnter(JNIEnv* env, jclass unused, jobject handle))
+  Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
+  if (Verbose) {
+    ResourceMark rm(THREAD);
+    tty->print_cr("MONITORENTER for " INTPTR_FORMAT, p2i(obj()));
+    obj()->print_on(tty);
+  }
+  if (UseNewCode2) fatal("HALT in MonitorEnter");
+
+  // An async deflation can race after the inflate() call and before
+  // enter() can make the ObjectMonitor busy. enter() returns false if
+  // we have lost the race to async deflation and we simply try again.
+  while (true) {
+    ObjectMonitor* monitor = ObjectSynchronizer::inflate(THREAD, obj(),
+                                                         ObjectSynchronizer::inflate_cause_monitor_enter);
+    if (monitor->enter(THREAD)) {
+      return;
+    }
+  }
+JVM_END
+
+JVM_ENTRY(void, JVM_MonitorExit(JNIEnv* env, jclass unused, jobject handle))
+  Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
+  if (Verbose) {
+    ResourceMark rm(THREAD);
+    tty->print_cr("MONITOREXIT for " INTPTR_FORMAT, p2i(obj()));
+    obj()->print_on(tty);
+  }
+  if (UseNewCode3) fatal("HALT in MonitorExit");
+
+  // There's no deflation race for exit as the monitor is busy
+  ObjectSynchronizer::inflate(THREAD, obj(),
+                              ObjectSynchronizer::inflate_cause_monitor_exit)->exit(THREAD);
+JVM_END
+
+JVM_LEAF(jint, JVM_MonitorPolicy())
+  return ObjectMonitorMode::as_int();
+JVM_END
+
+JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
+  RegisterMap map(JavaThread::current(),
+                  RegisterMap::UpdateMap::skip,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  frame this_frame = JavaThread::current()->last_frame();
+  frame monitor    = this_frame.sender(&map);
+  jlong id = (jlong)monitor.link();
+  return id;
+JVM_END
 
 JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
@@ -706,11 +755,168 @@ JVM_LEAF(jboolean, JVM_IsFinalizationEnabled(JNIEnv * env))
   return InstanceKlass::is_finalization_enabled();
 JVM_END
 
+// java.lang.Monitor //////////////////////////////////////////////////////////
+JVM_ENTRY(void, JVM_Monitor_abort(JNIEnv* env, jclass jc, jstring estr))
+ResourceMark rm(thread);
+  Handle es(thread, JNIHandles::resolve_non_null(estr));
+  char* str = java_lang_String::as_utf8_string(es());
+  fatal("Monitor fatal error: %s", str);
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg))
+  ResourceMark rm(thread);
+  Handle msg_h(thread, JNIHandles::resolve_non_null(msg));
+  char* str = java_lang_String::as_utf8_string(msg_h());
+  log_debug(monitor)("Monitor log: %s by %s (%p)", str, thread->name(), thread);
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid))
+  ResourceMark rm(thread);
+  oop obj_oop = JNIHandles::resolve(obj);
+  char* str = obj_oop->print_value_string();
+  log_debug(monitor)("Monitor enter: %s by %s (%p) with fid: %ld", str, thread->name(), thread, fid);
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid))
+  ResourceMark rm(thread);
+  oop obj_oop = JNIHandles::resolve(obj);
+  char* str = obj_oop->print_value_string();
+  log_debug(monitor)("Monitor exit: %s by %s (%p) with fid: %ld", str, thread->name(), thread, fid);
+JVM_END
+
+
+JVM_ENTRY(jboolean, JVM_Monitor_casLockState(JNIEnv* env, jclass jc, jobject handle, jint to, jint from))
+  Handle obj(thread, JNIHandles::resolve_non_null(handle));
+  markWord mw_org  = obj()->mark();
+  markWord nm_to   = mw_org.with_lock_state(to);
+  markWord nm_from = mw_org.with_lock_state(from);
+  markWord ret     = obj()->cas_set_mark(nm_to, nm_from);
+  return nm_from == ret;
+JVM_END
+
+
+JVM_ENTRY(jint, JVM_Monitor_getLockState(JNIEnv* env, jclass jc, jobject handle))
+  Handle obj(thread, JNIHandles::resolve_non_null(handle));
+  return obj()->mark().lock_state();
+JVM_END
+
+JVM_ENTRY(jobject, JVM_Monitor_getVMResult(JNIEnv* env, jclass jc))
+  return JNIHandles::make_local(thread, thread->vm_result());
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_storeVMResult(JNIEnv* env, jclass jc, jobject handle))
+  return thread->set_vm_result(JNIHandles::resolve(handle));
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
+                                           jobject jthread, jobject obj, jlong ms, jboolean timedOut))
+  jint sj = thread->current_system_java();
+  thread->set_system_java(0);
+
+  JavaThread* current = java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread));
+  oop object = JNIHandles::resolve_non_null(obj);
+
+  assert(current != NULL && current == JavaThread::current(), "must be");
+
+  ResourceMark rm(current);
+
+  bool exceptions_are_fatal = false;  // WAIT events are safe as they happen on entry and exit
+                                      // points. But the ENTER events happen in the middle of
+                                      // code and can leave an inconsistent state.
+
+  // The id is just a convention:
+  //  - BLOCKED_ENTER   => JVMTI_EVENT_MONITOR_CONTENDED_ENTER
+  //  - BLOCKED_ENTER+1 => JVMTI_EVENT_MONITOR_CONTENDED_ENTERED
+  //  - BLOCKED_WAIT    => JVMTI_EVENT_MONITOR_WAIT
+  //  - BLOCKED_WAIT+1  => JVMTI_EVENT_MONITOR_WAITED
+  // The BLOCKED_X are aliases for JavaThreadStatus values below.
+  switch(id) {
+
+  case (int)JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER:
+    log_info(monitor)("Hit postJvmtiEvent for contended enter on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+
+    if (JvmtiExport::should_post_monitor_contended_enter()) {
+      JvmtiExport::post_monitor_contended_enter(current, object);
+    }
+
+    // FIXME!
+    // The current thread does not yet own the monitor, but it is enqueued, so we will
+    // have to be sure the event handler cannot consume an unpark that is intended to
+    // release this thread so it can re-contest the monitor!
+
+    exceptions_are_fatal = true;
+    break;
+
+  case ((int)JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER) + 1:
+    log_info(monitor)("Hit postJvmtiEvent for contended entered on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+
+    if (JvmtiExport::should_post_monitor_contended_entered()) {
+      JvmtiExport::post_monitor_contended_entered(current, object);
+    }
+
+    // The current thread owns the monitor and is unparked, so the
+    // event handler cannot accidentally consume an unpark meant for
+    // the monitor.
+
+    exceptions_are_fatal = true;
+    break;
+
+  case (int)JavaThreadStatus::IN_OBJECT_WAIT:
+    log_info(monitor)("Hit postJvmtiEvent for monitor wait on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+
+    if (JvmtiExport::should_post_monitor_wait()) {
+      JvmtiExport::post_monitor_wait(thread, object, ms);
+    }
+
+    // The current thread already owns the monitor but is not yet
+    // parked. This means that the JVMTI_EVENT_MONITOR_WAIT
+    // event handler cannot accidentally consume an unpark() meant for
+    // the associated monitor..
+
+    break;
+
+  case ((int)JavaThreadStatus::IN_OBJECT_WAIT) + 1:
+    log_info(monitor)("Hit postJvmtiEvent for monitor waited on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+
+    if (JvmtiExport::should_post_monitor_waited()) {
+      JvmtiExport::post_monitor_waited(thread, object, timedOut );
+    }
+
+    // The current thread already owns the monitor but is not yet
+    // parked. This means that the JVMTI_EVENT_MONITOR_WAIT
+    // event handler cannot accidentally consume an unpark() meant for
+    // the associated monitor..
+
+    break;
+
+  default:
+    ShouldNotReachHere();
+  }
+
+  // It is unclear from the JVM TI specification what the above callbacks are allowed to do
+  // but we have to assume it is possible that they will invoke some Java code. This is
+  // potentially disasterous for the Java Monitor implementation as it could lead to reentrant
+  // execution of the monitor code, and some exceptions would break things completely. Without
+  // some general purpose exception deferral mechanism the best we can do for now is to
+  // abort on exceptions. We cannot do anything about the reentrancy problem without adding
+  // additional thread state.
+  if (exceptions_are_fatal && HAS_PENDING_EXCEPTION) {
+    stringStream ss;
+    ss.print("JVM TI monitor entry event callback raised a Java exception: ");
+    java_lang_Throwable::print(PENDING_EXCEPTION, &ss);
+    const char* msg = ss.as_string(false /* on C heap */);
+    fatal("%s", msg);
+  }
+  
+  thread->set_system_java(sj);
+JVM_END
+
 // jdk.internal.vm.Continuation /////////////////////////////////////////////////////
 
 JVM_ENTRY(void, JVM_RegisterContinuationMethods(JNIEnv *env, jclass cls))
   CONT_RegisterNativeMethods(env, cls);
 JVM_END
+
 
 // java.io.File ///////////////////////////////////////////////////////////////
 
@@ -3127,6 +3333,7 @@ JVM_END
 // Return true iff the current thread has locked the object passed in
 
 JVM_ENTRY(jboolean, JVM_HoldsLock(JNIEnv* env, jclass threadClass, jobject obj))
+  assert(!ObjectMonitorMode::java_only(), "should have stayed in Java code!");
   if (obj == nullptr) {
     THROW_(vmSymbols::java_lang_NullPointerException(), JNI_FALSE);
   }

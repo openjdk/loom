@@ -1,0 +1,9 @@
+The issue discussed in vm-result-issue.txt made us realize that the use of
+_vm_result across Java calls is also a problem for Loom. As _vm_result is
+logically part of the virtual thread's execution state, but stored in the carrier
+thread, it means we must not be able to switch virtual threads whilst the
+field is in use. Initially we thought this would not be an issue for monitor exit
+as we don't block releasing a monitor, but that may not be true. In Loom when we
+unpark a waiting thread so it can acquire the now free monitor, it is conceptually
+possible that we could switch to that newly unparked virtual thread! That would
+cause a breakage.

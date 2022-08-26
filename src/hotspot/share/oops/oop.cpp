@@ -104,8 +104,14 @@ intptr_t oopDesc::slow_identity_hash() {
 
 // used only for asserts and guarantees
 bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
+
   if (!Universe::heap()->is_oop(obj)) {
     return false;
+  } else if (ObjectMonitorMode::fast()) {
+    // As we don't store any locker information in the markWord
+    // when LOCKED (00), we can see an all-zero markWord below
+    // so we skip that part.
+    return true;
   }
 
   // Header verification: the mark is typically non-zero. If we're

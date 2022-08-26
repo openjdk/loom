@@ -113,6 +113,39 @@ public:
   ObjectMonitor* next();
 };
 
+class ObjectMonitorMode : AllStatic {
+  enum class Mode {
+    LEGACY = -1,
+    NATIVE =  0,
+    HEAVY  =  1,
+    FAST   =  2
+  };
+  static Mode _mode;
+public:
+  static bool initialize();
+  static bool legacy() { return _mode == Mode::LEGACY; };
+
+  static bool java()   { return _mode != Mode::LEGACY; };
+
+  static bool native() { return _mode == Mode::NATIVE; };
+
+  static bool java_only()   { return heavy() || fast(); };
+
+  static bool heavy()  { return _mode == Mode::HEAVY; };
+  static bool fast()   { return _mode == Mode::FAST; };
+
+  static int  as_int()    { return (int)_mode; };
+  static const char* const as_string() {
+    switch(_mode) {
+    case Mode::LEGACY: return "legacy";
+    case Mode::NATIVE: return "native";
+    case Mode::HEAVY:  return "heavy";
+    case Mode::FAST:   return "fast";
+    }
+    return "error: invalid mode";
+  };
+};
+
 class ObjectSynchronizer : AllStatic {
   friend class VMStructs;
 
@@ -125,7 +158,8 @@ class ObjectSynchronizer : AllStatic {
     inflate_cause_hash_code = 4,
     inflate_cause_jni_enter = 5,
     inflate_cause_jni_exit = 6,
-    inflate_cause_nof = 7 // Number of causes
+    inflate_cause_monitor_exit = 7,
+    inflate_cause_nof = 8 // Number of causes
   } InflateCause;
 
   typedef enum {
@@ -144,7 +178,7 @@ class ObjectSynchronizer : AllStatic {
   // Used only to handle jni locks or other unmatched monitor enter/exit
   // Internally they will use heavy weight monitor.
   static void jni_enter(Handle obj, JavaThread* current);
-  static void jni_exit(oop obj, TRAPS);
+  static void jni_exit(Handle obj, TRAPS);
 
   // Handle all interpreter, compiler and jni cases
   static int  wait(Handle obj, jlong millis, TRAPS);
@@ -159,6 +193,17 @@ class ObjectSynchronizer : AllStatic {
   // with original recursion count
   static intx complete_exit(Handle obj, JavaThread* current);
   static void reenter (Handle obj, intx recursions, JavaThread* current);
+
+  // This is the Java-based version of monitor operations.
+  static void java_enter(Handle obj, JavaThread* current, jlong fid);
+  static void java_exit(Handle obj, JavaThread* current, jlong fid);
+  static void java_wait_uninterruptibly(Handle obj, JavaThread* current);
+  static void java_wait(Handle obj, jlong millis, JavaThread* current);
+  static void java_notify(Handle obj, JavaThread* current);
+  static void java_notify_all(Handle obj, JavaThread* current);
+  static bool current_thread_holds_monitor(Handle obj, JavaThread* current);
+  static void java_jni_enter(Handle obj, JavaThread* current);
+  static void java_jni_exit(Handle obj, JavaThread* current);
 
   // Inflate light weight monitor to heavy weight monitor
   static ObjectMonitor* inflate(Thread* current, oop obj, const InflateCause cause);
@@ -247,15 +292,17 @@ class ObjectSynchronizer : AllStatic {
 class ObjectLocker : public StackObj {
  private:
   JavaThread* _thread;
-  Handle      _obj;
-  BasicLock   _lock;
+  Handle    _obj;
+  bool      _do_lock;   // default true
+  bool      _old_nae;
+  BasicLock _lock;
  public:
-  ObjectLocker(Handle obj, JavaThread* current);
+  ObjectLocker(Handle obj, JavaThread* current, bool do_lock = true);
   ~ObjectLocker();
 
   // Monitor behavior
-  void wait(TRAPS)  { ObjectSynchronizer::wait(_obj, 0, CHECK); } // wait forever
-  void notify_all(TRAPS)  { ObjectSynchronizer::notifyall(_obj, CHECK); }
+  void wait(); // wait forever
+  void notify_all();
 };
 
 #endif // SHARE_RUNTIME_SYNCHRONIZER_HPP

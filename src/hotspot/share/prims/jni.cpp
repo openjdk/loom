@@ -2733,8 +2733,11 @@ JNI_ENTRY(jint, jni_MonitorExit(JNIEnv *env, jobject jobj))
   }
 
   Handle obj(THREAD, JNIHandles::resolve_non_null(jobj));
-  ObjectSynchronizer::jni_exit(obj(), CHECK_(JNI_ERR));
-  return JNI_OK;
+  ObjectSynchronizer::jni_exit(obj, thread);
+  if (!HAS_PENDING_EXCEPTION) {
+    ret = JNI_OK;
+  }
+  return ret;
 JNI_END
 
 //

@@ -366,8 +366,12 @@ G1HeapRegionAttr G1ParScanThreadState::next_region_attr(G1HeapRegionAttr const r
   assert(region_attr.is_young() || region_attr.is_old(), "must be either Young or Old");
 
   if (region_attr.is_young()) {
-    age = !m.has_displaced_mark_helper() ? m.age()
-                                         : m.displaced_mark_helper().age();
+    if (ObjectMonitorMode::fast()) {  // fast-locks
+      age = m.age();
+    } else {
+      age = !m.has_displaced_mark_helper() ? m.age()
+                                           : m.displaced_mark_helper().age();
+    }
     if (age < _tenuring_threshold) {
       return region_attr;
     }

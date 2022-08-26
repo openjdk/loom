@@ -401,6 +401,8 @@ class GenerateOopMap {
   void  do_multianewarray                   (int dims, int bci);
   void  do_monitorenter                     (int bci);
   void  do_monitorexit                      (int bci);
+  void  do_monitor_enter                    ();
+  void  do_monitor_exit                     ();
   void  do_return_monitor_check             ();
   void  do_checkcast                        ();
   CellTypeState *signature_to_effect        (const Symbol* sig, int bci, CellTypeState *out);

@@ -82,6 +82,7 @@
 #include "runtime/safepoint.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/threadSMR.hpp"
+#include "runtime/thread.inline.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vm_version.hpp"
 #include "utilities/align.hpp"
@@ -99,19 +100,57 @@ InjectedField JavaClasses::_injected_fields[] = {
   ALL_INJECTED_FIELDS(DECLARE_INJECTED_FIELD)
 };
 
+// java_lang_Object
+
+int java_lang_Object::_static_sync_enabled_offset;
+
+#define OBJECT_FIELDS_DO(macro) \
+  macro(_static_sync_enabled_offset, k, "syncEnabled", int_signature, true)
+
+void java_lang_Object::compute_offsets() {
+  InstanceKlass* k = vmClasses::Object_klass();
+  OBJECT_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+#if INCLUDE_CDS
+void java_lang_Object::serialize_offsets(SerializeClosure* f) {
+  OBJECT_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+}
+#endif
+
+void java_lang_Object::set_sync_enabled() {
+  InstanceKlass* ik = vmClasses::Object_klass();
+  oop base = ik->static_field_base_raw();
+  base->int_field_put(_static_sync_enabled_offset, 1);
+}
+
+jint java_lang_Object::sync_enabled() {
+  InstanceKlass* ik = vmClasses::Object_klass();
+  oop base = ik->static_field_base_raw();
+  return base->int_field(_static_sync_enabled_offset);
+}
+
 // Register native methods of Object
 void java_lang_Object::register_natives(TRAPS) {
   InstanceKlass* obj = vmClasses::Object_klass();
   Method::register_native(obj, vmSymbols::hashCode_name(),
                           vmSymbols::void_int_signature(), (address) &JVM_IHashCode, CHECK);
-  Method::register_native(obj, vmSymbols::wait_name(),
+  Method::register_native(obj, vmSymbols::wait0_name(),
                           vmSymbols::long_void_signature(), (address) &JVM_MonitorWait, CHECK);
-  Method::register_native(obj, vmSymbols::notify_name(),
+  Method::register_native(obj, vmSymbols::notify0_name(),
                           vmSymbols::void_method_signature(), (address) &JVM_MonitorNotify, CHECK);
-  Method::register_native(obj, vmSymbols::notifyAll_name(),
+  Method::register_native(obj, vmSymbols::notifyAll0_name(),
                           vmSymbols::void_method_signature(), (address) &JVM_MonitorNotifyAll, CHECK);
   Method::register_native(obj, vmSymbols::clone_name(),
                           vmSymbols::void_object_signature(), (address) &JVM_Clone, THREAD);
+  Method::register_native(obj, vmSymbols::monitorEnter0_name(),
+                          vmSymbols::object_void_signature(), (address) &JVM_MonitorEnter, THREAD);
+  Method::register_native(obj, vmSymbols::monitorExit0_name(),
+                          vmSymbols::object_void_signature(), (address) &JVM_MonitorExit, THREAD);
+  Method::register_native(obj, vmSymbols::getMonitorPolicy_name(),
+                          vmSymbols::void_int_signature(), (address) &JVM_MonitorPolicy, THREAD);
+  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
+                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 int JavaClasses::compute_injected_offset(InjectedFieldID id) {
@@ -1524,6 +1563,8 @@ int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
 int java_lang_Thread::_scopedValueBindings_offset;
 JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
+int java_lang_Thread::_frame_id_offset;
+int java_lang_Thread::_lock_stack_pos_offset;
 
 #define THREAD_FIELDS_DO(macro) \
   macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
@@ -1535,7 +1576,9 @@ JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
-  macro(_scopedValueBindings_offset, k, "scopedValueBindings", object_signature, false);
+  macro(_scopedValueBindings_offset, k, "scopedValueBindings", object_signature, false); \
+  macro(_frame_id_offset,      k, "frameId", long_array_signature, false); \
+  macro(_lock_stack_pos_offset,k, "lockStackPos", int_signature, false)
 
 void java_lang_Thread::compute_offsets() {
   assert(_holder_offset == 0, "offsets should be initialized only once");
@@ -5170,6 +5213,7 @@ void java_lang_InternalError::serialize_offsets(SerializeClosure* f) {
   //end
 
 #define BASIC_JAVA_CLASSES_DO_PART2(f) \
+  f(java_lang_Object) \
   f(java_lang_System) \
   f(java_lang_ClassLoader) \
   f(java_lang_Throwable) \

@@ -166,8 +166,13 @@ inline oop PSPromotionManager::copy_unmarked_to_survivor_space(oop o,
   size_t new_obj_size = o->size();
 
   // Find the objects age, MT safe.
-  uint age = (test_mark.has_displaced_mark_helper() /* o->has_displaced_mark() */) ?
+  uint age;
+  if (ObjectMonitorMode::fast()) {
+    age = test_mark.age();
+  } else {
+    age = (test_mark.has_displaced_mark_helper() /* o->has_displaced_mark() */) ?
       test_mark.displaced_mark_helper().age() : test_mark.age();
+  }
 
   if (!promote_immediately) {
     // Try allocating obj in to-space (unless too old)

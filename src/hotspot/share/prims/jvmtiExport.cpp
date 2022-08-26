@@ -1765,6 +1765,8 @@ void JvmtiExport::post_resource_exhausted(jint resource_exhausted_flags, const c
 }
 
 void JvmtiExport::post_method_entry(JavaThread *thread, Method* method, frame current_frame) {
+  assert(!thread->system_java(), "JVM TI callback made while in system java");
+
   HandleMark hm(thread);
   methodHandle mh(thread, method);
 
@@ -1805,6 +1807,7 @@ void JvmtiExport::post_method_entry(JavaThread *thread, Method* method, frame cu
 }
 
 void JvmtiExport::post_method_exit(JavaThread* thread, Method* method, frame current_frame) {
+  assert(!thread->system_java(), "JVM TI callback made while in system java");
   HandleMark hm(thread);
   methodHandle mh(thread, method);
 
@@ -1857,6 +1860,7 @@ void JvmtiExport::post_method_exit_inner(JavaThread* thread,
                                          bool exception_exit,
                                          frame current_frame,
                                          jvalue& value) {
+  assert(!thread->system_java(), "JVM TI callback made while in system java");
   if (mh->jvmti_mount_transition() || thread->is_in_any_VTMS_transition()) {
     return; // no events should be posted if thread is in any VTMS transition
   }
@@ -2172,6 +2176,8 @@ void JvmtiExport::post_field_access_by_jni(JavaThread *thread, oop obj,
 void JvmtiExport::post_field_access(JavaThread *thread, Method* method,
   address location, Klass* field_klass, Handle object, jfieldID field) {
 
+  assert(!thread->system_java(), "JVM TI callback made while in system java");
+
   HandleMark hm(thread);
   methodHandle mh(thread, method);
 
@@ -2259,6 +2265,7 @@ void JvmtiExport::post_field_modification_by_jni(JavaThread *thread, oop obj,
 void JvmtiExport::post_raw_field_modification(JavaThread *thread, Method* method,
   address location, Klass* field_klass, Handle object, jfieldID field,
   char sig_type, jvalue *value) {
+  assert(!thread->system_java(), "JVM TI callback made while in system java");
 
   if (thread->is_in_any_VTMS_transition()) {
     return; // no events should be posted if thread is in any VTMS transition
@@ -2694,6 +2701,10 @@ void JvmtiExport::post_data_dump() {
 
 void JvmtiExport::post_monitor_contended_enter(JavaThread *thread, ObjectMonitor *obj_mntr) {
   oop object = obj_mntr->object();
+  post_monitor_contended_enter(thread, object);
+}
+
+void JvmtiExport::post_monitor_contended_enter(JavaThread *thread, oop object) {
   JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == nullptr) {
     return;
@@ -2727,6 +2738,11 @@ void JvmtiExport::post_monitor_contended_enter(JavaThread *thread, ObjectMonitor
 
 void JvmtiExport::post_monitor_contended_entered(JavaThread *thread, ObjectMonitor *obj_mntr) {
   oop object = obj_mntr->object();
+  post_monitor_contended_entered(thread, object);
+}
+
+void JvmtiExport::post_monitor_contended_entered(JavaThread *thread, oop object) {
+
   JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == nullptr) {
     return;
@@ -2795,6 +2811,10 @@ void JvmtiExport::post_monitor_wait(JavaThread *thread, oop object,
 
 void JvmtiExport::post_monitor_waited(JavaThread *thread, ObjectMonitor *obj_mntr, jboolean timed_out) {
   oop object = obj_mntr->object();
+  post_monitor_waited(thread, object, timed_out);
+}
+
+void JvmtiExport::post_monitor_waited(JavaThread *thread, oop object, jboolean timed_out) {
   JvmtiThreadState *state = thread->jvmti_thread_state();
   if (state == nullptr) {
     return;

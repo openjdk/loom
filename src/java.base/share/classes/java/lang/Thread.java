@@ -247,7 +247,7 @@ public class Thread implements Runnable {
 
     // Additional fields for platform threads.
     // All fields, except task, are accessed directly by the VM.
-    private static class FieldHolder {
+    static class FieldHolder {
         final ThreadGroup group;
         final Runnable task;
         final long stackSize;
@@ -268,7 +268,7 @@ public class Thread implements Runnable {
                 this.daemon = true;
         }
     }
-    private final FieldHolder holder;
+    final FieldHolder holder;
 
     /*
      * ThreadLocal values pertaining to this thread. This map is maintained
@@ -2456,7 +2456,215 @@ public class Thread implements Runnable {
      *         the specified object.
      * @since 1.4
      */
-    public static native boolean holdsLock(Object obj);
+    @SuppressWarnings("fallthrough")
+    public static boolean holdsLock(Object obj) {
+        java.util.Objects.requireNonNull(obj);
+
+        // For all policies >= 0 we could delegate to Monitor.hasLockedObject
+        // but for testing purposes that will callback to this method for the
+        // native case, as it can't access holdsLock0 directly.
+        switch (Object.monitorPolicy) {
+        case -1:
+        case 0: // native
+            return holdsLock0(obj);
+        case 1: // always inflated
+        case 2: // fast-locks
+            return Monitor.hasLockedObject(obj, Thread.currentThread());
+        default:
+            Monitor.abort("Invalid policy value " + monitorPolicy);
+            return false;
+        }
+    }
+
+    // Temporary tracking of locked objects to replace the native
+    // BasicObjectLock in the VM frames. Synchronized method exit
+    // specifically needs this to find which object to unlock.
+    // Note that only enter/exit cause pushes and pops so an object
+    // (or monitor) on the stack may not actually be locked as
+    // Object.wait() may have been called. However checking by the
+    // current thread is always correct - so holdsLock can either
+    // check the Monitor or the stack entries (fast-locking uses the
+    // stack). External queries must do more detailed checks.
+    // We also need to track the frameId's of the monitors that have
+    // been locked so that they can be unlocked on-demand i.e. by JVM TI.
+    // As JNI locking is not required to be strictly nested/balanced we
+    // need a seperate list to track that.
+
+    static final String LOCKSTACK_OOME = "OutOfMemoryError when growing lockStack";
+    static final int BLOCK_SIZE = 16;  // The lockStack grows by this amount
+    Object[] lockStack = new Object[BLOCK_SIZE];
+    long[]   frameId   = new long[BLOCK_SIZE];
+    int lockStackPos   = 0;
+
+    void grow() {
+        try {
+            Object[] newStack = new Object[lockStack.length + BLOCK_SIZE];
+            long[] newFrameId = new long[lockStack.length + BLOCK_SIZE];
+            System.arraycopy(lockStack, 0, newStack, 0, lockStack.length);
+            System.arraycopy(frameId, 0, newFrameId, 0, frameId.length);
+            lockStack = newStack;
+            frameId = newFrameId;
+        } catch (OutOfMemoryError oome) {
+            // For simplicity we abort on OOME.
+            // We are out of memory so any allocation here is potentially
+            // going to rethrow, so avoid String operations.
+            Monitor.abort(LOCKSTACK_OOME);
+        }
+        Monitor.log("Expanded thread lockStack to size " + lockStack.length);
+    }
+
+    void push(Object lockee, long fid) {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (lockStackPos == lockStack.length) {
+            grow();
+        }
+        frameId[lockStackPos] = fid;
+        lockStack[lockStackPos++] = lockee;
+    }
+
+    void pop(Object lockee, long fid) {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        Object o = lockStack[--lockStackPos];
+        if (o != lockee) {
+            Monitor.abort("mismatched lockStack: expected " + lockee + " but found " + o);
+        }
+        if (frameId[lockStackPos] != fid) {
+            Monitor.abort("frame id mismatched");
+        }
+        lockStack[lockStackPos] = null;
+        frameId[lockStackPos] = 0;
+    }
+
+    Object pop(long fid) {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        Object o = lockStack[--lockStackPos];
+        if (frameId[lockStackPos] != fid) {
+            Monitor.abort("frame id mismatched");
+        }
+        lockStack[lockStackPos] = null;
+        frameId[lockStackPos] = 0;
+        return o;
+    }
+
+    Object peek(long fid) {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (frameId[lockStackPos - 1] != fid) {
+            Monitor.abort("frame id mismatched");
+        }
+        return lockStack[lockStackPos - 1];
+    }
+
+    long peekId() {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        return lockStackPos > 0 ? frameId[lockStackPos - 1] : 0;
+    }
+
+    // This count is only useful for fast-locked lockees
+    int lockCount(Object lockee) {
+        if (lockee == null) Monitor.abort("lockCount(null) was called!");
+        int count = 0;
+        for (Object i : lockStack) {
+            if (i == lockee)
+                count++;
+        }
+        return count;
+    }
+
+    // Queries if lockee is directly, or indirectly
+    // in the lockStack, or JNI list
+    boolean hasLocked(Object lockee) {
+        // Search backwards as it is more likely that the object
+        // was recently locked.
+        for (int i = lockStackPos - 1; i >= 0; i--) {
+            Object o = lockStack[i];
+            if (o == lockee) {
+                 return true;
+            }
+            else if (o instanceof Monitor m) {
+                if (m.object() == lockee) {
+                    return true;
+                }
+            }
+        }
+        return hasJNILocked(lockee);
+    }
+
+    // Queries if lockee is directly
+    // in the lockStack,
+    boolean hasLockedDirect(Object lockee) {
+        for (Object o : lockStack) {
+            if (o == lockee) {
+                 return true;
+            }
+        }
+        return false;
+    }
+
+    static final String JNILIST_OOME = "OutOfMemoryError when growing JNI Monitor list";
+    Monitor[] jniList = new Monitor[BLOCK_SIZE];
+    int jniListPos   = 0;
+
+    void growJNIList() {
+        try {
+            Monitor[] newList = new Monitor[jniList.length + BLOCK_SIZE];
+            System.arraycopy(jniList, 0, newList, 0, jniList.length);
+            jniList = newList;
+        } catch (OutOfMemoryError oome) {
+            // For simplicity we abort on OOME.
+            // We are out of memory so any allocation here is potentially
+            // going to rethrow, so avoid String operations.
+            Monitor.abort(JNILIST_OOME);
+        }
+        Monitor.log("Expanded thread JNI Monitor list to size " + jniList.length);
+    }
+
+    // Queries if lockee is currently locked at the JNI level.
+    boolean hasJNILocked(Object lockee) {
+        // Search backwards as it is more likely that the object
+        // was recently locked.
+        for (int i = jniListPos - 1; i >= 0; i--) {
+            Monitor m = jniList[i];
+            if (m.object() == lockee) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Add a Monitor to the end of the JNI list. It may already exist
+    // but that is okay.
+    void addJNIMonitor(Monitor m) {
+        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (jniListPos == jniList.length) {
+            growJNIList();
+        }
+        jniList[jniListPos++] = m;
+    }
+
+    // Remove the most recent  occurrence of the given Monitor from the JNI list.
+    // Return true if the Monitor was found and removed, and false if not present.
+    boolean removeJNIMonitor(Monitor m) {
+        // JNI locking doesn't have to be properly nested, or balanced, but it
+        // usually is, so it is quicker to search backwards and remove the most
+        // recent entry.
+        for (int i = jniListPos - 1; i >= 0; i--) {
+            Monitor m2 = jniList[i];
+            if (m2 == m) {
+                // Need to compact the list
+                for (int j = i; j < jniListPos - 1; j++) {
+                    jniList[j] = jniList[j + 1];
+                }
+                jniList[--jniListPos] = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    //-------------------------------
+
+    private static native boolean holdsLock0(Object obj);
 
     private static final StackTraceElement[] EMPTY_STACK_TRACE
         = new StackTraceElement[0];

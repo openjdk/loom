@@ -1,0 +1,37 @@
+At the moment any thread-local structures needed to support Java Object Monitors have been
+allocated directly as fields within the java.lang.Thread class:
+
+- Object[] lockStack
+- long[]   frameId
+- int lockStackPos
+- Monitor[] jniList
+- int jniListPos
+
+This is a simple approach, potentially reasonably performant, but uses memory.
+
+In the context of having millions of Virtual Threads in a VM it is unlikely this approach
+wil be able to be used, both in terms of the size of the Thread object and the actual
+allocation of the arrays. The alternatives considered:
+
+- secondary Java structures allocated on demand
+
+  This only requires one extra field in Thread and only consumes additional memory in
+  virtual threads that uses object monitors. We could even split out Java synchronization
+  from JNI. Loom already uses a secondary structure to move carrier thread fields out of
+  thread.
+
+  The downside is the extra indirection.
+
+- external maps/tables
+
+  This removes any allocation overhead from the Thread class but is generally much more
+  complex to manage. The scalability of such a data structure needs careful consideration
+  and has to deal with highly concurrent access. All classes involved must be preloaded
+  and initialized before any synchronization can be enabled. We may need to reinvent
+  classes (as done for the MonitorMap) if existing JDK classes cannot be used within
+  "system Java".
+
+  We also have to consider how the VM can access data if needed - for example the current
+  contended monitor. It may not be possible for Java code to be executed to obtain this
+  data (i.e. VMoperation by VMThread) whereas direct access to an entry in an array can
+  be done quite easily and safely.

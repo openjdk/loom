@@ -29,6 +29,7 @@
 #include "interpreter/invocationCounter.hpp"
 #include "oops/method.hpp"
 #include "runtime/frame.hpp"
+#include "runtime/synchronizer.hpp"
 
 // This file specializes the assembler with interpreter-specific macros
 
@@ -227,12 +228,38 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void remove_activation(TosState state, Register ret_addr,
                          bool throw_monitor_exception = true,
                          bool install_monitor_exception = true,
-                         bool notify_jvmdi = true);
+                         bool notify_jvmdi = true) {
+    if (ObjectMonitorMode::legacy()) {
+      remove_activation_legacy(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
+    } else {
+      remove_activation_java(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
+    }
+  }
+
+  void remove_activation_pop_frame(TosState state, Register ret_addr) {
+    remove_activation(state, ret_addr, false, false, false);
+  }
+
+ private:
+  void remove_activation_java(TosState state, Register ret_addr,
+                              bool throw_monitor_exception = true,
+                              bool install_monitor_exception = true,
+                              bool notify_jvmdi = true);
+  void remove_activation_legacy(TosState state, Register ret_addr,
+                                bool throw_monitor_exception = true,
+                                bool install_monitor_exception = true,
+                                bool notify_jvmdi = true);
+
+ public:
   void get_method_counters(Register method, Register mcs, Label& skip);
 
   // Object locking
   void lock_object  (Register lock_reg);
   void unlock_object(Register lock_reg);
+
+  // For direct Java Object Monitors
+  void lock_object  ();
+  void unlock_object();
 
   // Interpreter profiling operations
   void set_method_data_pointer_for_bcp();

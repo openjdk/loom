@@ -692,6 +692,7 @@ class ThreadSelfSuspensionHandshake : public AsyncHandshakeClosure {
   void do_thread(Thread* thr) {
     JavaThread* current = JavaThread::cast(thr);
     assert(current == Thread::current(), "Must be self executed.");
+    assert(!current->system_java(), "Suspended in system java");
     JavaThreadState jts = current->thread_state();
 
     current->set_thread_state(_thread_blocked);
@@ -736,13 +737,20 @@ bool HandshakeState::suspend_with_handshake() {
 // This is the closure that synchronously honors the suspend request.
 class SuspendThreadHandshake : public HandshakeClosure {
   bool _did_suspend;
+  bool _in_system_java;
 public:
-  SuspendThreadHandshake() : HandshakeClosure("SuspendThread"), _did_suspend(false) {}
+  SuspendThreadHandshake() : HandshakeClosure("SuspendThread"), _did_suspend(false), _in_system_java(false) {}
   void do_thread(Thread* thr) {
     JavaThread* target = JavaThread::cast(thr);
+    if (target->system_java()) {
+      _in_system_java = true;
+      return;
+    }
     _did_suspend = target->handshake_state()->suspend_with_handshake();
   }
   bool did_suspend() { return _did_suspend; }
+  void reset() { _in_system_java = false; }
+  bool was_system_java() { return _in_system_java; }
 };
 
 bool HandshakeState::suspend() {
@@ -758,7 +766,15 @@ bool HandshakeState::suspend() {
     return true;
   } else {
     SuspendThreadHandshake st;
-    Handshake::execute(&st, _handshakee);
+    while (true) {
+      Handshake::execute(&st, _handshakee);
+      if (st.was_system_java()) {
+        st.reset();
+        os::naked_yield();
+      } else {
+        break;
+      }
+    }
     return st.did_suspend();
   }
 }

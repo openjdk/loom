@@ -178,7 +178,7 @@ void javaVFrame::print_lock_info_on(outputStream* st, int frame_count) {
   // then print out the receiver. Locals are not always available,
   // e.g., compiled native frames have no scope so there are no locals.
   if (frame_count == 0) {
-    if (method()->name() == vmSymbols::wait_name() &&
+    if (method()->name() == vmSymbols::wait0_name() &&
         method()->method_holder()->name() == vmSymbols::java_lang_Object()) {
       const char *wait_state = "waiting on"; // assume we are waiting
       // If earlier in the output we reported java.lang.Thread.State ==

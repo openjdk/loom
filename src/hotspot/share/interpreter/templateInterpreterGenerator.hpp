@@ -52,6 +52,7 @@ class TemplateInterpreterGenerator: public AbstractInterpreterGenerator {
   address generate_exception_handler_common(const char* name, const char* message, bool pass_oop);
   address generate_ClassCastException_handler();
   address generate_ArrayIndexOutOfBounds_handler();
+  address generate_return_entry_for_monitor(int step);
   address generate_return_entry_for(TosState state, int step, size_t index_size);
   address generate_earlyret_entry_for(TosState state);
   address generate_deopt_entry_for(TosState state, int step, address continuation = nullptr);
@@ -59,6 +60,7 @@ class TemplateInterpreterGenerator: public AbstractInterpreterGenerator {
   void    generate_throw_exception();
 
   void lock_method();
+  void unlock_method();
 
   void bang_stack_shadow_pages(bool native_call);
 
@@ -97,6 +99,12 @@ class TemplateInterpreterGenerator: public AbstractInterpreterGenerator {
 #if defined(AMD64) || defined(AARCH64) || defined(RISCV64)
   address generate_currentThread();
 #endif
+#ifdef AMD64
+  address generate_caller_frame_id();
+  address generate_get_lock_state();
+  address generate_cas_lock_state();
+#endif
+
 #ifdef IA32
   address generate_Float_intBitsToFloat_entry();
   address generate_Float_floatToRawIntBits_entry();

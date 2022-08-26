@@ -1,0 +1,210 @@
+Test: hotspot/jtreg :tier1_runtime
+
+Build info: jom-master + system-java and latest class init changes
+
+Test results: passed: 559; failed: 10  (2 subtests of one test)
+
+runtime/logging/MonitorInflationTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'inflate(has_locker):' missing from stdout/stderr
+
+Test not applicable to JOM: No native monitor inflation so logging is not present
+
+runtime/Thread/TestThreadDumpClassInitMonitor.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected initial stack line: "TestThread" #12 prio=5 os_prio=0 cpu=1.03ms elapsed=0.89s tid=0x00007feee8027e80 nid=2094 runnable [0x00007fef303ba000]
+
+Stack has changed with JOM, so test needs adjusting.
+
+runtime/BootClassAppendProp/BootClassPathAppend.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.Object' missing from stdout/stderr
+
+Won't work in interpreted mode
+
+runtime/exceptionMsgs/NullPointerException/NullPointerExceptionTest.java#id0: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Got null but expected this message: "Cannot enter synchronized block because "this.nullInstanceField" is null".
+runtime/exceptionMsgs/NullPointerException/NullPointerExceptionTest.java#id1: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Got null but expected this message: "Cannot enter synchronized block because "this.nullInstanceField" is null".
+
+JOM changes the NPE error message
+
+runtime/HiddenClasses/TestHiddenClassUnloading.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Background compilation enabled
+
+Won't work in interpreted mode
+
+runtime/Monitor/MonitorUsedDeflationThresholdTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Did not find too_many string in output.
+
+Not applicable for JOM: no deflation
+
+runtime/Monitor/SyncOnValueBasedClassTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Synchronizing on object' missing from stdout/stderr
+
+This check may be missing in the JOM prototype.
+
+runtime/ParallelLoad/ParallelSuperTest.java: Failed. Unexpected exit from test [exit code: 134]
+
+Parallel super load logic not implemented for JOM.
+
+runtime/whitebox/TestWBDeflateIdleMonitors.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0]
+
+Not applicable for JOM: no deflation
+
+
+----------------------------------------------------------
+
+hotspot/jtreg: vmTestbase/nsk/jvmti/
+
+Build info: jom-master with JNI locking changes
+
+Test results: passed: 628; failed: 19
+
+
+2022-02-24T02:50:02-0500 Test finished: vmTestbase/nsk/jvmti/CompiledMethodUnload/compmethunload001/TestDescription.java: Failed. Execution failed: `main' threw exception: nsk.share.Failure: PRODUCT BUG: class was not unloaded in 5
+2022-02-24T03:14:25-0500 Test finished: vmTestbase/nsk/jvmti/GetCurrentContendedMonitor/contmon001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:15:41-0500 Test finished: vmTestbase/nsk/jvmti/GetFrameCount/framecnt001/TestDescription.java: Failed. Execution failed: `main' threw exception: java.lang.AssertionError: [/scratch/users/daholme/jdk-dev4.git/build/linux-x64-debug-jni-entry/images/jdk/bin/java, -cp, /scratch/users/daholme/jdk-dev4.git/open/test/hotspot/jtreg/JTwork/classes/vmTestbase/nsk/jvmti/GetFrameCount/framecnt001/TestDescription.d:/scratch/users/daholme/jdk-dev4.git/open/test/hotspot/jtreg/JTwork/classes/vmTestbase:/scratch/users/daholme/jdk-dev4.git/open/test/hotspot/jtreg/JTwork/classes/test/lib, -Djava.library.path=/scratch/users/daholme/jdk-dev4.git/build/linux-x64-debug-jni-entry/images/test/hotspot/jtreg/native, -agentlib:framecnt001, nsk.jvmti.GetFrameCount.framecnt001] exit code is 97
+2022-02-24T03:15:58-0500 Test finished: vmTestbase/nsk/jvmti/GetFrameLocation/frameloc001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:18:45-0500 Test finished: vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage001/TestDescription.java: Failed. Unexpected exit from test [exit code: 134]
+2022-02-24T03:18:53-0500 Test finished: vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage003/TestDescription.java: Failed. Unexpected exit from test [exit code: 134]
+2022-02-24T03:18:58-0500 Test finished: vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage004/TestDescription.java: Failed. Unexpected exit from test [exit code: 134]
+2022-02-24T03:19:06-0500 Test finished: vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage006/TestDescription.java: Failed. Unexpected exit from test [exit code: 134]
+2022-02-24T03:19:18-0500 Test finished: vmTestbase/nsk/jvmti/GetOwnedMonitorInfo/ownmoninf001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:26:36-0500 Test finished: vmTestbase/nsk/jvmti/NotifyFramePop/nframepop001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:52:34-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:53:31-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/capability/CM01/cm01t011/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:54:32-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/contention/TC01/tc01t001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:59:37-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/contention/TC02/tc02t001/TestDescription.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Timeout in waiting for a MonitorContendedEnter event
+2022-02-24T03:59:42-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/contention/TC03/tc03t001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T03:59:47-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/contention/TC03/tc03t002/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T04:48:11-0500 Test finished: vmTestbase/nsk/jvmti/scenarios/multienv/MA08/ma08t001/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T04:54:26-0500 Test finished: vmTestbase/nsk/jvmti/StopThread/stopthrd007/TestDescription.java: Failed. Execution failed: Execution failed
+2022-02-24T04:58:19-0500 Test finished: vmTestbase/nsk/jvmti/unit/functions/nosuspendMonitorInfo/JvmtiTest/TestDescription.java: Failed. Execution failed: Execution failed
+
+
+----------------------------------------------------------
+
+hotspot/jtreg: :tier1_compiler
+
+Build info: Unclear - Dec 2, 2021
+
+Test results: passed: 605; failed: 24; error: 8
+
+1. compiler/c2/Test6857159.java
+
+java.lang.AssertionError: public void compiler.c2.Test6857159$ct0.run() didn't get compiled
+
+2.compiler/c2/TestShiftRightAndAccumulate.java#id0
+
+Timed out
+
+3. compiler/c2/TestUnsignedByteCompare1.java
+
+Timed out
+
+4. compiler/codecache/CheckSegmentedCodeCache.java
+
+java.lang.RuntimeException: 'Not enough space in non-nmethod code heap to run VM' missing from stdout/stderr
+
+5. compiler/codecache/OverflowCodeCacheTest.java
+
+java.lang.RuntimeException: Compilation must be disabled when CodeCache(CodeHeap) overflows: expected 1 to not equal 1
+
+6.compiler/gcbarriers/EqvUncastStepOverBarrier.java
+
+WB error: invalid compilation level 4
+
+7. compiler/intrinsics/IntrinsicAvailableTest.java
+
+java.lang.RuntimeException: Unexpected result: intrinsic for java.util.zip.CRC32.update() is enabled but intrinsic is not available at compilation level 4
+
+8. compiler/intrinsics/IntrinsicDisabledTest.java
+
+java.lang.RuntimeException: Intrinsic for [public native void jdk.internal.misc.Unsafe.putChar(java.lang.Object,long,char)] is not available globally although it should be.
+
+
+9.compiler/arraycopy/TestArrayCopyNoInitDeopt.java
+
+WB error: invalid compilation level 4
+
+10.compiler/arraycopy/TestDefaultMethodArrayCloneDeoptC2.java
+
+WB error: invalid compilation level 4
+
+11.compiler/c2/cr7200264/TestSSE2IntVect.java
+
+Unexpected AndV number: expected 0 >= 3
+
+12.compiler/c2/cr7200264/TestSSE4IntVect.java
+
+Unexpected MulVI number: expected 0 >= 2
+
+13.compiler/classUnloading/methodUnloading/TestMethodUnloading.java
+
+java.lang.RuntimeException: Background compilation enabled
+
+14.compiler/codecache/cli/codeheapsize/TestCodeHeapSizeOptions.java
+
+AssertionError: Option 'NonNMethodCodeHeapSize' is expected to have '20971520' value
+
+15.compiler/codecache/cli/printcodecache/TestPrintCodeCacheOption.java
+
+AssertionError: Expected message not found: 'CodeHeap 'non-profiled nmethods': size=40960Kb used=[0-9]+Kb max_used=[0-9]+Kb free=[0-9]+Kb'.
+
+16.compiler/dependencies/MonomorphicObjectCall/TestMonomorphicObjectCall.java
+
+Method [java.lang.Object.notify()V] is annotated with @IntrinsicCandidate, but no compiler intrinsic is defined for the method. Exiting.
+
+17.compiler/inlining/InlineAccessors.java
+
+RuntimeException: 'InlineAccessors::setBool (6 bytes) accessor' missing from stdout/stderr
+
+18.compiler/inlining/PrintInlining.java
+
+Exception: '-XX:+PrintInlining' didn't print virtual call.
+
+19.compiler/intrinsics/klass/CastNullCheckDroppingsTest.java
+
+TESTBUG: Background compilation enabled
+
+20.compiler/intrinsics/string/TestStringIntrinsics.java
+
+Timeout refired 3600 times
+
+21. compiler/intrinsics/string/TestStringLatin1IndexOfChar.java
+
+Timeout refired 1800 times
+
+22.compiler/intrinsics/unsafe/DirectByteBufferTest.java
+
+Timeout refired 1800 times
+
+23.compiler/intrinsics/unsafe/HeapByteBufferTest.java
+
+Timeout
+
+24. compiler/jsr292/ContinuousCallSiteTargetChange.java
+
+timeout
+
+25. compiler/jsr292/MHInlineTest.java
+
+RuntimeException: 'compiler.jsr292.MHInlineTest$B::public_x (3 bytes)   inline (hot)' missing from stdout/stderr
+
+26.compiler/locks/TestNestedLocksElimination.java
+
+Timeout refired 1800 times
+
+27.compiler/regalloc/TestC2IntPressure.java
+
+Error: test method didn't get compiled
+
+28.compiler/runtime/criticalnatives/argumentcorruption/CheckLongArgs.java
+
+Exception: critical native lookup failed
+
+29.compiler/runtime/criticalnatives/lookup/LookUp.java
+
+Exception: critical native lookup failed
+
+30.compiler/uncommontrap/Test8009761.java
+
+RuntimeException: Background compilation enabled
+
+31.compiler/unsafe/UnsafeGetConstantField.java
+
+RuntimeException: direct read doesn't return prev value: expected true to equal false
+
+32.compiler/unsafe/UnsafeGetStableArrayElement.java
+
+RuntimeException: assertEquals: expected true to equal false

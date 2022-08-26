@@ -37,7 +37,9 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/handshake.hpp"
+#include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
+#include "runtime/javaCalls.hpp"
 #include "runtime/javaThread.hpp"
 #include "runtime/mutexLocker.hpp"
 #include "runtime/objectMonitor.hpp"
@@ -187,6 +189,29 @@ ObjectMonitor* MonitorList::Iterator::next() {
   return current;
 }
 
+ObjectMonitorMode::Mode ObjectMonitorMode::_mode = ObjectMonitorMode::Mode::LEGACY;
+
+bool ObjectMonitorMode::initialize() {
+  if (strcmp(ObjectSynchronizerMode, "legacy") == 0) {
+    _mode = Mode::LEGACY;
+    return true;
+  }
+  if (strcmp(ObjectSynchronizerMode, "native") == 0) {
+    _mode = Mode::NATIVE;
+    return true;
+  }
+  if (strcmp(ObjectSynchronizerMode, "heavy") == 0) {
+    _mode = Mode::HEAVY;
+    return true;
+  }
+  if (strcmp(ObjectSynchronizerMode, "fast") == 0) {
+    _mode = Mode::FAST;
+    return true;
+  }
+  return false;
+}
+
+
 // The "core" versions of monitor enter and exit reside in this file.
 // The interpreter and compilers contain specialized transliterated
 // variants of the enter-exit fast-path operations.  See c2_MacroAssembler_x86.cpp
@@ -306,6 +331,7 @@ static uintx _no_progress_cnt = 0;
 // into a single notifyAndExit() runtime primitive.
 
 bool ObjectSynchronizer::quick_notify(oopDesc* obj, JavaThread* current, bool all) {
+  assert(ObjectMonitorMode::legacy(), "sanity");
   assert(current->thread_state() == _thread_in_Java, "invariant");
   NoSafepointVerifier nsv;
   if (obj == nullptr) return false;  // slow-path for invalid obj
@@ -354,6 +380,7 @@ bool ObjectSynchronizer::quick_notify(oopDesc* obj, JavaThread* current, bool al
 
 bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
                                      BasicLock * lock) {
+  assert(ObjectMonitorMode::legacy(), "sanity");
   assert(current->thread_state() == _thread_in_Java, "invariant");
   NoSafepointVerifier nsv;
   if (obj == nullptr) return false;       // Need to throw NPE
@@ -469,6 +496,112 @@ static bool useHeavyMonitors() {
 #endif
 }
 
+// Java-based monitor methods
+
+void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) {
+  assert(ObjectMonitorMode::java(), "must be");
+
+  SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
+
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  args.push_long(fid);
+  methodHandle mh (current, Universe::object_monitorEnterFrameId_method());
+  current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  current->clear_system_java();
+}
+
+void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
+  assert(ObjectMonitorMode::java(), "must be");
+
+  SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
+
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  args.push_long(fid);
+  methodHandle mh (current, Universe::object_monitorExitFrameId_method());
+  current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  current->clear_system_java();
+}
+
+void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java(), "must be");
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  methodHandle mh (current, Universe::object_monitorJNIEnter_method());
+  JavaCalls::call(&result, mh, &args, current);
+}
+
+void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java(), "must be");
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  methodHandle mh (current, Universe::object_monitorJNIExit_method());
+  JavaCalls::call(&result, mh, &args, current);
+}
+
+void ObjectSynchronizer::java_notify(Handle obj, JavaThread* current) {
+  assert(false, "Should be unused");
+  assert(ObjectMonitorMode::java(), "must be");
+  Klass* klass = vmClasses::Object_klass();
+  JavaValue result(T_VOID);
+  JavaCalls::call_virtual(&result,
+                          obj, klass,
+                          vmSymbols::notify_name(),
+                          vmSymbols::void_method_signature(),
+                          current);
+}
+
+void ObjectSynchronizer::java_notify_all(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java(), "must be");
+  JavaValue result(T_VOID);
+  JavaCallArguments args(obj);
+  methodHandle mh (current, Universe::object_monitorNotifyAll_method());
+  JavaCalls::call(&result, mh, &args, current);
+}
+
+void ObjectSynchronizer::java_wait(Handle obj, jlong millis, JavaThread* current) {
+  assert(ObjectMonitorMode::java(), "must be");
+  Klass* klass = vmClasses::Object_klass();
+  JavaValue result(T_VOID);
+  JavaCallArguments args(obj);
+  args.push_long(millis);
+  JavaCalls::call_virtual(&result,
+                          klass,
+                          vmSymbols::wait_name(),
+                          vmSymbols::long_void_signature(),
+                          &args, current);
+}
+
+// For class initialization
+void ObjectSynchronizer::java_wait_uninterruptibly(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java_only, "must be");
+  JavaValue result(T_VOID);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  methodHandle mh (current, Universe::object_monitorWaitUninterruptibly_method());
+  JavaCalls::call(&result, mh, &args, current);
+}
+
+bool ObjectSynchronizer::current_thread_holds_monitor(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java_only, "must be");
+  Klass* klass = vmClasses::Monitor_klass();
+  JavaValue result(T_BOOLEAN);
+  JavaCallArguments args;
+  args.push_oop(obj);
+  args.push_oop(Handle(current, current->threadObj()));
+  JavaCalls::call_static(&result, klass, vmSymbols::hasLockedObject_name(),
+                         vmSymbols::object_thread_boolean_signature(),
+                         &args, current);
+
+  return result.get_jboolean();
+}
 // -----------------------------------------------------------------------------
 // Monitor Enter/Exit
 // The interpreter and compiler assembly code tries to lock using the fast path
@@ -476,6 +609,7 @@ static bool useHeavyMonitors() {
 // changed. The implementation is extremely sensitive to race condition. Be careful.
 
 void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current) {
+  assert(ObjectMonitorMode::legacy(), "sanity");
   if (obj->klass()->is_value_based()) {
     handle_sync_on_value_based_class(obj, current);
   }
@@ -521,7 +655,8 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
 }
 
 void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) {
-  current->dec_held_monitor_count();
+    assert(ObjectMonitorMode::legacy(), "sanity");
+    current->dec_held_monitor_count();
 
   if (!useHeavyMonitors()) {
     markWord mark = object->mark();
@@ -576,7 +711,7 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
 }
 
 // -----------------------------------------------------------------------------
-// Class Loader  support to workaround deadlocks on the class loader lock objects
+// Class Loader support to workaround deadlocks on the class loader lock objects
 // Also used by GC
 // complete_exit()/reenter() are used to wait on a nested lock
 // i.e. to give up an outer lock completely and then re-enter
@@ -587,7 +722,11 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
 //  4) reenter lock1 with original recursion count
 //  5) lock lock2
 // NOTE: must use heavy weight monitor to handle complete_exit/reenter()
+//
+// Also used if JavaThread::exit finds a still-locked monitor belonging to
+// that thread (due to unbalanced jni_enter).
 intx ObjectSynchronizer::complete_exit(Handle obj, JavaThread* current) {
+  assert(ObjectMonitorMode::legacy(), "sanity");
   // The ObjectMonitor* can't be async deflated until ownership is
   // dropped inside exit() and the ObjectMonitor* must be !is_busy().
   ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_vm_internal);
@@ -598,6 +737,7 @@ intx ObjectSynchronizer::complete_exit(Handle obj, JavaThread* current) {
 
 // NOTE: must use heavy weight monitor to handle complete_exit/reenter()
 void ObjectSynchronizer::reenter(Handle obj, intx recursions, JavaThread* current) {
+  assert(ObjectMonitorMode::legacy(), "sanity");
   // An async deflation can race after the inflate() call and before
   // reenter() -> enter() can make the ObjectMonitor busy. reenter() ->
   // enter() returns false if we have lost the race to async deflation
@@ -614,6 +754,9 @@ void ObjectSynchronizer::reenter(Handle obj, intx recursions, JavaThread* curren
 // -----------------------------------------------------------------------------
 // JNI locks on java objects
 // NOTE: must use heavy weight monitor to handle jni monitor enter
+
+#define JNI_FRAME_ID 951 //Non-zero, non-valid FP
+
 void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
   if (obj->klass()->is_value_based()) {
     handle_sync_on_value_based_class(obj, current);
@@ -621,59 +764,48 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
 
   // the current locking is from JNI instead of Java code
   current->set_current_pending_monitor_is_from_java(false);
-  // An async deflation can race after the inflate() call and before
-  // enter() can make the ObjectMonitor busy. enter() returns false if
-  // we have lost the race to async deflation and we simply try again.
-  while (true) {
-    ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_enter);
-    if (monitor->enter(current)) {
-      current->inc_held_monitor_count(1, true);
-      break;
+  if (ObjectMonitorMode::legacy()) {
+    // An async deflation can race after the inflate() call and before
+    // enter() can make the ObjectMonitor busy. enter() returns false if
+    // we have lost the race to async deflation and we simply try again.
+    while (true) {
+      ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_enter);
+      if (monitor->enter(current)) {
+        current->inc_held_monitor_count(1, true);
+        break;
+      }
     }
+  } else {
+    java_jni_enter(obj, current);
   }
   current->set_current_pending_monitor_is_from_java(true);
 }
 
 // NOTE: must use heavy weight monitor to handle jni monitor exit
-void ObjectSynchronizer::jni_exit(oop obj, TRAPS) {
+void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
   JavaThread* current = THREAD;
 
-  // The ObjectMonitor* can't be async deflated until ownership is
-  // dropped inside exit() and the ObjectMonitor* must be !is_busy().
-  ObjectMonitor* monitor = inflate(current, obj, inflate_cause_jni_exit);
-  // If this thread has locked the object, exit the monitor. We
-  // intentionally do not use CHECK on check_owner because we must exit the
-  // monitor even if an exception was already pending.
-  if (monitor->check_owner(THREAD)) {
-    monitor->exit(current);
+  if (ObjectMonitorMode::legacy()) {
+    // The ObjectMonitor* can't be async deflated until ownership is
+    // dropped inside exit() and the ObjectMonitor* must be !is_busy().
+    ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_exit);
+    // If this thread has locked the object, exit the monitor. We
+    // intentionally do not use CHECK on check_owner because we must exit the
+    // monitor even if an exception was already pending.
+    if (monitor->check_owner(THREAD)) {
+      monitor->exit(current);
     current->dec_held_monitor_count(1, true);
+    }
+  } else {
+    java_jni_exit(obj, current);
   }
 }
-
-// -----------------------------------------------------------------------------
-// Internal VM locks on java objects
-// standard constructor, allows locking failures
-ObjectLocker::ObjectLocker(Handle obj, JavaThread* thread) {
-  _thread = thread;
-  _thread->check_for_valid_safepoint_state();
-  _obj = obj;
-
-  if (_obj() != nullptr) {
-    ObjectSynchronizer::enter(_obj, &_lock, _thread);
-  }
-}
-
-ObjectLocker::~ObjectLocker() {
-  if (_obj() != nullptr) {
-    ObjectSynchronizer::exit(_obj(), &_lock, _thread);
-  }
-}
-
 
 // -----------------------------------------------------------------------------
 //  Wait/Notify/NotifyAll
 // NOTE: must use heavy weight monitor to handle wait()
 int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
+  assert(!ObjectMonitorMode::java_only(), "sanity");
   JavaThread* current = THREAD;
   if (millis < 0) {
     THROW_MSG_0(vmSymbols::java_lang_IllegalArgumentException(), "timeout value is negative");
@@ -695,6 +827,7 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
 }
 
 void ObjectSynchronizer::notify(Handle obj, TRAPS) {
+  assert(!ObjectMonitorMode::java_only(), "sanity");
   JavaThread* current = THREAD;
 
   markWord mark = obj->mark();
@@ -710,6 +843,7 @@ void ObjectSynchronizer::notify(Handle obj, TRAPS) {
 
 // NOTE: see comment of notify()
 void ObjectSynchronizer::notifyall(Handle obj, TRAPS) {
+  assert(!ObjectMonitorMode::java_only(), "sanity");
   JavaThread* current = THREAD;
 
   markWord mark = obj->mark();
@@ -721,6 +855,68 @@ void ObjectSynchronizer::notifyall(Handle obj, TRAPS) {
   // dropped by the calling thread.
   ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_notify);
   monitor->notifyAll(CHECK);
+}
+
+// -----------------------------------------------------------------------------
+// Internal VM locks on java objects
+// standard constructor, allows locking failures
+
+#define OBJECT_LOCKER_FRAME_ID 785 //Non-zero, non-valid FP
+
+ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
+  _thread(current), _obj(obj), _do_lock(do_lock), _old_nae(current->no_async_exception()) {
+  _thread->check_for_valid_safepoint_state();
+  _thread->set_no_async_exception(true);
+  if (_obj() != NULL && _do_lock) {
+    if (ObjectMonitorMode::legacy()) {
+      ObjectSynchronizer::enter(_obj, &_lock, _thread);
+    } else {
+      // Weak only restores old exception if there is no exception.
+      // Any exception from enter will thus be kept.
+      WeakPreserveExceptionMark pem(_thread);
+      ObjectSynchronizer::java_enter(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+    }
+  }
+}
+
+ObjectLocker::~ObjectLocker() {
+  if (_obj() != NULL && _do_lock) {
+    if (ObjectMonitorMode::legacy()) {
+      ObjectSynchronizer::exit(_obj(), &_lock, _thread);
+    } else {
+      // Weak only restores old exception if there is no exception.
+      // Any exception from exit will thus be kept.
+      WeakPreserveExceptionMark pem(_thread);
+      ObjectSynchronizer::java_exit(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+    }
+  }
+  _thread->set_no_async_exception(_old_nae);
+}
+
+void ObjectLocker::wait() {  // wait forever
+  assert(_do_lock, "incorrect call to wait() with no locking");
+  if (ObjectMonitorMode::legacy()) {
+    ObjectSynchronizer::wait(_obj, 0, _thread);
+  } else {
+    assert(!_thread->has_pending_exception(), "unexpected pending exception in wait");
+    // Weak only restores old exception if there is no exception.
+    // Any exception from wait will thus be kept.
+    WeakPreserveExceptionMark pem(_thread);
+    ObjectSynchronizer::java_wait(_obj, 0, _thread);
+  }
+}
+
+void ObjectLocker::notify_all() {
+  assert(_do_lock, "incorrect call to wait() with no locking");
+  if (ObjectMonitorMode::legacy()) {
+    ObjectSynchronizer::notifyall(_obj, _thread);
+  } else {
+    assert(!_thread->has_pending_exception(), "unexpected pending exception in notify_all");
+    // Weak only restores old exception if there is no exception.
+    // Any exception from notify will thus be kept.
+    WeakPreserveExceptionMark pem(_thread);
+    ObjectSynchronizer::java_notify_all(_obj, _thread);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -741,6 +937,11 @@ static SharedGlobals GVars;
 
 static markWord read_stable_mark(oop obj) {
   markWord mark = obj->mark_acquire();
+
+  if (ObjectMonitorMode::fast()) {
+    return mark;       // normal fast-path return
+  }
+
   if (!mark.is_being_inflated()) {
     return mark;       // normal fast-path return
   }
@@ -867,7 +1068,9 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
       assert(UseHeavyMonitors, "+VerifyHeavyMonitors requires +UseHeavyMonitors");
       guarantee(!mark.has_locker(), "must not be stack locked");
     }
-    if (mark.is_neutral()) {               // if this is a normal header
+
+    if (mark.is_neutral() ||                           // if this is a normal header
+        ObjectMonitorMode::fast()) {
       hash = mark.hash();
       if (hash != 0) {                     // if it has a hash, just return it
         return hash;
@@ -883,6 +1086,12 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
       // installed the hash just before our attempt or inflation has
       // occurred or... so we fall thru to inflate the monitor for
       // stability and then install the hash.
+
+      // For Java Object Monitors the race can only be with another hash installer
+      // so just loop again.
+      if (ObjectMonitorMode::fast()) {
+        continue;
+      }
     } else if (mark.has_monitor()) {
       monitor = mark.monitor();
       temp = monitor->header();
@@ -970,6 +1179,11 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
 
 bool ObjectSynchronizer::current_thread_holds_lock(JavaThread* current,
                                                    Handle h_obj) {
+
+  if (ObjectMonitorMode::java_only()) {
+    return current_thread_holds_monitor(h_obj, current);
+  }
+
   assert(current == JavaThread::current(), "Can only be called on current thread");
   oop obj = h_obj();
 
@@ -1032,6 +1246,10 @@ JavaThread* ObjectSynchronizer::get_lock_owner(ThreadsList * t_list, Handle h_ob
 // This version of monitors_iterate() works with the in-use monitor list.
 //
 void ObjectSynchronizer::monitors_iterate(MonitorClosure* closure, JavaThread* thread) {
+  // FIXME: Java object monitor will need to record the JNI monitor usage
+  //        to allow this functionality to be implemented.
+  if (ObjectMonitorMode::java_only()) return;
+
   MonitorList::Iterator iter = _in_use_list.iterator();
   while (iter.has_next()) {
     ObjectMonitor* mid = iter.next();
@@ -1059,6 +1277,10 @@ void ObjectSynchronizer::monitors_iterate(MonitorClosure* closure, JavaThread* t
 void ObjectSynchronizer::monitors_iterate(MonitorClosure* closure,
                                           ObjectMonitorsHashtable::PtrList* list,
                                           JavaThread* thread) {
+  // FIXME: Java object monitor will need to record the JNI monitor usage
+  //        to allow this functionality to be implemented.
+  if (ObjectMonitorMode::java_only()) return;
+
   typedef LinkedListIterator<ObjectMonitor*> ObjectMonitorIterator;
   ObjectMonitorIterator iter(list->head());
   while (!iter.is_empty()) {
@@ -1204,6 +1426,12 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
                                            const InflateCause cause) {
   EventJavaMonitorInflate event;
 
+  LogStreamHandle(Trace, monitorinflation) lsh;
+  if (log_is_enabled(Trace, monitorinflation)) {
+    ResourceMark rm(current);
+    lsh.print_cr("inflate entry: object=" INTPTR_FORMAT ", type='%s'", p2i(object), object->klass()->external_name());
+  }
+
   for (;;) {
     const markWord mark = object->mark_acquire();
 
@@ -1215,6 +1443,12 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
 
     // CASE: inflated
     if (mark.has_monitor()) {
+      if (log_is_enabled(Trace, monitorinflation)) {
+        ResourceMark rm;
+        lsh.print_cr("inflate(inflated): object=" INTPTR_FORMAT ", mark="
+                      INTPTR_FORMAT ", type='%s'", p2i(object),
+                      object->mark().value(), object->klass()->external_name());
+      }
       ObjectMonitor* inf = mark.monitor();
       markWord dmw = inf->header();
       assert(dmw.is_neutral(), "invariant: header=" INTPTR_FORMAT, dmw.value());
@@ -1229,6 +1463,9 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
     // We could always eliminate polling by parking the thread on some auxiliary list.
     if (mark == markWord::INFLATING()) {
       read_stable_mark(object);
+      if (log_is_enabled(Trace, monitorinflation)) {
+        lsh.print_cr("inflate(INFLATING): object=" INTPTR_FORMAT, p2i(object));
+      }
       continue;
     }
 
@@ -1242,9 +1479,13 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
     // the interval in which INFLATING appeared in the mark, thus increasing
     // the odds of inflation contention.
 
-    LogStreamHandle(Trace, monitorinflation) lsh;
-
     if (mark.has_locker()) {
+      if (log_is_enabled(Trace, monitorinflation)) {
+        ResourceMark rm(current);
+        lsh.print_cr("inflate(has_locker): start object=" INTPTR_FORMAT ", mark="
+                     INTPTR_FORMAT ", type='%s'", p2i(object),
+                     mark.value(), object->klass()->external_name());
+      }
       ObjectMonitor* m = new ObjectMonitor(object);
       // Optimistically prepare the ObjectMonitor - anticipate successful CAS
       // We do this before the CAS in order to minimize the length of time
@@ -1253,6 +1494,9 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
       markWord cmp = object->cas_set_mark(markWord::INFLATING(), mark);
       if (cmp != mark) {
         delete m;
+        if (log_is_enabled(Trace, monitorinflation)) {
+          lsh.print_cr("inflate(has_locker): interference: object=" INTPTR_FORMAT, p2i(object));
+        }
         continue;       // Interference -- just retry
       }
 
@@ -1317,9 +1561,9 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
       OM_PERFDATA_OP(Inflations, inc());
       if (log_is_enabled(Trace, monitorinflation)) {
         ResourceMark rm(current);
-        lsh.print_cr("inflate(has_locker): object=" INTPTR_FORMAT ", mark="
-                     INTPTR_FORMAT ", type='%s'", p2i(object),
-                     object->mark().value(), object->klass()->external_name());
+        lsh.print_cr("inflate(has_locker): end object=" INTPTR_FORMAT ", mark="
+                     INTPTR_FORMAT ", mid=" INTPTR_FORMAT "type='%s'", p2i(object),
+                     object->mark().value(), p2i(m), object->klass()->external_name());
       }
       if (event.should_commit()) {
         post_monitor_inflate_event(&event, object, cause);
@@ -1336,6 +1580,13 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
     // to inflate and then CAS() again to try to swing _owner from null to current.
     // An inflateTry() method that we could call from enter() would be useful.
 
+    if (log_is_enabled(Trace, monitorinflation)) {
+      ResourceMark rm(current);
+      lsh.print_cr("inflate(neutral): start - object=" INTPTR_FORMAT ", mark="
+                   INTPTR_FORMAT ", type='%s'", p2i(object),
+                   object->mark().value(), object->klass()->external_name());
+    }
+
     // Catch if the object's header is not neutral (not locked and
     // not marked is what we care about here).
     assert(mark.is_neutral(), "invariant: header=" INTPTR_FORMAT, mark.value());
@@ -1346,6 +1597,11 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
     if (object->cas_set_mark(markWord::encode(m), mark) != mark) {
       delete m;
       m = nullptr;
+      if (log_is_enabled(Trace, monitorinflation)) {
+        ResourceMark rm(current);
+        lsh.print_cr("inflate(neutral): abort on interference - object=" INTPTR_FORMAT ,
+                     p2i(object));
+      }
       continue;
       // interference - the markword changed - just retry.
       // The state-transitions are one-way, so there's no chance of
@@ -1361,9 +1617,8 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
     OM_PERFDATA_OP(Inflations, inc());
     if (log_is_enabled(Trace, monitorinflation)) {
       ResourceMark rm(current);
-      lsh.print_cr("inflate(neutral): object=" INTPTR_FORMAT ", mark="
-                   INTPTR_FORMAT ", type='%s'", p2i(object),
-                   object->mark().value(), object->klass()->external_name());
+      lsh.print_cr("inflate(neutral): end - object=" INTPTR_FORMAT ", mid="
+                   INTPTR_FORMAT , p2i(object), p2i(m));
     }
     if (event.should_commit()) {
       post_monitor_inflate_event(&event, object, cause);
@@ -1611,6 +1866,7 @@ const char* ObjectSynchronizer::inflate_cause_name(const InflateCause cause) {
   switch (cause) {
     case inflate_cause_vm_internal:    return "VM Internal";
     case inflate_cause_monitor_enter:  return "Monitor Enter";
+    case inflate_cause_monitor_exit:   return "Monitor Exit";
     case inflate_cause_wait:           return "Monitor Wait";
     case inflate_cause_notify:         return "Monitor Notify";
     case inflate_cause_hash_code:      return "Monitor Hash Code";

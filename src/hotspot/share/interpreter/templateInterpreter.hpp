@@ -111,7 +111,7 @@ class TemplateInterpreter: public AbstractInterpreter {
 
   static address    _throw_StackOverflowError_entry;
 
-  static address    _remove_activation_entry;                   // continuation address if an exception is not handled by current frame
+  static address    _remove_activation_exception_handler_entry;                   // continuation address if an exception is not handled by current frame
   static address    _remove_activation_preserving_args_entry;   // continuation address when current frame is being popped
 
 #ifndef PRODUCT
@@ -124,6 +124,8 @@ class TemplateInterpreter: public AbstractInterpreter {
   static EntryPoint _safept_entry;
 
   static address _invoke_return_entry[number_of_return_addrs];           // for invokestatic, invokespecial, invokevirtual return entries
+  static address _monitor_enter_return_entry;
+  static address _monitor_exit_return_entry;
   static address _invokeinterface_return_entry[number_of_return_addrs];  // for invokeinterface return entries
   static address _invokedynamic_return_entry[number_of_return_addrs];    // for invokedynamic return entries
 
@@ -148,7 +150,7 @@ class TemplateInterpreter: public AbstractInterpreter {
   static address    remove_activation_early_entry(TosState state) { return _earlyret_entry.entry(state); }
   static address    remove_activation_preserving_args_entry()     { return _remove_activation_preserving_args_entry; }
 
-  static address    remove_activation_entry()                   { return _remove_activation_entry; }
+  static address    remove_activation_exception_handler_entry() { return _remove_activation_exception_handler_entry; }
   static address    throw_exception_entry()                     { return _throw_exception_entry; }
   static address    throw_ArithmeticException_entry()           { return _throw_ArithmeticException_entry; }
   static address    throw_NullPointerException_entry()          { return _throw_NullPointerException_entry; }
@@ -167,6 +169,8 @@ class TemplateInterpreter: public AbstractInterpreter {
 
   // Support for invokes
   static address*   invoke_return_entry_table()                 { return _invoke_return_entry; }
+  static address    monitor_enter_return_entry_adr()            { return _monitor_enter_return_entry; }
+  static address    monitor_exit_return_entry_adr()             { return _monitor_exit_return_entry; }
   static address*   invokeinterface_return_entry_table()        { return _invokeinterface_return_entry; }
   static address*   invokedynamic_return_entry_table()          { return _invokedynamic_return_entry; }
   static int        TosState_as_index(TosState state);

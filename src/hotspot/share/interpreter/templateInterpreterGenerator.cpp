@@ -123,6 +123,15 @@ void TemplateInterpreterGenerator::generate_all() {
     }
   }
 
+
+  if (ObjectMonitorMode::java()) {
+    CodeletMark cm(_masm, "monitor return entry points");
+    Interpreter::_monitor_enter_return_entry =
+      generate_return_entry_for_monitor(Bytecodes::length_for(Bytecodes::_monitorenter));
+    Interpreter::_monitor_exit_return_entry =
+      generate_return_entry_for_monitor(Bytecodes::length_for(Bytecodes::_monitorexit));
+  }
+
   { CodeletMark cm(_masm, "earlyret entry points");
     Interpreter::_earlyret_entry =
       EntryPoint(
@@ -204,6 +213,12 @@ void TemplateInterpreterGenerator::generate_all() {
 #if defined(AMD64) || defined(AARCH64) || defined(RISCV64)
   method_entry(java_lang_Thread_currentThread)
 #endif
+#ifdef AMD64
+  method_entry(java_lang_Monitor_getLockState)
+  method_entry(java_lang_Monitor_casLockState)
+  method_entry(java_lang_Object_callerFrameId)
+#endif
+
   AbstractInterpreter::initialize_method_handle_entries();
 
   // all native method kinds (must be one contiguous block)
@@ -436,6 +451,14 @@ address TemplateInterpreterGenerator::generate_method_entry(
 #if defined(AMD64) || defined(AARCH64) || defined(RISCV64)
   case Interpreter::java_lang_Thread_currentThread
                                            : entry_point = generate_currentThread(); break;
+#endif
+#ifdef AMD64
+  case Interpreter::java_lang_Object_callerFrameId
+                                           : entry_point = generate_caller_frame_id(); break;
+  case Interpreter::java_lang_Monitor_getLockState
+                                           : entry_point = generate_get_lock_state(); break;
+  case Interpreter::java_lang_Monitor_casLockState
+                                           : entry_point = generate_cas_lock_state(); break;
 #endif
 
 #ifdef IA32

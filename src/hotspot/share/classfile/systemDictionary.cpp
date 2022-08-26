@@ -513,6 +513,7 @@ InstanceKlass* SystemDictionary::resolve_super_or_fail(Symbol* class_name,
 // The notify allows applications that did an untimed wait() on
 // the classloader object lock to not hang.
 static void double_lock_wait(JavaThread* thread, Handle lockObject) {
+  assert(!ObjectMonitorMode::java_only(), "Unimplemented for Java monitor");
   assert_lock_strong(SystemDictionary_lock);
 
   assert(EnableWaitForParallelLoad,
@@ -939,6 +940,10 @@ InstanceKlass* SystemDictionary::resolve_class_from_stream(
   // Classloaders that support parallelism, e.g. bootstrap classloader,
   // do not acquire lock here
   Handle lockObject = get_loader_lock_or_null(class_loader);
+  if (!is_parallelCapable(class_loader) && log_is_enabled(Debug, class)) {
+    ResourceMark rm(THREAD);
+    log_debug(class)("Lock object for non-parallel loader %s is %s",loader_data->loader_name_and_id(), lockObject.is_null() ? "null" : "not null");
+  }
   ObjectLocker ol(lockObject, THREAD);
 
   // Parse the stream and create a klass.
@@ -1176,7 +1181,7 @@ InstanceKlass* SystemDictionary::load_shared_lambda_proxy_class(InstanceKlass* i
     assert(s->is_shared(), "must be");
   }
 
-  InstanceKlass* loaded_ik = load_shared_class(ik, class_loader, protection_domain, nullptr, pkg_entry, CHECK_NULL);
+  InstanceKlass* loaded_ik = load_shared_class(ik, class_loader, protection_domain, nullptr, pkg_entry, false /* !is_boot_class */, CHECK_NULL);
 
   if (loaded_ik != nullptr) {
     assert(shared_nest_host->is_same_class_package(ik),
@@ -1197,6 +1202,7 @@ InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
                                                    Handle protection_domain,
                                                    const ClassFileStream *cfs,
                                                    PackageEntry* pkg_entry,
+                                                   bool is_boot_class,
                                                    TRAPS) {
   assert(ik != nullptr, "sanity");
   assert(!ik->is_unshareable_info_restored(), "shared class can be loaded only once");
@@ -1238,7 +1244,7 @@ InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
   {
     HandleMark hm(THREAD);
     Handle lockObject = get_loader_lock_or_null(class_loader);
-    ObjectLocker ol(lockObject, THREAD);
+    ObjectLocker ol(lockObject, THREAD, !is_boot_class);
     // prohibited package check assumes all classes loaded from archive call
     // restore_unshareable_info which calls ik->set_package()
     ik->restore_unshareable_info(loader_data, protection_domain, pkg_entry, CHECK_NULL);
@@ -1338,7 +1344,7 @@ InstanceKlass* SystemDictionary::load_instance_class_impl(Symbol* class_name, Ha
       InstanceKlass* ik = SystemDictionaryShared::find_builtin_class(class_name);
       if (ik != nullptr && ik->is_shared_boot_class() && !ik->shared_loading_failed()) {
         SharedClassLoadingMark slm(THREAD, ik);
-        k = load_shared_class(ik, class_loader, Handle(), nullptr,  pkg_entry, CHECK_NULL);
+        k = load_shared_class(ik, class_loader, Handle(), nullptr,  pkg_entry, true /* is_boot_class */, CHECK_NULL);
       }
     }
 #endif
@@ -1456,6 +1462,11 @@ void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_load
 
   // Bootstrap and other parallel classloaders don't acquire a lock,
   // they use placeholder token.
+  if (log_is_enabled(Debug, class)) {
+    ResourceMark rm(THREAD);
+    log_debug(class)("define_instance_class for %s with loader %s", k->external_name(), loader_data->loader_name_and_id());
+  }
+
   // If a parallelCapable class loader calls define_instance_class instead of
   // find_or_define_instance_class to get here, we have a timing
   // hole with systemDictionary updates and check_constraints

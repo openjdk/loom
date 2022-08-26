@@ -56,6 +56,10 @@
   template(java_lang_System,                          "java/lang/System")                         \
   template(java_lang_Object,                          "java/lang/Object")                         \
   template(java_lang_Class,                           "java/lang/Class")                          \
+  template(java_lang_Monitor,                         "java/lang/Monitor")                        \
+  template(java_lang_Monitor$Node,                    "java/lang/Monitor$Node")                   \
+  template(java_lang_Monitor$LockNode,                "java/lang/Monitor$LockNode")               \
+  template(java_lang_Monitor$ConditionNode,           "java/lang/Monitor$ConditionNode")          \
   template(java_lang_Package,                         "java/lang/Package")                        \
   template(java_lang_Module,                          "java/lang/Module")                         \
   template(java_lang_String,                          "java/lang/String")                         \
@@ -386,6 +390,12 @@
   template(asPrimitive_int_signature,                 "(I)Ljava/lang/LiveStackFrame$PrimitiveSlot;") \
   template(asPrimitive_long_signature,                "(J)Ljava/lang/LiveStackFrame$PrimitiveSlot;") \
                                                                                                   \
+  /* Support for dynamic lookup of Java Object Monitor methods */                                                   \
+  template(wait_name,                                 "wait")                                     \
+  template(notify_name,                               "notify")                                   \
+  template(getMonitorPolicy_name,                     "getMonitorPolicy")                         \
+  template(hasLockedObject_name,                      "hasLockedObject")                          \
+                                                                                                  \
   /* common method and field names */                                                             \
   template(object_initializer_name,                   "<init>")                                   \
   template(class_initializer_name,                    "<clinit>")                                 \
@@ -457,7 +467,7 @@
   template(contextClassLoader_name,                   "contextClassLoader")                       \
   template(inheritedAccessControlContext_name,        "inheritedAccessControlContext")            \
   template(getClassContext_name,                      "getClassContext")                          \
-  template(wait_name,                                 "wait0")                                    \
+  template(wait0_name,                                "wait0")                                    \
   template(checkPackageAccess_name,                   "checkPackageAccess")                       \
   template(newInstance0_name,                         "newInstance0")                             \
   template(forName_name,                              "forName")                                  \
@@ -587,7 +597,10 @@
   template(object_void_signature,                     "(Ljava/lang/Object;)V")                    \
   template(object_int_signature,                      "(Ljava/lang/Object;)I")                    \
   template(long_object_long_signature,                "(JLjava/lang/Object;)J")                   \
+  template(object_long_int_signature,                 "(Ljava/lang/Object;J)I")                   \
+  template(object_long_void_signature,                "(Ljava/lang/Object;J)V")                   \
   template(object_boolean_signature,                  "(Ljava/lang/Object;)Z")                    \
+  template(object_thread_boolean_signature,           "(Ljava/lang/Object;Ljava/lang/Thread;)Z")  \
   template(object_object_signature,                   "(Ljava/lang/Object;)Ljava/lang/Object;")   \
   template(string_void_signature,                     "(Ljava/lang/String;)V")                    \
   template(string_int_signature,                      "(Ljava/lang/String;)I")                    \
@@ -608,6 +621,8 @@
   template(thread_void_signature,                     "(Ljava/lang/Thread;)V")                                    \
   template(runnable_void_signature,                   "(Ljava/lang/Runnable;)V")                                   \
   template(threadgroup_runnable_void_signature,       "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;)V")           \
+  template(threadgroup_void_void_signature,           "(Ljava/lang/ThreadGroup;Ljava/lang/Void;)V")               \
+  template(threadgroup_void_signature,                "(Ljava/lang/ThreadGroup;)V")                                \
   template(threadgroup_string_void_signature,         "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V")             \
   template(void_threadgroup_array_signature,          "()[Ljava/lang/ThreadGroup;")                               \
   template(string_class_signature,                    "(Ljava/lang/String;)Ljava/lang/Class;")                    \

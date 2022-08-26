@@ -29,6 +29,7 @@
 #include "classfile/classLoader.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/javaThreadStatus.hpp"
+#include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
@@ -363,10 +364,62 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // initialize the hardware-specific constants needed by Unsafe
   initialize_class(vmSymbols::jdk_internal_misc_UnsafeConstants(), CHECK);
   jdk_internal_misc_UnsafeConstants::set_unsafe_constants();
+  
+  assert(Threads::number_of_threads() == 1, "must be");
+
+  // With Java monitors we have to perform lock-free initialization of all classes
+  // needed within the implementation of the Monitor class before we can actually
+  // use that class for synchronization. In addition no Java code executed so far can
+  // have use synchronized blocks or methods.
+  if (ObjectMonitorMode::java_only()) {
+    log_info(class, init)("Continuing initialize_java_lang_classes with Monitor and related classes");
+    initialize_class(vmSymbols::java_lang_Monitor(), CHECK);
+    // Initialization of Monitor also initializes its nested types (including Inflater) and
+    // MonitorMap, but we need the classes used by those classes to also be initialized. This
+    // list is determined via a jdeps-like analysis. We can elide classes already known to be
+    // initialized, as well as those already initialized by initializing one of the below.
+    const char* classes[] = { "java/lang/MonitorMap$ReservationNode",
+                              "java/lang/MonitorMap$ForwardingNode",
+                              "java/lang/MonitorMap$Traverser",
+                              "java/lang/MonitorMap$TreeBin",
+                              "java/lang/MonitorMap$TreeNode",
+                              "java/lang/MonitorMap$CounterCell",
+                              "java/lang/MonitorMap$Helpers",
+                              "java/lang/MonitorMap$TableStack",
+                              "java/lang/Monitor$ObjectRef$1",
+                              "java/lang/Runnable",
+                              "jdk/internal/ref/Cleaner",  // initializes a few other j.u.c classes
+                              "java/util/concurrent/locks/LockSupport",
+                              "java/util/concurrent/locks/AbstractQueuedSynchronizer$ExclusiveNode",
+                              // I don't think the following are actually used via the inflation process
+                              // but it is tedious to determine that for sure.
+                              "java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject",
+                              "java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionNode",
+                              "java/util/concurrent/locks/AbstractQueuedSynchronizer$SharedNode",
+                              "java/util/concurrent/locks/Condition",
+                              "java/util/concurrent/locks/Lock",
+                              nullptr,
+    };
+    for (const char** cls = &classes[0]; *cls != nullptr; cls++) {
+      log_info(class, init)("  - Start direct initialization of: %s", *cls);
+      initialize_class(SymbolTable::new_symbol(*cls), CHECK);
+      log_info(class, init)("  - End   direct initialization of: %s", *cls);
+    }
+  }
 
   // The VM preresolves methods to these classes. Make sure that they get initialized
   initialize_class(vmSymbols::java_lang_reflect_Method(), CHECK);
   initialize_class(vmSymbols::java_lang_ref_Finalizer(), CHECK);
+  
+  // initPhase1 will now start the ReferenceHandler thread as its first action, so we have
+  // to reenable synchronization before that happens.
+  log_info(class, init)("Continuing initialize_jaava_lang_classes by re-enabling synchronization");
+  assert(!java_lang_Object::sync_enabled(), "must be disabled %x", (int) java_lang_Object::sync_enabled());
+  java_lang_Object::set_sync_enabled();
+  assert(java_lang_Object::sync_enabled(), "Didn't work! %x", (int) java_lang_Object::sync_enabled());
+
+  log_info(class, init)("Continuing initialize_java_lang_classes with call_initPhase1");
+  // Phase 1 of the system initialization in the library, java.lang.System class initialization
 
   // Phase 1 of the system initialization in the library, java.lang.System class initialization
   call_initPhase1(CHECK);

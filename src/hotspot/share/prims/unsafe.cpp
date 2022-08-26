@@ -800,6 +800,56 @@ UNSAFE_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) 
 
 } UNSAFE_END
 
+UNSAFE_ENTRY(void, Unsafe_UnparkMonitor(JNIEnv *env, jobject unsafe, jobject jthread)) {
+  // Unparking the first waiter is racy as the monitor is already unlocked
+  // before we do this, so another thread may acquire and release the monitor
+  // and unpark the same first-waiter before we get here. That first-waiter
+  // may have terminated before we get here.
+  ParkEvent* p = NULL;
+  if (jthread != NULL) {
+    ThreadsListHandle tlh(thread);
+    JavaThread* thr = NULL;
+    oop java_thread = NULL;
+    (void) tlh.cv_internal_thread_to_JavaThread(jthread, &thr, &java_thread);
+    if (java_thread != NULL) {
+      // This is a valid oop.
+      if (thr != NULL) {
+        // The JavaThread is alive.
+        p = thr->_ParkEvent;
+      }
+    }
+  } // ThreadsListHandle is destroyed here.
+
+  // 'p' points to type-stable-memory if non-NULL. If the target
+  // thread terminates before we get here the new user of this
+  // ParkEvent will get a 'spurious' unpark - which is perfectly valid.
+  if (p != NULL) {
+    p->unpark();
+  }
+} UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_ParkMonitor(JNIEnv *env, jobject unsafe)) {
+  jint sj = thread->current_system_java();
+  thread->set_system_java(0);
+  {
+    ThreadBlockInVM tbivm(thread, true);
+    thread->_ParkEvent->park();
+  }
+  thread->set_system_java(sj);
+} UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_ParkMonitorNanos(JNIEnv *env, jobject unsafe, jlong nanos)) {
+  jint sj = thread->current_system_java();
+  thread->set_system_java(0);
+  {
+    ThreadBlockInVM tbivm(thread, true);
+    // FIXME: we have a millis -> nanos -> millis -> nanos conversion chain
+    // from Object.wait() through to e.g. pthread_cond_wait
+    thread->_ParkEvent->park(nanos/1000000LL);
+  }
+  thread->set_system_java(sj);
+} UNSAFE_END
+
 UNSAFE_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleArray loadavg, jint nelem)) {
   const int max_nelem = 3;
   double la[max_nelem];
@@ -835,6 +885,7 @@ UNSAFE_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleAr
 #define CLS LANG "Class;"
 #define FLD LANG "reflect/Field;"
 #define THR LANG "Throwable;"
+#define THD LANG "Thread;"
 
 #define DC_Args  LANG "String;[BII" LANG "ClassLoader;" "Ljava/security/ProtectionDomain;"
 #define DAC_Args CLS "[B[" OBJ
@@ -890,6 +941,10 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
 
     {CC "park",               CC "(ZJ)V",                FN_PTR(Unsafe_Park)},
     {CC "unpark",             CC "(" OBJ ")V",           FN_PTR(Unsafe_Unpark)},
+
+    {CC "parkMonitor",        CC "()V",                  FN_PTR(Unsafe_ParkMonitor)},
+    {CC "parkMonitorNanos",   CC "(J)V",                 FN_PTR(Unsafe_ParkMonitorNanos)},
+    {CC "unparkMonitor",      CC "(" THD ")V",           FN_PTR(Unsafe_UnparkMonitor)},
 
     {CC "getLoadAverage0",    CC "([DI)I",               FN_PTR(Unsafe_GetLoadAverage0)},
 
