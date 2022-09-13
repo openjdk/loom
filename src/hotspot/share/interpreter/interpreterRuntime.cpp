@@ -371,6 +371,12 @@ JRT_ENTRY(void, InterpreterRuntime::throw_StackOverflowError(JavaThread* current
                                  CHECK);
   // Increment counter for hs_err file reporting
   Atomic::inc(&Exceptions::_stack_overflow_errors);
+  // Remove the ExtentLocal cache in case we got a StackOverflowError
+  // while we were trying to remove ExtentLocal bindings.
+  current->set_extentLocalCache(NULL);
+  // And the ExtentLocal bindings too.
+  oop threadObj = current->vthread();
+  java_lang_Thread::clear_extentLocalBindings(threadObj);
   THROW_HANDLE(exception);
 JRT_END
 
@@ -382,6 +388,12 @@ JRT_ENTRY(void, InterpreterRuntime::throw_delayed_StackOverflowError(JavaThread*
           Universe::delayed_stack_overflow_error_message());
   // Increment counter for hs_err file reporting
   Atomic::inc(&Exceptions::_stack_overflow_errors);
+  // Remove the ExtentLocal cache in case we got a StackOverflowError
+  // while we were trying to remove ExtentLocal bindings.
+  current->set_extentLocalCache(NULL);
+  // And the ExtentLocal bindings too.
+  oop threadObj = current->vthread();
+  java_lang_Thread::clear_extentLocalBindings(threadObj);
   THROW_HANDLE(exception);
 JRT_END
 

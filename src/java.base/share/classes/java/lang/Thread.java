@@ -275,10 +275,14 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
+    private static final Object noExtentLocalBindings = new Object();
+
     /*
      * Extent locals binding are maintained by the ExtentLocal class.
      */
-    private Object extentLocalBindings;
+    private Object extentLocalBindings = noExtentLocalBindings;
+
+    static Object noExtentLocalBindings() { return Thread.noExtentLocalBindings; }
 
     static Object extentLocalBindings() {
         return currentThread().extentLocalBindings;
@@ -287,6 +291,12 @@ public class Thread implements Runnable {
     static void setExtentLocalBindings(Object bindings) {
         currentThread().extentLocalBindings = bindings;
     }
+
+    /**
+     * Search the stack for the most recent extent-local bindings.
+     */
+    @IntrinsicCandidate
+    static native Object findExtentLocalBindings();
 
     /**
      * Inherit the extent-local bindings from the given container.
@@ -1586,7 +1596,9 @@ public class Thread implements Runnable {
     public void run() {
         Runnable task = holder.task;
         if (task != null) {
+            var snapshot = extentLocalBindings();
             task.run();
+            java.lang.ref.Reference.reachabilityFence(snapshot);
         }
     }
 

@@ -28,6 +28,7 @@ package jdk.incubator.concurrent;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.lang.ref.Reference;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -158,6 +159,9 @@ public final class ExtentLocal<T> {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     private final @Stable int hash;
+
+    private static final Object NO_EXTENT_LOCAL_BINDINGS
+        = JLA.noExtentLocalBindings();
 
     @Override
     public int hashCode() { return hash; }
@@ -326,16 +330,22 @@ public final class ExtentLocal<T> {
         public <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            var prevBindings = addExtentLocalBindings(this);
+            var prevSnapshot = extentLocalBindings();
+            var newSnapshot = new Snapshot(this, prevSnapshot);
+            R result;
             try {
-                return ExtentLocalContainer.call(op);
+                JLA.setExtentLocalBindings(newSnapshot);
+                result = ExtentLocalContainer.call(op);
             } catch (Throwable t) {
                 setExtentLocalCache(null); // Cache.invalidate();
+                Reference.reachabilityFence(newSnapshot);
                 throw t;
             } finally {
-                setExtentLocalBindings(prevBindings);
+                JLA.setExtentLocalBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
+            Reference.reachabilityFence(newSnapshot);
+            return result;
         }
 
         /**
@@ -355,16 +365,19 @@ public final class ExtentLocal<T> {
         public void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            var prevBindings = addExtentLocalBindings(this);
+            var prevSnapshot = extentLocalBindings();
+            var newSnapshot = new Snapshot(this, prevSnapshot);
             try {
+                JLA.setExtentLocalBindings(newSnapshot);
                 ExtentLocalContainer.run(op);
             } catch (Throwable t) {
                 setExtentLocalCache(null); // Cache.invalidate();
                 throw t;
             } finally {
-                setExtentLocalBindings(prevBindings);
+                JLA.setExtentLocalBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
+            Reference.reachabilityFence(newSnapshot);
         }
 
         /*
@@ -373,7 +386,7 @@ public final class ExtentLocal<T> {
         private static final Snapshot addExtentLocalBindings(Carrier bindings) {
             Snapshot prev = extentLocalBindings();
             var b = new Snapshot(bindings, prev);
-            ExtentLocal.setExtentLocalBindings(b);
+            JLA.setExtentLocalBindings(b);
             return prev;
         }
     }
@@ -538,16 +551,17 @@ public final class ExtentLocal<T> {
 
     private static Snapshot extentLocalBindings() {
         Object bindings = JLA.extentLocalBindings();
-        if (bindings != null) {
-            return (Snapshot) bindings;
-        } else {
-            return EmptySnapshot.getInstance();
+        if (bindings == NO_EXTENT_LOCAL_BINDINGS) {
+            // This must be a new thread
+            JLA.setExtentLocalBindings(bindings = EmptySnapshot.getInstance());
+        } else if (bindings == null) {
+            // Search the stack
+            JLA.setExtentLocalBindings(bindings = JLA.findExtentLocalBindings());
         }
+        assert (bindings != null);
+        return (Snapshot) bindings;
     }
 
-    private static void setExtentLocalBindings(Snapshot bindings) {
-        JLA.setExtentLocalBindings(bindings);
-    }
 
     private static int nextKey = 0xf0f0_f0f0;
 
@@ -663,6 +677,11 @@ public final class ExtentLocal<T> {
             cache[n * 2 + 1] = value;
         }
 
+        private static void setKeyAndObjectAt(Object[] cache, int n, Object key, Object value) {
+            cache[n * 2] = key;
+            cache[n * 2 + 1] = value;
+        }
+
         private static Object getKey(Object[] objs, int n) {
             return objs[n * 2];
         }
@@ -696,7 +715,7 @@ public final class ExtentLocal<T> {
             if ((objects = extentLocalCache()) != null) {
                 for (int bits = toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
-                    setKeyAndObjectAt(index & SLOT_MASK, null, null);
+                    setKeyAndObjectAt(objects, index & SLOT_MASK, null, null);
                     bits &= ~1 << index;
                 }
             }

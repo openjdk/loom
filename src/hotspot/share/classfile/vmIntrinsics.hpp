@@ -261,7 +261,7 @@ class methodHandle;
   do_intrinsic(_identityHashCode,         java_lang_System,       identityHashCode_name, object_int_signature,   F_SN)  \
    do_name(     identityHashCode_name,                           "identityHashCode")                                    \
   do_intrinsic(_currentTimeMillis,        java_lang_System,       currentTimeMillis_name, void_long_signature,   F_SN)  \
-                                                                                                                       \
+                                                                                                                        \
    do_name(     currentTimeMillis_name,                          "currentTimeMillis")                                   \
   do_intrinsic(_nanoTime,                 java_lang_System,       nanoTime_name,          void_long_signature,   F_SN)  \
    do_name(     nanoTime_name,                                   "nanoTime")                                            \
@@ -277,12 +277,15 @@ class methodHandle;
   do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,   F_SN)  \
    do_name(     currentThread_name,                              "currentThread")                                       \
    do_signature(currentThread_signature,                         "()Ljava/lang/Thread;")                                \
-  do_intrinsic(_extentLocalCache,          java_lang_Thread,       extentLocalCache_name, extentLocalCache_signature, F_SN) \
-   do_name(     extentLocalCache_name,                            "extentLocalCache")                                     \
-   do_signature(extentLocalCache_signature,                       "()[Ljava/lang/Object;")                               \
-  do_intrinsic(_setExtentLocalCache,       java_lang_Thread,       setExtentLocalCache_name, setExtentLocalCache_signature, F_SN) \
-   do_name(     setExtentLocalCache_name,                         "setExtentLocalCache")                                  \
-   do_signature(setExtentLocalCache_signature,                    "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_extentLocalCache,         java_lang_Thread,       extentLocalCache_name, extentLocalCache_signature, F_SN) \
+   do_name(     extentLocalCache_name,                           "extentLocalCache")                                    \
+   do_signature(extentLocalCache_signature,                      "()[Ljava/lang/Object;")                               \
+  do_intrinsic(_setExtentLocalCache,      java_lang_Thread,       setExtentLocalCache_name, setExtentLocalCache_signature, F_SN) \
+   do_name(     setExtentLocalCache_name,                        "setExtentLocalCache")                                 \
+   do_signature(setExtentLocalCache_signature,                   "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_findExtentLocalBindings,  java_lang_Thread,       findExtentLocalBindings_name, void_object_signature, F_SN) \
+   do_name(     findExtentLocalBindings_name,                    "findExtentLocalBindings")                             \
+                                                                                                                        \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
                                                                                                                         \

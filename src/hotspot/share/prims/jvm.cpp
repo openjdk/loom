@@ -1364,6 +1364,47 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
 JVM_END
 
 
+JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
+  ResourceMark rm(THREAD);
+  GrowableArray<Handle>* local_array = new GrowableArray<Handle>(12);
+  JvmtiVMObjectAllocEventCollector oam;
+
+  bool found = false;
+
+  static Symbol *Carrier_name = vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier();
+  static Klass *k = SystemDictionary::resolve_or_fail(Carrier_name, true, CHECK_NULL);
+  static InstanceKlass* Carrier_klass = InstanceKlass::cast(k);
+
+  // Iterate through Java frames
+  vframeStream vfst(thread);
+  for(; !vfst.at_end(); vfst.next()) {
+    int loc = 0;
+    // get method of frame
+    Method* method = vfst.method();
+
+    Symbol *name = method->name();
+    InstanceKlass *holder = method->method_holder();
+    if (holder == Carrier_klass &&
+        (name == vmSymbols::run_method_name() || name == vmSymbols::call_method_name())) {
+      loc = 3;
+    } else if (holder == vmClasses::Thread_klass()
+               && name == vmSymbols::run_method_name()) {
+      loc = 2;
+    }
+
+    if (loc != 0) {
+      javaVFrame *frame = vfst.asJavaVFrame();
+      StackValueCollection* locals = frame->locals();
+      StackValue* head_sv = locals->at(loc); // jdk/incubator/concurrent/ExtentLocal$Snapshot
+      assert(!head_sv->obj_is_scalar_replaced(), "found scalar-replaced object");
+      Handle result = head_sv->get_obj();
+      return JNIHandles::make_local(THREAD, result());
+    }
+  }
+
+  return NULL;
+JVM_END
+
 JVM_ENTRY(jboolean, JVM_IsArrayClass(JNIEnv *env, jclass cls))
   Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls));
   return (k != NULL) && k->is_array_klass() ? true : false;
