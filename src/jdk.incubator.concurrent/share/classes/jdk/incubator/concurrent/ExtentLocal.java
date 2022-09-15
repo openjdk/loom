@@ -335,6 +335,7 @@ public final class ExtentLocal<T> {
             R result;
             try {
                 JLA.setExtentLocalBindings(newSnapshot);
+                ensureMaterializedForStackWalk(newSnapshot);
                 result = ExtentLocalContainer.call(op);
             } catch (Throwable t) {
                 setExtentLocalCache(null); // Cache.invalidate();
@@ -369,6 +370,7 @@ public final class ExtentLocal<T> {
             var newSnapshot = new Snapshot(this, prevSnapshot);
             try {
                 JLA.setExtentLocalBindings(newSnapshot);
+                ensureMaterializedForStackWalk(newSnapshot);
                 ExtentLocalContainer.run(op);
             } catch (Throwable t) {
                 setExtentLocalCache(null); // Cache.invalidate();
@@ -562,6 +564,7 @@ public final class ExtentLocal<T> {
         return (Snapshot) bindings;
     }
 
+    private static native void ensureMaterializedForStackWalk(Object o);
 
     private static int nextKey = 0xf0f0_f0f0;
 
@@ -720,5 +723,9 @@ public final class ExtentLocal<T> {
                 }
             }
         }
+    }
+
+    static {
+        System.loadLibrary("conc_ext");
     }
 }
