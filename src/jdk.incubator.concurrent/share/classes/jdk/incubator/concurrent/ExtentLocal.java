@@ -381,16 +381,6 @@ public final class ExtentLocal<T> {
             }
             Reference.reachabilityFence(newSnapshot);
         }
-
-        /*
-         * Add a list of bindings to the current Thread's set of bound values.
-         */
-        private static final Snapshot addExtentLocalBindings(Carrier bindings) {
-            Snapshot prev = extentLocalBindings();
-            var b = new Snapshot(bindings, prev);
-            JLA.setExtentLocalBindings(b);
-            return prev;
-        }
     }
 
     /**
