@@ -60,7 +60,6 @@ JVM_DumpThreads
 JVM_FillInStackTrace
 JVM_FindClassFromCaller
 JVM_FindClassFromClass
-JVM_FindExtentLocalBindings
 JVM_FindLibraryEntry
 JVM_FindLoadedClass
 JVM_FindPrimitiveClass

@@ -408,6 +408,9 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     static native void setExtentLocalCache(Object[] cache);
 
+    // @IntrinsicCandidate
+    private static native void ensureMaterializedForStackWalk(Object o);
+
     /**
      * A hint to the scheduler that the current thread is willing to yield
      * its current use of a processor. The scheduler is free to ignore this
@@ -1597,6 +1600,7 @@ public class Thread implements Runnable {
         Runnable task = holder.task;
         if (task != null) {
             var snapshot = extentLocalBindings();
+            ensureMaterializedForStackWalk(snapshot);
             task.run();
             java.lang.ref.Reference.reachabilityFence(snapshot);
         }

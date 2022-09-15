@@ -4100,3 +4100,12 @@ JVM_ENTRY(jint, JVM_GetClassFileVersion(JNIEnv* env, jclass current))
   InstanceKlass* ik = InstanceKlass::cast(c);
   return (ik->minor_version() << 16) | ik->major_version();
 JVM_END
+
+/*
+ * Ensure that code doing a stackwalk and using javaVFrame::locals() to
+ * get the value will see a materialized value and not a scalar-replaced
+ * null value.
+ */
+JVM_ENTRY(void, JVM_EnsureMaterializedForStackWalk_func(JNIEnv* env, jobject vthread, jobject value))
+  JVM_EnsureMaterializedForStackWalk(env, value);
+JVM_END
