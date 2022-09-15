@@ -408,8 +408,8 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     static native void setExtentLocalCache(Object[] cache);
 
-    // @IntrinsicCandidate
-    private static native void ensureMaterializedForStackWalk(Object o);
+    @IntrinsicCandidate
+    static native void ensureMaterializedForStackWalk(Object o);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
