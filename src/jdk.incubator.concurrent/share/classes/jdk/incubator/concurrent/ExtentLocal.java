@@ -542,6 +542,17 @@ public final class ExtentLocal<T> {
     }
 
     private static Snapshot extentLocalBindings() {
+        // Bindings can be in one of four states:
+        //
+        // 1: NO_EXTENT_LOCAL_BINDINGS: this is a new Thread instance, and no
+        // extent locals have ever been bound in this Thread.
+        // 2: EmptySnapshot.SINGLETON: This is effectively an empty binding.
+        // 3: A Snapshot instance: this contains one or more extent local
+        // bindings.
+        // 4: null: there may be some bindings in this Thread, but we don't know
+        // where they are. We must invoke JLA.findExtentLocalBindings() to find
+        // them. findExtentLocalBindings() should never return null.
+
         Object bindings = JLA.extentLocalBindings();
         if (bindings == NO_EXTENT_LOCAL_BINDINGS) {
             // This must be a new thread
