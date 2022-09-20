@@ -494,8 +494,6 @@ public interface JavaLangAccess {
      */
     void setExtentLocalBindings(Object bindings);
 
-    Object noExtentLocalBindings();
-
     Object findExtentLocalBindings();
 
     void ensureMaterializedForStackWalk(Object value);

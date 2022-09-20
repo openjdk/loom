@@ -1371,8 +1371,8 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
 
   bool found = false;
 
-  static Symbol *Carrier_name = vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier();
-  static Klass *k = SystemDictionary::resolve_or_fail(Carrier_name, true, CHECK_NULL);
+  static Klass *k = SystemDictionary::resolve_or_fail
+    (vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier(), true, CHECK_NULL);
   static InstanceKlass* Carrier_klass = InstanceKlass::cast(k);
 
   // Iterate through Java frames
@@ -1386,7 +1386,7 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
     InstanceKlass *holder = method->method_holder();
     if (holder == Carrier_klass &&
         (name == vmSymbols::run_method_name() || name == vmSymbols::call_method_name())) {
-      loc = 3;
+      loc = 2;
     } else if (holder == vmClasses::Thread_klass()
                && name == vmSymbols::run_method_name()) {
       loc = 2;
@@ -1396,9 +1396,11 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
       javaVFrame *frame = vfst.asJavaVFrame();
       StackValueCollection* locals = frame->locals();
       StackValue* head_sv = locals->at(loc); // jdk/incubator/concurrent/ExtentLocal$Snapshot
-      assert(!head_sv->obj_is_scalar_replaced(), "found scalar-replaced object");
       Handle result = head_sv->get_obj();
-      return JNIHandles::make_local(THREAD, result());
+      assert(!head_sv->obj_is_scalar_replaced(), "found scalar-replaced object");
+      if (result() != NULL) {
+        return JNIHandles::make_local(THREAD, result());
+      }
     }
   }
 
@@ -4107,5 +4109,6 @@ JVM_END
  * null value.
  */
 JVM_ENTRY(void, JVM_EnsureMaterializedForStackWalk_func(JNIEnv* env, jobject vthread, jobject value))
+  asm("nop");
   JVM_EnsureMaterializedForStackWalk(env, value);
 JVM_END

@@ -275,14 +275,10 @@ public class Thread implements Runnable {
      */
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
-    private static final Object noExtentLocalBindings = new Object();
-
     /*
      * Extent locals binding are maintained by the ExtentLocal class.
      */
-    private Object extentLocalBindings = noExtentLocalBindings;
-
-    static Object noExtentLocalBindings() { return Thread.noExtentLocalBindings; }
+    private Object extentLocalBindings;
 
     static Object extentLocalBindings() {
         return currentThread().extentLocalBindings;
@@ -738,6 +734,7 @@ public class Thread implements Runnable {
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
         }
+        this.extentLocalBindings = Thread.class;
     }
 
     /**
@@ -785,6 +782,7 @@ public class Thread implements Runnable {
         } else {
             this.holder = null;
         }
+        this.extentLocalBindings = Thread.class;
     }
 
     /**

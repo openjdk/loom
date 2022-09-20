@@ -160,9 +160,6 @@ public final class ExtentLocal<T> {
 
     private final @Stable int hash;
 
-    private static final Object NO_EXTENT_LOCAL_BINDINGS
-        = JLA.noExtentLocalBindings();
-
     @Override
     public int hashCode() { return hash; }
 
@@ -337,15 +334,11 @@ public final class ExtentLocal<T> {
                 JLA.setExtentLocalBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
                 result = ExtentLocalContainer.call(op);
-            } catch (Throwable t) {
-                setExtentLocalCache(null); // Cache.invalidate();
-                Reference.reachabilityFence(newSnapshot);
-                throw t;
             } finally {
+                Reference.reachabilityFence(newSnapshot);
                 JLA.setExtentLocalBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
-            Reference.reachabilityFence(newSnapshot);
             return result;
         }
 
@@ -366,20 +359,19 @@ public final class ExtentLocal<T> {
         public void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
+            Snapshot newSnapshot = null;
+            JLA.ensureMaterializedForStackWalk(newSnapshot);
             var prevSnapshot = extentLocalBindings();
-            var newSnapshot = new Snapshot(this, prevSnapshot);
+            newSnapshot = new Snapshot(this, prevSnapshot);
             try {
                 JLA.setExtentLocalBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
                 ExtentLocalContainer.run(op);
-            } catch (Throwable t) {
-                setExtentLocalCache(null); // Cache.invalidate();
-                throw t;
             } finally {
+                Reference.reachabilityFence(newSnapshot);
                 JLA.setExtentLocalBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
-            Reference.reachabilityFence(newSnapshot);
         }
     }
 
@@ -544,22 +536,27 @@ public final class ExtentLocal<T> {
     private static Snapshot extentLocalBindings() {
         // Bindings can be in one of four states:
         //
-        // 1: NO_EXTENT_LOCAL_BINDINGS: this is a new Thread instance, and no
+        // 1: class Thread: this is a new Thread instance, and no
         // extent locals have ever been bound in this Thread.
         // 2: EmptySnapshot.SINGLETON: This is effectively an empty binding.
         // 3: A Snapshot instance: this contains one or more extent local
         // bindings.
         // 4: null: there may be some bindings in this Thread, but we don't know
-        // where they are. We must invoke JLA.findExtentLocalBindings() to find
-        // them. findExtentLocalBindings() should never return null.
+        // where they are. We must invoke JLA.findExtentLocalBindings() to walk
+        // the stack to find them.
 
         Object bindings = JLA.extentLocalBindings();
-        if (bindings == NO_EXTENT_LOCAL_BINDINGS) {
+        if (bindings == Thread.class) {
             // This must be a new thread
-            JLA.setExtentLocalBindings(bindings = EmptySnapshot.getInstance());
-        } else if (bindings == null) {
+           return EmptySnapshot.getInstance();
+        }
+        if (bindings == null) {
             // Search the stack
-            JLA.setExtentLocalBindings(bindings = JLA.findExtentLocalBindings());
+            bindings = JLA.findExtentLocalBindings();
+            if (bindings == null) {
+                // Nothing on the stack.
+                return EmptySnapshot.getInstance();
+            }
         }
         assert (bindings != null);
         return (Snapshot) bindings;

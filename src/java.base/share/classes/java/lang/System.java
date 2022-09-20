@@ -2590,10 +2590,6 @@ public final class System {
                 return Thread.findExtentLocalBindings();
             }
 
-            public Object noExtentLocalBindings() {
-                return Thread.noExtentLocalBindings();
-            }
-
             public void setExtentLocalBindings(Object bindings) {
                 Thread.setExtentLocalBindings(bindings);
             }
