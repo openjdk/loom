@@ -562,8 +562,6 @@ public final class ExtentLocal<T> {
         return (Snapshot) bindings;
     }
 
-    private static native void ensureMaterializedForStackWalk(Object o);
-
     private static int nextKey = 0xf0f0_f0f0;
 
     // A Marsaglia xor-shift generator used to generate hashes. This one has full period, so
