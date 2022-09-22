@@ -283,11 +283,14 @@ final class VirtualThread extends BaseVirtualThread {
             event.commit();
         }
 
+        var snapshot = extentLocalBindings();
+        ensureMaterializedForStackWalk(snapshot);
         try {
             task.run();
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
+            java.lang.ref.Reference.reachabilityFence(snapshot);
             try {
 
                 // pop any remaining scopes from the stack, this may block
