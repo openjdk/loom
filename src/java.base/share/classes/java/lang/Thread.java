@@ -289,6 +289,12 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Search the stack for the most recent extent-local bindings.
+     */
+    @IntrinsicCandidate
+    static native Object findExtentLocalBindings();
+
+    /**
      * Inherit the extent-local bindings from the given container.
      * Invoked when starting a thread.
      */
@@ -397,6 +403,9 @@ public class Thread implements Runnable {
 
     @IntrinsicCandidate
     static native void setExtentLocalCache(Object[] cache);
+
+    @IntrinsicCandidate
+    static native void ensureMaterializedForStackWalk(Object o);
 
     /**
      * A hint to the scheduler that the current thread is willing to yield
@@ -725,6 +734,7 @@ public class Thread implements Runnable {
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
         }
+        this.extentLocalBindings = Thread.class;
     }
 
     /**
@@ -772,6 +782,7 @@ public class Thread implements Runnable {
         } else {
             this.holder = null;
         }
+        this.extentLocalBindings = Thread.class;
     }
 
     /**
@@ -1586,7 +1597,10 @@ public class Thread implements Runnable {
     public void run() {
         Runnable task = holder.task;
         if (task != null) {
+            var snapshot = extentLocalBindings();
+            ensureMaterializedForStackWalk(snapshot);
             task.run();
+            java.lang.ref.Reference.reachabilityFence(snapshot);
         }
     }
 

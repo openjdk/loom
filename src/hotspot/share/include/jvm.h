@@ -324,6 +324,9 @@ JVM_ExtentLocalCache(JNIEnv *env, jclass threadClass);
 JNIEXPORT void JNICALL
 JVM_SetExtentLocalCache(JNIEnv *env, jclass threadClass, jobject theCache);
 
+JNIEXPORT jobject JNICALL
+JVM_FindExtentLocalBindings(JNIEnv *env, jclass threadClass);
+
 JNIEXPORT jlong JNICALL
 JVM_GetNextThreadIdOffset(JNIEnv *env, jclass threadClass);
 
@@ -751,6 +754,8 @@ JVM_GetInheritedAccessControlContext(JNIEnv *env, jclass cls);
 #define JVM_EnsureMaterializedForStackWalk(env, value) \
     do {} while(0) // Nothing to do.  The fact that the value escaped
                    // through a native method is enough.
+JNIEXPORT void JNICALL
+JVM_EnsureMaterializedForStackWalk_func(JNIEnv* env, jobject vthread, jobject value);
 
 JNIEXPORT jobject JNICALL
 JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls);

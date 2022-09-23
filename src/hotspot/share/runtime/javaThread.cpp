@@ -1067,17 +1067,18 @@ void JavaThread::handle_async_exception(oop java_throwable) {
     }
   }
 
-  // Only overwrite an already pending exception if it is not a ThreadDeath.
-  if (!has_pending_exception() || !pending_exception()->is_a(vmClasses::ThreadDeath_klass())) {
-
-    // We cannot call Exceptions::_throw(...) here because we cannot block
-    set_pending_exception(java_throwable, __FILE__, __LINE__);
-
+  if (java_throwable->is_a(vmClasses::ThreadDeath_klass())) {
     // Clear any extent-local bindings on ThreadDeath
     set_extentLocalCache(NULL);
     oop threadOop = threadObj();
     assert(threadOop != NULL, "must be");
     java_lang_Thread::clear_extentLocalBindings(threadOop);
+  }
+
+  // Only overwrite an already pending exception if it is not a ThreadDeath.
+  if (!has_pending_exception() || !pending_exception()->is_a(vmClasses::ThreadDeath_klass())) {
+    // We cannot call Exceptions::_throw(...) here because we cannot block
+    set_pending_exception(java_throwable, __FILE__, __LINE__);
 
     LogTarget(Info, exceptions) lt;
     if (lt.is_enabled()) {

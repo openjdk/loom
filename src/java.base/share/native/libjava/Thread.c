@@ -53,9 +53,12 @@ static JNINativeMethod methods[] = {
     {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
     {"getStackTrace0",   "()" OBJ,     (void *)&JVM_GetStackTrace},
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
-    {"extentLocalCache",  "()[" OBJ,    (void *)&JVM_ExtentLocalCache},
+    {"extentLocalCache", "()[" OBJ,    (void *)&JVM_ExtentLocalCache},
     {"setExtentLocalCache", "([" OBJ ")V",(void *)&JVM_SetExtentLocalCache},
-    {"getNextThreadIdOffset", "()J",     (void *)&JVM_GetNextThreadIdOffset}
+    {"getNextThreadIdOffset", "()J",   (void *)&JVM_GetNextThreadIdOffset},
+    {"findExtentLocalBindings", "()" OBJ, (void *)&JVM_FindExtentLocalBindings},
+    {"ensureMaterializedForStackWalk",
+                         "(" OBJ ")V", (void*)&JVM_EnsureMaterializedForStackWalk_func},
 };
 
 #undef THD
