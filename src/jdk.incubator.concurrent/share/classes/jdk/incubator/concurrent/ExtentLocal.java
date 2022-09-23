@@ -720,8 +720,4 @@ public final class ExtentLocal<T> {
             }
         }
     }
-
-    static {
-        System.loadLibrary("conc_ext");
-    }
 }

@@ -1363,6 +1363,25 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   return JNIHandles::make_local(THREAD, result);
 JVM_END
 
+class ExtentLocalBindingsResolver {
+public:
+  InstanceKlass* Carrier_klass;
+  Method *vthread_run_runnable_method;
+  Method *thread_run_method;
+
+  ExtentLocalBindingsResolver(JavaThread* THREAD) {
+    Klass *k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier(), true, THREAD);
+    Carrier_klass = InstanceKlass::cast(k);
+
+    vthread_run_runnable_method = vmClasses::VirtualThread_klass()->find_instance_method
+      (vmSymbols::run_method_name(), vmSymbols::runnable_void_signature(), Klass::PrivateLookupMode::find);
+    guarantee(vthread_run_runnable_method != NULL, "must be");
+
+    thread_run_method = vmClasses::Thread_klass()->find_instance_method
+      (vmSymbols::run_method_name(), vmSymbols::void_method_signature(), Klass::PrivateLookupMode::find);
+    guarantee(thread_run_method != NULL, "must be");
+  }
+};
 
 JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
   ResourceMark rm(THREAD);
@@ -1371,19 +1390,7 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
 
   bool found = false;
 
-  static Klass *k = SystemDictionary::resolve_or_fail
-    (vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier(), true, CHECK_NULL);
-  InstanceKlass* Carrier_klass = InstanceKlass::cast(k);
-
-  static Method *vthread_run_runnable_method
-    = vmClasses::VirtualThread_klass()->find_instance_method
-      (vmSymbols::run_method_name(), vmSymbols::runnable_void_signature(), Klass::PrivateLookupMode::find);
-  assert(vthread_run_runnable_method != NULL, "must be");
-
-  static Method *thread_run_method
-    = vmClasses::Thread_klass()->find_instance_method
-      (vmSymbols::run_method_name(), vmSymbols::void_method_signature(), Klass::PrivateLookupMode::find);
-  assert(thread_run_method != NULL, "must be");
+  static ExtentLocalBindingsResolver resolver(THREAD);
 
   // Iterate through Java frames
   vframeStream vfst(thread);
@@ -1394,12 +1401,12 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
 
     Symbol *name = method->name();
 
-    if (method->method_holder() == Carrier_klass &&
+    if (method->method_holder() == resolver.Carrier_klass &&
         (name == vmSymbols::run_method_name() || name == vmSymbols::call_method_name())) {
       loc = 2;
-    } else if (method == vthread_run_runnable_method) {
+    } else if (method == resolver.vthread_run_runnable_method) {
       loc = 3;
-    } else if (method == thread_run_method) {
+    } else if (method == resolver.thread_run_method) {
       loc = 2;
     }
 
