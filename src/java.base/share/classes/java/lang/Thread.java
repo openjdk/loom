@@ -734,6 +734,8 @@ public class Thread implements Runnable {
                 this.contextClassLoader = ClassLoader.getSystemClassLoader();
             }
         }
+
+        // special value to mean a new thread
         this.extentLocalBindings = Thread.class;
     }
 
@@ -774,6 +776,9 @@ public class Thread implements Runnable {
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
+        // special value to mean a new thread
+        this.extentLocalBindings = Thread.class;
+
         // create a FieldHolder object, needed when bound to an OS thread
         if (bound) {
             ThreadGroup g = Constants.VTHREAD_GROUP;
@@ -782,7 +787,6 @@ public class Thread implements Runnable {
         } else {
             this.holder = null;
         }
-        this.extentLocalBindings = Thread.class;
     }
 
     /**
