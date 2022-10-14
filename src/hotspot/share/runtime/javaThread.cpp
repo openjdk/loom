@@ -1067,13 +1067,11 @@ void JavaThread::handle_async_exception(oop java_throwable) {
   // We cannot call Exceptions::_throw(...) here because we cannot block
   set_pending_exception(java_throwable, __FILE__, __LINE__);
 
-#ifdef EXCLUDE
   // Clear any extent-local bindings
   set_extentLocalCache(NULL);
   oop threadOop = threadObj();
   assert(threadOop != NULL, "must be");
   java_lang_Thread::clear_extentLocalBindings(threadOop);
-#endif
 
   LogTarget(Info, exceptions) lt;
   if (lt.is_enabled()) {
