@@ -191,8 +191,11 @@ oop JavaThread::extentLocalCache() const {
 }
 
 void JavaThread::set_extentLocalCache(oop p) {
-  assert(_thread_oop_storage != NULL, "not yet initialized");
-  _extentLocalCache.replace(p);
+  if (_extentLocalCache.ptr_raw() != NULL) { // i.e. if the OopHandle has been allocated
+    _extentLocalCache.replace(p);
+  } else {
+    assert(p == NULL, "not yet initialized");
+  }
 }
 
 void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name,
