@@ -179,6 +179,11 @@ serviceability/dcmd/thread/PrintTest.java 0000000 generic-all
 serviceability/dcmd/thread/PrintConcurrentLocksTest.java 0000000 generic-all
 
 ####
+# Does not support JVMTI StopThread
+runtime/Thread/StopAtExit.java 0000000 generic-all
+runtime/Thread/AsyncExceptionOnMonitorEnter.java 0000000 generic-all
+
+####
 # TODO check what are the cds issues with vthread
 runtime/cds/serviceability/transformRelatedClasses/TransformSuperAndSubClasses.java 0000000 generic-all
 runtime/cds/serviceability/transformRelatedClasses/TransformSuperSubTwoPckgs.java 0000000 generic-all
@@ -254,6 +259,7 @@ runtime/cds/appcds/WideIloadTest.java 0000000 generic-all
 runtime/cds/appcds/TestParallelGCWithCDS.java 0000000 generic-all
 runtime/cds/appcds/VerifyObjArrayCloneTest.java 0000000 generic-all
 runtime/cds/appcds/XShareAutoWithChangedJar.java 0000000 generic-all
+runtime/cds/appcds/cacheObject/ArchiveHeapTestClass.java 0000000 generic-all
 runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java 0000000 generic-all
 runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java 0000000 generic-all
 runtime/cds/appcds/cacheObject/ArchivedModuleCompareTest.java 0000000 generic-all

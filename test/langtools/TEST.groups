@@ -79,7 +79,7 @@ tier1 = \
     :langtools_all \
     lib \
     tools \
-    -:langtools_jshell
+    -:langtools_jshell_unstable
 
 # (Almost) no langtools tests are tier 2.
 tier2 = \

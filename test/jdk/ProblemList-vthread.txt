@@ -67,8 +67,8 @@ java/lang/management/ThreadMXBean/ThreadLists.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 
 # Test assumes main thread is a platform thread
-java/lang/management/ThreadMXBean/VirtualThreads.java#id0 0000000 generic-all
-java/lang/management/ThreadMXBean/VirtualThreads.java#id1 0000000 generic-all
+java/lang/management/ThreadMXBean/VirtualThreads.java#default 0000000 generic-all
+java/lang/management/ThreadMXBean/VirtualThreads.java#no-vmcontinuations 0000000 generic-all
 
 ####
 
@@ -258,6 +258,10 @@ sun/management/jmxremote/bootstrap/JMXInterfaceBindingTest.java 0000000 generic-
 sun/management/jmxremote/startstop/JMXStartStopTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusTest.java 0000000 generic-all
+
+####
+# Junit version mismatch
+tools/jpackage/junit/jdk/jpackage/internal/AppImageFileTest.java 0000000 generic-all
 
 ####
 # No expected StackOverflow
