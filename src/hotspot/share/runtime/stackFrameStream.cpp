@@ -41,3 +41,19 @@ StackFrameStream::StackFrameStream(JavaThread *thread, bool update, bool process
 #endif
 }
 
+#if INCLUDE_KONA_FIBER
+StackFrameStream::StackFrameStream(JavaThread *thread, frame last_frame, bool update, bool process_frames, bool allow_missing_reg)
+  : _reg_map(thread,
+             update ? RegisterMap::UpdateMap::include : RegisterMap::UpdateMap::skip,
+             process_frames ? RegisterMap::ProcessFrames::include : RegisterMap::ProcessFrames::skip,
+             RegisterMap::WalkContinuation::skip) {
+  _fr = last_frame;
+  _is_done = false;
+#ifndef PRODUCT
+  if (allow_missing_reg) {
+    _reg_map.set_skip_missing(true);
+  }
+#endif
+}
+#endif
+

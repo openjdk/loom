@@ -49,6 +49,9 @@
 #include "runtime/signature.hpp"
 #include "runtime/stubRoutines.hpp"
 #include "runtime/thread.inline.hpp"
+#if INCLUDE_KONA_FIBER
+#include "runtime/coroutine.hpp"
+#endif
 
 // -----------------------------------------------------
 // Implementation of JavaCallWrapper
@@ -100,7 +103,19 @@ JavaCallWrapper::JavaCallWrapper(const methodHandle& callee_method, Handle recei
   MACOS_AARCH64_ONLY(_thread->enable_wx(WXExec));
 }
 
+#if INCLUDE_KONA_FIBER
+void JavaCallWrapper::initialize(JavaThread* thread, JNIHandleBlock* handles, Method* callee_method, oop receiver, JavaValue* result) {
+  _thread = thread;
+  _handles = handles;
+  _callee_method = callee_method;
+  _receiver = receiver;
+  _result = result;
+  _anchor.clear();
+}
+#endif
 
+// only coroutine first JavaCallWrapper can switch, other JavaCallWrapper means
+// invoke from native to java, can not yield, assert _thread == JavaThread::current() still keep
 JavaCallWrapper::~JavaCallWrapper() {
   assert(_thread == JavaThread::current(), "must still be the same thread");
 
@@ -141,7 +156,13 @@ JavaCallWrapper::~JavaCallWrapper() {
 
 void JavaCallWrapper::oops_do(OopClosure* f) {
   f->do_oop((oop*)&_receiver);
+#if INCLUDE_KONA_FIBER
+  if (handles() != NULL) {
+    handles()->oops_do(f);
+  }
+#else
   handles()->oops_do(f);
+#endif
 }
 
 
@@ -445,6 +466,130 @@ void JavaCalls::call_helper(JavaValue* result, const methodHandle& method, JavaC
   }
 }
 
+/*
+ * Different with normal JavaCallWrapper from vm to java
+ * Continuation actually is invoked from kernel thread's Java space to Contination.start Java code
+ * maintain this JavaCallWrapper is for stack walking entry frame(stub frame)
+ * So
+ * 1. no need save/clear last java farame, it must be empty
+ * 2. suspend/has_special_runtime_exit_condition on kernel thread should not affect newly created continuation
+ * 3. no pending exception to clear as call from java to java
+ */
+#if INCLUDE_KONA_FIBER
+JavaCallWrapper::JavaCallWrapper(Method* method, Handle receiver, TRAPS) {
+  JavaThread* thread = (JavaThread *)THREAD;
+  assert(!thread->owns_locks(), "must release all locks when leaving VM");
+  if (VerifyCoroutineStateOnYield) {
+    // continuation.run must call from java code, its frame_anchor must be cleared
+    guarantee(thread->last_Java_sp() == NULL &&
+              thread->last_Java_pc() == 0, "should not has last java frame");
+              //thread->last_Java_fp() == NULL, "should not has last java frame");
+  }
+  ThreadStateTransition::transition_from_vm(thread, _thread_in_Java);
+  _thread = thread;
+  _handles = NULL;
+  _callee_method = method;
+  _receiver = receiver();
+  _anchor.clear();
+  _result = NULL;
+  debug_only(_thread->inc_java_call_counter());
+}
+
+/*
+ * call continuation start, construct special entry that not return
+ * Similar with Call_helper, but can be simplied
+ * 1. Handles/MetaDataHandles are relcaimed before invoke StubRoutines::call_stub
+ * 2. No result is needed and stub will not callback here
+ *
+ * Steps todo:
+ * 1. Simplify JNI, reuse kernel thread JNI handle block, when run coroutine entry
+ *    1.1 JNI handle block is not siwtched during continuation switch
+ *    1.2 Continuation use kernel thread's JNI block
+ *    1.3 In continuation switch, save JNI active handle for later verfication
+ *    1.4 In first entry, JavaCallWrapper not create new JNI block and later ClearForCoro
+ *        will skip clean JNI block
+ *    1.5 when yield success, check if JNI handle block should be same when enter
+ * 2. Reuse kernel thread resource area(ResourceMark)
+ *    2.1 not switch _resource_area when enter continuation, save current chunk and water mark
+ *        for verfication
+ *    2.2 check _resource_area's current chunk and water mark is same when yield
+ * 3. Reuse Handle area
+ *    3.1 not switch handle area when call continuation.run, reuse kenrel theread handl area
+ *        save last handle mark snapshot for verification
+ *    3.2 in first entry, saved handle area snapshot, before call stub restore to snapshot
+ *    3.3 when yield success, check if current handle area is same with snapshot
+ * 4. Resuse kernel metadata handle area
+ *    4.1 in JavaCallWrapper._callee_method how to use? save raw Method because continuation start
+ *        is awlays live and not relocatable
+ *    same verification
+ *
+ * When continuation yield back to thread, check HandleMark/ResourceMark/JNI/MetadataHandle
+ * is same with before call continuation
+ *
+ * special handling keep cont_obj live and updated, GC might happen in blocking compilation,
+ * and ThreadStateTransition(JavaCallWrapper), so need use handle mark and explicity destruct
+ * before call to java code.
+ */
+void JavaCalls::call_continuation_start(oop cont_obj, TRAPS) {
+  // During dumping, Java execution environment is not fully initialized. Also, Java execution
+  // may cause undesirable side-effects in the class metadata.
+  assert(!DumpSharedSpaces, "must not execute Java bytecodes when dumping");
+
+  JavaThread* thread = (JavaThread*)THREAD;
+  Coroutine* coro = thread->current_coroutine();
+  HandleMark hm(thread);
+  Handle receiver = Handle(thread, cont_obj);
+  methodHandle method = methodHandle(thread, Coroutine::cont_start_method());
+  assert(thread->is_Java_thread(), "must be called by a java thread");
+  assert(coro != NULL && !coro->is_thread_coroutine(), "must be in coroutine");
+  assert(method.not_null(), "must have a method to call");
+  assert(!SafepointSynchronize::is_at_safepoint(), "call to Java code during VM operation");
+  assert(!thread->handle_area()->no_handle_mark_active(), "cannot call out to Java here");
+
+  CHECK_UNHANDLED_OOPS_ONLY(thread->clear_unhandled_oops();)
+
+  CompilationPolicy::compile_if_required(method, CHECK);
+
+  // Since the call stub sets up like the interpreter we call the from_interpreted_entry
+  // so we can go compiled via a i2c. Otherwise initial entry method will always
+  // run interpreted.
+  address entry_point = method->from_interpreted_entry();
+  if (JvmtiExport::can_post_interpreter_events() && thread->is_interp_only_mode()) {
+    entry_point = method->interpreter_entry();
+  }
+
+  // Find receiver
+  // call from Java in VM, no stack zone is change
+  // no stack overflow check is needed
+
+  // do call
+  {
+    JavaCallWrapper link(method(), receiver, CHECK);
+    {
+      oop cont = receiver();
+      intptr_t* parameters[2];
+      parameters[0] = (intptr_t*)cont;
+      parameters[1] = (intptr_t*)0;
+      coro->set_has_javacall(true);
+      coro->set_continuation(cont);
+      hm.~HandleMark();
+      method.~methodHandle();
+      StubRoutines::call_stub()(
+        (address)&link,
+        // (intptr_t*)&(result->_value), // see NOTE above (compiler problem)
+        NULL,          // result_val_address
+        T_VOID,
+        Coroutine::cont_start_method(),
+        entry_point,
+        (intptr_t*)parameters, //args->parameters(),
+        2, //args->size_of_parameters(),
+        CHECK
+      );
+      ShouldNotReachHere();
+    }
+  }
+}
+#endif //INCLUDE_KONA_FIBER
 
 //--------------------------------------------------------------------------------------
 // Implementation of JavaCallArguments

@@ -47,7 +47,9 @@
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadExtension.hpp"
 #endif
-
+#if INCLUDE_KONA_FIBER
+class Coroutine;
+#endif
 class AsyncExceptionHandshake;
 class ContinuationEntry;
 class DeoptResourceMark;
@@ -437,6 +439,19 @@ class JavaThread: public Thread {
   // _frames_to_pop_failed_realloc frames, the ones that reference
   // failed reallocations.
   int _frames_to_pop_failed_realloc;
+#if INCLUDE_KONA_FIBER
+  Coroutine*        _coroutine_cache;
+  uintx             _coroutine_cache_size;
+  Coroutine*        _current_coroutine;
+  Coroutine*        _thread_coroutine;
+
+ public:
+  Coroutine* current_coroutine() const           { return _current_coroutine;}
+  Coroutine* thread_coroutine() const            { return _thread_coroutine;}
+  Coroutine*& coroutine_cache()                  { return _coroutine_cache; }
+  uintx& coroutine_cache_size()                  { return _coroutine_cache_size; }
+  void initialize_coroutine_support();
+#endif
 
   ContinuationEntry* _cont_entry;
   intptr_t* _cont_fastpath; // the sp of the oldest known interpreted/call_stub frame inside the
@@ -778,6 +793,10 @@ private:
   static ByteSize polling_page_offset()          { return byte_offset_of(JavaThread, _poll_data) + byte_offset_of(SafepointMechanism::ThreadData, _polling_page);}
   static ByteSize saved_exception_pc_offset()    { return byte_offset_of(JavaThread, _saved_exception_pc); }
   static ByteSize osthread_offset()              { return byte_offset_of(JavaThread, _osthread); }
+#if INCLUDE_KONA_FIBER
+  static ByteSize thread_coro_offset()           { return byte_offset_of(JavaThread, _thread_coroutine); }
+  static ByteSize thread_cur_coro_offset()       { return byte_offset_of(JavaThread, _current_coroutine); }
+#endif
 #if INCLUDE_JVMCI
   static ByteSize pending_deoptimization_offset() { return byte_offset_of(JavaThread, _pending_deoptimization); }
   static ByteSize pending_monitorenter_offset()  { return byte_offset_of(JavaThread, _pending_monitorenter); }
@@ -792,6 +811,15 @@ private:
   static ByteSize is_method_handle_return_offset() { return byte_offset_of(JavaThread, _is_method_handle_return); }
 
   static ByteSize active_handles_offset()        { return byte_offset_of(JavaThread, _active_handles); }
+
+#if INCLUDE_KONA_FIBER
+  static ByteSize stack_overflow_base_offset() {
+    return byte_offset_of(JavaThread, _stack_overflow_state._stack_base);
+  }
+  static ByteSize stack_overflow_end_offset() {
+    return byte_offset_of(JavaThread, _stack_overflow_state._stack_end);
+  }
+#endif
 
   // StackOverflow offsets
   static ByteSize stack_overflow_limit_offset()  {
@@ -811,6 +839,12 @@ private:
   }
 
   static ByteSize suspend_flags_offset()         { return byte_offset_of(JavaThread, _suspend_flags); }
+#if INCLUDE_KONA_FIBER
+  static ByteSize current_coro_offset()          { return byte_offset_of(JavaThread,_current_coroutine    ); }
+#ifdef ASSERT
+  static ByteSize java_call_counter_offset()     { return byte_offset_of(JavaThread, _java_call_counter   ); }
+#endif
+#endif
 
   static ByteSize do_not_unlock_if_synchronized_offset() { return byte_offset_of(JavaThread, _do_not_unlock_if_synchronized); }
   static ByteSize should_post_on_exceptions_flag_offset() {
@@ -915,6 +949,9 @@ private:
 
   void print_on(outputStream* st, bool print_extended_info) const;
   void print_on(outputStream* st) const { print_on(st, false); }
+#if INCLUDE_KONA_FIBER
+  void print_coroutine_on(outputStream* st, bool printstack);
+#endif
   void print() const;
   void print_thread_state_on(outputStream*) const;
   const char* thread_state_name() const;

@@ -68,6 +68,9 @@
 #if INCLUDE_JVMCI
 #include "jvmci/jvmciJavaClasses.hpp"
 #endif
+#if INCLUDE_KONA_FIBER
+#include "runtime/coroutine.hpp"
+#endif
 
 #define __ masm->
 
@@ -1270,6 +1273,64 @@ static void check_continuation_enter_argument(VMReg actual_vmreg,
          "%s is in unexpected register: %s instead of %s",
          name, actual_vmreg->as_Register()->name(), expected_reg->name());
 }
+#if INCLUDE_KONA_FIBER
+static void gen_stackful_continuation_enter(MacroAssembler* masm,
+                                            const VMRegPair* regs,
+                                            int& exception_offset,
+                                            OopMapSet* oop_maps,
+                                            int& frame_complete,
+                                            int& stack_slots,
+                                            int& interpreted_entry_offset,
+                                            int& compiled_entry_offset) {
+    // enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread)
+    int pos_cont_obj   = 0;
+    int pos_is_cont    = 1;
+
+    address start = __ pc();
+    // i2i entry used at interp_only_mode only
+    interpreted_entry_offset = __ pc() - start;
+    compiled_entry_offset = __ pc() - start;
+
+    frame_complete = 0;
+    stack_slots = 0;
+    exception_offset = 0;
+
+    // resgister should not overlap
+    Register target_coroutine_obj  = c_rarg1;
+    Register reg_is_cont           = c_rarg2;
+
+    Register thread                = r15;
+    Register target_coroutine      = r10;
+    Register old_coroutine         = rdx;
+    Register temp                  = r8;
+
+    check_continuation_enter_argument(regs[pos_cont_obj].first(), target_coroutine_obj, "Continuation object");
+    check_continuation_enter_argument(regs[pos_is_cont].first(),  reg_is_cont,          "isContinue");
+
+    Label L_created;
+    // If continuation, call to thaw. Otherwise, resolve the call and exit.
+    __ testptr(reg_is_cont, reg_is_cont);
+    __ jcc(Assembler::notZero, L_created);
+
+    __ push(target_coroutine_obj);
+    // pointer of created coroutine is rax
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Coroutine::createContinuation));
+    __ pop(target_coroutine_obj);
+    __ movptr(Address(target_coroutine_obj, jdk_internal_vm_Continuation::get_data_offset()), rax);
+ 
+    __ bind(L_created);
+
+    __ movptr(old_coroutine, Address(thread, in_bytes(JavaThread::thread_coro_offset())));
+    __ movptr(target_coroutine, Address(target_coroutine_obj, jdk_internal_vm_Continuation::get_data_offset()));
+
+    __ CoroutineSwitch(old_coroutine, target_coroutine, thread);
+
+    ContinuationEntry::_return_pc_offset = __ pc() - start;
+
+    __ xorl(rax, rax);
+    __ ret(0);
+}
+#endif
 
 static void gen_continuation_enter(MacroAssembler* masm,
                                    const VMRegPair* regs,
@@ -1445,6 +1506,70 @@ static void gen_continuation_enter(MacroAssembler* masm,
   __ jmp(rbx);
 }
 
+#if INCLUDE_KONA_FIBER
+static void gen_stackful_continuation_yield(MacroAssembler* masm,
+                                            const VMRegPair* regs,
+                                            OopMapSet* oop_maps,
+                                            int& frame_complete,
+                                            int& stack_slots,
+                                            int& compiled_entry_offset) {
+    if (!Continuations::enabled()) return;
+
+    enum layout {
+      rbp_off,
+      rbpH_off,
+      return_off,
+      return_off2,
+      framesize // inclusive of return address
+    };
+
+    stack_slots = framesize /  VMRegImpl::slots_per_word;
+    assert(stack_slots == 2, "recheck layout");
+    address start = __ pc();
+    compiled_entry_offset = __ pc() - start;
+
+    address the_pc = __ pc();
+    frame_complete = the_pc - start;
+
+    oop_maps = new OopMapSet();
+    OopMap* map = new OopMap(framesize, 1);
+    oop_maps->add_gc_map(frame_complete, map);
+
+    // resgister should not overlap
+    Register thread                = r15;
+    Register target_coroutine      = r10;
+    Register old_coroutine         = r9;
+    Register old_coroutine_obj     = rdx;
+    Register temp                  = r8;
+
+    // check if continuation is pinned, return pinned result
+    // terminate must happen in Continuation.start method no JNI and lock
+    Label pinSlowPath;
+    __ movl(temp, Address(thread, JavaThread::held_monitor_count_offset()));
+    __ testl(temp, temp);
+    __ jcc(Assembler::notZero, pinSlowPath);
+
+    __ movq(target_coroutine, Address(thread, in_bytes(JavaThread::thread_coro_offset())));
+    __ movq(old_coroutine, Address(thread, in_bytes(JavaThread::thread_cur_coro_offset())));
+    __ CoroutineSwitch(old_coroutine, target_coroutine, thread);
+
+    __ movptr(c_rarg0, old_coroutine);
+    __ movptr(c_rarg1, thread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, Coroutine::TerminateCoroutine), 2);
+
+    // jump and prepare arguments
+    __ reinit_heapbase();
+    __ xorl(rax, rax);
+    __ ret(0);
+
+    // switch to return result
+    __ bind(pinSlowPath);
+    __ movl(rax, 4);
+    // Pinned, return to caller
+    __ ret(0);
+  }
+#endif
+
 static void gen_continuation_yield(MacroAssembler* masm,
                                    const VMRegPair* regs,
                                    OopMapSet* oop_maps,
@@ -1590,21 +1715,43 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     int interpreted_entry_offset = -1;
     int vep_offset = -1;
     if (method->is_continuation_enter_intrinsic()) {
-      gen_continuation_enter(masm,
-                             in_regs,
-                             exception_offset,
-                             oop_maps,
-                             frame_complete,
-                             stack_slots,
-                             interpreted_entry_offset,
-                             vep_offset);
+#if INCLUDE_KONA_FIBER
+      if (UseKonaFiber)
+        gen_stackful_continuation_enter(masm,
+                                        in_regs,
+                                        exception_offset,
+                                        oop_maps,
+                                        frame_complete,
+                                        stack_slots,
+                                        interpreted_entry_offset,
+                                        vep_offset);
+      else
+#endif
+        gen_continuation_enter(masm,
+                               in_regs,
+                               exception_offset,
+                               oop_maps,
+                               frame_complete,
+                               stack_slots,
+                               interpreted_entry_offset,
+                               vep_offset);
     } else if (method->is_continuation_yield_intrinsic()) {
-      gen_continuation_yield(masm,
-                             in_regs,
-                             oop_maps,
-                             frame_complete,
-                             stack_slots,
-                             vep_offset);
+#if INCLUDE_KONA_FIBER
+      if (UseKonaFiber)
+        gen_stackful_continuation_yield(masm,
+                                        in_regs,
+                                        oop_maps,
+                                        frame_complete,
+                                        stack_slots,
+                                        vep_offset);
+      else
+#endif
+        gen_continuation_yield(masm,
+                               in_regs,
+                               oop_maps,
+                               frame_complete,
+                               stack_slots,
+                               vep_offset);
     } else {
       guarantee(false, "Unknown Continuation native intrinsic");
     }

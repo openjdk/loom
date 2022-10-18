@@ -57,7 +57,9 @@ class StackFrameStream : public StackObj {
   bool        _is_done;
  public:
   StackFrameStream(JavaThread *thread, bool update, bool process_frames, bool allow_missing_reg = false);
-
+#if INCLUDE_KONA_FIBER
+  StackFrameStream(JavaThread *thread, frame last_frame, bool update = true, bool process_frames = true, bool allow_missing_reg = false);
+#endif
   // Iteration
   inline bool is_done();
   void next()                     { if (!_is_done) _fr = _fr.sender(&_reg_map); }

@@ -361,7 +361,7 @@ inline const ImmutableOopMap* frame::get_oop_map() const {
 inline frame frame::sender(RegisterMap* map) const {
   frame result = sender_raw(map);
 
-  if (map->process_frames() && !map->in_cont()) {
+  if (map->process_frames() && !map->in_cont() && !UseKonaFiber) {
     StackWatermarkSet::on_iteration(map->thread(), result);
   }
 

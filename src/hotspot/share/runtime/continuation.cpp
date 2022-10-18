@@ -37,6 +37,7 @@
 #include "runtime/osThread.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
+#include "runtime/coroutine.hpp"
 
 // defined in continuationFreezeThaw.cpp
 extern "C" jint JNICALL CONT_isPinned0(JNIEnv* env, jobject cont_scope);
@@ -447,4 +448,7 @@ void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {
     int status = env->RegisterNatives(cls, CONT_methods, sizeof(CONT_methods)/sizeof(JNINativeMethod));
     guarantee(status == JNI_OK, "register jdk.internal.vm.Continuation natives");
     guarantee(!env->ExceptionOccurred(), "register jdk.internal.vm.Continuation natives");
+    if (UseKonaFiber) {
+      Coroutine::Initialize();
+    }
 }

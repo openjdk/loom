@@ -121,6 +121,7 @@ public class Continuation {
     private final ContinuationScope scope;
     private Continuation parent; // null for native stack
     private Continuation child; // non-null when we're yielded in a child continuation
+    private long data;
 
     private StackChunk tail;
 
@@ -301,6 +302,9 @@ public class Continuation {
 
     private void finish() {
         done = true;
+        if (data != 0) {
+            Continuation.yield(scope); // try to release corourine when yield
+        }
         assert isEmpty();
     }
 
@@ -328,7 +332,7 @@ public class Continuation {
     }
 
     private boolean isStarted() {
-        return tail != null;
+        return tail != null || data != 0;
     }
 
     private boolean isEmpty() {

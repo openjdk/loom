@@ -57,6 +57,9 @@ class jdk_internal_vm_Continuation: AllStatic {
   static int _mounted_offset;
   static int _done_offset;
   static int _preempted_offset;
+#if INCLUDE_KONA_FIBER
+  static int _data_offset;
+#endif
 
   static void compute_offsets();
  public:
@@ -73,6 +76,21 @@ class jdk_internal_vm_Continuation: AllStatic {
   static inline bool done(oop continuation);
   static inline bool is_preempted(oop continuation);
   static inline void set_preempted(oop continuation, bool value);
+#if INCLUDE_KONA_FIBER
+  // Accessors for Kona Fiber
+  static jlong data(oop obj) {
+    return obj->long_field(_data_offset);
+  }
+  static void set_data(oop obj, jlong value) {
+    obj->long_field_put(_data_offset, value);
+  }
+  static int get_data_offset() {
+    return _data_offset;
+  }
+  static int get_done_offset() {
+    return _done_offset;
+  }
+#endif
 };
 
 // Interface to jdk.internal.vm.StackChunk objects

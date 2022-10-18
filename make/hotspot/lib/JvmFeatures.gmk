@@ -162,6 +162,10 @@ ifneq ($(call check-jvm-feature, jfr), true)
   JVM_EXCLUDE_FILES += compilerEvent.cpp
 endif
 
+ifneq ($(call check-jvm-feature, fiber), true)
+  JVM_CFLAGS_FEATURES += -DINCLUDE_KONA_FIBER=0
+endif
+
 ################################################################################
 
 ifeq ($(call check-jvm-feature, link-time-opt), true)

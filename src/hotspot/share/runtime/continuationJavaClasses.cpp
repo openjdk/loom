@@ -56,6 +56,7 @@ int jdk_internal_vm_Continuation::_yieldInfo_offset;
 int jdk_internal_vm_Continuation::_mounted_offset;
 int jdk_internal_vm_Continuation::_done_offset;
 int jdk_internal_vm_Continuation::_preempted_offset;
+int jdk_internal_vm_Continuation::_data_offset;
 
 #define CONTINUATION_FIELDS_DO(macro) \
   macro(_scope_offset,     k, vmSymbols::scope_name(),     continuationscope_signature, false); \
@@ -65,7 +66,8 @@ int jdk_internal_vm_Continuation::_preempted_offset;
   macro(_tail_offset,      k, vmSymbols::tail_name(),      stackchunk_signature,        false); \
   macro(_mounted_offset,   k, vmSymbols::mounted_name(),   bool_signature,              false); \
   macro(_done_offset,      k, vmSymbols::done_name(),      bool_signature,              false); \
-  macro(_preempted_offset, k, "preempted",                 bool_signature,              false);
+  macro(_preempted_offset, k, "preempted",                 bool_signature,              false); \
+  macro(_data_offset,      k, "data",                      long_signature,              false);
 
 void jdk_internal_vm_Continuation::compute_offsets() {
   InstanceKlass* k = vmClasses::Continuation_klass();

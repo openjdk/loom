@@ -110,6 +110,9 @@
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
+#if INCLUDE_KONA_FIBER
+#include "runtime/coroutine.hpp"
+#endif
 
 // Initialization after module runtime initialization
 void universe_post_module_init();  // must happen after call_initPhase2
@@ -539,6 +542,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // must do this before set_active_handles
   main_thread->record_stack_base_and_size();
   main_thread->register_thread_stack_with_NMT();
+#if INCLUDE_KONA_FIBER
+  if (UseKonaFiber) {
+    ContReservedStack::init();
+    ContContainer::init();
+    Coroutine::set_main_thread(main_thread);
+    main_thread->initialize_coroutine_support();
+  }
+#endif
   main_thread->set_active_handles(JNIHandleBlock::allocate_block());
   MACOS_AARCH64_ONLY(main_thread->init_wx());
 
@@ -1314,6 +1325,14 @@ void Threads::assert_all_threads_claimed() {
     assert_thread_claimed("Thread", p, _thread_claim_token);
   }
   assert_thread_claimed("VMThread", VMThread::vm_thread(), _thread_claim_token);
+#if INCLUDE_KONA_FIBER
+  if (UseKonaFiber) {
+    guarantee(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+    for (size_t i = 0; i < CONT_CONTAINER_SIZE; i++) {
+      assert((uintx)((ContContainer::bucket(i))->parity()) == _thread_claim_token, " has incorrect parity %lu != %lu", (ContContainer::bucket(i))->parity(), _thread_claim_token);
+    }
+  }
+#endif
 }
 #endif // ASSERT
 
@@ -1331,12 +1350,29 @@ public:
 void Threads::possibly_parallel_oops_do(bool is_par, OopClosure* f, CodeBlobClosure* cf) {
   ParallelOopsDoThreadClosure tc(f, cf);
   possibly_parallel_threads_do(is_par, &tc);
+#if INCLUDE_KONA_FIBER
+  if (UseKonaFiber) {
+    guarantee(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+    int ct = Threads::thread_claim_token();
+    for (size_t i = 0; i < CONT_CONTAINER_SIZE; i++) {
+      ContBucket* bucket = ContContainer::bucket(i);
+      if (bucket->claim_oops_do(is_par, ct)) {
+        bucket->oops_do(f, cf);
+      }
+    }
+  }
+#endif
 }
 
 void Threads::metadata_do(MetadataClosure* f) {
   ALL_JAVA_THREADS(p) {
     p->metadata_do(f);
   }
+#if INCLUDE_KONA_FIBER
+  if (UseKonaFiber) {
+    ContContainer::metadata_do(f);
+  }
+#endif
 }
 
 class ThreadHandlesClosure : public ThreadClosure {
@@ -1577,3 +1613,12 @@ void Threads::verify() {
   VMThread* thread = VMThread::vm_thread();
   if (thread != NULL) thread->verify();
 }
+
+#if INCLUDE_KONA_FIBER
+void JavaThread::initialize_coroutine_support() {
+  // no lock in thread initialization
+  Coroutine* coro = Coroutine::create_thread_coroutine(this);
+  _thread_coroutine = _current_coroutine = coro;
+  OrderAccess::release();
+}
+#endif

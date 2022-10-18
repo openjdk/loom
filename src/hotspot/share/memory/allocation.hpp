@@ -129,6 +129,8 @@ typedef AllocFailStrategy::AllocFailEnum AllocFailType;
   f(mtMetaspace,      "Metaspace")                                                   \
   f(mtStringDedup,    "String Deduplication")                                        \
   f(mtObjectMonitor,  "Object Monitors")                                             \
+  f(mtCoroutineStack, "Fiber Coroutine Stack Space")                                 \
+  f(mtCoroutine,      "Fiber Coroutine Wrapper")                                     \
   f(mtNone,           "Unknown")                                                     \
   //end
 

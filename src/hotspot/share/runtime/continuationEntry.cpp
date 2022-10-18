@@ -47,7 +47,9 @@ void ContinuationEntry::set_enter_code(CompiledMethod* cm, int interpreted_entry
   _interpreted_entry_offset = interpreted_entry_offset;
   assert(_enter_special->code_contains(compiled_entry()),    "entry not in enterSpecial");
   assert(_enter_special->code_contains(interpreted_entry()), "entry not in enterSpecial");
-  assert(interpreted_entry() < compiled_entry(), "unexpected code layout");
+  if (!UseKonaFiber) {
+    assert(interpreted_entry() < compiled_entry(), "unexpected code layout");
+  }
 }
 
 address ContinuationEntry::compiled_entry() {

@@ -199,6 +199,7 @@ public class OneShot {
         cont.run();
         if (cont.isDone())
             throw new RuntimeException("continuation done???");
+        cont.run();
     }
 
     /**

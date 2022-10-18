@@ -53,6 +53,9 @@
 #include "runtime/stubRoutines.hpp"
 #include "utilities/macros.hpp"
 #include "crc32c.h"
+#if INCLUDE_KONA_FIBER
+#include "runtime/coroutine.hpp"
+#endif
 
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
@@ -4998,6 +5001,62 @@ void MacroAssembler::verify_FPU(int stack_depth, const char* s) {
   pop_CPU_state();
 }
 #endif // _LP64
+
+#if INCLUDE_KONA_FIBER
+void MacroAssembler::CoroutineSwitch(Register old_coroutine, Register target_coroutine, Register thread) {
+  Register temp = r8;
+  // push the current IP and frame pointer onto the stack
+  push(rbp);
+
+  // save old continuation, save rsp
+#ifdef ASSERT
+  movl(temp, Address(thread, JavaThread::java_call_counter_offset()));
+  movl(Address(old_coroutine, Coroutine::java_call_counter_offset()), temp);
+#endif
+  movptr(Address(old_coroutine, in_bytes(Coroutine::thread_offset())), 0x0);
+  movl(Address(old_coroutine, Coroutine::state_offset()) , Coroutine::_onstack);
+  movptr(Address(old_coroutine, Coroutine::last_sp_offset()), rsp);
+
+  movptr(temp, Address(thread, JavaThread::shadow_zone_growth_watermark()));
+  movptr(Address(old_coroutine, Coroutine::stack_shadow_zone_growth_watermark_offset()), temp);
+
+  // load target continuation context
+#ifdef ASSERT
+  movl(temp, Address(target_coroutine, Coroutine::java_call_counter_offset()));
+  movl(Address(thread, JavaThread::java_call_counter_offset()), temp);
+#endif
+  movptr(Address(target_coroutine, in_bytes(Coroutine::thread_offset())), thread);
+  movl(Address(target_coroutine, Coroutine::state_offset()), Coroutine::_current);
+  movptr(Address(thread,JavaThread::current_coro_offset()), target_coroutine);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_base_offset()));
+  movptr(Address(thread, JavaThread::stack_base_offset()), temp);
+  movptr(Address(thread, JavaThread::stack_overflow_base_offset()), temp);
+  movptr(Address(thread, JavaThread::reserved_stack_activation_offset()), temp);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_size_offset()));
+  movptr(Address(thread, JavaThread::stack_size_offset()), temp);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_end_offset()));
+  movptr(Address(thread, JavaThread::stack_overflow_end_offset()), temp);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_shadow_zone_safe_limit_offset()));
+  movptr(Address(thread, JavaThread::shadow_zone_safe_limit()), temp);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_shadow_zone_growth_watermark_offset()));
+  movptr(Address(thread, JavaThread::shadow_zone_growth_watermark()), temp);
+
+  movptr(temp, Address(target_coroutine, Coroutine::stack_overflow_limit_offset()));
+  movptr(Address(thread, JavaThread::stack_overflow_limit_offset()), temp);
+
+  movptr(rsp, Address(target_coroutine, Coroutine::last_sp_offset()));
+
+  pop(rbp);
+
+  // jump and prepare arguments
+  reinit_heapbase();
+}
+#endif
 
 void MacroAssembler::restore_cpu_control_state_after_jni(Register rscratch) {
   // Either restore the MXCSR register after returning from the JNI Call

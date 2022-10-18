@@ -670,6 +670,10 @@ public:
   // prints msg and continues
   void warn(const char* msg);
 
+//#if INCLUDE_KONA_FIBER
+  void CoroutineSwitch(Register old_coroutine, Register target_coroutine, Register thread);
+//#endif
+
   // dumps registers and other state
   void print_state();
 

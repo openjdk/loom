@@ -46,7 +46,7 @@ m4_define(jvm_features_valid, m4_normalize( \
     \
     cds compiler1 compiler2 dtrace epsilongc g1gc jfr jni-check \
     jvmci jvmti link-time-opt management minimal opt-size parallelgc \
-    serialgc services shenandoahgc static-build vm-structs zero zgc \
+    serialgc services shenandoahgc static-build vm-structs zero zgc fiber \
 ))
 
 # Deprecated JVM features (these are ignored, but with a warning)
@@ -319,6 +319,34 @@ AC_DEFUN_ONCE([JVM_FEATURES_CHECK_STATIC_BUILD],
   ])
 ])
 
+################################################################################
+# Allow to disable fiber
+#
+AC_DEFUN_ONCE([HOTSPOT_ENABLE_DISABLE_FIBER],
+[
+  AC_ARG_ENABLE([fiber], [AS_HELP_STRING([--enable-fiber@<:@=yes/no/auto@:>@],
+      [Default is auto, where fiber is enabled if supported on the platform.])])
+
+  if test "x$enable_fiber" = "x" || test "x$enable_fiber" = "xauto"; then
+    ENABLE_FIBER="true"
+  elif test "x$enable_fiber" = "xyes"; then
+    ENABLE_FIBER="true"
+  elif test "x$enable_fiber" = "xno"; then
+    ENABLE_FIBER="false"
+  else
+    AC_MSG_ERROR([Invalid value for --enable-fiber: $enable_fiber])
+  fi
+
+  if test "x$OPENJDK_TARGET_CPU" != "xx86_64" && test "x$OPENJDK_TARGET_CPU" != "xaarch64"; then
+    ENABLE_FIBER="false"
+    if test "x$enable_fiber" = "xyes"; then
+      AC_MSG_ERROR([Fiber is currently not supported on none X64 platform. Remove --enable-fiber.])
+    fi
+  fi
+
+  AC_SUBST(ENABLE_FIBER)
+])
+
 ###############################################################################
 # Check if the feature 'zgc' is available on this platform.
 #
@@ -391,7 +419,7 @@ AC_DEFUN_ONCE([JVM_FEATURES_PREPARE_PLATFORM],
   JVM_FEATURES_CHECK_SHENANDOAHGC
   JVM_FEATURES_CHECK_STATIC_BUILD
   JVM_FEATURES_CHECK_ZGC
-
+  JVM_FEATURES_CHECK_FIBER
 ])
 
 ###############################################################################
@@ -424,7 +452,7 @@ AC_DEFUN([JVM_FEATURES_PREPARE_VARIANT],
   elif test "x$variant" = "xminimal"; then
     JVM_FEATURES_VARIANT_FILTER="cds compiler2 dtrace epsilongc g1gc \
         jfr jni-check jvmci jvmti management parallelgc services \
-        shenandoahgc vm-structs zgc"
+        shenandoahgc vm-structs zgc fiber"
     if test "x$OPENJDK_TARGET_CPU" = xarm ; then
       JVM_FEATURES_VARIANT_FILTER="$JVM_FEATURES_VARIANT_FILTER opt-size"
     else

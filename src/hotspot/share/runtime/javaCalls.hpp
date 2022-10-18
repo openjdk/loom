@@ -55,7 +55,11 @@ class JavaCallWrapper: StackObj {
   // Construction/destruction
    JavaCallWrapper(const methodHandle& callee_method, Handle receiver, JavaValue* result, TRAPS);
   ~JavaCallWrapper();
-
+  // Used for continuation wrapper
+#if INCLUDE_KONA_FIBER
+  JavaCallWrapper(Method* method, Handle receiver, TRAPS);
+  void initialize(JavaThread* thread, JNIHandleBlock* handles, Method* callee_method, oop receiver, JavaValue* result);
+#endif
   // Accessors
   JavaThread*      thread() const           { return _thread; }
   JNIHandleBlock*  handles() const          { return _handles; }
@@ -252,6 +256,11 @@ class JavaCalls: AllStatic {
 
   // Low-level interface
   static void call(JavaValue* result, const methodHandle& method, JavaCallArguments* args, TRAPS);
+
+  // Continuation Entry call
+#if INCLUDE_KONA_FIBER
+  static void call_continuation_start(oop cont_obj, TRAPS);
+#endif
 };
 
 #endif // SHARE_RUNTIME_JAVACALLS_HPP

@@ -67,6 +67,10 @@
 #include "oops/access.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/continuation.hpp"
+#if INCLUDE_KONA_FIBER
+#include "runtime/coroutine.hpp"
+#endif
 #include "runtime/globals_extension.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/java.hpp"
@@ -1810,6 +1814,29 @@ class G1RemarkThreadsClosure : public ThreadClosure {
   }
 };
 
+#if INCLUDE_KONA_FIBER
+class G1RemarkContsClosure {
+  //G1SATBMarkQueueSet& _qset;  for thread local?
+  G1CMOopClosure _cm_cl;
+  MarkingCodeBlobClosure _code_cl;
+  uintx _claim_token;
+
+ public:
+  G1RemarkContsClosure(G1CollectedHeap* g1h, G1CMTask* task) :
+    _cm_cl(g1h, task),
+    _code_cl(&_cm_cl, !CodeBlobToOopClosure::FixRelocations, true /* keepalive nmethods */),
+    _claim_token(Threads::thread_claim_token()) {}
+
+  void do_continuation(ContBucket* bucket) {
+    assert(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+    guarantee(SafepointSynchronize::is_at_safepoint(), "should be at safepoint");
+    if (bucket->claim_oops_do(true, _claim_token)) {
+      bucket->nmethods_do(&_code_cl);
+    }
+  }
+};
+#endif
+
 class G1CMRemarkTask : public WorkerTask {
   G1ConcurrentMark* _cm;
 public:
@@ -1821,6 +1848,15 @@ public:
 
       G1RemarkThreadsClosure threads_f(G1CollectedHeap::heap(), task);
       Threads::threads_do(&threads_f);
+#if INCLUDE_KONA_FIBER
+        if (UseKonaFiber) {
+          G1RemarkContsClosure continuations_f(G1CollectedHeap::heap(), task);
+          for (size_t i = 0; i < CONT_CONTAINER_SIZE; i++) {
+            ContBucket* bucket = ContContainer::bucket(i);
+            continuations_f.do_continuation(bucket);
+          }
+        }
+#endif
     }
 
     do {

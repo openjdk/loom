@@ -479,6 +479,15 @@ JavaThread::JavaThread() :
 
   _SleepEvent(ParkEvent::Allocate(this))
 {
+#if INCLUDE_KONA_FIBER
+  _current_coroutine = NULL;
+  _thread_coroutine = NULL;
+  if (UseKonaFiber) {
+    _coroutine_cache = NULL;
+    _coroutine_cache_size = 0;
+  }
+#endif
+
   set_jni_functions(jni_functions());
 
 #if INCLUDE_JVMCI
@@ -655,7 +664,11 @@ void JavaThread::run() {
   initialize_tlab();
 
   _stack_overflow_state.create_stack_guard_pages();
-
+#if INCLUDE_KONA_FIBER
+  if (UseKonaFiber) {
+    this->initialize_coroutine_support();
+  }
+#endif
   cache_global_variables();
 
   // Thread is now sufficiently initialized to be handled by the safepoint code as being

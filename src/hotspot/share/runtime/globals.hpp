@@ -1984,6 +1984,21 @@ const int ObjectAlignmentInBytes = 8;
                                                                             \
   develop(bool, TraceOptimizedUpcallStubs, false,                           \
                 "Trace optimized upcall stub generation")                   \
+                                                                            \
+  product(bool, UseKonaFiber, true,                                         \
+          "Enable Kona Fiber")                                              \
+                                                                            \
+  product(uintx, DefaultCoroutineStackSize, 4*8*8*K,                        \
+        "Default size of the stack that is associated with new coroutines") \
+                                                                            \
+  product(uintx, MaxFreeCoroutinesCacheSize, 20,                            \
+          "The number of free coroutine stacks a thread can keep")          \
+                                                                            \
+  product(bool, TraceCoroutine, false, DIAGNOSTIC,                          \
+          "Trace Coroutine create/switch/terminate")                        \
+                                                                            \
+  product(bool, VerifyCoroutineStateOnYield, false, DIAGNOSTIC,             \
+          "Verify coroutine state after yield success")                     \
 
 // end of RUNTIME_FLAGS
 

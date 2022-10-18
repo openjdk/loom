@@ -63,6 +63,9 @@ class StackOverflow {
     set_shadow_zone_limits();
     set_reserved_stack_activation(base);
   }
+  address stack_end()  const           { return _stack_end; }
+  address shadow_zone_growth_watermark() const { return _shadow_zone_growth_watermark; }
+
  private:
 
   StackGuardState  _stack_guard_state;
@@ -78,7 +81,6 @@ class StackOverflow {
   address          _stack_base;
   address          _stack_end;
 
-  address stack_end()  const           { return _stack_end; }
   address stack_base() const           { assert(_stack_base != nullptr, "Sanity check"); return _stack_base; }
 
   // Stack overflow support
