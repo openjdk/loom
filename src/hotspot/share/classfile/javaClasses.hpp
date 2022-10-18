@@ -400,7 +400,7 @@ class java_lang_Thread : AllStatic {
   static JvmtiThreadState* jvmti_thread_state(oop java_thread);
   static void set_jvmti_thread_state(oop java_thread, JvmtiThreadState* state);
 
-  // Clear all extent local bindings on error
+  // Clear all scoped value bindings on error
   static void clear_scopedValueBindings(oop java_thread);
 
   // Blocker object responsible for thread parking

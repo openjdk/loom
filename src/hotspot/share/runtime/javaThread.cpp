@@ -1070,7 +1070,7 @@ void JavaThread::handle_async_exception(oop java_throwable) {
   // We cannot call Exceptions::_throw(...) here because we cannot block
   set_pending_exception(java_throwable, __FILE__, __LINE__);
 
-  // Clear any extent-local bindings
+  // Clear any scoped-value bindings
   set_scopedValueCache(NULL);
   oop threadOop = threadObj();
   assert(threadOop != NULL, "must be");

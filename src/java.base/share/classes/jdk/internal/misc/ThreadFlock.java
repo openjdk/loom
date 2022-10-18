@@ -210,7 +210,7 @@ public class ThreadFlock implements AutoCloseable {
      * Opens a new thread flock. The flock is owned by the current thread. It can be
      * named to aid debugging.
      *
-     * <p> This method captures the current thread's {@linkplain ScopedValue extent-local}
+     * <p> This method captures the current thread's {@linkplain ScopedValue scoped-value}
      * bindings for inheritance by threads created in the flock.
      *
      * <p> For the purposes of containment, monitoring, and debugging, the parent
@@ -250,7 +250,7 @@ public class ThreadFlock implements AutoCloseable {
     /**
      * Starts the given unstarted thread in this flock.
      *
-     * <p> The thread is started with the extent-local bindings that were captured
+     * <p> The thread is started with the scoped-value bindings that were captured
      * when opening the flock. The bindings must match the current thread's bindings.
      *
      * <p> This method may only be invoked by the flock owner or threads {@linkplain
@@ -263,7 +263,7 @@ public class ThreadFlock implements AutoCloseable {
      * @throws WrongThreadException if the current thread is not the owner or a thread
      * contained in the flock
      * @throws jdk.incubator.concurrent.StructureViolationException if the current
-     * extent-local bindings are not the same as when the flock was created
+     * scoped-value bindings are not the same as when the flock was created
      */
     public Thread start(Thread thread) {
         ensureOwnerOrContainsThread();
@@ -402,7 +402,7 @@ public class ThreadFlock implements AutoCloseable {
      * jdk.incubator.concurrent.StructureViolationException}.
      * Similarly, if called to close a flock that <em>encloses</em> {@linkplain
      * jdk.incubator.concurrent.ScopedValue.Carrier#run(Runnable) operations} with
-     * extent-local bindings then it also throws {@code StructureViolationException}
+     * scoped-value bindings then it also throws {@code StructureViolationException}
      * after closing the flock.
      *
      * @throws WrongThreadException if invoked by a thread that is not the owner

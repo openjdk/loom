@@ -49,12 +49,12 @@ import sun.security.action.GetPropertyAction;
  * transitively. Extent-local variables also provide a way to share immutable data across
  * threads.
  *
- * <p> An extent-local variable is bound, meaning it gets a value, when invoking an
+ * <p> An scoped-value variable is bound, meaning it gets a value, when invoking an
  * operation with the {@link Carrier#run(Runnable) Carrier.run} or {@link
  * Carrier#call(Callable) Carrier.call} methods. {@link Carrier Carrier} instances are
  * created by the static method {@link #where(ScopedValue, Object)}. The operations
  * executed by the {@code run} and {@code call} methods use the {@link #get()} method to
- * read the value of a bound extent local. An extent-local variable reverts to being
+ * read the value of a bound scoped value. An scoped-value variable reverts to being
  * unbound (or its previous value) when the operation completes.
  *
  * <p> An {@code ScopedValue} object will typically be declared in a {@code private
@@ -62,29 +62,29 @@ import sun.security.action.GetPropertyAction;
  * classes within its nest).
  *
  * <p> {@link ScopedValue} bindings are immutable: there is no "{@code set}" method.
- * There may be cases when an operation might need to use the same extent-local variable
+ * There may be cases when an operation might need to use the same scoped-value variable
  * to communicate a different value to the methods that it calls. The requirement is not
  * to change the original binding but to establish a new binding for nested calls. If an
- * extent local already has a value, then {@code run} or {@code call} methods may be
+ * scoped value already has a value, then {@code run} or {@code call} methods may be
  * invoked to run another operation with a newly-bound value. Code executed by the
- * operation will read the new value of the extent local. The extent local reverts to its
+ * operation will read the new value of the scoped value. The scoped value reverts to its
  * previous value when the operation completes.
  *
- * <h2> Sharing extent-local variables across threads </h2>
+ * <h2> Sharing scoped-value variables across threads </h2>
  *
  * Extent-local variables can be shared across threads when used in conjunction with
  * {@link StructuredTaskScope}. Creating a {@code StructuredTaskScope} captures the
- * current thread's extent-local bindings for inheritance by threads {@link
+ * current thread's scoped-value bindings for inheritance by threads {@link
  * StructuredTaskScope#fork(Callable) forked} in the task scope. This means that a thread
- * may bind an extent-local variable and share its value in a structured concurrency
- * context. Threads forked in the task scope that read the extent-local variable will read
+ * may bind an scoped-value variable and share its value in a structured concurrency
+ * context. Threads forked in the task scope that read the scoped-value variable will read
  * the value bound by the thread that created the task scope.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @apiNote
- * The following example uses an extent local to make credentials available to callees.
+ * The following example uses an scoped value to make credentials available to callees.
  *
  * {@snippet lang=java :
  *   // @link substring="newInstance" target="ScopedValue#newInstance" :
@@ -109,50 +109,50 @@ import sun.security.action.GetPropertyAction;
  * @implNote
  * Extent-local variables are designed to be used in fairly small
  * numbers. {@link #get} initially performs a search through enclosing
- * scopes to find an extent-local variable's innermost binding. It
+ * scopes to find an scoped-value variable's innermost binding. It
  * then caches the result of the search in a small thread-local
- * cache. Subsequent invocations of {@link #get} for that extent local
+ * cache. Subsequent invocations of {@link #get} for that scoped value
  * will almost always be very fast. However, if a program has many
- * extent-local variables that it uses cyclically, the cache hit rate
+ * scoped-value variables that it uses cyclically, the cache hit rate
  * will be low and performance will be poor. This design allows
- * extent-local inheritance by {@link StructuredTaskScope} threads to
+ * scoped-value inheritance by {@link StructuredTaskScope} threads to
  * be very fast: in essence, no more than copying a pointer, and
- * leaving an extent-local binding also requires little more than
+ * leaving an scoped-value binding also requires little more than
  * updating a pointer.
  *
- * <p>Because the extent-local per-thread cache is small, you should
- * try to minimize the number of bound extent-local variables in
+ * <p>Because the scoped-value per-thread cache is small, you should
+ * try to minimize the number of bound scoped-value variables in
  * use. For example, if you need to pass a number of values in this
  * way, it makes sense to create a record class to hold those values,
- * and then bind a single extent-local variable to an instance of that
+ * and then bind a single scoped-value variable to an instance of that
  * record.
  *
  * <p>For this incubator release, we have provided some system properties
- * to tune the performance of extent-local variables.
+ * to tune the performance of scoped-value variables.
  *
  * <p>The system property {@code jdk.incubator.concurrent.ScopedValue.cacheSize}
- * controls the size of the (per-thread) extent-local cache. This cache is crucial
- * for the performance of extent-local variables. If it is too small,
+ * controls the size of the (per-thread) scoped-value cache. This cache is crucial
+ * for the performance of scoped-value variables. If it is too small,
  * the runtime library will repeatedly need to scan for each
  * {@link #get}. If it is too large, memory will be unnecessarily
- * consumed. The default extent-local cache size is 16 entries. It may
+ * consumed. The default scoped-value cache size is 16 entries. It may
  * be varied from 2 to 16 entries in size. {@code ScopedValue.cacheSize}
  * must be an integer power of 2.
  *
  * <p>For example, you could use {@code -Djdk.incubator.concurrent.ScopedValue.cacheSize=8}.
  *
  * <p>The other system property is {@code jdk.preserveScopedValueCache}.
- * This property determines whether the per-thread extent-local
+ * This property determines whether the per-thread scoped-value
  * cache is preserved when a virtual thread is blocked. By default
  * this property is set to {@code true}, meaning that every virtual
- * thread preserves its extent-local cache when blocked. Like {@code
+ * thread preserves its scoped-value cache when blocked. Like {@code
  * ScopedValue.cacheSize}, this is a space versus speed trade-off: if
  * you have a great many virtual threads that are blocked most of the
  * time, setting this property to {@code false} might result in a
- * useful memory saving, but each virtual thread's extent-local cache
+ * useful memory saving, but each virtual thread's scoped-value cache
  * would have to be regenerated after a blocking operation.
  *
- * @param <T> the extent local's type
+ * @param <T> the scoped value's type
  * @since 19
  */
 public final class ScopedValue<T> {
@@ -220,9 +220,9 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * An immutable map of extent-local variables to values.
+     * An immutable map of scoped-value variables to values.
      * It define the {@link #run(Runnable) run} and {@link #call(Callable) call} methods
-     * to invoke an operation with the extent-local variable mappings bound to the thread
+     * to invoke an operation with the scoped-value variable mappings bound to the thread
      * that invokes {@code run} or {@code call}.
      *
      * @since 19
@@ -257,7 +257,7 @@ public final class ScopedValue<T> {
         /**
          * Returns a new {@link Carrier Carrier}, which consists of the contents of this
          * carrier plus a new mapping from {@code key} to {@code value}. If this carrier
-         * already has a mapping for the extent-local variable {@code key} then the new
+         * already has a mapping for the scoped-value variable {@code key} then the new
          * value added by this method overrides the previous mapping. That is to say, if
          * there is a list of {@code where(...)} clauses, the rightmost clause wins.
          * @param key   the ScopedValue to bind a value to
@@ -286,7 +286,7 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Returns the value of a variable in this map of extent-local variables.
+         * Returns the value of a variable in this map of scoped-value variables.
          * @param key the ScopedValue variable
          * @param <T> the type of the ScopedValue
          * @return the value
@@ -307,9 +307,9 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Runs a value-returning operation with this map of extent-local variables bound
+         * Runs a value-returning operation with this map of scoped-value variables bound
          * to values. Code invoked by {@code op} can use the {@link ScopedValue#get()
-         * get} method to get the value of the extent local. The extent-local variables
+         * get} method to get the value of the scoped value. The scoped-value variables
          * revert to their previous values or become {@linkplain #isBound() unbound} when
          * the operation completes.
          *
@@ -345,7 +345,7 @@ public final class ScopedValue<T> {
         /**
          * Runs an operation with this map of ScopedValues bound to values. Code executed
          * by the operation can use the {@link ScopedValue#get() get()} method to get the
-         * value of the extent local. The extent-local variables revert to their previous
+         * value of the scoped value. The scoped-value variables revert to their previous
          * values or becomes {@linkplain #isBound() unbound} when the operation completes.
          *
          * <p> Extent-local variables are intended to be used in a <em>structured
@@ -376,7 +376,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for an extent-local variable.
+     * Creates a binding for an scoped-value variable.
      * The {@link Carrier Carrier} may be used later to invoke a {@link Callable} or
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier Carrier}
      * by further calls to this method.
@@ -391,7 +391,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for an extent-local variable and runs a
+     * Creates a binding for an scoped-value variable and runs a
      * value-returning operation with that {@link ScopedValue} bound to the value.
      * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
@@ -406,7 +406,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for extent-local variable and runs an
+     * Creates a binding for scoped-value variable and runs an
      * operation with that  {@link ScopedValue} bound to the value.
      * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
@@ -422,19 +422,19 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates an extent-local variable to refer to a value of type T.
+     * Creates an scoped-value variable to refer to a value of type T.
      *
-     * @param <T> the type of the extent local's value.
-     * @return an extent-local variable
+     * @param <T> the type of the scoped value's value.
+     * @return an scoped-value variable
      */
     public static <T> ScopedValue<T> newInstance() {
         return new ScopedValue<T>();
     }
 
     /**
-     * Returns the current thread's bound value for this extent-local variable.
-     * @return the value of the extent local
-     * @throws NoSuchElementException if the extent local is not bound
+     * Returns the current thread's bound value for this scoped-value variable.
+     * @return the value of the scoped value
+     * @throws NoSuchElementException if the scoped value is not bound
      */
     @ForceInline
     @SuppressWarnings("unchecked")
@@ -467,7 +467,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * {@return {@code true} if the extent local is bound to a value}
+     * {@return {@code true} if the scoped value is bound to a value}
      */
     public boolean isBound() {
         // ??? Do we want to search cache for this? In most cases we don't expect
@@ -482,7 +482,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Return the value of the extent local or NIL if not bound.
+     * Return the value of the scoped value or NIL if not bound.
      */
     private Object findBinding() {
         Object value = scopedValueBindings().find(this);
@@ -490,9 +490,9 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Returns the value of the extent local if bound, otherwise returns {@code other}.
+     * Returns the value of the scoped value if bound, otherwise returns {@code other}.
      * @param other the value to return if not bound, can be {@code null}
-     * @return the value of the extent local if bound, otherwise {@code other}
+     * @return the value of the scoped value if bound, otherwise {@code other}
      */
     public T orElse(T other) {
         Object obj = findBinding();
@@ -506,12 +506,12 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Returns the value of the extent local if bound, otherwise throws the exception
+     * Returns the value of the scoped value if bound, otherwise throws the exception
      * produced by the exception supplying function.
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces the exception to throw
-     * @return the value of the extent local if bound
-     * @throws X prodouced by the exception suppying function if the extent local is unbound
+     * @return the value of the scoped value if bound
+     * @throws X prodouced by the exception suppying function if the scoped value is unbound
      */
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         Objects.requireNonNull(exceptionSupplier);
@@ -537,9 +537,9 @@ public final class ScopedValue<T> {
         // Bindings can be in one of four states:
         //
         // 1: class Thread: this is a new Thread instance, and no
-        // extent locals have ever been bound in this Thread.
+        // scoped values have ever been bound in this Thread.
         // 2: EmptySnapshot.SINGLETON: This is effectively an empty binding.
-        // 3: A Snapshot instance: this contains one or more extent local
+        // 3: A Snapshot instance: this contains one or more scoped value
         // bindings.
         // 4: null: there may be some bindings in this Thread, but we don't know
         // where they are. We must invoke JLA.findScopedValueBindings() to walk
@@ -594,7 +594,7 @@ public final class ScopedValue<T> {
         return (bitmask & targetBits) == targetBits;
     }
 
-    // A small fixed-size key-value cache. When an extent local's get() method
+    // A small fixed-size key-value cache. When an scoped value's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
     private static class Cache {

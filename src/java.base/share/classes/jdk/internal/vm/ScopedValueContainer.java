@@ -33,11 +33,11 @@ import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
- * A StackableScope to represent extent-local bindings.
+ * A StackableScope to represent scoped-value bindings.
  *
  * This class defines static methods to run an operation with a ScopedValueContainer
  * on the scope stack. It also defines a method to get the latest ScopedValueContainer
- * and a method to return a snapshot of the extent local bindings.
+ * and a method to return a snapshot of the scoped value bindings.
  */
 public class ScopedValueContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -78,14 +78,14 @@ public class ScopedValueContainer extends StackableScope {
     }
 
     /**
-     * A snapshot of the extent local bindings. The snapshot includes the bindings
-     * established for the current thread and extent local container.
+     * A snapshot of the scoped value bindings. The snapshot includes the bindings
+     * established for the current thread and scoped value container.
      */
     public record BindingsSnapshot(Object scopedValueBindings,
                                    ScopedValueContainer container) { }
 
     /**
-     * Returns the extent local bindings for the current thread.
+     * Returns the scoped value bindings for the current thread.
      */
     public static BindingsSnapshot captureBindings() {
         return new BindingsSnapshot(JLA.scopedValueBindings(), latest());

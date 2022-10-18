@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test ThreadFlock with extent locals
+ * @summary Test ThreadFlock with scoped values
  * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
@@ -54,7 +54,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test inheritance of extent-local bindings.
+     * Test inheritance of scoped-value bindings.
      */
     @Test(dataProvider = "factories")
     public void testInheritsScopedValues(ThreadFactory factory) throws Exception {
@@ -74,7 +74,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test exiting a extent local operation should close nested thread flocks.
+     * Test exiting a scoped value operation should close nested thread flocks.
      */
     @Test
     public void testStructureViolation1() {
@@ -96,7 +96,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock1.
      */
     @Test
@@ -129,7 +129,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock2.
      */
     @Test
@@ -161,7 +161,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock3.
      */
     @Test
@@ -193,7 +193,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that start throws StructureViolationException if extent-local bindings
+     * Test that start throws StructureViolationException if scoped-value bindings
      * have changed.
      */
     @Test(dataProvider = "factories")

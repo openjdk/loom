@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Basic tests for StructuredTaskScope with extent-locals
+ * @summary Basic tests for StructuredTaskScope with scoped-values
  * @enablePreview
  * @modules jdk.incubator.concurrent
  * @run testng ScopedValuesTest
@@ -40,7 +40,7 @@ import static org.testng.Assert.*;
 public class ScopedValuesTest {
 
     /**
-     * Test that fork inherits extent-local bindings.
+     * Test that fork inherits scoped-value bindings.
      */
     @Test
     public void testForkInheritsScopedValues1() throws Exception {
@@ -59,7 +59,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork inherits extent-local bindings into a grandchild.
+     * Test that fork inherits scoped-value bindings into a grandchild.
      */
     @Test
     public void testForkInheritsScopedValues2() throws Exception {
@@ -84,7 +84,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test exiting an extent local operation closes the thread flock of a nested scope
+     * Test exiting an scoped value operation closes the thread flock of a nested scope
      * and throws StructureViolationException.
      */
     @Test
@@ -122,7 +122,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if extent-local bindings
+     * Test that fork throws StructureViolationException if scoped-value bindings
      * created after StructuredTaskScope is created.
      */
     @Test
@@ -138,7 +138,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if extent-local bindings
+     * Test that fork throws StructureViolationException if scoped-value bindings
      * change after StructuredTaskScope is created.
      */
     @Test

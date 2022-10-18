@@ -292,13 +292,13 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Search the stack for the most recent extent-local bindings.
+     * Search the stack for the most recent scoped-value bindings.
      */
     @IntrinsicCandidate
     static native Object findScopedValueBindings();
 
     /**
-     * Inherit the extent-local bindings from the given container.
+     * Inherit the scoped-value bindings from the given container.
      * Invoked when starting a thread.
      */
     void inheritScopedValueBindings(ThreadContainer container) {
@@ -1572,7 +1572,7 @@ public class Thread implements Runnable {
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // extent locals may be inherited
+                // scoped values may be inherited
                 inheritScopedValueBindings(container);
 
                 start0();
