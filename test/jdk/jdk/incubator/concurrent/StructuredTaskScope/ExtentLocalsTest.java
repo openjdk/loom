@@ -26,7 +26,7 @@
  * @summary Basic tests for StructuredTaskScope with extent-locals
  * @enablePreview
  * @modules jdk.incubator.concurrent
- * @run testng/othervm ExtentLocalsTest
+ * @run testng ExtentLocalsTest
  */
 
 import jdk.incubator.concurrent.ExtentLocal;

@@ -70,7 +70,6 @@
   template(java_lang_Cloneable,                       "java/lang/Cloneable")                      \
   template(java_lang_Throwable,                       "java/lang/Throwable")                      \
   template(java_lang_ClassLoader,                     "java/lang/ClassLoader")                    \
-  template(java_lang_ThreadDeath,                     "java/lang/ThreadDeath")                    \
   template(java_lang_Runnable,                        "java/lang/Runnable")                       \
   template(jdk_internal_vm_ContinuationScope,         "jdk/internal/vm/ContinuationScope")        \
   template(jdk_internal_vm_StackChunk,                "jdk/internal/vm/StackChunk")               \
@@ -157,6 +156,8 @@
   template(jdk_internal_loader_BuiltinClassLoader,    "jdk/internal/loader/BuiltinClassLoader")   \
   template(jdk_internal_loader_ClassLoaders_AppClassLoader,      "jdk/internal/loader/ClassLoaders$AppClassLoader")      \
   template(jdk_internal_loader_ClassLoaders_PlatformClassLoader, "jdk/internal/loader/ClassLoaders$PlatformClassLoader") \
+  template(jdk_incubator_concurrent_ExtentLocal,      "jdk/incubator/concurrent/ExtentLocal")     \
+  template(jdk_incubator_concurrent_ExtentLocal_Carrier, "jdk/incubator/concurrent/ExtentLocal$Carrier") \
                                                                                                   \
   /* Java runtime version access */                                                               \
   template(java_lang_VersionProps,                    "java/lang/VersionProps")                   \
@@ -394,10 +395,10 @@
   template(main_name,                                 "main")                                     \
   template(name_name,                                 "name")                                     \
   template(priority_name,                             "priority")                                 \
-  template(stillborn_name,                            "stillborn")                                \
   template(group_name,                                "group")                                    \
   template(daemon_name,                               "daemon")                                   \
   template(run_method_name,                           "run")                                      \
+  template(call_method_name,                          "call")                                     \
   template(interrupt_method_name,                     "interrupt")                                \
   template(exit_method_name,                          "exit")                                     \
   template(remove_method_name,                        "remove")                                   \
@@ -607,6 +608,7 @@
   template(string_array_string_array_void_signature,  "([Ljava/lang/String;[Ljava/lang/String;)V")                \
   template(thread_throwable_void_signature,           "(Ljava/lang/Thread;Ljava/lang/Throwable;)V")               \
   template(thread_void_signature,                     "(Ljava/lang/Thread;)V")                                    \
+  template(runnable_void_signature,                   "(Ljava/lang/Runnable;)V")                                    \
   template(threadgroup_runnable_void_signature,       "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;)V")           \
   template(threadgroup_string_void_signature,         "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V")             \
   template(string_class_signature,                    "(Ljava/lang/String;)Ljava/lang/Class;")                    \

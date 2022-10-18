@@ -206,8 +206,11 @@ class methodHandle;
   do_intrinsic(_dsqrt_strict,             java_lang_StrictMath,   sqrt_name,          double_double_signature,   F_SN)  \
                                                                                                                         \
   do_intrinsic(_floatIsInfinite,          java_lang_Float,        isInfinite_name,    float_bool_signature,      F_S)   \
-   do_name(     isInfinite_name,                                 "isInfinite")                                          \
+   do_name(     isInfinite_name,                                  "isInfinite")                                         \
+  do_intrinsic(_floatIsFinite,            java_lang_Float,        isFinite_name,      float_bool_signature,      F_S)   \
+   do_name(     isFinite_name,                                    "isFinite")                                           \
   do_intrinsic(_doubleIsInfinite,         java_lang_Double,       isInfinite_name,    double_bool_signature,     F_S)   \
+  do_intrinsic(_doubleIsFinite,           java_lang_Double,       isFinite_name,      double_bool_signature,     F_S)   \
                                                                                                                         \
   do_intrinsic(_floatToRawIntBits,        java_lang_Float,        floatToRawIntBits_name,   float_int_signature, F_SN)  \
    do_name(     floatToRawIntBits_name,                          "floatToRawIntBits")                                   \
@@ -221,6 +224,12 @@ class methodHandle;
    do_name(     doubleToLongBits_name,                           "doubleToLongBits")                                    \
   do_intrinsic(_longBitsToDouble,         java_lang_Double,       longBitsToDouble_name,    long_double_signature, F_SN)\
    do_name(     longBitsToDouble_name,                           "longBitsToDouble")                                    \
+  do_intrinsic(_float16ToFloat,           java_lang_Float,        float16ToFloat_name,      f16_float_signature, F_S)   \
+   do_name(     float16ToFloat_name,                             "float16ToFloat")                                      \
+   do_signature(f16_float_signature,                             "(S)F")                                                \
+  do_intrinsic(_floatToFloat16,           java_lang_Float,        floatToFloat16_name,      float_f16_signature, F_S)   \
+   do_name(     floatToFloat16_name,                             "floatToFloat16")                                      \
+   do_signature(float_f16_signature,                             "(F)S")                                                \
                                                                                                                         \
   do_intrinsic(_compareUnsigned_i,        java_lang_Integer,      compareUnsigned_name,     int2_int_signature,  F_S)   \
   do_intrinsic(_compareUnsigned_l,        java_lang_Long,         compareUnsigned_name,     long2_int_signature, F_S)   \
@@ -261,7 +270,7 @@ class methodHandle;
   do_intrinsic(_identityHashCode,         java_lang_System,       identityHashCode_name, object_int_signature,   F_SN)  \
    do_name(     identityHashCode_name,                           "identityHashCode")                                    \
   do_intrinsic(_currentTimeMillis,        java_lang_System,       currentTimeMillis_name, void_long_signature,   F_SN)  \
-                                                                                                                       \
+                                                                                                                        \
    do_name(     currentTimeMillis_name,                          "currentTimeMillis")                                   \
   do_intrinsic(_nanoTime,                 java_lang_System,       nanoTime_name,          void_long_signature,   F_SN)  \
    do_name(     nanoTime_name,                                   "nanoTime")                                            \
@@ -277,12 +286,15 @@ class methodHandle;
   do_intrinsic(_currentThread,            java_lang_Thread,       currentThread_name, currentThread_signature,   F_SN)  \
    do_name(     currentThread_name,                              "currentThread")                                       \
    do_signature(currentThread_signature,                         "()Ljava/lang/Thread;")                                \
-  do_intrinsic(_extentLocalCache,          java_lang_Thread,       extentLocalCache_name, extentLocalCache_signature, F_SN) \
-   do_name(     extentLocalCache_name,                            "extentLocalCache")                                     \
-   do_signature(extentLocalCache_signature,                       "()[Ljava/lang/Object;")                               \
-  do_intrinsic(_setExtentLocalCache,       java_lang_Thread,       setExtentLocalCache_name, setExtentLocalCache_signature, F_SN) \
-   do_name(     setExtentLocalCache_name,                         "setExtentLocalCache")                                  \
-   do_signature(setExtentLocalCache_signature,                    "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_extentLocalCache,         java_lang_Thread,       extentLocalCache_name, extentLocalCache_signature, F_SN) \
+   do_name(     extentLocalCache_name,                           "extentLocalCache")                                    \
+   do_signature(extentLocalCache_signature,                      "()[Ljava/lang/Object;")                               \
+  do_intrinsic(_setExtentLocalCache,      java_lang_Thread,       setExtentLocalCache_name, setExtentLocalCache_signature, F_SN) \
+   do_name(     setExtentLocalCache_name,                        "setExtentLocalCache")                                 \
+   do_signature(setExtentLocalCache_signature,                   "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_findExtentLocalBindings,  java_lang_Thread,       findExtentLocalBindings_name, void_object_signature, F_SN) \
+   do_name(     findExtentLocalBindings_name,                    "findExtentLocalBindings")                             \
+                                                                                                                        \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \
                                                                                                                         \
@@ -321,6 +333,9 @@ class methodHandle;
   do_intrinsic(_onSpinWait,               java_lang_Thread,       onSpinWait_name, onSpinWait_signature,         F_S)   \
    do_name(     onSpinWait_name,                                  "onSpinWait")                                         \
    do_alias(    onSpinWait_signature,                             void_method_signature)                                \
+                                                                                                                        \
+  do_intrinsic(_ensureMaterializedForStackWalk, java_lang_Thread, ensureMaterializedForStackWalk_name, object_void_signature, F_SN)  \
+   do_name(     ensureMaterializedForStackWalk_name,              "ensureMaterializedForStackWalk")                     \
                                                                                                                         \
   do_intrinsic(_copyOf,                   java_util_Arrays,       copyOf_name, copyOf_signature,                 F_S)   \
    do_name(     copyOf_name,                                     "copyOf")                                              \

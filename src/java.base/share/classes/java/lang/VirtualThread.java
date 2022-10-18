@@ -24,6 +24,7 @@
  */
 package java.lang;
 
+import java.lang.ref.Reference;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Locale;
@@ -283,11 +284,14 @@ final class VirtualThread extends BaseVirtualThread {
             event.commit();
         }
 
+        Object bindings = extentLocalBindings();
+        ensureMaterializedForStackWalk(bindings);
         try {
             task.run();
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
+            Reference.reachabilityFence(bindings);
             try {
 
                 // pop any remaining scopes from the stack, this may block
@@ -352,6 +356,39 @@ final class VirtualThread extends BaseVirtualThread {
             setCarrierThread(null);
         }
         carrier.clearInterrupt();
+    }
+
+    /**
+     * Sets the current thread to the current carrier thread.
+     * @return true if JVMTI was notified
+     */
+    @ChangesCurrentThread
+    @JvmtiMountTransition
+    private boolean switchToCarrierThread() {
+        boolean notifyJvmti = notifyJvmtiEvents;
+        if (notifyJvmti) {
+            notifyJvmtiHideFrames(true);
+        }
+        Thread carrier = this.carrierThread;
+        assert Thread.currentThread() == this
+                && carrier == Thread.currentCarrierThread();
+        carrier.setCurrentThread(carrier);
+        return notifyJvmti;
+    }
+
+    /**
+     * Sets the current thread to the given virtual thread.
+     * If {@code notifyJvmti} is true then JVMTI is notified.
+     */
+    @ChangesCurrentThread
+    @JvmtiMountTransition
+    private void switchToVirtualThread(VirtualThread vthread, boolean notifyJvmti) {
+        Thread carrier = vthread.carrierThread;
+        assert carrier == Thread.currentCarrierThread();
+        carrier.setCurrentThread(vthread);
+        if (notifyJvmti) {
+            notifyJvmtiHideFrames(false);
+        }
     }
 
     /**
@@ -526,7 +563,7 @@ final class VirtualThread extends BaseVirtualThread {
             long startTime = System.nanoTime();
 
             boolean yielded;
-            Future<?> unparker = scheduleUnpark(nanos);
+            Future<?> unparker = scheduleUnpark(this::unpark, nanos);
             setState(PARKING);
             try {
                 yielded = yieldContinuation();
@@ -579,17 +616,16 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Schedules this thread to be unparked after the given delay.
+     * Schedule an unpark task to run after a given delay.
      */
     @ChangesCurrentThread
-    private Future<?> scheduleUnpark(long nanos) {
-        Thread carrier = this.carrierThread;
-        // need to switch to current platform thread to avoid nested parking
-        carrier.setCurrentThread(carrier);
+    private Future<?> scheduleUnpark(Runnable unparker, long nanos) {
+        // need to switch to current carrier thread to avoid nested parking
+        boolean notifyJvmti = switchToCarrierThread();
         try {
-            return UNPARKER.schedule(() -> unpark(), nanos, NANOSECONDS);
+            return UNPARKER.schedule(unparker, nanos, NANOSECONDS);
         } finally {
-            carrier.setCurrentThread(this);
+            switchToVirtualThread(this, notifyJvmti);
         }
     }
 
@@ -599,13 +635,12 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     private void cancel(Future<?> future) {
         if (!future.isDone()) {
-            Thread carrier = this.carrierThread;
-            // need to switch to current platform thread to avoid nested parking
-            carrier.setCurrentThread(carrier);
+            // need to switch to current carrier thread to avoid nested parking
+            boolean notifyJvmti = switchToCarrierThread();
             try {
                 future.cancel(false);
             } finally {
-                carrier.setCurrentThread(this);
+                switchToVirtualThread(this, notifyJvmti);
             }
         }
     }
@@ -625,12 +660,11 @@ final class VirtualThread extends BaseVirtualThread {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
                 if (currentThread instanceof VirtualThread vthread) {
-                    Thread carrier = vthread.carrierThread;
-                    carrier.setCurrentThread(carrier);
+                    boolean notifyJvmti = vthread.switchToCarrierThread();
                     try {
                         submitRunContinuation();
                     } finally {
-                        carrier.setCurrentThread(vthread);
+                        switchToVirtualThread(vthread, notifyJvmti);
                     }
                 } else {
                     submitRunContinuation();
@@ -1004,6 +1038,9 @@ final class VirtualThread extends BaseVirtualThread {
 
     @JvmtiMountTransition
     private native void notifyJvmtiUnmountEnd(boolean lastUnmount);
+
+    @JvmtiMountTransition
+    private native void notifyJvmtiHideFrames(boolean hide);
 
     private static native void registerNatives();
     static {

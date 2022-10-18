@@ -24,10 +24,10 @@
 /*
  * @test
  * @summary Test ThreadFlock with extent locals
+ * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
- * @compile --enable-preview -source ${jdk.version} ExtentLocalsTest.java
- * @run testng/othervm --enable-preview ExtentLocalsTest
+ * @run testng ExtentLocalsTest
  */
 
 import java.util.*;
