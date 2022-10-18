@@ -1363,14 +1363,14 @@ JVM_ENTRY(jobject, JVM_GetStackAccessControlContext(JNIEnv *env, jclass cls))
   return JNIHandles::make_local(THREAD, result);
 JVM_END
 
-class ExtentLocalBindingsResolver {
+class ScopedValueBindingsResolver {
 public:
   InstanceKlass* Carrier_klass;
   Method *vthread_run_runnable_method;
   Method *thread_run_method;
 
-  ExtentLocalBindingsResolver(JavaThread* THREAD) {
-    Klass *k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_incubator_concurrent_ExtentLocal_Carrier(), true, THREAD);
+  ScopedValueBindingsResolver(JavaThread* THREAD) {
+    Klass *k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_incubator_concurrent_ScopedValue_Carrier(), true, THREAD);
     Carrier_klass = InstanceKlass::cast(k);
 
     vthread_run_runnable_method = vmClasses::VirtualThread_klass()->find_instance_method
@@ -1383,14 +1383,14 @@ public:
   }
 };
 
-JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
+JVM_ENTRY(jobject, JVM_FindScopedValueBindings(JNIEnv *env, jclass cls))
   ResourceMark rm(THREAD);
   GrowableArray<Handle>* local_array = new GrowableArray<Handle>(12);
   JvmtiVMObjectAllocEventCollector oam;
 
   bool found = false;
 
-  static ExtentLocalBindingsResolver resolver(THREAD);
+  static ScopedValueBindingsResolver resolver(THREAD);
 
   // Iterate through Java frames
   vframeStream vfst(thread);
@@ -1413,7 +1413,7 @@ JVM_ENTRY(jobject, JVM_FindExtentLocalBindings(JNIEnv *env, jclass cls))
     if (loc != 0) {
       javaVFrame *frame = vfst.asJavaVFrame();
       StackValueCollection* locals = frame->locals();
-      StackValue* head_sv = locals->at(loc); // jdk/incubator/concurrent/ExtentLocal$Snapshot
+      StackValue* head_sv = locals->at(loc); // jdk/incubator/concurrent/ScopedValue$Snapshot
       Handle result = head_sv->get_obj();
       assert(!head_sv->obj_is_scalar_replaced(), "found scalar-replaced object");
       if (result() != NULL) {
@@ -3175,12 +3175,12 @@ JVM_ENTRY(void, JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring na
   }
 JVM_END
 
-JVM_ENTRY(jobject, JVM_ExtentLocalCache(JNIEnv* env, jclass threadClass))
+JVM_ENTRY(jobject, JVM_ScopedValueCache(JNIEnv* env, jclass threadClass))
   oop theCache = thread->extentLocalCache();
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
-JVM_ENTRY(void, JVM_SetExtentLocalCache(JNIEnv* env, jclass threadClass,
+JVM_ENTRY(void, JVM_SetScopedValueCache(JNIEnv* env, jclass threadClass,
                                        jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
   thread->set_extentLocalCache(objs);

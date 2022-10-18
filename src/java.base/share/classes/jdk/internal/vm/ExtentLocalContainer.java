@@ -35,24 +35,24 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
 /**
  * A StackableScope to represent extent-local bindings.
  *
- * This class defines static methods to run an operation with a ExtentLocalContainer
- * on the scope stack. It also defines a method to get the latest ExtentLocalContainer
+ * This class defines static methods to run an operation with a ScopedValueContainer
+ * on the scope stack. It also defines a method to get the latest ScopedValueContainer
  * and a method to return a snapshot of the extent local bindings.
  */
-public class ExtentLocalContainer extends StackableScope {
+public class ScopedValueContainer extends StackableScope {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         Unsafe.getUnsafe().ensureClassInitialized(StructureViolationExceptions.class);
     }
 
-    private ExtentLocalContainer() {
+    private ScopedValueContainer() {
     }
 
     /**
-     * Returns the "latest" ExtentLocalContainer for the current Thread. This may be on
+     * Returns the "latest" ScopedValueContainer for the current Thread. This may be on
      * the current thread's scope task or ma require walking up the tree to find it.
      */
-    public static <T extends ExtentLocalContainer> T latest(Class<T> containerClass) {
+    public static <T extends ScopedValueContainer> T latest(Class<T> containerClass) {
         StackableScope scope = head();
         if (scope == null) {
             scope = JLA.threadContainer(Thread.currentThread());
@@ -69,12 +69,12 @@ public class ExtentLocalContainer extends StackableScope {
     }
 
     /**
-     * Returns the "latest" ExtentLocalContainer for the current Thread. This
+     * Returns the "latest" ScopedValueContainer for the current Thread. This
      * may be on the current thread's scope task or may require walking up the
      * tree to find it.
      */
-    public static ExtentLocalContainer latest() {
-        return latest(ExtentLocalContainer.class);
+    public static ScopedValueContainer latest() {
+        return latest(ScopedValueContainer.class);
     }
 
     /**
@@ -82,7 +82,7 @@ public class ExtentLocalContainer extends StackableScope {
      * established for the current thread and extent local container.
      */
     public record BindingsSnapshot(Object extentLocalBindings,
-                                   ExtentLocalContainer container) { }
+                                   ScopedValueContainer container) { }
 
     /**
      * Returns the extent local bindings for the current thread.
@@ -92,14 +92,14 @@ public class ExtentLocalContainer extends StackableScope {
     }
 
     /**
-     * For use by ExtentLocal to run an operation in a structured context.
+     * For use by ScopedValue to run an operation in a structured context.
      */
     public static void run(Runnable op) {
         if (head() == null) {
             // no need to push scope when stack is empty
             runWithoutScope(op);
         } else {
-            new ExtentLocalContainer().doRun(op);
+            new ScopedValueContainer().doRun(op);
         }
     }
 
@@ -141,14 +141,14 @@ public class ExtentLocalContainer extends StackableScope {
     }
 
     /**
-     * For use by ExtentLocal to call a value returning operation in a structured context.
+     * For use by ScopedValue to call a value returning operation in a structured context.
      */
     public static <V> V call(Callable<V> op) throws Exception {
         if (head() == null) {
             // no need to push scope when stack is empty
             return callWithoutScope(op);
         } else {
-            return new ExtentLocalContainer().doCall(op);
+            return new ScopedValueContainer().doCall(op);
         }
     }
 

@@ -35,7 +35,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.ExtentLocalContainer;
+import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.ThreadContainers;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -99,7 +99,7 @@ public class ThreadFlock implements AutoCloseable {
     private volatile int threadCount;
 
     private final String name;
-    private final ExtentLocalContainer.BindingsSnapshot extentLocalBindings;
+    private final ScopedValueContainer.BindingsSnapshot extentLocalBindings;
     private final ThreadContainerImpl container; // encapsulate for now
 
     // state
@@ -111,7 +111,7 @@ public class ThreadFlock implements AutoCloseable {
 
     ThreadFlock(String name) {
         this.name = name;
-        this.extentLocalBindings = ExtentLocalContainer.captureBindings();
+        this.extentLocalBindings = ScopedValueContainer.captureBindings();
         this.container = new ThreadContainerImpl(this);
     }
 
@@ -119,7 +119,7 @@ public class ThreadFlock implements AutoCloseable {
         return threadCount;
     }
 
-    private ExtentLocalContainer.BindingsSnapshot extentLocalBindings() {
+    private ScopedValueContainer.BindingsSnapshot extentLocalBindings() {
         return extentLocalBindings;
     }
 
@@ -210,7 +210,7 @@ public class ThreadFlock implements AutoCloseable {
      * Opens a new thread flock. The flock is owned by the current thread. It can be
      * named to aid debugging.
      *
-     * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
+     * <p> This method captures the current thread's {@linkplain ScopedValue extent-local}
      * bindings for inheritance by threads created in the flock.
      *
      * <p> For the purposes of containment, monitoring, and debugging, the parent
@@ -401,7 +401,7 @@ public class ThreadFlock implements AutoCloseable {
      * closes this flock, and then throws {@link
      * jdk.incubator.concurrent.StructureViolationException}.
      * Similarly, if called to close a flock that <em>encloses</em> {@linkplain
-     * jdk.incubator.concurrent.ExtentLocal.Carrier#run(Runnable) operations} with
+     * jdk.incubator.concurrent.ScopedValue.Carrier#run(Runnable) operations} with
      * extent-local bindings then it also throws {@code StructureViolationException}
      * after closing the flock.
      *
@@ -585,7 +585,7 @@ public class ThreadFlock implements AutoCloseable {
             return flock.toString();
         }
         @Override
-        public ExtentLocalContainer.BindingsSnapshot extentLocalBindings() {
+        public ScopedValueContainer.BindingsSnapshot extentLocalBindings() {
             return flock.extentLocalBindings();
         }
     }

@@ -886,10 +886,10 @@ void SharedRuntime::throw_StackOverflowError_common(JavaThread* current, bool de
   if (StackTraceInThrowable) {
     java_lang_Throwable::fill_in_stack_trace(exception);
   }
-  // Remove the ExtentLocal cache in case we got a StackOverflowError
-  // while we were trying to remove ExtentLocal bindings.
+  // Remove the ScopedValue cache in case we got a StackOverflowError
+  // while we were trying to remove ScopedValue bindings.
   current->set_extentLocalCache(NULL);
-  // And the ExtentLocal bindings too.
+  // And the ScopedValue bindings too.
   oop threadObj = current->vthread();
   java_lang_Thread::clear_extentLocalBindings(threadObj);
   // Increment counter for hs_err file reporting

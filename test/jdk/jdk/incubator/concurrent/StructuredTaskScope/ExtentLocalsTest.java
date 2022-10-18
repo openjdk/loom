@@ -26,10 +26,10 @@
  * @summary Basic tests for StructuredTaskScope with extent-locals
  * @enablePreview
  * @modules jdk.incubator.concurrent
- * @run testng ExtentLocalsTest
+ * @run testng ScopedValuesTest
  */
 
-import jdk.incubator.concurrent.ExtentLocal;
+import jdk.incubator.concurrent.ScopedValue;
 import jdk.incubator.concurrent.StructuredTaskScope;
 import jdk.incubator.concurrent.StructureViolationException;
 import java.util.concurrent.Future;
@@ -37,15 +37,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ExtentLocalsTest {
+public class ScopedValuesTest {
 
     /**
      * Test that fork inherits extent-local bindings.
      */
     @Test
-    public void testForkInheritsExtentLocals1() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-        String value = ExtentLocal.where(NAME, "x").call(() -> {
+    public void testForkInheritsScopedValues1() throws Exception {
+        ScopedValue<String> NAME = ScopedValue.newInstance();
+        String value = ScopedValue.where(NAME, "x").call(() -> {
             try (var scope = new StructuredTaskScope()) {
                 Future<String> future = scope.fork(() -> {
                     // child
@@ -62,9 +62,9 @@ public class ExtentLocalsTest {
      * Test that fork inherits extent-local bindings into a grandchild.
      */
     @Test
-    public void testForkInheritsExtentLocals2() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-        String value = ExtentLocal.where(NAME, "x").call(() -> {
+    public void testForkInheritsScopedValues2() throws Exception {
+        ScopedValue<String> NAME = ScopedValue.newInstance();
+        String value = ScopedValue.where(NAME, "x").call(() -> {
             try (var scope1 = new StructuredTaskScope()) {
                 Future<String> future1 = scope1.fork(() -> {
                     try (var scope2 = new StructuredTaskScope()) {
@@ -89,14 +89,14 @@ public class ExtentLocalsTest {
      */
     @Test
     public void testStructureViolation1() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         class Box {
             StructuredTaskScope<Object> scope;
         }
         var box = new Box();
         try {
             try {
-                ExtentLocal.where(name, "x").run(() -> {
+                ScopedValue.where(name, "x").run(() -> {
                     box.scope = new StructuredTaskScope();
                 });
                 fail();
@@ -127,10 +127,10 @@ public class ExtentLocalsTest {
      */
     @Test
     public void testStructureViolation2() throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
+        ScopedValue<String> NAME = ScopedValue.newInstance();
 
         try (var scope = new StructuredTaskScope()) {
-            ExtentLocal.where(NAME, "x").run(() -> {
+            ScopedValue.where(NAME, "x").run(() -> {
                 assertThrows(StructureViolationException.class,
                         () -> scope.fork(() -> "foo"));
             });
@@ -143,13 +143,13 @@ public class ExtentLocalsTest {
      */
     @Test
     public void testStructureViolation3() throws Exception {
-        ExtentLocal<String> NAME1 = ExtentLocal.newInstance();
-        ExtentLocal<String> NAME2 = ExtentLocal.newInstance();
+        ScopedValue<String> NAME1 = ScopedValue.newInstance();
+        ScopedValue<String> NAME2 = ScopedValue.newInstance();
 
         // re-bind
-        ExtentLocal.where(NAME1, "x").run(() -> {
+        ScopedValue.where(NAME1, "x").run(() -> {
             try (var scope = new StructuredTaskScope()) {
-                ExtentLocal.where(NAME1, "y").run(() -> {
+                ScopedValue.where(NAME1, "y").run(() -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });
@@ -157,9 +157,9 @@ public class ExtentLocalsTest {
         });
 
         // new binding
-        ExtentLocal.where(NAME1, "x").run(() -> {
+        ScopedValue.where(NAME1, "x").run(() -> {
             try (var scope = new StructuredTaskScope()) {
-                ExtentLocal.where(NAME2, "y").run(() -> {
+                ScopedValue.where(NAME2, "y").run(() -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });

@@ -473,7 +473,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
 
   case vmIntrinsics::_extentLocalCache:          return inline_native_extentLocalCache();
-  case vmIntrinsics::_setExtentLocalCache:       return inline_native_setExtentLocalCache();
+  case vmIntrinsics::_setScopedValueCache:       return inline_native_setScopedValueCache();
 
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:              return inline_native_time_funcs(CAST_FROM_FN_PTR(address, JfrTime::time_function()), "counterTime");
@@ -3388,8 +3388,8 @@ bool LibraryCallKit::inline_native_extentLocalCache() {
   return true;
 }
 
-//------------------------inline_native_setExtentLocalCache------------------
-bool LibraryCallKit::inline_native_setExtentLocalCache() {
+//------------------------inline_native_setScopedValueCache------------------
+bool LibraryCallKit::inline_native_setScopedValueCache() {
   Node* arr = argument(0);
   Node* cache_obj_handle = extentLocalCache_helper();
 

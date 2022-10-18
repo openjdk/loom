@@ -35,7 +35,7 @@ import java.util.function.Supplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.vm.ExtentLocalContainer;
+import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.ReservedStackAccess;
@@ -52,16 +52,16 @@ import sun.security.action.GetPropertyAction;
  * <p> An extent-local variable is bound, meaning it gets a value, when invoking an
  * operation with the {@link Carrier#run(Runnable) Carrier.run} or {@link
  * Carrier#call(Callable) Carrier.call} methods. {@link Carrier Carrier} instances are
- * created by the static method {@link #where(ExtentLocal, Object)}. The operations
+ * created by the static method {@link #where(ScopedValue, Object)}. The operations
  * executed by the {@code run} and {@code call} methods use the {@link #get()} method to
  * read the value of a bound extent local. An extent-local variable reverts to being
  * unbound (or its previous value) when the operation completes.
  *
- * <p> An {@code ExtentLocal} object will typically be declared in a {@code private
+ * <p> An {@code ScopedValue} object will typically be declared in a {@code private
  * static final} field so that it can only be accessed by code in that class (or other
  * classes within its nest).
  *
- * <p> {@link ExtentLocal} bindings are immutable: there is no "{@code set}" method.
+ * <p> {@link ScopedValue} bindings are immutable: there is no "{@code set}" method.
  * There may be cases when an operation might need to use the same extent-local variable
  * to communicate a different value to the methods that it calls. The requirement is not
  * to change the original binding but to establish a new binding for nested calls. If an
@@ -87,11 +87,11 @@ import sun.security.action.GetPropertyAction;
  * The following example uses an extent local to make credentials available to callees.
  *
  * {@snippet lang=java :
- *   // @link substring="newInstance" target="ExtentLocal#newInstance" :
- *   private static final ExtentLocal<Credentials> CREDENTIALS = ExtentLocal.newInstance();
+ *   // @link substring="newInstance" target="ScopedValue#newInstance" :
+ *   private static final ScopedValue<Credentials> CREDENTIALS = ScopedValue.newInstance();
  *
  *   Credentials creds = ...
- *   ExtentLocal.where(CREDENTIALS, creds).run(() -> {
+ *   ScopedValue.where(CREDENTIALS, creds).run(() -> {
  *       ...
  *       Connection connection = connectDatabase();
  *       ...
@@ -100,7 +100,7 @@ import sun.security.action.GetPropertyAction;
  *   ...
  *
  *   Connection connectDatabase() {
- *       // @link substring="get" target="ExtentLocal#get" :
+ *       // @link substring="get" target="ScopedValue#get" :
  *       Credentials credentials = CREDENTIALS.get();
  *       ...
  *   }
@@ -130,23 +130,23 @@ import sun.security.action.GetPropertyAction;
  * <p>For this incubator release, we have provided some system properties
  * to tune the performance of extent-local variables.
  *
- * <p>The system property {@code jdk.incubator.concurrent.ExtentLocal.cacheSize}
+ * <p>The system property {@code jdk.incubator.concurrent.ScopedValue.cacheSize}
  * controls the size of the (per-thread) extent-local cache. This cache is crucial
  * for the performance of extent-local variables. If it is too small,
  * the runtime library will repeatedly need to scan for each
  * {@link #get}. If it is too large, memory will be unnecessarily
  * consumed. The default extent-local cache size is 16 entries. It may
- * be varied from 2 to 16 entries in size. {@code ExtentLocal.cacheSize}
+ * be varied from 2 to 16 entries in size. {@code ScopedValue.cacheSize}
  * must be an integer power of 2.
  *
- * <p>For example, you could use {@code -Djdk.incubator.concurrent.ExtentLocal.cacheSize=8}.
+ * <p>For example, you could use {@code -Djdk.incubator.concurrent.ScopedValue.cacheSize=8}.
  *
- * <p>The other system property is {@code jdk.preserveExtentLocalCache}.
+ * <p>The other system property is {@code jdk.preserveScopedValueCache}.
  * This property determines whether the per-thread extent-local
  * cache is preserved when a virtual thread is blocked. By default
  * this property is set to {@code true}, meaning that every virtual
  * thread preserves its extent-local cache when blocked. Like {@code
- * ExtentLocal.cacheSize}, this is a space versus speed trade-off: if
+ * ScopedValue.cacheSize}, this is a space versus speed trade-off: if
  * you have a great many virtual threads that are blocked most of the
  * time, setting this property to {@code false} might result in a
  * useful memory saving, but each virtual thread's extent-local cache
@@ -155,7 +155,7 @@ import sun.security.action.GetPropertyAction;
  * @param <T> the extent local's type
  * @since 19
  */
-public final class ExtentLocal<T> {
+public final class ScopedValue<T> {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     private final @Stable int hash;
@@ -164,7 +164,7 @@ public final class ExtentLocal<T> {
     public int hashCode() { return hash; }
 
     /**
-     * An immutable map from {@code ExtentLocal} to values.
+     * An immutable map from {@code ScopedValue} to values.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
      * or method in this class will cause a {@link NullPointerException} to be thrown.
@@ -188,7 +188,7 @@ public final class ExtentLocal<T> {
             this.bitmask = 0;
         }
 
-        Object find(ExtentLocal<?> key) {
+        Object find(ScopedValue<?> key) {
             int bits = key.bitmask();
             for (Snapshot snapshot = this;
                  containsAll(snapshot.bitmask, bits);
@@ -231,11 +231,11 @@ public final class ExtentLocal<T> {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache.
         final int bitmask;
-        final ExtentLocal<?> key;
+        final ScopedValue<?> key;
         final Object value;
         final Carrier prev;
 
-        Carrier(ExtentLocal<?> key, Object value, Carrier prev) {
+        Carrier(ScopedValue<?> key, Object value, Carrier prev) {
             this.key = key;
             this.value = value;
             this.prev = prev;
@@ -249,7 +249,7 @@ public final class ExtentLocal<T> {
         /**
          * Add a binding to this map, returning a new Carrier instance.
          */
-        private static final <T> Carrier where(ExtentLocal<T> key, T value,
+        private static final <T> Carrier where(ScopedValue<T> key, T value,
                                                Carrier prev) {
             return new Carrier(key, value, prev);
         }
@@ -260,20 +260,20 @@ public final class ExtentLocal<T> {
          * already has a mapping for the extent-local variable {@code key} then the new
          * value added by this method overrides the previous mapping. That is to say, if
          * there is a list of {@code where(...)} clauses, the rightmost clause wins.
-         * @param key   the ExtentLocal to bind a value to
+         * @param key   the ScopedValue to bind a value to
          * @param value the new value, can be {@code null}
-         * @param <T>   the type of the ExtentLocal
+         * @param <T>   the type of the ScopedValue
          * @return a new carrier, consisting of {@code this} plus a new binding
          * ({@code this} is unchanged)
          */
-        public <T> Carrier where(ExtentLocal<T> key, T value) {
+        public <T> Carrier where(ScopedValue<T> key, T value) {
             return where(key, value, this);
         }
 
         /*
          * Return a new set consisting of a single binding.
          */
-        static <T> Carrier of(ExtentLocal<T> key, T value) {
+        static <T> Carrier of(ScopedValue<T> key, T value) {
             return where(key, value, null);
         }
 
@@ -281,19 +281,19 @@ public final class ExtentLocal<T> {
             return value;
         }
 
-        final ExtentLocal<?> getKey() {
+        final ScopedValue<?> getKey() {
             return key;
         }
 
         /**
          * Returns the value of a variable in this map of extent-local variables.
-         * @param key the ExtentLocal variable
-         * @param <T> the type of the ExtentLocal
+         * @param key the ScopedValue variable
+         * @param <T> the type of the ScopedValue
          * @return the value
          * @throws NoSuchElementException if key is not bound to any value
          */
         @SuppressWarnings("unchecked")
-        public <T> T get(ExtentLocal<T> key) {
+        public <T> T get(ScopedValue<T> key) {
             var bits = key.bitmask();
             for (Carrier carrier = this;
                  carrier != null && containsAll(carrier.bitmask, bits);
@@ -308,7 +308,7 @@ public final class ExtentLocal<T> {
 
         /**
          * Runs a value-returning operation with this map of extent-local variables bound
-         * to values. Code invoked by {@code op} can use the {@link ExtentLocal#get()
+         * to values. Code invoked by {@code op} can use the {@link ScopedValue#get()
          * get} method to get the value of the extent local. The extent-local variables
          * revert to their previous values or become {@linkplain #isBound() unbound} when
          * the operation completes.
@@ -331,20 +331,20 @@ public final class ExtentLocal<T> {
             var newSnapshot = new Snapshot(this, prevSnapshot);
             R result;
             try {
-                JLA.setExtentLocalBindings(newSnapshot);
+                JLA.setScopedValueBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
-                result = ExtentLocalContainer.call(op);
+                result = ScopedValueContainer.call(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setExtentLocalBindings(prevSnapshot);
+                JLA.setScopedValueBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
             return result;
         }
 
         /**
-         * Runs an operation with this map of ExtentLocals bound to values. Code executed
-         * by the operation can use the {@link ExtentLocal#get() get()} method to get the
+         * Runs an operation with this map of ScopedValues bound to values. Code executed
+         * by the operation can use the {@link ScopedValue#get() get()} method to get the
          * value of the extent local. The extent-local variables revert to their previous
          * values or becomes {@linkplain #isBound() unbound} when the operation completes.
          *
@@ -364,12 +364,12 @@ public final class ExtentLocal<T> {
             var prevSnapshot = extentLocalBindings();
             newSnapshot = new Snapshot(this, prevSnapshot);
             try {
-                JLA.setExtentLocalBindings(newSnapshot);
+                JLA.setScopedValueBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
-                ExtentLocalContainer.run(op);
+                ScopedValueContainer.run(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setExtentLocalBindings(prevSnapshot);
+                JLA.setScopedValueBindings(prevSnapshot);
                 Cache.invalidate(bitmask);
             }
         }
@@ -381,43 +381,43 @@ public final class ExtentLocal<T> {
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier Carrier}
      * by further calls to this method.
      *
-     * @param key the ExtentLocal to bind
+     * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
-     * @param <T> the type of the ExtentLocal
+     * @param <T> the type of the ScopedValue
      * @return A Carrier instance that contains one binding, that of key and value
      */
-    public static <T> Carrier where(ExtentLocal<T> key, T value) {
+    public static <T> Carrier where(ScopedValue<T> key, T value) {
         return Carrier.of(key, value);
     }
 
     /**
      * Creates a binding for an extent-local variable and runs a
-     * value-returning operation with that {@link ExtentLocal} bound to the value.
-     * @param key the ExtentLocal to bind
+     * value-returning operation with that {@link ScopedValue} bound to the value.
+     * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
-     * @param <T> the type of the ExtentLocal
+     * @param <T> the type of the ScopedValue
      * @param <U> the type of the Result
      * @param op the operation to call
      * @return the result
      * @throws Exception if the operation completes with an exception
      */
-    public static <T, U> U where(ExtentLocal<T> key, T value, Callable<U> op) throws Exception {
+    public static <T, U> U where(ScopedValue<T> key, T value, Callable<U> op) throws Exception {
         return where(key, value).call(op);
     }
 
     /**
      * Creates a binding for extent-local variable and runs an
-     * operation with that  {@link ExtentLocal} bound to the value.
-     * @param key the ExtentLocal to bind
+     * operation with that  {@link ScopedValue} bound to the value.
+     * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
-     * @param <T> the type of the ExtentLocal
+     * @param <T> the type of the ScopedValue
      * @param op the operation to run
      */
-    public static <T> void where(ExtentLocal<T> key, T value, Runnable op) {
+    public static <T> void where(ScopedValue<T> key, T value, Runnable op) {
         where(key, value).run(op);
     }
 
-    private ExtentLocal() {
+    private ScopedValue() {
         this.hash = generateKey();
     }
 
@@ -427,8 +427,8 @@ public final class ExtentLocal<T> {
      * @param <T> the type of the extent local's value.
      * @return an extent-local variable
      */
-    public static <T> ExtentLocal<T> newInstance() {
-        return new ExtentLocal<T>();
+    public static <T> ScopedValue<T> newInstance() {
+        return new ScopedValue<T>();
     }
 
     /**
@@ -471,7 +471,7 @@ public final class ExtentLocal<T> {
      */
     public boolean isBound() {
         // ??? Do we want to search cache for this? In most cases we don't expect
-        // this {@link ExtentLocal} to be bound, so it's not worth it. But I may
+        // this {@link ScopedValue} to be bound, so it's not worth it. But I may
         // be wrong about that.
 /*
         if (Cache.find(this) != Snapshot.NIL) {
@@ -529,8 +529,8 @@ public final class ExtentLocal<T> {
         return JLA.extentLocalCache();
     }
 
-    private static void setExtentLocalCache(Object[] cache) {
-        JLA.setExtentLocalCache(cache);
+    private static void setScopedValueCache(Object[] cache) {
+        JLA.setScopedValueCache(cache);
     }
 
     private static Snapshot extentLocalBindings() {
@@ -542,7 +542,7 @@ public final class ExtentLocal<T> {
         // 3: A Snapshot instance: this contains one or more extent local
         // bindings.
         // 4: null: there may be some bindings in this Thread, but we don't know
-        // where they are. We must invoke JLA.findExtentLocalBindings() to walk
+        // where they are. We must invoke JLA.findScopedValueBindings() to walk
         // the stack to find them.
 
         Object bindings = JLA.extentLocalBindings();
@@ -552,7 +552,7 @@ public final class ExtentLocal<T> {
         }
         if (bindings == null) {
             // Search the stack
-            bindings = JLA.findExtentLocalBindings();
+            bindings = JLA.findScopedValueBindings();
             if (bindings == null) {
                 // Nothing on the stack.
                 return EmptySnapshot.getInstance();
@@ -579,9 +579,9 @@ public final class ExtentLocal<T> {
     }
 
     /**
-     * Return a bit mask that may be used to determine if this ExtentLocal is
+     * Return a bit mask that may be used to determine if this ScopedValue is
      * bound in the current context. Each Carrier holds a bit mask which is
-     * the OR of all the bit masks of the bound ExtentLocals.
+     * the OR of all the bit masks of the bound ScopedValues.
      * @return the bitmask
      */
     int bitmask() {
@@ -611,7 +611,7 @@ public final class ExtentLocal<T> {
         private static final int MAX_CACHE_SIZE = 16;
 
         static {
-            final String propertyName = "jdk.incubator.concurrent.ExtentLocal.cacheSize";
+            final String propertyName = "jdk.incubator.concurrent.ScopedValue.cacheSize";
             var sizeString = GetPropertyAction.privilegedGetProperty(propertyName, "16");
             var cacheSize = Integer.valueOf(sizeString);
             if (cacheSize < 2 || cacheSize > MAX_CACHE_SIZE) {
@@ -626,19 +626,19 @@ public final class ExtentLocal<T> {
             SLOT_MASK = cacheSize - 1;
         }
 
-        static final int primaryIndex(ExtentLocal<?> key) {
+        static final int primaryIndex(ScopedValue<?> key) {
             return key.hash & TABLE_MASK;
         }
 
-        static final int secondaryIndex(ExtentLocal<?> key) {
+        static final int secondaryIndex(ScopedValue<?> key) {
             return (key.hash >> INDEX_BITS) & TABLE_MASK;
         }
 
-        private static final int primarySlot(ExtentLocal<?> key) {
+        private static final int primarySlot(ScopedValue<?> key) {
             return key.hashCode() & SLOT_MASK;
         }
 
-        private static final int secondarySlot(ExtentLocal<?> key) {
+        private static final int secondarySlot(ScopedValue<?> key) {
             return (key.hash >> INDEX_BITS) & SLOT_MASK;
         }
 
@@ -650,11 +650,11 @@ public final class ExtentLocal<T> {
             return (hash >> INDEX_BITS) & SLOT_MASK;
         }
 
-        static void put(ExtentLocal<?> key, Object value) {
+        static void put(ScopedValue<?> key, Object value) {
             Object[] theCache = extentLocalCache();
             if (theCache == null) {
                 theCache = new Object[CACHE_TABLE_SIZE * 2];
-                setExtentLocalCache(theCache);
+                setScopedValueCache(theCache);
             }
             // Update the cache to replace one entry with the value we just looked up.
             // Each value can be in one of two possible places in the cache.
@@ -703,7 +703,7 @@ public final class ExtentLocal<T> {
 
         @ReservedStackAccess @DontInline
         public static void invalidate() {
-            setExtentLocalCache(null);
+            setScopedValueCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given

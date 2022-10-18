@@ -23,14 +23,14 @@
 
 /**
  * @test
- * @summary Stress test for ExtentLocal
+ * @summary Stress test for ScopedValue
  * @modules jdk.incubator.concurrent
  * @compile --enable-preview -source ${jdk.version} Stress.java
  * @run testng/othervm/timeout=300 -XX:-TieredCompilation --enable-preview Stress
  * @run testng/othervm/timeout=300 --enable-preview Stress
  */
 
-import jdk.incubator.concurrent.ExtentLocal;
+import jdk.incubator.concurrent.ScopedValue;
 import jdk.incubator.concurrent.StructuredTaskScope;
 import jdk.incubator.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
@@ -39,28 +39,28 @@ import static org.testng.Assert.*;
 
 public class Stress {
 
-    ExtentLocal<Integer> sl1 = ExtentLocal.newInstance();
-    ExtentLocal<Integer> sl2 = ExtentLocal.newInstance();
+    ScopedValue<Integer> sl1 = ScopedValue.newInstance();
+    ScopedValue<Integer> sl2 = ScopedValue.newInstance();
 
-    static final ExtentLocal<ThreadFactory> factory = ExtentLocal.newInstance();
-    static final ExtentLocal.Carrier platformFactoryCarrier = ExtentLocal.where(factory, Thread.ofPlatform().factory());
-    static final ExtentLocal.Carrier virtualFactoryCarrier = ExtentLocal.where(factory, Thread.ofVirtual().factory());
+    static final ScopedValue<ThreadFactory> factory = ScopedValue.newInstance();
+    static final ScopedValue.Carrier platformFactoryCarrier = ScopedValue.where(factory, Thread.ofPlatform().factory());
+    static final ScopedValue.Carrier virtualFactoryCarrier = ScopedValue.where(factory, Thread.ofVirtual().factory());
 
-    final ExtentLocal<Integer>[] scopeLocals;
+    final ScopedValue<Integer>[] scopeLocals;
 
     Stress() {
-        scopeLocals = new ExtentLocal[500];
+        scopeLocals = new ScopedValue[500];
         for (int i = 0; i < scopeLocals.length; i++) {
-            scopeLocals[i] = ExtentLocal.newInstance();
+            scopeLocals[i] = ScopedValue.newInstance();
         }
     }
 
     private class MyBanger implements Runnable {
-        final ExtentLocal.Binder binder;
+        final ScopedValue.Binder binder;
         boolean shouldRunOutOfMemory;
         boolean failed = false;
 
-        MyBanger(ExtentLocal.Binder binder, boolean shouldRunOutOfMemory) {
+        MyBanger(ScopedValue.Binder binder, boolean shouldRunOutOfMemory) {
             this.binder = binder;
             this.shouldRunOutOfMemory = shouldRunOutOfMemory;
         }
@@ -83,7 +83,7 @@ public class Stress {
         public void run() {
             int n = sl1.get();
             try {
-                ExtentLocal.where(sl1, n + 1).run(this);
+                ScopedValue.where(sl1, n + 1).run(this);
             } catch (StackOverflowError e) {
                 if (sl1.get() != n) {
                     failed = true;
@@ -100,11 +100,11 @@ public class Stress {
     }
 
     public void stackOverflow() {
-        ExtentLocal.Binder binder = sl2.bind(99);
+        ScopedValue.Binder binder = sl2.bind(99);
         try {
             var myBanger = new MyBanger(binder, false);
             try {
-                ExtentLocal.where(sl1, 0, myBanger);
+                ScopedValue.where(sl1, 0, myBanger);
             } catch (RuntimeException e) {
                 assertFalse(sl1.isBound());
             } finally {
@@ -121,7 +121,7 @@ public class Stress {
             if (depth > 0) {
                 try (var unused = scopeLocals[depth].bind(depth)) {
                     var vx = scopeLocals[depth].get();
-                    return ExtentLocal.where(sl1, sl1.get() + 1)
+                    return ScopedValue.where(sl1, sl1.get() + 1)
                             .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
                             .call(() -> scopeLocals[depth].get() + deepBindings(depth - 1) + sl1.get());
                 }
@@ -136,7 +136,7 @@ public class Stress {
     private void deepBindings() {
         int result;
         try {
-            result = ExtentLocal.where(sl2, 42).where(sl1, 99).call(() ->
+            result = ScopedValue.where(sl2, 42).where(sl1, 99).call(() ->
                     deepBindings(scopeLocals.length - 1));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -149,7 +149,7 @@ public class Stress {
             try (var unused = scopeLocals[depth].bind(depth)) {
                 try (var structuredTaskScope = new StructuredTaskScope<Integer>(null, factory.get())) {
                     var future = structuredTaskScope.fork(
-                            () -> ExtentLocal.where(sl1, sl1.get() + 1)
+                            () -> ScopedValue.where(sl1, sl1.get() + 1)
                                     .where(scopeLocals[depth], scopeLocals[depth].get() * 2)
                                     .call(() -> scopeLocals[depth].get() + deepBindings2(depth - 1) + sl1.get()));
                     structuredTaskScope.join();
@@ -161,15 +161,15 @@ public class Stress {
         }
     }
 
-    // Serious abuse of ExtentLocals. Make sure everything still works,
+    // Serious abuse of ScopedValues. Make sure everything still works,
     // even with a ridiculous number of bindings.
     @Test
-    public void manyExtentLocals() {
-        ExtentLocal<Object>[] scopeLocals = new ExtentLocal[10_000];
-        ExtentLocal.Binder[] binders = new ExtentLocal.Binder[scopeLocals.length];
+    public void manyScopedValues() {
+        ScopedValue<Object>[] scopeLocals = new ScopedValue[10_000];
+        ScopedValue.Binder[] binders = new ScopedValue.Binder[scopeLocals.length];
 
         for (int i = 0; i < scopeLocals.length; i++) {
-            scopeLocals[i] = ExtentLocal.newInstance();
+            scopeLocals[i] = ScopedValue.newInstance();
             binders[i] = scopeLocals[i].bind(i);
         }
         long n = 0;
@@ -208,7 +208,7 @@ public class Stress {
         assertEquals(caught, 0);
     }
 
-    private void testDeepBindings(ExtentLocal.Carrier factoryCarrier) {
+    private void testDeepBindings(ScopedValue.Carrier factoryCarrier) {
         int val = 0;
         try (var unused = factoryCarrier.where(sl2, 42).where(sl1, 99).bind()) {
             val = deepBindings2(scopeLocals.length - 1);
@@ -244,7 +244,7 @@ public class Stress {
     }
 
     void run() {
-        manyExtentLocals();
+        manyScopedValues();
         platformFactorydeepBindings();
         stackOverflowTest();
         virtualFactorydeepBindings();

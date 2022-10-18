@@ -23,12 +23,12 @@
 
 /**
  * @test
- * @summary Basic test for ExtentLocal
+ * @summary Basic test for ScopedValue
  * @modules jdk.incubator.concurrent
  * @run testng Basic
  */
 
-import jdk.incubator.concurrent.ExtentLocal;
+import jdk.incubator.concurrent.ScopedValue;
 import jdk.incubator.concurrent.StructureViolationException;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
@@ -44,18 +44,18 @@ public class Basic {
 
     @Test
     public void testUnbound1() {
-        ExtentLocal<String> v = ExtentLocal.newInstance();
+        ScopedValue<String> v = ScopedValue.newInstance();
         assertFalse(v.isBound());
         assertThrows(NoSuchElementException.class, () -> v.get());
     }
 
     @Test
     public void testOrElse() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         assertFalse(name.isBound());
         assertTrue(name.orElse(null) == null);
         assertEquals(name.orElse("default"), "default");
-        ExtentLocal.where(name, "fred", () -> {
+        ScopedValue.where(name, "fred", () -> {
             assertEquals(name.orElse(null), "fred");
             assertEquals(name.orElse("default"), "fred");
         });
@@ -63,11 +63,11 @@ public class Basic {
 
     @Test
     public void testOrElseThrow() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         assertFalse(name.isBound());
         assertThrows(IllegalStateException.class, () -> name.orElseThrow(IllegalStateException::new));
         assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
-        ExtentLocal.where(name, "fred", () -> {
+        ScopedValue.where(name, "fred", () -> {
             assertEquals(name.orElseThrow(IllegalStateException::new), "fred");
             assertThrows(NullPointerException.class, () -> name.orElseThrow(null));
         });
@@ -75,8 +75,8 @@ public class Basic {
 
     @Test
     public void testRunWithBinding1() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
         });
@@ -84,12 +84,12 @@ public class Basic {
 
     @Test
     public void testRunWithBinding2() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            ExtentLocal.where(name, "joe", () -> {
+            ScopedValue.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 assertTrue("joe".equals(name.get()));
             });
@@ -101,8 +101,8 @@ public class Basic {
 
     @Test
     public void testRunWithBinding3() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        ExtentLocal.where(name, null, () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        ScopedValue.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
         });
@@ -110,12 +110,12 @@ public class Basic {
 
     @Test
     public void testRunWithBinding4() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             assertTrue("fred".equals(name.get()));
 
-            ExtentLocal.where(name, null, () -> {
+            ScopedValue.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
             });
@@ -127,15 +127,15 @@ public class Basic {
 
     @Test
     public void testRunWithBinding9() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         assertThrows(NullPointerException.class,
-                     () -> ExtentLocal.where(name, "fred", (Runnable) null));
+                     () -> ScopedValue.where(name, "fred", (Runnable) null));
     }
 
     @Test
     public void testCallWithBinding1() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        int result = ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        int result = ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value = name.get();
             assertTrue("fred".equals(value));
@@ -146,13 +146,13 @@ public class Basic {
 
     @Test
     public void testCallWithBinding2() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        int result1 = ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        int result1 = ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
 
-            int result2 = ExtentLocal.where(name, "joe", () -> {
+            int result2 = ScopedValue.where(name, "joe", () -> {
                 assertTrue(name.isBound());
                 String value2 = name.get();
                 assertTrue("joe".equals(value2));
@@ -167,8 +167,8 @@ public class Basic {
 
     @Test
     public void testCallWithBinding3() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        int result = ExtentLocal.where(name, null, () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        int result = ScopedValue.where(name, null, () -> {
             assertTrue(name.isBound());
             assertTrue(name.get() == null);
             return 1;
@@ -178,13 +178,13 @@ public class Basic {
 
     @Test
     public void testCallWithBinding4() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
-        int result1 = ExtentLocal.where(name, "fred", () -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        int result1 = ScopedValue.where(name, "fred", () -> {
             assertTrue(name.isBound());
             String value1 = name.get();
             assertTrue("fred".equals(value1));
 
-            int result2 = ExtentLocal.where(name, null, () -> {
+            int result2 = ScopedValue.where(name, null, () -> {
                 assertTrue(name.isBound());
                 assertTrue(name.get() == null);
                 return 2;
@@ -198,8 +198,8 @@ public class Basic {
 
     @Test
     public void testCallWithBinding9() throws Exception {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         assertThrows(NullPointerException.class,
-                     () -> ExtentLocal.where(name, "fred", (Callable) null));
+                     () -> ScopedValue.where(name, "fred", (Callable) null));
     }
 }

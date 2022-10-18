@@ -454,7 +454,7 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   vframeArray* array = create_vframeArray(current, deoptee, &map, chunk, realloc_failures);
 #if COMPILER2_OR_JVMCI
   if (realloc_failures) {
-    // FIXME: This very crudely destroys all ExtentLocal bindings. This
+    // FIXME: This very crudely destroys all ScopedValue bindings. This
     // is better than a bound value escaping, but far from ideal.
     oop java_thread = current->threadObj();
     current->set_extentLocalCache(NULL);

@@ -224,7 +224,7 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> The tree structure supports:
  * <ul>
- *   <li> Inheritance of {@linkplain ExtentLocal extent-local} variables across threads.
+ *   <li> Inheritance of {@linkplain ScopedValue extent-local} variables across threads.
  *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
  *   descriptions means threads started in the task scope or descendant scopes.
  * </ul>
@@ -232,14 +232,14 @@ import jdk.internal.misc.ThreadFlock;
  * <p> The following example demonstrates the inheritance of an extent-local variable. An
  * extent local {@code NAME} is bound to the value "duke". A StructuredTaskScope is created
  * and its {@code fork} method invoked to start a thread to execute {@code childTask}.
- * The thread inherits the extent-local {@linkplain ExtentLocal.Carrier bindings} captured
+ * The thread inherits the extent-local {@linkplain ScopedValue.Carrier bindings} captured
  * when creating the task scope. The code in {@code childTask} uses the value of the
  * extent-local and so reads the value "duke".
  * {@snippet lang=java :
- *     private static final ExtentLocal<String> NAME = ExtentLocal.newInstance();
+ *     private static final ScopedValue<String> NAME = ScopedValue.newInstance();
  *
- *     // @link substring="where" target="ExtentLocal#where" :
- *     ExtentLocal.where(NAME, "duke").run(() -> {
+ *     // @link substring="where" target="ScopedValue#where" :
+ *     ScopedValue.where(NAME, "duke").run(() -> {
  *         try (var scope = new StructuredTaskScope<String>()) {
  *
  *             scope.fork(() -> childTask());           // @highlight substring="fork"
@@ -311,7 +311,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * tasks are {@linkplain #fork(Callable) forked}. The task scope is owned by the
      * current thread.
      *
-     * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
+     * <p> This method captures the current thread's {@linkplain ScopedValue extent-local}
      * bindings for inheritance by threads created in the task scope. The
      * <a href="#TreeStructure">Tree Structure</a> section in the class description
      * details how parent-child relations are established implicitly for the purpose of
@@ -405,7 +405,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Starts a new thread to run the given task.
      *
      * <p> The new thread is created with the task scope's {@link ThreadFactory}. It
-     * inherits the current thread's {@linkplain ExtentLocal extent-local} bindings. The
+     * inherits the current thread's {@linkplain ScopedValue extent-local} bindings. The
      * bindings must match the bindings captured when the task scope was created.
      *
      * <p> If the task completes before the task scope is {@link #shutdown() shutdown}
@@ -671,7 +671,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * throws {@link StructureViolationException}.
      *
      * Similarly, if called to close a task scope that <em>encloses</em> {@linkplain
-     * ExtentLocal.Carrier#run(Runnable) operations} with extent-local bindings then
+     * ScopedValue.Carrier#run(Runnable) operations} with extent-local bindings then
      * it also throws {@code StructureViolationException} after closing the task scope.
      *
      * If a thread terminates without first closing task scopes that it owns then
@@ -870,7 +870,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
          * owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
+         * <p> This method captures the current thread's {@linkplain ScopedValue extent-local}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established
@@ -1052,7 +1052,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope
          * is owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ExtentLocal extent-local}
+         * <p> This method captures the current thread's {@linkplain ScopedValue extent-local}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established

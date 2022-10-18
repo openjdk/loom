@@ -24,15 +24,15 @@
 
 package org.openjdk.bench.jdk.incubator.concurrent;
 
-import jdk.incubator.concurrent.ExtentLocal;
+import jdk.incubator.concurrent.ScopedValue;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
-import static org.openjdk.bench.jdk.incubator.concurrent.ExtentLocalsData.*;
+import static org.openjdk.bench.jdk.incubator.concurrent.ScopedValuesData.*;
 
 /**
- * Tests ExtentLocal
+ * Tests ScopedValue
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -40,24 +40,24 @@ import static org.openjdk.bench.jdk.incubator.concurrent.ExtentLocalsData.*;
 @Measurement(iterations=10, time=1)
 @Threads(1)
 @Fork(value = 1,
-      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.jdk.incubator.concurrent.ExtentLocalsExecutorService",
+      jvmArgsPrepend = {"-Djmh.executor.class=org.openjdk.bench.jdk.incubator.concurrent.ScopedValuesExecutorService",
                         "-Djmh.executor=CUSTOM",
                         "-Djmh.blackhole.mode=COMPILER",
                         "--add-modules=jdk.incubator.concurrent",
                         "--enable-preview"})
 @State(Scope.Thread)
 @SuppressWarnings("preview")
-public class ExtentLocals {
+public class ScopedValues {
 
     private static final Integer THE_ANSWER = 42;
 
-    // Test 1: make sure ExtentLocal.get() is hoisted out of loops.
+    // Test 1: make sure ScopedValue.get() is hoisted out of loops.
 
     @Benchmark
-    public void thousandAdds_ExtentLocal(Blackhole bh) throws Exception {
+    public void thousandAdds_ScopedValue(Blackhole bh) throws Exception {
         int result = 0;
         for (int i = 0; i < 1_000; i++) {
-            result += ExtentLocalsData.sl1.get();
+            result += ScopedValuesData.sl1.get();
         }
         bh.consume(result);
     }
@@ -66,21 +66,21 @@ public class ExtentLocals {
     public void thousandAdds_ThreadLocal(Blackhole bh) throws Exception {
         int result = 0;
         for (int i = 0; i < 1_000; i++) {
-            result += ExtentLocalsData.tl1.get();
+            result += ScopedValuesData.tl1.get();
         }
         bh.consume(result);
     }
 
-    // Test 2: stress the ExtentLocal cache.
+    // Test 2: stress the ScopedValue cache.
     // The idea here is to use a bunch of bound values cyclically, which
-    // stresses the ExtentLocal cache.
+    // stresses the ScopedValue cache.
 
     int combine(int n, int i1, int i2, int i3, int i4, int i5, int i6) {
         return n + ((i1 ^ i2 >>> 6) + (i3 << 7) + i4 - i5 | i6);
     }
 
     @Benchmark
-    public int sixValues_ExtentLocal() throws Exception {
+    public int sixValues_ScopedValue() throws Exception {
         int result = 0;
         for (int i = 0 ; i < 166; i++) {
             result = combine(result, sl1.get(), sl2.get(), sl3.get(), sl4.get(), sl5.get(), sl6.get());
@@ -98,23 +98,23 @@ public class ExtentLocals {
     }
 
     // Test 3: The cost of bind, then get
-    // This is the worst case for ExtentLocals because we have to create
+    // This is the worst case for ScopedValues because we have to create
     // a binding, link it in, then search the current bindings. In addition, we
     // create a cache entry for the bound value, then we immediately have to
     // destroy it.
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public int CreateBindThenGetThenRemove_ExtentLocal() throws Exception {
-        return ExtentLocal.where(sl1, THE_ANSWER).call(sl1::get);
+    public int CreateBindThenGetThenRemove_ScopedValue() throws Exception {
+        return ScopedValue.where(sl1, THE_ANSWER).call(sl1::get);
     }
 
 
     // Create a Carrier ahead of time: might be slightly faster
-    private static final ExtentLocal.Carrier HOLD_42 = ExtentLocal.where(sl1, 42);
+    private static final ScopedValue.Carrier HOLD_42 = ScopedValue.where(sl1, 42);
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public int bindThenGetThenRemove_ExtentLocal() throws Exception {
+    public int bindThenGetThenRemove_ScopedValue() throws Exception {
         return HOLD_42.call(sl1::get);
     }
 
@@ -129,7 +129,7 @@ public class ExtentLocals {
         }
     }
 
-    // This has no exact equivalent in ExtentLocal, but it's provided here for
+    // This has no exact equivalent in ScopedValue, but it's provided here for
     // information.
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -142,7 +142,7 @@ public class ExtentLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public Object bind_ExtentLocal() throws Exception {
+    public Object bind_ScopedValue() throws Exception {
         return HOLD_42.call(this::getClass);
     }
 
@@ -158,7 +158,7 @@ public class ExtentLocals {
     }
 
     // Simply set a ThreadLocal so that the caller can see it
-    // This has no exact equivalent in ExtentLocal, but it's provided here for
+    // This has no exact equivalent in ScopedValue, but it's provided here for
     // information.
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -167,11 +167,11 @@ public class ExtentLocals {
     }
 
     // This is the closest I can think of to setNoRemove_ThreadLocal in that it
-    // returns a value in a ExtentLocal container. The container must already
+    // returns a value in a ScopedValue container. The container must already
     // be bound to an AtomicReference for this to work.
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void setNoRemove_ExtentLocal() throws Exception {
+    public void setNoRemove_ScopedValue() throws Exception {
         sl_atomicRef.get().setPlain(THE_ANSWER);
     }
 
@@ -179,7 +179,7 @@ public class ExtentLocals {
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void counter_ExtentLocal() {
+    public void counter_ScopedValue() {
         sl_atomicInt.get().setPlain(
                 sl_atomicInt.get().getPlain() + 1);
     }

@@ -482,7 +482,7 @@ public interface JavaLangAccess {
     /**
      * Sets the current thread's extent locals cache
      */
-    void setExtentLocalCache(Object[] cache);
+    void setScopedValueCache(Object[] cache);
 
     /**
      * Return the current thread's extent local bindings.
@@ -492,9 +492,9 @@ public interface JavaLangAccess {
     /**
      * Set the current thread's extent local bindings.
      */
-    void setExtentLocalBindings(Object bindings);
+    void setScopedValueBindings(Object bindings);
 
-    Object findExtentLocalBindings();
+    Object findScopedValueBindings();
 
     void ensureMaterializedForStackWalk(Object value);
 

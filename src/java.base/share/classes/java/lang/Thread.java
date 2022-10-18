@@ -49,7 +49,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
-import jdk.internal.vm.ExtentLocalContainer;
+import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -279,7 +279,7 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Extent locals binding are maintained by the ExtentLocal class.
+     * Extent locals binding are maintained by the ScopedValue class.
      */
     private Object extentLocalBindings;
 
@@ -287,7 +287,7 @@ public class Thread implements Runnable {
         return currentThread().extentLocalBindings;
     }
 
-    static void setExtentLocalBindings(Object bindings) {
+    static void setScopedValueBindings(Object bindings) {
         currentThread().extentLocalBindings = bindings;
     }
 
@@ -295,14 +295,14 @@ public class Thread implements Runnable {
      * Search the stack for the most recent extent-local bindings.
      */
     @IntrinsicCandidate
-    static native Object findExtentLocalBindings();
+    static native Object findScopedValueBindings();
 
     /**
      * Inherit the extent-local bindings from the given container.
      * Invoked when starting a thread.
      */
-    void inheritExtentLocalBindings(ThreadContainer container) {
-        ExtentLocalContainer.BindingsSnapshot snapshot;
+    void inheritScopedValueBindings(ThreadContainer container) {
+        ScopedValueContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
                 && (snapshot = container.extentLocalBindings()) != null) {
 
@@ -399,13 +399,13 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     native void setCurrentThread(Thread thread);
 
-    // ExtentLocal support:
+    // ScopedValue support:
 
     @IntrinsicCandidate
     static native Object[] extentLocalCache();
 
     @IntrinsicCandidate
-    static native void setExtentLocalCache(Object[] cache);
+    static native void setScopedValueCache(Object[] cache);
 
     @IntrinsicCandidate
     static native void ensureMaterializedForStackWalk(Object o);
@@ -1573,7 +1573,7 @@ public class Thread implements Runnable {
             container.onStart(this);  // may throw
             try {
                 // extent locals may be inherited
-                inheritExtentLocalBindings(container);
+                inheritScopedValueBindings(container);
 
                 start0();
                 started = true;

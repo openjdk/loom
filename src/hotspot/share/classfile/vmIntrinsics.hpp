@@ -289,11 +289,11 @@ class methodHandle;
   do_intrinsic(_extentLocalCache,         java_lang_Thread,       extentLocalCache_name, extentLocalCache_signature, F_SN) \
    do_name(     extentLocalCache_name,                           "extentLocalCache")                                    \
    do_signature(extentLocalCache_signature,                      "()[Ljava/lang/Object;")                               \
-  do_intrinsic(_setExtentLocalCache,      java_lang_Thread,       setExtentLocalCache_name, setExtentLocalCache_signature, F_SN) \
-   do_name(     setExtentLocalCache_name,                        "setExtentLocalCache")                                 \
-   do_signature(setExtentLocalCache_signature,                   "([Ljava/lang/Object;)V")                              \
-  do_intrinsic(_findExtentLocalBindings,  java_lang_Thread,       findExtentLocalBindings_name, void_object_signature, F_SN) \
-   do_name(     findExtentLocalBindings_name,                    "findExtentLocalBindings")                             \
+  do_intrinsic(_setScopedValueCache,      java_lang_Thread,       setScopedValueCache_name, setScopedValueCache_signature, F_SN) \
+   do_name(     setScopedValueCache_name,                        "setScopedValueCache")                                 \
+   do_signature(setScopedValueCache_signature,                   "([Ljava/lang/Object;)V")                              \
+  do_intrinsic(_findScopedValueBindings,  java_lang_Thread,       findScopedValueBindings_name, void_object_signature, F_SN) \
+   do_name(     findScopedValueBindings_name,                    "findScopedValueBindings")                             \
                                                                                                                         \
   do_intrinsic(_setCurrentThread,         java_lang_Thread,       setCurrentThread_name, thread_void_signature,   F_RN) \
    do_name(     setCurrentThread_name,                           "setCurrentThread")                                    \

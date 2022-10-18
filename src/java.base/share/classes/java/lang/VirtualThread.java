@@ -493,7 +493,7 @@ final class VirtualThread extends BaseVirtualThread {
         container.onStart(this); // may throw
         try {
             // extent locals may be inherited
-            inheritExtentLocalBindings(container);
+            inheritScopedValueBindings(container);
 
             // submit task to run thread
             submitRunContinuation();
