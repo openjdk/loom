@@ -43,18 +43,18 @@ import jdk.internal.vm.annotation.Stable;
 import sun.security.action.GetPropertyAction;
 
 /**
- * Represents a variable that is local to an <em>extent</em>. It is a per-thread variable
- * that allows context to be set in a caller and read by callees. The <em>extent</em> is
+ * Represents a value that is local to a <em>scope</em>. It is a per-thread value
+ * that allows context to be set in a caller and read by callees. The <em>scope</em> is
  * the set of methods that the caller directly invokes, and any methods invoked
- * transitively. Scoped-value variables also provide a way to share immutable data across
+ * transitively. Scoped values also provide a way to share immutable data across
  * threads.
  *
- * <p> An scoped-value variable is bound, meaning it gets a value, when invoking an
+ * <p> An scoped value is bound, meaning it gets a value, when invoking an
  * operation with the {@link Carrier#run(Runnable) Carrier.run} or {@link
  * Carrier#call(Callable) Carrier.call} methods. {@link Carrier Carrier} instances are
  * created by the static method {@link #where(ScopedValue, Object)}. The operations
  * executed by the {@code run} and {@code call} methods use the {@link #get()} method to
- * read the value of a bound scoped value. An scoped-value variable reverts to being
+ * read the value of a bound scoped value. A scoped value reverts to being
  * unbound (or its previous value) when the operation completes.
  *
  * <p> An {@code ScopedValue} object will typically be declared in a {@code private
@@ -70,9 +70,9 @@ import sun.security.action.GetPropertyAction;
  * operation will read the new value of the scoped value. The scoped value reverts to its
  * previous value when the operation completes.
  *
- * <h2> Sharing scoped-value variables across threads </h2>
+ * <h2> Sharing scoped values across threads </h2>
  *
- * Scoped-value variables can be shared across threads when used in conjunction with
+ * scoped values can be shared across threads when used in conjunction with
  * {@link StructuredTaskScope}. Creating a {@code StructuredTaskScope} captures the
  * current thread's scoped-value bindings for inheritance by threads {@link
  * StructuredTaskScope#fork(Callable) forked} in the task scope. This means that a thread
@@ -107,13 +107,13 @@ import sun.security.action.GetPropertyAction;
  * }
  *
  * @implNote
- * Scoped-value variables are designed to be used in fairly small
+ * scoped values are designed to be used in fairly small
  * numbers. {@link #get} initially performs a search through enclosing
  * scopes to find an scoped-value variable's innermost binding. It
  * then caches the result of the search in a small thread-local
  * cache. Subsequent invocations of {@link #get} for that scoped value
  * will almost always be very fast. However, if a program has many
- * scoped-value variables that it uses cyclically, the cache hit rate
+ * scoped values that it uses cyclically, the cache hit rate
  * will be low and performance will be poor. This design allows
  * scoped-value inheritance by {@link StructuredTaskScope} threads to
  * be very fast: in essence, no more than copying a pointer, and
@@ -121,18 +121,18 @@ import sun.security.action.GetPropertyAction;
  * updating a pointer.
  *
  * <p>Because the scoped-value per-thread cache is small, you should
- * try to minimize the number of bound scoped-value variables in
+ * try to minimize the number of bound scoped values in
  * use. For example, if you need to pass a number of values in this
  * way, it makes sense to create a record class to hold those values,
  * and then bind a single scoped-value variable to an instance of that
  * record.
  *
  * <p>For this incubator release, we have provided some system properties
- * to tune the performance of scoped-value variables.
+ * to tune the performance of scoped values.
  *
  * <p>The system property {@code jdk.incubator.concurrent.ScopedValue.cacheSize}
  * controls the size of the (per-thread) scoped-value cache. This cache is crucial
- * for the performance of scoped-value variables. If it is too small,
+ * for the performance of scoped values. If it is too small,
  * the runtime library will repeatedly need to scan for each
  * {@link #get}. If it is too large, memory will be unnecessarily
  * consumed. The default scoped-value cache size is 16 entries. It may
@@ -220,7 +220,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * An immutable map of scoped-value variables to values.
+     * An immutable map of scoped values to values.
      * It define the {@link #run(Runnable) run} and {@link #call(Callable) call} methods
      * to invoke an operation with the scoped-value variable mappings bound to the thread
      * that invokes {@code run} or {@code call}.
@@ -286,7 +286,7 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Returns the value of a variable in this map of scoped-value variables.
+         * Returns the value of a variable in this map of scoped values.
          * @param key the ScopedValue variable
          * @param <T> the type of the ScopedValue
          * @return the value
@@ -307,13 +307,13 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Runs a value-returning operation with this map of scoped-value variables bound
+         * Runs a value-returning operation with this map of scoped values bound
          * to values. Code invoked by {@code op} can use the {@link ScopedValue#get()
-         * get} method to get the value of the scoped value. The scoped-value variables
+         * get} method to get the value of the scoped value. The scoped values
          * revert to their previous values or become {@linkplain #isBound() unbound} when
          * the operation completes.
          *
-         * <p> Scoped-value variables are intended to be used in a <em>structured
+         * <p> scoped values are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were
@@ -345,10 +345,10 @@ public final class ScopedValue<T> {
         /**
          * Runs an operation with this map of ScopedValues bound to values. Code executed
          * by the operation can use the {@link ScopedValue#get() get()} method to get the
-         * value of the scoped value. The scoped-value variables revert to their previous
+         * value of the scoped value. The scoped values revert to their previous
          * values or becomes {@linkplain #isBound() unbound} when the operation completes.
          *
-         * <p> Scoped-value variables are intended to be used in a <em>structured
+         * <p> scoped values are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were
