@@ -457,8 +457,8 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
     // FIXME: This very crudely destroys all ScopedValue bindings. This
     // is better than a bound value escaping, but far from ideal.
     oop java_thread = current->threadObj();
-    current->set_extentLocalCache(NULL);
-    java_lang_Thread::clear_extentLocalBindings(java_thread);
+    current->set_scopedValueCache(NULL);
+    java_lang_Thread::clear_scopedValueBindings(java_thread);
     pop_frames_failed_reallocs(current, array);
   }
 #endif

@@ -3176,14 +3176,14 @@ JVM_ENTRY(void, JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring na
 JVM_END
 
 JVM_ENTRY(jobject, JVM_ScopedValueCache(JNIEnv* env, jclass threadClass))
-  oop theCache = thread->extentLocalCache();
+  oop theCache = thread->scopedValueCache();
   return JNIHandles::make_local(THREAD, theCache);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetScopedValueCache(JNIEnv* env, jclass threadClass,
                                        jobject theCache))
   arrayOop objs = arrayOop(JNIHandles::resolve(theCache));
-  thread->set_extentLocalCache(objs);
+  thread->set_scopedValueCache(objs);
 JVM_END
 
 // java.lang.SecurityManager ///////////////////////////////////////////////////////////////////////

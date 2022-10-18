@@ -680,7 +680,7 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_currentCarrierThread:
   case vmIntrinsics::_currentThread:
   case vmIntrinsics::_setCurrentThread:
-  case vmIntrinsics::_extentLocalCache:
+  case vmIntrinsics::_scopedValueCache:
   case vmIntrinsics::_setScopedValueCache:
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:

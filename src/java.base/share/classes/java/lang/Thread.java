@@ -281,14 +281,14 @@ public class Thread implements Runnable {
     /*
      * Extent locals binding are maintained by the ScopedValue class.
      */
-    private Object extentLocalBindings;
+    private Object scopedValueBindings;
 
-    static Object extentLocalBindings() {
-        return currentThread().extentLocalBindings;
+    static Object scopedValueBindings() {
+        return currentThread().scopedValueBindings;
     }
 
     static void setScopedValueBindings(Object bindings) {
-        currentThread().extentLocalBindings = bindings;
+        currentThread().scopedValueBindings = bindings;
     }
 
     /**
@@ -304,15 +304,15 @@ public class Thread implements Runnable {
     void inheritScopedValueBindings(ThreadContainer container) {
         ScopedValueContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
-                && (snapshot = container.extentLocalBindings()) != null) {
+                && (snapshot = container.scopedValueBindings()) != null) {
 
             // bindings established for running/calling an operation
-            Object bindings = snapshot.extentLocalBindings();
-            if (currentThread().extentLocalBindings != bindings) {
+            Object bindings = snapshot.scopedValueBindings();
+            if (currentThread().scopedValueBindings != bindings) {
                 StructureViolationExceptions.throwException("Extent local bindings have changed");
             }
 
-            this.extentLocalBindings = bindings;
+            this.scopedValueBindings = bindings;
         }
     }
 
@@ -402,7 +402,7 @@ public class Thread implements Runnable {
     // ScopedValue support:
 
     @IntrinsicCandidate
-    static native Object[] extentLocalCache();
+    static native Object[] scopedValueCache();
 
     @IntrinsicCandidate
     static native void setScopedValueCache(Object[] cache);
@@ -739,7 +739,7 @@ public class Thread implements Runnable {
         }
 
         // special value to mean a new thread
-        this.extentLocalBindings = Thread.class;
+        this.scopedValueBindings = Thread.class;
     }
 
     /**
@@ -780,7 +780,7 @@ public class Thread implements Runnable {
         }
 
         // special value to mean a new thread
-        this.extentLocalBindings = Thread.class;
+        this.scopedValueBindings = Thread.class;
 
         // create a FieldHolder object, needed when bound to an OS thread
         if (bound) {
@@ -1604,7 +1604,7 @@ public class Thread implements Runnable {
     public void run() {
         Runnable task = holder.task;
         if (task != null) {
-            Object bindings = extentLocalBindings();
+            Object bindings = scopedValueBindings();
             ensureMaterializedForStackWalk(bindings);
             task.run();
             Reference.reachabilityFence(bindings);

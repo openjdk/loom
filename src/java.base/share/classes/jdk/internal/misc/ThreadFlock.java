@@ -99,7 +99,7 @@ public class ThreadFlock implements AutoCloseable {
     private volatile int threadCount;
 
     private final String name;
-    private final ScopedValueContainer.BindingsSnapshot extentLocalBindings;
+    private final ScopedValueContainer.BindingsSnapshot scopedValueBindings;
     private final ThreadContainerImpl container; // encapsulate for now
 
     // state
@@ -111,7 +111,7 @@ public class ThreadFlock implements AutoCloseable {
 
     ThreadFlock(String name) {
         this.name = name;
-        this.extentLocalBindings = ScopedValueContainer.captureBindings();
+        this.scopedValueBindings = ScopedValueContainer.captureBindings();
         this.container = new ThreadContainerImpl(this);
     }
 
@@ -119,8 +119,8 @@ public class ThreadFlock implements AutoCloseable {
         return threadCount;
     }
 
-    private ScopedValueContainer.BindingsSnapshot extentLocalBindings() {
-        return extentLocalBindings;
+    private ScopedValueContainer.BindingsSnapshot scopedValueBindings() {
+        return scopedValueBindings;
     }
 
     private void incrementThreadCount() {
@@ -585,8 +585,8 @@ public class ThreadFlock implements AutoCloseable {
             return flock.toString();
         }
         @Override
-        public ScopedValueContainer.BindingsSnapshot extentLocalBindings() {
-            return flock.extentLocalBindings();
+        public ScopedValueContainer.BindingsSnapshot scopedValueBindings() {
+            return flock.scopedValueBindings();
         }
     }
 }

@@ -81,14 +81,14 @@ public class ScopedValueContainer extends StackableScope {
      * A snapshot of the extent local bindings. The snapshot includes the bindings
      * established for the current thread and extent local container.
      */
-    public record BindingsSnapshot(Object extentLocalBindings,
+    public record BindingsSnapshot(Object scopedValueBindings,
                                    ScopedValueContainer container) { }
 
     /**
      * Returns the extent local bindings for the current thread.
      */
     public static BindingsSnapshot captureBindings() {
-        return new BindingsSnapshot(JLA.extentLocalBindings(), latest());
+        return new BindingsSnapshot(JLA.scopedValueBindings(), latest());
     }
 
     /**

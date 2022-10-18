@@ -129,7 +129,7 @@ public class Continuation {
     private Object yieldInfo;
     private boolean preempted;
 
-    private Object[] extentLocalCache;
+    private Object[] scopedValueCache;
 
     /**
      * Constructs a continuation
@@ -238,7 +238,7 @@ public class Continuation {
     public final void run() {
         while (true) {
             mount();
-            JLA.setScopedValueCache(extentLocalCache);
+            JLA.setScopedValueCache(scopedValueCache);
 
             if (done)
                 throw new IllegalStateException("Continuation terminated");
@@ -271,9 +271,9 @@ public class Continuation {
 
                     unmount();
                     if (PRESERVE_EXTENT_LOCAL_CACHE) {
-                        extentLocalCache = JLA.extentLocalCache();
+                        scopedValueCache = JLA.scopedValueCache();
                     } else {
-                        extentLocalCache = null;
+                        scopedValueCache = null;
                     }
                     JLA.setScopedValueCache(null);
                 } catch (Throwable e) { e.printStackTrace(); System.exit(1); }

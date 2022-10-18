@@ -477,7 +477,7 @@ public interface JavaLangAccess {
     /**
      * Returns the current thread's extent locals cache
      */
-    Object[] extentLocalCache();
+    Object[] scopedValueCache();
 
     /**
      * Sets the current thread's extent locals cache
@@ -487,7 +487,7 @@ public interface JavaLangAccess {
     /**
      * Return the current thread's extent local bindings.
      */
-    Object extentLocalBindings();
+    Object scopedValueBindings();
 
     /**
      * Set the current thread's extent local bindings.

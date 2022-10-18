@@ -284,7 +284,7 @@ final class VirtualThread extends BaseVirtualThread {
             event.commit();
         }
 
-        Object bindings = extentLocalBindings();
+        Object bindings = scopedValueBindings();
         ensureMaterializedForStackWalk(bindings);
         try {
             task.run();

@@ -2574,16 +2574,16 @@ public final class System {
                 return ((ThreadLocal<?>)local).isCarrierThreadLocalPresent();
             }
 
-            public Object[] extentLocalCache() {
-                return Thread.extentLocalCache();
+            public Object[] scopedValueCache() {
+                return Thread.scopedValueCache();
             }
 
             public void setScopedValueCache(Object[] cache) {
                 Thread.setScopedValueCache(cache);
             }
 
-            public Object extentLocalBindings() {
-                return Thread.extentLocalBindings();
+            public Object scopedValueBindings() {
+                return Thread.scopedValueBindings();
             }
 
             public Object findScopedValueBindings() {

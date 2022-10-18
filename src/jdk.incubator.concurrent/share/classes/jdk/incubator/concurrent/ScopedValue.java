@@ -327,7 +327,7 @@ public final class ScopedValue<T> {
         public <R> R call(Callable<R> op) throws Exception {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            var prevSnapshot = extentLocalBindings();
+            var prevSnapshot = scopedValueBindings();
             var newSnapshot = new Snapshot(this, prevSnapshot);
             R result;
             try {
@@ -361,7 +361,7 @@ public final class ScopedValue<T> {
             Cache.invalidate(bitmask);
             Snapshot newSnapshot = null;
             JLA.ensureMaterializedForStackWalk(newSnapshot);
-            var prevSnapshot = extentLocalBindings();
+            var prevSnapshot = scopedValueBindings();
             newSnapshot = new Snapshot(this, prevSnapshot);
             try {
                 JLA.setScopedValueBindings(newSnapshot);
@@ -440,7 +440,7 @@ public final class ScopedValue<T> {
     @SuppressWarnings("unchecked")
     public T get() {
         Object[] objects;
-        if ((objects = extentLocalCache()) != null) {
+        if ((objects = scopedValueCache()) != null) {
             // This code should perhaps be in class Cache. We do it
             // here because the generated code is small and fast and
             // we really want it to be inlined in the caller.
@@ -485,7 +485,7 @@ public final class ScopedValue<T> {
      * Return the value of the extent local or NIL if not bound.
      */
     private Object findBinding() {
-        Object value = extentLocalBindings().find(this);
+        Object value = scopedValueBindings().find(this);
         return value;
     }
 
@@ -525,15 +525,15 @@ public final class ScopedValue<T> {
         }
     }
 
-    private static Object[] extentLocalCache() {
-        return JLA.extentLocalCache();
+    private static Object[] scopedValueCache() {
+        return JLA.scopedValueCache();
     }
 
     private static void setScopedValueCache(Object[] cache) {
         JLA.setScopedValueCache(cache);
     }
 
-    private static Snapshot extentLocalBindings() {
+    private static Snapshot scopedValueBindings() {
         // Bindings can be in one of four states:
         //
         // 1: class Thread: this is a new Thread instance, and no
@@ -545,7 +545,7 @@ public final class ScopedValue<T> {
         // where they are. We must invoke JLA.findScopedValueBindings() to walk
         // the stack to find them.
 
-        Object bindings = JLA.extentLocalBindings();
+        Object bindings = JLA.scopedValueBindings();
         if (bindings == Thread.class) {
             // This must be a new thread
            return EmptySnapshot.getInstance();
@@ -651,7 +651,7 @@ public final class ScopedValue<T> {
         }
 
         static void put(ScopedValue<?> key, Object value) {
-            Object[] theCache = extentLocalCache();
+            Object[] theCache = scopedValueCache();
             if (theCache == null) {
                 theCache = new Object[CACHE_TABLE_SIZE * 2];
                 setScopedValueCache(theCache);
@@ -671,7 +671,7 @@ public final class ScopedValue<T> {
         }
 
         private static void setKeyAndObjectAt(int n, Object key, Object value) {
-            var cache = extentLocalCache();
+            var cache = scopedValueCache();
             cache[n * 2] = key;
             cache[n * 2 + 1] = value;
         }
@@ -711,7 +711,7 @@ public final class ScopedValue<T> {
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
-            if ((objects = extentLocalCache()) != null) {
+            if ((objects = scopedValueCache()) != null) {
                 for (int bits = toClearBits; bits != 0; ) {
                     int index = Integer.numberOfTrailingZeros(bits);
                     setKeyAndObjectAt(objects, index & SLOT_MASK, null, null);
