@@ -46,7 +46,7 @@ import sun.security.action.GetPropertyAction;
  * Represents a variable that is local to an <em>extent</em>. It is a per-thread variable
  * that allows context to be set in a caller and read by callees. The <em>extent</em> is
  * the set of methods that the caller directly invokes, and any methods invoked
- * transitively. Extent-local variables also provide a way to share immutable data across
+ * transitively. Scoped-value variables also provide a way to share immutable data across
  * threads.
  *
  * <p> An scoped-value variable is bound, meaning it gets a value, when invoking an
@@ -72,7 +72,7 @@ import sun.security.action.GetPropertyAction;
  *
  * <h2> Sharing scoped-value variables across threads </h2>
  *
- * Extent-local variables can be shared across threads when used in conjunction with
+ * Scoped-value variables can be shared across threads when used in conjunction with
  * {@link StructuredTaskScope}. Creating a {@code StructuredTaskScope} captures the
  * current thread's scoped-value bindings for inheritance by threads {@link
  * StructuredTaskScope#fork(Callable) forked} in the task scope. This means that a thread
@@ -107,7 +107,7 @@ import sun.security.action.GetPropertyAction;
  * }
  *
  * @implNote
- * Extent-local variables are designed to be used in fairly small
+ * Scoped-value variables are designed to be used in fairly small
  * numbers. {@link #get} initially performs a search through enclosing
  * scopes to find an scoped-value variable's innermost binding. It
  * then caches the result of the search in a small thread-local
@@ -313,7 +313,7 @@ public final class ScopedValue<T> {
          * revert to their previous values or become {@linkplain #isBound() unbound} when
          * the operation completes.
          *
-         * <p> Extent-local variables are intended to be used in a <em>structured
+         * <p> Scoped-value variables are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were
@@ -348,7 +348,7 @@ public final class ScopedValue<T> {
          * value of the scoped value. The scoped-value variables revert to their previous
          * values or becomes {@linkplain #isBound() unbound} when the operation completes.
          *
-         * <p> Extent-local variables are intended to be used in a <em>structured
+         * <p> Scoped-value variables are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were

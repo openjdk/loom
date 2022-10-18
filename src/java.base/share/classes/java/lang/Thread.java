@@ -279,7 +279,7 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Extent locals binding are maintained by the ScopedValue class.
+     * Scoped values binding are maintained by the ScopedValue class.
      */
     private Object scopedValueBindings;
 
@@ -309,7 +309,7 @@ public class Thread implements Runnable {
             // bindings established for running/calling an operation
             Object bindings = snapshot.scopedValueBindings();
             if (currentThread().scopedValueBindings != bindings) {
-                StructureViolationExceptions.throwException("Extent local bindings have changed");
+                StructureViolationExceptions.throwException("Scoped value bindings have changed");
             }
 
             this.scopedValueBindings = bindings;
