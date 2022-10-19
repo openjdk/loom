@@ -20,6 +20,9 @@ tools/javac/generics/T5094318.java 0000000 generic-all
 tools/javac/api/T6395981.java 0000000 generic-all
 jdk/javadoc/tool/sourceOption/SourceOption.java 0000000 generic-all
 
+####
+# --enable-preview is not supported
+tools/javac/launcher/GetResourceTest.java
 
 ####
 # Incorrect stacktrace epxectectations
