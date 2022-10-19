@@ -486,6 +486,11 @@ gc/g1/TestRemsetLogging.java 0000000 generic-all
 gc/g1/TestMixedGCLiveThreshold.java#25percent 0000000 generic-all
 gc/g1/plab/TestPLABResize.java 0000000 generic-all
 
+gc/shenandoah/oom/TestAllocLargeObj.java 0000000 generic-all
+gc/shenandoah/oom/TestAllocLargerThanHeap.java 0000000 generic-all
+gc/shenandoah/oom/TestAllocSmallObj.java 0000000 generic-all
+gc/shenandoah/oom/TestClassLoaderLeak.java 0000000 generic-all
+
 ####
 ## Expected exception is ignored
 

@@ -13,15 +13,6 @@ java/util/logging/Logger/logrb/TestLogrbResourceBundle.java                  828
 
 com/sun/jdi/EATests.java#id0                                         8264699 generic-all
 
-####
-## Tests failing because of issues with testng import in jtreg with wrapper.
-java/foreign/handles/Driver.java 0000000 generic-all
-java/lang/ModuleTests/addXXX/Driver.java 0000000 generic-all
-java/lang/invoke/MethodHandleProxies/Driver.java 0000000 generic-all
-java/lang/invoke/MethodHandles/privateLookupIn/Driver.java 0000000 generic-all
-java/lang/invoke/modules/Driver.java 0000000 generic-all
-java/lang/invoke/modules/Driver1.java 0000000 generic-all
-
 
 ##########
 ## Tests failing when main() is executed in additional vthread or in vthread instead of thread
@@ -40,12 +31,12 @@ java/lang/StackWalker/NativeMethod.java 0000000 generic-all
 # Uses custom scheduler
 java/lang/Thread/virtual/HoldsLock.java 0000000 generic-all
 
-# Requires JUnit
-java/lang/Thread/DegradedMethodsThrowUOE.java 0000000 generic-all
-
 jdk/internal/vm/Continuation/HumongousStack.java 0000000 generic-all
 jdk/internal/vm/Continuation/Scoped.java 0000000 generic-all
 jdk/internal/vm/Continuation/Fuzz.java 0000000 generic-all
+
+# Doesn't work with --enable-preview
+java/lang/invoke/defineHiddenClass/PreviewHiddenClass.java 0000000 generic-all
 
 ####
 # Thread-sensitive threads
@@ -260,10 +251,6 @@ sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java 0000000 generi
 sun/management/jmxremote/startstop/JMXStatusTest.java 0000000 generic-all
 
 ####
-# Junit version mismatch
-tools/jpackage/junit/jdk/jpackage/internal/AppImageFileTest.java 0000000 generic-all
-
-####
 # No expected StackOverflow
 
 java/lang/invoke/condy/CondyNestedResolutionTest.java 0000000 generic-all
@@ -335,4 +322,3 @@ com/sun/jdi/sde/SourceDebugExtensionTest.java 0000000 generic-all
 
 # Tests using Thread.stop(), not supported on virtual threads
 jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all
-
