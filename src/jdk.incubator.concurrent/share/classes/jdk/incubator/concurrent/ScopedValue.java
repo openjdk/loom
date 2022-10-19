@@ -308,7 +308,7 @@ public final class ScopedValue<T> {
 
         /**
          * Runs a value-returning operation with this map of scoped-value
-         * bindings. Code invoked by {@code op} can use the {@link ScopedValue#get() get} 
+         * bindings. Code invoked by {@code op} can use the {@link ScopedValue#get() get}
          * method to get the value of the scoped value. The scoped values
          * revert to their previously-bound values or become {@linkplain #isBound() unbound} when
          * the operation completes.
