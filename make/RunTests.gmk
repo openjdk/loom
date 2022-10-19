@@ -93,6 +93,9 @@ endif
 JTREG_FAILURE_HANDLER_DIR := $(TEST_IMAGE_DIR)/failure_handler
 JTREG_FAILURE_HANDLER := $(JTREG_FAILURE_HANDLER_DIR)/jtregFailureHandler.jar
 
+JTREG_MAIN_WRAPPER_DIR := $(TEST_IMAGE_DIR)/jtreg_main_wrapper
+JTREG_MAIN_WRAPPER_JAR := $(JTREG_MAIN_WRAPPER_DIR)/jtregMainWrapper.jar
+
 JTREG_FAILURE_HANDLER_TIMEOUT ?= 0
 
 ifneq ($(wildcard $(JTREG_FAILURE_HANDLER)), )
@@ -760,6 +763,7 @@ define SetupRunJtregTestBody
 
   ifneq ($$(JTREG_MAIN_WRAPPER), )
     JT_HOME = $$(JT_HOME_MW)
+    $1_JTREG_BASIC_OPTIONS += -mainWrapperPath:$$(JTREG_MAIN_WRAPPER_JAR)
     $1_JTREG_BASIC_OPTIONS += -mainWrapper:$$(JTREG_MAIN_WRAPPER)
   endif
 

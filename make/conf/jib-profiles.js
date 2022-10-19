@@ -1142,7 +1142,7 @@ var getJibProfilesDependencies = function (input, common) {
         jtregMW: {
             organization: common.organization,
             ext: "zip",
-            revision: "7.0-virtual-1.1",
+            revision: "7.1-virtual-1.0",
             environment_name: "JT_HOME_MW",
             environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
         },
