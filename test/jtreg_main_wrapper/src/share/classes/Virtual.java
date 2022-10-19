@@ -37,11 +37,12 @@ public class Virtual implements CustomMainWrapper {
     private static List<String> vmOpts = new ArrayList<>();
     static {
         vmOpts.add("--enable-preview");
+
+        // This property is used by ProcessTools
+        vmOpts.add("-Dmain.wrapper=Virtual");
     }
 
     public Virtual() {
-        // This property is used by ProcessTools
-        System.setProperty("main.wrapper", "Virtual");
     }
 
     @Override
