@@ -2574,24 +2574,24 @@ public final class System {
                 return ((ThreadLocal<?>)local).isCarrierThreadLocalPresent();
             }
 
-            public Object[] extentLocalCache() {
-                return Thread.extentLocalCache();
+            public Object[] scopedValueCache() {
+                return Thread.scopedValueCache();
             }
 
-            public void setExtentLocalCache(Object[] cache) {
-                Thread.setExtentLocalCache(cache);
+            public void setScopedValueCache(Object[] cache) {
+                Thread.setScopedValueCache(cache);
             }
 
-            public Object extentLocalBindings() {
-                return Thread.extentLocalBindings();
+            public Object scopedValueBindings() {
+                return Thread.scopedValueBindings();
             }
 
-            public Object findExtentLocalBindings() {
-                return Thread.findExtentLocalBindings();
+            public Object findScopedValueBindings() {
+                return Thread.findScopedValueBindings();
             }
 
-            public void setExtentLocalBindings(Object bindings) {
-                Thread.setExtentLocalBindings(bindings);
+            public void setScopedValueBindings(Object bindings) {
+                Thread.setScopedValueBindings(bindings);
             }
 
             @ForceInline

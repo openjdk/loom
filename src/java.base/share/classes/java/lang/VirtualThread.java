@@ -284,7 +284,7 @@ final class VirtualThread extends BaseVirtualThread {
             event.commit();
         }
 
-        Object bindings = extentLocalBindings();
+        Object bindings = scopedValueBindings();
         ensureMaterializedForStackWalk(bindings);
         try {
             task.run();
@@ -492,8 +492,8 @@ final class VirtualThread extends BaseVirtualThread {
         boolean started = false;
         container.onStart(this); // may throw
         try {
-            // extent locals may be inherited
-            inheritExtentLocalBindings(container);
+            // scoped values may be inherited
+            inheritScopedValueBindings(container);
 
             // submit task to run thread
             submitRunContinuation();

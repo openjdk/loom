@@ -49,7 +49,7 @@ import jdk.internal.misc.VM;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
-import jdk.internal.vm.ExtentLocalContainer;
+import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -279,40 +279,40 @@ public class Thread implements Runnable {
     ThreadLocal.ThreadLocalMap inheritableThreadLocals;
 
     /*
-     * Extent locals binding are maintained by the ExtentLocal class.
+     * Scoped values binding are maintained by the ScopedValue class.
      */
-    private Object extentLocalBindings;
+    private Object scopedValueBindings;
 
-    static Object extentLocalBindings() {
-        return currentThread().extentLocalBindings;
+    static Object scopedValueBindings() {
+        return currentThread().scopedValueBindings;
     }
 
-    static void setExtentLocalBindings(Object bindings) {
-        currentThread().extentLocalBindings = bindings;
+    static void setScopedValueBindings(Object bindings) {
+        currentThread().scopedValueBindings = bindings;
     }
 
     /**
-     * Search the stack for the most recent extent-local bindings.
+     * Search the stack for the most recent scoped-value bindings.
      */
     @IntrinsicCandidate
-    static native Object findExtentLocalBindings();
+    static native Object findScopedValueBindings();
 
     /**
-     * Inherit the extent-local bindings from the given container.
+     * Inherit the scoped-value bindings from the given container.
      * Invoked when starting a thread.
      */
-    void inheritExtentLocalBindings(ThreadContainer container) {
-        ExtentLocalContainer.BindingsSnapshot snapshot;
+    void inheritScopedValueBindings(ThreadContainer container) {
+        ScopedValueContainer.BindingsSnapshot snapshot;
         if (container.owner() != null
-                && (snapshot = container.extentLocalBindings()) != null) {
+                && (snapshot = container.scopedValueBindings()) != null) {
 
             // bindings established for running/calling an operation
-            Object bindings = snapshot.extentLocalBindings();
-            if (currentThread().extentLocalBindings != bindings) {
-                StructureViolationExceptions.throwException("Extent local bindings have changed");
+            Object bindings = snapshot.scopedValueBindings();
+            if (currentThread().scopedValueBindings != bindings) {
+                StructureViolationExceptions.throwException("Scoped value bindings have changed");
             }
 
-            this.extentLocalBindings = bindings;
+            this.scopedValueBindings = bindings;
         }
     }
 
@@ -399,13 +399,13 @@ public class Thread implements Runnable {
     @IntrinsicCandidate
     native void setCurrentThread(Thread thread);
 
-    // ExtentLocal support:
+    // ScopedValue support:
 
     @IntrinsicCandidate
-    static native Object[] extentLocalCache();
+    static native Object[] scopedValueCache();
 
     @IntrinsicCandidate
-    static native void setExtentLocalCache(Object[] cache);
+    static native void setScopedValueCache(Object[] cache);
 
     @IntrinsicCandidate
     static native void ensureMaterializedForStackWalk(Object o);
@@ -739,7 +739,7 @@ public class Thread implements Runnable {
         }
 
         // special value to mean a new thread
-        this.extentLocalBindings = Thread.class;
+        this.scopedValueBindings = Thread.class;
     }
 
     /**
@@ -780,7 +780,7 @@ public class Thread implements Runnable {
         }
 
         // special value to mean a new thread
-        this.extentLocalBindings = Thread.class;
+        this.scopedValueBindings = Thread.class;
 
         // create a FieldHolder object, needed when bound to an OS thread
         if (bound) {
@@ -1572,8 +1572,8 @@ public class Thread implements Runnable {
             boolean started = false;
             container.onStart(this);  // may throw
             try {
-                // extent locals may be inherited
-                inheritExtentLocalBindings(container);
+                // scoped values may be inherited
+                inheritScopedValueBindings(container);
 
                 start0();
                 started = true;
@@ -1604,7 +1604,7 @@ public class Thread implements Runnable {
     public void run() {
         Runnable task = holder.task;
         if (task != null) {
-            Object bindings = extentLocalBindings();
+            Object bindings = scopedValueBindings();
             ensureMaterializedForStackWalk(bindings);
             task.run();
             Reference.reachabilityFence(bindings);

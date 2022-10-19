@@ -23,25 +23,25 @@
 
 /*
  * @test
- * @summary Test ThreadFlock with extent locals
+ * @summary Test ThreadFlock with scoped values
  * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
- * @run testng ExtentLocalsTest
+ * @run testng ScopedValuesTest
  */
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import jdk.internal.misc.ThreadFlock;
-import jdk.incubator.concurrent.ExtentLocal;
+import jdk.incubator.concurrent.ScopedValue;
 import jdk.incubator.concurrent.StructureViolationException;
 
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ExtentLocalsTest {
+public class ScopedValuesTest {
 
     @DataProvider(name = "factories")
     public Object[][] factories() {
@@ -54,12 +54,12 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test inheritance of extent-local bindings.
+     * Test inheritance of scoped-value bindings.
      */
     @Test(dataProvider = "factories")
-    public void testInheritsExtentLocals(ThreadFactory factory) throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
-        String value = ExtentLocal.where(NAME, "fred").call(() -> {
+    public void testInheritsScopedValues(ThreadFactory factory) throws Exception {
+        ScopedValue<String> NAME = ScopedValue.newInstance();
+        String value = ScopedValue.where(NAME, "fred").call(() -> {
             var result = new AtomicReference<String>();
             try (var flock = ThreadFlock.open(null)) {
                 Thread thread = factory.newThread(() -> {
@@ -74,18 +74,18 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test exiting a extent local operation should close nested thread flocks.
+     * Test exiting a scoped value operation should close nested thread flocks.
      */
     @Test
     public void testStructureViolation1() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         class Box {
             ThreadFlock flock1;
             ThreadFlock flock2;
         }
         var box = new Box();
         try {
-            ExtentLocal.where(name, "x1").run(() -> {
+            ScopedValue.where(name, "x1").run(() -> {
                 box.flock1 = ThreadFlock.open(null);
                 box.flock2 = ThreadFlock.open(null);
             });
@@ -96,18 +96,18 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock1.
      */
     @Test
     public void testStructureViolation2() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ExtentLocal.where(name, "x1").run(() -> {
+            ScopedValue.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ExtentLocal.where(name, "x2").run(() -> {
+                    ScopedValue.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ExtentLocal.where(name, "x3").run(() -> {
+                            ScopedValue.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -129,18 +129,18 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock2.
      */
     @Test
     public void testStructureViolation3() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ExtentLocal.where(name, "x1").run(() -> {
+            ScopedValue.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ExtentLocal.where(name, "x2").run(() -> {
+                    ScopedValue.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ExtentLocal.where(name, "x3").run(() -> {
+                            ScopedValue.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -161,18 +161,18 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test closing a thread flock with enclosing extent local operations and
+     * Test closing a thread flock with enclosing scoped value operations and
      * thread flocks. This test closes enclosing flock3.
      */
     @Test
     public void testStructureViolation4() {
-        ExtentLocal<String> name = ExtentLocal.newInstance();
+        ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
-            ExtentLocal.where(name, "x1").run(() -> {
+            ScopedValue.where(name, "x1").run(() -> {
                 try (var flock2 = ThreadFlock.open("flock2")) {
-                    ExtentLocal.where(name, "x2").run(() -> {
+                    ScopedValue.where(name, "x2").run(() -> {
                         try (var flock3 = ThreadFlock.open("flock3")) {
-                            ExtentLocal.where(name, "x3").run(() -> {
+                            ScopedValue.where(name, "x3").run(() -> {
                                 var flock4 = ThreadFlock.open("flock4");
 
                                 try {
@@ -193,14 +193,14 @@ public class ExtentLocalsTest {
     }
 
     /**
-     * Test that start throws StructureViolationException if extent-local bindings
+     * Test that start throws StructureViolationException if scoped-value bindings
      * have changed.
      */
     @Test(dataProvider = "factories")
     public void testStructureViolation5(ThreadFactory factory) throws Exception {
-        ExtentLocal<String> NAME = ExtentLocal.newInstance();
+        ScopedValue<String> NAME = ScopedValue.newInstance();
         try (var flock = ThreadFlock.open(null)) {
-            ExtentLocal.where(NAME, "fred").run(() -> {
+            ScopedValue.where(NAME, "fred").run(() -> {
                 Thread thread = factory.newThread(() -> { });
                 expectThrows(StructureViolationException.class, () -> flock.start(thread));
             });

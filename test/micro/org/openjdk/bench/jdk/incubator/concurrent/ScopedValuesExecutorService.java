@@ -26,8 +26,8 @@ package org.openjdk.bench.jdk.incubator.concurrent;
 
 import java.util.concurrent.*;
 
-public class ExtentLocalsExecutorService extends ThreadPoolExecutor {
-    public ExtentLocalsExecutorService(int corePoolSize, String prefix) {
+public class ScopedValuesExecutorService extends ThreadPoolExecutor {
+    public ScopedValuesExecutorService(int corePoolSize, String prefix) {
         super(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
               new AThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
     }
@@ -37,7 +37,7 @@ class AThreadFactory implements ThreadFactory {
     public Thread newThread(Runnable action) {
         return new Thread() {
             public void run() {
-                ExtentLocalsData.run(action);
+                ScopedValuesData.run(action);
             }
         };
     }
