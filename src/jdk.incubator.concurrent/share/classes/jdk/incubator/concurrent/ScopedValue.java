@@ -49,12 +49,12 @@ import sun.security.action.GetPropertyAction;
  * transitively. Scoped values also provide a way to share immutable data across
  * threads.
  *
- * <p> An scoped value is bound, meaning it gets a value, when invoking an
+ * <p> A scoped value is bound, meaning it gets a value, when invoking an
  * operation with the {@link Carrier#run(Runnable) Carrier.run} or {@link
  * Carrier#call(Callable) Carrier.call} methods. {@link Carrier Carrier} instances are
  * created by the static method {@link #where(ScopedValue, Object)}. The operations
  * executed by the {@code run} and {@code call} methods use the {@link #get()} method to
- * read the value of a bound scoped value. A scoped value reverts to being
+ * read the value of a bound `ScopedValue`. A scoped value reverts to being
  * unbound (or its previous value) when the operation completes.
  *
  * <p> An {@code ScopedValue} object will typically be declared in a {@code private
@@ -62,7 +62,7 @@ import sun.security.action.GetPropertyAction;
  * classes within its nest).
  *
  * <p> {@link ScopedValue} bindings are immutable: there is no "{@code set}" method.
- * There may be cases when an operation might need to use the same scoped-value variable
+ * There may be cases when an operation might need to use the same scoped value
  * to communicate a different value to the methods that it calls. The requirement is not
  * to change the original binding but to establish a new binding for nested calls. If an
  * scoped value already has a value, then {@code run} or {@code call} methods may be
@@ -72,12 +72,12 @@ import sun.security.action.GetPropertyAction;
  *
  * <h2> Sharing scoped values across threads </h2>
  *
- * scoped values can be shared across threads when used in conjunction with
+ * Scoped-value bindings can be shared across threads when used in conjunction with
  * {@link StructuredTaskScope}. Creating a {@code StructuredTaskScope} captures the
  * current thread's scoped-value bindings for inheritance by threads {@link
  * StructuredTaskScope#fork(Callable) forked} in the task scope. This means that a thread
- * may bind an scoped-value variable and share its value in a structured concurrency
- * context. Threads forked in the task scope that read the scoped-value variable will read
+ * may bind a scoped value and share its value in a structured concurrency
+ * context. Threads forked in the task scope that read the scoped value will read
  * the value bound by the thread that created the task scope.
  *
  * <p> Unless otherwise specified, passing a {@code null} argument to a constructor
@@ -109,7 +109,7 @@ import sun.security.action.GetPropertyAction;
  * @implNote
  * scoped values are designed to be used in fairly small
  * numbers. {@link #get} initially performs a search through enclosing
- * scopes to find an scoped-value variable's innermost binding. It
+ * scopes to find a scoped value's innermost binding. It
  * then caches the result of the search in a small thread-local
  * cache. Subsequent invocations of {@link #get} for that scoped value
  * will almost always be very fast. However, if a program has many
@@ -124,7 +124,7 @@ import sun.security.action.GetPropertyAction;
  * try to minimize the number of bound scoped values in
  * use. For example, if you need to pass a number of values in this
  * way, it makes sense to create a record class to hold those values,
- * and then bind a single scoped-value variable to an instance of that
+ * and then bind a single `ScopedValue` to an instance of that
  * record.
  *
  * <p>For this incubator release, we have provided some system properties
@@ -222,7 +222,7 @@ public final class ScopedValue<T> {
     /**
      * An immutable map of scoped values to values.
      * It define the {@link #run(Runnable) run} and {@link #call(Callable) call} methods
-     * to invoke an operation with the scoped-value variable mappings bound to the thread
+     * to invoke an operation with the scoped value mappings bound to the thread
      * that invokes {@code run} or {@code call}.
      *
      * @since 19
@@ -257,7 +257,7 @@ public final class ScopedValue<T> {
         /**
          * Returns a new {@link Carrier Carrier}, which consists of the contents of this
          * carrier plus a new mapping from {@code key} to {@code value}. If this carrier
-         * already has a mapping for the scoped-value variable {@code key} then the new
+         * already has a mapping for the scoped value {@code key} then the new
          * value added by this method overrides the previous mapping. That is to say, if
          * there is a list of {@code where(...)} clauses, the rightmost clause wins.
          * @param key   the ScopedValue to bind a value to
@@ -286,8 +286,8 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Returns the value of a variable in this map of scoped values.
-         * @param key the ScopedValue variable
+         * Returns the value bound to a {@link ScopedValue} in this map of scoped values.
+         * @param key the {@link ScopedValue} instance
          * @param <T> the type of the ScopedValue
          * @return the value
          * @throws NoSuchElementException if key is not bound to any value
@@ -307,13 +307,13 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Runs a value-returning operation with this map of scoped values bound
-         * to values. Code invoked by {@code op} can use the {@link ScopedValue#get()
-         * get} method to get the value of the scoped value. The scoped values
-         * revert to their previous values or become {@linkplain #isBound() unbound} when
+         * Runs a value-returning operation with this map of scoped-value
+         * bindings. Code invoked by {@code op} can use the {@link ScopedValue#get() get} 
+         * method to get the value of the scoped value. The scoped values
+         * revert to their previously-bound values or become {@linkplain #isBound() unbound} when
          * the operation completes.
          *
-         * <p> scoped values are intended to be used in a <em>structured
+         * <p> Scoped values are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were
@@ -343,12 +343,12 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Runs an operation with this map of ScopedValues bound to values. Code executed
+         * Runs an operation with this map of scoped-value bindings. Code executed
          * by the operation can use the {@link ScopedValue#get() get()} method to get the
          * value of the scoped value. The scoped values revert to their previous
-         * values or becomes {@linkplain #isBound() unbound} when the operation completes.
+         * values or become {@linkplain #isBound() unbound} when the operation completes.
          *
-         * <p> scoped values are intended to be used in a <em>structured
+         * <p> Scoped values are intended to be used in a <em>structured
          * manner</em>. If {@code op} creates any {@link StructuredTaskScope}s but does
          * not close them, then exiting {@code op} causes the underlying construct of each
          * {@link StructuredTaskScope} to be closed (in the reverse order that they were
@@ -376,7 +376,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for an scoped-value variable.
+     * Creates a binding for a scoped value.
      * The {@link Carrier Carrier} may be used later to invoke a {@link Callable} or
      * {@link Runnable} instance. More bindings may be added to the {@link Carrier Carrier}
      * by further calls to this method.
@@ -391,7 +391,7 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for an scoped-value variable and runs a
+     * Creates a binding for a scoped value and runs a
      * value-returning operation with that {@link ScopedValue} bound to the value.
      * @param key the ScopedValue to bind
      * @param value the value to bind it to, can be {@code null}
@@ -406,11 +406,11 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates a binding for scoped-value variable and runs an
+     * Creates a binding for a scoped value variable and runs an
      * operation with that  {@link ScopedValue} bound to the value.
-     * @param key the ScopedValue to bind
+     * @param key the {@link ScopedValue} to bind
      * @param value the value to bind it to, can be {@code null}
-     * @param <T> the type of the ScopedValue
+     * @param <T> the type of the {@link ScopedValue}
      * @param op the operation to run
      */
     public static <T> void where(ScopedValue<T> key, T value, Runnable op) {
@@ -422,10 +422,10 @@ public final class ScopedValue<T> {
     }
 
     /**
-     * Creates an scoped-value variable to refer to a value of type T.
+     * Creates a scoped value to refer to a value of type T.
      *
-     * @param <T> the type of the scoped value's value.
-     * @return an scoped-value variable
+     * @param <T> the type of the scoped value.
+     * @return a scoped value
      */
     public static <T> ScopedValue<T> newInstance() {
         return new ScopedValue<T>();
