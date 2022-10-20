@@ -364,6 +364,7 @@ runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java 0000000 
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java 0000000 generic-all
 runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java 0000000 generic-all
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java 0000000 generic-all
+runtime/cds/appcds/lambdaForm/DefaultClassListLFInvokers.java 0000000 generic-all
 runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
 runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java 0000000 generic-all
 runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java 0000000 generic-all
