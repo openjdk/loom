@@ -153,7 +153,7 @@ import sun.security.action.GetPropertyAction;
  * would have to be regenerated after a blocking operation.
  *
  * @param <T> the scoped value's type
- * @since 19
+ * @since 20
  */
 public final class ScopedValue<T> {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -225,7 +225,7 @@ public final class ScopedValue<T> {
      * to invoke an operation with the scoped value mappings bound to the thread
      * that invokes {@code run} or {@code call}.
      *
-     * @since 19
+     * @since 20
      */
     public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
@@ -511,7 +511,7 @@ public final class ScopedValue<T> {
      * @param <X> Type of the exception to be thrown
      * @param exceptionSupplier the supplying function that produces the exception to throw
      * @return the value of the scoped value if bound
-     * @throws X prodouced by the exception suppying function if the scoped value is unbound
+     * @throws X produced by the exception suppyling function if the scoped value is unbound
      */
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         Objects.requireNonNull(exceptionSupplier);
