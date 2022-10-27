@@ -224,22 +224,22 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> The tree structure supports:
  * <ul>
- *   <li> Inheritance of {@linkplain ScopedValue scoped-value} variables across threads.
+ *   <li> Inheritance of {@linkplain ScopedValue scoped values} across threads.
  *   <li> Confinement checks. The phrase "threads contained in the task scope" in method
  *   descriptions means threads started in the task scope or descendant scopes.
  * </ul>
  *
- * <p> The following example demonstrates the inheritance of an scoped-value variable. An
- * scoped value {@code NAME} is bound to the value "duke". A StructuredTaskScope is created
+ * <p> The following example demonstrates the inheritance of a scoped value. A scoped
+ * value {@code USERNAME} is bound to the value "duke". A StructuredTaskScope is created
  * and its {@code fork} method invoked to start a thread to execute {@code childTask}.
- * The thread inherits the scoped-value {@linkplain ScopedValue.Carrier bindings} captured
+ * The thread inherits the scoped value {@linkplain ScopedValue.Carrier bindings} captured
  * when creating the task scope. The code in {@code childTask} uses the value of the
- * scoped-value and so reads the value "duke".
+ * scoped value and so reads the value "duke".
  * {@snippet lang=java :
- *     private static final ScopedValue<String> NAME = ScopedValue.newInstance();
+ *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
- *     // @link substring="where" target="ScopedValue#where" :
- *     ScopedValue.where(NAME, "duke").run(() -> {
+ *     // @link substring="where" target="ScopedValue#where(ScopedValue, Object, Runnable)" :
+ *     ScopedValue.where(USERNAME, "duke", () -> {
  *         try (var scope = new StructuredTaskScope<String>()) {
  *
  *             scope.fork(() -> childTask());           // @highlight substring="fork"
@@ -250,7 +250,8 @@ import jdk.internal.misc.ThreadFlock;
  *     ...
  *
  *     String childTask() {
- *         String name = NAME.get();   // "duke"    // @highlight substring="get"
+ *         // @link substring="get" target="ScopedValue#get()" :
+ *         String name = USERNAME.get();   // "duke"
  *         ...
  *     }
  * }
@@ -311,11 +312,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * tasks are {@linkplain #fork(Callable) forked}. The task scope is owned by the
      * current thread.
      *
-     * <p> This method captures the current thread's {@linkplain ScopedValue scoped-value}
+     * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
      * bindings for inheritance by threads created in the task scope. The
      * <a href="#TreeStructure">Tree Structure</a> section in the class description
      * details how parent-child relations are established implicitly for the purpose of
-     * inheritance of scoped-value bindings.
+     * inheritance of scoped value bindings.
      *
      * @param name the name of the task scope, can be null
      * @param factory the thread factory
@@ -405,13 +406,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Starts a new thread to run the given task.
      *
      * <p> The new thread is created with the task scope's {@link ThreadFactory}. It
-     * inherits the current thread's {@linkplain ScopedValue scoped-value} bindings. The
+     * inherits the current thread's {@linkplain ScopedValue scoped value} bindings. The
      * bindings must match the bindings captured when the task scope was created.
      *
      * <p> If the task completes before the task scope is {@link #shutdown() shutdown}
-     * then the {@link #handleComplete(Future) handle} method is invoked to consume the
-     * completed task. The {@code handleComplete} method is run when the task completes
-     * with a result or exception. If the {@code Future} {@link Future#cancel(boolean)
+     * then the {@link #handleComplete(Future) handleComplete} method is invoked to
+     * consume the completed task. The {@code handleComplete} method is run when the task
+     * completes with a result or exception. If the Future's {@link Future#cancel(boolean)
      * cancel} method is used the cancel a task before the task scope is shut down, then
      * the {@code handleComplete} method is run by the thread that invokes {@code cancel}.
      * If the task scope shuts down at or around the same time that the task completes or
@@ -434,7 +435,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the owner or a thread
      * contained in the task scope
-     * @throws StructureViolationException if the current scoped-value bindings are not
+     * @throws StructureViolationException if the current scoped value bindings are not
      * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the task
@@ -671,7 +672,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * throws {@link StructureViolationException}.
      *
      * Similarly, if called to close a task scope that <em>encloses</em> {@linkplain
-     * ScopedValue.Carrier#run(Runnable) operations} with scoped-value bindings then
+     * ScopedValue.Carrier#run(Runnable) operations} with scoped value bindings then
      * it also throws {@code StructureViolationException} after closing the task scope.
      *
      * If a thread terminates without first closing task scopes that it owns then
@@ -870,11 +871,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
          * owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopedValue scoped-value}
+         * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established
-         * implicitly for the purpose of inheritance of scoped-value bindings.
+         * implicitly for the purpose of inheritance of scoped value bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
@@ -1052,11 +1053,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope
          * is owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopedValue scoped-value}
+         * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
          * bindings for inheritance by threads created in the task scope. The
          * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
          * the class description details how parent-child relations are established
-         * implicitly for the purpose of inheritance of scoped-value bindings.
+         * implicitly for the purpose of inheritance of scoped value bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
