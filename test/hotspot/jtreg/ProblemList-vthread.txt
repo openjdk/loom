@@ -212,6 +212,7 @@ runtime/cds/appcds/BootClassPathMismatch.java 0000000 generic-all
 runtime/cds/appcds/CDSandJFR.java 0000000 generic-all
 runtime/cds/appcds/ClassPathAttr.java 0000000 generic-all
 runtime/cds/appcds/CommandLineFlagCombo.java 0000000 generic-all
+runtime/cds/appcds/CommonAppClasspath.java 0000000 generic-all
 runtime/cds/appcds/DumpClassList.java 0000000 generic-all
 runtime/cds/appcds/DumpingWithNoCoops.java 0000000 generic-all
 runtime/cds/appcds/ExtraSymbols.java 0000000 generic-all
@@ -292,6 +293,7 @@ runtime/cds/appcds/dynamicArchive/ArrayKlasses.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/CommonAppClasspath.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicLambdaWithUseImplMethodHandle.java 0000000 generic-all
