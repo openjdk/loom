@@ -42,34 +42,46 @@ import jdk.internal.vm.annotation.Stable;
 import sun.security.action.GetPropertyAction;
 
 /**
- * A value that is written once and is then available for reading for a bounded period
- * of execution by a thread. A {@code ScopedValue} allows for safely and efficiently
- * sharing data for a bounded period of execution without using method arguments.
+ * A value that is set once and is then available for reading for a bounded period of
+ * execution by a thread. A {@code ScopedValue} allows for safely and efficiently sharing
+ * data for a bounded period of execution without using method arguments.
  *
- * <p> Consider the following example with a {@code ScopedValue} "{@code USERNAME}" that
- * is <em>bound</em> to the value "{@code duke}" for the execution of the method
- * {@code doSomething()}.
+ * <p> {@code ScopedValue} defines the {@link #where(ScopedValue, Object, Runnable)}
+ * method to set the value of a {@code ScopedValue} for the period of execution by a
+ * thread of the runnable's {@link Runnable#run() run} method. The unfolding execution of
+ * the methods executed by {@code run} defines a <b><em>dynamic scope</em></b>. The scoped
+ * value is {@linkplain #isBound() bound} when executing in the dynamic scope, it reverts
+ * to being <em>unbound</em> when the {@code run} method completes (normally or with an
+ * exception). Code execting in the dynamic scope uses the {@code ScopeValue} {@link
+ * #get() get} method to read its value.
+ *
+ * <p> Like a {@linkplain ThreadLocal thread-local variable}, a scoped value has multiple
+ * incarnations, one per thread. The particular incarnation that is used depends on which
+ * thread calls its methods.
+ *
+ * <p> Consider the following example with a scoped value {@code USERNAME} that is
+ * <em>bound</em> to the value "{@code duke}" for the execution, by a thread, of a run
+ * method that invokes {@code doSomething()}.
  * {@snippet lang=java :
  *     // @link substring="newInstance" target="#newInstance" :
  *     private static final ScopeValue<String> USERNAME = ScopeValue.newInstance();
  *
- *     // @link substring="where" target="#where(ScopedValue, java.lang.Object, Runnable)"
  *     ScopedValue.where(USERNAME, "duke", () -> doSomething());
  * }
- * Code executed directly or indirectly by {@code doSomething()} that invokes
- * {@linkplain #get() USERNAME.get()} will read the value "{@code duke}". The unfolding
- * execution of the methods executed by {@code doSomething()} defines a <em>dynamic
- * scope</em>. The {@code ScopedValue} is bound to a value for the thread executing
- * {@code doSomething()}. The {@code ScopedValue} becomes unbound when {@code
- * doSomething()} completes (normally or with an exception).
+ * Code executed directly or indirectly by {@code doSomething()} that invokes {@code
+ * USERNAME.get()} will read the value "{@code duke}". The scoped
+ * value is bound when executing {@code doSomething()} and becomes unbound when {@code
+ * doSomething()} completes (normally or with an exception). If one thread were to call
+ * {@code doSomething()} with {@code USERNAME} bound to "{@code duke1}", and another
+ * thread were to call the method with {@code USERNAME} bound to "{@code duke2}", then
+ * {@code USERNAME.get()} would read the value "{@code duke1}" or "{@code duke2}",
+ * depending on which thread is executing.
  *
- * <p> Like a {@linkplain ThreadLocal thread-local variable}, a scoped value has multiple
- * incarnations, one per thread. The particular incarnation that is used depends on which
- * thread calls its methods. Thread {@code T1} may call the {@code doSomething()} method
- * above with {@code USERNAME} bound to "{@code duke1}", another thread {@code T2} may
- * call the same method with {@code USERNAME} bound to "{@code duke2}". Code in
- * {@code doSomething()} will read the value "{@code duke1}" or "{@code duke2}" depending
- * on which thread is executing.
+ * <p> In addition to the {@code where} method that executes a {@code run} method, {@code
+ * ScopeLocal} defines the {@link #where(ScopedValue, Object, Callable)} method to execute
+ * a method that returns a result. It also defines the {@link #where(ScopeValue, Object)}
+ * method for cases where it is useful to accumulate mappings of {@code ScopeValue} to
+ * value.
  *
  * <p> A {@code ScopedValue} will typically be declared in a {@code final} and {@code
  * static} field. The accessibility of the field will determine which components can
@@ -81,12 +93,12 @@ import sun.security.action.GetPropertyAction;
  *
  * <h2><a id="rebind">Rebinding</a></h2>
  *
- * The {@code ScopedValue} API allows a new binding to be established for nested dynamic
- * scopes. This is known as <em>rebinding</em>. A {@code ScopedValue} that is bound to
- * some value may be bound to a new value for the bounded execution of some method. The
- * unfolding execution of code executed by that method defines the nested dynamic scope.
- * When the method completes (normally or with an exception), the value of the {@code
- * ScopedValue} reverts to its previous value.
+ * The {@code ScopedValue} API allows a new binding to be established for <em>nested
+ * dynamic scopes</em>. This is known as <em>rebinding</em>. A {@code ScopedValue} that
+ * is bound to some value may be bound to a new value for the bounded execution of some
+ * method. The unfolding execution of code executed by that method defines the nested
+ * dynamic scope. When the method completes (normally or with an exception), the value of
+ * the {@code ScopedValue} reverts to its previous value.
  *
  * <p> In the above example, suppose that code executed by {@code doSomething()} binds
  * {@code USERNAME} to a new value with:
@@ -102,15 +114,15 @@ import sun.security.action.GetPropertyAction;
  *
  * {@code ScopedValue} supports sharing data across threads. At this time, this sharing
  * is limited to structured cases where child threads are started and terminate within
- * the bounded period of execution by a parent thread. More specifically, when using
- * a {@link StructuredTaskScope}, scoped value bindings are captured when creating the
- * {@code StructuredTaskScope} and inherited by all threads started in that scope with
+ * the bounded period of execution by a parent thread. More specifically, when using a
+ * {@link StructuredTaskScope}, scoped value bindings are <em>captured</em> when creating
+ * a {@code StructuredTaskScope} and inherited by all threads started in that scope with
  * the {@link StructuredTaskScope#fork(Callable) fork} method.
  *
- * <p> In the following example, the {@code ScopedValue} "{@code USERNAME}" is bound to
- * the value "{@code duke}" for the execution of a runnable operation. The code in the
- * runnable operation creates a {@code StructuredTaskScope} and forks three child threads.
- * Code executed directly or indirectly by these threads running {@code childTask1()},
+ * <p> In the following example, the {@code ScopedValue} {@code USERNAME} is bound to the
+ * value "{@code duke}" for the execution of a runnable operation. The code in the {@code
+ * run} method creates a {@code StructuredTaskScope} and forks three child threads. Code
+ * executed directly or indirectly by these threads running {@code childTask1()},
  * {@code childTask2()}, and {@code childTask3()} will read the value "duke".
  *
  * {@snippet lang=java :
@@ -361,10 +373,12 @@ public final class ScopedValue<T> {
          * values, or become {@linkplain #isBound() unbound}, when the operation completes.
          *
          * <p> Scoped values are intended to be used in a <em>structured manner</em>.
-         * If {@code op} creates any {@link StructuredTaskScope}s but does not close them,
-         * then exiting {@code op} causes the underlying construct of each
-         * {@link StructuredTaskScope} to be closed (in the reverse order that they were
-         * created in), and {@link StructureViolationException} to be thrown.
+         * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+         * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+         * underlying construct of each {@code StructuredTaskScope} created in the
+         * dynamic scope to be closed. This may require blocking until all child threads
+         * have completed their sub-tasks. The closing is done in the reverse order that
+         * they were created. Once closed, {@link StructureViolationException} is thrown.
          *
          * @param op the operation to run
          * @param <R> the type of the result of the operation
@@ -398,10 +412,12 @@ public final class ScopedValue<T> {
          * values, or become {@linkplain #isBound() unbound}, when the operation completes.
          *
          * <p> Scoped values are intended to be used in a <em>structured manner</em>.
-         * If {@code op} creates any {@link StructuredTaskScope}s but does not close them,
-         * then exiting {@code op} causes the underlying construct of each
-         * {@link StructuredTaskScope} to be closed (in the reverse order that they were
-         * created in), and {@link StructureViolationException} to be thrown.
+         * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+         * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+         * underlying construct of each {@code StructuredTaskScope} created in the
+         * dynamic scope to be closed. This may require blocking until all child threads
+         * have completed their sub-tasks. The closing is done in the reverse order that
+         * they were created. Once closed, {@link StructureViolationException} is thrown.
          *
          * @param op the operation to run
          */
@@ -450,11 +466,13 @@ public final class ScopedValue<T> {
      * exception), the {@code ScopedValue} will revert to being unbound, or rervert to
      * its previous value when previously bound, in the current thread.
      *
-     * <p> Scoped values are intended to be used in a <em>structured manner</em>. If
-     * {@code op} creates any {@link StructuredTaskScope}s but does not close them,
-     * then exiting {@code op} causes the underlying construct of each {@link
-     * StructuredTaskScope} to be closed (in the reverse order that they were created
-     * in), and {@link StructureViolationException} to be thrown.
+     * <p> Scoped values are intended to be used in a <em>structured manner</em>.
+     * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+     * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+     * underlying construct of each {@code StructuredTaskScope} created in the
+     * dynamic scope to be closed. This may require blocking until all child threads
+     * have completed their sub-tasks. The closing is done in the reverse order that
+     * they were created. Once closed, {@link StructureViolationException} is thrown.
      *
      * <p> This method is equivalent to:
      * {@snippet lang=java :
@@ -481,11 +499,13 @@ public final class ScopedValue<T> {
      * {@code ScopedValue} will revert to being unbound, or rervert to its previous value
      * when previously bound, in the current thread.
      *
-     * <p> Scoped values are intended to be used in a <em>structured manner</em>. If
-     * {@code op} creates any {@link StructuredTaskScope}s but does not close them,
-     * then exiting {@code op} causes the underlying construct of each {@link
-     * StructuredTaskScope} to be closed (in the reverse order that they were created
-     * in), and {@link StructureViolationException} to be thrown.
+     * <p> Scoped values are intended to be used in a <em>structured manner</em>.
+     * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+     * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+     * underlying construct of each {@code StructuredTaskScope} created in the
+     * dynamic scope to be closed. This may require blocking until all child threads
+     * have completed their sub-tasks. The closing is done in the reverse order that
+     * they were created. Once closed, {@link StructureViolationException} is thrown.
      *
      * <p> This method is equivalent to:
      * {@snippet lang=java :
