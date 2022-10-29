@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Basic tests for StructuredTaskScope with scoped-values
+ * @summary Basic tests for StructuredTaskScope with scoped values
  * @enablePreview
  * @modules jdk.incubator.concurrent
  * @run testng ScopedValuesTest
@@ -40,16 +40,16 @@ import static org.testng.Assert.*;
 public class ScopedValuesTest {
 
     /**
-     * Test that fork inherits scoped-value bindings.
+     * Test that fork inherits scoped value bindings.
      */
     @Test
     public void testForkInheritsScopedValues1() throws Exception {
-        ScopedValue<String> NAME = ScopedValue.newInstance();
-        String value = ScopedValue.where(NAME, "x").call(() -> {
-            try (var scope = new StructuredTaskScope()) {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        String value = ScopedValue.where(name, "x", () -> {
+            try (var scope = new StructuredTaskScope<String>()) {
                 Future<String> future = scope.fork(() -> {
                     // child
-                    return NAME.get();
+                    return name.get();
                 });
                 scope.join();
                 return future.resultNow();
@@ -59,18 +59,18 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork inherits scoped-value bindings into a grandchild.
+     * Test that fork inherits scoped value bindings into a grandchild.
      */
     @Test
     public void testForkInheritsScopedValues2() throws Exception {
-        ScopedValue<String> NAME = ScopedValue.newInstance();
-        String value = ScopedValue.where(NAME, "x").call(() -> {
-            try (var scope1 = new StructuredTaskScope()) {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        String value = ScopedValue.where(name, "x", () -> {
+            try (var scope1 = new StructuredTaskScope<String>()) {
                 Future<String> future1 = scope1.fork(() -> {
-                    try (var scope2 = new StructuredTaskScope()) {
+                    try (var scope2 = new StructuredTaskScope<String>()) {
                         Future<String> future2 = scope2.fork(() -> {
                             // grandchild
-                            return NAME.get();
+                            return name.get();
                         });
                         scope2.join();
                         return future2.resultNow();
@@ -84,8 +84,7 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test exiting an scoped value operation closes the thread flock of a nested scope
-     * and throws StructureViolationException.
+     * Test exiting a dynamic scope with an open task scope.
      */
     @Test
     public void testStructureViolation1() throws Exception {
@@ -96,8 +95,8 @@ public class ScopedValuesTest {
         var box = new Box();
         try {
             try {
-                ScopedValue.where(name, "x").run(() -> {
-                    box.scope = new StructuredTaskScope();
+                ScopedValue.where(name, "x", () -> {
+                    box.scope = new StructuredTaskScope<Object>();
                 });
                 fail();
             } catch (StructureViolationException expected) { }
@@ -105,7 +104,7 @@ public class ScopedValuesTest {
             // underlying flock should be closed, fork should return a cancelled task
             StructuredTaskScope<Object> scope = box.scope;
             AtomicBoolean ran = new AtomicBoolean();
-            Future<String> future = scope.fork(() -> {
+            Future<Object> future = scope.fork(() -> {
                 ran.set(true);
                 return null;
             });
@@ -122,15 +121,26 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if scoped-value bindings
-     * created after StructuredTaskScope is created.
+     * Test closing a StructuredTaskScope while executing in a dynamic scope.
      */
     @Test
     public void testStructureViolation2() throws Exception {
-        ScopedValue<String> NAME = ScopedValue.newInstance();
-
-        try (var scope = new StructuredTaskScope()) {
-            ScopedValue.where(NAME, "x").run(() -> {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        try (var scope = new StructuredTaskScope<String>()) {
+            ScopedValue.where(name, "x", () -> {
+                assertThrows(StructureViolationException.class, scope::close);
+            });
+        }
+    }
+    
+    /**
+     * Test fork when a scoped value is bound after a StructuredTaskScope is created.
+     */
+    @Test
+    public void testStructureViolation3() throws Exception {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        try (var scope = new StructuredTaskScope<String>()) {
+            ScopedValue.where(name, "x", () -> {
                 assertThrows(StructureViolationException.class,
                         () -> scope.fork(() -> "foo"));
             });
@@ -138,18 +148,17 @@ public class ScopedValuesTest {
     }
 
     /**
-     * Test that fork throws StructureViolationException if scoped-value bindings
-     * change after StructuredTaskScope is created.
+     * Test fork when a scoped value is re-bound after a StructuredTaskScope is created.
      */
     @Test
-    public void testStructureViolation3() throws Exception {
-        ScopedValue<String> NAME1 = ScopedValue.newInstance();
-        ScopedValue<String> NAME2 = ScopedValue.newInstance();
+    public void testStructureViolation4() throws Exception {
+        ScopedValue<String> name1 = ScopedValue.newInstance();
+        ScopedValue<String> name2 = ScopedValue.newInstance();
 
         // re-bind
-        ScopedValue.where(NAME1, "x").run(() -> {
-            try (var scope = new StructuredTaskScope()) {
-                ScopedValue.where(NAME1, "y").run(() -> {
+        ScopedValue.where(name1, "x", () -> {
+            try (var scope = new StructuredTaskScope<String>()) {
+                ScopedValue.where(name1, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });
@@ -157,9 +166,9 @@ public class ScopedValuesTest {
         });
 
         // new binding
-        ScopedValue.where(NAME1, "x").run(() -> {
-            try (var scope = new StructuredTaskScope()) {
-                ScopedValue.where(NAME2, "y").run(() -> {
+        ScopedValue.where(name1, "x", () -> {
+            try (var scope = new StructuredTaskScope<String>()) {
+                ScopedValue.where(name2, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
                 });
