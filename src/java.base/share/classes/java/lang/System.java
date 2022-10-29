@@ -88,7 +88,6 @@ import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
-import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import sun.nio.fs.DefaultFileSystemProvider;

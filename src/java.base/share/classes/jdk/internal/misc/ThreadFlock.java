@@ -210,7 +210,7 @@ public class ThreadFlock implements AutoCloseable {
      * Opens a new thread flock. The flock is owned by the current thread. It can be
      * named to aid debugging.
      *
-     * <p> This method captures the current thread's {@linkplain ScopedValue scoped-value}
+     * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
      * bindings for inheritance by threads created in the flock.
      *
      * <p> For the purposes of containment, monitoring, and debugging, the parent
@@ -250,7 +250,7 @@ public class ThreadFlock implements AutoCloseable {
     /**
      * Starts the given unstarted thread in this flock.
      *
-     * <p> The thread is started with the scoped-value bindings that were captured
+     * <p> The thread is started with the scoped value bindings that were captured
      * when opening the flock. The bindings must match the current thread's bindings.
      *
      * <p> This method may only be invoked by the flock owner or threads {@linkplain
@@ -263,7 +263,7 @@ public class ThreadFlock implements AutoCloseable {
      * @throws WrongThreadException if the current thread is not the owner or a thread
      * contained in the flock
      * @throws jdk.incubator.concurrent.StructureViolationException if the current
-     * scoped-value bindings are not the same as when the flock was created
+     * scoped value bindings are not the same as when the flock was created
      */
     public Thread start(Thread thread) {
         ensureOwnerOrContainsThread();
@@ -398,12 +398,11 @@ public class ThreadFlock implements AutoCloseable {
      * <p> A ThreadFlock is intended to be used in a <em>structured manner</em>. If
      * this method is called to close a flock before nested flocks are closed then it
      * closes the nested flocks (in the reverse order that they were created in),
-     * closes this flock, and then throws {@link
-     * jdk.incubator.concurrent.StructureViolationException}.
-     * Similarly, if called to close a flock that <em>encloses</em> {@linkplain
-     * jdk.incubator.concurrent.ScopedValue.Carrier#run(Runnable) operations} with
-     * scoped-value bindings then it also throws {@code StructureViolationException}
-     * after closing the flock.
+     * closes this flock, and then throws {@code StructureViolationException}.
+     * Similarly, if this method is called to close a thread flock while executing with
+     * scoped value bindings, and the thread flock was created before the scoped values
+     * were bound, then {@code StructureViolationException} is thrown after closing the
+     * thread flock.
      *
      * @throws WrongThreadException if invoked by a thread that is not the owner
      * @throws jdk.incubator.concurrent.StructureViolationException if a structure

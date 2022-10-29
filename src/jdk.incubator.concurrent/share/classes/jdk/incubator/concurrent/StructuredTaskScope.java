@@ -232,9 +232,9 @@ import jdk.internal.misc.ThreadFlock;
  * <p> The following example demonstrates the inheritance of a scoped value. A scoped
  * value {@code USERNAME} is bound to the value "duke". A StructuredTaskScope is created
  * and its {@code fork} method invoked to start a thread to execute {@code childTask}.
- * The thread inherits the scoped value {@linkplain ScopedValue.Carrier bindings} captured
- * when creating the task scope. The code in {@code childTask} uses the value of the
- * scoped value and so reads the value "duke".
+ * The thread inherits the scoped value <em>bindings</em> captured when creating the
+ * task scope. The code in {@code childTask} uses the value of the scoped value and so
+ * reads the value "duke".
  * {@snippet lang=java :
  *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
@@ -266,7 +266,7 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> Actions in the owner thread of, or a thread contained in, the task scope prior to
  * {@linkplain #fork forking} of a {@code Callable} task
- * <a href="../../../../java.base/java/util/concurrent/package-summary.html#MemoryVisibility">
+ * <a href="{@docRoot}/java.base/java/util/concurrent/package-summary.html#MemoryVisibility">
  * <i>happen-before</i></a> any actions taken by that task, which in turn <i>happen-before</i>
  * the task result is retrieved via its {@code Future}, or <i>happen-before</i> any actions
  * taken in a thread after {@linkplain #join() joining} of the task scope.
@@ -671,9 +671,10 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * (in the reverse order that they were created in), closes this task scope, and then
      * throws {@link StructureViolationException}.
      *
-     * Similarly, if called to close a task scope that <em>encloses</em> {@linkplain
-     * ScopedValue.Carrier#run(Runnable) operations} with scoped value bindings then
-     * it also throws {@code StructureViolationException} after closing the task scope.
+     * Similarly, if this method is called to close a task scope while executing with
+     * {@linkplain ScopedValue scoped value} bindings, and the task scope was created
+     * before the scoped values were bound, then {@code StructureViolationException} is
+     * thrown after closing the task scope.
      *
      * If a thread terminates without first closing task scopes that it owns then
      * termination will cause the underlying construct of each of its open tasks scopes to
