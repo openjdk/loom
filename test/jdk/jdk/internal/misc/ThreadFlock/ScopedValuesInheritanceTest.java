@@ -27,21 +27,22 @@
  * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
- * @run testng ScopedValuesTest
+ * @run testng ScopedValuesInheritanceTest
  */
 
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 import jdk.internal.misc.ThreadFlock;
 import jdk.incubator.concurrent.ScopedValue;
 import jdk.incubator.concurrent.StructureViolationException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ScopedValuesTest {
+@Test
+public class ScopedValuesInheritanceTest {
 
     @DataProvider(name = "factories")
     public Object[][] factories() {
@@ -76,7 +77,6 @@ public class ScopedValuesTest {
     /**
      * Test exiting a dynamic scope with open thread flocks.
      */
-    @Test
     public void testStructureViolation1() {
         ScopedValue<String> name = ScopedValue.newInstance();
         class Box {
@@ -99,7 +99,6 @@ public class ScopedValuesTest {
      * Test closing a thread flock while in a dynamic scope and with enclosing thread
      * flocks. This test closes enclosing flock1.
      */
-    @Test
     public void testStructureViolation2() {
         ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
@@ -131,7 +130,6 @@ public class ScopedValuesTest {
      * Test closing a thread flock while in a dynamic scope and with enclosing thread
      * flocks. This test closes enclosing flock2.
      */
-    @Test
     public void testStructureViolation3() {
         ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {
@@ -163,7 +161,6 @@ public class ScopedValuesTest {
      * Test closing a thread flock while in a dynamic scope and with enclosing thread
      * flocks. This test closes enclosing flock3.
      */
-    @Test
     public void testStructureViolation4() {
         ScopedValue<String> name = ScopedValue.newInstance();
         try (var flock1 = ThreadFlock.open("flock1")) {

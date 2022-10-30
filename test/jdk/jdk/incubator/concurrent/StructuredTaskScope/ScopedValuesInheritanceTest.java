@@ -26,7 +26,7 @@
  * @summary Basic tests for StructuredTaskScope with scoped values
  * @enablePreview
  * @modules jdk.incubator.concurrent
- * @run testng ScopedValuesTest
+ * @run testng ScopedValuesInheritanceTest
  */
 
 import jdk.incubator.concurrent.ScopedValue;
@@ -37,19 +37,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
-public class ScopedValuesTest {
+@Test
+public class ScopedValuesInheritanceTest {
 
     /**
      * Test that fork inherits scoped value bindings.
      */
-    @Test
     public void testForkInheritsScopedValues1() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "x", () -> {
             try (var scope = new StructuredTaskScope<String>()) {
                 Future<String> future = scope.fork(() -> {
-                    // child
-                    return name.get();
+                    return name.get(); // child should read "x"
                 });
                 scope.join();
                 return future.resultNow();
@@ -61,7 +60,6 @@ public class ScopedValuesTest {
     /**
      * Test that fork inherits scoped value bindings into a grandchild.
      */
-    @Test
     public void testForkInheritsScopedValues2() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "x", () -> {
@@ -69,8 +67,7 @@ public class ScopedValuesTest {
                 Future<String> future1 = scope1.fork(() -> {
                     try (var scope2 = new StructuredTaskScope<String>()) {
                         Future<String> future2 = scope2.fork(() -> {
-                            // grandchild
-                            return name.get();
+                            return name.get(); // grandchild should read "x"
                         });
                         scope2.join();
                         return future2.resultNow();
@@ -84,9 +81,39 @@ public class ScopedValuesTest {
     }
 
     /**
+     * Test that fork inherits a rebound scoped value into a grandchild.
+     */
+    public void testForkInheritsScopedValues3() throws Exception {
+        ScopedValue<String> name = ScopedValue.newInstance();
+        String value = ScopedValue.where(name, "x", () -> {
+            try (var scope1 = new StructuredTaskScope<String>()) {
+                Future<String> future1 = scope1.fork(() -> {
+                    assertEquals(name.get(), "x");  // child should read "x"
+
+                    // rebind name to "y"
+                    String grandchildValue = ScopedValue.where(name, "y", () -> {
+                        try (var scope2 = new StructuredTaskScope<String>()) {
+                            Future<String> future2 = scope2.fork(() -> {
+                                return name.get(); // grandchild should read "y"
+                            });
+                            scope2.join();
+                            return future2.resultNow();
+                        }
+                    });
+
+                    assertEquals(name.get(), "x");  // child should read "x"
+                    return grandchildValue;
+                });
+                scope1.join();
+                return future1.resultNow();
+            }
+        });
+        assertEquals(value, "y");
+    }
+
+    /**
      * Test exiting a dynamic scope with an open task scope.
      */
-    @Test
     public void testStructureViolation1() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         class Box {
@@ -123,7 +150,6 @@ public class ScopedValuesTest {
     /**
      * Test closing a StructuredTaskScope while executing in a dynamic scope.
      */
-    @Test
     public void testStructureViolation2() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         try (var scope = new StructuredTaskScope<String>()) {
@@ -136,7 +162,6 @@ public class ScopedValuesTest {
     /**
      * Test fork when a scoped value is bound after a StructuredTaskScope is created.
      */
-    @Test
     public void testStructureViolation3() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         try (var scope = new StructuredTaskScope<String>()) {
@@ -150,7 +175,6 @@ public class ScopedValuesTest {
     /**
      * Test fork when a scoped value is re-bound after a StructuredTaskScope is created.
      */
-    @Test
     public void testStructureViolation4() throws Exception {
         ScopedValue<String> name1 = ScopedValue.newInstance();
         ScopedValue<String> name2 = ScopedValue.newInstance();
