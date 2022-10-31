@@ -26,7 +26,7 @@
  * @summary Basic tests for StructuredTaskScope with scoped values
  * @enablePreview
  * @modules jdk.incubator.concurrent
- * @run testng ScopedValuesInheritanceTest
+ * @run testng WithScopedValue
  */
 
 import jdk.incubator.concurrent.ScopedValue;
@@ -38,12 +38,12 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class ScopedValuesInheritanceTest {
+public class WithScopedValue {
 
     /**
-     * Test that fork inherits scoped value bindings.
+     * Test that fork inherits a scoped value into a child thread.
      */
-    public void testForkInheritsScopedValues1() throws Exception {
+    public void testForkInheritsScopedValue1() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "x", () -> {
             try (var scope = new StructuredTaskScope<String>()) {
@@ -58,9 +58,9 @@ public class ScopedValuesInheritanceTest {
     }
 
     /**
-     * Test that fork inherits scoped value bindings into a grandchild.
+     * Test that fork inherits a scoped value into a grandchild thread.
      */
-    public void testForkInheritsScopedValues2() throws Exception {
+    public void testForkInheritsScopedValue2() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "x", () -> {
             try (var scope1 = new StructuredTaskScope<String>()) {
@@ -81,9 +81,9 @@ public class ScopedValuesInheritanceTest {
     }
 
     /**
-     * Test that fork inherits a rebound scoped value into a grandchild.
+     * Test that fork inherits a rebound scoped value into a grandchild thread.
      */
-    public void testForkInheritsScopedValues3() throws Exception {
+    public void testForkInheritsScopedValue3() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "x", () -> {
             try (var scope1 = new StructuredTaskScope<String>()) {
@@ -179,7 +179,7 @@ public class ScopedValuesInheritanceTest {
         ScopedValue<String> name1 = ScopedValue.newInstance();
         ScopedValue<String> name2 = ScopedValue.newInstance();
 
-        // re-bind
+        // rebind
         ScopedValue.where(name1, "x", () -> {
             try (var scope = new StructuredTaskScope<String>()) {
                 ScopedValue.where(name1, "y", () -> {

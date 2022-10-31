@@ -27,7 +27,7 @@
  * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @modules jdk.incubator.concurrent
- * @run testng ScopedValuesInheritanceTest
+ * @run testng WithScopedValue
  */
 
 import jdk.internal.misc.ThreadFlock;
@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 @Test
-public class ScopedValuesInheritanceTest {
+public class WithScopedValue {
 
     @DataProvider(name = "factories")
     public Object[][] factories() {
@@ -55,10 +55,10 @@ public class ScopedValuesInheritanceTest {
     }
 
     /**
-     * Test inheritance of scoped value bindings.
+     * Test inheritance of a scoped value.
      */
     @Test(dataProvider = "factories")
-    public void testInheritsScopedValues(ThreadFactory factory) throws Exception {
+    public void testInheritsScopedValue(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.where(name, "duke", () -> {
             var result = new AtomicReference<String>();
