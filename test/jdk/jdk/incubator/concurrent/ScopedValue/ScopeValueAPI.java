@@ -267,7 +267,6 @@ public class ScopeValueAPI {
         assertFalse(name.isBound());
 
         // call
-        // call
         var ignore1 = ScopedValue.where(name, null, () -> {
             assertTrue(name.isBound());
             assertEquals(name.get(), null);
