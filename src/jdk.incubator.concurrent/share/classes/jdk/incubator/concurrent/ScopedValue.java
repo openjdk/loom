@@ -44,15 +44,15 @@ import sun.security.action.GetPropertyAction;
 /**
  * A value that is set once and is then available for reading for a bounded period of
  * execution by a thread. A {@code ScopedValue} allows for safely and efficiently sharing
- * data for a bounded period of execution without using method arguments.
+ * data for a bounded period of execution without passing the data as method arguments.
  *
  * <p> {@code ScopedValue} defines the {@link #where(ScopedValue, Object, Runnable)}
  * method to set the value of a {@code ScopedValue} for the period of execution by a
  * thread of the runnable's {@link Runnable#run() run} method. The unfolding execution of
  * the methods executed by {@code run} defines a <b><em>dynamic scope</em></b>. The scoped
- * value is {@linkplain #isBound() bound} when executing in the dynamic scope, it reverts
+ * value is {@linkplain #isBound() bound} while executing in the dynamic scope, it reverts
  * to being <em>unbound</em> when the {@code run} method completes (normally or with an
- * exception). Code execting in the dynamic scope uses the {@code ScopeValue} {@link
+ * exception). Code executing in the dynamic scope uses the {@code ScopedValue} {@link
  * #get() get} method to read its value.
  *
  * <p> Like a {@linkplain ThreadLocal thread-local variable}, a scoped value has multiple
@@ -64,32 +64,31 @@ import sun.security.action.GetPropertyAction;
  * method that invokes {@code doSomething()}.
  * {@snippet lang=java :
  *     // @link substring="newInstance" target="#newInstance" :
- *     private static final ScopeValue<String> USERNAME = ScopeValue.newInstance();
+ *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
  *     ScopedValue.where(USERNAME, "duke", () -> doSomething());
  * }
  * Code executed directly or indirectly by {@code doSomething()} that invokes {@code
- * USERNAME.get()} will read the value "{@code duke}". The scoped
- * value is bound when executing {@code doSomething()} and becomes unbound when {@code
- * doSomething()} completes (normally or with an exception). If one thread were to call
- * {@code doSomething()} with {@code USERNAME} bound to "{@code duke1}", and another
- * thread were to call the method with {@code USERNAME} bound to "{@code duke2}", then
+ * USERNAME.get()} will read the value "{@code duke}". The scoped value is bound while
+ * executing {@code doSomething()} and becomes unbound when {@code doSomething()}
+ * completes (normally or with an exception). If one thread were to call {@code
+ * doSomething()} with {@code USERNAME} bound to "{@code duke1}", and another thread
+ * were to call the method with {@code USERNAME} bound to "{@code duke2}", then
  * {@code USERNAME.get()} would read the value "{@code duke1}" or "{@code duke2}",
  * depending on which thread is executing.
  *
  * <p> In addition to the {@code where} method that executes a {@code run} method, {@code
  * ScopeLocal} defines the {@link #where(ScopedValue, Object, Callable)} method to execute
- * a method that returns a result. It also defines the {@link #where(ScopeValue, Object)}
- * method for cases where it is useful to accumulate mappings of {@code ScopeValue} to
+ * a method that returns a result. It also defines the {@link #where(ScopedValue, Object)}
+ * method for cases where it is useful to accumulate mappings of {@code ScopedValue} to
  * value.
  *
  * <p> A {@code ScopedValue} will typically be declared in a {@code final} and {@code
  * static} field. The accessibility of the field will determine which components can
  * bind or read its value.
  *
- * <p> The value of a {@code ScopedValue} should be an immutable object. This is
- * important for cases where a {@code ScopedValue} is used to share data across threads
- * (see <a href="#inheritence">Inheritance</a>).
+ * <p> Unless otherwise specified, passing a {@code null} argument to a method in this
+ * class will cause a {@link NullPointerException} to be thrown.
  *
  * <h2><a id="rebind">Rebinding</a></h2>
  *
@@ -112,11 +111,11 @@ import sun.security.action.GetPropertyAction;
  *
  * <h2><a id="inheritence">Inheritance</a></h2>
  *
- * {@code ScopedValue} supports sharing data across threads. At this time, this sharing
- * is limited to structured cases where child threads are started and terminate within
- * the bounded period of execution by a parent thread. More specifically, when using a
- * {@link StructuredTaskScope}, scoped value bindings are <em>captured</em> when creating
- * a {@code StructuredTaskScope} and inherited by all threads started in that scope with
+ * {@code ScopedValue} supports sharing data across threads. This sharing is limited to
+ * structured cases where child threads are started and terminate within the bounded
+ * period of execution by a parent thread. More specifically, when using a {@link
+ * StructuredTaskScope}, scoped value bindings are <em>captured</em> when creating a
+ * {@code StructuredTaskScope} and inherited by all threads started in that scope with
  * the {@link StructuredTaskScope#fork(Callable) fork} method.
  *
  * <p> In the following example, the {@code ScopedValue} {@code USERNAME} is bound to the
@@ -139,9 +138,6 @@ import sun.security.action.GetPropertyAction;
  *          }
  *     });
  * }
- *
- * <p> Unless otherwise specified, passing a {@code null} argument to a method in this
- * class will cause a {@link NullPointerException} to be thrown.
  *
  * @implNote
  * Scoped values are designed to be used in fairly small
