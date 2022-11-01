@@ -109,7 +109,7 @@ import sun.security.action.GetPropertyAction;
  * (normally or with an exception), the value of {@code USERNAME} reverts to
  * "{@code duke}".
  *
- * <h2><a id="inheritence">Inheritance</a></h2>
+ * <h2><a id="inheritance">Inheritance</a></h2>
  *
  * {@code ScopedValue} supports sharing data across threads. This sharing is limited to
  * structured cases where child threads are started and terminate within the bounded
