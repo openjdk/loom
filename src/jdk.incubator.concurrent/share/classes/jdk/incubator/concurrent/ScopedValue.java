@@ -47,8 +47,8 @@ import sun.security.action.GetPropertyAction;
  * data for a bounded period of execution without passing the data as method arguments.
  *
  * <p> {@code ScopedValue} defines the {@link #where(ScopedValue, Object, Runnable)}
- * method to set the value of a {@code ScopedValue} for the period of execution by a
- * thread of the runnable's {@link Runnable#run() run} method. The unfolding execution of
+ * method to set the value of a {@code ScopedValue} for the bouned period of execution by
+ * a thread of the runnable's {@link Runnable#run() run} method. The unfolding execution of
  * the methods executed by {@code run} defines a <b><em>dynamic scope</em></b>. The scoped
  * value is {@linkplain #isBound() bound} while executing in the dynamic scope, it reverts
  * to being <em>unbound</em> when the {@code run} method completes (normally or with an
@@ -78,7 +78,7 @@ import sun.security.action.GetPropertyAction;
  * depending on which thread is executing.
  *
  * <p> In addition to the {@code where} method that executes a {@code run} method, {@code
- * ScopeLocal} defines the {@link #where(ScopedValue, Object, Callable)} method to execute
+ * ScopedValue} defines the {@link #where(ScopedValue, Object, Callable)} method to execute
  * a method that returns a result. It also defines the {@link #where(ScopedValue, Object)}
  * method for cases where it is useful to accumulate mappings of {@code ScopedValue} to
  * value.
@@ -257,18 +257,11 @@ public final class ScopedValue<T> {
      *
      * <p> A {@code Carrier} is used to accumlate mappings so that an operation (a
      * {@link Runnable} or {@link Callable}) can be executed with all scoped values in
-     * the mapping bound to a value. The following example runs an operation with k1
+     * the mapping bound to values. The following example runs an operation with k1
      * bound (or rebound) to v1, and k2 bound (or rebound) to v2.
      * {@snippet lang=java :
      *     // @link substring="where" target="#where(ScopedValue, Object)" :
      *     ScopedValue.where(k1, v1).where(k2, v2).run(() -> ... );
-     * }
-     * It is equivalent to:
-     * {@snippet lang=java :
-     *     // @link substring="where" target="ScopedValue#where(ScopedValue, Object, Runnable)" :
-     *     ScopedValue.where(k1, v1, () -> {
-     *         ScopedValue.where(k2, v2, () -> ... );
-     *     });
      * }
      *
      * <p> A {@code Carrier} is immutable and thread-safe. The {@link
