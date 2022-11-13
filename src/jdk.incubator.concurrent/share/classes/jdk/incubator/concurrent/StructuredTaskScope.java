@@ -625,8 +625,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <ul>
      * <li> {@linkplain Future#cancel(boolean) Cancels} the tasks that have threads
      * {@linkplain Future#get() waiting} on a result so that the waiting threads wakeup.
-     * <li> {@linkplain Thread#interrupt() Interrupts} all unfinished threads contained in the
-     * task scope.
+     * <li> {@linkplain Thread#interrupt() Interrupts} all unfinished threads in the
+     * task scope (except the current thread).
      * <li> Wakes up the owner if it is waiting in {@link #join()} or {@link
      * #joinUntil(Instant)}. If the owner is not waiting then its next call to {@code
      * join} or {@code joinUntil} will return immediately.
