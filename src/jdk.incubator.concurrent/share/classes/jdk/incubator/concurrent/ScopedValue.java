@@ -35,10 +35,7 @@ import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ScopedValueContainer;
-import jdk.internal.vm.annotation.DontInline;
-import jdk.internal.vm.annotation.ForceInline;
-import jdk.internal.vm.annotation.ReservedStackAccess;
-import jdk.internal.vm.annotation.Stable;
+import jdk.internal.vm.annotation.*;
 import sun.security.action.GetPropertyAction;
 
 /**
@@ -376,20 +373,29 @@ public final class ScopedValue<T> {
          */
         public <R> R call(Callable<? extends R> op) throws Exception {
             Objects.requireNonNull(op);
-            Cache.invalidate(bitmask);
+            ScopedValue.Cache.invalidate(bitmask);
             var prevSnapshot = scopedValueBindings();
             var newSnapshot = new Snapshot(this, prevSnapshot);
-            R result;
+            return invokeWith(newSnapshot, op);
+        }
+
+        /**
+         * Execute the action with a set of ScopedValue bindings.
+         *
+         * The VM recognizes this method as special, so any changes to the
+         * name or signature require corresponding changes in
+         * JVM_FindScopedValueBindings().
+         */
+        private <R> R invokeWith(Snapshot newSnapshot, Callable<R> op) throws Exception {
             try {
                 JLA.setScopedValueBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
-                result = ScopedValueContainer.call(op);
+                return ScopedValueContainer.call(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setScopedValueBindings(prevSnapshot);
-                Cache.invalidate(bitmask);
+                JLA.setScopedValueBindings(newSnapshot.prev);
+                ScopedValue.Cache.invalidate(bitmask);
             }
-            return result;
         }
 
         /**
@@ -413,17 +419,28 @@ public final class ScopedValue<T> {
         public void run(Runnable op) {
             Objects.requireNonNull(op);
             Cache.invalidate(bitmask);
-            Snapshot newSnapshot = null;
-            JLA.ensureMaterializedForStackWalk(newSnapshot);
             var prevSnapshot = scopedValueBindings();
-            newSnapshot = new Snapshot(this, prevSnapshot);
+            var newSnapshot = new Snapshot(this, prevSnapshot);
+            invokeWith(newSnapshot, op);
+        }
+
+        /**
+         * Execute the action with a set of ScopedValue bindings.
+         *
+         * The VM recognizes this method as special, so any changes to the
+         * name or signature require corresponding changes in
+         * JVM_FindScopedValueBindings().
+         */
+        @Hidden
+        @ForceInline
+        private void invokeWith(Snapshot newSnapshot, Runnable op) {
             try {
                 JLA.setScopedValueBindings(newSnapshot);
                 JLA.ensureMaterializedForStackWalk(newSnapshot);
                 ScopedValueContainer.run(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setScopedValueBindings(prevSnapshot);
+                JLA.setScopedValueBindings(newSnapshot.prev);
                 Cache.invalidate(bitmask);
             }
         }
@@ -655,10 +672,11 @@ public final class ScopedValue<T> {
             bindings = JLA.findScopedValueBindings();
             if (bindings == null) {
                 // Nothing on the stack.
-                return EmptySnapshot.getInstance();
+                bindings = EmptySnapshot.getInstance();
             }
         }
         assert (bindings != null);
+        JLA.setScopedValueBindings(bindings);
         return (Snapshot) bindings;
     }
 
@@ -801,13 +819,11 @@ public final class ScopedValue<T> {
             return (r & 15) >= 5;
         }
 
-        @ReservedStackAccess @DontInline
         public static void invalidate() {
             setScopedValueCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
-        @ReservedStackAccess @DontInline
         static void invalidate(int toClearBits) {
             toClearBits = (toClearBits >>> TABLE_SIZE) | (toClearBits & PRIMARY_MASK);
             Object[] objects;
