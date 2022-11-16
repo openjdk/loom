@@ -1391,7 +1391,7 @@ JVM_ENTRY(jobject, JVM_FindScopedValueBindings(JNIEnv *env, jclass cls))
     Symbol *name = method->name();
 
     InstanceKlass* holder = method->method_holder();
-    if (name == vmSymbols::invokeWith_method_name()) {
+    if (name == vmSymbols::runWith_method_name()) {
       if ((holder == resolver.Carrier_klass
            || holder == vmClasses::VirtualThread_klass()
            || holder == vmClasses::Thread_klass())) {
@@ -4069,6 +4069,5 @@ JVM_END
  * null value.
  */
 JVM_ENTRY(void, JVM_EnsureMaterializedForStackWalk_func(JNIEnv* env, jobject vthread, jobject value))
-  //asm("nop");
   JVM_EnsureMaterializedForStackWalk(env, value);
 JVM_END
