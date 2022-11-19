@@ -156,7 +156,7 @@ import sun.security.action.GetPropertyAction;
  * should minimize the number of bound scoped values in use. For
  * example, if it is necessary to pass a number of values in this way,
  * it makes sense to create a record class to hold those values, and
- * then bind a single `ScopedValue` to an instance of that record.
+ * then bind a single {@code ScopedValue} to an instance of that record.
  *
  * <p>For this incubator release, the reference implementation
  * provides some system properties to tune the performance of scoped
@@ -184,7 +184,7 @@ import sun.security.action.GetPropertyAction;
  * memory saving, but each virtual thread's scoped-value cache would
  * have to be regenerated after a blocking operation.
  *
- * @param <T> the type of the value
+ * @param <T> the type of the object bound to this {@code ScopedValue}
  * @since 20
  */
 public final class ScopedValue<T> {
@@ -417,7 +417,7 @@ public final class ScopedValue<T> {
         }
 
         /**
-         * Execute the action with a set of ScopedValue bindings.
+         * Execute the action with a set of {@code ScopedValue} bindings.
          *
          * The VM recognizes this method as special, so any changes to the
          * name or signature require corresponding changes in
@@ -479,7 +479,7 @@ public final class ScopedValue<T> {
      *     ScopedValue.where(key, value).call(op);
      * }
      *
-     * @param key the ScopedValue
+     * @param key the {@code ScopedValue}
      * @param value the value, can be {@code null}
      * @param <T> the type of the value
      * @param <R> the result type
@@ -514,7 +514,7 @@ public final class ScopedValue<T> {
      *     ScopedValue.where(key, value).run(op);
      * }
      *
-     * @param key the ScopedValue
+     * @param key the {@code ScopedValue}
      * @param value the value, can be {@code null}
      * @param <T> the type of the value
      * @param op the operation to call
@@ -717,7 +717,7 @@ public final class ScopedValue<T> {
     // A small fixed-size key-value cache. When an scoped value's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
-    private static class Cache {
+    private static final class Cache {
         static final int INDEX_BITS = 4;  // Must be a power of 2
         static final int TABLE_SIZE = 1 << INDEX_BITS;
         static final int TABLE_MASK = TABLE_SIZE - 1;
@@ -746,27 +746,27 @@ public final class ScopedValue<T> {
             SLOT_MASK = cacheSize - 1;
         }
 
-        static final int primaryIndex(ScopedValue<?> key) {
+        static int primaryIndex(ScopedValue<?> key) {
             return key.hash & TABLE_MASK;
         }
 
-        static final int secondaryIndex(ScopedValue<?> key) {
+        static int secondaryIndex(ScopedValue<?> key) {
             return (key.hash >> INDEX_BITS) & TABLE_MASK;
         }
 
-        private static final int primarySlot(ScopedValue<?> key) {
+        private static int primarySlot(ScopedValue<?> key) {
             return key.hashCode() & SLOT_MASK;
         }
 
-        private static final int secondarySlot(ScopedValue<?> key) {
+        private static int secondarySlot(ScopedValue<?> key) {
             return (key.hash >> INDEX_BITS) & SLOT_MASK;
         }
 
-        static final int primarySlot(int hash) {
+        static int primarySlot(int hash) {
             return hash & SLOT_MASK;
         }
 
-        static final int secondarySlot(int hash) {
+        static int secondarySlot(int hash) {
             return (hash >> INDEX_BITS) & SLOT_MASK;
         }
 
@@ -819,10 +819,6 @@ public final class ScopedValue<T> {
         private static boolean chooseVictim() {
             int r = THREAD_LOCAL_RANDOM_ACCESS.nextSecondaryThreadLocalRandomSeed();
             return (r & 15) >= 5;
-        }
-
-        public static void invalidate() {
-            setScopedValueCache(null);
         }
 
         // Null a set of cache entries, indicated by the 1-bits given
