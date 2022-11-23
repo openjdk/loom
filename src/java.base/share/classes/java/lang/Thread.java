@@ -745,6 +745,7 @@ public class Thread implements Runnable {
         }
 
         // special value to indicate this is a newly-created Thread
+        // Note that his must match the declaration in ScopedValue.
         this.scopedValueBindings = NEW_THREAD_BINDINGS;
     }
 
@@ -1615,11 +1616,13 @@ public class Thread implements Runnable {
         }
     }
 
+    /**
+     * The VM recognizes this method as special, so any changes to the
+     * name or signature require corresponding changes in
+     * JVM_FindScopedValueBindings().
+     */
     @Hidden
     @ForceInline
-    // The VM recognizes this method as special, so any changes to the
-    // name or signature require corresponding changes in
-    // JVM_FindScopedValueBindings().
     private void runWith(Object bindings, Runnable op) {
         ensureMaterializedForStackWalk(bindings);
         op.run();
