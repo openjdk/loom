@@ -149,7 +149,7 @@ import sun.security.action.GetPropertyAction;
  * will be low and performance will be poor. This design allows
  * scoped-value inheritance by {@link StructuredTaskScope} threads to
  * be very fast: in essence, no more than copying a pointer, and
- * leaving an scoped-value binding also requires little more than
+ * leaving a scoped-value binding also requires little more than
  * updating a pointer.
  *
  * <p>Because the scoped-value per-thread cache is small, clients
@@ -209,6 +209,7 @@ public final class ScopedValue<T> {
         private static final Object NIL = new Object();
 
         static final Snapshot EMPTY_SNAPSHOT = new Snapshot();
+
         Snapshot(Carrier bindings, Snapshot prev) {
             this.prev = prev;
             this.bindings = bindings;
@@ -291,13 +292,13 @@ public final class ScopedValue<T> {
          * Returns a new {@code Carrier} with the mappings from this carrier plus a
          * new mapping from {@code key} to {@code value}. If this carrier already has a
          * mapping for the scoped value {@code key} then it will map to the new
-         * {@code value}. The current carrier is immutable, it is not changed by this
+         * {@code value}. The current carrier is immutable, so it is not changed by this
          * method.
          *
          * @param key the {@code ScopedValue} key
          * @param value the value, can be {@code null}
          * @param <T> the type of the value
-         * @return a new Carrier with the mappings from this carrier plus the new mapping
+         * @return a new {@code Carrier} with the mappings from this carrier plus the new mapping
          */
         public <T> Carrier where(ScopedValue<T> key, T value) {
             return where(key, value, this);
@@ -344,7 +345,7 @@ public final class ScopedValue<T> {
          * Calls a value-returning operation with each scoped value in this mapping bound
          * to its value in the current thread.
          * When the operation completes (normally or with an exception), each scoped value
-         * in the mapping will revert to being unbound, or rervert to its previous value
+         * in the mapping will revert to being unbound, or revert to its previous value
          * when previously bound, in the current thread.
          *
          * <p> Scoped values are intended to be used in a <em>structured manner</em>.
@@ -394,7 +395,7 @@ public final class ScopedValue<T> {
          * Runs an operation with each scoped value in this mapping bound to its value
          * in the current thread.
          * When the operation completes (normally or with an exception), each scoped value
-         * in the mapping will revert to being unbound, or rervert to its previous value
+         * in the mapping will revert to being unbound, or revert to its previous value
          * when previously bound, in the current thread.
          *
          * <p> Scoped values are intended to be used in a <em>structured manner</em>.
@@ -452,7 +453,7 @@ public final class ScopedValue<T> {
      * @param key the {@code ScopedValue} key
      * @param value the value, can be {@code null}
      * @param <T> the type of the value
-     * @return a new Carrier with a single mapping
+     * @return a new {@code Carrier} with a single mapping
      */
     public static <T> Carrier where(ScopedValue<T> key, T value) {
         return Carrier.of(key, value);
@@ -461,7 +462,7 @@ public final class ScopedValue<T> {
     /**
      * Calls a value-returning operation with a {@code ScopedValue} bound to a value
      * in the current thread. When the operation completes (normally or with an
-     * exception), the {@code ScopedValue} will revert to being unbound, or rervert to
+     * exception), the {@code ScopedValue} will revert to being unbound, or revert to
      * its previous value when previously bound, in the current thread.
      *
      * <p> Scoped values are intended to be used in a <em>structured manner</em>.
@@ -479,7 +480,7 @@ public final class ScopedValue<T> {
      *     ScopedValue.where(key, value).call(op);
      * }
      *
-     * @param key the {@code ScopedValue}
+     * @param key the {@code ScopedValue} key
      * @param value the value, can be {@code null}
      * @param <T> the type of the value
      * @param <R> the result type
@@ -496,7 +497,7 @@ public final class ScopedValue<T> {
     /**
      * Run an operation with a {@code ScopedValue} bound to a value in the current
      * thread. When the operation completes (normally or with an exception), the
-     * {@code ScopedValue} will revert to being unbound, or rervert to its previous value
+     * {@code ScopedValue} will revert to being unbound, or revert to its previous value
      * when previously bound, in the current thread.
      *
      * <p> Scoped values are intended to be used in a <em>structured manner</em>.
@@ -514,7 +515,7 @@ public final class ScopedValue<T> {
      *     ScopedValue.where(key, value).run(op);
      * }
      *
-     * @param key the {@code ScopedValue}
+     * @param key the {@code ScopedValue} key
      * @param value the value, can be {@code null}
      * @param <T> the type of the value
      * @param op the operation to call
@@ -648,7 +649,7 @@ public final class ScopedValue<T> {
         JLA.setScopedValueCache(cache);
     }
 
-    // special value to indicate this is a newly-created Thread
+    // Special value to indicate this is a newly-created Thread
     // Note that his must match the declaration in j.l.Thread.
     private static final Object NEW_THREAD_BINDINGS = Thread.class;
 
@@ -714,7 +715,7 @@ public final class ScopedValue<T> {
         return (bitmask & targetBits) == targetBits;
     }
 
-    // A small fixed-size key-value cache. When an scoped value's get() method
+    // A small fixed-size key-value cache. When a scoped value's get() method
     // is invoked, we record the result of the lookup in this per-thread cache
     // for fast access in future.
     private static final class Cache {
