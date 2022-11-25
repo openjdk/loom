@@ -273,11 +273,10 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     private void run(Runnable task) {
         assert state == RUNNING;
-        boolean notifyJvmti = notifyJvmtiEvents;
 
         // first mount
         mount();
-        if (notifyJvmti) notifyJvmtiMountEnd(true);
+        if (notifyJvmtiEvents) notifyJvmtiMountEnd(true);
 
         // emit JFR event if enabled
         if (VirtualThreadStartEvent.isTurnedOn()) {
@@ -305,7 +304,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             } finally {
                 // last unmount
-                if (notifyJvmti) notifyJvmtiUnmountBegin(true);
+                if (notifyJvmtiEvents) notifyJvmtiUnmountBegin(true);
                 unmount();
 
                 // final state
@@ -405,17 +404,15 @@ final class VirtualThread extends BaseVirtualThread {
      */
     @ChangesCurrentThread
     private boolean yieldContinuation() {
-        boolean notifyJvmti = notifyJvmtiEvents;
-
         // unmount
-        if (notifyJvmti) notifyJvmtiUnmountBegin(false);
+        if (notifyJvmtiEvents) notifyJvmtiUnmountBegin(false);
         unmount();
         try {
             return Continuation.yield(VTHREAD_SCOPE);
         } finally {
             // re-mount
             mount();
-            if (notifyJvmti) notifyJvmtiMountEnd(false);
+            if (notifyJvmtiEvents) notifyJvmtiMountEnd(false);
         }
     }
 
