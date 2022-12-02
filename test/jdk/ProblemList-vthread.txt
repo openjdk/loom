@@ -13,7 +13,7 @@ java/util/logging/Logger/logrb/TestLogrbResourceBundle.java                  828
 
 com/sun/jdi/EATests.java#id0                                         8264699 generic-all
 
-jdk/jdk/incubator/concurrent/ScopedValue/StressStackOverflow.java   8283508 generic-all
+jdk/incubator/concurrent/ScopedValue/StressStackOverflow.java   8283508 generic-all
 
 
 ##########
