@@ -1377,14 +1377,12 @@ JVM_ENTRY(jobject, JVM_FindScopedValueBindings(JNIEnv *env, jclass cls))
   GrowableArray<Handle>* local_array = new GrowableArray<Handle>(12);
   JvmtiVMObjectAllocEventCollector oam;
 
-  bool found = false;
-
   static ScopedValueBindingsResolver resolver(THREAD);
 
   // Iterate through Java frames
   vframeStream vfst(thread);
   for(; !vfst.at_end(); vfst.next()) {
-    int loc = 0;
+    int loc = -1;
     // get method of frame
     Method* method = vfst.method();
 
@@ -1399,7 +1397,7 @@ JVM_ENTRY(jobject, JVM_FindScopedValueBindings(JNIEnv *env, jclass cls))
       }
     }
 
-    if (loc != 0) {
+    if (loc != -1) {
       javaVFrame *frame = vfst.asJavaVFrame();
       StackValueCollection* locals = frame->locals();
       StackValue* head_sv = locals->at(loc); // jdk/incubator/concurrent/ScopedValue$Snapshot

@@ -200,7 +200,12 @@ void JavaThread::set_scopedValueCache(oop p) {
 
 void JavaThread::clear_scopedValueBindings() {
   set_scopedValueCache(NULL);
-  java_lang_Thread::clear_scopedValueBindings(vthread());
+  oop vthread_oop = vthread();
+  // vthread may be null here if we get a VM error during startup,
+  // before the java.lang.Thread instance has been created.
+  if (vthread_oop != NULL) {
+    java_lang_Thread::clear_scopedValueBindings(vthread_oop);
+  }
 }
 
 void JavaThread::allocate_threadObj(Handle thread_group, const char* thread_name,
@@ -391,7 +396,6 @@ void JavaThread::check_for_valid_safepoint_state() {
 JavaThread::JavaThread() :
   // Initialize fields
 
-  _in_asgct(false),
   _on_thread_list(false),
   DEBUG_ONLY(_java_call_counter(0) COMMA)
   _entry_point(nullptr),
@@ -989,30 +993,6 @@ bool JavaThread::is_lock_owned(address adr) const {
   return false;
 }
 
-bool JavaThread::is_lock_owned_current(address adr) const {
-  address stack_end = _stack_base - _stack_size;
-  const ContinuationEntry* ce = vthread_continuation();
-  address stack_base = ce != nullptr ? (address)ce->entry_sp() : _stack_base;
-  if (stack_base > adr && adr >= stack_end) {
-    return true;
-  }
-
-  for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
-    if (chunk->contains(adr)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool JavaThread::is_lock_owned_carrier(address adr) const {
-  assert(is_vthread_mounted(), "");
-  address stack_end = _stack_base - _stack_size;
-  address stack_base = (address)vthread_continuation()->entry_sp();
-  return stack_base > adr && adr >= stack_end;
-}
-
 oop JavaThread::exception_oop() const {
   return Atomic::load(&_exception_oop);
 }
@@ -1475,10 +1455,6 @@ void JavaThread::print_thread_state_on(outputStream *st) const {
   st->print_cr("   JavaThread state: %s", _get_thread_state_name(_thread_state));
 }
 
-const char* JavaThread::thread_state_name() const {
-  return _get_thread_state_name(_thread_state);
-}
-
 // Called by Threads::print() for VM_PrintThreads operation
 void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
   st->print_raw("\"");
@@ -1911,11 +1887,6 @@ javaVFrame* JavaThread::last_java_vframe(const frame f, RegisterMap *reg_map) {
     if (vf->is_java_frame()) return javaVFrame::cast(vf);
   }
   return NULL;
-}
-
-oop JavaThread::get_continuation() const {
-  assert(threadObj() != nullptr, "must be set");
-  return java_lang_Thread::continuation(threadObj());
 }
 
 Klass* JavaThread::security_get_caller_class(int depth) {

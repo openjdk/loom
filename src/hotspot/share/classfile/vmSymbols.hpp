@@ -398,7 +398,6 @@
   template(group_name,                                "group")                                    \
   template(daemon_name,                               "daemon")                                   \
   template(run_method_name,                           "run")                                      \
-  template(call_method_name,                          "call")                                     \
   template(runWith_method_name,                       "runWith")                                  \
   template(interrupt_method_name,                     "interrupt")                                \
   template(exit_method_name,                          "exit")                                     \
@@ -605,7 +604,7 @@
   template(string_array_string_array_void_signature,  "([Ljava/lang/String;[Ljava/lang/String;)V")                \
   template(thread_throwable_void_signature,           "(Ljava/lang/Thread;Ljava/lang/Throwable;)V")               \
   template(thread_void_signature,                     "(Ljava/lang/Thread;)V")                                    \
-  template(runnable_void_signature,                   "(Ljava/lang/Runnable;)V")                                    \
+  template(runnable_void_signature,                   "(Ljava/lang/Runnable;)V")                                   \
   template(threadgroup_runnable_void_signature,       "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;)V")           \
   template(threadgroup_string_void_signature,         "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V")             \
   template(void_threadgroup_array_signature,          "()[Ljava/lang/ThreadGroup;")                               \

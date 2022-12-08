@@ -26,6 +26,7 @@
 package java.lang;
 
 import java.lang.ref.Reference;
+import java.lang.reflect.Field;
 import java.security.AccessController;
 import java.security.AccessControlContext;
 import java.security.Permission;
@@ -285,7 +286,7 @@ public class Thread implements Runnable {
      */
     private Object scopedValueBindings;
 
-    // special value to indicate this is a newly-created Thread
+    // Special value to indicate this is a newly-created Thread
     // Note that his must match the declaration in ScopedValue.
     private static final Object NEW_THREAD_BINDINGS = Thread.class;
 
@@ -744,7 +745,7 @@ public class Thread implements Runnable {
             }
         }
 
-        // special value to indicate this is a newly-created Thread
+        // Special value to indicate this is a newly-created Thread
         // Note that his must match the declaration in ScopedValue.
         this.scopedValueBindings = NEW_THREAD_BINDINGS;
     }
@@ -786,7 +787,7 @@ public class Thread implements Runnable {
             this.contextClassLoader = ClassLoader.getSystemClassLoader();
         }
 
-        // special value to mean a new thread
+        // Special value to indicate this is a newly-created Thread
         this.scopedValueBindings = NEW_THREAD_BINDINGS;
 
         // create a FieldHolder object, needed when bound to an OS thread
@@ -1130,14 +1131,21 @@ public class Thread implements Runnable {
      */
     private static class ThreadNumbering {
         private static final Unsafe U;
-        private static final long NEXT;
+        private static final Object NEXT_BASE;
+        private static final long NEXT_OFFSET;
         static {
             U = Unsafe.getUnsafe();
-            NEXT = U.objectFieldOffset(ThreadNumbering.class, "next");
+            try {
+                Field nextField = ThreadNumbering.class.getDeclaredField("next");
+                NEXT_BASE = U.staticFieldBase(nextField);
+                NEXT_OFFSET = U.staticFieldOffset(nextField);
+            } catch (NoSuchFieldException e) {
+                throw new ExceptionInInitializerError(e);
+            }
         }
         private static volatile int next;
         static int next() {
-            return U.getAndAddInt(ThreadNumbering.class, NEXT, 1);
+            return U.getAndAddInt(NEXT_BASE, NEXT_OFFSET, 1);
         }
     }
 
