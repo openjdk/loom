@@ -34,34 +34,31 @@ import java.util.concurrent.ThreadFactory;
 
 public class Virtual implements CustomMainWrapper {
 
-    private static List<String> vmOpts = new ArrayList<>();
     static {
-        vmOpts.add("--enable-preview");
-
-        // This property is used by ProcessTools
-        vmOpts.add("-Dmain.wrapper=Virtual");
+        // This property is used by ProcessTools and some tests
+        // Should be set for all tests
+        System.setProperty("main.wrapper", "Virtual");
     }
+
+    String actionName;
 
     public Virtual() {
     }
 
     @Override
-    public Thread createThread(ThreadGroup tg, Runnable task) {
-        ThreadFactory factory;
-        try {
-            factory = VirtualAPI.instance().factory(true);
-        } catch (Throwable e) {
-            // we are in driver mode, the --enable-preview is not propagated
-            // should we distinct driver vs main?
-            factory = null;
-        }
-
-        return factory == null ? new Thread(tg, task) : factory.newThread(task);
+    public void setAction(String actionName) {
+        this.actionName = actionName;
     }
 
     @Override
-    public List<String> getAdditionalVMOpts() {
-        return vmOpts;
+    public Thread createThread(ThreadGroup tg, Runnable task) {
+        if (actionName.equals("main")) {
+            ThreadFactory factory = VirtualAPI.instance().factory(true);
+            return factory.newThread(task);
+        } else {
+            // No need to run @driver code in virtual thread
+            return new Thread(tg, task);
+        }
     }
 }
 
