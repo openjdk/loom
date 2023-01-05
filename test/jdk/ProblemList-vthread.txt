@@ -126,6 +126,9 @@ java/lang/SecurityManager/CheckSecurityProvider.java 0000000 generic-all
 java/lang/SecurityManager/PackageAccessTest.java 0000000 generic-all
 java/lang/SecurityManager/modules/CustomSecurityManagerTest.java 0000000 generic-all
 java/lang/reflect/Proxy/nonPublicProxy/NonPublicProxyClass.java 0000000 generic-all
+java/lang/reflect/records/IsRecordTest.java 0000000 generic-all
+java/lang/reflect/records/RecordPermissionsTest.java 0000000 generic-all
+java/lang/reflect/records/RecordReflectionTest.java 0000000 generic-all
 java/lang/ProcessHandle/PermissionTest.java 0000000 generic-all
 java/lang/ProcessBuilder/SecurityManagerClinit.java 0000000 generic-all
 java/lang/ProcessBuilder/Basic.java#id1 0000000 generic-all
@@ -136,6 +139,7 @@ java/lang/invoke/MethodTypeSecurityManager.java 0000000 generic-all
 java/lang/invoke/MethodHandleConstants.java 0000000 generic-all
 java/lang/invoke/InvokeDynamicPrintArgs.java 0000000 generic-all
 java/lang/reflect/callerCache/ReflectionCallerCacheTest.java 0000000 generic-all
+java/lang/runtime/ObjectMethodsTest.java 0000000 generic-all
 java/util/ServiceLoader/security/SecurityTest.java 0000000 generic-all
 java/util/PluggableLocale/PermissionTest.java 0000000 generic-all
 java/util/logging/TestLoggerBundleSync.java 0000000 generic-all
@@ -204,6 +208,7 @@ java/lang/ClassLoader/getResource/modules/ResourcesTest.java 0000000 generic-all
 java/lang/Thread/jni/AttachCurrentThread/AttachTest.java#id0 0000000 generic-all
 java/lang/Thread/jni/AttachCurrentThread/AttachTest.java#id1 0000000 generic-all
 java/foreign/enablenativeaccess/TestEnableNativeAccess.java 0000000 generic-all
+java/foreign/enablenativeaccess/TestEnableNativeAccessDynamic.java 0000000 generic-all
 java/security/AccessController/DoPrivAccompliceTest.java 0000000 generic-all
 java/security/AccessController/LimitedDoPrivileged.java 0000000 generic-all
 java/security/Policy/SignedJar/SignedJarTest.java 0000000 generic-all
@@ -324,3 +329,7 @@ com/sun/jdi/sde/SourceDebugExtensionTest.java 0000000 generic-all
 
 # Tests using Thread.stop(), not supported on virtual threads
 jdk/jshell/PasteAndMeasurementsUITest.java                      0000000 generic-all
+
+
+# Junit test fail to check permissions
+java/util/concurrent/tck/JSR166TestCase.java
