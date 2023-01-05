@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,17 +19,24 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_METAPROGRAMMING_ISARRAY_HPP
-#define SHARE_METAPROGRAMMING_ISARRAY_HPP
+/*
+ * @test
+ * @bug 8298425
+ * @summary Verify behavior of System.console()
+ * @build KullaTesting TestingInputStream
+ * @run testng ConsoleTest
+ */
 
-#include "metaprogramming/integralConstant.hpp"
 
-template <typename T> struct IsArray: public FalseType {};
+import org.testng.annotations.Test;
 
-template <typename T> struct IsArray<T[]>: public TrueType {};
-template <typename T, size_t S> struct IsArray<T[S]>: public TrueType {};
+public class ConsoleTest extends KullaTesting {
 
-#endif // SHARE_METAPROGRAMMING_ISARRAY_HPP
+    @Test
+    public void testConsole1() {
+        assertEval("System.console()", "null");
+    }
+
+}

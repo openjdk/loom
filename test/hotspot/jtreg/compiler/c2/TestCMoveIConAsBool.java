@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,28 +19,33 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#include "precompiled.hpp"
-#include "memory/allocation.hpp"
-#include "metaprogramming/isVolatile.hpp"
-#include "utilities/debug.hpp"
+/*
+ * @test
+ * @bug 8298824
+ * @summary Test BoolNode::Ideal() transformation with CMoveINode that has a Con node as condition.
+ * @run main/othervm -Xcomp -XX:CompileCommand=compileonly,compiler.c2.TestCMoveIConAsBool::test
+ *                   compiler.c2.TestCMoveIConAsBool
+ */
 
-class IsVolatileTest {
-  class A: AllStatic {};
+package compiler.c2;
 
-  STATIC_ASSERT(IsVolatile<volatile int>::value);
-  STATIC_ASSERT(IsVolatile<const volatile int>::value);
-  STATIC_ASSERT(!IsVolatile<const int>::value);
-  STATIC_ASSERT(!IsVolatile<int>::value);
+public class TestCMoveIConAsBool {
+    static int x;
 
-  STATIC_ASSERT(IsVolatile<volatile A>::value);
-  STATIC_ASSERT(!IsVolatile<const A>::value);
-  STATIC_ASSERT(!IsVolatile<A>::value);
+    public static void main(String[] strArr) {
+        test();
+    }
 
-  STATIC_ASSERT(!IsVolatile<volatile A*>::value);
-  STATIC_ASSERT(IsVolatile<A* volatile>::value);
-  STATIC_ASSERT(IsVolatile<volatile A* volatile>::value);
-  STATIC_ASSERT(IsVolatile<A* const volatile>::value);
-};
+    static void test() {
+        int i = 7;
+        boolean b = false;
+        float f = 7.135f;
+
+        do {
+            b = i > f | b || x != 7;
+        }
+        while (++i < 0);
+    }
+}
