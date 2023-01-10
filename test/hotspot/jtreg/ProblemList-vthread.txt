@@ -250,7 +250,8 @@ runtime/cds/appcds/TestCombinedCompressedFlags.java 0000000 generic-all
 runtime/cds/appcds/TestDumpClassListSource.java 0000000 generic-all
 runtime/cds/appcds/TestWithProfiler.java 0000000 generic-all
 runtime/cds/appcds/TestEpsilonGCWithCDS.java 0000000 generic-all
-runtime/cds/appcds/TestSerialGCWithCDS.java 0000000 generic-all
+runtime/cds/appcds/TestSerialGCWithCDS.java#id0 0000000 generic-all
+runtime/cds/appcds/TestSerialGCWithCDS.java#id1 0000000 generic-all
 runtime/cds/appcds/TestZGCWithCDS.java 0000000 generic-all
 runtime/cds/appcds/UnusedCPDuringDump.java 0000000 generic-all
 runtime/cds/appcds/VerifierTest_1A.java 0000000 generic-all
