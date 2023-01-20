@@ -257,6 +257,8 @@ sun/management/jmxremote/startstop/JMXStartStopTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusTest.java 0000000 generic-all
 
+jdk/internal/misc/CDS/ArchivedEnumTest.java 0000000 generic-all
+
 ####
 # No expected StackOverflow
 
