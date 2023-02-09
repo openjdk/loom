@@ -35,16 +35,10 @@ public class VThreadRunner {
     private VThreadRunner() { }
 
     /**
-     * Characteristic value signifying that the thread cannot set values for its
-     * copy of thread-locals.
-     */
-    public static final int NO_THREAD_LOCALS = 1 << 1;
-
-    /**
      * Characteristic value signifying that initial values for inheritable
      * thread locals are not inherited from the constructing thread.
      */
-    public static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
+    public static final int NO_INHERIT_THREAD_LOCALS = 1 << 1;
 
     /**
      * Represents a task that does not return a result but may throw
@@ -85,8 +79,6 @@ public class VThreadRunner {
         Thread.Builder builder = Thread.ofVirtual();
         if (name != null)
             builder.name(name);
-        if ((characteristics & NO_THREAD_LOCALS) != 0)
-            builder.allowSetThreadLocals(false);
         if ((characteristics & NO_INHERIT_THREAD_LOCALS) != 0)
             builder.inheritInheritableThreadLocals(false);
         Thread thread = builder.start(target);

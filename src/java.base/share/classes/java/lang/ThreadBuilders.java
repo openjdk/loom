@@ -97,17 +97,6 @@ class ThreadBuilders {
 
         @Override
         @SuppressWarnings("unchecked")
-        public T allowSetThreadLocals(boolean allow) {
-            if (allow) {
-                characteristics &= ~Thread.NO_THREAD_LOCALS;
-            } else {
-                characteristics |= Thread.NO_THREAD_LOCALS;
-            }
-            return (T) this;
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
         public T inheritInheritableThreadLocals(boolean inherit) {
             if (inherit) {
                 characteristics &= ~Thread.NO_INHERIT_THREAD_LOCALS;

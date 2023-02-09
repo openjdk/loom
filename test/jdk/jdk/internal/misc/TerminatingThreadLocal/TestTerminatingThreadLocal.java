@@ -140,7 +140,6 @@ public class TestTerminatingThreadLocal {
 
             ThreadFactory factory = virtualThreadBuilder(pool)
                     .name("ttl-test-virtual-", 0)
-                    .allowSetThreadLocals(false)
                     .factory();
             try (var executor = Executors.newThreadPerTaskExecutor(factory)) {
                 executor.submit(() -> ttlOps.accept(ttl)).get();

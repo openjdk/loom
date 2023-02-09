@@ -67,48 +67,6 @@ class ThreadLocals {
     }
 
     /**
-     * Test Thread that cannot set values for its copy of thread-locals.
-     */
-    @Test
-    void testThreadLocal3() throws Exception {
-        Object INITIAL_VALUE = new Object();
-        ThreadLocal<Object> LOCAL2 = new ThreadLocal<>() {
-            @Override
-            protected Object initialValue() {
-                return INITIAL_VALUE;
-            }
-        };
-        ThreadLocal<Object> INHERITED_LOCAL2 = new InheritableThreadLocal<>()  {
-            @Override
-            protected Object initialValue() {
-                return INITIAL_VALUE;
-            }
-        };
-
-        VThreadRunner.run(VThreadRunner.NO_THREAD_LOCALS, () -> {
-            assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(null));
-            assertThrows(UnsupportedOperationException.class, () -> LOCAL.set(new Object()));
-            assertNull(LOCAL.get());
-            LOCAL.remove();  // should not throw
-
-            assertThrows(UnsupportedOperationException.class, () -> LOCAL2.set(null));
-            assertThrows(UnsupportedOperationException.class, () -> LOCAL2.set(new Object()));
-            assertTrue(LOCAL2.get() == INITIAL_VALUE);
-            LOCAL2.remove();  // should not throw
-
-            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL.set(null));
-            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL.set(new Object()));
-            assertNull(INHERITED_LOCAL.get());
-            INHERITED_LOCAL.remove();  // should not throw
-
-            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL2.set(null));
-            assertThrows(UnsupportedOperationException.class, () -> INHERITED_LOCAL2.set(new Object()));
-            assertTrue(INHERITED_LOCAL2.get() == INITIAL_VALUE);
-            INHERITED_LOCAL2.remove();  // should not throw
-        });
-    }
-
-    /**
      * Basic test of inheritable thread local set/get, no initial value inherited.
      */
     @Test

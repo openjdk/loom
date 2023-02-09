@@ -1526,27 +1526,11 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.xxxContextClassLoader when thread locals not supported.
-     */
-    @Test
-    void testContextClassLoader5() throws Exception {
-        ClassLoader scl = ClassLoader.getSystemClassLoader();
-        ClassLoader loader = new ClassLoader() { };
-        VThreadRunner.run(VThreadRunner.NO_THREAD_LOCALS, () -> {
-            Thread t = Thread.currentThread();
-            assertTrue(t.getContextClassLoader() == scl);
-            assertThrows(UnsupportedOperationException.class,
-                         () -> t.setContextClassLoader(loader));
-            assertTrue(t.getContextClassLoader() == scl);
-        });
-    }
-
-    /**
      * Test Thread.xxxContextClassLoader when thread does not inherit the
      * initial value of inheritable thread locals.
      */
     @Test
-    void testContextClassLoader6() throws Exception {
+    void testContextClassLoader5() throws Exception {
         VThreadRunner.run(() -> {
             ClassLoader loader = new ClassLoader() { };
             Thread.currentThread().setContextClassLoader(loader);
