@@ -262,8 +262,9 @@ class GraphBuilder {
   void new_object_array();
   void check_cast(int klass_index);
   void instance_of(int klass_index);
-  void monitorenter(Value x, int bci);
-  void monitorexit(Value x, int bci);
+  void invoke_monitor(Value x, int bci, Bytecodes::Code code);
+//  void monitorenter(Value x, int bci);
+//  void monitorexit(Value x, int bci);
   void new_multi_array(int dimensions);
   void throw_op(int bci);
   Value round_fp(Value fp_value);

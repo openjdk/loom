@@ -357,6 +357,7 @@ public:
     void do_getfield(ciBytecodeStream* str);
     void do_getstatic(ciBytecodeStream* str);
     void do_invoke(ciBytecodeStream* str, bool has_receiver);
+    void do_invoke_monitor(ciBytecodeStream* str, bool has_receiver, bool enter);
     void do_jsr(ciBytecodeStream* str);
     void do_ldc(ciBytecodeStream* str);
     void do_multianewarray(ciBytecodeStream* str);

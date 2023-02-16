@@ -712,6 +712,72 @@ void ciTypeFlow::StateVector::do_invoke(ciBytecodeStream* str,
 }
 
 // ------------------------------------------------------------------
+void ciTypeFlow::StateVector::do_invoke_monitor(ciBytecodeStream* str, bool has_receiver, bool enter) {
+  bool will_link;
+  ciSignature* declared_signature = NULL;
+  ciMethod* callee = str->get_monitor_method(will_link, &declared_signature, enter);
+  assert(declared_signature != NULL, "cannot be null");
+  if (!will_link) {
+    // We weren't able to find the method.
+    if (str->cur_bc() == Bytecodes::_invokedynamic) {
+      trap(str, NULL,
+           Deoptimization::make_trap_request
+           (Deoptimization::Reason_uninitialized,
+            Deoptimization::Action_reinterpret));
+    } else {
+      ciKlass* unloaded_holder = callee->holder();
+      trap(str, unloaded_holder, str->get_method_holder_index());
+    }
+  } else {
+    // We are using the declared signature here because it might be
+    // different from the callee signature (Cf. invokedynamic and
+    // invokehandle).
+    ciSignatureStream sigstr(declared_signature);
+    const int arg_size = declared_signature->size();
+    const int stack_base = stack_size() - arg_size;
+    int i = 0;
+    for( ; !sigstr.at_return_type(); sigstr.next()) {
+      ciType* type = sigstr.type();
+      ciType* stack_type = type_at(stack(stack_base + i++));
+      // Do I want to check this type?
+      // assert(stack_type->is_subtype_of(type), "bad type for field value");
+      if (type->is_two_word()) {
+        ciType* stack_type2 = type_at(stack(stack_base + i++));
+        assert(stack_type2->equals(half_type(type)), "must be 2nd half");
+      }
+    }
+    assert(arg_size == i, "must match");
+    for (int j = 0; j < arg_size; j++) {
+      pop();
+    }
+    if (has_receiver) {
+      // Check this?
+      pop_object();
+    }
+    assert(!sigstr.is_done(), "must have return type");
+    ciType* return_type = sigstr.type();
+    if (!return_type->is_void()) {
+      if (!return_type->is_loaded()) {
+        // As in do_getstatic(), generally speaking, we need the return type to
+        // be loaded if we are to do anything interesting with its value.
+        // We used to do this:  trap(str, str->get_method_signature_index());
+        //
+        // We do not trap here since execution can get past this invoke if
+        // the return value is null.  As long as the value is null, the class
+        // does not need to be loaded!  The compiler must assume that
+        // the value of the unloaded class reference is null; if the code
+        // ever sees a non-null value, loading has occurred.
+        //
+        // See do_getstatic() for similar explanation, as well as bug 4684993.
+        do_null_assert(return_type->as_klass());
+      } else {
+        push_translate(return_type);
+      }
+    }
+  }
+}
+
+// ------------------------------------------------------------------
 // ciTypeFlow::StateVector::do_jsr
 void ciTypeFlow::StateVector::do_jsr(ciBytecodeStream* str) {
   push(ciReturnAddress::make(str->next_bci()));
@@ -923,15 +989,17 @@ bool ciTypeFlow::StateVector::apply_one_bytecode(ciBytecodeStream* str) {
     }
   case Bytecodes::_monitorenter:
     {
-      pop_object();
-      set_monitor_count(monitor_count() + 1);
+      do_invoke_monitor(str, false, true);
+      //pop_object();
+      //set_monitor_count(monitor_count() + 1);
       break;
     }
   case Bytecodes::_monitorexit:
     {
-      pop_object();
-      assert(monitor_count() > 0, "must be a monitor to exit from");
-      set_monitor_count(monitor_count() - 1);
+      do_invoke_monitor(str, false, false);
+      // pop_object();
+      // assert(monitor_count() > 0, "must be a monitor to exit from");
+      // set_monitor_count(monitor_count() - 1);
       break;
     }
   case Bytecodes::_arraylength:

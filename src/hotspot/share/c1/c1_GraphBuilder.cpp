@@ -1632,7 +1632,7 @@ void GraphBuilder::method_return(Value x, bool ignore_return) {
     // released before we jump to the continuation block.
     if (method()->is_synchronized()) {
       assert(state()->locks_size() == 1, "receiver must be locked here");
-      monitorexit(state()->lock_at(0), SynchronizationEntryBCI);
+      invoke_monitor(state()->lock_at(0), SynchronizationEntryBCI, Bytecodes::_monitorexit);
     }
 
     if (need_mem_bar) {
@@ -1923,6 +1923,330 @@ Values* GraphBuilder::collect_args_for_profiling(Values* args, ciMethod* target,
   }
   check_args_for_profiling(obj_args, s);
   return obj_args;
+}
+
+void GraphBuilder::invoke_monitor(Value x, int bci, Bytecodes::Code code) {
+  bool will_link;
+
+  ciSignature* declared_signature = NULL;
+  ciMethod*    target;
+  ciKlass*     holder;
+  const Bytecodes::Code bc_raw = Bytecodes::_invokestatic; //stream()->cur_bc_raw();
+  
+  target = stream()->get_monitor_method(will_link, &declared_signature, code == Bytecodes::_monitorenter);
+  holder = stream()->get_monitor_holder(code == Bytecodes::_monitorenter);
+
+  assert(declared_signature != NULL, "cannot be null");
+  assert(will_link == target->is_loaded(), "");
+  JFR_ONLY(Jfr::on_resolution(this, holder, target); CHECK_BAILOUT();)
+
+  ciInstanceKlass* klass = target->holder();
+  assert(!target->is_loaded() || klass->is_loaded(), "loaded target must imply loaded klass");
+
+  // check if CHA possible: if so, change the code to invoke_special
+  ciInstanceKlass* calling_klass = method()->holder();
+  ciInstanceKlass* callee_holder = ciEnv::get_instance_klass_for_declared_method_holder(holder);
+  ciInstanceKlass* actual_recv = callee_holder;
+
+  CompileLog* log = compilation()->log();
+  if (log != NULL)
+      log->elem("call method='%d' instr='%s'",
+                log->identify(target),
+                Bytecodes::name(code));
+
+  // Some methods are obviously bindable without any type checks so
+  // convert them directly to an invokespecial or invokestatic.
+  if (target->is_loaded() && !target->is_abstract() && target->can_be_statically_bound()) {
+    switch (bc_raw) {
+    case Bytecodes::_invokeinterface:
+    assert(false, "Here");
+      // convert to invokespecial if the target is the private interface method.
+      if (target->is_private()) {
+        assert(holder->is_interface(), "How did we get a non-interface method here!");
+        code = Bytecodes::_invokespecial;
+      }
+      break;
+    case Bytecodes::_invokevirtual:
+    assert(false, "Here");
+      code = Bytecodes::_invokespecial;
+      break;
+    case Bytecodes::_invokehandle:
+    assert(false, "Here");
+      code = target->is_static() ? Bytecodes::_invokestatic : Bytecodes::_invokespecial;
+      break;
+    default:
+      break;
+    }
+  } else {
+    if (bc_raw == Bytecodes::_invokehandle) {
+      assert(false, "Here");
+      assert(!will_link, "should come here only for unlinked call");
+      code = Bytecodes::_invokespecial;
+    }
+  }
+
+  if (code == Bytecodes::_invokespecial) {
+    assert(false, "Here");
+    // Additional receiver subtype checks for interface calls via invokespecial or invokeinterface.
+    ciKlass* receiver_constraint = nullptr;
+
+    if (bc_raw == Bytecodes::_invokeinterface) {
+      receiver_constraint = holder;
+    } else if (bc_raw == Bytecodes::_invokespecial && !target->is_object_initializer() && calling_klass->is_interface()) {
+      receiver_constraint = calling_klass;
+    }
+
+    if (receiver_constraint != nullptr) {
+      int index = state()->stack_size() - (target->arg_size_no_receiver() + 1);
+      Value receiver = state()->stack_at(index);
+      CheckCast* c = new CheckCast(receiver_constraint, receiver, copy_state_before());
+      // go to uncommon_trap when checkcast fails
+      c->set_invokespecial_receiver_check();
+      state()->stack_at_put(index, append_split(c));
+    }
+  }
+
+  // Push appendix argument (MethodType, CallSite, etc.), if one.
+  /*bool patch_for_appendix = false;
+  int patching_appendix_arg = 0;
+  if (Bytecodes::has_optional_appendix(bc_raw) && (!will_link || PatchALot)) {
+    Value arg = append(new Constant(new ObjectConstant(compilation()->env()->unloaded_ciinstance()), copy_state_before()));
+    apush(arg);
+    patch_for_appendix = true;
+    patching_appendix_arg = (will_link && stream()->has_appendix()) ? 0 : 1;
+  } else if (stream()->has_appendix()) {
+    ciObject* appendix = stream()->get_appendix();
+    Value arg = append(new Constant(new ObjectConstant(appendix)));
+    apush(arg);
+  }*/
+
+  ciMethod* cha_monomorphic_target = NULL;
+  ciMethod* exact_target = NULL;
+  Value better_receiver = NULL;
+  if (UseCHA && DeoptC1 && target->is_loaded() &&
+      !(// %%% FIXME: Are both of these relevant?
+        target->is_method_handle_intrinsic() ||
+        target->is_compiled_lambda_form()) &&
+      true) {
+    Value receiver = NULL;
+    ciInstanceKlass* receiver_klass = NULL;
+    bool type_is_exact = false;
+    // try to find a precise receiver type
+    if (will_link && !target->is_static()) {
+      assert(false, "Here");
+      int index = state()->stack_size() - (target->arg_size_no_receiver() + 1);
+      receiver = state()->stack_at(index);
+      ciType* type = receiver->exact_type();
+      if (type != NULL && type->is_loaded() &&
+          type->is_instance_klass() && !type->as_instance_klass()->is_interface()) {
+        receiver_klass = (ciInstanceKlass*) type;
+        type_is_exact = true;
+      }
+      if (type == NULL) {
+        type = receiver->declared_type();
+        if (type != NULL && type->is_loaded() &&
+            type->is_instance_klass() && !type->as_instance_klass()->is_interface()) {
+          receiver_klass = (ciInstanceKlass*) type;
+          if (receiver_klass->is_leaf_type() && !receiver_klass->is_final()) {
+            // Insert a dependency on this type since
+            // find_monomorphic_target may assume it's already done.
+            dependency_recorder()->assert_leaf_type(receiver_klass);
+            type_is_exact = true;
+          }
+        }
+      }
+    }
+    if (receiver_klass != NULL && type_is_exact &&
+        receiver_klass->is_loaded() && code != Bytecodes::_invokespecial) {
+      assert(false, "Here");
+      // If we have the exact receiver type we can bind directly to
+      // the method to call.
+      exact_target = target->resolve_invoke(calling_klass, receiver_klass);
+      if (exact_target != NULL) {
+        target = exact_target;
+        code = Bytecodes::_invokespecial;
+      }
+    }
+    if (receiver_klass != NULL &&
+        receiver_klass->is_subtype_of(actual_recv) &&
+        actual_recv->is_initialized()) {
+      actual_recv = receiver_klass;
+      assert(false, "Here");
+    }
+
+    if ((code == Bytecodes::_invokevirtual && callee_holder->is_initialized()) ||
+        (code == Bytecodes::_invokeinterface && callee_holder->is_initialized() && !actual_recv->is_interface())) {
+      // Use CHA on the receiver to select a more precise method.
+      assert(false, "Here");
+      cha_monomorphic_target = target->find_monomorphic_target(calling_klass, callee_holder, actual_recv);
+    } else if (code == Bytecodes::_invokeinterface && callee_holder->is_loaded() && receiver != NULL) {
+      assert(callee_holder->is_interface(), "invokeinterface to non interface?");
+      assert(false, "Here");
+      // If there is only one implementor of this interface then we
+      // may be able bind this invoke directly to the implementing
+      // klass but we need both a dependence on the single interface
+      // and on the method we bind to.  Additionally since all we know
+      // about the receiver type is the it's supposed to implement the
+      // interface we have to insert a check that it's the class we
+      // expect.  Interface types are not checked by the verifier so
+      // they are roughly equivalent to Object.
+      // The number of implementors for declared_interface is less or
+      // equal to the number of implementors for target->holder() so
+      // if number of implementors of target->holder() == 1 then
+      // number of implementors for decl_interface is 0 or 1. If
+      // it's 0 then no class implements decl_interface and there's
+      // no point in inlining.
+      ciInstanceKlass* declared_interface = callee_holder;
+      ciInstanceKlass* singleton = declared_interface->unique_implementor();
+      if (singleton != NULL) {
+        assert(singleton != declared_interface, "not a unique implementor");
+        cha_monomorphic_target = target->find_monomorphic_target(calling_klass, declared_interface, singleton);
+        if (cha_monomorphic_target != NULL) {
+          if (cha_monomorphic_target->holder() != compilation()->env()->Object_klass()) {
+            ciInstanceKlass* holder = cha_monomorphic_target->holder();
+            ciInstanceKlass* constraint = (holder->is_subtype_of(singleton) ? holder : singleton); // avoid upcasts
+            actual_recv = declared_interface;
+
+            // insert a check it's really the expected class.
+            CheckCast* c = new CheckCast(constraint, receiver, copy_state_for_exception());
+            c->set_incompatible_class_change_check();
+            c->set_direct_compare(constraint->is_final());
+            // pass the result of the checkcast so that the compiler has
+            // more accurate type info in the inlinee
+            better_receiver = append_split(c);
+
+            dependency_recorder()->assert_unique_implementor(declared_interface, singleton);
+          } else {
+            cha_monomorphic_target = NULL; // subtype check against Object is useless
+          }
+        }
+      }
+    }
+  }
+
+  if (cha_monomorphic_target != NULL) {
+      assert(false, "Here");
+    assert(!target->can_be_statically_bound() || target == cha_monomorphic_target, "");
+    assert(!cha_monomorphic_target->is_abstract(), "");
+    if (!cha_monomorphic_target->can_be_statically_bound(actual_recv)) {
+      // If we inlined because CHA revealed only a single target method,
+      // then we are dependent on that target method not getting overridden
+      // by dynamic class loading.  Be sure to test the "static" receiver
+      // dest_method here, as opposed to the actual receiver, which may
+      // falsely lead us to believe that the receiver is final or private.
+      dependency_recorder()->assert_unique_concrete_method(actual_recv, cha_monomorphic_target, callee_holder, target);
+    }
+    code = Bytecodes::_invokespecial;
+  }
+
+  // check if we could do inlining
+  if (!PatchALot && Inline && target->is_loaded() && true &&
+      callee_holder->is_loaded()) { // the effect of symbolic reference resolution
+
+    // callee is known => check if we have static binding
+    if ((code == Bytecodes::_invokestatic && klass->is_initialized()) || // invokestatic involves an initialization barrier on declaring class
+        code == Bytecodes::_invokespecial ||
+        (code == Bytecodes::_invokevirtual && target->is_final_method()) ||
+        code == Bytecodes::_invokedynamic) {
+      // static binding => check if callee is ok
+      ciMethod* inline_target = (cha_monomorphic_target != NULL) ? cha_monomorphic_target : target;
+      bool holder_known = (cha_monomorphic_target != NULL) || (exact_target != NULL);
+      bool success = try_inline(inline_target, holder_known, false /* ignore_return */, code, better_receiver);
+
+      CHECK_BAILOUT();
+      clear_inline_bailout();
+
+      if (success) {
+        // Register dependence if JVMTI has either breakpoint
+        // setting or hotswapping of methods capabilities since they may
+        // cause deoptimization.
+        if (compilation()->env()->jvmti_can_hotswap_or_post_breakpoint()) {
+          dependency_recorder()->assert_evol_method(inline_target);
+        }
+        return;
+      }
+    } else {
+      print_inlining(target, "no static binding", /*success*/ false);
+    }
+  } else {
+    print_inlining(target, "not inlineable", /*success*/ false);
+  }
+
+  // If we attempted an inline which did not succeed because of a
+  // bailout during construction of the callee graph, the entire
+  // compilation has to be aborted. This is fairly rare and currently
+  // seems to only occur for jasm-generated classes which contain
+  // jsr/ret pairs which are not associated with finally clauses and
+  // do not have exception handlers in the containing method, and are
+  // therefore not caught early enough to abort the inlining without
+  // corrupting the graph. (We currently bail out with a non-empty
+  // stack at a ret in these situations.)
+  CHECK_BAILOUT();
+
+  // inlining not successful => standard invoke
+  ValueType* result_type = as_ValueType(declared_signature->return_type());
+  ValueStack* state_before = copy_state_exhandling();
+
+  // The bytecode (code) might change in this method so we are checking this very late.
+  const bool has_receiver =
+    code == Bytecodes::_invokespecial   ||
+    code == Bytecodes::_invokevirtual   ||
+    code == Bytecodes::_invokeinterface;
+  // Values* args = state()->pop_arguments(target->arg_size_no_receiver() + patching_appendix_arg);
+  Values* args = new Values(code == Bytecodes::_monitorenter ? 1 : 0); 
+  if (code == Bytecodes::_monitorenter) {
+    args->push(x);
+  }
+  Value recv = NULL; //has_receiver ? apop() : NULL;
+
+  // A null check is required here (when there is a receiver) for any of the following cases
+  // - invokespecial, always need a null check.
+  // - invokevirtual, when the target is final and loaded. Calls to final targets will become optimized
+  //   and require null checking. If the target is loaded a null check is emitted here.
+  //   If the target isn't loaded the null check must happen after the call resolution. We achieve that
+  //   by using the target methods unverified entry point (see CompiledIC::compute_monomorphic_entry).
+  //   (The JVM specification requires that LinkageError must be thrown before a NPE. An unloaded target may
+  //   potentially fail, and can't have the null check before the resolution.)
+  // - A call that will be profiled. (But we can't add a null check when the target is unloaded, by the same
+  //   reason as above, so calls with a receiver to unloaded targets can't be profiled.)
+  //
+  // Normal invokevirtual will perform the null check during lookup
+
+  bool need_null_check = (code == Bytecodes::_invokespecial) ||
+      (target->is_loaded() && (target->is_final_method() || (is_profiling() && profile_calls())));
+
+  if (need_null_check) {
+    if (recv != NULL) {
+      null_check(recv);
+    }
+
+    if (is_profiling()) {
+      // Note that we'd collect profile data in this method if we wanted it.
+      compilation()->set_would_profile(true);
+
+      if (profile_calls()) {
+        assert(cha_monomorphic_target == NULL || exact_target == NULL, "both can not be set");
+        ciKlass* target_klass = NULL;
+        if (cha_monomorphic_target != NULL) {
+          target_klass = cha_monomorphic_target->holder();
+        } else if (exact_target != NULL) {
+          target_klass = exact_target->holder();
+        }
+        profile_call(target, recv, target_klass, collect_args_for_profiling(args, NULL, false), false);
+      }
+    }
+  }
+
+  Invoke* result = new Invoke(code, result_type, recv, args, target, state_before);
+  // push result
+  append_with_bci(result, bci);
+
+  if (result_type != voidType) {
+    push(result_type, round_fp(result));
+  }
+  if (profile_return() && result_type->is_object_kind()) {
+    profile_return_type(result, target);
+  }
 }
 
 void GraphBuilder::invoke(Bytecodes::Code code) {
@@ -2310,7 +2634,7 @@ void GraphBuilder::instance_of(int klass_index) {
   }
 }
 
-
+/*
 void GraphBuilder::monitorenter(Value x, int bci) {
   // save state before locking in case of deoptimization after a NullPointerException
   ValueStack* state_before = copy_state_for_exception_with_bci(bci);
@@ -2324,7 +2648,7 @@ void GraphBuilder::monitorexit(Value x, int bci) {
   append_with_bci(new MonitorExit(x, state()->unlock()), bci);
   kill_all();
 }
-
+*/
 
 void GraphBuilder::new_multi_array(int dimensions) {
   ciKlass* klass = stream()->get_klass();
@@ -2968,8 +3292,8 @@ BlockEnd* GraphBuilder::iterate_bytecodes_for_block(int bci) {
       case Bytecodes::_athrow         : throw_op(s.cur_bci()); break;
       case Bytecodes::_checkcast      : check_cast(s.get_index_u2()); break;
       case Bytecodes::_instanceof     : instance_of(s.get_index_u2()); break;
-      case Bytecodes::_monitorenter   : monitorenter(apop(), s.cur_bci()); break;
-      case Bytecodes::_monitorexit    : monitorexit (apop(), s.cur_bci()); break;
+      case Bytecodes::_monitorenter   : invoke_monitor(apop(), s.cur_bci(), code); break;
+      case Bytecodes::_monitorexit    : invoke_monitor(apop(), s.cur_bci(), code); break;
       case Bytecodes::_wide           : ShouldNotReachHere(); break;
       case Bytecodes::_multianewarray : new_multi_array(s.cur_bcp()[3]); break;
       case Bytecodes::_ifnull         : if_null(objectType, If::eql); break;
@@ -3785,8 +4109,7 @@ bool GraphBuilder::try_inline_jsr(int jsr_dest_bci) {
 void GraphBuilder::inline_sync_entry(Value lock, BlockBegin* sync_handler) {
   assert(lock != NULL && sync_handler != NULL, "lock or handler missing");
 
-  monitorenter(lock, SynchronizationEntryBCI);
-  assert(_last->as_MonitorEnter() != NULL, "monitor enter expected");
+  invoke_monitor(lock, SynchronizationEntryBCI, Bytecodes::_monitorenter);
   _last->set_needs_null_check(false);
 
   sync_handler->set(BlockBegin::exception_entry_flag);
@@ -3839,7 +4162,7 @@ void GraphBuilder::fill_sync_handler(Value lock, BlockBegin* sync_handler, bool 
     }
 
     // exit the monitor in the context of the synchronized method
-    monitorexit(lock, bci);
+    invoke_monitor(lock, bci, Bytecodes::_monitorexit);
 
     // exit the context of the synchronized method
     if (!default_handler) {
@@ -3863,6 +4186,8 @@ void GraphBuilder::fill_sync_handler(Value lock, BlockBegin* sync_handler, bool 
 
 
 bool GraphBuilder::try_inline_full(ciMethod* callee, bool holder_known, bool ignore_return, Bytecodes::Code bc, Value receiver) {
+  if (callee->is_synchronized()) return false;
+
   assert(!callee->is_native(), "callee must not be native");
   if (CompilationPolicy::should_not_inline(compilation()->env(), callee)) {
     INLINE_BAILOUT("inlining prohibited by policy");
@@ -4082,8 +4407,9 @@ bool GraphBuilder::try_inline_full(ciMethod* callee, bool holder_known, bool ign
   if (log != NULL) log->done("parse");
 
   // If we bailed out during parsing, return immediately (this is bad news)
-  if (bailed_out())
-      return false;
+  if (bailed_out()) {   
+    return false;
+  }
 
   // iterate_all_blocks theoretically traverses in random order; in
   // practice, we have only traversed the continuation if we are
@@ -4129,11 +4455,13 @@ bool GraphBuilder::try_inline_full(ciMethod* callee, bool holder_known, bool ign
 
   // Fill the exception handler for synchronized methods with instructions
   if (callee->is_synchronized() && sync_handler->state() != NULL) {
+    scope_data()->set_stream(scope_data()->parent()->stream());
     fill_sync_handler(lock, sync_handler);
+    scope_data()->set_stream(NULL);
   } else {
     pop_scope();
   }
-
+  
   compilation()->notice_inlined_method(callee);
 
   return true;

@@ -3037,7 +3037,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
 
   if (ObjectMonitorMode::java()) {
     //  TieredStopAtLevel=1;
-    set_mode_flags(_int);
+    // set_mode_flags(_int);
     log_info(monitor)("Using new monitors with policy %s", ObjectMonitorMode::as_string());
   }
 
