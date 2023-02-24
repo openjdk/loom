@@ -140,8 +140,8 @@ serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.jav
 serviceability/jvmti/vthread/SelfSuspendDisablerTest/SelfSuspendDisablerTest.java#no-vmcontinuations 0000000 generic-all
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#default 0000000 generic-all
 serviceability/jvmti/vthread/SuspendResume1/SuspendResume1.java#no-vmcontinuations 0000000 generic-all
-serviceability/jvmti/vthread/SuspendResume2/SuspendResume1.java#default 0000000 generic-all
-serviceability/jvmti/vthread/SuspendResume2/SuspendResume1.java#no-vmcontinuations 0000000 generic-all
+serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#default 0000000 generic-all
+serviceability/jvmti/vthread/SuspendResume2/SuspendResume2.java#no-vmcontinuations 0000000 generic-all
 serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java#default 0000000 generic-all
 serviceability/jvmti/vthread/SuspendResumeAll/SuspendResumeAll.java#no-vmcontinuations 0000000 generic-all
 
