@@ -536,3 +536,8 @@ vmTestbase/nsk/monitoring/ThreadInfo/getLockOwnerName/getlockownername001/TestDe
 vmTestbase/nsk/monitoring/ThreadInfo/getLockName/getlockname001/TestDescription.java 8285420 generic-all
 vmTestbase/nsk/monitoring/ThreadInfo/from_c/from_c001/TestDescription.java 8285420 generic-all
 vmTestbase/nsk/monitoring/MemoryUsage/from/from001/TestDescription.java 8285420 generic-all
+
+
+####
+## different number of frames
+serviceability/AsyncGetCallTrace/MyPackage/ASGCTBaseTest.java 0000000 generic-all
