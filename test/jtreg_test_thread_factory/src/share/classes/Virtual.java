@@ -23,8 +23,6 @@
  * questions.
  */
 
-import com.sun.javatest.regtest.agent.CustomMainWrapper;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -32,34 +30,31 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 
-public class Virtual implements CustomMainWrapper {
+public class Virtual implements ThreadFactory {
 
     static {
         // This property is used by ProcessTools and some tests
-        // Some tests deny changing of properties, just ignore them now
-        try {
-            System.setProperty("main.wrapper", "Virtual");
-        } catch (Throwable t) {}
+        // Should be set for all tests
+        System.setProperty("main.wrapper", "Virtual");
     }
 
-    String actionName;
+    private ThreadFactory factory;
 
     public Virtual() {
+        try {
+            factory = VirtualAPI.factory();
+        } catch (Throwable t) {
+            factory = task -> new Thread(task);
+        }
     }
 
-    @Override
-    public void setAction(String actionName) {
-        this.actionName = actionName;
-    }
 
     @Override
-    public Thread createThread(ThreadGroup tg, Runnable task) {
-        if (actionName.equals("main")) {
-            ThreadFactory factory = VirtualAPI.instance().factory(true);
+    public Thread newThread(Runnable task) {
+        try {
             return factory.newThread(task);
-        } else {
-            // No need to run @driver code in virtual thread
-            return new Thread(tg, task);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
         }
     }
 }
@@ -69,32 +64,17 @@ class VirtualAPI {
     private MethodHandles.Lookup publicLookup = MethodHandles.publicLookup();
 
     private ThreadFactory virtualThreadFactory;
-    private ThreadFactory platformThreadFactory;
 
 
     VirtualAPI() {
         try {
-
-            Class<?> vbuilderClass =Class.forName("java.lang.Thread$Builder$OfVirtual");
-            Class<?> pbuilderClass =Class.forName("java.lang.Thread$Builder$OfPlatform");
-
-
+            Class<?> vbuilderClass = Class.forName("java.lang.Thread$Builder$OfVirtual");
             MethodType vofMT = MethodType.methodType(vbuilderClass);
-            MethodType pofMT = MethodType.methodType(pbuilderClass);
-
             MethodHandle ofVirtualMH =  publicLookup.findStatic(Thread.class, "ofVirtual", vofMT);
-            MethodHandle ofPlatformMH =  publicLookup.findStatic(Thread.class, "ofPlatform", pofMT);
-
             Object virtualBuilder = ofVirtualMH.invoke();
-            Object platformBuilder = ofPlatformMH.invoke();
-
             MethodType factoryMT = MethodType.methodType(ThreadFactory.class);
             MethodHandle vfactoryMH =  publicLookup.findVirtual(vbuilderClass, "factory", factoryMT);
-            MethodHandle pfactoryMH =  publicLookup.findVirtual(pbuilderClass, "factory", factoryMT);
-
             virtualThreadFactory = (ThreadFactory) vfactoryMH.invoke(virtualBuilder);
-            platformThreadFactory = (ThreadFactory) pfactoryMH.invoke(platformBuilder);
-
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
@@ -102,11 +82,7 @@ class VirtualAPI {
 
     private static VirtualAPI instance = new VirtualAPI();
 
-    public static VirtualAPI instance() {
-        return instance;
-    }
-
-    public ThreadFactory factory(boolean isVirtual) {
-        return isVirtual ? virtualThreadFactory : platformThreadFactory;
+    public static ThreadFactory factory() {
+        return instance.virtualThreadFactory;
     }
 }

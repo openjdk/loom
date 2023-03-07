@@ -248,7 +248,7 @@ var getJibProfilesCommon = function (input, data) {
 
     // These are the base settings for all the main build profiles.
     common.main_profile_base = {
-        dependencies: ["boot_jdk", "gnumake", "jtreg", "jtregMW", "jib", "autoconf", "jmh", "jcov"],
+        dependencies: ["boot_jdk", "gnumake", "jtreg", "jib", "autoconf", "jmh", "jcov"],
         default_make_targets: ["product-bundles", "test-bundles", "static-libs-bundles"],
         configure_args: concat(
             "--with-exclude-translations=es,fr,it,ko,pt_BR,sv,ca,tr,cs,sk,ja_JP_A,ja_JP_HA,ja_JP_HI,ja_JP_I,zh_TW,zh_HK",
@@ -906,7 +906,7 @@ var getJibProfilesProfiles = function (input, common, data) {
         "run-test": {
             target_os: input.build_os,
             target_cpu: input.build_cpu,
-            dependencies: [ "jtreg", "jtregMW", "gnumake", "boot_jdk", "devkit", "jib" ],
+            dependencies: [ "jtreg", "gnumake", "boot_jdk", "devkit", "jib" ],
             labels: "test",
             environment: {
                 "JT_JAVA": common.boot_jdk_home
@@ -940,7 +940,7 @@ var getJibProfilesProfiles = function (input, common, data) {
             target_os: input.build_os,
             target_cpu: input.build_cpu,
             dependencies: [
-                "jtreg", "jtregMW", "gnumake", "boot_jdk", "devkit", "jib", "jcov", testedProfileJdk,
+                "jtreg", "gnumake", "boot_jdk", "devkit", "jib", "jcov", testedProfileJdk,
                 testedProfileTest,
             ],
             src: "src.conf",
@@ -1150,20 +1150,12 @@ var getJibProfilesDependencies = function (input, common) {
         jtreg: {
             server: "jpg",
             product: "jtreg",
-            version: "7.1.1",
-            build_number: "1",
-            file: "bundles/jtreg-7.1.1+1.zip",
+            version: "7.2",
+            build_number: "ci/13",
+            file: "bundles/jtreg-7.2+1.zip",
             environment_name: "JT_HOME",
             environment_path: input.get("jtreg", "home_path") + "/bin",
             configure_args: "--with-jtreg=" + input.get("jtreg", "home_path"),
-        },
-
-        jtregMW: {
-            organization: common.organization,
-            ext: "zip",
-            revision: "7.2-virtual-1.0",
-            environment_name: "JT_HOME_MW",
-            environment_path: input.get("jtreg", "install_path") + "/jtreg/bin"
         },
 
         jmh: {
