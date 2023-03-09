@@ -119,10 +119,15 @@ java/lang/ProcessBuilder/Basic.java#id1 0000000 generic-all
 java/lang/ProcessBuilder/Basic.java#id0 0000000 generic-all
 java/lang/ModuleTests/WithSecurityManager.java 0000000 generic-all
 java/lang/module/ModuleFinderWithSecurityManager.java 0000000 generic-all
+java/lang/invoke/7196190/GetUnsafeTest.java 0000000 generic-all
+java/lang/invoke/8076596/Test8076596.java 0000000 generic-all
+java/lang/invoke/FindClassSecurityManager.java 0000000 generic-all
 java/lang/invoke/MethodTypeSecurityManager.java 0000000 generic-all
 java/lang/invoke/MethodHandleConstants.java 0000000 generic-all
 java/lang/invoke/InvokeDynamicPrintArgs.java 0000000 generic-all
+java/lang/invoke/RevealDirectTest.java 0000000 generic-all
 java/lang/reflect/callerCache/ReflectionCallerCacheTest.java 0000000 generic-all
+java/lang/reflect/Nestmates/TestReflectionAPI.java 0000000 generic-all
 java/lang/runtime/ObjectMethodsTest.java 0000000 generic-all
 java/util/ServiceLoader/security/SecurityTest.java 0000000 generic-all
 java/util/PluggableLocale/PermissionTest.java 0000000 generic-all
