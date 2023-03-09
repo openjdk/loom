@@ -27,7 +27,6 @@ package com.sun.management;
 
 import java.io.IOException;
 import java.lang.management.PlatformManagedObject;
-import jdk.internal.javac.PreviewFeature;
 
 /**
  * Diagnostic management interface for the HotSpot Virtual Machine.
@@ -147,31 +146,23 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      *         access to the file or {@link java.lang.management.ManagementPermission
      *         ManagementPermission("control")} is denied
      * @throws UnsupportedOperationException if this operation is not supported
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS, reflective = true)
     default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
         throw new UnsupportedOperationException();
     }
 
     /**
      * Thread dump format.
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS, reflective = true)
     public static enum ThreadDumpFormat {
         /**
          * Plain text format.
          */
         TEXT_PLAIN,
         /**
-         * JSON (JavaScript Object Notation) format
-         * (<a href="https://tools.ietf.org/html/rfc8259">RFC 8259</a>).
-         *
-         * <p> <a href="doc-files/threadDump.schema.json">threadDump.schema.json</a>
-         * describes the thread dump format in draft
-         * <a href="https://tools.ietf.org/html/draft-json-schema-language-02">
-         * JSON Schema Language version 2</a>.
+         * JSON (JavaScript Object Notation) format.
          */
         JSON,
     }

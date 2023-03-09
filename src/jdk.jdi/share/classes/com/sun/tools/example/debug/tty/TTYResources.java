@@ -477,7 +477,6 @@ public class TTYResources extends java.util.ListResourceBundle {
              "                      connect to target VM using named connector with listed argument values\n" +
              "    -dbgtrace [flags] print info for debugging {0}\n" +
              "    -trackallthreads  Track all threads, including virtual threads.\n" +
-             "                      Virtual threads are a preview feature of the Java platform.\n" +
              "    -tclient          run the application in the HotSpot(TM) Client Compiler\n" +
              "    -tserver          run the application in the HotSpot(TM) Server Compiler\n" +
              "    -R<option>        forward <option> to debuggee process if launched by jdb, otherwise ignored\n" +
