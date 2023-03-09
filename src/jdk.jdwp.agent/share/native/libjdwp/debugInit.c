@@ -827,7 +827,6 @@ printUsage(void)
  "onuncaught=y|n                   debug on any uncaught?            n\n"
  "timeout=<timeout value>          for listen/attach in milliseconds n\n"
  "includevirtualthreads=y|n        List of all threads includes virtual threads as well as platform threads.\n"
- "                                 Virtual threads are a preview feature of the Java platform.\n"
  "                                                                   n\n"
  "mutf8=y|n                        output modified utf-8             n\n"
  "quiet=y|n                        control over terminal messages    n\n"));

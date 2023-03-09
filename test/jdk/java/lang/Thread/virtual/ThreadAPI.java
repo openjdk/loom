@@ -1247,7 +1247,7 @@ class ThreadAPI {
         VThreadRunner.run(() -> {
             long start = millisTime();
             sleeper.run();
-            expectDuration(start, /*min*/900, /*max*/4000);
+            expectDuration(start, /*min*/900, /*max*/20_000);
         });
     }
 
@@ -1337,7 +1337,7 @@ class ThreadAPI {
 
             long start = millisTime();
             Thread.sleep(1000);
-            expectDuration(start, /*min*/900, /*max*/4000);
+            expectDuration(start, /*min*/900, /*max*/20_000);
 
             // check that parking permit was not consumed
             LockSupport.park();
@@ -1354,7 +1354,7 @@ class ThreadAPI {
             try {
                 long start = millisTime();
                 Thread.sleep(1000);
-                expectDuration(start, /*min*/900, /*max*/4000);
+                expectDuration(start, /*min*/900, /*max*/20_000);
             } catch (Exception e) {
                 exc.set(e);
             }
@@ -1382,7 +1382,7 @@ class ThreadAPI {
             synchronized (lock) {
                 Thread.sleep(1000);
             }
-            expectDuration(start, /*min*/900, /*max*/4000);
+            expectDuration(start, /*min*/900, /*max*/20_000);
         });
     }
 

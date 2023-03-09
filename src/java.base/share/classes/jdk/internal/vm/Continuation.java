@@ -25,7 +25,6 @@
 
 package jdk.internal.vm;
 
-import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.DontInline;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -34,9 +33,7 @@ import sun.security.action.GetPropertyAction;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.EnumSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -50,7 +47,6 @@ public class Continuation {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     static {
         ContinuationSupport.ensureSupported();
-        PreviewFeatures.ensureEnabled();
 
         StackChunk.init(); // ensure StackChunk class is initialized
 

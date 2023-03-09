@@ -116,6 +116,7 @@ enum {
     JVMTI_VERSION_9   = 0x30090000,
     JVMTI_VERSION_11  = 0x300B0000,
     JVMTI_VERSION_19  = 0x30130000,
+    JVMTI_VERSION_21  = 0x30150000,
 
     JVMTI_VERSION = 0x30000000 + (</xsl:text>
   <xsl:value-of select="$majorversion"/>

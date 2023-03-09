@@ -24,7 +24,6 @@
  */
 package java.lang;
 
-import java.lang.Thread.Builder;
 import java.lang.Thread.Builder.OfPlatform;
 import java.lang.Thread.Builder.OfVirtual;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -41,12 +40,12 @@ import jdk.internal.vm.ContinuationSupport;
  * Defines static methods to create platform and virtual thread builders.
  */
 class ThreadBuilders {
+    private ThreadBuilders() { }
 
     /**
-     * Base implementation of ThreadBuilder.
+     * Base class for Thread.Builder implementations.
      */
-    static abstract non-sealed
-    class BaseThreadBuilder<T extends Builder> implements Builder {
+    private static class BaseThreadBuilder {
         private String name;
         private long counter;
         private int characteristics;
@@ -76,41 +75,29 @@ class ThreadBuilders {
             }
         }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public T name(String name) {
+        void setName(String name) {
             this.name = Objects.requireNonNull(name);
             this.counter = -1;
-            return (T) this;
         }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public T name(String prefix, long start) {
+        void setName(String prefix, long start) {
             Objects.requireNonNull(prefix);
             if (start < 0)
                 throw new IllegalArgumentException("'start' is negative");
             this.name = prefix;
             this.counter = start;
-            return (T) this;
         }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public T inheritInheritableThreadLocals(boolean inherit) {
+        void setInheritInheritableThreadLocals(boolean inherit) {
             if (inherit) {
                 characteristics &= ~Thread.NO_INHERIT_THREAD_LOCALS;
             } else {
                 characteristics |= Thread.NO_INHERIT_THREAD_LOCALS;
             }
-            return (T) this;
         }
 
-        @Override
-        @SuppressWarnings("unchecked")
-        public T uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+        void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             this.uhe = Objects.requireNonNull(ueh);
-            return (T) this;
         }
     }
 
@@ -118,7 +105,7 @@ class ThreadBuilders {
      * ThreadBuilder.OfPlatform implementation.
      */
     static final class PlatformThreadBuilder
-            extends BaseThreadBuilder<OfPlatform> implements OfPlatform {
+            extends BaseThreadBuilder implements OfPlatform {
         private ThreadGroup group;
         private boolean daemon;
         private boolean daemonChanged;
@@ -132,6 +119,30 @@ class ThreadBuilders {
         String nextThreadName() {
             String name = super.nextThreadName();
             return (name != null) ? name : Thread.genThreadName();
+        }
+
+        @Override
+        public OfPlatform name(String name) {
+            setName(name);
+            return this;
+        }
+
+        @Override
+        public OfPlatform name(String prefix, long start) {
+            setName(prefix, start);
+            return this;
+        }
+
+        @Override
+        public OfPlatform inheritInheritableThreadLocals(boolean inherit) {
+            setInheritInheritableThreadLocals(inherit);
+            return this;
+        }
+
+        @Override
+        public OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+            setUncaughtExceptionHandler(ueh);
+            return this;
         }
 
         @Override
@@ -197,7 +208,7 @@ class ThreadBuilders {
      * ThreadBuilder.OfVirtual implementation.
      */
     static final class VirtualThreadBuilder
-            extends BaseThreadBuilder<OfVirtual> implements OfVirtual {
+            extends BaseThreadBuilder implements OfVirtual {
         private Executor scheduler;
 
         VirtualThreadBuilder() {
@@ -208,6 +219,30 @@ class ThreadBuilders {
             if (!ContinuationSupport.isSupported())
                 throw new UnsupportedOperationException();
             this.scheduler = Objects.requireNonNull(scheduler);
+        }
+
+        @Override
+        public OfVirtual name(String name) {
+            setName(name);
+            return this;
+        }
+
+        @Override
+        public OfVirtual name(String prefix, long start) {
+            setName(prefix, start);
+            return this;
+        }
+
+        @Override
+        public OfVirtual inheritInheritableThreadLocals(boolean inherit) {
+            setInheritInheritableThreadLocals(inherit);
+            return this;
+        }
+
+        @Override
+        public OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+            setUncaughtExceptionHandler(ueh);
+            return this;
         }
 
         @Override

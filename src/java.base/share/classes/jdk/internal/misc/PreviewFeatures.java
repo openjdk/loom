@@ -37,7 +37,7 @@ public class PreviewFeatures {
      * {@return true if preview features are enabled, otherwise false}
      */
     public static boolean isEnabled() {
-        return true; // FIXME: return true until test environment ready
+        return ENABLED;
     }
 
     /**

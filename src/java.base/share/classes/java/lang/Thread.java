@@ -41,8 +41,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import jdk.internal.event.ThreadSleepEvent;
-import jdk.internal.javac.PreviewFeature;
-import jdk.internal.misc.PreviewFeatures;
 import jdk.internal.misc.StructureViolationExceptions;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
@@ -464,24 +462,32 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
+        long nanos = MILLISECONDS.toNanos(millis);
 
-        if (currentThread() instanceof VirtualThread vthread) {
-            long nanos = MILLISECONDS.toNanos(millis);
-            vthread.sleepNanos(nanos);
-            return;
+        // create jdk.ThreadSleepEvent event if enabled
+        ThreadSleepEvent event = null;
+        if (ThreadSleepEvent.isTurnedOn()) {
+            try {
+                event = new ThreadSleepEvent();
+                event.time = nanos;
+                event.begin();
+            } catch (OutOfMemoryError e) {
+                event = null;
+            }
         }
 
-        if (ThreadSleepEvent.isTurnedOn()) {
-            ThreadSleepEvent event = new ThreadSleepEvent();
-            try {
-                event.time = MILLISECONDS.toNanos(millis);
-                event.begin();
+        try {
+            if (currentThread() instanceof VirtualThread vthread) {
+                vthread.sleepNanos(nanos);
+            } else {
                 sleep0(millis);
-            } finally {
-                event.commit();
             }
-        } else {
-            sleep0(millis);
+        } finally {
+            try {
+                if (event != null) event.commit();
+            } catch (OutOfMemoryError e) {
+                // ignore
+            }
         }
     }
 
@@ -518,14 +524,6 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException("nanosecond timeout value out of range");
         }
 
-        if (currentThread() instanceof VirtualThread vthread) {
-            // total sleep time, in nanoseconds
-            long totalNanos = MILLISECONDS.toNanos(millis);
-            totalNanos += Math.min(Long.MAX_VALUE - totalNanos, nanos);
-            vthread.sleepNanos(totalNanos);
-            return;
-        }
-
         if (nanos > 0 && millis < Long.MAX_VALUE) {
             millis++;
         }
@@ -550,20 +548,40 @@ public class Thread implements Runnable {
      */
     public static void sleep(Duration duration) throws InterruptedException {
         long nanos = NANOSECONDS.convert(duration);  // MAX_VALUE if > 292 years
-        if (nanos < 0)
-            return;
-
-        if (currentThread() instanceof VirtualThread vthread) {
-            vthread.sleepNanos(nanos);
+        if (nanos < 0) {
             return;
         }
 
-        // convert to milliseconds
-        long millis = MILLISECONDS.convert(nanos, NANOSECONDS);
-        if (nanos > NANOSECONDS.convert(millis, MILLISECONDS)) {
-            millis += 1L;
+        // create jdk.ThreadSleepEvent event if enabled
+        ThreadSleepEvent event = null;
+        if (ThreadSleepEvent.isTurnedOn()) {
+            try {
+                event = new ThreadSleepEvent();
+                event.time = nanos;
+                event.begin();
+            } catch (OutOfMemoryError e) {
+                event = null;
+            }
         }
-        sleep(millis);
+
+        try {
+            if (currentThread() instanceof VirtualThread vthread) {
+                vthread.sleepNanos(nanos);
+            } else {
+                // convert to milliseconds
+                long millis = NANOSECONDS.toMillis(nanos);
+                if (nanos > MILLISECONDS.toNanos(millis)) {
+                    millis += 1L;
+                }
+                sleep0(millis);
+            }
+        } finally {
+            try {
+                if (event != null) event.commit();
+            } catch (OutOfMemoryError e) {
+                // ignore
+            }
+        }
     }
 
     /**
@@ -611,7 +629,7 @@ public class Thread implements Runnable {
      * the constructing thread.
      * See Thread initialization.
      */
-    static final int NO_INHERIT_THREAD_LOCALS = 1 << 1;
+    static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
      * Helper class to generate thread identifiers. The identifiers start at
@@ -800,9 +818,8 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfPlatform ofPlatform() {
         return new ThreadBuilders.PlatformThreadBuilder();
     }
@@ -821,12 +838,9 @@ public class Thread implements Runnable {
      * }
      *
      * @return A builder for creating {@code Thread} or {@code ThreadFactory} objects.
-     * @throws UnsupportedOperationException if preview features are not enabled
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Builder.OfVirtual ofVirtual() {
-        PreviewFeatures.ensureEnabled();
         return new ThreadBuilders.VirtualThreadBuilder();
     }
 
@@ -856,14 +870,10 @@ public class Thread implements Runnable {
      *
      * @see Thread#ofPlatform()
      * @see Thread#ofVirtual()
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public sealed interface Builder
-            permits Builder.OfPlatform,
-                    Builder.OfVirtual,
-                    ThreadBuilders.BaseThreadBuilder {
-
+            permits Builder.OfPlatform, Builder.OfVirtual {
 
         /**
          * Sets the thread name.
@@ -962,9 +972,8 @@ public class Thread implements Runnable {
          * this interface causes a {@code NullPointerException} to be thrown.
          *
          * @see Thread#ofPlatform()
-         * @since 19
+         * @since 21
          */
-        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfPlatform extends Builder
                 permits ThreadBuilders.PlatformThreadBuilder {
 
@@ -1037,9 +1046,8 @@ public class Thread implements Runnable {
          * this interface causes a {@code NullPointerException} to be thrown.
          *
          * @see Thread#ofVirtual()
-         * @since 19
+         * @since 21
          */
-        @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
         sealed interface OfVirtual extends Builder
                 permits ThreadBuilders.VirtualThreadBuilder {
 
@@ -1467,14 +1475,11 @@ public class Thread implements Runnable {
      *
      * @param task the object to run when the thread executes
      * @return a new, and started, virtual thread
-     * @throws UnsupportedOperationException if preview features are not enabled
      * @see <a href="#inheritance">Inheritance when creating threads</a>
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public static Thread startVirtualThread(Runnable task) {
         Objects.requireNonNull(task);
-        PreviewFeatures.ensureEnabled();
         var thread = ThreadBuilders.newVirtualThread(null, null, 0, task);
         thread.start();
         return thread;
@@ -1486,9 +1491,8 @@ public class Thread implements Runnable {
      *
      * @return {@code true} if this thread is a virtual thread
      *
-     * @since 19
+     * @since 21
      */
-    @PreviewFeature(feature = PreviewFeature.Feature.VIRTUAL_THREADS)
     public final boolean isVirtual() {
         return (this instanceof BaseVirtualThread);
     }
@@ -1523,6 +1527,8 @@ public class Thread implements Runnable {
                 throw new IllegalThreadStateException();
 
             // bind thread to container
+            if (this.container != null)
+                throw new IllegalThreadStateException();
             setThreadContainer(container);
 
             // start thread
@@ -1597,15 +1603,17 @@ public class Thread implements Runnable {
      * a chance to clean up before it actually exits.
      */
     private void exit() {
-        // pop any remaining scopes from the stack, this may block
-        if (headStackableScopes != null) {
-            StackableScope.popAll();
-        }
-
-        // notify container that thread is exiting
-        ThreadContainer container = threadContainer();
-        if (container != null) {
-            container.onExit(this);
+        try {
+            // pop any remaining scopes from the stack, this may block
+            if (headStackableScopes != null) {
+                StackableScope.popAll();
+            }
+        } finally {
+            // notify container that thread is exiting
+            ThreadContainer container = threadContainer();
+            if (container != null) {
+                container.onExit(this);
+            }
         }
 
         try {
