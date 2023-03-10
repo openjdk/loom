@@ -88,13 +88,7 @@ com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java 0000000 generic-all
 java/util/Properties/LoadAndStoreXML.java 0000000 generic-all
 java/util/Properties/StoreReproducibilityTest.java 0000000 generic-all
 sun/reflect/ReflectionFactory/ReflectionFactoryTest.java 0000000 generic-all
-java/io/Console/SecurityManagerTest.java 0000000 generic-all
-java/io/File/createTempFile/SecurityTest.java 0000000 generic-all
 java/io/FilePermission/MergeName.java 0000000 generic-all
-java/io/Serializable/serialFilter/FilterWithSecurityManagerTest.java 0000000 generic-all
-java/io/Serializable/serialFilter/SerialFilterFactoryTest.java 0000000 generic-all
-java/io/Serializable/subclass/SubclassTest.java 0000000 generic-all
-java/io/Serializable/subclassGC/SubclassGC.java 0000000 generic-all
 java/lang/System/SecurityRace.java 0000000 generic-all
 java/lang/System/LoggerFinder/jdk/DefaultLoggerBridgeTest/DefaultLoggerBridgeTest.java 0000000 generic-all
 java/lang/System/LoggerFinder/jdk/DefaultPlatformLoggerTest/DefaultPlatformLoggerTest.java 0000000 generic-all
@@ -135,9 +129,6 @@ java/lang/invoke/RevealDirectTest.java 0000000 generic-all
 java/lang/reflect/callerCache/ReflectionCallerCacheTest.java 0000000 generic-all
 java/lang/reflect/Nestmates/TestReflectionAPI.java 0000000 generic-all
 java/lang/runtime/ObjectMethodsTest.java 0000000 generic-all
-java/io/Serializable/subclassGC/SubclassGC.java 0000000 generic-all
-java/nio/channels/unixdomain/Security.java 0000000 generic-all
-java/time/nontestng/java/time/chrono/Bug8178823.java 0000000 generic-all
 java/util/ServiceLoader/security/SecurityTest.java 0000000 generic-all
 java/util/PluggableLocale/PermissionTest.java 0000000 generic-all
 java/util/logging/TestLoggerBundleSync.java 0000000 generic-all
@@ -172,46 +163,13 @@ java/lang/constant/methodTypeDesc/ResolveConstantDesc.java 0000000 generic-all
 java/lang/ClassLoader/forNameLeak/ClassForNameLeak.java 0000000 generic-all
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithRemoveAddProvider.java 0000000 generic-all
 com/sun/crypto/provider/Cipher/AES/TestAESCiphers/TestAESWithProviderChange.java 0000000 generic-all
-jdk/jfr/api/consumer/security/TestMissingPermission.java 0000000 generic-all
-jdk/jfr/api/consumer/security/TestRecordingFile.java 0000000 generic-all
-jdk/jfr/api/consumer/security/TestRecordingStream.java 0000000 generic-all
-jdk/jfr/api/consumer/security/TestStreamingFile.java 0000000 generic-all
-jdk/jfr/api/consumer/security/TestStreamingLocal.java 0000000 generic-all
 jdk/jfr/api/consumer/security/TestStreamingRemote.java 0000000 generic-all
-jdk/jfr/jmx/security/TestEnoughPermission.java 0000000 generic-all
-jdk/jfr/jmx/security/TestNoControlPermission.java 0000000 generic-all
-jdk/jfr/jmx/security/TestNoMonitorPermission.java 0000000 generic-all
-jdk/jfr/jmx/security/TestNotificationListenerPermission.java 0000000 generic-all
 jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
-jdk/nio/zipfs/Basic.java 0000000 generic-all
-jdk/nio/zipfs/PathOps.java 0000000 generic-all
-jdk/nio/zipfs/ZFSTests.java 0000000 generic-all
-jdk/nio/zipfs/ZipFSTester.java 0000000 generic-all
 java/lang/Class/getDeclaredField/FieldSetAccessibleTest.java 0000000 generic-all
 java/lang/Class/getDeclaredField/ClassDeclaredFieldsTest.java 0000000 generic-all
 java/lang/annotation/ParameterAnnotations.java 0000000 generic-all
 sun/security/util/Resources/early/EarlyResources.java 0000000 generic-all
-javax/management/modelmbean/ModelMBeanInfoSupport/GetAllDescriptorsTest.java 0000000 generic-all
-javax/management/modelmbean/SimpleModelMBean/SimpleModelMBeanCommand.java 0000000 generic-all
 javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java 0000000 generic-all
-
-
-####
-# Client tests failed because of permissions
-java/awt/Desktop/DefaultPermissions/DefaultPermissions.java 0000000 generic-all
-java/awt/color/StandardProfileTest.java 0000000 generic-all
-java/awt/event/KeyEvent/RegisterKeyStroke/TestAWTKeyStroke.java 0000000 generic-all
-java/awt/image/mlib/MlibOpsTest.java 0000000 generic-all
-java/awt/print/PrinterJob/GetUserNameTest.java 0000000 generic-all
-java/beans/SimpleBeanInfo/LoadingStandardIcons/LoadingStandardIcons.java 0000000 generic-all
-java/beans/Statement/ClassForName/ClassForName.java 0000000 generic-all
-javax/sound/midi/MidiSystem/DefaultProperties/DefaultProperties.java 0000000 generic-all
-javax/sound/midi/MidiSystem/DefaultProperties/DefaultPropertiesNegative.java 0000000 generic-all
-javax/sound/sampled/AudioSystem/DefaultProperties/DefaultProperties.java 0000000 generic-all
-javax/sound/sampled/AudioSystem/DefaultProperties/DefaultPropertiesNegative.java 0000000 generic-all
-javax/swing/JFileChooser/7036025/bug7036025.java 0000000 generic-all
-javax/swing/JFileChooser/ShellFolderQueries/ShellFolderQueriesSecurityManagerTest.java 0000000 generic-all
-
 
 #####
 # Tests failing because of ProcessTools wrapper
@@ -266,28 +224,7 @@ tools/launcher/modules/limitmods/LimitModsTest.java 0000000 generic-all
 tools/launcher/modules/listmods/ListModsTest.java 0000000 generic-all
 tools/launcher/modules/showmoduleresolution/ShowModuleResolutionTest.java 0000000 generic-all
 tools/launcher/modules/validate/ValidateModulesTest.java 0000000 generic-all
-java/rmi/dgc/VMID/CheckVMID.java 0000000 generic-all
-java/rmi/dgc/dgcImplInsulation/DGCImplInsulation.java 0000000 generic-all
 java/rmi/module/ModuleTest.java 0000000 generic-all
-java/rmi/registry/classPathCodebase/ClassPathCodebase.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/delegateToContextLoader/DelegateToContextLoader.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/downloadArrayClass/DownloadArrayClass.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/getClassLoader/GetClassLoader.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/loadProxyClasses/LoadProxyClasses.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/spi/ContextInsulation.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/spi/DefaultProperty.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/spi/Installed.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/spi/InvalidProperty.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/spi/Property.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/useCodebaseOnly/UseCodebaseOnly.java 0000000 generic-all
-java/rmi/server/RMIClassLoader/useGetURLs/UseGetURLs.java 0000000 generic-all
-java/rmi/server/RMISocketFactory/useSocketFactory/registry/UseCustomSocketFactory.java 0000000 generic-all
-java/rmi/server/RMISocketFactory/useSocketFactory/unicast/UseCustomSocketFactory.java 0000000 generic-all
-java/rmi/server/RemoteServer/setLogPermission/SetLogPermission.java 0000000 generic-all
-java/rmi/server/clientStackTrace/ClientStackTrace.java 0000000 generic-all
-java/rmi/server/useCustomRef/UseCustomRef.java 0000000 generic-all
-java/rmi/transport/dgcDeadLock/DGCDeadLock.java 0000000 generic-all
-sun/rmi/server/MarshalOutputStream/marshalForeignStub/MarshalForeignStub.java 0000000 generic-all
 javax/crypto/SecretKeyFactory/TestFailOver.java 0000000 generic-all
 javax/xml/jaxp/module/ServiceProviderTest/BasicModularXMLParserTest.java 0000000 generic-all
 tools/jimage/JImageToolTest.java 0000000 generic-all
@@ -411,9 +348,6 @@ jdk/nio/zipfs/NewFileSystemTests.java 0000000 generic-all
 jdk/nio/zipfs/PropertyPermissionTests.java 0000000 generic-all
 jdk/nio/zipfs/TestPosix.java 0000000 generic-all
 jdk/nio/zipfs/ZipFSPermissionsTest.java 0000000 generic-all
-java/net/IPSupport/MinimumPermissions.java 0000000 generic-all
-java/net/SetFactoryPermission/SetFactoryPermission.java 0000000 generic-all
-java/net/SocketOption/OptionsTest.java 0000000 generic-all
 java/net/httpclient/AsFileDownloadTest.java 0000000 generic-all
 java/net/httpclient/ConnectExceptionTest.java 0000000 generic-all
 java/net/httpclient/DependentActionsTest.java 0000000 generic-all
@@ -421,15 +355,10 @@ java/net/httpclient/DependentPromiseActionsTest.java 0000000 generic-all
 java/net/httpclient/FilePublisher/FilePublisherPermsTest.java 0000000 generic-all
 java/net/httpclient/FilePublisher/FilePublisherTest.java 0000000 generic-all
 java/net/httpclient/HttpClientLocalAddrTest.java 0000000 generic-all
-java/net/httpclient/PathSubscriber/BodyHandlerOfFileDownloadTest.java 0000000 generic-alla
+java/net/httpclient/PathSubscriber/BodyHandlerOfFileDownloadTest.jav 0000000 generic-alla
 java/net/httpclient/PathSubscriber/BodyHandlerOfFileTest.java 0000000 generic-all
 java/net/httpclient/PathSubscriber/BodySubscriberOfFileTest.java 0000000 generic-all
 java/net/httpclient/RequestBodyTest.java 0000000 generic-all
-java/net/httpclient/security/Security.java 0000000 generic-all
 java/net/httpclient/security/filePerms/FileProcessorPermissionTest.java 0000000 generic-all
 java/net/httpclient/security/filePerms/SecurityBeforeFile.java 0000000 generic-all
 java/net/httpclient/websocket/security/WSURLPermissionTest.java 0000000 generic-all
-com/sun/net/httpserver/simpleserver/SecurityManagerTest.java 0000000 generic-all
-sun/net/www/http/HttpClient/IsKeepingAlive.java 0000000 generic-all
-sun/net/www/http/HttpClient/OpenServer.java 0000000 generic-all
-sun/net/www/http/HttpURLConnection/NTLMAuthWithSM.java 0000000 generic-all
