@@ -35,7 +35,11 @@ public class Virtual implements ThreadFactory {
     static {
         // This property is used by ProcessTools and some tests
         // Should be set for all tests
-        System.setProperty("main.wrapper", "Virtual");
+        try {
+            System.setProperty("main.wrapper", "Virtual");
+        } catch (Throwable t) {
+        // Might be securty-related exceptions
+        }
     }
 
     private ThreadFactory factory;
