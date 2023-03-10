@@ -588,9 +588,9 @@ final class VirtualThread extends BaseVirtualThread {
         try {
             yielded = yieldContinuation();  // may throw
         } finally {
-            assert (Thread.currentThread() == this)
-                && ((yielded && state() == RUNNING) ^ (!yielded && state() == PARKING));
-            if (state() != RUNNING) {
+            assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
+            if (!yielded) {
+                assert state() == PARKING;
                 setState(RUNNING);
             }
         }
@@ -627,9 +627,9 @@ final class VirtualThread extends BaseVirtualThread {
             try {
                 yielded = yieldContinuation();  // may throw
             } finally {
-                assert (Thread.currentThread() == this)
-                    && ((yielded && state() == RUNNING) ^ (!yielded && state() == PARKING));
-                if (state() != RUNNING) {
+                assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
+                if (!yielded) {
+                    assert state() == PARKING;
                     setState(RUNNING);
                 }
                 cancel(unparker);
@@ -760,11 +760,12 @@ final class VirtualThread extends BaseVirtualThread {
     void tryYield() {
         assert Thread.currentThread() == this;
         setState(YIELDING);
+        boolean yielded = false;
         try {
-            yieldContinuation();  // may throw
+            yielded = yieldContinuation();  // may throw
         } finally {
-            assert Thread.currentThread() == this;
-            if (state() != RUNNING) {
+            assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
+            if (!yielded) {
                 assert state() == YIELDING;
                 setState(RUNNING);
             }
