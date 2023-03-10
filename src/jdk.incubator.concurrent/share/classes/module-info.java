@@ -23,15 +23,12 @@
  * questions.
  */
 
-import jdk.internal.javac.ParticipatesInPreview;
-
 /**
  * Defines non-final APIs for concurrent programming.
  * {@Incubating}
  *
  * @moduleGraph
  */
-@ParticipatesInPreview
 module jdk.incubator.concurrent {
     exports jdk.incubator.concurrent;
 }

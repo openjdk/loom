@@ -2158,6 +2158,7 @@ JDWP "Java(tm) Debug Wire Protocol"
     (Command IsVirtual=15
         "Determine if a thread is a "
         "<a href=../../api/java.base/java/lang/Thread.html#virtual-threads>virtual thread</a>."
+        "<p>Since JDWP version 21."
         (Out
             (threadObject thread "The thread object ID.")
         )
@@ -2535,6 +2536,7 @@ JDWP "Java(tm) Debug Wire Protocol"
                     (Alt PlatformThreadsOnly=13
                         "For thread start and thread end events, restrict the "
                         "events so they are only sent for platform threads."
+                        "<p>Since JDWP version 21."
                     )
 
                 )

@@ -23,8 +23,6 @@
  * questions.
  */
 
-import jdk.internal.javac.ParticipatesInPreview;
-
 /**
  * Defines the Java Management Extensions (JMX) API.
  * <P>
@@ -37,7 +35,6 @@ import jdk.internal.javac.ParticipatesInPreview;
  * @moduleGraph
  * @since 9
  */
-@ParticipatesInPreview
 module java.management {
 
     exports java.lang.management;
