@@ -14,9 +14,6 @@ java/lang/StackWalker/DumpStackTest.java 0000000 generic-all
 java/lang/StackWalker/ReflectionFrames.java 0000000 generic-all
 java/lang/StackWalker/NativeMethod.java 0000000 generic-all
 
-# Uses custom scheduler
-java/lang/Thread/virtual/HoldsLock.java 0000000 generic-all
-
 jdk/internal/vm/Continuation/HumongousStack.java 0000000 generic-all
 jdk/internal/vm/Continuation/Scoped.java 0000000 generic-all
 jdk/internal/vm/Continuation/Fuzz.java 0000000 generic-all
@@ -43,9 +40,8 @@ java/lang/Thread/MainThreadTest.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ThreadLists.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 
-# Test assumes main thread is a platform thread
-java/lang/management/ThreadMXBean/VirtualThreads.java#default 0000000 generic-all
-java/lang/management/ThreadMXBean/VirtualThreads.java#no-vmcontinuations 0000000 generic-all
+# Thread MainThread is not supposed to be hold any lock.
+java/lang/management/ThreadMXBean/Locks.java 0000000 generic-all
 
 ####
 
