@@ -57,6 +57,7 @@ import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 import sun.nio.ch.Interruptible;
 import sun.security.action.GetPropertyAction;
 import static java.util.concurrent.TimeUnit.*;
@@ -340,6 +341,7 @@ final class VirtualThread extends BaseVirtualThread {
      * return, the current thread is the virtual thread.
      */
     @ChangesCurrentThread
+    @ReservedStackAccess
     private void mount() {
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
@@ -366,6 +368,7 @@ final class VirtualThread extends BaseVirtualThread {
      * current thread is the current platform thread.
      */
     @ChangesCurrentThread
+    @ReservedStackAccess
     private void unmount() {
         // set Thread.currentThread() to return the platform thread
         Thread carrier = this.carrierThread;
