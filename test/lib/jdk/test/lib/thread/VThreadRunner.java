@@ -38,7 +38,7 @@ public class VThreadRunner {
      * Characteristic value signifying that initial values for inheritable
      * thread locals are not inherited from the constructing thread.
      */
-    public static final int NO_INHERIT_THREAD_LOCALS = 1 << 1;
+    public static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
      * Represents a task that does not return a result but may throw
