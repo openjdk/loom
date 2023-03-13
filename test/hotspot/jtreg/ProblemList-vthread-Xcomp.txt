@@ -32,5 +32,3 @@
 compiler/uncommontrap/TestUnstableIfTrap.java
 gc/g1/plab/TestPLABPromotion.java
 gc/whitebox/TestWBGC.java
-
-serviceability/dcmd/vm/ClassLoaderStatsTest.java    8278123 generic-all

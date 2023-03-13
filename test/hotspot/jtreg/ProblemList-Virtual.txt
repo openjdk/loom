@@ -3,6 +3,7 @@
 gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
 vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
 
+vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 8282492 generic-all
 vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java 8282492 generic-all
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree_ArrayOf/TestDescription.java 8282492 generic-all
 vmTestbase/vm/gc/compact/Compact_NonbranchyTree/TestDescription.java 8282492 generic-all
