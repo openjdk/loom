@@ -47,9 +47,11 @@ java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 java/lang/management/ThreadMXBean/VirtualThreads.java#default 0000000 generic-all
 java/lang/management/ThreadMXBean/VirtualThreads.java#no-vmcontinuations 0000000 generic-all
 
+jdk/incubator/concurrent/ScopedValue/StressStackOverflow.java 0000000 generic-all
 ####
 
 # JFR tests check events for test main thread only or expect to find MainThread
+jdk/jfr/event/gc/detailed/TestPromotionFailedEventWithParallelScavenge.java 0000000 generic-all
 jdk/jfr/event/io/TestFileStreamEvents.java 0000000 generic-all
 jdk/jfr/event/compiler/TestAllocInNewTLAB.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
@@ -282,6 +284,7 @@ java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
 com/sun/jdi/DeferredStepTest.java 0000000 generic-all
 com/sun/jdi/EarlyReturnTest.java 0000000 generic-all
+com/sun/jdi/EATests.java#id0 0000000 generic-all
 com/sun/jdi/ExceptionEvents.java 0000000 generic-all
 com/sun/jdi/FetchLocals.java 0000000 generic-all
 com/sun/jdi/Frames2Test.java 0000000 generic-all
