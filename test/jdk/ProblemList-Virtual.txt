@@ -43,7 +43,9 @@ java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 # Thread MainThread is not supposed to be hold any lock.
 java/lang/management/ThreadMXBean/Locks.java 0000000 generic-all
 
+java/lang/Thread/virtual/stress/Skynet.java#id0 0000000 generic-all
 jdk/incubator/concurrent/ScopedValue/StressStackOverflow.java 0000000 generic-all
+vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
 ####
 
 # JFR tests check events for test main thread only or expect to find MainThread
