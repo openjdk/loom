@@ -82,11 +82,11 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *
  * <p> Threads support {@link ThreadLocal} variables. These are variables that are
  * local to a thread, meaning a thread can have a copy of a variable that is set to
- * a value that is independent of the value set by other threads. Thread also supports
- * {@link InheritableThreadLocal} variables that are thread local variables that are
- * inherited at Thread creation time from the parent Thread. Thread supports a special
- * inheritable thread local for the thread {@linkplain #getContextClassLoader()
- * context-class-loader}.
+ * a value that is independent of the value set by other threads. {@code Thread} also
+ * supports {@link InheritableThreadLocal} variables that are thread local variables
+ * that are inherited at thread creation time from the parent {@code Thread}.
+ * {@code Thread} supports a special inheritable thread local for the thread
+ * {@linkplain #getContextClassLoader() context-class-loader}.
  *
  * <h2><a id="platform-threads">Platform threads</a></h2>
  * <p> {@code Thread} supports the creation of <i>platform threads</i> that are
