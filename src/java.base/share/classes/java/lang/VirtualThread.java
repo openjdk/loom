@@ -175,7 +175,7 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private static class VThreadContinuation extends Continuation {
         VThreadContinuation(VirtualThread vthread, Runnable task) {
-            super(VTHREAD_SCOPE, () -> vthread.run(task));
+            super(VTHREAD_SCOPE, wrap(vthread, task));
         }
         @Override
         protected void onPinned(Continuation.Pinned reason) {
@@ -183,6 +183,14 @@ final class VirtualThread extends BaseVirtualThread {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
                 PinnedThreadPrinter.printStackTrace(System.out, printAll);
             }
+        }
+        private static Runnable wrap(VirtualThread vthread, Runnable task) {
+            return new Runnable() {
+                @Hidden
+                public void run() {
+                    vthread.run(task);
+                }
+            };
         }
     }
 
@@ -433,6 +441,7 @@ final class VirtualThread extends BaseVirtualThread {
      * thread when continued. When enabled, JVMTI must be notified from this method.
      * @return true if the yield was successful
      */
+    @Hidden
     @ChangesCurrentThread
     private boolean yieldContinuation() {
         // unmount

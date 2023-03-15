@@ -576,7 +576,7 @@ jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
     if (!stream.at_end()) {
       int n = fill_in_frames(mode, stream, frame_count, start_index,
                              frames_array, end_index, CHECK_0);
-      if (n < 1) {
+      if (n < 1 && !skip_hidden_frames(mode)) {
         THROW_MSG_(vmSymbols::java_lang_InternalError(), "doStackWalk: later decode failed", 0L);
       }
       return end_index;
