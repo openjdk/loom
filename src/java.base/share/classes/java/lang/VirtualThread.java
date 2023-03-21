@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -56,6 +56,7 @@ import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
+import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 import sun.nio.ch.Interruptible;
@@ -219,7 +220,7 @@ final class VirtualThread extends BaseVirtualThread {
         }
 
         // notify JVMTI before mount
-        if (notifyJvmtiEvents) notifyJvmtiMountBegin(firstRun);
+        notifyJvmtiMount(/*hide*/true, firstRun);
 
         try {
             cont.run();
@@ -299,7 +300,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         // first mount
         mount();
-        if (notifyJvmtiEvents) notifyJvmtiMountEnd(true);
+        notifyJvmtiMount(/*hide*/false, /*first*/true);
 
         // emit JFR event if enabled
         if (VirtualThreadStartEvent.isTurnedOn()) {
@@ -327,7 +328,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             } finally {
                 // last unmount
-                if (notifyJvmtiEvents) notifyJvmtiUnmountBegin(true);
+                notifyJvmtiUnmount(/*hide*/true, /*last*/true);
                 unmount();
 
                 // final state
@@ -391,35 +392,27 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Sets the current thread to the current carrier thread.
-     * @return true if JVMTI was notified
      */
     @ChangesCurrentThread
     @JvmtiMountTransition
-    private boolean switchToCarrierThread() {
-        boolean notifyJvmti = notifyJvmtiEvents;
-        if (notifyJvmti) {
-            notifyJvmtiHideFrames(true);
-        }
+    private void switchToCarrierThread() {
+        notifyJvmtiHideFrames(true);
         Thread carrier = this.carrierThread;
         assert Thread.currentThread() == this
                 && carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(carrier);
-        return notifyJvmti;
     }
 
     /**
      * Sets the current thread to the given virtual thread.
-     * If {@code notifyJvmti} is true then JVMTI is notified.
      */
     @ChangesCurrentThread
     @JvmtiMountTransition
-    private void switchToVirtualThread(VirtualThread vthread, boolean notifyJvmti) {
+    private void switchToVirtualThread(VirtualThread vthread) {
         Thread carrier = vthread.carrierThread;
         assert carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(vthread);
-        if (notifyJvmti) {
-            notifyJvmtiHideFrames(false);
-        }
+        notifyJvmtiHideFrames(false);
     }
 
     /**
@@ -428,11 +421,11 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     <V> V executeOnCarrierThread(Callable<V> task) throws Exception {
         assert Thread.currentThread() == this;
-        boolean notifyJvmti = switchToCarrierThread();
+        switchToCarrierThread();
         try {
             return task.call();
         } finally {
-            switchToVirtualThread(this, notifyJvmti);
+            switchToVirtualThread(this);
         }
      }
 
@@ -445,14 +438,14 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     private boolean yieldContinuation() {
         // unmount
-        if (notifyJvmtiEvents) notifyJvmtiUnmountBegin(false);
+        notifyJvmtiUnmount(/*hide*/true, /*last*/false);
         unmount();
         try {
             return Continuation.yield(VTHREAD_SCOPE);
         } finally {
             // re-mount
             mount();
-            if (notifyJvmtiEvents) notifyJvmtiMountEnd(false);
+            notifyJvmtiMount(/*hide*/false, /*first*/false);
         }
     }
 
@@ -469,7 +462,7 @@ final class VirtualThread extends BaseVirtualThread {
             setState(PARKED);
 
             // notify JVMTI that unmount has completed, thread is parked
-            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
+            notifyJvmtiUnmount(/*hide*/false, /*last*/false);
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
@@ -485,7 +478,7 @@ final class VirtualThread extends BaseVirtualThread {
             setState(RUNNABLE);
 
             // notify JVMTI that unmount has completed, thread is runnable
-            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(false);
+            notifyJvmtiUnmount(/*hide*/false, /*last*/false);
 
             // external submit if there are no tasks in the local task queue
             if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
@@ -515,7 +508,7 @@ final class VirtualThread extends BaseVirtualThread {
         assert (state() == TERMINATED) && (carrierThread == null);
 
         if (executed) {
-            if (notifyJvmtiEvents) notifyJvmtiUnmountEnd(true);
+            notifyJvmtiUnmount(/*hide*/false, /*last*/true);
         }
 
         // notify anyone waiting for this virtual thread to terminate
@@ -706,11 +699,11 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     private Future<?> scheduleUnpark(Runnable unparker, long nanos) {
         // need to switch to current carrier thread to avoid nested parking
-        boolean notifyJvmti = switchToCarrierThread();
+        switchToCarrierThread();
         try {
             return UNPARKER.schedule(unparker, nanos, NANOSECONDS);
         } finally {
-            switchToVirtualThread(this, notifyJvmti);
+            switchToVirtualThread(this);
         }
     }
 
@@ -721,11 +714,11 @@ final class VirtualThread extends BaseVirtualThread {
     private void cancel(Future<?> future) {
         if (!future.isDone()) {
             // need to switch to current carrier thread to avoid nested parking
-            boolean notifyJvmti = switchToCarrierThread();
+            switchToCarrierThread();
             try {
                 future.cancel(false);
             } finally {
-                switchToVirtualThread(this, notifyJvmti);
+                switchToVirtualThread(this);
             }
         }
     }
@@ -745,11 +738,11 @@ final class VirtualThread extends BaseVirtualThread {
             int s = state();
             if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
                 if (currentThread instanceof VirtualThread vthread) {
-                    boolean notifyJvmti = vthread.switchToCarrierThread();
+                    vthread.switchToCarrierThread();
                     try {
                         submitRunContinuation();
                     } finally {
-                        switchToVirtualThread(vthread, notifyJvmti);
+                        switchToVirtualThread(vthread);
                     }
                 } else {
                     submitRunContinuation();
@@ -1090,20 +1083,15 @@ final class VirtualThread extends BaseVirtualThread {
 
     // -- JVM TI support --
 
-    private static volatile boolean notifyJvmtiEvents;  // set by VM
-
+    @IntrinsicCandidate
     @JvmtiMountTransition
-    private native void notifyJvmtiMountBegin(boolean firstMount);
+    private native void notifyJvmtiMount(boolean hide, boolean firstMount);
 
+    @IntrinsicCandidate
     @JvmtiMountTransition
-    private native void notifyJvmtiMountEnd(boolean firstMount);
+    private native void notifyJvmtiUnmount(boolean hide, boolean lastUnmount);
 
-    @JvmtiMountTransition
-    private native void notifyJvmtiUnmountBegin(boolean lastUnmount);
-
-    @JvmtiMountTransition
-    private native void notifyJvmtiUnmountEnd(boolean lastUnmount);
-
+    @IntrinsicCandidate
     @JvmtiMountTransition
     private native void notifyJvmtiHideFrames(boolean hide);
 
