@@ -232,6 +232,7 @@ runtime/cds/appcds/MultiReleaseJars.java 0000000 generic-all
 runtime/cds/appcds/NestHostOldInf.java 0000000 generic-all
 runtime/cds/appcds/NonExistClasspath.java 0000000 generic-all
 runtime/cds/appcds/OldClassTest.java 0000000 generic-all
+runtime/cds/appcds/OldClassWithjsr.java 0000000 generic-all
 runtime/cds/appcds/PackageSealing.java 0000000 generic-all
 runtime/cds/appcds/ParallelLoad2.java 0000000 generic-all
 runtime/cds/appcds/ParallelLoadTest.java 0000000 generic-all
