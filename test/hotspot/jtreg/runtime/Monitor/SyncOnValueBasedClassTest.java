@@ -170,7 +170,7 @@ public class SyncOnValueBasedClassTest {
         final String[] vtTest = { "-XX:+UnlockDiagnosticVMOptions", "-XX:-CreateCoredumpOnCrash",
                                   "", "SyncOnValueBasedClassTest$VTTest" };
         // Fatal test
-        vtTest[3] = "-XX:DiagnoseSyncOnValueBasedClasses=1";
+        vtTest[2] = "-XX:DiagnoseSyncOnValueBasedClasses=1";
         ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(vtTest);
         OutputAnalyzer output = ProcessTools.executeProcess(pb);
         output.shouldContain("fatal error: Synchronizing on object");
@@ -178,7 +178,7 @@ public class SyncOnValueBasedClassTest {
         output.shouldNotHaveExitValue(0);
 
         // Log test
-        vtTest[3] = "-XX:DiagnoseSyncOnValueBasedClasses=2";
+        vtTest[2] = "-XX:DiagnoseSyncOnValueBasedClasses=2";
         pb = ProcessTools.createJavaProcessBuilder(vtTest);
         output = ProcessTools.executeProcess(pb);
         output.shouldHaveExitValue(0);

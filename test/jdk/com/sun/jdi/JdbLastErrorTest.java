@@ -27,6 +27,7 @@
  * @summary Test persistence of native last error value under jdb (Windows)
  * @requires (os.family == "windows") & (vm.compMode != "Xcomp") & (vm.compMode != "Xint") & (vm.gc != "Z")
  * @library /test/lib
+ * @enablePreview
  * @run main/othervm JdbLastErrorTest
  */
 
@@ -76,6 +77,7 @@ public class JdbLastErrorTest extends JdbTest {
 
     public static void main(String argv[]) {
         LaunchOptions lo = new LaunchOptions(DEBUGGEE_CLASS);
+        lo.addVMOptions("--enable-preview");
         new JdbLastErrorTest(lo).run();
     }
 
