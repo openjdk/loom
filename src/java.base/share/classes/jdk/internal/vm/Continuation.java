@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.vm.annotation.Hidden;
 
 /**
  * A one-shot delimited continuation.
@@ -307,6 +308,7 @@ public class Continuation {
     private native static void enterSpecial(Continuation c, boolean isContinue, boolean isVirtualThread);
 
 
+    @Hidden
     @DontInline
     @IntrinsicCandidate
     private static void enter(Continuation c, boolean isContinue) {
@@ -319,6 +321,7 @@ public class Continuation {
         }
     }
 
+    @Hidden
     private void enter0() {
         target.run();
     }
@@ -342,6 +345,7 @@ public class Continuation {
      * @return {@code true} for success; {@code false} for failure
      * @throws IllegalStateException if not currently in the given {@code scope},
      */
+    @Hidden
     public static boolean yield(ContinuationScope scope) {
         Continuation cont = JLA.getContinuation(currentCarrierThread());
         Continuation c;
@@ -353,6 +357,7 @@ public class Continuation {
         return cont.yield0(scope, null);
     }
 
+    @Hidden
     private boolean yield0(ContinuationScope scope, Continuation child) {
         preempted = false;
 
