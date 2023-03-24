@@ -25,7 +25,6 @@
  * @test id=default
  * @bug 8284161 8290562 8303242
  * @summary Test java.lang.management.ThreadMXBean with virtual threads
- * @enablePreview
  * @modules java.base/java.lang:+open java.management
  * @library /test/lib
  * @run junit/othervm VirtualThreads
@@ -34,7 +33,6 @@
 /**
  * @test id=no-vmcontinuations
  * @requires vm.continuations
- * @enablePreview
  * @modules java.base/java.lang:+open java.management
  * @library /test/lib
  * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations VirtualThreads

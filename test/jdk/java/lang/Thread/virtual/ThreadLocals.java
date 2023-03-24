@@ -25,7 +25,6 @@
  * @test
  * @summary Test Virtual threads using thread locals
  * @library /test/lib
- * @enablePreview
  * @run junit ThreadLocals
  */
 

@@ -27,7 +27,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -48,7 +47,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -69,7 +67,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -90,7 +87,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -111,7 +107,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -132,7 +127,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -153,7 +147,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -174,7 +167,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -195,7 +187,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper
@@ -216,7 +207,6 @@
  * @summary Collection of basic continuation tests. CompilationPolicy controls which frames in a sequence should be compiled when calling Continuation.yield().
  * @requires vm.continuations
  * @requires vm.flavor == "server" & vm.opt.TieredCompilation != true
- * @enablePreview
  * @modules java.base/jdk.internal.vm
  * @library /test/lib /test/hotspot/jtreg
  * @build java.base/java.lang.StackWalkerHelper

@@ -24,7 +24,6 @@
 /**
  * @test
  * @summary Unit test for Thread.Builder
- * @enablePreview
  * @run junit BuilderTest
  */
 
