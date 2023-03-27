@@ -54,6 +54,7 @@ import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
+import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
 import sun.security.util.SecurityConstants;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -2942,7 +2943,7 @@ public class Thread implements Runnable {
     int threadLocalRandomSecondarySeed;
 
     /** The thread container that this thread is in */
-    private volatile ThreadContainer container;  // @Stable candidate?
+    private @Stable ThreadContainer container;
     ThreadContainer threadContainer() {
         return container;
     }
