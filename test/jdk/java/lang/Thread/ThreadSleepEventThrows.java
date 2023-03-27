@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @summary Test Thread.sleep and emitting the JFR ThreadSleepEvent throws
+ * @summary Test Thread.sleep when emitting the JFR ThreadSleepEvent throws OOME
  * @modules java.base/jdk.internal.event
  * @compile/module=java.base jdk/internal/event/ThreadSleepEvent.java
  * @run junit ThreadSleepEventThrows
@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ThreadSleepEventThrows {
 
     /**
-     * Test Thread.sleep and creating the ThreadSleepEvent fails with OOME.
+     * Test Thread.sleep when creating the ThreadSleepEvent fails with OOME.
      */
     @Test
     void testThreadSleepEventCreateThrows() throws Exception {
@@ -51,7 +51,7 @@ class ThreadSleepEventThrows {
     }
 
     /**
-     * Test Thread.sleep and ThreadSleepEvent.begin fails with OOME.
+     * Test Thread.sleep when ThreadSleepEvent.begin fails with OOME.
      */
     @Test
     void testThreadSleepEventBeginThrows() throws Exception {
@@ -64,7 +64,7 @@ class ThreadSleepEventThrows {
     }
 
     /**
-     * Test Thread.sleep and ThreadSleepEvent.commit fails with OOME.
+     * Test Thread.sleep when ThreadSleepEvent.commit fails with OOME.
      */
     @Test
     void testThreadSleepEventCommitThrows() throws Exception {

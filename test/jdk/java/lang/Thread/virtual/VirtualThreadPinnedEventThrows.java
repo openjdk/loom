@@ -23,7 +23,7 @@
 
 /**
  * @test
- * @summary Test parked when pinned and emitting the JFR VirtualThreadPinnedEvent throws
+ * @summary Test parking when pinned and emitting the JFR VirtualThreadPinnedEvent throws
  * @modules java.base/jdk.internal.event
  * @compile/module=java.base jdk/internal/event/VirtualThreadPinnedEvent.java
  * @run junit VirtualThreadPinnedEventThrows
