@@ -302,6 +302,7 @@ runtime/cds/appcds/dynamicArchive/DynamicLambdaWithUseImplMethodHandle.java 0000
 runtime/cds/appcds/dynamicArchive/DynamicFlag.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/ExcludedClasses.java 0000000 generic-all
+runtime/cds/appcds/dynamicArchive/ExitRaceTest.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/HelloDynamic.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java 0000000 generic-all
 runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java 0000000 generic-all
