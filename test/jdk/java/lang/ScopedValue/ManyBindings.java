@@ -24,14 +24,13 @@
 /*
  * @test
  * @summary Stress test ScopedValue with many bindings and rebinings
- * @modules jdk.incubator.concurrent
+ * @enablePreview
  * @library /test/lib
  * @key randomness
  * @run junit ManyBindings
  */
 
-import jdk.incubator.concurrent.ScopedValue;
-import jdk.incubator.concurrent.ScopedValue.Carrier;
+import java.lang.ScopedValue.Carrier;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Random;

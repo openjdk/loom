@@ -24,8 +24,7 @@
 /**
  * @test
  * @summary StressStackOverflow the recovery path for ScopedValue
- * @modules jdk.incubator.concurrent
- * @compile StressStackOverflow.java
+ * @enablePreview
  * @run main/othervm/timeout=300 -XX:-TieredCompilation StressStackOverflow
  * @run main/othervm/timeout=300 -XX:TieredStopAtLevel=1 StressStackOverflow
  * @run main/othervm/timeout=300 StressStackOverflow
@@ -34,9 +33,8 @@
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
-import jdk.incubator.concurrent.ScopedValue;
-import jdk.incubator.concurrent.StructureViolationException;
-import jdk.incubator.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructureViolationException;
+import java.util.concurrent.StructuredTaskScope;
 
 public class StressStackOverflow {
     public static final ScopedValue<Integer> el = ScopedValue.newInstance();

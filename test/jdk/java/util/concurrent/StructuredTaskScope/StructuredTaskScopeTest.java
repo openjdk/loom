@@ -25,20 +25,20 @@
  * @test id=platform
  * @bug 8284199
  * @summary Basic tests for StructuredTaskScope
- * @modules jdk.incubator.concurrent
+ * @enablePreview
  * @run junit/othervm -DthreadFactory=platform StructuredTaskScopeTest
  */
 
 /*
  * @test id=virtual
- * @modules jdk.incubator.concurrent
+ * @enablePreview
  * @run junit/othervm -DthreadFactory=virtual StructuredTaskScopeTest
  */
 
-import jdk.incubator.concurrent.StructuredTaskScope;
-import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnSuccess;
-import jdk.incubator.concurrent.StructuredTaskScope.ShutdownOnFailure;
-import jdk.incubator.concurrent.StructureViolationException;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructuredTaskScope.ShutdownOnSuccess;
+import java.util.concurrent.StructuredTaskScope.ShutdownOnFailure;
+import java.util.concurrent.StructureViolationException;
 import java.time.Duration;
 import java.io.IOException;
 import java.time.Instant;

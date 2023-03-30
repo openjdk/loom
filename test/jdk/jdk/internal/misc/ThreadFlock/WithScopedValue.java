@@ -24,15 +24,14 @@
 /*
  * @test
  * @summary Test ThreadFlock with scoped values
+ * @enablePreview
  * @modules java.base/jdk.internal.misc
- * @modules jdk.incubator.concurrent
  * @run junit WithScopedValue
  */
 
 import jdk.internal.misc.ThreadFlock;
-import jdk.incubator.concurrent.ScopedValue;
-import jdk.incubator.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 

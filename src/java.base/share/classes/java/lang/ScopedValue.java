@@ -24,19 +24,20 @@
  * questions.
  */
 
-package jdk.incubator.concurrent;
+package java.lang;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.lang.ref.Reference;
 import java.util.concurrent.Callable;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructureViolationException;
 import java.util.function.Supplier;
-import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.JavaUtilConcurrentTLRAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.javac.PreviewFeature;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
-import jdk.internal.vm.annotation.Stable;
 import jdk.internal.vm.ScopedValueContainer;
 import sun.security.action.GetPropertyAction;
 
@@ -158,11 +159,11 @@ import sun.security.action.GetPropertyAction;
  * it makes sense to create a record class to hold those values, and
  * then bind a single {@code ScopedValue} to an instance of that record.
  *
- * <p>For this incubator release, the reference implementation
+ * <p>For this release, the reference implementation
  * provides some system properties to tune the performance of scoped
  * values.
  *
- * <p>The system property {@code jdk.incubator.concurrent.ScopedValue.cacheSize}
+ * <p>The system property {@code java.lang.ScopedValue.cacheSize}
  * controls the size of the (per-thread) scoped-value cache. This cache is crucial
  * for the performance of scoped values. If it is too small,
  * the runtime library will repeatedly need to scan for each
@@ -171,7 +172,7 @@ import sun.security.action.GetPropertyAction;
  * be varied from 2 to 16 entries in size. {@code ScopedValue.cacheSize}
  * must be an integer power of 2.
  *
- * <p>For example, you could use {@code -Djdk.incubator.concurrent.ScopedValue.cacheSize=8}.
+ * <p>For example, you could use {@code -Djava.lang.ScopedValue.cacheSize=8}.
  *
  * <p>The other system property is {@code jdk.preserveScopedValueCache}.
  * This property determines whether the per-thread scoped-value
@@ -185,12 +186,11 @@ import sun.security.action.GetPropertyAction;
  * have to be regenerated after a blocking operation.
  *
  * @param <T> the type of the object bound to this {@code ScopedValue}
- * @since 20
+ * @since 21
  */
+@PreviewFeature(feature = PreviewFeature.Feature.SCOPED_VALUES)
 public final class ScopedValue<T> {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
-    private final @Stable int hash;
+    private final int hash;
 
     @Override
     public int hashCode() { return hash; }
@@ -259,8 +259,9 @@ public final class ScopedValue<T> {
      * <p> Unless otherwise specified, passing a {@code null} argument to a method in
      * this class will cause a {@link NullPointerException} to be thrown.
      *
-     * @since 20
+     * @since 21
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.SCOPED_VALUES)
     public static final class Carrier {
         // Bit masks: a 1 in postion n indicates that this set of bound values
         // hits that slot in the cache.
@@ -381,12 +382,12 @@ public final class ScopedValue<T> {
         @ForceInline
         private <R> R runWith(Snapshot newSnapshot, Callable<R> op) throws Exception {
             try {
-                JLA.setScopedValueBindings(newSnapshot);
-                JLA.ensureMaterializedForStackWalk(newSnapshot);
+                Thread.setScopedValueBindings(newSnapshot);
+                Thread.ensureMaterializedForStackWalk(newSnapshot);
                 return ScopedValueContainer.call(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setScopedValueBindings(newSnapshot.prev);
+                Thread.setScopedValueBindings(newSnapshot.prev);
                 Cache.invalidate(bitmask);
             }
         }
@@ -428,12 +429,12 @@ public final class ScopedValue<T> {
         @ForceInline
         private void runWith(Snapshot newSnapshot, Runnable op) {
             try {
-                JLA.setScopedValueBindings(newSnapshot);
-                JLA.ensureMaterializedForStackWalk(newSnapshot);
+                Thread.setScopedValueBindings(newSnapshot);
+                Thread.ensureMaterializedForStackWalk(newSnapshot);
                 ScopedValueContainer.run(op);
             } finally {
                 Reference.reachabilityFence(newSnapshot);
-                JLA.setScopedValueBindings(newSnapshot.prev);
+                Thread.setScopedValueBindings(newSnapshot.prev);
                 Cache.invalidate(bitmask);
             }
         }
@@ -642,11 +643,11 @@ public final class ScopedValue<T> {
     }
 
     private static Object[] scopedValueCache() {
-        return JLA.scopedValueCache();
+        return Thread.scopedValueCache();
     }
 
     private static void setScopedValueCache(Object[] cache) {
-        JLA.setScopedValueCache(cache);
+        Thread.setScopedValueCache(cache);
     }
 
     // Special value to indicate this is a newly-created Thread
@@ -662,24 +663,24 @@ public final class ScopedValue<T> {
         // 3: A Snapshot instance: this contains one or more scoped value
         // bindings.
         // 4: null: there may be some bindings in this Thread, but we don't know
-        // where they are. We must invoke JLA.findScopedValueBindings() to walk
+        // where they are. We must invoke Thread.findScopedValueBindings() to walk
         // the stack to find them.
 
-        Object bindings = JLA.scopedValueBindings();
+        Object bindings = Thread.scopedValueBindings();
         if (bindings == NEW_THREAD_BINDINGS) {
             // This must be a new thread
            return Snapshot.EMPTY_SNAPSHOT;
         }
         if (bindings == null) {
             // Search the stack
-            bindings = JLA.findScopedValueBindings();
+            bindings = Thread.findScopedValueBindings();
             if (bindings == null) {
                 // Nothing on the stack.
                 bindings = Snapshot.EMPTY_SNAPSHOT;
             }
         }
         assert (bindings != null);
-        JLA.setScopedValueBindings(bindings);
+        Thread.setScopedValueBindings(bindings);
         return (Snapshot) bindings;
     }
 
@@ -732,7 +733,7 @@ public final class ScopedValue<T> {
         private static final int MAX_CACHE_SIZE = 16;
 
         static {
-            final String propertyName = "jdk.incubator.concurrent.ScopedValue.cacheSize";
+            final String propertyName = "java.lang.ScopedValue.cacheSize";
             var sizeString = GetPropertyAction.privilegedGetProperty(propertyName, "16");
             var cacheSize = Integer.valueOf(sizeString);
             if (cacheSize < 2 || cacheSize > MAX_CACHE_SIZE) {

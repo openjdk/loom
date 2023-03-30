@@ -25,12 +25,12 @@
  * @test
  * @bug 8284199
  * @summary Test thread dumps with StructuredTaskScope
- * @modules jdk.incubator.concurrent
+ * @enablePreview
  * @library /test/lib
  * @run junit/othervm StructuredThreadDumpTest
  */
 
-import jdk.incubator.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructuredTaskScope;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;

@@ -22,7 +22,7 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.incubator.concurrent;
+package java.util.concurrent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -34,18 +34,9 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
+import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.ThreadFlock;
 
 /**
@@ -276,8 +267,9 @@ import jdk.internal.misc.ThreadFlock;
  * @jls 17.4.5 Happens-before Order
  *
  * @param <T> the result type of tasks executed in the scope
- * @since 19
+ * @since 21
  */
+@PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public class StructuredTaskScope<T> implements AutoCloseable {
     private static final VarHandle FUTURES;
     static {
@@ -851,8 +843,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
      * @param <T> the result type
-     * @since 19
+     * @since 21
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class ShutdownOnSuccess<T> extends StructuredTaskScope<T> {
         private static final VarHandle FUTURE;
         static {
@@ -1033,8 +1026,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
      *
-     * @since 19
+     * @since 21
      */
+    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class ShutdownOnFailure extends StructuredTaskScope<Object> {
         private static final VarHandle FUTURE;
         static {

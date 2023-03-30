@@ -24,11 +24,10 @@
 /*
  * @test
  * @summary Test ScopedValue API
- * @modules jdk.incubator.concurrent
- * @run junit ScopeValueAPI
+ * @enablePreview
+ * @run junit ScopedValueAPI
  */
 
-import jdk.incubator.concurrent.ScopedValue;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -41,7 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
-class ScopeValueAPI {
+class ScopedValueAPI {
 
     private static Stream<ThreadFactory> factories() {
         return Stream.of(Thread.ofPlatform().factory(), Thread.ofVirtual().factory());

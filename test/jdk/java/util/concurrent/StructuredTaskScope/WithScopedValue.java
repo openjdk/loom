@@ -24,13 +24,12 @@
 /*
  * @test
  * @summary Basic tests for StructuredTaskScope with scoped values
- * @modules jdk.incubator.concurrent
+ * @enablePreview
  * @run junit WithScopedValue
  */
 
-import jdk.incubator.concurrent.ScopedValue;
-import jdk.incubator.concurrent.StructuredTaskScope;
-import jdk.incubator.concurrent.StructureViolationException;
+import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;

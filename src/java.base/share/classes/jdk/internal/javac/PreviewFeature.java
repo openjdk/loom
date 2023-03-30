@@ -72,6 +72,10 @@ public @interface PreviewFeature {
         VIRTUAL_THREADS,
         @JEP(number=434, title="Foreign Function & Memory API", status="Second Preview")
         FOREIGN,
+        @JEP(number=100_001, title="Structured Concurrency", status="Preview")
+        STRUCTURED_CONCURRENCY,
+        @JEP(number=100_002, title="Scoped Values", status="Preview")
+        SCOPED_VALUES,
         /**
          * A key for testing.
          */
