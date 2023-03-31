@@ -513,6 +513,7 @@ class java_lang_VirtualThread : AllStatic {
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
+  static int _preemptionDisabled_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
  public:
   enum {
@@ -545,6 +546,9 @@ class java_lang_VirtualThread : AllStatic {
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
   static int state(oop vthread);
+  static bool is_preempted(oop vthread);
+  static bool is_preemption_disabled(oop vthread);
+  static void set_preemption_disabled(oop vthread, bool value);
   static JavaThreadStatus map_state_to_thread_status(int state);
 };
 

@@ -26,6 +26,7 @@
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
 #include "jni.h"
+#include "classfile/javaClasses.hpp"
 #include "memory/allStatic.hpp"
 #include "oops/oopsHierarchy.hpp"
 
@@ -140,6 +141,23 @@ public:
   static void print(oop continuation);
   static void print_on(outputStream* st, oop continuation);
 #endif
+};
+
+class DisablePreemption : public StackObj {
+  Handle _thread;
+  bool _is_vthread;
+ public:
+  DisablePreemption(Handle t) : _thread(t), _is_vthread(false) {
+    if (java_lang_VirtualThread::is_instance(_thread())) {
+      java_lang_VirtualThread::set_preemption_disabled(_thread(), true);
+      _is_vthread = true;
+    }
+  }
+  ~DisablePreemption() {
+    if (_is_vthread) {
+      java_lang_VirtualThread::set_preemption_disabled(_thread(), false);
+    }
+  }
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);

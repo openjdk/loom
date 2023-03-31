@@ -103,6 +103,8 @@ class JvmtiVTMSTransitionDisabler {
   JvmtiVTMSTransitionDisabler(jthread thread);
   ~JvmtiVTMSTransitionDisabler();
 
+  static bool start_VTMS_transition(JavaThread* current, JavaThread* target, oop vthread, bool is_mount);
+  static void finish_VTMS_transition(JavaThread* current, JavaThread* target, oop vthread, bool is_mount);
   static void start_VTMS_transition(jthread vthread, bool is_mount);
   static void finish_VTMS_transition(jthread vthread, bool is_mount);
 

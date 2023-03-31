@@ -129,6 +129,11 @@ serviceability/jvmti/vthread/MethodExitTest/MethodExitTest.java 0000000 generic-
 serviceability/jvmti/vthread/NullAsCurrentThreadTest/NullAsCurrentThreadTest.java 0000000 generic-all
 serviceability/jvmti/vthread/VThreadMonitorTest/VThreadMonitorTest.java 0000000 generic-all
 serviceability/jvmti/vthread/VThreadNotifyFramePopTest/VThreadNotifyFramePopTest.java 0000000 generic-all
+serviceability/jvmti/vthread/VThreadPreemption/VThreadPreemption.java#default 0000000 generic-all
+serviceability/jvmti/vthread/VThreadPreemption/VThreadPreemption.java#interpreter-only 0000000 generic-all
+serviceability/jvmti/vthread/VThreadPreemption/VThreadPreemption.java#compiler-only 0000000 generic-all
+serviceability/jvmti/vthread/VThreadPreemption/VThreadPreemption.java#miscellaneous 0000000 generic-all
+serviceability/jvmti/vthread/VThreadPreemption/VThreadPreemption.java#zgc 0000000 generic-all
 serviceability/jvmti/vthread/VThreadTest/VThreadTest.java 0000000 generic-all
 serviceability/jvmti/vthread/VThreadUnsupportedTest/VThreadUnsupportedTest.java 0000000 generic-all
 serviceability/jvmti/vthread/premain/AgentWithVThreadTest.java 0000000 generic-all

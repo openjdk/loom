@@ -94,6 +94,84 @@ JVM_ENTRY(jint, CONT_tryPreempt0(JNIEnv* env, jobject jcont, jobject jthread)) {
 }
 JVM_END
 
+#if INCLUDE_JVMTI
+class JvmtiUnmountBeginMark : public StackObj {
+  JavaThread* _target;
+  int _preempt_result;
+  bool _do_full_VTMS_transition;
+  bool _transition_succeded;
+  bool _is_vthread;
+
+ public:
+  JvmtiUnmountBeginMark(JavaThread* t, bool is_vthread) :
+    _target(t), _preempt_result(freeze_pinned_native), _do_full_VTMS_transition(false), _transition_succeded(true), _is_vthread(is_vthread) {
+    assert(!_target->is_in_VTMS_transition(), "must be");
+    assert(!_target->is_suspended(), "must be");
+
+    if (!_is_vthread) return;
+
+    _do_full_VTMS_transition = JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events();
+    if (_do_full_VTMS_transition) {
+      _transition_succeded = JvmtiVTMSTransitionDisabler::start_VTMS_transition(JavaThread::current(), _target, _target->vthread(), /* is_mount */ false);
+    } else {
+      _target->set_is_in_VTMS_transition(true);
+    }
+  }
+  ~JvmtiUnmountBeginMark() {
+    assert(!_target->is_suspended(), "must be");
+
+    if (!_is_vthread) return;
+
+    if (_preempt_result == freeze_ok) {
+      assert(_target->is_in_VTMS_transition(), "must be");
+      _target->rebind_to_jvmti_thread_state_of(_target->threadObj());
+    } else {
+      // Undo transition
+      if (_do_full_VTMS_transition) {
+        JvmtiVTMSTransitionDisabler::finish_VTMS_transition(JavaThread::current(), _target, _target->vthread(), false);
+      } else {
+        _target->set_is_in_VTMS_transition(false);
+      }
+    }        
+  }
+  bool transition_succeded()  { return _transition_succeded; }
+  void set_preempt_result(int res) { _preempt_result = res; }
+};
+
+static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread, oop cont) {
+  assert(!target->has_pending_popframe(), "should be true; no support for vthreads yet");
+  JvmtiThreadState* state = target->jvmti_thread_state();
+  assert(state == nullptr || !state->is_earlyret_pending(), "should be true; no support for vthreads yet");
+
+  if (target->is_in_VTMS_transition()) {
+    // We caught target at the end of a mount transition.
+    return false;
+  }
+  if (target->is_suspended()) {
+    // If we preempt while target is suspended, the resumer will later block in the
+    // JvmtiVTMSTransitionDisabler waiting for the target to call finish_VTMS_transition(), while the
+    // target in turn will be waiting for the resumer to resume it.
+    // Target suspended implies mounted vthread suspended (see JvmtiEnvBase::suspend_thread) and we
+    // would like to assert that. But the resumer could have just resumed the vthread and be now
+    // waiting to handshake the target to resume it.
+    return false;
+  }
+  return true;
+}
+#endif
+
+static bool is_safe_vthread_to_preempt(JavaThread* target, oop cont) {
+  oop vthread = target->vthread();
+  assert(vthread != NULL, "vthread should be always set");
+  if (java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::RUNNING ||  // in unmounting transition
+      !java_lang_VirtualThread::is_instance(vthread) ||                               // in mounting transition after voluntary yield
+      java_lang_VirtualThread::is_preemption_disabled(vthread)) {                     // temp switch to carrier thread or at jvmti_mount_end in thaw_slow()
+    return false;
+  }
+  assert(java_lang_VirtualThread::continuation(vthread) == cont, "invalid continuation");
+  return JVMTI_ONLY(is_safe_vthread_to_preempt_for_jvmti(target, vthread, cont)) NOT_JVMTI(true);
+}
+
 static bool is_safe_pc_to_preempt(address pc, JavaThread* target) {
   if (Interpreter::contains(pc)) {
     InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
@@ -125,7 +203,7 @@ static bool is_safe_pc_to_preempt(address pc, JavaThread* target) {
   }
 }
 
-static bool is_safe_to_preempt(JavaThread* target) {
+static bool is_safe_to_preempt(JavaThread* target, oop continuation, bool is_vthread) {
   if (target->preempting()) {
     return false;
   }
@@ -136,6 +214,9 @@ static bool is_safe_to_preempt(JavaThread* target) {
     return false;
   }
   if (!is_safe_pc_to_preempt(target->last_Java_pc(), target)) {
+    return false;
+  }
+  if (is_vthread && !is_safe_vthread_to_preempt(target, continuation)) {
     return false;
   }
   return true;
@@ -153,15 +234,24 @@ int Continuation::try_preempt(JavaThread* target, Handle continuation) {
     return freeze_not_mounted;
   }
 
+  bool is_vthread = Continuation::continuation_scope(mounted_cont) == java_lang_VirtualThread::vthread_scope();
+
   // Continuation is mounted and it's not done so check if it's safe to preempt.
-  if (!is_safe_to_preempt(target)) {
+  if (!is_safe_to_preempt(target, mounted_cont, is_vthread)) {
     return freeze_pinned_native;
   }
   assert(!is_continuation_preempted(mounted_cont), "shouldn't be");
 
+#if INCLUDE_JVMTI
+  JvmtiUnmountBeginMark jubm(target, is_vthread);
+  if (!jubm.transition_succeded()) {
+    return freeze_pinned_native;
+  }
+#endif
   target->set_preempting(true);
   int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp());
   log_trace(continuations, preempt)("try_preempt: %d", res);
+  JVMTI_ONLY(jubm.set_preempt_result(res);)
   if (res != freeze_ok) {
     target->set_preempting(false);
   }

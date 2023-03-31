@@ -1930,12 +1930,14 @@ int java_lang_VirtualThread::static_vthread_scope_offset;
 int java_lang_VirtualThread::_carrierThread_offset;
 int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
+int java_lang_VirtualThread::_preemptionDisabled_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_vthread_scope_offset,       k, "VTHREAD_SCOPE",      continuationscope_signature, true);  \
   macro(_carrierThread_offset,             k, "carrierThread",      thread_signature,            false); \
   macro(_continuation_offset,              k, "cont",               continuation_signature,      false); \
-  macro(_state_offset,                     k, "state",              int_signature,               false)
+  macro(_state_offset,                     k, "state",              int_signature,               false); \
+  macro(_preemptionDisabled_offset,        k, "preemptionDisabled", bool_signature,              false);
 
 
 void java_lang_VirtualThread::compute_offsets() {
@@ -1987,6 +1989,19 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
       ShouldNotReachHere();
   }
   return status;
+}
+
+bool java_lang_VirtualThread::is_preempted(oop vthread) {
+  oop continuation = java_lang_VirtualThread::continuation(vthread);
+  return jdk_internal_vm_Continuation::is_preempted(continuation);
+}
+
+bool java_lang_VirtualThread::is_preemption_disabled(oop vthread) {
+  return vthread->bool_field(_preemptionDisabled_offset);
+}
+
+void java_lang_VirtualThread::set_preemption_disabled(oop vthread, bool value) {
+  vthread->bool_field_put(_preemptionDisabled_offset, value);
 }
 
 #if INCLUDE_CDS

@@ -1079,6 +1079,15 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Attempts to preempt this thread if it's a virtual thread.
+     *
+     * @return True if succesfully preempted, false otherwise.
+     */
+    public boolean tryPreempt() throws UnsupportedOperationException {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
      * Throws CloneNotSupportedException as a Thread can not be meaningfully
      * cloned. Construct a new Thread instead.
      *
