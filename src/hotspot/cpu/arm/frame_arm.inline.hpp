@@ -214,6 +214,23 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
 }
 PRAGMA_DIAG_POP
 
+#ifdef ASSERT
+inline oop* frame::saved_oop_result_address(RegisterMap* map) {
+  Unimplemented();
+  return nullptr;
+}
+#endif
+
+inline oop* frame::saved_oop_result_address(const frame& f) {
+  Unimplemented();
+  return nullptr;
+}
+
+inline JavaThread** frame::saved_thread_address(const frame& f) {
+  Unimplemented();
+  return nullptr;
+}
+
 inline int frame::frame_size() const {
   return sender_sp() - sp();
 }

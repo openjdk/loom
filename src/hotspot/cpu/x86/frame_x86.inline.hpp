@@ -334,6 +334,26 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
   *result_adr = obj;
 }
 
+#ifdef ASSERT
+inline oop* frame::saved_oop_result_address(RegisterMap* map) {
+  oop* result_adr = (oop *)map->location(rax->as_VMReg(), nullptr);
+  guarantee(result_adr != NULL, "bad register save location");
+  return result_adr;
+}
+#endif
+
+inline oop* frame::saved_oop_result_address(const frame& f) {
+  oop* result_adr = (oop *)(f.sp() + SharedRuntime::safepoint_blob_return_value_offset(f));
+  guarantee(result_adr != NULL, "bad register save location");
+  return result_adr;
+}
+
+inline JavaThread** frame::saved_thread_address(const frame& f) {
+  JavaThread** result_adr = (JavaThread**)(f.sp() + SharedRuntime::safepoint_blob_current_thread_offset(f));
+  guarantee(result_adr != NULL, "bad register save location");
+  return result_adr;
+}
+
 inline bool frame::is_interpreted_frame() const {
   return Interpreter::contains(pc());
 }

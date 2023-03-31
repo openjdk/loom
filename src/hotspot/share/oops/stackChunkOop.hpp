@@ -58,6 +58,7 @@ private:
   static const uint8_t FLAG_NOTIFY_RELATIVIZE = 1 << 2; // Someone is waiting for relativization to complete
   static const uint8_t FLAG_GC_MODE = 1 << 3; // Once true it and FLAG_HAS_INTERPRETED_FRAMES can't change
   static const uint8_t FLAG_HAS_BITMAP = 1 << 4; // Can only be true if FLAG_GC_MODE is true
+  static const uint8_t FLAG_HAS_OOP_ON_STUB = 1 << 5; // There is a return oop on freezed safepoint stub
 
   bool try_acquire_relativization();
   void release_relativization();
@@ -125,6 +126,9 @@ public:
 
   inline bool has_mixed_frames() const;
   inline void set_has_mixed_frames(bool value);
+
+  inline bool has_oop_on_stub() const;
+  inline void set_has_oop_on_stub(bool value);
 
   inline bool is_gc_mode() const;
   inline bool is_gc_mode_acquire() const;

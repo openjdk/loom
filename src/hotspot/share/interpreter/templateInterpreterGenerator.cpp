@@ -149,7 +149,7 @@ void TemplateInterpreterGenerator::generate_all() {
   }
 
 
-  { CodeletMark cm(_masm, "safepoint entry points");
+  { CodeletMark cm(_masm, "safepoint entry points", InterpreterCodelet::codelet_safepoint_entry);
     Interpreter::_safept_entry =
       EntryPoint(
                  generate_safept_entry_for(atos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
@@ -177,9 +177,9 @@ void TemplateInterpreterGenerator::generate_all() {
 
 
 
-#define method_entry(kind)                                                                          \
-  { CodeletMark cm(_masm, "method entry point (kind = " #kind ")");                                 \
-    Interpreter::_entry_table[Interpreter::kind] = generate_method_entry(Interpreter::kind, false); \
+#define method_entry(kind)                                                                                    \
+  { CodeletMark cm(_masm, "method entry point (kind = " #kind ")", InterpreterCodelet::codelet_method_entry); \
+    Interpreter::_entry_table[Interpreter::kind] = generate_method_entry(Interpreter::kind, false);           \
   }
 
   // all non-native method kinds
@@ -213,9 +213,9 @@ void TemplateInterpreterGenerator::generate_all() {
 #undef method_entry
 
   // all native method kinds
-#define native_method_entry(kind)                                                                  \
-  { CodeletMark cm(_masm, "native method entry point (kind = " #kind ")");                         \
-    Interpreter::_entry_table[Interpreter::kind] = generate_method_entry(Interpreter::kind, true); \
+#define native_method_entry(kind)                                                                             \
+  { CodeletMark cm(_masm, "method entry point (kind = " #kind ")", InterpreterCodelet::codelet_method_entry); \
+    Interpreter::_entry_table[Interpreter::kind] = generate_method_entry(Interpreter::kind, true);            \
   }
 
   native_method_entry(native)
@@ -305,7 +305,7 @@ void TemplateInterpreterGenerator::set_unimplemented(int i) {
 
 
 void TemplateInterpreterGenerator::set_entry_points(Bytecodes::Code code) {
-  CodeletMark cm(_masm, Bytecodes::name(code), code);
+  CodeletMark cm(_masm, Bytecodes::name(code), InterpreterCodelet::codelet_bytecode, code);
   // initialize entry points
   assert(_unimplemented_bytecode    != nullptr, "should have been generated before");
   assert(_illegal_bytecode_sequence != nullptr, "should have been generated before");

@@ -47,6 +47,18 @@ void continuations_init();
 class javaVFrame;
 class JavaThread;
 
+// should match Continuation.toPreemptStatus() in Continuation.java
+enum freeze_result {
+  freeze_ok = 0,
+  freeze_ok_bottom = 1,
+  freeze_pinned_cs = 2,
+  freeze_pinned_native = 3,
+  freeze_pinned_monitor = 4,
+  freeze_exception = 5,
+  freeze_not_mounted = 6,
+  unsupported = 7
+};
+
 class Continuation : AllStatic {
 public:
 
@@ -69,14 +81,21 @@ public:
   static void init();
 
   static address freeze_entry();
+  static address freeze_preempt_entry();
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
+
+  static int try_preempt(JavaThread* target, Handle continuation);
+  DEBUG_ONLY(static bool verify_preemption(JavaThread* thread);)
 
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
   static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f);
 
   static bool is_continuation_mounted(JavaThread* thread, oop continuation);
+  static bool is_continuation_preempted(oop cont);
+  static bool is_continuation_done(oop cont);
+
 
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);

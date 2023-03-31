@@ -290,6 +290,11 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+  Unimplemented();
+  return nullptr;
+}
+
 static inline void derelativize_one(intptr_t* const fp, int offset) {
   intptr_t* addr = fp + offset;
   *addr = (intptr_t)(fp + *addr);

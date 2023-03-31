@@ -7009,6 +7009,80 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
+  address generate_cont_preempt_stub() {
+    if (!Continuations::enabled()) return nullptr;
+    StubCodeMark mark(this, "StubRoutines","Continuation preempt stub");
+    address start = __ pc();
+
+    __ reset_last_Java_frame(true);
+
+    // reset the flag
+    __ mov(rscratch2, zr);
+    __ strb(rscratch2, Address(rthread, JavaThread::preempting_offset()));
+
+    // Set sp to enterSpecial frame and then remove it from the stack
+    __ ldr(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch2);
+    SharedRuntime::continuation_enter_cleanup(_masm);
+
+    __ leave();
+    __ ret(lr);
+
+    return start;
+  }
+
+  address generate_cont_preempt_rerun_interpreter_adapter() {
+    if (!Continuations::enabled()) return nullptr;
+    StubCodeMark mark(this, "StubRoutines", "Continuation preempt interpreter adapter");
+    address start = __ pc();
+
+    // Restore rfp first since we need it to restore rest of registers
+    __ leave();
+
+    // Restore constant pool cache
+    __ ldr(rcpool, Address(rfp, frame::interpreter_frame_cache_offset * wordSize));
+
+    // Restore Java expression stack pointer
+    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    // and NULL it as marker that esp is now tos until next java call
+    __ str(zr, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+
+    // Restore machine SP
+    __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
+    __ mov(sp, rscratch1);
+
+    // Prepare for adjustment on return to call_VM_leaf_base()
+    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize));
+    __ stp(rscratch1, rmethod, Address(__ pre(sp, -2 * wordSize)));
+
+    // Restore dispatch
+    uint64_t offset;
+    __ adrp(rdispatch, ExternalAddress((address)Interpreter::dispatch_table()), offset);
+    __ add(rdispatch, rdispatch, offset);
+
+    __ ret(lr);
+
+    return start;
+  }
+
+  address generate_cont_preempt_rerun_safepointblob_adapter() {
+    if (!Continuations::enabled()) return nullptr;
+    StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
+    address start = __ pc();
+
+    // The safepoint blob handler expects that r20, being a callee saved register, will be preserved
+    // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
+    // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this
+    // additional value of r20 during freeze will complicate too much the code, so we just zero it here
+    // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
+    __ movptr(r20, NULL_WORD);
+
+    __ leave();
+    __ ret(lr);
+
+    return start;
+  }
+
 #if INCLUDE_JFR
 
   static void jfr_prologue(address the_pc, MacroAssembler* _masm, Register thread) {
@@ -8058,6 +8132,9 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_thaw          = generate_cont_thaw();
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
+    StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
+    StubRoutines::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
+    StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint_stub = generate_jfr_write_checkpoint();)
     JFR_ONLY(StubRoutines::_jfr_write_checkpoint = StubRoutines::_jfr_write_checkpoint_stub->entry_point();)

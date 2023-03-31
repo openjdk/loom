@@ -162,9 +162,12 @@ inline void stackChunkOopDesc::clear_flags() {
 
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {
-  assert((flags() & ~FLAG_HAS_INTERPRETED_FRAMES) == 0, "other flags should not be set");
+  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_HAS_OOP_ON_STUB)) == 0, "other flags should not be set");
   set_flag(FLAG_HAS_INTERPRETED_FRAMES, value);
 }
+
+inline bool stackChunkOopDesc::has_oop_on_stub() const         { return is_flag(FLAG_HAS_OOP_ON_STUB); }
+inline void stackChunkOopDesc::set_has_oop_on_stub(bool value) { set_flag(FLAG_HAS_OOP_ON_STUB, value); }
 
 inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_flag(FLAG_GC_MODE); }
 inline bool stackChunkOopDesc::is_gc_mode_acquire() const          { return is_flag_acquire(FLAG_GC_MODE); }
@@ -208,15 +211,13 @@ inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure
                          RegisterMap::ProcessFrames::skip,
                          RegisterMap::WalkContinuation::include);
     full_map.set_include_argument_oops(false);
+    closure->do_frame(f, map);
 
     f.next(&full_map);
-
-    assert(!f.is_done(), "");
-    assert(f.is_compiled(), "");
+    if (f.is_done()) return;
 
     should_continue = closure->do_frame(f, &full_map);
-    f.next(map);
-    f.handle_deopted(); // the stub caller might be deoptimized (as it's not at a call)
+    f.next(&map);
   }
   assert(!f.is_stub(), "");
 

@@ -26,6 +26,8 @@
 #include "classfile/vmSymbols.hpp"
 #include "gc/shared/barrierSetNMethod.hpp"
 #include "oops/method.inline.hpp"
+#include "oops/oop.inline.hpp"
+#include "prims/jvmtiThreadState.inline.hpp"
 #include "runtime/continuation.hpp"
 #include "runtime/continuationEntry.inline.hpp"
 #include "runtime/continuationHelper.inline.hpp"
@@ -33,6 +35,7 @@
 #include "runtime/continuationWrapper.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaThread.inline.hpp"
+#include "runtime/jniHandles.inline.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframe_hp.hpp"
@@ -53,6 +56,140 @@ JVM_ENTRY(void, CONT_unpin(JNIEnv* env, jclass cls)) {
   }
 }
 JVM_END
+
+class PreemptHandshake : public AllocatingHandshakeClosure {
+  JvmtiSampledObjectAllocEventCollector _jsoaec;
+  Handle _cont;
+  int _result;
+
+public:
+  PreemptHandshake(Handle cont) : AllocatingHandshakeClosure("PreemptHandshake"),
+    _jsoaec(true),  // initialize if needed eagerly before the handshake since it might safepoint
+    _cont(cont),
+    _result(freeze_not_mounted) {}
+
+  void do_thread(Thread* thr) {
+    JavaThread* target = JavaThread::cast(thr);
+    _result = Continuation::try_preempt(target, _cont);
+  }
+  int result() { return _result; }
+};
+
+JVM_ENTRY(jint, CONT_tryPreempt0(JNIEnv* env, jobject jcont, jobject jthread)) {
+  JavaThread* current = thread;
+  assert(current == JavaThread::current(), "should be");
+  jint result = freeze_not_mounted;
+
+  ThreadsListHandle tlh(current);
+  JavaThread* target = NULL;
+  bool is_alive = tlh.cv_internal_thread_to_JavaThread(jthread, &target, NULL);
+
+  if (is_alive) {
+    Handle conth(current, JNIHandles::resolve_non_null(jcont));
+    PreemptHandshake ph(conth);
+    Handshake::execute(&ph, target);
+    result = ph.result();
+  }
+  return result;
+}
+JVM_END
+
+static bool is_safe_pc_to_preempt(address pc, JavaThread* target) {
+  if (Interpreter::contains(pc)) {
+    InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
+    if (codelet == nullptr) {
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: no codelet (unsafe)");
+      return false;
+    }
+    // We allow preemption only when at a safepoint codelet or a return byteocde
+    if (codelet->bytecode() >= 0 && Bytecodes::is_return(codelet->bytecode())) {
+      assert(codelet->kind() == InterpreterCodelet::codelet_bytecode, "");
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: safe bytecode: %s", Bytecodes::name(codelet->bytecode()));
+      return true;
+    } else if (codelet->kind() == InterpreterCodelet::codelet_safepoint_entry) {
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: safepoint entry: %s", codelet->description());
+      return true;
+    } else {
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: %s (unsafe)", codelet->description());
+      return false;
+    }
+  } else {
+    CodeBlob* cb = CodeCache::find_blob(pc);
+    if (cb->is_safepoint_stub()) {
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: safepoint stub. Return poll: %d", !target->is_at_poll_safepoint());
+      return true;
+    } else {
+      log_trace(continuations, preempt)("is_safe_pc_to_preempt: not safepoint stub");
+      return false;
+    }
+  }
+}
+
+static bool is_safe_to_preempt(JavaThread* target) {
+  if (target->preempting()) {
+    return false;
+  }
+  if (!target->has_last_Java_frame()) {
+    return false;
+  }
+  if (target->has_pending_exception()) {
+    return false;
+  }
+  if (!is_safe_pc_to_preempt(target->last_Java_pc(), target)) {
+    return false;
+  }
+  return true;
+}
+
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
+
+int Continuation::try_preempt(JavaThread* target, Handle continuation) {
+  ContinuationEntry* ce = target->last_continuation();
+  if (ce == nullptr) {
+    return freeze_not_mounted;
+  }
+  oop mounted_cont = ce->cont_oop(target);
+  if (mounted_cont != continuation() || is_continuation_done(mounted_cont)) {
+    return freeze_not_mounted;
+  }
+
+  // Continuation is mounted and it's not done so check if it's safe to preempt.
+  if (!is_safe_to_preempt(target)) {
+    return freeze_pinned_native;
+  }
+  assert(!is_continuation_preempted(mounted_cont), "shouldn't be");
+
+  target->set_preempting(true);
+  int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp());
+  log_trace(continuations, preempt)("try_preempt: %d", res);
+  if (res != freeze_ok) {
+    target->set_preempting(false);
+  }
+  return res;
+}
+
+bool Continuation::is_continuation_preempted(oop cont) {
+  return jdk_internal_vm_Continuation::is_preempted(cont);
+}
+
+bool Continuation::is_continuation_done(oop cont) {
+  return jdk_internal_vm_Continuation::done(cont);
+}
+
+#ifdef ASSERT
+bool Continuation::verify_preemption(JavaThread* thread) {
+  ContinuationEntry* cont_entry = thread->last_continuation();
+  assert(cont_entry != nullptr, "");
+  oop mounted_cont = cont_entry->cont_oop(thread);
+  assert(is_continuation_preempted(mounted_cont), "continuation not marked preempted");
+  assert(thread->last_Java_sp() == cont_entry->entry_sp(), "wrong anchor change");
+  assert(!thread->has_pending_exception(), "should not have pending exception after preemption");
+  assert(!thread->has_pending_popframe(), "should not have popframe condition after preemption");
+  JvmtiThreadState* state = thread->jvmti_thread_state();
+  assert(state == nullptr || !state->is_earlyret_pending(), "should not have earlyret condition after preemption");
+  return true;
+}
+#endif
 
 #ifndef PRODUCT
 static jlong java_tid(JavaThread* thread) {
@@ -421,6 +558,7 @@ static JNINativeMethod CONT_methods[] = {
     {CC"pin",              CC"()V",                                    FN_PTR(CONT_pin)},
     {CC"unpin",            CC"()V",                                    FN_PTR(CONT_unpin)},
     {CC"isPinned0",        CC"(Ljdk/internal/vm/ContinuationScope;)I", FN_PTR(CONT_isPinned0)},
+    {CC"tryPreempt0",      CC"(Ljava/lang/Thread;)I",                  FN_PTR(CONT_tryPreempt0)},
 };
 
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls) {

@@ -137,6 +137,13 @@ inline JavaThread::NoAsyncExceptionDeliveryMark::~NoAsyncExceptionDeliveryMark()
   _target->handshake_state()->set_async_exceptions_blocked(false);
 }
 
+inline JavaThread::AllocationInHandshakeMark::AllocationInHandshakeMark(JavaThread* target) : _requester(JavaThread::current()), _target(target) {
+  _target->handshake_state()->break_handshake(_requester);
+}
+inline JavaThread::AllocationInHandshakeMark::~AllocationInHandshakeMark() {
+  _target->handshake_state()->reacquire_handshake(_requester);
+}
+
 inline JavaThreadState JavaThread::thread_state() const    {
 #if defined(PPC64) || defined (AARCH64) || defined(RISCV64)
   // Use membars when accessing volatile _thread_state. See

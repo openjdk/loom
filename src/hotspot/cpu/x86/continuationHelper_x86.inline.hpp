@@ -40,6 +40,13 @@ static inline intptr_t** link_address(const frame& f) {
     : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - frame::sender_sp_offset);
 }
 
+static inline void patch_return_pc_with_preempt_stub(frame& f) {
+  // Patch the pc of the now old last Java frame (we already set the anchor to enterSpecial)
+  // so that when target goes back to Java it will actually return to the preempt cleanup stub.
+  intptr_t* sp = f.sp();
+  sp[-1] = (intptr_t)StubRoutines::cont_preempt_stub();
+}
+
 inline int ContinuationHelper::frame_align_words(int size) {
 #ifdef _LP64
   return size & 1;

@@ -40,6 +40,10 @@ static inline intptr_t** link_address(const frame& f) {
             : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - 2);
 }
 
+static inline void patch_return_pc_with_preempt_stub(frame& f) {
+  Unimplemented();
+}
+
 inline int ContinuationHelper::frame_align_words(int size) {
 #ifdef _LP64
   return size & 1;

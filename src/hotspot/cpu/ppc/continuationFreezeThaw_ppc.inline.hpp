@@ -555,6 +555,11 @@ inline void ThawBase::set_interpreter_frame_bottom(const frame& f, intptr_t* bot
   *f.addr_at(ijava_idx(locals)) = (bottom - 1) - f.fp();
 }
 
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+  Unimplemented();
+  return nullptr;
+}
+
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
   // Prevent assertion if f gets deoptimized right away before it's fully initialized

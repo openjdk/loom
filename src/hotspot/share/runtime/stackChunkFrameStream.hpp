@@ -47,9 +47,9 @@ private:
   intptr_t* _unextended_sp; // used only when mixed
   CodeBlob* _cb;
   mutable const ImmutableOopMap* _oopmap;
+  stackChunkOop _chunk;
 
 #ifndef PRODUCT
-  stackChunkOop _chunk;
   int _index;
 #endif
 

@@ -165,6 +165,7 @@ class RegisterSaver {
   static int rax_offset_in_bytes(void)    { return BytesPerInt * rax_off; }
   static int rdx_offset_in_bytes(void)    { return BytesPerInt * rdx_off; }
   static int rbx_offset_in_bytes(void)    { return BytesPerInt * rbx_off; }
+  static int r15_offset_in_bytes(void)    { return BytesPerInt * r15_off; }
   static int xmm0_offset_in_bytes(void)   { return BytesPerInt * xmm0_off; }
   static int return_offset_in_bytes(void) { return BytesPerInt * return_off; }
 
@@ -1350,7 +1351,7 @@ static void fill_continuation_entry(MacroAssembler* masm, Register reg_cont_obj,
 // Kills:
 //   rbx
 //
-void static continuation_enter_cleanup(MacroAssembler* masm) {
+static void continuation_enter_cleanup(MacroAssembler* masm) {
 #ifdef ASSERT
   Label L_good_sp;
   __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
@@ -1603,6 +1604,10 @@ static void gen_continuation_yield(MacroAssembler* masm,
 
   __ leave();
   __ ret(0);
+}
+
+void SharedRuntime::continuation_enter_cleanup(MacroAssembler* masm) {
+  ::continuation_enter_cleanup(masm);
 }
 
 static void gen_special_dispatch(MacroAssembler* masm,
@@ -2511,6 +2516,14 @@ uint SharedRuntime::out_preserve_stack_slots() {
 // return address.
 uint SharedRuntime::in_preserve_stack_slots() {
   return 4 + 2 * VerifyStackAtCalls;
+}
+
+uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
+  return RegisterSaver::rax_offset_in_bytes() >> LogBytesPerWord;
+}
+
+uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
+  return RegisterSaver::r15_offset_in_bytes() >> LogBytesPerWord;
 }
 
 //------------------------------generate_deopt_blob----------------------------

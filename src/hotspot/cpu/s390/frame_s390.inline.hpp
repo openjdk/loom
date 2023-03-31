@@ -299,6 +299,23 @@ inline void frame::set_saved_oop_result(RegisterMap* map, oop obj) {
   *((oop*) map->location(Z_R2->as_VMReg(), nullptr)) = obj;  // R2 is return register.
 }
 
+#ifdef ASSERT
+inline oop* frame::saved_oop_result_address(RegisterMap* map) {
+  Unimplemented();
+  return nullptr;
+}
+#endif
+
+inline oop* frame::saved_oop_result_address(const frame& f) {
+  Unimplemented();
+  return nullptr;
+}
+
+inline JavaThread** frame::saved_thread_address(const frame& f) {
+  Unimplemented();
+  return nullptr;
+}
+
 inline intptr_t* frame::real_fp() const {
   return fp();
 }

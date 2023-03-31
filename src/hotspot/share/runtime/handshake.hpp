@@ -54,6 +54,7 @@ class HandshakeClosure : public ThreadClosure, public CHeapObj<mtThread> {
   virtual bool is_async()                          { return false; }
   virtual bool is_suspend()                        { return false; }
   virtual bool is_async_exception()                { return false; }
+  virtual bool can_allocate_objects()              { return false; }
   virtual void do_thread(Thread* thread) = 0;
 };
 
@@ -62,6 +63,13 @@ class AsyncHandshakeClosure : public HandshakeClosure {
    AsyncHandshakeClosure(const char* name) : HandshakeClosure(name) {}
    virtual ~AsyncHandshakeClosure() {}
    virtual bool is_async()          { return true; }
+};
+
+class AllocatingHandshakeClosure : public HandshakeClosure {
+ public:
+   AllocatingHandshakeClosure(const char* name) : HandshakeClosure(name) {}
+   virtual ~AllocatingHandshakeClosure() {}
+   virtual bool can_allocate_objects()   { return true; }
 };
 
 class Handshake : public AllStatic {
@@ -107,10 +115,11 @@ class HandshakeState {
   bool possibly_can_process_handshake();
   bool can_process_handshake();
 
-  bool have_non_self_executable_operation();
+  bool has_handshaker_operation();
   HandshakeOperation* get_op_for_self(bool allow_suspend, bool check_async_exception);
-  HandshakeOperation* get_op();
+  HandshakeOperation* get_op_for_handshaker();
   void remove_op(HandshakeOperation* op);
+  void wait_for_op(HandshakeOperation* op);
 
   void set_active_handshaker(Thread* thread) { Atomic::store(&_active_handshaker, thread); }
 
@@ -152,6 +161,11 @@ class HandshakeState {
   ProcessResult try_process(HandshakeOperation* match_op);
 
   Thread* active_handshaker() const { return Atomic::load(&_active_handshaker); }
+
+  // Support for allocating handshakes
+ private:
+  void break_handshake(JavaThread* requester);
+  void reacquire_handshake(JavaThread* requester);
 
   // Support for asynchronous exceptions
  private:

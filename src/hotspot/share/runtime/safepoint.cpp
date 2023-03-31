@@ -917,16 +917,13 @@ void ThreadSafepointState::handle_polling_page_exception() {
   if( nm->is_at_poll_return(real_return_addr) ) {
     // See if return type is an oop.
     bool return_oop = nm->method()->is_returning_oop();
-    HandleMark hm(self);
-    Handle return_value;
     if (return_oop) {
       // The oop result has been saved on the stack together with all
-      // the other registers. In order to preserve it over GCs we need
-      // to keep it in a handle.
+      // the other registers. We need to preserve it over GCs.
       oop result = caller_fr.saved_oop_result(&map);
       assert(oopDesc::is_oop_or_null(result), "must be oop");
-      return_value = Handle(self, result);
       assert(Universe::heap()->is_in_or_null(result), "must be heap pointer");
+      self->set_return_oop(result);
     }
 
     // We get here if compiled return polls found a reason to call into the VM.
@@ -939,7 +936,8 @@ void ThreadSafepointState::handle_polling_page_exception() {
 
     // restore oop result, if any
     if (return_oop) {
-      caller_fr.set_saved_oop_result(&map, return_value());
+      caller_fr.set_saved_oop_result(&map, self->return_oop());
+      self->set_return_oop(nullptr);
     }
   }
 

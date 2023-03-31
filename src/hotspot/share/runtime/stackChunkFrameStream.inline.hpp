@@ -46,7 +46,7 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 #endif
 
 template <ChunkFrames frame_kind>
-StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DEBUG_ONLY(: _chunk(chunk)) {
+StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) : _chunk(chunk) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
 
@@ -71,7 +71,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DE
 
 template <ChunkFrames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, const frame& f)
-  DEBUG_ONLY(: _chunk(chunk)) {
+  : _chunk(chunk) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
   // assert(!is_empty(), ""); -- allowed to be empty
@@ -195,7 +195,14 @@ inline int StackChunkFrameStream<frame_kind>::stack_argsize() const {
 
 template <ChunkFrames frame_kind>
 inline int StackChunkFrameStream<frame_kind>::num_oops() const {
-  return is_interpreted() ? interpreter_frame_num_oops() : oopmap()->num_oops();
+  if (is_interpreted()) {
+    return interpreter_frame_num_oops();
+  } else if (is_compiled()) {
+    return oopmap()->num_oops();
+  } else {
+    assert(is_stub(), "invariant");
+    return _chunk->has_oop_on_stub() ? 1 : 0;
+  }
 }
 
 template <ChunkFrames frame_kind>
@@ -232,7 +239,7 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map, bool stop
   get_cb();
   update_reg_map_pd(map);
   if (safepoint && cb() != nullptr) { // there's no post-call nop and no fast oopmap lookup
-    _oopmap = cb()->oop_map_for_return_address(pc());
+    _oopmap = cb()->oop_map_for_return_address(orig_pc());
   }
 }
 
@@ -358,6 +365,11 @@ inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* clos
   if (is_interpreted()) {
     frame f = to_frame();
     f.oops_interpreted_do(closure, nullptr, true);
+  } else if (is_stub()){
+    if (_chunk->has_oop_on_stub()) {
+      frame f = to_frame();
+      Devirtualizer::do_oop(closure, frame::saved_oop_result_address(f));
+    }
   } else {
     DEBUG_ONLY(int oops = 0;)
     for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {

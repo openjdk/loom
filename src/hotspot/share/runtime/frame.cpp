@@ -1267,7 +1267,7 @@ public:
   }
 
   bool is_good(oop* p) {
-    return *p == nullptr || (dbg_is_safe(*p, -1) && dbg_is_safe((*p)->klass(), -1) && oopDesc::is_oop_or_null(*p));
+    return *p == nullptr || (dbg_is_safe(*p, -1) && oopDesc::is_oop_or_null(*p));
   }
   void describe(FrameValues& values, int frame_no) {
     for (int i = 0; i < _oops->length(); i++) {
@@ -1320,9 +1320,14 @@ public:
 
 // callers need a ResourceMark because of name_and_sig_as_C_string() usage,
 // RA allocated string is returned to the caller
-void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_map) {
+void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_map, bool top) {
   // boundaries: sp and the 'real' frame pointer
   values.describe(-1, sp(), err_msg("sp for #%d", frame_no), 0);
+  if (top) {
+    values.describe(-1, sp() - 1, err_msg("sp[-1] for #%d", frame_no), 0);
+    values.describe(-1, sp() - 2, err_msg("sp[-2] for #%d", frame_no), 0);
+  }
+
   intptr_t* frame_pointer = real_fp(); // Note: may differ from fp()
 
   // print frame info at the highest boundary

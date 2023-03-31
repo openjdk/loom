@@ -245,7 +245,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     int fsize = FKind::size(hf);
     intptr_t* frame_sp = caller.unextended_sp() - fsize;
     if (bottom || caller.is_interpreted_frame()) {
-      int argsize = hf.compiled_frame_stack_argsize();
+      int argsize = FKind::stack_argsize(hf);
 
       fsize += argsize;
       frame_sp   -= argsize;
@@ -263,7 +263,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
       fp = frame_sp + FKind::size(hf) - frame::sender_sp_offset;
     } else {
       fp = FKind::stub
-        ? frame_sp + fsize - frame::sender_sp_offset // on AArch64, this value is used for the safepoint stub
+        ? frame_sp + fsize - frame::sender_sp_offset // fp always points to the address below the pushed return pc. We need correct address.
         : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     }
     return frame(frame_sp, frame_sp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
@@ -285,6 +285,21 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp, frame& cal
 
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
+}
+
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+  intptr_t* sp = top.sp();
+  intptr_t* fp = sp - frame::sender_sp_offset;
+  address pc = is_interpreted_frame ? StubRoutines::cont_preempt_rerun_interpreter_adapter()
+                                    : StubRoutines::cont_preempt_rerun_safepointblob_adapter();
+
+  sp -= frame::metadata_words;
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
+
+  log_develop_trace(continuations, preempt)("push_preempt_rerun_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
+    is_interpreted_frame ? "interpreter" : "safepointblob", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+  return sp;
 }
 
 static inline void derelativize_one(intptr_t* const fp, int offset) {

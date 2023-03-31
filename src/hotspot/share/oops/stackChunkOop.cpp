@@ -43,16 +43,20 @@ class FrameOopIterator : public OopIterator {
 private:
   const frame& _f;
   const RegisterMapT* _map;
+  const stackChunkOop _chunk;
 
 public:
-  FrameOopIterator(const frame& f, const RegisterMapT* map)
+  FrameOopIterator(const frame& f, const RegisterMapT* map, const stackChunkOop chunk)
     : _f(f),
-      _map(map) {
+      _map(map),
+      _chunk(chunk) {
   }
 
   virtual void oops_do(OopClosure* cl) override {
     if (_f.is_interpreted_frame()) {
       _f.oops_interpreted_do(cl, nullptr);
+    } else if (_f.is_safepoint_blob_frame() && _chunk->has_oop_on_stub()){
+      cl->do_oop(frame::saved_oop_result_address(_f));
     } else {
       OopMapDo<OopClosure, DerivedOopClosure, IncludeAllValues> visitor(cl, nullptr);
       visitor.oops_do(&_f, _map, _f.oop_map());
@@ -212,7 +216,7 @@ public:
 
     BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
     frame fr = f.to_frame();
-    FrameOopIterator<RegisterMapT> iterator(fr, map);
+    FrameOopIterator<RegisterMapT> iterator(fr, map, _chunk);
     bs_chunk->encode_gc_mode(_chunk, &iterator);
 
     return true;
@@ -308,7 +312,7 @@ public:
 
     BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
     frame fr = f.to_frame();
-    FrameOopIterator<RegisterMapT> iterator(fr, map);
+    FrameOopIterator<RegisterMapT> iterator(fr, map, _chunk);
     bs_chunk->encode_gc_mode(_chunk, &iterator);
 
     return true;
@@ -388,7 +392,7 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
   }
 
   BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
-  FrameOopIterator<RegisterMapT> iterator(f, map);
+  FrameOopIterator<RegisterMapT> iterator(f, map, this);
   bs_chunk->decode_gc_mode(this, &iterator);
 
   if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
@@ -451,9 +455,9 @@ public:
   int _num_interpreted_frames;
   int _num_i2c;
 
-  VerifyStackChunkFrameClosure(stackChunkOop chunk, int num_frames, int size)
+  VerifyStackChunkFrameClosure(stackChunkOop chunk)
     : _chunk(chunk), _sp(nullptr), _cb(nullptr), _callee_interpreted(false),
-      _size(size), _argsize(0), _num_oops(0), _num_frames(num_frames), _num_interpreted_frames(0), _num_i2c(0) {}
+      _size(0), _argsize(0), _num_oops(0), _num_frames(0), _num_interpreted_frames(0), _num_i2c(0) {}
 
   template <ChunkFrames frame_kind, typename RegisterMapT>
   bool do_frame(const StackChunkFrameStream<frame_kind>& f, const RegisterMapT* map) {
@@ -549,9 +553,7 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   const StackChunkFrameStream<ChunkFrames::Mixed> first(this);
   const bool has_safepoint_stub_frame = first.is_stub();
 
-  VerifyStackChunkFrameClosure closure(this,
-                                       has_safepoint_stub_frame ? 1 : 0, // Iterate_stack skips the safepoint stub
-                                       has_safepoint_stub_frame ? first.frame_size() : 0);
+  VerifyStackChunkFrameClosure closure(this);
   iterate_stack(&closure);
 
   assert(!is_empty() || closure._cb == nullptr, "");

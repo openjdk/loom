@@ -87,6 +87,11 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   Unimplemented();
 }
 
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+  Unimplemented();
+  return nullptr;
+}
+
 template <typename ConfigT>
 inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
   Unimplemented();

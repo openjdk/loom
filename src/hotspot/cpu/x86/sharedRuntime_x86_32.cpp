@@ -2069,6 +2069,16 @@ uint SharedRuntime::out_preserve_stack_slots() {
   return 0;
 }
 
+uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
+  Unimplemented();
+  return 0;
+}
+
+uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
+  Unimplemented();
+  return 0;
+}
+
 //------------------------------generate_deopt_blob----------------------------
 void SharedRuntime::generate_deopt_blob() {
   // allocate space for the code

@@ -40,6 +40,21 @@ static inline intptr_t** link_address(const frame& f) {
             : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - frame::sender_sp_offset);
 }
 
+static inline void patch_return_pc_with_preempt_stub(frame& f) {
+  // Unlike x86 we don't know where in the callee frame the return pc is
+  // saved so we can't patch the return from the VM call back to Java. If
+  // the target is coming from compiled code we will patch the return from
+  // the safepoint handler blob back to the compiled method instead. If
+  // it's coming from the interpreter, the target will check for preemption
+  // once it returns to the interpreter and will manually jump to the
+  // preempt stub.
+  if (!f.is_interpreted_frame()) {
+    assert(f.is_safepoint_blob_frame(), "invariant");
+    intptr_t* caller_sp = f.sp() + f.cb()->frame_size();
+    caller_sp[-1] = (intptr_t)StubRoutines::cont_preempt_stub();
+  }
+}
+
 inline int ContinuationHelper::frame_align_words(int size) {
 #ifdef _LP64
   return size & 1;

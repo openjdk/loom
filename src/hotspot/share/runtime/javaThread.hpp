@@ -245,6 +245,7 @@ class JavaThread: public Thread {
   SafepointMechanism::ThreadData _poll_data;
   ThreadSafepointState*          _safepoint_state;              // Holds information about a thread during a safepoint
   address                        _saved_exception_pc;           // Saved pc of instruction where last implicit exception happened
+  oop                            _return_oop;                   // Holds return oop when polling on return from nmethod
   NOT_PRODUCT(bool               _requires_cross_modify_fence;) // State used by VerifyCrossModifyFence
 #ifdef ASSERT
   // Debug support for checking if code allows safepoints or not.
@@ -263,6 +264,9 @@ class JavaThread: public Thread {
   // including NoSafepointVerifier.
   void check_for_valid_safepoint_state() NOT_DEBUG_RETURN;
   void check_possible_safepoint()        NOT_DEBUG_RETURN;
+
+  oop  return_oop() const           { return _return_oop; }
+  void set_return_oop(oop o)        { _return_oop = o; }
 
 #ifdef ASSERT
  private:
@@ -455,6 +459,7 @@ class JavaThread: public Thread {
   int32_t _held_monitor_count;  // used by continuations for fast lock detection
   int32_t _jni_monitor_count;
 #endif
+  bool _preempting;
 
 private:
 
@@ -608,6 +613,9 @@ private:
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
 
+  bool preempting()           { return _preempting; }
+  void set_preempting(bool b) { _preempting = b; }
+
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -621,6 +629,25 @@ private:
   bool is_handshake_safe_for(Thread* th) const {
     return _handshake.active_handshaker() == th || this == th;
   }
+
+#ifdef ASSERT
+  HandshakeOperation* _current_handshake_op;
+
+  HandshakeOperation* current_handshake_op() { return _current_handshake_op; }
+  void set_current_handshake_op(HandshakeOperation* op) {
+    assert((op != nullptr && _current_handshake_op == nullptr) ||
+           (op == nullptr && _current_handshake_op != nullptr), "invariant");
+    _current_handshake_op = op;
+  }
+#endif
+
+  class AllocationInHandshakeMark : public StackObj {
+    JavaThread* _requester;
+    JavaThread* _target;
+   public:
+    inline AllocationInHandshakeMark(JavaThread* target);
+    inline ~AllocationInHandshakeMark();
+  };
 
   // Suspend/resume support for JavaThread
   // higher-level suspension/resume logic called by the public APIs
@@ -810,6 +837,7 @@ private:
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
+  static ByteSize preempting_offset()         { return byte_offset_of(JavaThread, _preempting); }
 
 #if INCLUDE_JVMTI
   static ByteSize is_in_VTMS_transition_offset()     { return byte_offset_of(JavaThread, _is_in_VTMS_transition); }

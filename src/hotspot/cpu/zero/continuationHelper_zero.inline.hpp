@@ -33,6 +33,10 @@ static inline intptr_t** link_address(const frame& f) {
   return nullptr;
 }
 
+static inline void patch_return_pc_with_preempt_stub(frame& f) {
+  Unimplemented();
+}
+
 inline int ContinuationHelper::frame_align_words(int size) {
   Unimplemented();
   return 0;

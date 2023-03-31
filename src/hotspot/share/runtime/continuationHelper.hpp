@@ -135,6 +135,7 @@ public:
   static const bool stub = true;
 
   static bool is_instance(const frame& f);
+  static int stack_argsize(const frame& f) { return 0; }
 };
 
 #endif // SHARE_VM_RUNTIME_CONTINUATIONHELPER_HPP
