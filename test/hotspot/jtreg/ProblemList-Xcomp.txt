@@ -42,6 +42,8 @@ serviceability/jvmti/VMObjectAlloc/VMObjectAllocTest.java 8288430 generic-all
 
 gc/cslocker/TestCSLocker.java 8293289 generic-x64
 
+serviceability/sa/ClhsdbInspect.java 8283578 windows-x64
+
 ############################################################################
 
 # Loom, fibers branch
