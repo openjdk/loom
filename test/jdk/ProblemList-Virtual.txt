@@ -293,6 +293,7 @@ com/sun/jdi/LaunchCommandLine.java 0000000 generic-all
 com/sun/jdi/MethodEntryExitEvents.java 0000000 generic-all
 com/sun/jdi/MultiBreakpointsTest.java 0000000 generic-all
 com/sun/jdi/NativeInstanceFilter.java 0000000 generic-all
+com/sun/jdi/PopAndInvokeTest.java 0000000 generic-all
 com/sun/jdi/PopAndStepTest.java 0000000 generic-all
 com/sun/jdi/PopAsynchronousTest.java 0000000 generic-all
 com/sun/jdi/PopSynchronousTest.java 0000000 generic-all
