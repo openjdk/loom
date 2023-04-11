@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,24 +21,13 @@
  * questions.
  */
 
-
-package org.openjdk.bench.java.lang;
-
-import java.util.concurrent.*;
-
-public class ScopedValuesExecutorService extends ThreadPoolExecutor {
-    public ScopedValuesExecutorService(int corePoolSize, String prefix) {
-        super(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
-              new AThreadFactory(), new ThreadPoolExecutor.AbortPolicy());
-    }
+/**
+ * Defines non-final APIs for concurrent programming.
+ * {@Incubating}
+ *
+ * @moduleGraph
+ */
+module jdk.incubator.concurrent {
+    exports jdk.incubator.concurrent;
 }
 
-class AThreadFactory implements ThreadFactory {
-    public Thread newThread(Runnable action) {
-        return new Thread() {
-            public void run() {
-                ScopedValuesData.run(action);
-            }
-        };
-    }
-}

@@ -24,7 +24,6 @@
 /*
  * @test
  * @summary Test ThreadFlock with scoped values
- * @enablePreview
  * @modules java.base/jdk.internal.misc
  * @run junit WithScopedValue
  */
