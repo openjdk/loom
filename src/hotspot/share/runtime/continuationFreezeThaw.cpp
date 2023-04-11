@@ -1470,7 +1470,7 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
   // All the conditions that we check for in Continuation::try_preempt() will check out if
   // a safepoint happens below, since this thread will look like as it has polled for
   // a safepoint coming from Java. We don't want to preempt in this case.
-  DisablePreemption dp(vth);
+  DisablePreemption dp(current);
   ContinuationWrapper::SafepointOp so(current, cont);
 
   // Since we might safepoint set the anchor so that the stack can we walked. Also

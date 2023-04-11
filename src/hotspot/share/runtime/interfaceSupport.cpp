@@ -108,6 +108,9 @@ void InterfaceSupport::gc_alot() {
         warning("FullGCALot: Unable to release more dummies at bottom of heap");
       }
       HandleMark hm(thread);
+      // Thread can block in the preempt handshake holding the Heap_lock which might
+      // be needed by the preempter in the stackChunk allocation path.
+      DisablePreemption dp(current_thread);
       Universe::heap()->collect(GCCause::_full_gc_alot);
       unsigned int invocations = Universe::heap()->total_full_collections();
       // Compute new interval

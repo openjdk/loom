@@ -1937,7 +1937,7 @@ int java_lang_VirtualThread::_preemptionDisabled_offset;
   macro(_carrierThread_offset,             k, "carrierThread",      thread_signature,            false); \
   macro(_continuation_offset,              k, "cont",               continuation_signature,      false); \
   macro(_state_offset,                     k, "state",              int_signature,               false); \
-  macro(_preemptionDisabled_offset,        k, "preemptionDisabled", bool_signature,              false);
+  macro(_preemptionDisabled_offset,        k, "preemptionDisabled", int_signature,               false);
 
 
 void java_lang_VirtualThread::compute_offsets() {
@@ -1997,11 +1997,19 @@ bool java_lang_VirtualThread::is_preempted(oop vthread) {
 }
 
 bool java_lang_VirtualThread::is_preemption_disabled(oop vthread) {
-  return vthread->bool_field(_preemptionDisabled_offset);
+  return vthread->int_field(_preemptionDisabled_offset) > 0;
 }
 
-void java_lang_VirtualThread::set_preemption_disabled(oop vthread, bool value) {
-  vthread->bool_field_put(_preemptionDisabled_offset, value);
+void java_lang_VirtualThread::inc_preemption_disabled(oop vthread) {
+  int val = vthread->int_field(_preemptionDisabled_offset);
+  assert(val >= 0, "must be");
+  vthread->int_field_put(_preemptionDisabled_offset, val + 1);
+}
+
+void java_lang_VirtualThread::dec_preemption_disabled(oop vthread) {
+  int val = vthread->int_field(_preemptionDisabled_offset);
+  assert(val - 1 >= 0, "must be");
+  vthread->int_field_put(_preemptionDisabled_offset, val - 1);
 }
 
 #if INCLUDE_CDS

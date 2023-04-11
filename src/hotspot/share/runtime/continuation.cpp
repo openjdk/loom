@@ -143,8 +143,9 @@ static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread
   JvmtiThreadState* state = target->jvmti_thread_state();
   assert(state == nullptr || !state->is_earlyret_pending(), "should be true; no support for vthreads yet");
 
-  if (target->is_in_VTMS_transition()) {
-    // We caught target at the end of a mount transition.
+  if (target->is_in_any_VTMS_transition()) {
+    // We caught target at the end of a mount transition (is_in_VTMS_transition()) or at the
+    // beginning or end of a temporary switch to carrier thread (is_in_tmp_VTMS_transition()).
     return false;
   }
   if (target->is_suspended()) {
@@ -165,7 +166,7 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop cont) {
   assert(vthread != NULL, "vthread should be always set");
   if (java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::RUNNING ||  // in unmounting transition
       !java_lang_VirtualThread::is_instance(vthread) ||                               // in mounting transition after voluntary yield
-      java_lang_VirtualThread::is_preemption_disabled(vthread)) {                     // temp switch to carrier thread or at jvmti_mount_end in thaw_slow()
+      java_lang_VirtualThread::is_preemption_disabled(vthread)) {                     // temp switch to carrier thread or within DisablePreemption context
     return false;
   }
   assert(java_lang_VirtualThread::continuation(vthread) == cont, "invalid continuation");

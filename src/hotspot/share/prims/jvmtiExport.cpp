@@ -1934,8 +1934,7 @@ void JvmtiExport::post_single_step(JavaThread *thread, Method* method, address l
     return; // no events should be posted if thread is in any VTMS transition
   }
 
-  Handle th(thread, thread->vthread());
-  DisablePreemption dp(th);
+  DisablePreemption dp(thread);
   JvmtiEnvThreadStateIterator it(state);
   for (JvmtiEnvThreadState* ets = it.first(); ets != nullptr; ets = it.next(ets)) {
     ets->compare_and_set_current_location(mh(), location, JVMTI_EVENT_SINGLE_STEP);

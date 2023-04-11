@@ -144,18 +144,19 @@ public:
 };
 
 class DisablePreemption : public StackObj {
-  Handle _thread;
-  bool _is_vthread;
+  JavaThread* _thread;
+  bool _should_enable;
  public:
-  DisablePreemption(Handle t) : _thread(t), _is_vthread(false) {
-    if (java_lang_VirtualThread::is_instance(_thread())) {
-      java_lang_VirtualThread::set_preemption_disabled(_thread(), true);
-      _is_vthread = true;
+  DisablePreemption(JavaThread* thread) : _thread(thread), _should_enable(false) {
+    oop vthread = thread->vthread();
+    if (java_lang_VirtualThread::is_instance(vthread)) {
+      java_lang_VirtualThread::inc_preemption_disabled(vthread);
+      _should_enable = true;
     }
   }
   ~DisablePreemption() {
-    if (_is_vthread) {
-      java_lang_VirtualThread::set_preemption_disabled(_thread(), false);
+    if (_should_enable) {
+      java_lang_VirtualThread::dec_preemption_disabled(_thread->vthread());
     }
   }
 };

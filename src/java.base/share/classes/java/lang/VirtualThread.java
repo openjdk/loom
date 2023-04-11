@@ -133,7 +133,7 @@ final class VirtualThread extends BaseVirtualThread {
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
 
-    private boolean preemptionDisabled;
+    private int preemptionDisabled;
 
     /**
      * Returns the continuation scope used for virtual threads.
@@ -407,7 +407,7 @@ final class VirtualThread extends BaseVirtualThread {
     @JvmtiMountTransition
     private void switchToCarrierThread() {
         notifyJvmtiHideFrames(true);
-        setPreemptionDisabled(true);
+        disablePreemption();
         Thread carrier = this.carrierThread;
         assert Thread.currentThread() == this
                 && carrier == Thread.currentCarrierThread();
@@ -423,7 +423,7 @@ final class VirtualThread extends BaseVirtualThread {
         Thread carrier = vthread.carrierThread;
         assert carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(vthread);
-        vthread.setPreemptionDisabled(false);
+        vthread.enablePreemption();
         notifyJvmtiHideFrames(false);
     }
 
@@ -1118,9 +1118,14 @@ final class VirtualThread extends BaseVirtualThread {
         this.carrierThread = carrier;
     }
 
-    private void setPreemptionDisabled(boolean newValue) {
-        assert this.preemptionDisabled != newValue;
-        this.preemptionDisabled = newValue;
+    private void disablePreemption() {
+        assert this.preemptionDisabled >= 0;
+        this.preemptionDisabled++;
+    }
+
+    private void enablePreemption() {
+        this.preemptionDisabled--;
+        assert this.preemptionDisabled >= 0;
     }
 
     // -- JVM TI support --

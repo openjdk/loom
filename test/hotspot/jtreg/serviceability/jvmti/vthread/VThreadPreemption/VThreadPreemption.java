@@ -64,6 +64,7 @@
 * @enablePreview
 *
 * @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -XX:+DeoptimizeALot VThreadPreemption
+* @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -XX:+FullGCALot -XX:FullGCALotInterval=100 VThreadPreemption
 */
 
 /**

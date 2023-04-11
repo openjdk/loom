@@ -548,7 +548,8 @@ class java_lang_VirtualThread : AllStatic {
   static int state(oop vthread);
   static bool is_preempted(oop vthread);
   static bool is_preemption_disabled(oop vthread);
-  static void set_preemption_disabled(oop vthread, bool value);
+  static void inc_preemption_disabled(oop vthread);
+  static void dec_preemption_disabled(oop vthread);
   static JavaThreadStatus map_state_to_thread_status(int state);
 };
 
