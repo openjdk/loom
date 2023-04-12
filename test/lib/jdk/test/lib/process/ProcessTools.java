@@ -315,7 +315,7 @@ public final class ProcessTools {
         }
 
         ArrayList<String> args = new ArrayList<>();
-        final String[] doubleWordArgs = {"-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path",
+        final String[] doubleWordArgs = {"-jar", "-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path",
                 "--add-modules", "-d", "--add-exports", "--patch-module", "--module-path"};
 
         if (mainWrapper.equalsIgnoreCase("virtual")) {
@@ -337,9 +337,7 @@ public final class ProcessTools {
             }
             for (String dWArg : doubleWordArgs) {
                 if (cmd.equals(dWArg)) {
-                    expectSecondArg = true;
-                    args.add(cmd);
-                    break;
+                    return command;
                 }
             }
             if (expectSecondArg) {
