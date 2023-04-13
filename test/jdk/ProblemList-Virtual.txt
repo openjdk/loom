@@ -1,6 +1,36 @@
 # Filed bugs
 
+com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
+##########
+## Tests failing when main() is executed in additional vthread or in vthread instead of thread
+#
+
+com/sun/jdi/DeferredStepTest.java 8285422 generic-all
+com/sun/jdi/EarlyReturnTest.java 8285422 generic-all
+com/sun/jdi/ExceptionEvents.java 8285422 generic-all
+com/sun/jdi/FetchLocals.java 8285422 generic-all
+com/sun/jdi/Frames2Test.java 8285422 generic-all
+com/sun/jdi/GetSetLocalTest.java 8285422 generic-all
+com/sun/jdi/JdbMethodExitTest.java 8285422 generic-all
+com/sun/jdi/JdbStepTest.java 8285422 generic-all
+com/sun/jdi/JdbStopThreadTest.java 8285422 generic-all
+com/sun/jdi/JdbStopThreadidTest.java 8285422 generic-all
+com/sun/jdi/LaunchCommandLine.java 8285422 generic-all
+com/sun/jdi/MethodEntryExitEvents.java 8285422 generic-all
+com/sun/jdi/MultiBreakpointsTest.java 8285422 generic-all
+com/sun/jdi/NativeInstanceFilter.java 8285422 generic-all
+com/sun/jdi/PopAndStepTest.java 8285422 generic-all
+com/sun/jdi/PopAsynchronousTest.java 8285422 generic-all
+com/sun/jdi/PopSynchronousTest.java 8285422 generic-all
+com/sun/jdi/RedefineCrossStart.java 8285422 generic-all
+com/sun/jdi/RedefineG.java 8285422 generic-all
+com/sun/jdi/RedefineNestmateAttr/TestNestmateAttr.java 8285422 generic-all
+com/sun/jdi/RedefineTTYLineNumber.java 8285422 generic-all
+com/sun/jdi/ReferrersTest.java 8285422 generic-all
+com/sun/jdi/SetLocalWhileThreadInNative.java 8285422 generic-all
+com/sun/jdi/StepTest.java 8285422 generic-all
+com/sun/jdi/PopAndInvokeTest.java 8305632 generic-all
 
 ##########
 ## Tests failing when executed with virtual test thread factory
@@ -172,7 +202,6 @@ javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java 
 #####
 # Tests failing because of ProcessTools wrapper
 
-com/sun/jdi/ProcessAttachTest.java 0000000 generic-all
 java/util/ResourceBundle/modules/cache/CacheTest.java 0000000 generic-all
 java/util/logging/modules/GetResourceBundleTest.java 0000000 generic-all
 jdk/modules/etc/DefaultModules.java 0000000 generic-all
@@ -271,52 +300,6 @@ java/nio/channels/DatagramChannel/InterruptibleOrNot.java 0000000 generic-all
 ####
 # Tests behavior that differs when underlying socket is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
-
-
-####
-# JDI tests failing with wrapper
-# some failing to find main method
-# need to be re-reviewed later if want to support wrapper for jdi
-
-com/sun/jdi/DeferredStepTest.java 0000000 generic-all
-com/sun/jdi/EarlyReturnTest.java 0000000 generic-all
-com/sun/jdi/EATests.java#id0 0000000 generic-all
-com/sun/jdi/ExceptionEvents.java 0000000 generic-all
-com/sun/jdi/FetchLocals.java 0000000 generic-all
-com/sun/jdi/Frames2Test.java 0000000 generic-all
-com/sun/jdi/GetSetLocalTest.java 0000000 generic-all
-com/sun/jdi/JdbMethodExitTest.java 0000000 generic-all
-com/sun/jdi/JdbStepTest.java 0000000 generic-all
-com/sun/jdi/JdbStopThreadTest.java 0000000 generic-all
-com/sun/jdi/JdbStopThreadidTest.java 0000000 generic-all
-com/sun/jdi/LaunchCommandLine.java 0000000 generic-all
-com/sun/jdi/MethodEntryExitEvents.java 0000000 generic-all
-com/sun/jdi/MultiBreakpointsTest.java 0000000 generic-all
-com/sun/jdi/NativeInstanceFilter.java 0000000 generic-all
-com/sun/jdi/PopAndInvokeTest.java 0000000 generic-all
-com/sun/jdi/PopAndStepTest.java 0000000 generic-all
-com/sun/jdi/PopAsynchronousTest.java 0000000 generic-all
-com/sun/jdi/PopSynchronousTest.java 0000000 generic-all
-com/sun/jdi/RedefineCrossStart.java 0000000 generic-all
-com/sun/jdi/RedefineG.java 0000000 generic-all
-com/sun/jdi/RedefineNestmateAttr/TestNestmateAttr.java 0000000 generic-all
-com/sun/jdi/RedefineTTYLineNumber.java 0000000 generic-all
-com/sun/jdi/ReferrersTest.java 0000000 generic-all
-com/sun/jdi/ResumeAfterThreadResumeCallTest.java 0000000 generic-all
-com/sun/jdi/SetLocalWhileThreadInNative.java 0000000 generic-all
-com/sun/jdi/StepTest.java 0000000 generic-all
-com/sun/jdi/redefine/RedefineTest.java 0000000 generic-all
-com/sun/jdi/redefineMethod/RedefineTest.java 0000000 generic-all
-
-####
-# JDI SDE Tests
-# Use custom classpath
-
-com/sun/jdi/sde/FilterMangleTest.java 0000000 generic-all
-com/sun/jdi/sde/MangleTest.java 0000000 generic-all
-com/sun/jdi/sde/MangleStepTest.java 0000000 generic-all
-com/sun/jdi/sde/TemperatureTableTest.java 0000000 generic-all
-com/sun/jdi/sde/SourceDebugExtensionTest.java 0000000 generic-all
 
 # Tests using Thread.stop(), not supported on virtual threads
 jdk/jshell/PasteAndMeasurementsUITest.java 0000000 generic-all
