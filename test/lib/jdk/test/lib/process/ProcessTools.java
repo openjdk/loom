@@ -305,22 +305,17 @@ public final class ProcessTools {
       When test is executed with process wrapper the line is changed from
       java <jvm-args> <test-class> <test-args>
       to
-      java --enable-preview <jvm-args> jdk.test.lib.process.ProcessTools <wrapper-name> <test-class> <test-args>
+      java <jvm-args> -Dmain.wrapper=Virtual jdk.test.lib.process.ProcessTools <wrapper-name> <test-class> <test-args>
      */
     private static List<String> addMainWrapperArgs(String mainWrapper, List<String> command) {
 
-        boolean useModules = command.contains("-m");
-        if (useModules) {
-            return command;
-        }
+        final List<String> unsupportedArgs = List.of("-jar", "-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path", "--describe-module",
+                                                     "--add-modules", "-d", "--add-exports", "--add-reads", "--patch-module", "--module-path", "--module", "--list-modules", "-m", "-version");
+
+        final List<String> doubleWordArgs = List.of("-jar", "-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path", "--describe-module", "--limit-modules",
+                                                    "--add-modules", "-d", "--add-exports", "--add-reads", "--patch-module", "--module-path", "--module", "--list-modules", "-m", "-p", "-version");
 
         ArrayList<String> args = new ArrayList<>();
-        final String[] doubleWordArgs = {"-jar", "-cp", "-classpath", "--add-opens", "--class-path", "--upgrade-module-path",
-                "--add-modules", "-d", "--add-exports", "--patch-module", "--module-path"};
-
-        if (mainWrapper.equalsIgnoreCase("virtual")) {
-            args.add("--enable-preview");
-        }
 
         boolean expectSecondArg = false;
         boolean isWrapperClassAdded = false;
@@ -335,10 +330,13 @@ public final class ProcessTools {
                 args.add(cmd);
                 continue;
             }
-            for (String dWArg : doubleWordArgs) {
-                if (cmd.equals(dWArg)) {
-                    return command;
-                }
+            if (unsupportedArgs.contains(cmd)) {
+                return command;
+            }
+            if (doubleWordArgs.contains(cmd)) {
+                expectSecondArg = true;
+                args.add(cmd);
+                continue;
             }
             if (expectSecondArg) {
                 continue;
@@ -347,6 +345,8 @@ public final class ProcessTools {
                 args.add(cmd);
                 continue;
             }
+
+            args.add("-Dmain.wrapper=" + mainWrapper);
             args.add("jdk.test.lib.process.ProcessTools");
             args.add(mainWrapper);
             isWrapperClassAdded = true;
