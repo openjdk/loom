@@ -1,7 +1,5 @@
 ### Filed bugs
 
-gc/g1/TestPeriodicCollectionJNI.java                                                            8254852 generic-all
-vmTestbase/nsk/stress/jni/gclocker/gcl001.java                                                  8254852 generic-all
 
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 8282492 generic-all
 vmTestbase/vm/gc/compact/Humongous_Arrays5M/TestDescription.java 8282492 generic-all
@@ -309,249 +307,16 @@ runtime/Dictionary/ProtectionDomainCacheTest.java 0000000 generic-all
 
 ####
 # Don't work with ProcessTools wrapper
-serviceability/sa/ClhsdbCDSCore.java 0000000 generic-all
-serviceability/logging/TestLogRotation.java 0000000 generic-all
-compiler/c2/Test8062950.java 0000000 generic-all
-serviceability/sa/TestObjectMonitorIterate.java 0000000 generic-all
-runtime/cds/appcds/AppendClasspath.java 0000000 generic-all
-runtime/cds/appcds/ArchiveRelocationTest.java 0000000 generic-all
-runtime/cds/appcds/BootClassPathMismatch.java 0000000 generic-all
-runtime/cds/appcds/CDSandJFR.java 0000000 generic-all
-runtime/cds/appcds/ClassPathAttr.java 0000000 generic-all
-runtime/cds/appcds/CommandLineFlagCombo.java 0000000 generic-all
-runtime/cds/appcds/CommonAppClasspath.java 0000000 generic-all
-runtime/cds/appcds/DumpClassList.java 0000000 generic-all
-runtime/cds/appcds/DumpingWithNoCoops.java 0000000 generic-all
-runtime/cds/appcds/ExtraSymbols.java 0000000 generic-all
-runtime/cds/appcds/FieldAnnotationsTest.java 0000000 generic-all
-runtime/cds/appcds/FieldLayoutFlags.java 0000000 generic-all
-runtime/cds/appcds/FreeUnusedMetadata.java 0000000 generic-all
-runtime/cds/appcds/HelloExtTest.java 0000000 generic-all
-runtime/cds/appcds/IgnoreEmptyClassPaths.java 0000000 generic-all
-runtime/cds/appcds/JvmtiAddPath.java 0000000 generic-all
-runtime/cds/appcds/LambdaWithOldClass.java 0000000 generic-all
-runtime/cds/appcds/LambdaWithJavaAgent.java 0000000 generic-all
-runtime/cds/appcds/LambdaWithUseImplMethodHandle.java 0000000 generic-all
-runtime/cds/appcds/MismatchedPathTriggerMemoryRelease.java 0000000 generic-all
-runtime/cds/appcds/MissingSuperTest.java 0000000 generic-all
-runtime/cds/appcds/MultiProcessSharing.java 0000000 generic-all
-runtime/cds/appcds/MultiReleaseJars.java 0000000 generic-all
-runtime/cds/appcds/NestHostOldInf.java 0000000 generic-all
-runtime/cds/appcds/NonExistClasspath.java 0000000 generic-all
-runtime/cds/appcds/OldClassTest.java 0000000 generic-all
-runtime/cds/appcds/OldClassWithjsr.java 0000000 generic-all
-runtime/cds/appcds/PackageSealing.java 0000000 generic-all
-runtime/cds/appcds/ParallelLoad2.java 0000000 generic-all
-runtime/cds/appcds/ParallelLoadTest.java 0000000 generic-all
-runtime/cds/appcds/ProhibitedPackage.java 0000000 generic-all
-runtime/cds/appcds/ProtectionDomain.java 0000000 generic-all
-runtime/cds/appcds/RelativePath.java 0000000 generic-all
-runtime/cds/appcds/RewriteBytecodesTest.java 0000000 generic-all
-runtime/cds/appcds/SharedArchiveConsistency.java 0000000 generic-all
-runtime/cds/appcds/SharedBaseAddress.java 0000000 generic-all
-runtime/cds/appcds/SharedPackages.java 0000000 generic-all
-runtime/cds/appcds/SharedRegionAlignmentTest.java 0000000 generic-all
-runtime/cds/appcds/SignedJar.java 0000000 generic-all
-runtime/cds/appcds/SpecifySysLoaderProp.java 0000000 generic-all
-runtime/cds/appcds/StaticArchiveWithLambda.java 0000000 generic-all
-runtime/cds/appcds/TestCombinedCompressedFlags.java 0000000 generic-all
-runtime/cds/appcds/TestDumpClassListSource.java 0000000 generic-all
-runtime/cds/appcds/TestWithProfiler.java 0000000 generic-all
-runtime/cds/appcds/TestEpsilonGCWithCDS.java 0000000 generic-all
-runtime/cds/appcds/TestSerialGCWithCDS.java#id0 0000000 generic-all
-runtime/cds/appcds/TestSerialGCWithCDS.java#id1 0000000 generic-all
-runtime/cds/appcds/TestZGCWithCDS.java 0000000 generic-all
-runtime/cds/appcds/UnusedCPDuringDump.java 0000000 generic-all
-runtime/cds/appcds/VerifierTest_1A.java 0000000 generic-all
-runtime/cds/appcds/VerifierTest_1B.java 0000000 generic-all
-runtime/cds/appcds/VerifierTest_2.java 0000000 generic-all
-runtime/cds/appcds/WideIloadTest.java 0000000 generic-all
-runtime/cds/appcds/TestParallelGCWithCDS.java 0000000 generic-all
-runtime/cds/appcds/VerifyObjArrayCloneTest.java 0000000 generic-all
-runtime/cds/appcds/XShareAutoWithChangedJar.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/ArchiveHeapTestClass.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/ArchivedIntegerCacheTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/ArchivedModuleComboTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/ArchivedModuleCompareTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/CheckCachedMirrorTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/CheckCachedResolvedReferences.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/DifferentHeapSizes.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/GCStressTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/HeapFragmentationTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/MirrorWithReferenceFieldsTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/ArchivedEnumTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/OpenArchiveRegion.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/PrimitiveTypesTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/RedefineClassTest.java 0000000 generic-all
-runtime/cds/appcds/cacheObject/VerifyArchivedFields.java 0000000 generic-all
-runtime/cds/appcds/condy/CondyHelloTest.java 0000000 generic-all
-runtime/cds/appcds/customLoader/CustomClassListDump.java 0000000 generic-all
-runtime/cds/appcds/customLoader/HelloCustom.java 0000000 generic-all
-runtime/cds/appcds/customLoader/HelloCustom_JFR.java 0000000 generic-all
-runtime/cds/appcds/customLoader/LoaderSegregationTest.java 0000000 generic-all
-runtime/cds/appcds/customLoader/ParallelTestMultiFP.java 0000000 generic-all
-runtime/cds/appcds/customLoader/ParallelTestSingleFP.java 0000000 generic-all
-runtime/cds/appcds/customLoader/ProtectionDomain.java 0000000 generic-all
-runtime/cds/appcds/customLoader/SameNameInTwoLoadersTest.java 0000000 generic-all
-runtime/cds/appcds/customLoader/UnintendedLoadersTest.java 0000000 generic-all
-runtime/cds/appcds/customLoader/UnloadUnregisteredLoaderTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/AppendClasspath.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ArchiveConsistency.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ArchivedSuperIf.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ArrayKlasses.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/BasicLambdaTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/CDSStreamTestDriver.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ClassResolutionFailure.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/CommonAppClasspath.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/DuplicatedCustomTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/DynamicArchiveRelocationTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/DynamicLambdaWithUseImplMethodHandle.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/DynamicFlag.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/DynamicLotsOfClasses.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ExcludedClasses.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ExitRaceTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/HelloDynamic.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/HelloDynamicCustom.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/HelloDynamicCustomUnload.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/JITInteraction.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaContainsOldInf.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaCustomLoader.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaForClassInBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaInBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaProxyCallerIsHidden.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaProxyDuringShutdown.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LinkClassTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/MethodSorting.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/MismatchedBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/MissingArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/NestTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/NoClassToArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ParallelLambdaLoadTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/PredicateTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/PrintSharedArchiveAndExit.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/RegularHiddenClass.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/RelativePath.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/SharedArchiveFileOption.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/SharedBaseAddressOption.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/StaticInnerTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/TestAutoCreateSharedArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/UnsafeAndLambda.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/UnsafeAnonymous.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/UnsupportedBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/UnusedCPDuringDump.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/UsedAllArchivedLambdas.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/VerifyWithDynamicArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/VerifyObjArrayCloneTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/WrongTopClasspath.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesAsCollectorTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesCastFailureTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesGeneralTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesInvokersTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesPermuteArgumentsTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/methodHandles/MethodHandlesSpreadArgumentsTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LotsUnloadTest.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/TestLambdaInvokers.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/ModulePath.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/NestHostOldInf.java 0000000 generic-all
-runtime/cds/appcds/javaldr/AnonVmClassesDuringDump.java 0000000 generic-all
-runtime/cds/appcds/javaldr/ArrayTest.java 0000000 generic-all
-runtime/cds/appcds/javaldr/GCDuringDump.java 0000000 generic-all
-runtime/cds/appcds/javaldr/GCSharedStringsDuringDump.java 0000000 generic-all
-runtime/cds/appcds/javaldr/HumongousDuringDump.java 0000000 generic-all
-runtime/cds/appcds/javaldr/LockDuringDump.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/JigsawOptionsCombo.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/PatchModule/AppClassInCP.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/PatchModule/SubClassOfPatchedClass.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/RedefineClassesInModuleGraph.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/classpathtests/BootAppendTests.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/classpathtests/ClassPathTests.java 0000000 generic-all
 runtime/cds/appcds/jigsaw/classpathtests/EmptyClassInBootClassPath.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/modulepath/ExportModule.java 0000000 generic-all
-runtime/cds/appcds/jigsaw/modulepath/JvmtiAddPath.java 0000000 generic-all
 runtime/cds/appcds/jigsaw/modulepath/OptimizeModuleHandlingTest.java 0000000 generic-all
-runtime/cds/appcds/jvmti/ClassFileLoadHookTest.java 0000000 generic-all
-runtime/cds/appcds/jvmti/InstrumentationTest.java 0000000 generic-all
-runtime/cds/appcds/jvmti/dumpingWithAgent/DumpingWithJavaAgent.java 0000000 generic-all
-runtime/cds/appcds/jvmti/parallelLoad/ParallelLoadAndTransformTest.java 0000000 generic-all
-runtime/cds/appcds/jvmti/transformRelatedClasses/TransformInterfaceImplementorAppCDS.java 0000000 generic-all
-runtime/cds/appcds/jvmti/transformRelatedClasses/TransformSuperSubAppCDS.java 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java 0000000 generic-all
-runtime/cds/appcds/lambdaForm/DefaultClassListLFInvokers.java 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl-zgc
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesAsCollectorTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesCastFailureTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesGeneralTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesInvokersTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesPermuteArgumentsTest.java 0000000 generic-all
-runtime/cds/appcds/methodHandles/MethodHandlesSpreadArgumentsTest.java 0000000 generic-all
-runtime/cds/appcds/redefineClass/RedefineBasicTest.java 0000000 generic-all
-runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java 0000000 generic-all
-runtime/cds/appcds/redefineClass/RedefineRunningMethods_Shared.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/ExerciseGC.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/FlagCombo.java#id0 0000000 generic-all
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id0 0000000 generic-all
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id1 0000000 generic-all
-runtime/cds/appcds/sharedStrings/IncompatibleOptions.java#id2 0000000 generic-all
-runtime/cds/appcds/sharedStrings/InternSharedString.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/LargePages.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/LockSharedStrings.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsBasicPlus.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsHumongous.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsStress.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsWbTest.java 0000000 generic-all
-runtime/cds/appcds/LambdaContainsOldInf.java 0000000 generic-all
-runtime/cds/appcds/NonJarInClasspath.java 0000000 generic-all
-runtime/cds/appcds/OldInfExtendsInfDefMeth.java 0000000 generic-all
-runtime/cds/appcds/OldSuperClass.java 0000000 generic-all
-runtime/cds/appcds/OldSuperInf.java 0000000 generic-all
-runtime/cds/appcds/OldSuperInfIndirect.java 0000000 generic-all
-runtime/cds/appcds/customLoader/OldClassAndInf.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/JFRDynamicCDS.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/LambdaForOldInfInBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/OldClassAndInf.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/TestDynamicDumpAtOom.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/TestDynamicRegenerateHolderClasses.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/OldClassInBaseArchive.java 0000000 generic-all
-runtime/cds/appcds/dynamicArchive/RedefineCallerClassTest.java 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#custom-cl 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/DynamicLoaderConstraintsTest.java#default-cl 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#custom-cl 0000000 generic-all
-runtime/cds/appcds/loaderConstraints/LoaderConstraintsTest.java#default-cl 0000000 generic-all
+runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java 0000000 generic-all
 
 ####
 ## Fails when run even in new kernel thread
 runtime/BootstrapMethod/TestLambdaExceptionInInitializer.java 0000000 generic-all
-runtime/ClassFile/PreviewVersion.java 0000000 generic-all
-runtime/getSysPackage/GetSysPkgTest.java 0000000 generic-all
 runtime/logging/VtablesTest.java 0000000 generic-all
 serviceability/sa/TestCpoolForInvokeDynamic.java 0000000 generic-all
-compiler/ciReplay/TestServerVM.java 0000000 generic-all
 compiler/ciReplay/TestVMNoCompLevel.java 0000000 generic-all
-
-####
-# Custom cp adding (overriding -cp)
-
-runtime/verifier/TestMultiANewArray.java 0000000 generic-all
-runtime/verifier/OverriderMsg.java 0000000 generic-all
-runtime/verifier/TestANewArray.java 0000000 generic-all
-runtime/StackTrace/LargeClassTest.java 0000000 generic-all
-runtime/LocalVariableTable/TestLVT.java 0000000 generic-all
-runtime/duplAttributes/DuplAttributesTest.java 0000000 generic-all
-runtime/EnclosingMethodAttr/EnclMethodAttr.java 0000000 generic-all
-runtime/classFileParserBug/TestBadPackageWithInterface.java 0000000 generic-all
-runtime/classFileParserBug/TestEmptyBootstrapMethodsAttr.java 0000000 generic-all
-runtime/classFileParserBug/ClassFileParserBug.java 0000000 generic-all
-runtime/ClassFile/UnsupportedClassFileVersion.java 0000000 generic-all
-runtime/ClassFile/JsrRewriting.java 0000000 generic-all
-runtime/ClassFile/OomWhileParsingRepeatedJsr.java 0000000 generic-all
-runtime/cds/appcds/ClassLoaderTest.java 0000000 generic-all
-runtime/cds/appcds/HelloTest.java 0000000 generic-all
-runtime/cds/appcds/sharedStrings/SharedStringsBasic.java 0000000 generic-all
-runtime/cds/BootAppendTests.java 0000000 generic-all
-runtime/BootstrapMethod/BSMCalledTwice.java#id0 0000000 generic-all
-runtime/BootstrapMethod/BSMCalledTwice.java#id1 0000000 generic-all
-
 
 ####
 # dont run classname (-version/empty)
@@ -563,14 +328,6 @@ runtime/NMT/NMTInitializationTest.java#default_long-off 0000000 generic-all
 runtime/NMT/NMTInitializationTest.java#normal-detail 0000000 generic-all
 runtime/NMT/NMTInitializationTest.java#normal-off 0000000 generic-all
 
-####
-# Seems module patching doesn't work with wrapper
-
-runtime/modules/PatchModule/PatchModuleTestJarDir.java 0000000 generic-all
-runtime/modules/PatchModule/PatchModuleJavaBase.java 0000000 generic-all
-runtime/modules/PatchModule/PatchModuleTestJar.java 0000000 generic-all
-runtime/modules/PatchModule/PatchModuleTest.java 0000000 generic-all
-runtime/modules/PatchModule/PatchModuleClassList.java 0000000 generic-all
 
 
 ####
@@ -578,14 +335,6 @@ runtime/modules/PatchModule/PatchModuleClassList.java 0000000 generic-all
 
 gc/TestAgeOutput.java#id1 0000000 generic-all
 gc/TestAgeOutput.java#id0 0000000 generic-all
-gc/arguments/TestUseCompressedOopsErgo.java#id0 0000000 generic-all
-gc/arguments/TestUseCompressedOopsErgo.java#id1 0000000 generic-all
-gc/arguments/TestUseCompressedOopsErgo.java#id2 0000000 generic-all
-gc/arguments/TestSerialHeapSizeFlags.java 0000000 generic-all
-gc/arguments/TestParallelHeapSizeFlags.java 0000000 generic-all
-gc/arguments/TestMinInitialErgonomics.java 0000000 generic-all
-gc/arguments/TestMaxRAMFlags.java 0000000 generic-all
-gc/arguments/TestG1HeapSizeFlags.java 0000000 generic-all
 gc/arguments/TestNewSizeThreadIncrease.java 0000000 generic-all
 gc/g1/TestSkipRebuildRemsetPhase.java 0000000 generic-all
 gc/g1/TestStringDeduplicationYoungGC.java 0000000 generic-all
