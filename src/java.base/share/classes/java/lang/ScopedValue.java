@@ -372,6 +372,48 @@ public final class ScopedValue<T> {
         }
 
         /**
+         * Invokes a supplier of results with each scoped value in this mapping bound
+         * to its value in the current thread.
+         * When the operation completes (normally or with an exception), each scoped value
+         * in the mapping will revert to being unbound, or revert to its previous value
+         * when previously bound, in the current thread.
+         *
+         * <p> Scoped values are intended to be used in a <em>structured manner</em>.
+         * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+         * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+         * underlying construct of each {@code StructuredTaskScope} created in the
+         * dynamic scope to be closed. This may require blocking until all child threads
+         * have completed their sub-tasks. The closing is done in the reverse order that
+         * they were created. Once closed, {@link StructureViolationException} is thrown.
+         *
+         * @param op the operation to run
+         * @param <R> the type of the result of the operation
+         * @return the result
+         * @see ScopedValue#where(ScopedValue, Object, Callable)
+         */
+        public <R> R get(Supplier<? extends R> op) {
+            Objects.requireNonNull(op);
+            Cache.invalidate(bitmask);
+            var prevSnapshot = scopedValueBindings();
+            var newSnapshot = new Snapshot(this, prevSnapshot);
+            return runWith(newSnapshot, new CallableAdapter<R>(op));
+        }
+
+        // A lightweight adapter from Supplier to Callable. This is
+        // used here to create the Callable which is passed to
+        // Carrier#call() in this thread because it needs neither
+        // runtime bytecode generation nor any release fencing.
+        private static final class CallableAdapter<V> implements Callable<V> {
+            private Supplier<? extends V> s;
+            CallableAdapter(Supplier<? extends V> s) {
+                this.s = s;
+            }
+            public V call() {
+                return s.get();
+            }
+        }
+
+        /**
          * Execute the action with a set of ScopedValue bindings.
          *
          * The VM recognizes this method as special, so any changes to the
@@ -380,7 +422,7 @@ public final class ScopedValue<T> {
          */
         @Hidden
         @ForceInline
-        private <R> R runWith(Snapshot newSnapshot, Callable<R> op) throws Exception {
+        private <R> R runWith(Snapshot newSnapshot, Callable<R> op) {
             try {
                 Thread.setScopedValueBindings(newSnapshot);
                 Thread.ensureMaterializedForStackWalk(newSnapshot);
@@ -493,6 +535,40 @@ public final class ScopedValue<T> {
                                  T value,
                                  Callable<? extends R> op) throws Exception {
         return where(key, value).call(op);
+    }
+
+    /**
+     * Invokes a supplier of results with a {@code ScopedValue} bound to a value
+     * in the current thread. When the operation completes (normally or with an
+     * exception), the {@code ScopedValue} will revert to being unbound, or revert to
+     * its previous value when previously bound, in the current thread.
+     *
+     * <p> Scoped values are intended to be used in a <em>structured manner</em>.
+     * If {@code op} creates a {@link StructuredTaskScope} but does not {@linkplain
+     * StructuredTaskScope#close() close} it, then exiting {@code op} causes the
+     * underlying construct of each {@code StructuredTaskScope} created in the
+     * dynamic scope to be closed. This may require blocking until all child threads
+     * have completed their sub-tasks. The closing is done in the reverse order that
+     * they were created. Once closed, {@link StructureViolationException} is thrown.
+     *
+     * @implNote
+     * This method is implemented to be equivalent to:
+     * {@snippet lang=java :
+     *     // @link substring="call" target="Carrier#call(Callable)" :
+     *     ScopedValue.where(key, value).get(op);
+     * }
+     *
+     * @param key the {@code ScopedValue} key
+     * @param value the value, can be {@code null}
+     * @param <T> the type of the value
+     * @param <R> the result type
+     * @param op the operation to call
+     * @return the result
+     */
+    public static <T, R> R getWhere(ScopedValue<T> key,
+                                 T value,
+                                 Supplier<? extends R> op) {
+        return where(key, value).get(op);
     }
 
     /**

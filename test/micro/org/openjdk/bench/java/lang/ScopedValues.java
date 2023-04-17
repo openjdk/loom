@@ -24,7 +24,9 @@
 
 package org.openjdk.bench.java.lang;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
@@ -159,12 +161,21 @@ public class ScopedValues {
     }
 
     // Test 4: The cost of binding, but not using any result
-
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bind_ScopedValue() throws Exception {
-        return HOLD_42.call(this::getClass);
+        return HOLD_42.call(aCallable);
     }
+    private static final Callable<Class<?>> aCallable = () -> ScopedValues.class;
+
+    // Same, but make sure that Carrier.get(Supplier) is no slower
+    // than Carrier.call(Callable).
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    public Object bindViaGet_ScopedValue() {
+        return HOLD_42.get(aSupplier);
+    }
+    private static final Supplier<Class<?>> aSupplier = () -> ScopedValues.class;
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
