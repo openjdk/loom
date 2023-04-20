@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.function.Supplier;
 
 public class StressStackOverflow {
     public static final ScopedValue<Integer> el = ScopedValue.newInstance();
@@ -51,9 +52,16 @@ public class StressStackOverflow {
 
     // Test the ScopedValue recovery mechanism for stack overflows. We implement both Callable
     // and Runnable interfaces. Which one gets tested depends on the constructor argument.
-    class DeepRecursion implements Callable, Runnable {
+    class DeepRecursion implements Callable, Supplier, Runnable {
 
-        static enum Behaviour {CALL, RUN}
+        static enum Behaviour {
+            CALL, GET, RUN;
+            private static Behaviour[] values = values();
+            public static Behaviour choose(ThreadLocalRandom tlr) {
+                return values[tlr.nextInt(3)];
+            }
+        }
+
         final Behaviour behaviour;
 
         public DeepRecursion(Behaviour behaviour) {
@@ -68,6 +76,8 @@ public class StressStackOverflow {
                 switch (behaviour) {
                     case CALL ->
                         ScopedValue.where(el, el.get() + 1).call(() -> fibonacci_pad(20, this));
+                    case GET ->
+                        ScopedValue.where(el, el.get() + 1).get(() -> fibonacci_pad(20, this));
                     case RUN ->
                         ScopedValue.where(el, el.get() + 1).run(() -> fibonacci_pad(20, this));
                 }
@@ -94,9 +104,13 @@ public class StressStackOverflow {
             Thread.yield();
         }
 
-        public Object call() {
+        public Object get() {
             run();
             return null;
+        }
+
+        public Object call() {
+            return get();
         }
     }
 
@@ -157,9 +171,9 @@ public class StressStackOverflow {
                 try (var scope = new StructuredTaskScope<Object>()) {
                     try {
                         if (tlr.nextBoolean()) {
-                            // Repeatedly test Scoped Values set by ScopedValue::call() and ScopedValue::run()
+                            // Repeatedly test Scoped Values set by ScopedValue::call(), get(), and run()
                             final var deepRecursion
-                                    = new DeepRecursion(tlr.nextBoolean() ? DeepRecursion.Behaviour.CALL : DeepRecursion.Behaviour.RUN);
+                                = new DeepRecursion(DeepRecursion.Behaviour.choose(tlr));
                             deepRecursion.run();
                         } else {
                             // Recursively run ourself until we get a stack overflow
