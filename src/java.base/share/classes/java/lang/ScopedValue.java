@@ -46,8 +46,8 @@ import sun.security.action.GetPropertyAction;
  * execution by a thread. A {@code ScopedValue} allows for safely and efficiently sharing
  * data for a bounded period of execution without passing the data as method arguments.
  *
- * <p> {@code ScopedValue} defines the {@link #where(ScopedValue, Object, Runnable)}
- * method to set the value of a {@code ScopedValue} for the bouned period of execution by
+ * <p> {@code ScopedValue} defines the {@link #runWhere(ScopedValue, Object, Runnable)}
+ * method to set the value of a {@code ScopedValue} for the bounded period of execution by
  * a thread of the runnable's {@link Runnable#run() run} method. The unfolding execution of
  * the methods executed by {@code run} defines a <b><em>dynamic scope</em></b>. The scoped
  * value is {@linkplain #isBound() bound} while executing in the dynamic scope, it reverts
@@ -66,7 +66,7 @@ import sun.security.action.GetPropertyAction;
  *     // @link substring="newInstance" target="#newInstance" :
  *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
- *     ScopedValue.where(USERNAME, "duke", () -> doSomething());
+ *     ScopedValue.runWhere(USERNAME, "duke", () -> doSomething());
  * }
  * Code executed directly or indirectly by {@code doSomething()} that invokes {@code
  * USERNAME.get()} will read the value "{@code duke}". The scoped value is bound while
@@ -77,11 +77,12 @@ import sun.security.action.GetPropertyAction;
  * {@code USERNAME.get()} would read the value "{@code duke1}" or "{@code duke2}",
  * depending on which thread is executing.
  *
- * <p> In addition to the {@code where} method that executes a {@code run} method, {@code
- * ScopedValue} defines the {@link #where(ScopedValue, Object, Callable)} method to execute
- * a method that returns a result. It also defines the {@link #where(ScopedValue, Object)}
- * method for cases where it is useful to accumulate mappings of {@code ScopedValue} to
- * value.
+ * <p> In addition to the {@code runWhere} method that executes a {@code run} method, {@code
+ * ScopedValue} defines the {@link #callWhere(ScopedValue, Object, Callable)} and
+ * {@link #getWhere(ScopedValue, Object, Supplier)} methods to execute
+ * methods that returns results. It also defines the {@link #where(ScopedValue, Object)}
+ * method for cases where it is useful to accumulate mappings of multiple {@code ScopedValue}s to
+ * bound values.
  *
  * <p> A {@code ScopedValue} will typically be declared in a {@code final} and {@code
  * static} field. The accessibility of the field will determine which components can
@@ -102,7 +103,7 @@ import sun.security.action.GetPropertyAction;
  * <p> In the above example, suppose that code executed by {@code doSomething()} binds
  * {@code USERNAME} to a new value with:
  * {@snippet lang=java :
- *     ScopedValue.where(USERNAME, "duchess", () -> doMore());
+ *     ScopedValue.runWhere(USERNAME, "duchess", () -> doMore());
  * }
  * Code executed directly or indirectly by {@code doMore()} that invokes {@code
  * USERNAME.get()} will read the value "{@code duchess}". When {@code doMore()} completes
@@ -127,7 +128,7 @@ import sun.security.action.GetPropertyAction;
  * {@snippet lang=java :
  *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
 
- *     ScopedValue.where(USERNAME, "duke", () -> {
+ *     ScopedValue.runWhere(USERNAME, "duke", () -> {
  *         try (var scope = new StructuredTaskScope<String>()) {
  *
  *             scope.fork(() -> childTask1());
@@ -248,7 +249,7 @@ public final class ScopedValue<T> {
      * mapping bound to values. The following example runs an operation with {@code k1}
      * bound (or rebound) to {@code v1}, and {@code k2} bound (or rebound) to {@code v2}.
      * {@snippet lang=java :
-     *     // @link substring="where" target="#where(ScopedValue, Object)" :
+     *     // @link substring="runWhere" target="#runWhere(ScopedValue, Object)" :
      *     ScopedValue.where(k1, v1).where(k2, v2).run(() -> ... );
      * }
      *
@@ -361,7 +362,7 @@ public final class ScopedValue<T> {
          * @param <R> the type of the result of the operation
          * @return the result
          * @throws Exception if {@code op} completes with an exception
-         * @see ScopedValue#where(ScopedValue, Object, Callable)
+         * @see ScopedValue#callWhere(ScopedValue, Object, Callable) callWhere(ScopedValue, Object, Callable)
          */
         public <R> R call(Callable<? extends R> op) throws Exception {
             Objects.requireNonNull(op);
@@ -389,7 +390,7 @@ public final class ScopedValue<T> {
          * @param op the operation to run
          * @param <R> the type of the result of the operation
          * @return the result
-         * @see ScopedValue#where(ScopedValue, Object, Callable)
+         * @see ScopedValue#getWhere(ScopedValue, Object, Supplier)
          */
         public <R> R get(Supplier<? extends R> op) {
             Objects.requireNonNull(op);
@@ -450,7 +451,7 @@ public final class ScopedValue<T> {
          * they were created. Once closed, {@link StructureViolationException} is thrown.
          *
          * @param op the operation to run
-         * @see ScopedValue#where(ScopedValue, Object, Runnable)
+         * @see ScopedValue#runWhere(ScopedValue, Object, Runnable)
          */
         public void run(Runnable op) {
             Objects.requireNonNull(op);
@@ -531,7 +532,7 @@ public final class ScopedValue<T> {
      * @return the result
      * @throws Exception if the operation completes with an exception
      */
-    public static <T, R> R where(ScopedValue<T> key,
+    public static <T, R> R callWhere(ScopedValue<T> key,
                                  T value,
                                  Callable<? extends R> op) throws Exception {
         return where(key, value).call(op);
@@ -597,7 +598,7 @@ public final class ScopedValue<T> {
      * @param <T> the type of the value
      * @param op the operation to call
      */
-    public static <T> void where(ScopedValue<T> key, T value, Runnable op) {
+    public static <T> void runWhere(ScopedValue<T> key, T value, Runnable op) {
         where(key, value).run(op);
     }
 
