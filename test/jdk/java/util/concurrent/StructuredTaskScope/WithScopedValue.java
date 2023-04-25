@@ -29,8 +29,8 @@
  */
 
 import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructuredTaskScope.TaskHandle;
 import java.util.concurrent.StructureViolationException;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -55,11 +55,11 @@ class WithScopedValue {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
             try (var scope = new StructuredTaskScope<String>(null, factory)) {
-                Future<String> future = scope.fork(() -> {
+                TaskHandle<String> handle = scope.fork(() -> {
                     return name.get(); // child should read "x"
                 });
                 scope.join();
-                return future.resultNow();
+                return handle.get();
             }
         });
         assertEquals(value, "x");
@@ -74,17 +74,17 @@ class WithScopedValue {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
             try (var scope1 = new StructuredTaskScope<String>(null, factory)) {
-                Future<String> future1 = scope1.fork(() -> {
+                TaskHandle<String> handle1 = scope1.fork(() -> {
                     try (var scope2 = new StructuredTaskScope<String>(null, factory)) {
-                        Future<String> future2 = scope2.fork(() -> {
+                        TaskHandle<String> handle2 = scope2.fork(() -> {
                             return name.get(); // grandchild should read "x"
                         });
                         scope2.join();
-                        return future2.resultNow();
+                        return handle2.get();
                     }
                 });
                 scope1.join();
-                return future1.resultNow();
+                return handle1.get();
             }
         });
         assertEquals(value, "x");
@@ -99,17 +99,17 @@ class WithScopedValue {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
             try (var scope1 = new StructuredTaskScope<String>(null, factory)) {
-                Future<String> future1 = scope1.fork(() -> {
+                TaskHandle<String> handle1 = scope1.fork(() -> {
                     assertEquals(name.get(), "x");  // child should read "x"
 
                     // rebind name to "y"
                     String grandchildValue = ScopedValue.callWhere(name, "y", () -> {
                         try (var scope2 = new StructuredTaskScope<String>(null, factory)) {
-                            Future<String> future2 = scope2.fork(() -> {
+                            TaskHandle<String> handle2 = scope2.fork(() -> {
                                 return name.get(); // grandchild should read "y"
                             });
                             scope2.join();
-                            return future2.resultNow();
+                            return handle2.get();
                         }
                     });
 
@@ -117,7 +117,7 @@ class WithScopedValue {
                     return grandchildValue;
                 });
                 scope1.join();
-                return future1.resultNow();
+                return handle1.get();
             }
         });
         assertEquals(value, "y");
@@ -144,14 +144,13 @@ class WithScopedValue {
             // underlying flock should be closed, fork should return a cancelled task
             StructuredTaskScope<Object> scope = box.scope;
             AtomicBoolean ran = new AtomicBoolean();
-            Future<Object> future = scope.fork(() -> {
+            TaskHandle<Object> handle = scope.fork(() -> {
                 ran.set(true);
                 return null;
             });
-            assertTrue(future.isCancelled());
             scope.join();
+            assertEquals(TaskHandle.State.CANCELLED, handle.state());
             assertFalse(ran.get());
-
         } finally {
             StructuredTaskScope<Object> scope = box.scope;
             if (scope != null) {

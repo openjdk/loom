@@ -154,12 +154,12 @@ public class StressStackOverflow {
         var threadFactory
                 = (tlr.nextBoolean() ? Thread.ofPlatform() : Thread.ofVirtual()).factory();
         try (var scope = new StructuredTaskScope<Object>("", threadFactory)) {
-            var future = scope.fork(() -> {
+            var handle = scope.fork(() -> {
                 op.run();
                 return null;
             });
-            future.get();
             scope.join();
+            handle.get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
