@@ -1284,9 +1284,10 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with tasks that complete successfully.
      */
-    @Test
-    void testShutdownOnSuccess2() throws Exception {
-        try (var scope = new ShutdownOnSuccess<String>()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnSuccess2(ThreadFactory factory) throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>(null, factory)) {
             scope.fork(() -> "foo");
             scope.join();  // ensures foo completes first
             scope.fork(() -> "bar");
@@ -1299,9 +1300,10 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with a task that completes successfully with a null result.
      */
-    @Test
-    void testShutdownOnSuccess3() throws Exception {
-        try (var scope = new ShutdownOnSuccess<Object>()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnSuccess3(ThreadFactory factory) throws Exception {
+        try (var scope = new ShutdownOnSuccess<Object>(null, factory)) {
             scope.fork(() -> null);
             scope.join();
             assertNull(scope.result());
@@ -1312,9 +1314,10 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with tasks that complete succcessfully and tasks that fail.
      */
-    @Test
-    void testShutdownOnSuccess4() throws Exception {
-        try (var scope = new ShutdownOnSuccess<String>()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnSuccess4(ThreadFactory factory) throws Exception {
+        try (var scope = new ShutdownOnSuccess<String>(null, factory)) {
             scope.fork(() -> "foo");
             scope.fork(() -> { throw new ArithmeticException(); });
             scope.join();
@@ -1326,15 +1329,46 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnSuccess with a task that fails.
      */
-    @Test
-    void testShutdownOnSuccess5() throws Exception {
-        try (var scope = new ShutdownOnSuccess<Object>()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnSuccess5(ThreadFactory factory) throws Exception {
+        try (var scope = new ShutdownOnSuccess<Object>(null, factory)) {
             scope.fork(() -> { throw new ArithmeticException(); });
             scope.join();
             Throwable ex = assertThrows(ExecutionException.class, () -> scope.result());
             assertTrue(ex.getCause() instanceof  ArithmeticException);
             ex = assertThrows(FooException.class, () -> scope.result(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof  ArithmeticException);
+        }
+    }
+
+    /**
+     * Test ShutdownOnSuccess methods are confined to the owner.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnSuccessConfined(ThreadFactory factory) throws Exception {
+        // owner before join
+        try (var scope = new ShutdownOnSuccess<Boolean>(null, factory)) {
+            scope.fork(() -> { throw new FooException(); });
+            assertThrows(IllegalStateException.class, scope::result);
+            assertThrows(IllegalStateException.class, () -> {
+                scope.result(e -> new RuntimeException(e));
+            });
+            scope.join();
+        }
+
+        // non-owner
+        try (var scope = new ShutdownOnSuccess<Boolean>(null, factory)) {
+            TaskHandle<Boolean> handle = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, scope::result);
+                assertThrows(WrongThreadException.class, () -> {
+                    scope.result(e -> new RuntimeException(e));
+                });
+                return true;
+            });
+            scope.join();
+            assertTrue(handle.get());
         }
     }
 
@@ -1353,9 +1387,10 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with tasks that complete successfully.
      */
-    @Test
-    void testShutdownOnFailure2() throws Throwable {
-        try (var scope = new ShutdownOnFailure()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnFailure2(ThreadFactory factory) throws Throwable {
+        try (var scope = new ShutdownOnFailure(null, factory)) {
             scope.fork(() -> "foo");
             scope.fork(() -> "bar");
             scope.join();
@@ -1370,9 +1405,10 @@ class StructuredTaskScopeTest {
     /**
      * Test ShutdownOnFailure with tasks that complete succcessfully and tasks that fail.
      */
-    @Test
-    void testShutdownOnFailure3() throws Throwable {
-        try (var scope = new ShutdownOnFailure()) {
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnFailure3(ThreadFactory factory) throws Throwable {
+        try (var scope = new ShutdownOnFailure(null, factory)) {
 
             // one task completes successfully, the other with an exception
             scope.fork(() -> "foo");
@@ -1388,6 +1424,38 @@ class StructuredTaskScopeTest {
             ex = assertThrows(FooException.class,
                               () -> scope.throwIfFailed(e -> new FooException(e)));
             assertTrue(ex.getCause() instanceof ArithmeticException);
+        }
+    }
+
+    /**
+     * Test ShutdownOnFailure methods are confined to the owner.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testShutdownOnFailureConfined(ThreadFactory factory) throws Exception {
+        // owner before join
+        try (var scope = new ShutdownOnFailure(null, factory)) {
+            scope.fork(() -> "foo");
+            assertThrows(IllegalStateException.class, scope::exception);
+            assertThrows(IllegalStateException.class, scope::throwIfFailed);
+            assertThrows(IllegalStateException.class, () -> {
+                scope.throwIfFailed(e -> new RuntimeException(e));
+            });
+            scope.join();
+        }
+
+        // non-owner
+        try (var scope = new ShutdownOnFailure(null, factory)) {
+            TaskHandle<Boolean> handle = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, scope::exception);
+                assertThrows(WrongThreadException.class, scope::throwIfFailed);
+                assertThrows(WrongThreadException.class, () -> {
+                    scope.throwIfFailed(e -> new RuntimeException(e));
+                });
+                return true;
+            });
+            scope.join();
+            assertTrue(handle.get());
         }
     }
 

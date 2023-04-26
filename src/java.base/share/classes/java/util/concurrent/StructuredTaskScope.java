@@ -53,13 +53,12 @@ import jdk.internal.misc.ThreadFlock;
  * the {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
  * #join() join} method to wait for all threads to finish, and the {@link #close() close}
  * method to close the task scope. The API is intended to be used with the {@code
- * try-with-resources} construct. The intention is that code in the <em>block</em> uses
- * the {@code fork} method to fork threads to execute the subtasks, wait for the threads
- * to finish with the {@code join} method, and then <em>process the results</em>. The
- * {@code fork} method returns a {@link TaskHandle TaskHandle} to the forked task. The
- * task handle can be used to obtain the {@linkplain TaskHandle#get result} of a task that
- * completes successfully or the {@link TaskHandle#exception() exception} when a task fails.
- * Processing the outcome may include handling or re-throwing of exceptions.
+ * try-with-resources} statement. The intention is that code in the try <em>block</em>
+ * uses the {@code fork} method to fork threads to execute the subtasks, wait for the
+ * threads to finish with the {@code join} method, and then <em>process the results</em>.
+ * Each call to the {@code fork} method returns a {@link TaskHandle TaskHandle}. The
+ * processing of the results can use the {@code TaskHandle} to get result of a task that
+ * completes successfully and the exception when a task fails.
  * {@snippet lang=java :
  *     try (var scope = new StructuredTaskScope<Object>()) {
  *
@@ -72,9 +71,11 @@ import jdk.internal.misc.ThreadFlock;
  *
  *     } // close                                           // @highlight substring="close"
  * }
- * <p> The following forks a collection of homogeneous tasks, waits for all tasks to
- * complete with the {@code join} method, then collects the results of the tasks that
- * complete successfully.
+ * <p> The following example forks a collection of homogeneous tasks, waits for all tasks
+ * to complete with the {@code join} method, then collects the results of the tasks that
+ * complete successfully. It uses the {@linkplain TaskHandle.State TaskHandle.State} to
+ * filter a stream of task handles and the {@link TaskHandle#get() TaskHandle::get} method
+ * to get the results of tasks that completed successfully.
  * {@snippet lang=java :
  *     List<Callable<String>> tasks = ...
  *
