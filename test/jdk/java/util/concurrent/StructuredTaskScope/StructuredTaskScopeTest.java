@@ -23,7 +23,7 @@
 
 /*
  * @test id=platform
- * @bug 8284199
+ * @bug 8284199 8296779 8306647
  * @summary Basic tests for StructuredTaskScope
  * @enablePreview
  * @run junit/othervm -DthreadFactory=platform StructuredTaskScopeTest

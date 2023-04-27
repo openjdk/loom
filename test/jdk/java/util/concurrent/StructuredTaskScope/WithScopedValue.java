@@ -23,6 +23,7 @@
 
 /*
  * @test
+ * @bug 8284199 8296779 8306647
  * @summary Basic tests for StructuredTaskScope with scoped values
  * @enablePreview
  * @run junit WithScopedValue

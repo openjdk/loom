@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @bug 8284199
+ * @bug 8284199 8296779 8306647
  * @summary Test thread dumps with StructuredTaskScope
  * @enablePreview
  * @library /test/lib
