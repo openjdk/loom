@@ -118,7 +118,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork uses the specified thread factory.
+     * Test that fork uses the given thread factory.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -134,7 +134,7 @@ class StructuredTaskScopeTest {
             }
             scope.join();
         }
-        assertTrue(count.get() == 100);
+        assertEquals(100, count.get());
     }
 
     /**
@@ -204,18 +204,18 @@ class StructuredTaskScopeTest {
     @ParameterizedTest
     @MethodSource("factories")
     void testForkAfterShutdown(ThreadFactory factory) throws Exception {
-        var count = new AtomicInteger();
-        try (var scope = new StructuredTaskScope<String>(null, factory)) {
+        var executed = new AtomicBoolean();
+        try (var scope = new StructuredTaskScope<Object>(null, factory)) {
             scope.shutdown();
             TaskHandle<String> handle = scope.fork(() -> {
-                count.incrementAndGet();
-                return "foo";
+                executed.set(true);
+                return null;
             });
             assertEquals(TaskHandle.State.CANCELLED, handle.state());
             assertThrows(IllegalStateException.class, handle::get);
             assertThrows(IllegalStateException.class, handle::exception);
         }
-        assertTrue(count.get() == 0);   // check that task did not run.
+        assertFalse(executed.get());
     }
 
     /**
@@ -225,7 +225,6 @@ class StructuredTaskScopeTest {
     @MethodSource("factories")
     void testForkAfterClose(ThreadFactory factory) throws Exception {
         try (var scope = new StructuredTaskScope<Object>(null, factory)) {
-            scope.join();
             scope.close();
             assertThrows(IllegalStateException.class, () -> scope.fork(() -> null));
         }
@@ -235,7 +234,7 @@ class StructuredTaskScopeTest {
      * Test fork when the thread factory rejects creating a thread.
      */
     @Test
-    void testForkReject() throws Exception {
+    void testForkRejectedExecutionException() throws Exception {
         ThreadFactory factory = task -> null;
         try (var scope = new StructuredTaskScope(null, factory)) {
             assertThrows(RejectedExecutionException.class, () -> scope.fork(() -> null));
@@ -431,17 +430,6 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test join after scope is shutdown.
-     */
-    @Test
-    void testJoinAfterShutdown() throws Exception {
-        try (var scope = new StructuredTaskScope()) {
-            scope.shutdown();
-            scope.join();
-        }
-    }
-
-    /**
      * Test join after scope is closed.
      */
     @Test
@@ -615,7 +603,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that shutdown prevents new threads from starting with fork.
+     * Test that shutdown prevents new threads from starting.
      */
     @Test
     void testShutdownWithFork() throws Exception {
@@ -629,7 +617,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that shutdown interrupts started threads.
+     * Test that shutdown interrupts unfinished threads.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -780,7 +768,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test close without join, threads forked.
+     * Test close without join, unfinished threads.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -791,6 +779,7 @@ class StructuredTaskScopeTest {
                 return null;
             });
             assertThrows(IllegalStateException.class, scope::close);
+            assertEquals(TaskHandle.State.CANCELLED, handle.state());
         }
     }
 
@@ -821,7 +810,7 @@ class StructuredTaskScopeTest {
     void testCloseConfined(ThreadFactory factory) throws Exception {
         try (var scope = new StructuredTaskScope<Boolean>()) {
 
-            // attempt to close on thread in scope
+            // attempt to close from thread in scope
             TaskHandle<Boolean> handle = scope.fork(() -> {
                 assertThrows(WrongThreadException.class, scope::close);
                 return true;
@@ -917,7 +906,7 @@ class StructuredTaskScopeTest {
      * Test that closing an enclosing scope closes the thread flock of a nested scope.
      */
     @Test
-    void testCloseThrowsStructureViolation1() throws Exception {
+    void testCloseThrowsStructureViolation() throws Exception {
         try (var scope1 = new StructuredTaskScope<Object>()) {
             try (var scope2 = new StructuredTaskScope<Object>()) {
 
@@ -929,14 +918,14 @@ class StructuredTaskScopeTest {
                 } catch (StructureViolationException expected) { }
 
                 // underlying flock should be closed, fork should return a cancelled task
-                var ran = new AtomicBoolean();
+                var executed = new AtomicBoolean();
                 TaskHandle<Void> handle = scope2.fork(() -> {
-                    ran.set(true);
+                    executed.set(true);
                     return null;
                 });
                 assertEquals(TaskHandle.State.CANCELLED, handle.state());
                 scope2.join();
-                assertFalse(ran.get());
+                assertFalse(executed.get());
             }
         }
     }
@@ -1014,7 +1003,7 @@ class StructuredTaskScopeTest {
      * with a running or cancelled task.
      */
     @Test
-    void testHandleCompleteThrowsIAE() throws Exception {
+    void testHandleCompleteThrows() throws Exception {
         class TestScope<T> extends StructuredTaskScope<T> {
             protected void handleComplete(TaskHandle<T> handle) {
                 super.handleComplete(handle);
@@ -1036,6 +1025,9 @@ class StructuredTaskScopeTest {
             // cancelled task
             assertEquals(TaskHandle.State.CANCELLED, handle.state());
             assertThrows(IllegalArgumentException.class, () -> scope.handleComplete(handle));
+
+            // null task
+            assertThrows(NullPointerException.class, () -> scope.handleComplete(null));
 
             scope.join();
         }
@@ -1063,7 +1055,7 @@ class StructuredTaskScopeTest {
                 scope.invokeEnsureOwnerAndJoined();
             });
 
-            // owner thread, after before
+            // owner thread, after join
             scope.join();
             scope.invokeEnsureOwnerAndJoined();
 
@@ -1096,23 +1088,23 @@ class StructuredTaskScopeTest {
     @Test
     void testToString() throws Exception {
         ThreadFactory factory = Thread.ofVirtual().factory();
-        try (var scope = new StructuredTaskScope<Object>("xxx", factory)) {
+        try (var scope = new StructuredTaskScope<Object>("duke", factory)) {
             // open
-            assertTrue(scope.toString().contains("xxx"));
+            assertTrue(scope.toString().contains("duke"));
 
             // shutdown
             scope.shutdown();
-            assertTrue(scope.toString().contains("xxx"));
+            assertTrue(scope.toString().contains("duke"));
 
             // closed
             scope.join();
             scope.close();
-            assertTrue(scope.toString().contains("xxx"));
+            assertTrue(scope.toString().contains("duke"));
         }
     }
 
     /**
-     * Test TaskHandle with test that completes successfully.
+     * Test TaskHandle with task that completes successfully.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -1215,7 +1207,6 @@ class StructuredTaskScopeTest {
     @Test
     void testTaskHandleToString() throws Exception {
         try (var scope = new StructuredTaskScope<Object>()) {
-
             // success
             var handle1 = scope.fork(() -> "foo");
             scope.join();
@@ -1241,32 +1232,6 @@ class StructuredTaskScopeTest {
             assertTrue(handle4.toString().contains("Cancelled"));
 
             scope.join();
-        }
-    }
-
-    /**
-     * Test for NullPointerException.
-     */
-    @Test
-    void testNulls() throws Exception {
-        assertThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
-        try (var scope = new StructuredTaskScope<Object>()) {
-            assertThrows(NullPointerException.class, () -> scope.fork(null));
-            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
-        }
-
-        assertThrows(NullPointerException.class, () -> new ShutdownOnSuccess<Object>("", null));
-        try (var scope = new ShutdownOnSuccess<Object>()) {
-            assertThrows(NullPointerException.class, () -> scope.fork(null));
-            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            assertThrows(NullPointerException.class, () -> scope.result(null));
-        }
-
-        assertThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
-        try (var scope = new ShutdownOnFailure()) {
-            assertThrows(NullPointerException.class, () -> scope.fork(null));
-            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
-            assertThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
         }
     }
 
@@ -1410,7 +1375,7 @@ class StructuredTaskScopeTest {
     void testShutdownOnFailure3(ThreadFactory factory) throws Throwable {
         try (var scope = new ShutdownOnFailure(null, factory)) {
 
-            // one task completes successfully, the other with an exception
+            // one task completes successfully, the other fails
             scope.fork(() -> "foo");
             scope.fork(() -> { throw new ArithmeticException(); });
             scope.join();
@@ -1456,6 +1421,33 @@ class StructuredTaskScopeTest {
             });
             scope.join();
             assertTrue(handle.get());
+        }
+    }
+
+
+    /**
+     * Test for NullPointerException.
+     */
+    @Test
+    void testNulls() throws Exception {
+        assertThrows(NullPointerException.class, () -> new StructuredTaskScope("", null));
+        try (var scope = new StructuredTaskScope<Object>()) {
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+        }
+
+        assertThrows(NullPointerException.class, () -> new ShutdownOnSuccess<Object>("", null));
+        try (var scope = new ShutdownOnSuccess<Object>()) {
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.result(null));
+        }
+
+        assertThrows(NullPointerException.class, () -> new ShutdownOnFailure("", null));
+        try (var scope = new ShutdownOnFailure()) {
+            assertThrows(NullPointerException.class, () -> scope.fork(null));
+            assertThrows(NullPointerException.class, () -> scope.joinUntil(null));
+            assertThrows(NullPointerException.class, () -> scope.throwIfFailed(null));
         }
     }
 
