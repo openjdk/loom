@@ -299,7 +299,7 @@ import jdk.internal.misc.ThreadFlock;
  *
  * @jls 17.4.5 Happens-before Order
  *
- * @param <T> the result type of tasks executed in the scope
+ * @param <T> the result type of tasks executed in the task scope
  * @since 21
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
@@ -327,7 +327,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public sealed interface TaskHandle<T> extends Supplier<T> permits TaskRunner {
         /**
-         * {@return the task}
+         * {@return the task provided to the {@code fork} method}
          */
         Callable<T> task();
 
@@ -496,7 +496,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Invoked when a task completes successfully or fails before the scope is shut down.
+     * Invoked when a task completes successfully or fails before the task scope is shut
+     * down.
      *
      * @implSpec The default implementation throws {@code NullPointerException} if the
      * handle is null. It throws {@link IllegalArgumentException} if task is has not
@@ -517,7 +518,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Starts a new thread to run the given task.
+     * Starts a new thread in this task scope to run the given task.
      *
      * <p> The new thread is created with the task scope's {@link ThreadFactory}. It
      * inherits the current thread's {@linkplain ScopedValue scoped value} bindings. The
@@ -525,7 +526,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * <p> The fork method returns a {@link TaskHandle TaskHandle} to the forked task. The
      * handle can be used to obtain the result when the task completes successfully, or the
-     * exception when task fails. To ensure correct usage, the {@link TaskHandle#get()
+     * exception when the task fails. To ensure correct usage, the {@link TaskHandle#get()
      * get()} and {@link TaskHandle#exception() exception()} methods may only be called by
      * the task scope owner after it has waited for all threads to finish with the {@link
      * #join() join} or {@link #joinUntil(Instant)} methods.
@@ -543,8 +544,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> This method may only be invoked by the task scope owner or threads contained
      * in the task scope.
      *
-     * @implSpec If overridden, the subclass should invoke {@code super.fork} to ensure
-     * that the method starts a new thread to run the task as specified.
+     * @implSpec This method may be overridden for customization purposes. If overridden,
+     * the subclass should invoke {@code super.fork} to ensure that the method starts a
+     * new thread to run the task as specified.
      *
      * @param task the task to run
      * @param <U> the result type
@@ -612,16 +614,17 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Wait for all threads to finish or the task scope to shut down. This method waits
-     * until all threads started in the task scope finish execution (of both task and
-     * {@link #handleComplete(TaskHandle) handleComplete} method), the {@link #shutdown()
-     * shutdown} method is invoked to shut down the task scope, or the current thread is
-     * {@linkplain Thread#interrupt() interrupted}.
+     * Wait for all threads in this task scope to finish or the task scope to shut down.
+     * This method waits until all threads started in this task scope finish execution
+     * (of both task and the {@link #handleComplete(TaskHandle) handleComplete} method),
+     * the {@link #shutdown() shutdown} method is invoked to shut down the task scope,
+     * or the current thread is {@linkplain Thread#interrupt() interrupted}.
      *
      * <p> This method may only be invoked by the task scope owner.
      *
-     * @implSpec If overridden, the subclass should invoke {@code super.join} to ensure
-     * that the method waits for all threads as specified.
+     * @implSpec This method may be overridden for customization purposes. If overridden,
+     * the subclass should invoke {@code super.join} to ensure that the method waits as
+     * specified.
      *
      * @return this task scope
      * @throws IllegalStateException if this task scope is closed
@@ -638,17 +641,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Wait for all threads to finish or the task scope to shut down, up to the given
-     * deadline. This method waits until all threads started in the task scope finish
-     * execution (of both task and {@link #handleComplete(TaskHandle) handleComplete}
-     * method), the {@link #shutdown() shutdown} method is invoked to shut down the task
-     * scope, the current thread is {@linkplain Thread#interrupt() interrupted}, or the
-     * deadline is reached.
+     * Wait for all threads in this task scope to finish or the task scope to shut down,
+     * up to the given deadline. This method waits until all threads started in the task
+     * scope finish execution (of both task and the {@link #handleComplete(TaskHandle)
+     * handleComplete} method), the {@link #shutdown() shutdown} method is invoked to
+     * shut down the task scope, the current thread is {@linkplain Thread#interrupt()
+     * interrupted}, or the deadline is reached.
      *
      * * <p> This method may only be invoked by the task scope owner.
      *
-     * @implSpec If overridden, the subclass should invoke {@code super.joinUntil} to
-     * ensure that the method waits for all threads as specified.
+     * @implSpec This method may be overridden for customization purposes. If overridden,
+     * the subclass should invoke {@code super.joinUntil} to ensure that the method waits
+     * specified.
      *
      * @param deadline the deadline
      * @return this task scope
@@ -722,7 +726,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Shut down the task scope without closing it. Shutting down a task scope prevents
      * new threads from starting, interrupts all unfinished threads, and causes the
      * {@link #join() join} method to wakeup. Shutdown is useful for cases where the
-     * results of unfinished subtasks are no longer needed.
+     * results of unfinished subtasks are no longer needed. It will typically be called
+     * by the {@link #handleComplete(TaskHandle)} implementation of a subclass that
+     * implements a policy to discard unfinished tasks once some outcome is reached.
      *
      * <p> More specifically, this method:
      * <ul>
@@ -736,8 +742,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> This method may only be invoked by the task scope owner or threads contained
      * in the task scope.
      *
-     * @implSpec If overridden, the subclass should invoke {@code super.shutdown} to
-     * ensure that the method shuts down the scope as specified.
+     * @implSpec This method may be overridden for customization purposes. If overridden,
+     * the subclass should invoke {@code super.shutdown} to ensure that the method shuts
+     * down the task scope as specified.
      *
      * @apiNote
      * There may be threads that have not finished because they are executing code that
@@ -783,8 +790,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * created in. Thread termination may therefore be delayed when the task scope owner
      * has to wait for threads forked in these task scopes to finish.
      *
-     * @implSpec If overridden, the subclass should invoke {@code super.code} to
-     * ensure that the method closes the task scope as specified.
+     * @implSpec This method may be overridden for customization purposes. If overridden,
+     * the subclass should invoke {@code super.close} to ensure that the method closes
+     * the task scope as specified.
      *
      * @throws IllegalStateException thrown after closing the task scope if the task scope
      * owner did not invoke join after forking
