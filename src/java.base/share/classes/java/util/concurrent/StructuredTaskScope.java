@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.ThreadFlock;
 
@@ -47,7 +46,7 @@ import jdk.internal.misc.ThreadFlock;
  * operation is confined by a <em>syntax block</em>, just like that of a sequential
  * operation in structured programming.
  *
- * <h2>Basic usage</h2>
+ * <h2>Basic operation</h2>
  *
  * A {@code StructuredTaskScope} is created with one of its public constructors. It defines
  * the {@link #fork(Callable) fork} method to start a thread to execute a task, the {@link
@@ -57,13 +56,17 @@ import jdk.internal.misc.ThreadFlock;
  * uses the {@code fork} method to fork threads to execute the subtasks, wait for the
  * threads to finish with the {@code join} method, and then <em>process the results</em>.
  * Each call to the {@code fork} method returns a {@link TaskHandle TaskHandle}. The
- * processing of the results can use the {@code TaskHandle} to get result of a task that
- * completes successfully and the exception when a task fails.
+ * processing of the results can use {@link TaskHandle#get() TaskHandle.get()} method to
+ * get the result of a task that completes successfully. If needed, it can use {@link
+ * TaskHandle#exception() TaskHandle.exception()} to get the exception of a task that fails.
  * {@snippet lang=java :
+ *     Callable<String> task1 = ...
+ *     Callable<Integer> task2 = ...
+ *
  *     try (var scope = new StructuredTaskScope<Object>()) {
  *
- *         TaskHandle<Integer> handle1 = scope.fork(task1); // @highlight substring="fork"
- *         TaskHandle<String> handle2 = scope.fork(task2);  // @highlight substring="fork"
+ *         TaskHandle<String> handle1 = scope.fork(task1);  // @highlight substring="fork"
+ *         TaskHandle<Integer> handle2 = scope.fork(task2); // @highlight substring="fork"
  *
  *         scope.join();                                    // @highlight substring="join"
  *
@@ -72,10 +75,9 @@ import jdk.internal.misc.ThreadFlock;
  *     } // close                                           // @highlight substring="close"
  * }
  * <p> The following example forks a collection of homogeneous tasks, waits for all tasks
- * to complete with the {@code join} method, then collects the results of the tasks that
- * complete successfully. It uses the {@linkplain TaskHandle.State TaskHandle.State} to
- * filter a stream of task handles and the {@link TaskHandle#get() TaskHandle::get} method
- * to get the results of tasks that completed successfully.
+ * to complete with the {@code join} method, and uses the {@link TaskHandle.State
+ * TaskHandle.State} to partition the task handles into one set with the handles to tasks
+ * that completed successfully and another for the tasks that failed.
  * {@snippet lang=java :
  *     List<Callable<String>> tasks = ...
  *
@@ -85,10 +87,9 @@ import jdk.internal.misc.ThreadFlock;
  *
  *         scope.join();
  *
- *         // map of task to result
- *         Map<Callable<String>, String> results = handles.stream()
- *                 .filter(h -> h.state() == TaskHandle.State.SUCCESS)
- *                 .collect(Collectors.toMap(TaskHandle::task, TaskHandle::get));
+ *         Map<Boolean, Set<TaskHandle<String>>> map = handles.stream()
+ *                 .collect(Collectors.partitioningBy(h -> h.state() == TaskHandle.State.SUCCESS,
+ *                                                    Collectors.toSet()));
  *
  *     } // close
  * }
@@ -99,12 +100,13 @@ import jdk.internal.misc.ThreadFlock;
  * {@code join} method after forking.
  *
  * <p> {@code StructuredTaskScope} defines the {@link #shutdown() shutdown} method to shut
- * down a task scope without closing it. Shutdown is useful for cases where a subtask
- * completes with a result (or exception) and the results of other unfinished subtasks are
- * no longer needed. If a subtask invokes {@code shutdown} while the owner is waiting in
- * the {@code join} method then it will cause {@code join} to wakeup, all unfinished
- * threads to be {@linkplain Thread#interrupt() interrupted} and prevents new threads
- * from starting in the task scope.
+ * down a task scope without closing it. The {@code shutdown()} method cancels all
+ * unfinished subtasks by {@linkplain Thread#interrupt() interrupting} the threads. It
+ * prevents new threads from starting in the task scope. If the owner is waiting in the
+ * {@code join} method then it will wakeup.
+ *
+ * <p> Shutdown is used for <em>short-circuiting</em> and allow subclasses to implement
+ * <em>policy</em> that does not require all tasks to finish.
  *
  * <h2>Subclasses with policies for common cases</h2>
  *
@@ -194,36 +196,33 @@ import jdk.internal.misc.ThreadFlock;
  * define a method to get the exception of the first subtask to fail.
  *
  * <p> The following is an example of a {@code StructuredTaskScope} implementation that
- * collects the results of subtasks that complete successfully. It defines the method
- * <b>{@code results()}</b> to be used by the main task to retrieve the results.
- *
+ * collects the task handles to all tasks that complete. It defines the method
+ * <b>{@code results()}</b> to be used by the main task to retrieve the results of subtasks
+ * that complete successfully.
  * {@snippet lang=java :
- *     class MyScope<T> extends StructuredTaskScope<T> {
- *         private final Queue<T> results = new ConcurrentLinkedQueue<>();
+ *     class CollectingScope<T> extends StructuredTaskScope<T> {
+ *         private final Queue<TaskHandle<T>> handles = new LinkedTransferQueue<>();
  *
- *         MyScope() {
- *             super(null, Thread.ofVirtual().factory());
- *         }
+ *         CollectingScope() { }
  *
  *         @Override
- *         // @link substring="handleComplete" target="handleComplete" :
  *         protected void handleComplete(TaskHandle<T> handle) {
- *             if (handle.state() == Handle.State.SUCCESS) {
- *                 results.add(result);
- *             }
+ *             handles.add(handle);
  *         }
  *
  *         @Override
- *         public MyScope<T> join() throws InterruptedException {
- *              super.join();
- *              return this;
+ *         public CollectingScope<T> join() throws InterruptedException {
+ *             super.join();
+ *             return this;
  *         }
  *
- *         // Returns a stream of results from the subtasks that completed successfully
- *         public Stream<T> results() {   // @highlight substring="results"
- *              // @link substring="ensureOwnerAndJoined" target="ensureOwnerAndJoined" :
- *              super.ensureOwnerAndJoined();
- *              return results.stream();
+ *         // returns a map of a task to result for the tasks that completed successfully
+ *         public Map<Callable<T>, T> results() {
+ *             // @link substring="ensureOwnerAndJoined" target="ensureOwnerAndJoined" :
+ *             super.ensureOwnerAndJoined();
+ *             return handles.stream()
+ *                     .filter(h -> h.state() == TaskHandle.State.SUCCESS)
+ *                     .collect(Collectors.toMap(TaskHandle::task, TaskHandle::get));
  *         }
  *     }
  * }
@@ -544,9 +543,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> This method may only be invoked by the task scope owner or threads contained
      * in the task scope.
      *
-     * @implSpec This method may be overridden for customization purposes. If overridden,
-     * the subclass should invoke {@code super.fork} to ensure that the method starts a
-     * new thread to run the task as specified.
+     * @implSpec This method may be overridden for customization purposes, wrapping tasks
+     * for example. If overridden, the subclass should invoke {@code super.fork} to ensure
+     * that the method starts a new thread to run the task as specified.
      *
      * @param task the task to run
      * @param <U> the result type
@@ -622,9 +621,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * <p> This method may only be invoked by the task scope owner.
      *
-     * @implSpec This method may be overridden for customization purposes. If overridden,
-     * the subclass should invoke {@code super.join} to ensure that the method waits as
-     * specified.
+     * @implSpec This method may be overridden for customization purposes or to return a
+     * more specific return type. If overridden, the subclass should invoke {@code
+     * super.join} to ensure that the method waits as specified.
      *
      * @return this task scope
      * @throws IllegalStateException if this task scope is closed
@@ -650,9 +649,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * * <p> This method may only be invoked by the task scope owner.
      *
-     * @implSpec This method may be overridden for customization purposes. If overridden,
-     * the subclass should invoke {@code super.joinUntil} to ensure that the method waits
-     * specified.
+     * @implSpec This method may be overridden for customization purposes or to return a
+     * more specific return type. If overridden, the subclass should invoke {@code
+     * super.joinUntil} to ensure that the method waits as specified.
      *
      * @param deadline the deadline
      * @return this task scope

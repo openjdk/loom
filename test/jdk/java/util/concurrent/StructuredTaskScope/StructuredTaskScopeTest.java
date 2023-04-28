@@ -1424,7 +1424,6 @@ class StructuredTaskScopeTest {
         }
     }
 
-
     /**
      * Test for NullPointerException.
      */
