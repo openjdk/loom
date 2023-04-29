@@ -153,10 +153,10 @@ import jdk.internal.misc.ThreadFlock;
  * main task waits in {@link #joinUntil(Instant)} until both subtasks complete with a
  * result, either fails, or a deadline is reached. It invokes {@link
  * ShutdownOnFailure#throwIfFailed(Function) throwIfFailed(Function)} to throw an exception
- * when either subtask fails. This method is a no-op if no subtasks fail. The example uses
- * {@link Supplier#get()} to get the result of each subtask. Using {@code Supplier}
- * instead of {@code TaskHandle} is preferred for common cases where the handle is only
- * used to get the result of a task that completed successfully.
+ * if either subtask fails. This method is a no-op if both subtasks complete successfully.
+ * The example uses {@link Supplier#get()} to get the result of each subtask. Using
+ * {@code Supplier} instead of {@code TaskHandle} is preferred for common cases where the
+ * handle is only used to get the result of a task that completed successfully.
  * {@snippet lang=java :
  *    Instant deadline = ...
  *
@@ -197,8 +197,8 @@ import jdk.internal.misc.ThreadFlock;
  *
  * <p> The following is an example of a {@code StructuredTaskScope} implementation that
  * collects the task handles to all tasks that complete. It defines the method
- * <b>{@code results()}</b> to be used by the main task to retrieve the results of subtasks
- * that complete successfully.
+ * <b>{@code results()}</b> to be used by the main task to getting a map of "task to
+ * result" for the subtasks that completed successfully.
  * {@snippet lang=java :
  *     class CollectingScope<T> extends StructuredTaskScope<T> {
  *         private final Queue<TaskHandle<T>> handles = new LinkedTransferQueue<>();
@@ -396,11 +396,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * tasks are {@linkplain #fork(Callable) forked}. The task scope is owned by the
      * current thread.
      *
-     * <p> The constructor captures the current thread's {@linkplain ScopedValue scoped
-     * value} bindings for inheritance by threads created in the task scope. The
-     * <a href="#TreeStructure">Tree Structure</a> section in the class description
-     * details how parent-child relations are established implicitly for the purpose of
-     * inheritance of scoped value bindings.
+     * <p> Construction captures the current thread's {@linkplain ScopedValue scoped value}
+     * bindings for inheritance by threads started in the task scope. The
+     * <a href="#TreeStructure">Tree Structure</a> section in the class description details
+     * how parent-child relations are established implicitly for the purpose of inheritance
+     * of scoped value bindings.
      *
      * @param name the name of the task scope, can be null
      * @param factory the thread factory
@@ -499,8 +499,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * down.
      *
      * @implSpec The default implementation throws {@code NullPointerException} if the
-     * handle is null. It throws {@link IllegalArgumentException} if task is has not
-     * completed or the task was cancelled.
+     * handle is {@code null}. It throws {@link IllegalArgumentException} if the task has
+     * not completed or was cancelled.
      *
      * @apiNote The {@code handleComplete} method should be thread safe. It may be
      * invoked by several threads concurrently.
@@ -544,8 +544,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * in the task scope.
      *
      * @implSpec This method may be overridden for customization purposes, wrapping tasks
-     * for example. If overridden, the subclass should invoke {@code super.fork} to ensure
-     * that the method starts a new thread to run the task as specified.
+     * for example. If overridden, the subclass must invoke {@code super.fork} to start a
+     * new thread in this task scope.
      *
      * @param task the task to run
      * @param <U> the result type
@@ -622,8 +622,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * <p> This method may only be invoked by the task scope owner.
      *
      * @implSpec This method may be overridden for customization purposes or to return a
-     * more specific return type. If overridden, the subclass should invoke {@code
-     * super.join} to ensure that the method waits as specified.
+     * more specific return type. If overridden, the subclass must invoke {@code
+     * super.join} to ensure that the method waits for threads in this task scope to
+     * finish.
      *
      * @return this task scope
      * @throws IllegalStateException if this task scope is closed
@@ -650,8 +651,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * * <p> This method may only be invoked by the task scope owner.
      *
      * @implSpec This method may be overridden for customization purposes or to return a
-     * more specific return type. If overridden, the subclass should invoke {@code
-     * super.joinUntil} to ensure that the method waits as specified.
+     * more specific return type. If overridden, the subclass must invoke {@code
+     * super.joinUntil} to ensure that the method waits for threads in this task scope to
+     * finish.
      *
      * @param deadline the deadline
      * @return this task scope
@@ -742,8 +744,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * in the task scope.
      *
      * @implSpec This method may be overridden for customization purposes. If overridden,
-     * the subclass should invoke {@code super.shutdown} to ensure that the method shuts
-     * down the task scope as specified.
+     * the subclass must invoke {@code super.shutdown} to ensure that the method shuts
+     * down the task scope.
      *
      * @apiNote
      * There may be threads that have not finished because they are executing code that
@@ -790,8 +792,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * has to wait for threads forked in these task scopes to finish.
      *
      * @implSpec This method may be overridden for customization purposes. If overridden,
-     * the subclass should invoke {@code super.close} to ensure that the method closes
-     * the task scope as specified.
+     * the subclass must invoke {@code super.close} to close the task scope.
      *
      * @throws IllegalStateException thrown after closing the task scope if the task scope
      * owner did not invoke join after forking
@@ -1006,11 +1007,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope is
          * owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
-         * bindings for inheritance by threads created in the task scope. The
-         * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
-         * the class description details how parent-child relations are established
-         * implicitly for the purpose of inheritance of scoped value bindings.
+         * <p> Construction captures the current thread's {@linkplain ScopedValue scoped
+         * value} bindings for inheritance by threads started in the task scope. The
+         * <a href="#TreeStructure">Tree Structure</a> section in the class description
+         * details how parent-child relations are established implicitly for the purpose
+         * of inheritance of scoped value bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
@@ -1030,8 +1031,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         /**
-         * Shut down the given task scope when invoked for the first time with a task
-         * that completed {@linkplain TaskHandle.State#SUCCESS successfully}.
+         * Shut down this task scope when invoked for the first time with a task that
+         * completed {@linkplain TaskHandle.State#SUCCESS successfully}.
          *
          * @throws IllegalArgumentException {@inheritDoc}
          */
@@ -1087,9 +1088,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * {@return the result of the first subtask that completed {@linkplain
          * TaskHandle.State#SUCCESS successfully}}
          *
-         * <p> When no subtask completed successfully but a task {@linkplain
-         * TaskHandle.State#FAILED failed} with an exception, then {@code ExecutionException}
-         * is thrown with the exception as the {@linkplain Throwable#getCause() cause}.
+         * <p> When no subtask completed successfully, but a task {@linkplain
+         * TaskHandle.State#FAILED failed}, then {@code ExecutionException} is thrown with
+         * the failed task's exception as the {@linkplain Throwable#getCause() cause}.
          *
          * @throws ExecutionException if no subtasks completed successfully but a subtask
          * failed
@@ -1123,8 +1124,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * TaskHandle.State#SUCCESS successfully}, otherwise throws an exception produced
          * by the given exception supplying function.
          *
-         * <p> When no subtask completed successfully but a subtask failed with an
-         * exception then the exception supplying function is invoked with the exception.
+         * <p> When no subtask completed successfully, but a task {@linkplain
+         * TaskHandle.State#FAILED failed}, then the exception supplying function is
+         * invoked with failed task's exception.
          *
          * @param esf the exception supplying function
          * @param <X> type of the exception to be thrown
@@ -1193,11 +1195,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * threads when tasks are {@linkplain #fork(Callable) forked}. The task scope
          * is owned by the current thread.
          *
-         * <p> This method captures the current thread's {@linkplain ScopedValue scoped value}
-         * bindings for inheritance by threads created in the task scope. The
-         * <a href="StructuredTaskScope.html#TreeStructure">Tree Structure</a> section in
-         * the class description details how parent-child relations are established
-         * implicitly for the purpose of inheritance of scoped value bindings.
+         * <p> Construction captures the current thread's {@linkplain ScopedValue scoped
+         * value} bindings for inheritance by threads started in the task scope. The
+         * <a href="#TreeStructure">Tree Structure</a> section in the class description
+         * details how parent-child relations are established implicitly for the purpose
+         * of inheritance of scoped value bindings.
          *
          * @param name the name of the task scope, can be null
          * @param factory the thread factory
@@ -1217,8 +1219,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         /**
-         * Shut down the given task scope when invoked for the first time with a task
-         * that {@linkplain TaskHandle.State#FAILED failed}.
+         * Shut down this task scope when invoked for the first time with a task that
+         * {@linkplain TaskHandle.State#FAILED failed}.
          *
          * @throws IllegalArgumentException {@inheritDoc}
          */
