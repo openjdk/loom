@@ -319,7 +319,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     private volatile int state;
 
     /**
-     * A handle to a task forked with {@linkplain #fork(Callable) fork}.
+     * A handle to a task forked with {@link #fork(Callable)}.
      * @param <T> the result type
      * @since 21
      */
@@ -438,7 +438,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Throws IllegalStateException if the scope is closed, returning the current state.
+     * Throws IllegalStateException if the scope is closed, returning the state if not
+     * closed.
      */
     private int ensureOpen() {
         int s = state;
@@ -476,9 +477,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Ensures that the current thread is the task scope owner and that the {@link #join()}
-     * or {@link #joinUntil(Instant)} method has been called after {@linkplain
-     * #fork(Callable) forking}.
+     * Ensures that the current thread is the owner of this task scope and that the
+     * {@link #join()} or {@link #joinUntil(Instant)} method has been called after
+     * {@linkplain #fork(Callable) forking}.
      *
      * @apiNote This method can be used by subclasses that define methods to make available
      * results, state, or other outcome to code intended to execute after the join method.
@@ -495,8 +496,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Invoked when a task completes successfully or fails before the task scope is shut
-     * down.
+     * Invoked when a task completes successfully or fails in this task scope.
      *
      * @implSpec The default implementation throws {@code NullPointerException} if the
      * handle is {@code null}. It throws {@link IllegalArgumentException} if the task has
@@ -724,7 +724,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     }
 
     /**
-     * Shut down the task scope without closing it. Shutting down a task scope prevents
+     * Shut down this task scope without closing it. Shutting down a task scope prevents
      * new threads from starting, interrupts all unfinished threads, and causes the
      * {@link #join() join} method to wakeup. Shutdown is useful for cases where the
      * results of unfinished subtasks are no longer needed. It will typically be called

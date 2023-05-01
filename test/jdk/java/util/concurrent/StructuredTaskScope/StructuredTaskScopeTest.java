@@ -99,7 +99,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that each fork creates a new thread.
+     * Test that fork creates a new thread.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -1113,7 +1113,7 @@ class StructuredTaskScopeTest {
             Callable<String> task = () -> "foo";
             TaskHandle<String> handle = scope.fork(task);
 
-            // before join
+            // before join, owner thread
             assertEquals(task, handle.task());
             assertThrows(IllegalStateException.class, handle::get);
             assertThrows(IllegalStateException.class, handle::exception);
@@ -1138,7 +1138,7 @@ class StructuredTaskScopeTest {
             Callable<String> task = () -> { throw new FooException(); };
             TaskHandle<String> handle = scope.fork(task);
 
-            // before join
+            // before join, owner thread
             assertEquals(task, handle.task());
             assertThrows(IllegalStateException.class, handle::get);
             assertThrows(IllegalStateException.class, handle::exception);
