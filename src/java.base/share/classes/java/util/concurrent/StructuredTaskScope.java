@@ -40,11 +40,10 @@ import jdk.internal.misc.ThreadFlock;
 
 /**
  * A basic API for <em>structured concurrency</em>. {@code StructuredTaskScope} supports
- * cases where a task splits into several concurrent subtasks, to be executed in their
- * own threads, and where the subtasks must complete before the main task continues. A
- * {@code StructuredTaskScope} can be used to ensure that the lifetime of a concurrent
- * operation is confined by a <em>syntax block</em>, just like that of a sequential
- * operation in structured programming.
+ * cases where a task splits into several concurrent subtasks, and where the subtasks must
+ * complete before the main task continues. A {@code StructuredTaskScope} can be used to
+ * ensure that the lifetime of a concurrent operation is confined by a <em>syntax block</em>,
+ * just like that of a sequential operation in structured programming.
  *
  * <h2>Basic operation</h2>
  *
