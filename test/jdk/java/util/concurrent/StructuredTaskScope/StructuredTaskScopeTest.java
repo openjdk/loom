@@ -99,13 +99,13 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork creates a new thread.
+     * Test that fork creates a new thread for each task.
      */
     @ParameterizedTest
     @MethodSource("factories")
     void testForkCreatesThread(ThreadFactory factory) throws Exception {
         Set<Long> tids = ConcurrentHashMap.newKeySet();
-        try (var scope = new StructuredTaskScope<Integer>(null, factory)) {
+        try (var scope = new StructuredTaskScope<Object>(null, factory)) {
             for (int i = 0; i < 100; i++) {
                 scope.fork(() -> {
                     tids.add(Thread.currentThread().threadId());
@@ -118,7 +118,26 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork uses the given thread factory.
+     * Test that fork creates a new virtual thread for each task.
+     */
+    @Test
+    void testForkCreateVirtualThread() throws Exception {
+        Set<Thread> threads = ConcurrentHashMap.newKeySet();
+        try (var scope = new StructuredTaskScope<Object>()) {
+            for (int i = 0; i < 100; i++) {
+                scope.fork(() -> {
+                    threads.add(Thread.currentThread());
+                    return null;
+                });
+            }
+            scope.join();
+        }
+        assertEquals(100, threads.size());
+        threads.forEach(t -> assertTrue(t.isVirtual()));
+    }
+
+    /**
+     * Test that fork creates a new thread with the given thread factory.
      */
     @ParameterizedTest
     @MethodSource("factories")

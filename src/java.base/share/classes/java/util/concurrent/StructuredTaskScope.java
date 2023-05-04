@@ -369,20 +369,16 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         /**
          * Returns the result, if the task completed successfully.
          * @return the possibly-null result
-         * @throws IllegalStateException if the task has not completed, the task failed,
-         * or the scope was shutdown before the task completed
-         * @throws IllegalStateException if the current thread is the task scope owner
-         * and it did not invoke join after forking
+         * @throws IllegalStateException if the task did not complete successfully, or
+         * the current thread is the task scope owner and did not join after forking
          * @see State#SUCCESS
          */
         T get();
 
         /**
          * {@return the exception, if the task failed with an exception}
-         * @throws IllegalStateException if the task has not completed, the task
-         * completed successfully, or the scope was shutdown before the task completed
-         * @throws IllegalStateException if the current thread is the task scope owner
-         * and it did not invoke join after forking
+         * @throws IllegalStateException if the task did not fail, or the current thread
+         * is the task scope owner and did not invoke join after forking
          * @see State#FAILED
          */
         Throwable exception();
@@ -417,8 +413,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * name of {@code null} and a thread factory that creates virtual threads.
      */
     public StructuredTaskScope() {
-        this.factory = Thread.ofVirtual().factory();
-        this.flock = ThreadFlock.open(null);
+        this(null, Thread.ofVirtual().factory());
     }
 
     private IllegalStateException newIllegalStateExceptionScopeClosed() {
@@ -1026,7 +1021,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * a name of {@code null} and a thread factory that creates virtual threads.
          */
         public ShutdownOnSuccess() {
-            super(null, Thread.ofVirtual().factory());
+            this(null, Thread.ofVirtual().factory());
         }
 
         /**
@@ -1214,7 +1209,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * a name of {@code null} and a thread factory that creates virtual threads.
          */
         public ShutdownOnFailure() {
-            super(null, Thread.ofVirtual().factory());
+            this(null, Thread.ofVirtual().factory());
         }
 
         /**
