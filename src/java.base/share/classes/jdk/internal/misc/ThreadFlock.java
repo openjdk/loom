@@ -563,6 +563,10 @@ public class ThreadFlock implements AutoCloseable {
         }
 
         @Override
+        public String name() {
+            return flock.name();
+        }
+        @Override
         public long threadCount() {
             return flock.threadCount();
         }
@@ -577,10 +581,6 @@ public class ThreadFlock implements AutoCloseable {
         @Override
         public void onExit(Thread thread) {
             flock.onExit(thread);
-        }
-        @Override
-        public String toString() {
-            return flock.toString();
         }
         @Override
         public ScopedValueContainer.BindingsSnapshot scopedValueBindings() {
