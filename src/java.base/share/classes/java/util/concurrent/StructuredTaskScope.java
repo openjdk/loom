@@ -314,7 +314,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     private static final int SHUTDOWN = 1;
     private static final int CLOSED   = 2;
 
-    // scope state, set by owner, read by any thread
+    // state: set to SHUTDOWN by any thread, set to CLOSED by owner, read by any thread
     private volatile int state;
 
     /**
@@ -402,6 +402,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      */
     public StructuredTaskScope(String name, ThreadFactory factory) {
         this.factory = Objects.requireNonNull(factory, "'factory' is null");
+        if (name == null)
+            name = Objects.toIdentityString(this);
         this.flock = ThreadFlock.open(name);
     }
 
@@ -501,8 +503,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      *
      * @param handle the handle to the task
      *
-     * @throws IllegalArgumentException if the task has not completed or the task was
-     * cancelled
+     * @throws IllegalArgumentException if called with a task that has not completed or
+     * a task that was cancelled
      */
     protected void handleComplete(TaskHandle<T> handle) {
         var state = handle.state();
@@ -571,7 +573,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 flock.start(thread);
                 started = true;
             } catch (IllegalStateException e) {
-                // shutdown by another thread or underlying flock is shutdown
+                // shutdown by another thread, or underlying flock is shutdown due
+                // to unstructured use
             }
         }
 
@@ -668,13 +671,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Interrupt all unfinished threads.
      */
     private void implInterruptAll() {
-        flock.threads().forEach(t -> {
-            if (t != Thread.currentThread()) {
+        flock.threads()
+            .filter(t -> t != Thread.currentThread())
+            .forEach(t -> {
                 try {
                     t.interrupt();
                 } catch (Throwable ignore) { }
-            }
-        });
+            });
     }
 
     @SuppressWarnings("removal")
@@ -815,19 +818,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
         String name = flock.name();
-        if (name != null) {
-            sb.append(name);
-            sb.append('/');
-        }
-        sb.append(Objects.toIdentityString(this));
-        int s = state;
-        if (s == SHUTDOWN)
-            sb.append("/shutdown");
-        else if (s == CLOSED)
-            sb.append("/closed");
-        return sb.toString();
+        return switch (state) {
+            case OPEN     -> name;
+            case SHUTDOWN -> name + "/shutdown";
+            case CLOSED   -> name + "/closed";
+            default -> throw new InternalError();
+        };
     }
 
     /**
