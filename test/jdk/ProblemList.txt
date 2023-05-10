@@ -607,6 +607,7 @@ sun/security/pkcs11/rsa/TestSignatures.java                     8295343 linux-al
 sun/security/pkcs11/rsa/TestKeyPairGenerator.java               8295343 linux-all
 sun/security/pkcs11/rsa/TestKeyFactory.java                     8295343 linux-all
 sun/security/pkcs11/KeyStore/Basic.java                         8295343 linux-all
+sun/security/pkcs11/Cipher/TestKATForGCM.java                   8240611 linux-x64,macosx-x64
 
 
 ############################################################################
@@ -668,6 +669,7 @@ java/awt/dnd/MissingDragExitEventTest/MissingDragExitEventTest.java 8288839 wind
 
 sanity/client/SwingSet/src/ToolTipDemoTest.java 8293001 linux-all
 sanity/client/SwingSet/src/ButtonDemoScreenshotTest.java 8265770 macosx-all
+sanity/client/SwingSet/src/EditorPaneDemoTest.java 8212240 linux-x64
 
 ############################################################################
 
@@ -695,8 +697,6 @@ com/sun/jdi/RepStep.java                                        8043571 generic-
 com/sun/jdi/InvokeHangTest.java                                 8218463 linux-all
 
 com/sun/jdi/AfterThreadDeathTest.java                           8232839 linux-all
-
-com/sun/jdi/JdbLastErrorTest.java                               8305913 windows-x64
 
 ############################################################################
 
@@ -737,6 +737,7 @@ sun/tools/jhsdb/JStackStressTest.java                           8276210 linux-aa
 javax/rmi/ssl/SSLSocketParametersTest.sh                        8162906 generic-all
 
 jdk/incubator/vector/ShortMaxVectorTests.java                   8306592 generic-i586
+jdk/incubator/vector/LoadJsvmlTest.java                         8305390 windows-x64
 
 ############################################################################
 
