@@ -62,6 +62,7 @@ java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
 
 # Incorrect stack/threadgroup/exception expectations for main thread
 com/sun/net/httpserver/bugs/B6431193.java 0000000 generic-all
+java/lang/ScopedValue/StressStackOverflow.java 0000000 generic-all
 java/lang/StackWalker/DumpStackTest.java 0000000 generic-all
 java/lang/StackWalker/StackWalkTest.java 0000000 generic-all
 java/lang/StackWalker/CallerFromMain.java 0000000 generic-all
