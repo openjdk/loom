@@ -51,6 +51,9 @@ com/sun/jdi/cds/CDSBreakpointTest.java 8307778 generic-all
 com/sun/jdi/cds/CDSDeleteAllBkptsTest.java 8307778 generic-all
 com/sun/jdi/cds/CDSFieldWatchpoints.java 8307778 generic-all
 
+## Unknown
+java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
+
 
 ##########
 ## Tests incompatible with  with virtual test thread factory.
@@ -58,6 +61,7 @@ com/sun/jdi/cds/CDSFieldWatchpoints.java 8307778 generic-all
 ## So any test migth be added as incompatible, the bug is not required.
 
 # Incorrect stack/threadgroup/exception expectations for main thread
+com/sun/net/httpserver/bugs/B6431193.java 0000000 generic-all
 java/lang/StackWalker/DumpStackTest.java 0000000 generic-all
 java/lang/StackWalker/StackWalkTest.java 0000000 generic-all
 java/lang/StackWalker/CallerFromMain.java 0000000 generic-all
@@ -67,10 +71,25 @@ java/lang/Thread/virtual/GetStackTraceWhenRunnable.java 0000000 generic-all
 java/lang/invoke/condy/CondyNestedResolutionTest.java 0000000 generic-all
 java/lang/ref/OOMEInReferenceHandler.java 0000000 generic-all
 jdk/internal/vm/Continuation/Scoped.java 0000000 generic-all
+jdk/jfr/event/runtime/TestThreadDumpEvent.java 0000000 generic-all
+jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
+jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
 
 # The problems with permissions
-jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
 java/lang/SecurityManager/modules/CustomSecurityManagerTest.java 0000000 generic-all
 java/util/PluggableLocale/PermissionTest.java 0000000 generic-all
 java/util/Properties/StoreReproducibilityTest.java 0000000 generic-all
 java/util/Properties/StoreReproducibilityTest.java 0000000 generic-all
+javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java 0000000 generic-all
+
+jdk/jfr/api/consumer/security/TestStreamingRemote.java
+jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
+
+
+# Unimplemnted functionality
+com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java 0000000 generic-all
+java/lang/management/ManagementFactory/ProxyTypeMapping.java 0000000 generic-all
+java/lang/management/ManagementFactory/ValidateOpenTypes.java 0000000 generic-all
+java/lang/management/ThreadMXBean/Locks.java 0000000 generic-all
+java/lang/management/ThreadMXBean/ThreadCpuTime.java 0000000 generic-all
+java/lang/management/ThreadMXBean/ThreadUserTime.java 0000000 generic-all
