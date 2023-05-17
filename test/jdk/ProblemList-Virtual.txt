@@ -52,8 +52,9 @@ com/sun/jdi/cds/CDSDeleteAllBkptsTest.java 8307778 generic-all
 com/sun/jdi/cds/CDSFieldWatchpoints.java 8307778 generic-all
 
 ## Unknown
+java/nio/channels/DatagramChannel/InterruptibleOrNot.java 0000000 generic-all
+java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
-
 
 ##########
 ## Tests incompatible with  with virtual test thread factory.
@@ -77,15 +78,19 @@ jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
 jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
 
 # The problems with permissions
+java/io/FilePermission/MergeName.java 0000000 generic-all
 java/lang/SecurityManager/modules/CustomSecurityManagerTest.java 0000000 generic-all
+java/security/AccessController/LimitedDoPrivileged.java	0000000 generic-all
 java/util/PluggableLocale/PermissionTest.java 0000000 generic-all
 java/util/Properties/StoreReproducibilityTest.java 0000000 generic-all
 java/util/Properties/StoreReproducibilityTest.java 0000000 generic-all
 javax/management/remote/mandatory/subjectDelegation/SubjectDelegation1Test.java 0000000 generic-all
 
-jdk/jfr/api/consumer/security/TestStreamingRemote.java
+jdk/jfr/api/consumer/security/TestStreamingRemote.java 0000000 generic-all
 jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
 
+sun/security/util/Resources/early/EarlyResources.java 0000000 generic-all
+tools/jimage/JImageToolTest.java 0000000 generic-all
 
 # Unimplemnted functionality
 com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java 0000000 generic-all
