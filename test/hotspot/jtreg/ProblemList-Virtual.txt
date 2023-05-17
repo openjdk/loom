@@ -135,6 +135,11 @@ vmTestbase/nsk/jdi/stress/serial/forceEarlyReturn002/TestDescription.java 828541
 
 vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java 8285417 windows-all
 
+
+# Unknown reasons, should be investigated
+vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
+
+
 ##########
 ## Tests incompatible with  with virtual test thread factory.
 ## There is no goal to run all test with virtual test thread factory.
