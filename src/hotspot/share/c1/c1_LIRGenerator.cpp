@@ -621,7 +621,7 @@ void LIRGenerator::monitor_exit(LIR_Opr object, LIR_Opr lock, LIR_Opr new_hdr, L
   // setup registers
   LIR_Opr hdr = lock;
   lock = new_hdr;
-  CodeStub* slow_path = new MonitorExitStub(lock, !UseHeavyMonitors, monitor_no);
+  CodeStub* slow_path = new MonitorExitStub(lock, LockingMode != LM_MONITOR, monitor_no);
   __ load_stack_address_monitor(monitor_no, lock);
   __ unlock_object(hdr, object, lock, scratch, slow_path);
 }
@@ -2964,6 +2964,10 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
 
   case vmIntrinsics::_fmaD:           do_FmaIntrinsic(x); break;
   case vmIntrinsics::_fmaF:           do_FmaIntrinsic(x); break;
+
+  // Use java.lang.Math intrinsics code since it works for these intrinsics too.
+  case vmIntrinsics::_floatToFloat16: // fall through
+  case vmIntrinsics::_float16ToFloat: do_MathIntrinsic(x); break;
 
   case vmIntrinsics::_Preconditions_checkIndex:
     do_PreconditionsCheckIndex(x, T_INT);

@@ -53,6 +53,16 @@ void oopDesc::print_address_on(outputStream* st) const {
 
 }
 
+void oopDesc::print_name_on(outputStream* st) const {
+  if (*((juint*)this) == badHeapWordVal) {
+    st->print_cr("BAD WORD");
+  } else if (*((juint*)this) == badMetaWordVal) {
+    st->print_cr("BAD META WORD");
+  } else {
+    st->print_cr("%s", klass()->external_name());
+  }
+}
+
 void oopDesc::print()         { print_on(tty);         }
 
 void oopDesc::print_address() { print_address_on(tty); }
@@ -115,7 +125,7 @@ bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
   }
 
   // Header verification: the mark is typically non-zero. If we're
-  // at a safepoint, it must not be zero.
+  // at a safepoint, it must not be zero, except when using the new lightweight locking.
   // Outside of a safepoint, the header could be changing (for example,
   // another thread could be inflating a lock on this object).
   if (ignore_mark_word) {
@@ -124,7 +134,7 @@ bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
   if (obj->mark().value() != 0) {
     return true;
   }
-  return !SafepointSynchronize::is_at_safepoint();
+  return LockingMode == LM_LIGHTWEIGHT || !SafepointSynchronize::is_at_safepoint();
 }
 
 // used only for asserts and guarantees
@@ -227,13 +237,6 @@ jdouble oopDesc::double_field_acquire(int offset) const               { return A
 void oopDesc::release_double_field_put(int offset, jdouble value)     { Atomic::release_store(field_addr<jdouble>(offset), value); }
 
 #ifdef ASSERT
-void oopDesc::verify_forwardee(oop forwardee) {
-#if INCLUDE_CDS_JAVA_HEAP
-  assert(!Universe::heap()->is_archived_object(forwardee) && !Universe::heap()->is_archived_object(this),
-         "forwarding archive object");
-#endif
-}
-
 bool oopDesc::size_might_change() {
   // UseParallelGC and UseG1GC can change the length field
   // of an "old copy" of an object array in the young gen so it indicates
