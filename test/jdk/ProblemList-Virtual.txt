@@ -51,10 +51,17 @@ com/sun/jdi/cds/CDSBreakpointTest.java 8307778 generic-all
 com/sun/jdi/cds/CDSDeleteAllBkptsTest.java 8307778 generic-all
 com/sun/jdi/cds/CDSFieldWatchpoints.java 8307778 generic-all
 
-## Unknown
+sun/tools/jcmd/JcmdOutputEncodingTest.java 8308033 generic-all
+sun/tools/jstack/BasicJStackTest.java 8308033 generic-all
+
+javax/management/remote/mandatory/connection/BrokenConnectionTest.java 8308035 windows-x64
+
+## DatagramSocket blocks ops are interruptible when invoked on virtual threads
 java/nio/channels/DatagramChannel/InterruptibleOrNot.java 0000000 generic-all
-java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
+
+# Undelrying implementation is non-blocking
+java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
 ##########
 ## Tests incompatible with  with virtual test thread factory.
