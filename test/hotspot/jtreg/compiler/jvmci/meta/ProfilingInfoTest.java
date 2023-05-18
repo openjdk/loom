@@ -29,6 +29,7 @@
  *
  * @test
  * @requires vm.jvmci
+ * @requires vm.flavor == "server" & (vm.opt.TieredStopAtLevel == null | vm.opt.TieredStopAtLevel > 1)
  * @requires vm.compMode != "Xcomp"
  * @modules jdk.internal.vm.ci/jdk.vm.ci.meta
  *          jdk.internal.vm.ci/jdk.vm.ci.runtime

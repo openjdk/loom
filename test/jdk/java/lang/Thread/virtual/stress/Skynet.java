@@ -25,7 +25,7 @@
  * @test
  * @summary Stress test virtual threads with a variation of the Skynet 1M benchmark
  * @requires vm.continuations
- * @run main/othervm/timeout=300 -Xmx1g Skynet
+ * @run main/othervm/timeout=300 -Xmx1400m Skynet
  */
 
 /*
@@ -33,7 +33,7 @@
  * @requires vm.debug == true & vm.continuations
  * @requires vm.gc.Z
  * @run main/othervm/timeout=300 -XX:+UnlockDiagnosticVMOptions
- *     -XX:+ZVerifyViews -XX:ZCollectionInterval=0.01 -Xmx1g Skynet
+ *     -XX:+ZVerifyViews -XX:ZCollectionInterval=0.01 -Xmx1400m Skynet
  */
 
 import java.util.concurrent.BlockingQueue;
