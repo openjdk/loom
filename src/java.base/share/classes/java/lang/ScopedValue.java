@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2020, 2022, Red Hat Inc.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -361,7 +361,7 @@ public final class ScopedValue<T> {
          * @param <R> the type of the result of the operation
          * @return the result
          * @throws Exception if {@code op} completes with an exception
-         * @see ScopedValue#callWhere(ScopedValue, Object, Callable) callWhere(ScopedValue, Object, Callable)
+         * @see ScopedValue#callWhere(ScopedValue, Object, Callable)
          */
         public <R> R call(Callable<? extends R> op) throws Exception {
             Objects.requireNonNull(op);
