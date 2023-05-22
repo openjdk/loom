@@ -1,14 +1,11 @@
 [general]
-project=jdk
+project=loom
+repository=loom
 jbs=JDK
 version=21
 
 [checks]
-error=author,committer,reviewers,merge,issues,executable,symlink,message,hg-tag,whitespace,problemlists
-
-[repository]
-tags=(?:jdk-(?:[1-9]([0-9]*)(?:\.(?:0|[1-9][0-9]*)){0,4})(?:\+(?:(?:[0-9]+))|(?:-ga)))|(?:jdk[4-9](?:u\d{1,3})?-(?:(?:b\d{2,3})|(?:ga)))|(?:hs\d\d(?:\.\d{1,2})?-b\d\d)
-branches=
+error=author,committer,whitespace
 
 [census]
 version=0
@@ -18,18 +15,3 @@ domain=openjdk.org
 files=.*\.cpp|.*\.hpp|.*\.c|.*\.h|.*\.java|.*\.cc|.*\.hh|.*\.m|.*\.mm|.*\.md|.*\.gmk|.*\.m4|.*\.ac|Makefile
 ignore-tabs=.*\.gmk|Makefile
 
-[checks "merge"]
-message=Merge
-
-[checks "reviewers"]
-reviewers=1
-ignore=duke
-
-[checks "committer"]
-role=committer
-
-[checks "issues"]
-pattern=^([124-8][0-9]{6}): (\S.*)$
-
-[checks "problemlists"]
-dirs=test/jdk|test/langtools|test/lib-test|test/hotspot/jtreg|test/jaxp
