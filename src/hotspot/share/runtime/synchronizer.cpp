@@ -833,6 +833,68 @@ void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
 }
 
 // -----------------------------------------------------------------------------
+// Internal VM locks on java objects
+// standard constructor, allows locking failures
+
+#define OBJECT_LOCKER_FRAME_ID 785 //Non-zero, non-valid FP
+
+ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
+  _thread(current), _obj(obj), _do_lock(do_lock), _old_nae(current->no_async_exception()) {
+  _thread->check_for_valid_safepoint_state();
+  _thread->set_no_async_exception(true);
+  if (_obj() != nullptr && _do_lock) {
+    if (ObjectMonitorMode::legacy()) {
+      ObjectSynchronizer::enter(_obj, &_lock, _thread);
+    } else {
+      // Weak only restores old exception if there is no exception.
+      // Any exception from enter will thus be kept.
+      WeakPreserveExceptionMark pem(_thread);
+      ObjectSynchronizer::java_enter(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+    }
+  }
+}
+
+ObjectLocker::~ObjectLocker() {
+  if (_obj() != nullptr && _do_lock) {
+    if (ObjectMonitorMode::legacy()) {
+      ObjectSynchronizer::exit(_obj(), &_lock, _thread);
+    } else {
+      // Weak only restores old exception if there is no exception.
+      // Any exception from exit will thus be kept.
+      WeakPreserveExceptionMark pem(_thread);
+      ObjectSynchronizer::java_exit(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+    }
+  }
+  _thread->set_no_async_exception(_old_nae);
+}
+
+void ObjectLocker::wait() {  // wait forever
+  assert(_do_lock, "incorrect call to wait() with no locking");
+  if (ObjectMonitorMode::legacy()) {
+    ObjectSynchronizer::wait(_obj, 0, _thread);
+  } else {
+    assert(!_thread->has_pending_exception(), "unexpected pending exception in wait");
+    // Weak only restores old exception if there is no exception.
+    // Any exception from wait will thus be kept.
+    WeakPreserveExceptionMark pem(_thread);
+    ObjectSynchronizer::java_wait(_obj, 0, _thread);
+  }
+}
+
+void ObjectLocker::notify_all() {
+  assert(_do_lock, "incorrect call to wait() with no locking");
+  if (ObjectMonitorMode::legacy()) {
+    ObjectSynchronizer::notifyall(_obj, _thread);
+  } else {
+    assert(!_thread->has_pending_exception(), "unexpected pending exception in notify_all");
+    // Weak only restores old exception if there is no exception.
+    // Any exception from notify will thus be kept.
+    WeakPreserveExceptionMark pem(_thread);
+    ObjectSynchronizer::java_notify_all(_obj, _thread);
+  }
+}
+
+// -----------------------------------------------------------------------------
 //  Wait/Notify/NotifyAll
 // NOTE: must use heavy weight monitor to handle wait()
 int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
@@ -900,68 +962,6 @@ void ObjectSynchronizer::notifyall(Handle obj, TRAPS) {
   // dropped by the calling thread.
   ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_notify);
   monitor->notifyAll(CHECK);
-}
-
-// -----------------------------------------------------------------------------
-// Internal VM locks on java objects
-// standard constructor, allows locking failures
-
-#define OBJECT_LOCKER_FRAME_ID 785 //Non-zero, non-valid FP
-
-ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
-  _thread(current), _obj(obj), _do_lock(do_lock), _old_nae(current->no_async_exception()) {
-  _thread->check_for_valid_safepoint_state();
-  _thread->set_no_async_exception(true);
-  if (_obj() != NULL && _do_lock) {
-    if (ObjectMonitorMode::legacy()) {
-      ObjectSynchronizer::enter(_obj, &_lock, _thread);
-    } else {
-      // Weak only restores old exception if there is no exception.
-      // Any exception from enter will thus be kept.
-      WeakPreserveExceptionMark pem(_thread);
-      ObjectSynchronizer::java_enter(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
-    }
-  }
-}
-
-ObjectLocker::~ObjectLocker() {
-  if (_obj() != NULL && _do_lock) {
-    if (ObjectMonitorMode::legacy()) {
-      ObjectSynchronizer::exit(_obj(), &_lock, _thread);
-    } else {
-      // Weak only restores old exception if there is no exception.
-      // Any exception from exit will thus be kept.
-      WeakPreserveExceptionMark pem(_thread);
-      ObjectSynchronizer::java_exit(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
-    }
-  }
-  _thread->set_no_async_exception(_old_nae);
-}
-
-void ObjectLocker::wait() {  // wait forever
-  assert(_do_lock, "incorrect call to wait() with no locking");
-  if (ObjectMonitorMode::legacy()) {
-    ObjectSynchronizer::wait(_obj, 0, _thread);
-  } else {
-    assert(!_thread->has_pending_exception(), "unexpected pending exception in wait");
-    // Weak only restores old exception if there is no exception.
-    // Any exception from wait will thus be kept.
-    WeakPreserveExceptionMark pem(_thread);
-    ObjectSynchronizer::java_wait(_obj, 0, _thread);
-  }
-}
-
-void ObjectLocker::notify_all() {
-  assert(_do_lock, "incorrect call to wait() with no locking");
-  if (ObjectMonitorMode::legacy()) {
-    ObjectSynchronizer::notifyall(_obj, _thread);
-  } else {
-    assert(!_thread->has_pending_exception(), "unexpected pending exception in notify_all");
-    // Weak only restores old exception if there is no exception.
-    // Any exception from notify will thus be kept.
-    WeakPreserveExceptionMark pem(_thread);
-    ObjectSynchronizer::java_notify_all(_obj, _thread);
-  }
 }
 
 // -----------------------------------------------------------------------------

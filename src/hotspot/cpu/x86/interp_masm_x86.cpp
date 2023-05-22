@@ -1566,7 +1566,7 @@ void InterpreterMacroAssembler::lock_object() {
 
   // Restore stack bottom in case i2c adjusted stack
   movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
-  // and NULL it as marker that esp is now tos until next java call
+  // and null it as marker that esp is now tos until next java call
   movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
   pop(rax);
@@ -1620,7 +1620,7 @@ void InterpreterMacroAssembler::unlock_object() {
 
   // Restore stack bottom in case i2c adjusted stack
   movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
-  // and NULL it as marker that esp is now tos until next java call
+  // and null it as marker that esp is now tos until next java call
   movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
   restore_bcp();

@@ -811,7 +811,7 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
   JavaThread* current = java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread));
   oop object = JNIHandles::resolve_non_null(obj);
 
-  assert(current != NULL && current == JavaThread::current(), "must be");
+  assert(current != nullptr && current == JavaThread::current(), "must be");
 
   ResourceMark rm(current);
 
@@ -902,7 +902,7 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
     const char* msg = ss.as_string(false /* on C heap */);
     fatal("%s", msg);
   }
-  
+
   thread->set_system_java(sj);
 JVM_END
 

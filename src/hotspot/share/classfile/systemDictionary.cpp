@@ -487,7 +487,6 @@ InstanceKlass* SystemDictionary::resolve_super_or_fail(Symbol* class_name,
   return superk;
 }
 
-  assert(!ObjectMonitorMode::java_only(), "Unimplemented for Java monitor");
 // If the class in is in the placeholder table, class loading is in progress.
 // For cases where the application changes threads to load classes, it
 // is critical to ClassCircularity detection that we try loading

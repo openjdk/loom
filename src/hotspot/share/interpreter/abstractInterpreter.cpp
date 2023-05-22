@@ -234,6 +234,13 @@ vmIntrinsics::ID AbstractInterpreter::method_intrinsic(MethodKind kind) {
                                   : return vmIntrinsics::_float16ToFloat;
   case java_lang_Float_floatToFloat16
                                   : return vmIntrinsics::_floatToFloat16;
+  // Java Object Monitors
+  case java_lang_Object_callerFrameId
+                                  : return vmIntrinsics::_Object_caller_frame_id;
+  case java_lang_Monitor_getLockState
+                                  : return vmIntrinsics::_Monitor_get_lock_state;
+  case java_lang_Monitor_casLockState
+                                  : return vmIntrinsics::_Monitor_cas_lock_state;
 
   default:
     fatal("unexpected method intrinsic kind: %d", kind);
@@ -334,6 +341,11 @@ void AbstractInterpreter::print_method_kind(MethodKind kind) {
     case java_lang_Double_doubleToRawLongBits : tty->print("java_lang_Double_doubleToRawLongBits"); break;
     case java_lang_Float_float16ToFloat       : tty->print("java_lang_Float_float16ToFloat"); break;
     case java_lang_Float_floatToFloat16       : tty->print("java_lang_Float_floatToFloat16"); break;
+    // Java Object Monitors
+    case java_lang_Object_callerFrameId       : tty->print("java_lang_Object_callerFrameId"); break;
+    case java_lang_Monitor_getLockState       : tty->print("java_lang_Monitor_getLockState"); break;
+    case java_lang_Monitor_casLockState       : tty->print("java_lang_Monitor_casLockState"); break;
+
     default:
       if (kind >= method_handle_invoke_FIRST &&
           kind <= method_handle_invoke_LAST) {

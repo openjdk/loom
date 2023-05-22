@@ -137,24 +137,24 @@ LatestMethodCache* Universe::_throw_no_such_method_error_cache = nullptr;
 LatestMethodCache* Universe::_do_stack_walk_cache     = nullptr;
 
 // Java object monitor support
-LatestMethodCache* Universe::_object_monitorEnter_cache = NULL;
-LatestMethodCache* Universe::_object_monitorEnterFrameId_cache = NULL;
-LatestMethodCache* Universe::_object_monitorExit_cache = NULL;
-LatestMethodCache* Universe::_object_monitorExitFrameId_cache = NULL;
-LatestMethodCache* Universe::_object_monitorExitVoid_cache = NULL;
-LatestMethodCache* Universe::_object_monitorNotifyAll_cache = NULL;
-LatestMethodCache* Universe::_object_monitorWaitUninterruptibly_cache = NULL;
-LatestMethodCache* Universe::_object_monitorJNIEnter_cache = NULL;
-LatestMethodCache* Universe::_object_monitorJNIExit_cache = NULL;
-Method* Universe::_object_monitorEnter = NULL;
-Method* Universe::_object_monitorEnterFrameId = NULL;
-Method* Universe::_object_monitorExit  = NULL;
-Method* Universe::_object_monitorExitFrameId  = NULL;
-Method* Universe::_object_monitorExitVoid  = NULL;
-Method* Universe::_object_monitorNotifyAll  = NULL;
-Method* Universe::_object_monitorWaitUninterruptibly  = NULL;
-Method* Universe::_object_monitorJNIEnter = NULL;
-Method* Universe::_object_monitorJNIExit  = NULL;
+LatestMethodCache* Universe::_object_monitorEnter_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorEnterFrameId_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorExit_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorExitFrameId_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorExitVoid_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorNotifyAll_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorWaitUninterruptibly_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorJNIEnter_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorJNIExit_cache = nullptr;
+Method* Universe::_object_monitorEnter = nullptr;
+Method* Universe::_object_monitorEnterFrameId = nullptr;
+Method* Universe::_object_monitorExit  = nullptr;
+Method* Universe::_object_monitorExitFrameId  = nullptr;
+Method* Universe::_object_monitorExitVoid  = nullptr;
+Method* Universe::_object_monitorNotifyAll  = nullptr;
+Method* Universe::_object_monitorWaitUninterruptibly  = nullptr;
+Method* Universe::_object_monitorJNIEnter = nullptr;
+Method* Universe::_object_monitorJNIExit  = nullptr;
 
 long Universe::verify_flags                           = Universe::Verify_All;
 

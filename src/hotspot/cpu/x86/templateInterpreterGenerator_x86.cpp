@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2003, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -265,7 +264,7 @@ address TemplateInterpreterGenerator::generate_return_entry_for_monitor(int step
 
   // Restore stack bottom in case i2c adjusted stack
   __ movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
-  // and NULL it as marker that esp is now tos until next java call
+  // and null it as marker that esp is now tos until next java call
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
   __ restore_bcp();
@@ -921,6 +920,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   if (ObjectMonitorMode::legacy()) {
     // reset the _do_not_unlock_if_synchronized flag
+    NOT_LP64(__ get_thread(thread1));
     __ movbool(do_not_unlock_if_synchronized, false);
   }
 
@@ -1486,6 +1486,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
 
   if (ObjectMonitorMode::legacy()) {
     // reset the _do_not_unlock_if_synchronized flag
+    NOT_LP64(__ get_thread(thread1));
     __ movbool(do_not_unlock_if_synchronized, false);
   }
 

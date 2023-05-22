@@ -741,8 +741,6 @@ static void ensure_join(JavaThread* thread) {
   assert(threadObj.not_null(), "java thread object must exist");
   bool canDoSync = ObjectMonitorMode::legacy() || thread->can_call_java();
   ObjectLocker lock(threadObj, thread, canDoSync);
-  // Ignore pending exception (ThreadDeath), since we are exiting anyway
-  thread->clear_pending_exception();
   // Thread is exiting. So set thread_status field in  java.lang.Thread class to TERMINATED.
   java_lang_Thread::set_thread_status(threadObj(), JavaThreadStatus::TERMINATED);
   // Clear the native thread instance - this makes isAlive return false and allows the join()
@@ -756,7 +754,7 @@ static void ensure_join(JavaThread* thread) {
     lock.notify_all();
     thread->clear_system_java();
   }
-  // Ignore pending exception (ThreadDeath), since we are exiting anyway
+  // Ignore pending exception, since we are exiting anyway
   thread->clear_pending_exception();
 }
 
