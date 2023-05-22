@@ -843,9 +843,7 @@ UNSAFE_ENTRY(void, Unsafe_ParkMonitorNanos(JNIEnv *env, jobject unsafe, jlong na
   thread->set_system_java(0);
   {
     ThreadBlockInVM tbivm(thread, true);
-    // FIXME: we have a millis -> nanos -> millis -> nanos conversion chain
-    // from Object.wait() through to e.g. pthread_cond_wait
-    thread->_ParkEvent->park(nanos/1000000LL);
+    thread->_ParkEvent->park_nanos(nanos);
   }
   thread->set_system_java(sj);
 } UNSAFE_END
