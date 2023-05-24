@@ -257,7 +257,7 @@ public class TreeCopier<P> implements TreeVisitor<JCTree,P> {
     @DefinedBy(Api.COMPILER_TREE)
     public JCTree visitImport(ImportTree node, P p) {
         JCImport t = (JCImport) node;
-        JCTree qualid = copy(t.qualid, p);
+        JCFieldAccess qualid = copy(t.qualid, p);
         return M.at(t.pos).Import(qualid, t.staticImport);
     }
 
@@ -280,6 +280,14 @@ public class TreeCopier<P> implements TreeVisitor<JCTree,P> {
     public JCTree visitLiteral(LiteralTree node, P p) {
         JCLiteral t = (JCLiteral) node;
         return M.at(t.pos).Literal(t.typetag, t.value);
+    }
+
+    @DefinedBy(Api.COMPILER_TREE)
+    public JCTree visitStringTemplate(StringTemplateTree node, P p) {
+        JCStringTemplate t = (JCStringTemplate) node;
+        JCExpression processor = copy(t.processor, p);
+        List<JCExpression> expressions = copy(t.expressions, p);
+        return M.at(t.pos).StringTemplate(processor, t.fragments, expressions);
     }
 
     @DefinedBy(Api.COMPILER_TREE)

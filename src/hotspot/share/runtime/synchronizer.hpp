@@ -188,12 +188,6 @@ class ObjectSynchronizer : AllStatic {
   static bool quick_notify(oopDesc* obj, JavaThread* current, bool All);
   static bool quick_enter(oop obj, JavaThread* current, BasicLock* Lock);
 
-  // used by classloading to free classloader object lock,
-  // wait on an internal lock, and reclaim original lock
-  // with original recursion count
-  static intx complete_exit(Handle obj, JavaThread* current);
-  static void reenter (Handle obj, intx recursions, JavaThread* current);
-
   // This is the Java-based version of monitor operations.
   static void java_enter(Handle obj, JavaThread* current, jlong fid);
   static void java_exit(Handle obj, JavaThread* current, jlong fid);

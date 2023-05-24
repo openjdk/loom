@@ -42,8 +42,28 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
  * Library," <a
  * href="https://www.netlib.org/fdlibm/">{@code fdlibm}</a>. These
  * algorithms, which are written in the C programming language, are
- * then to be understood as executed with all floating-point
- * operations following the rules of Java floating-point arithmetic.
+ * then to be understood to be transliterated into Java and executed
+ * with all floating-point and integer operations following the rules
+ * of Java arithmetic. The following transformations are used in the
+ * transliteration:
+ *
+ * <ul>
+ * <li>Extraction and setting of the high and low halves of a 64-bit
+ * {@code double} in C is expressed using Java platform methods that
+ * perform bit-wise conversions {@linkplain
+ * Double#doubleToRawLongBits(double) from {@code double} to {@code
+ * long}} and {@linkplain Double#longBitsToDouble(long) {@code long}
+ * to {@code double}}.
+ *
+ * <li>Unsigned {@code int} values in C are mapped to signed {@code
+ * int} values in Java with updates to operations to replicate
+ * unsigned semantics where the results on the same textual operation
+ * would differ. For example, {@code >>} shifts on unsigned C values
+ * are replaced with {@code >>>} shifts on signed Java values. Sized
+ * comparisons on unsigned C values ({@code <}, {@code <=}, {@code >},
+ * {@code >=}) are replaced with semantically equivalent calls to
+ * {@link Integer#compareUnsigned(int, int) compareUnsigned}.
+ * </ul>
  *
  * <p>The Java math library is defined with respect to
  * {@code fdlibm} version 5.3. Where {@code fdlibm} provides
@@ -127,7 +147,9 @@ public final class StrictMath {
      * @param   a   an angle, in radians.
      * @return  the sine of the argument.
      */
-    public static native double sin(double a);
+    public static double sin(double a) {
+        return FdLibm.Sin.compute(a);
+    }
 
     /**
      * Returns the trigonometric cosine of an angle. Special cases:
@@ -139,7 +161,9 @@ public final class StrictMath {
      * @param   a   an angle, in radians.
      * @return  the cosine of the argument.
      */
-    public static native double cos(double a);
+    public static double cos(double a) {
+        return FdLibm.Cos.compute(a);
+    }
 
     /**
      * Returns the trigonometric tangent of an angle. Special cases:
@@ -151,7 +175,9 @@ public final class StrictMath {
      * @param   a   an angle, in radians.
      * @return  the tangent of the argument.
      */
-    public static native double tan(double a);
+    public static double tan(double a) {
+        return FdLibm.Tan.compute(a);
+    }
 
     /**
      * Returns the arc sine of a value; the returned angle is in the
@@ -310,7 +336,9 @@ public final class StrictMath {
      * @return  the positive square root of {@code a}.
      */
     @IntrinsicCandidate
-    public static native double sqrt(double a);
+    public static double sqrt(double a) {
+        return FdLibm.Sqrt.compute(a);
+    }
 
     /**
      * Returns the cube root of a {@code double} value.  For
@@ -361,7 +389,9 @@ public final class StrictMath {
      * @return  the remainder when {@code f1} is divided by
      *          {@code f2}.
      */
-    public static native double IEEEremainder(double f1, double f2);
+    public static double IEEEremainder(double f1, double f2) {
+        return FdLibm.IEEEremainder.compute(f1, f2);
+    }
 
     /**
      * Returns the smallest (closest to negative infinity)
@@ -547,7 +577,9 @@ public final class StrictMath {
      *          in polar coordinates that corresponds to the point
      *          (<i>x</i>,&nbsp;<i>y</i>) in Cartesian coordinates.
      */
-    public static native double atan2(double y, double x);
+    public static double atan2(double y, double x) {
+        return FdLibm.Atan2.compute(y, x);
+    }
 
     /**
      * Returns the value of the first argument raised to the power of the
@@ -2081,7 +2113,9 @@ public final class StrictMath {
      * @return  The hyperbolic sine of {@code x}.
      * @since 1.5
      */
-    public static native double sinh(double x);
+    public static double sinh(double x) {
+        return FdLibm.Sinh.compute(x);
+    }
 
     /**
      * Returns the hyperbolic cosine of a {@code double} value.
@@ -2105,7 +2139,9 @@ public final class StrictMath {
      * @return  The hyperbolic cosine of {@code x}.
      * @since 1.5
      */
-    public static native double cosh(double x);
+    public static double cosh(double x) {
+        return FdLibm.Cosh.compute(x);
+    }
 
     /**
      * Returns the hyperbolic tangent of a {@code double} value.
@@ -2136,7 +2172,9 @@ public final class StrictMath {
      * @return  The hyperbolic tangent of {@code x}.
      * @since 1.5
      */
-    public static native double tanh(double x);
+    public static double tanh(double x) {
+        return FdLibm.Tanh.compute(x);
+    }
 
     /**
      * Returns sqrt(<i>x</i><sup>2</sup>&nbsp;+<i>y</i><sup>2</sup>)
