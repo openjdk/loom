@@ -615,7 +615,7 @@ void ObjectSynchronizer::java_wait_uninterruptibly(Handle obj, JavaThread* curre
 
 bool ObjectSynchronizer::current_thread_holds_monitor(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java_only, "must be");
-  Klass* klass = vmClasses::Monitor_klass();
+  Klass* klass = vmClasses::Thread_klass();
   JavaValue result(T_BOOLEAN);
   JavaCallArguments args;
   args.push_oop(obj);

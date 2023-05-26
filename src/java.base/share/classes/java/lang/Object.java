@@ -40,14 +40,6 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
 public class Object {
 
     /**
-     * Control use of monitor synchronization during VM initialisation.
-     * Should only be used for monitor enter and exit as the other monitor
-     * methods should not be used during initialization when there is only
-     * a single thread.
-     */
-    private static int syncEnabled = 0;
-
-    /**
      * Constructs a new object.
      */
     @IntrinsicCandidate
@@ -298,29 +290,14 @@ public class Object {
      * @see        java.lang.Object#notifyAll()
      * @see        java.lang.Object#wait()
      */
-    @SuppressWarnings("fallthrough")
     @ReservedStackAccess
     public final void notify() {
-        if (syncEnabled == 0) Monitor.abort("invariant");
-        switch(monitorPolicy) {
-        case -1:
-        case 0: // native
-            notify0();
-            break;
-        case 1: // always inflated
-            Monitor.of(this).signal(Thread.currentThread());
-            break;
-        case 2: // fast-locks
-            Thread t = Thread.currentThread();
-            Monitor.slowNotify(t, this);
-            return;
-        default:
-            Monitor.abort("Invalid policy value " + monitorPolicy);
-        }
+        MonitorSupport.policy().monitorNotify(this);
     }
 
+    // package access for MonitorSupport
     @IntrinsicCandidate
-    private final native void notify0();
+    final native void notify0();
 
     /**
      * Wakes up all threads that are waiting on this object's monitor. A
@@ -344,29 +321,14 @@ public class Object {
      * @see        java.lang.Object#notify()
      * @see        java.lang.Object#wait()
      */
-    @SuppressWarnings("fallthrough")
     @ReservedStackAccess
     public final void notifyAll() {
-        if (syncEnabled == 0) Monitor.abort("invariant");
-        switch(monitorPolicy) {
-        case -1:
-        case 0: // native
-            notifyAll0();
-            break;
-        case 1: // always inflated
-            Monitor.of(this).signalAll(Thread.currentThread());
-            break;
-        case 2: // fast-locks
-            Thread t = Thread.currentThread();
-            Monitor.slowNotifyAll(t, this);
-            break;
-        default:
-            Monitor.abort("Invalid policy value " + monitorPolicy);
-        }
+        MonitorSupport.policy().monitorNotifyAll(this);
     }
 
+    // package access for MonitorSupport
     @IntrinsicCandidate
-    private final native void notifyAll0();
+    final native void notifyAll0();
 
     /**
      * Causes the current thread to wait until it is awakened, typically
@@ -414,36 +376,12 @@ public class Object {
     @SuppressWarnings("fallthrough")
     @ReservedStackAccess
     public final void wait(long timeoutMillis) throws InterruptedException {
-        if (syncEnabled == 0) Monitor.abort("invariant");
-        switch(monitorPolicy) {
-        case -1:
-        case 0: // native
-        	long comp = Blocker.begin();
-		try {
-		    wait0(timeoutMillis);
-		} catch (InterruptedException e) {
-		    Thread thread = Thread.currentThread();
-		    if (thread.isVirtual())
-			thread.getAndClearInterrupt();
-		    throw e;
-		} finally {
-		    Blocker.end(comp);
-		}
-            break;
-        case 1: // always inflated
-            Monitor.of(this).await(Thread.currentThread(), timeoutMillis);
-            break;
-        case 2: // fast-locks
-            Thread t = Thread.currentThread();
-            Monitor.slowWait(t, this, timeoutMillis);
-            break;
-        default:
-            Monitor.abort("Invalid policy value " + monitorPolicy);
-        }
+        MonitorSupport.policy().monitorWait(this, timeoutMillis);
     }
 
+    // package access for MonitorSupport
     // final modifier so method not in vtable
-    private final native void wait0(long timeoutMillis) throws InterruptedException;
+    final native void wait0(long timeoutMillis) throws InterruptedException;
 
     /**
      * Causes the current thread to wait until it is awakened, typically
@@ -663,7 +601,7 @@ public class Object {
     /* Monitor support functionality */
 
     @IntrinsicCandidate
-    private static final native long getCallerFrameId();
+    static final native long getCallerFrameId();
 
     /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
     @ReservedStackAccess
@@ -672,56 +610,14 @@ public class Object {
         if (o == null)
             throw new NullPointerException();
 
-        if (monitorPolicy == -1) {
-            Monitor.abort("ShouldNotReachHere!");
-        }
-
-        if (syncEnabled == 0) return;
-
-        Thread t = Thread.currentThread();
-
         long monitorFrameId = getCallerFrameId();
-        if (monitorPolicy == 2) {  // fast-locks
-            if (!Monitor.quickEnter(t, o, monitorFrameId)) {
-                Monitor.slowEnter(t, o, monitorFrameId);
-            }
-        } else {
-            t.push(o, monitorFrameId);
-            if (monitorPolicy == 0) { // native
-                monitorEnter0(o);
-            } else {  // always inflated
-                Monitor.of(o).enter(t);
-            }
-        }
+        MonitorSupport.policy().monitorEnter(o, monitorFrameId);
     }
 
-    /** Entry point for monitor entry from the VM (ObjectLocker)*/
+    /** Entry point for monitor entry from the VM (ObjectLocker) */
     @ReservedStackAccess
     private static final void monitorEnter(Object o, long monitorFrameId) {
-        // FIXME: This should really be handled in the interpreter and JIT.
-        if (o == null)
-            throw new NullPointerException();
-
-        if (monitorPolicy == -1) {
-            Monitor.abort("ShouldNotReachHere!");
-        }
-
-        if (syncEnabled == 0) return;
-
-        Thread t = Thread.currentThread();
-
-        if (monitorPolicy == 2) {  // fast-locks
-            if (!Monitor.quickEnter(t, o, monitorFrameId)) {
-                Monitor.slowEnter(t, o, monitorFrameId);
-            }
-        } else {
-            t.push(o, monitorFrameId);
-            if (monitorPolicy == 0) { // native
-                monitorEnter0(o);
-            } else {  // always inflated
-                Monitor.of(o).enter(t);
-            }
-        }
+        MonitorSupport.policy().monitorEnter(o, monitorFrameId);
     }
 
     /** Entry point for monitor enter from the JNI */
@@ -733,52 +629,14 @@ public class Object {
     /** Entry point for monitor exit from the VM (ObjectLocker) */
     @ReservedStackAccess
     private static final void monitorExit(Object o, long monitorFrameId) {
-        if (monitorPolicy == -1) {
-            Monitor.abort("ShouldNotReachHere!");
-        }
-
-        if (syncEnabled == 0) return;
-
-        Thread t = Thread.currentThread();
-
-        if (monitorPolicy == 2) {  // fast-locks
-            if (!Monitor.quickExit(t, o, monitorFrameId)) {
-                Monitor.slowExit(t, o, monitorFrameId);
-            }
-        } else {
-            t.pop(o, monitorFrameId);
-            if (monitorPolicy == 0) { // native
-                monitorExit0(o);
-            } else {  // always inflated
-                Monitor.of(o).exit(t);
-            }
-        }
+        MonitorSupport.policy().monitorExit(o, monitorFrameId);
     }
 
     /** Entry point for monitor exit from the VM (bytecode) */
     @ReservedStackAccess
     private static final void monitorExit(Object o) {
-        if (monitorPolicy == -1) {
-            Monitor.abort("ShouldNotReachHere!");
-        }
-
-        if (syncEnabled == 0) return;
-
-        Thread t = Thread.currentThread();
-
         long monitorFrameId = getCallerFrameId();
-        if (monitorPolicy == 2) {  // fast-locks
-            if (!Monitor.quickExit(t, o, monitorFrameId)) {
-                Monitor.slowExit(t, o, monitorFrameId);
-            }
-        } else {
-            t.pop(o, monitorFrameId);
-            if (monitorPolicy == 0) { // native
-                monitorExit0(o);
-            } else {  // always inflated
-                Monitor.of(o).exit(t);
-            }
-        }
+        MonitorSupport.policy().monitorExit(o, monitorFrameId);
     }
 
     /** Entry point for monitor exit from the JNI */
@@ -790,48 +648,8 @@ public class Object {
     /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
     @ReservedStackAccess
     private static final void monitorExit() {
-        if (monitorPolicy == -1) {
-            Monitor.abort("ShouldNotReachHere!");
-        }
-
-        if (syncEnabled == 0) return;
-
-        Thread t = Thread.currentThread();
-
         long monitorFrameId = getCallerFrameId();
-        if (monitorPolicy == 0) { // native
-            Object o = t.peek(monitorFrameId);
-            if (o instanceof Monitor)
-                Monitor.abort("Impossible!");
-            t.pop(o, monitorFrameId);
-            monitorExit0(o);
-        } else if (monitorPolicy == 2) {  // fast-locks
-            // We are removing frame with monitorFrameId.
-            // We either came here due to the method for that frame is
-            // synchronized, and/or we still own a monitor taken in that method.
-            // In normal excution there should be at max one monitor with that monitorFrameId if
-            // this is a synchronized method, else zero.
-            // If there is more monitors than that we:
-            // - Unexpectedly exit method due to debugger, thus the monitor should be exited.
-            // - The method contains asymmetric locking, which should not happen.
-            //   This case is currently only notice when exiting the monitor we already
-            //   exited here.
-            do {
-                Object o = t.peek(monitorFrameId);
-                if (o instanceof Monitor) { // inflated
-                    Monitor m = (Monitor)o;
-                    t.pop(m, monitorFrameId);
-                    m.exit(t);
-                } else if (!Monitor.quickExit(t, o, monitorFrameId)) {
-                    Monitor.slowExitOnRemoveActivation(t, o, monitorFrameId);
-                }
-            } while (t.peekId() == monitorFrameId);
-        } else { // always inflated
-            do {
-                Object o = t.pop(monitorFrameId);
-                Monitor.of(o).exit(t);
-            } while (t.peekId() == monitorFrameId);
-        }
+        MonitorSupport.policy().monitorExit(monitorFrameId);
     }
 
     /** Entry point for uninterruptible monitor wait from the VM
@@ -839,47 +657,12 @@ public class Object {
      */
     @ReservedStackAccess
     private static final void monitorWaitUninterruptibly(Object o) {
-        if (monitorPolicy < 1) {
-            throw new Error("Unexpected Java call with native monitors");
-        }
-        if (syncEnabled == 0) Monitor.abort("invariant");
-
-        Thread t = Thread.currentThread();
-        if (monitorPolicy == 2) { // fast-locks
-            Monitor.slowWaitUninterruptibly(t, o);
-            return;
-        } else { // always inflated
-            Monitor.of(o).awaitUninterruptibly(t);
-        }
+        MonitorSupport.policy().monitorWaitUninterruptibly(o);
     }
 
-    /* API to call into the VM to get the monitor implementation policy:
-
-       -1: Original monitor implementation
-
-       Otherwise, we are using a Java upcall from the VM, combined with the
-       use of the Thread lockStack and then a particular monitor implementation
-       as follows:
-        - 0: call back into VM to use native monitors, but always inflate
-             (no fast-locking via markWord or stackLocks).
-        - 1: use Monitor class with always-inflate policy. No deflation.
-        - 2: use Java-based fast-locks via markWord and inflate to Monitor
-             class on contention, or when needed for wait(). No deflation.
-    */
-    private static final native int getMonitorPolicy();
-
-    /* package access for Thread */
-    static final int monitorPolicy = getMonitorPolicy();
-
-    /* API to call into the VM to use the existing native monitor
-       implementation via direct inflation. When UseNewMonitors is
-       true, and monitorPolicy==0, all monitor methods (ie. wait/notify)
-       will always directly inflate.
-    */
+    @IntrinsicCandidate
+    static final native void monitorEnter0(Object o);
 
     @IntrinsicCandidate
-    private static final native void monitorEnter0(Object o);
-
-    @IntrinsicCandidate
-    private static final native void monitorExit0(Object o);
+    static final native void monitorExit0(Object o);
 }

@@ -2396,20 +2396,25 @@ public class Thread implements Runnable {
     public static boolean holdsLock(Object obj) {
         java.util.Objects.requireNonNull(obj);
 
-        // For all policies >= 0 we could delegate to Monitor.hasLockedObject
-        // but for testing purposes that will callback to this method for the
-        // native case, as it can't access holdsLock0 directly.
-        switch (Object.monitorPolicy) {
-        case -1:
-        case 0: // native
-            return holdsLock0(obj);
-        case 1: // always inflated
-        case 2: // fast-locks
-            return Monitor.hasLockedObject(obj, Thread.currentThread());
-        default:
-            Monitor.abort("Invalid policy value " + monitorPolicy);
-            return false;
-        }
+        return hasLockedObject(obj, Thread.currentThread());
+    }
+
+    /* Implementation for holdsLock, and the VM upcall to check if an
+       object is locked.
+    */
+    static boolean hasLockedObject(Object o, Thread current) {
+        return MonitorSupport.policy().hasLockedObject(o, current);
+    }
+
+    /**
+     * Special constructor for the Monitor's Sentinel thread object.
+     * This is only a partially constructed instance and will never be started.
+     */
+    // package access
+    Thread(String name, Void notUsed) {
+        this.name = name;
+        tid = -1;
+        holder = null;
     }
 
     // Temporary tracking of locked objects to replace the native
@@ -2444,13 +2449,13 @@ public class Thread implements Runnable {
             // For simplicity we abort on OOME.
             // We are out of memory so any allocation here is potentially
             // going to rethrow, so avoid String operations.
-            Monitor.abort(LOCKSTACK_OOME);
+            MonitorSupport.abort(LOCKSTACK_OOME);
         }
-        Monitor.log("Expanded thread lockStack to size " + lockStack.length);
+        MonitorSupport.log("Expanded thread lockStack to size " + lockStack.length);
     }
 
     void push(Object lockee, long fid) {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (lockStackPos == lockStack.length) {
             grow();
         }
@@ -2459,23 +2464,23 @@ public class Thread implements Runnable {
     }
 
     void pop(Object lockee, long fid) {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         Object o = lockStack[--lockStackPos];
         if (o != lockee) {
-            Monitor.abort("mismatched lockStack: expected " + lockee + " but found " + o);
+            MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
         if (frameId[lockStackPos] != fid) {
-            Monitor.abort("frame id mismatched");
+            MonitorSupport.abort("frame id mismatched");
         }
         lockStack[lockStackPos] = null;
         frameId[lockStackPos] = 0;
     }
 
     Object pop(long fid) {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         Object o = lockStack[--lockStackPos];
         if (frameId[lockStackPos] != fid) {
-            Monitor.abort("frame id mismatched");
+            MonitorSupport.abort("frame id mismatched");
         }
         lockStack[lockStackPos] = null;
         frameId[lockStackPos] = 0;
@@ -2483,21 +2488,21 @@ public class Thread implements Runnable {
     }
 
     Object peek(long fid) {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (frameId[lockStackPos - 1] != fid) {
-            Monitor.abort("frame id mismatched");
+            MonitorSupport.abort("frame id mismatched");
         }
         return lockStack[lockStackPos - 1];
     }
 
     long peekId() {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         return lockStackPos > 0 ? frameId[lockStackPos - 1] : 0;
     }
 
     // This count is only useful for fast-locked lockees
     int lockCount(Object lockee) {
-        if (lockee == null) Monitor.abort("lockCount(null) was called!");
+        if (lockee == null) MonitorSupport.abort("lockCount(null) was called!");
         int count = 0;
         for (Object i : lockStack) {
             if (i == lockee)
@@ -2549,9 +2554,9 @@ public class Thread implements Runnable {
             // For simplicity we abort on OOME.
             // We are out of memory so any allocation here is potentially
             // going to rethrow, so avoid String operations.
-            Monitor.abort(JNILIST_OOME);
+            MonitorSupport.abort(JNILIST_OOME);
         }
-        Monitor.log("Expanded thread JNI Monitor list to size " + jniList.length);
+        MonitorSupport.log("Expanded thread JNI Monitor list to size " + jniList.length);
     }
 
     // Queries if lockee is currently locked at the JNI level.
@@ -2570,7 +2575,7 @@ public class Thread implements Runnable {
     // Add a Monitor to the end of the JNI list. It may already exist
     // but that is okay.
     void addJNIMonitor(Monitor m) {
-        if (this != Thread.currentThread()) Monitor.abort("invariant");
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (jniListPos == jniList.length) {
             growJNIList();
         }
@@ -2600,7 +2605,9 @@ public class Thread implements Runnable {
 
     //-------------------------------
 
-    private static native boolean holdsLock0(Object obj);
+    // package access for MonitorSupport
+
+    static native boolean holdsLock0(Object obj);
 
     private static final StackTraceElement[] EMPTY_STACK_TRACE
         = new StackTraceElement[0];

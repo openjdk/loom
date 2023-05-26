@@ -97,12 +97,29 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     /**
      * Creates the top-level "system" ThreadGroup.
      *
-     * @apiNote This method is invoked by the VM early startup.
+     * @apiNote This method is invoked by the VM early startup and
+     * must avoid any use of synchronization.
      */
     private ThreadGroup() {
         this.parent = null;
         this.name = "system";
         this.maxPriority = Thread.MAX_PRIORITY;
+        groups = new ThreadGroup[4];
+    }
+
+    /**
+     * Creates the second-level "main" ThreadGroup.
+     *
+     * @apiNote This method is invoked by the VM early startup and
+     * must avoid any use of synchronization.
+     */
+    private ThreadGroup(ThreadGroup system) {
+        this.parent = system;
+        this.name = "main";
+        this.maxPriority = system.maxPriority;
+        // Directly add this to parent group
+        parent.groups[0] = this;
+        parent.ngroups++;
     }
 
     /**

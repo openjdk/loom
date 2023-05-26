@@ -119,25 +119,28 @@ void universe_post_module_init();  // must happen after call_initPhase2
 
 static void initialize_class(Symbol* class_name, TRAPS) {
   Klass* klass = SystemDictionary::resolve_or_fail(class_name, true, CHECK);
-  InstanceKlass::cast(klass)->initialize(CHECK);
+  InstanceKlass* ik = InstanceKlass::cast(klass);
+  if (!ik->is_not_initialized()) {
+    log_info(class, init)("Skipping initialized class");
+  }
+  ik->initialize(CHECK);
 }
 
 
-// Creates the initial ThreadGroup
-static Handle create_initial_thread_group(TRAPS) {
+// Creates the initial ThreadGroups and returns the "main" group.
+static Handle create_initial_thread_groups(TRAPS) {
   Handle system_instance = JavaCalls::construct_new_instance(
                             vmClasses::ThreadGroup_klass(),
                             vmSymbols::void_method_signature(),
                             CHECK_NH);
   Universe::set_system_thread_group(system_instance());
 
-  Handle string = java_lang_String::create_from_str("main", CHECK_NH);
   Handle main_instance = JavaCalls::construct_new_instance(
                             vmClasses::ThreadGroup_klass(),
-                            vmSymbols::threadgroup_string_void_signature(),
+                            vmSymbols::threadgroup_void_signature(),
                             system_instance,
-                            string,
                             CHECK_NH);
+  Universe::set_main_thread_group(main_instance());
   return main_instance;
 }
 
@@ -345,10 +348,21 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // The VM creates & returns objects of this class. Make sure it's initialized.
   initialize_class(vmSymbols::java_lang_Class(), CHECK);
   initialize_class(vmSymbols::java_lang_ThreadGroup(), CHECK);
-  Handle thread_group = create_initial_thread_group(CHECK);
-  Universe::set_main_thread_group(thread_group());
+  Handle main_group = create_initial_thread_groups(CHECK);
   initialize_class(vmSymbols::java_lang_Thread(), CHECK);
-  create_initial_thread(thread_group, main_thread, CHECK);
+  create_initial_thread(main_group, main_thread, CHECK);
+
+  // Now we have Thread we should be able to enable Java Object Monitor
+  // fast-locking via the MonitorSupport class. No Java code executed so
+  // far can have used synchronized blocks or methods. All policies require
+  // MonitorSupport to be initialized, but only Fast can enable synchronization
+  // after this.
+  log_info(class, init)("Continuing initialize_java_lang_classes with MonitorSupport class");
+  initialize_class(vmSymbols::java_lang_MonitorSupport(), CHECK);
+  if (ObjectMonitorMode::fast()) {
+    log_info(class, init)("Continuing initialize_java_lang_classes by re-enabling synchronization");
+    java_lang_MonitorSupport::set_sync_enabled();
+  }
 
   // The VM creates objects of this class.
   initialize_class(vmSymbols::java_lang_Module(), CHECK);
@@ -361,13 +375,14 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // initialize the hardware-specific constants needed by Unsafe
   initialize_class(vmSymbols::jdk_internal_misc_UnsafeConstants(), CHECK);
   jdk_internal_misc_UnsafeConstants::set_unsafe_constants();
-  
+
   assert(Threads::number_of_threads() == 1, "must be");
 
-  // With Java monitors we have to perform lock-free initialization of all classes
-  // needed within the implementation of the Monitor class before we can actually
-  // use that class for synchronization. In addition no Java code executed so far can
-  // have use synchronized blocks or methods.
+  // With heavy Java monitors we have to perform lock-free initialization of all classes
+  // needed within the implementation of the Monitor class before we can actually use that
+  // that class for synchronization. Even with fast-locking we must initialize all classes that
+  // will be needed for monitor inflation before we can start any other threads - otherwise
+  // we can race to initialize those classes, which itself requires an inflated Monitor.
   if (ObjectMonitorMode::java_only()) {
     log_info(class, init)("Continuing initialize_java_lang_classes with Monitor and related classes");
     initialize_class(vmSymbols::java_lang_Monitor(), CHECK);
@@ -404,16 +419,21 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
     }
   }
 
+  // FIXME: we can now revert thread starting changes mentioned below as it should be safe.
+  // Without Monitor, initializing Method triggers our first system thread creation.
+
   // The VM preresolves methods to these classes. Make sure that they get initialized
   initialize_class(vmSymbols::java_lang_reflect_Method(), CHECK);
   initialize_class(vmSymbols::java_lang_ref_Finalizer(), CHECK);
-  
+
   // initPhase1 will now start the ReferenceHandler thread as its first action, so we have
   // to reenable synchronization before that happens.
-  log_info(class, init)("Continuing initialize_jaava_lang_classes by re-enabling synchronization");
-  assert(!java_lang_Object::sync_enabled(), "must be disabled %x", (int) java_lang_Object::sync_enabled());
-  java_lang_Object::set_sync_enabled();
-  assert(java_lang_Object::sync_enabled(), "Didn't work! %x", (int) java_lang_Object::sync_enabled());
+  if (!ObjectMonitorMode::fast() && ObjectMonitorMode::java_only()) {
+    log_info(class, init)("Continuing initialize_java_lang_classes by re-enabling synchronization");
+    assert(!java_lang_MonitorSupport::sync_enabled(), "must be disabled %x", (int) java_lang_MonitorSupport::sync_enabled());
+    java_lang_MonitorSupport::set_sync_enabled();
+    assert(java_lang_MonitorSupport::sync_enabled(), "Didn't work! %x", (int) java_lang_MonitorSupport::sync_enabled());
+  }
 
   log_info(class, init)("Continuing initialize_java_lang_classes with call_initPhase1");
   // Phase 1 of the system initialization in the library, java.lang.System class initialization

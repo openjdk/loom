@@ -101,34 +101,53 @@ InjectedField JavaClasses::_injected_fields[] = {
   ALL_INJECTED_FIELDS(DECLARE_INJECTED_FIELD)
 };
 
-// java_lang_Object
-
-int java_lang_Object::_static_sync_enabled_offset;
-
-#define OBJECT_FIELDS_DO(macro) \
+// java_lang_MonitorSupport
+int java_lang_MonitorSupport::_static_sync_enabled_offset;
+#define MONITORSUPPORT_FIELDS_DO(macro) \
   macro(_static_sync_enabled_offset, k, "syncEnabled", int_signature, true)
 
-void java_lang_Object::compute_offsets() {
-  InstanceKlass* k = vmClasses::Object_klass();
-  OBJECT_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+void java_lang_MonitorSupport::compute_offsets() {
+  InstanceKlass* k = vmClasses::MonitorSupport_klass();
+  MONITORSUPPORT_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 }
 
 #if INCLUDE_CDS
-void java_lang_Object::serialize_offsets(SerializeClosure* f) {
-  OBJECT_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
+void java_lang_MonitorSupport::serialize_offsets(SerializeClosure* f) {
+  MONITORSUPPORT_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
 }
 #endif
 
-void java_lang_Object::set_sync_enabled() {
-  InstanceKlass* ik = vmClasses::Object_klass();
+void java_lang_MonitorSupport::set_sync_enabled() {
+  InstanceKlass* ik = vmClasses::MonitorSupport_klass();
   oop base = ik->static_field_base_raw();
   base->int_field_put(_static_sync_enabled_offset, 1);
 }
 
-jint java_lang_Object::sync_enabled() {
-  InstanceKlass* ik = vmClasses::Object_klass();
+jint java_lang_MonitorSupport::sync_enabled() {
+  InstanceKlass* ik = vmClasses::MonitorSupport_klass();
   oop base = ik->static_field_base_raw();
   return base->int_field(_static_sync_enabled_offset);
+}
+
+// Register native methods of MonitorSupport
+void java_lang_MonitorSupport::register_natives(TRAPS) {
+  InstanceKlass* obj = vmClasses::MonitorSupport_klass();
+  Method::register_native(obj, vmSymbols::log_name(),
+                          vmSymbols::string_void_signature(),
+                          (address) &JVM_Monitor_log, THREAD);
+  Method::register_native(obj, vmSymbols::abort_name(),
+                          vmSymbols::string_void_signature(),
+                          (address) &JVM_Monitor_abort, THREAD);
+  Method::register_native(obj, vmSymbols::monitor_cas_lock_state_name(),
+                          vmSymbols::object_int_int_bool_signature(),
+                          (address) &JVM_Monitor_casLockState, THREAD);
+  Method::register_native(obj, vmSymbols::monitor_get_lock_state_name(),
+                          vmSymbols::object_int_signature(),
+                          (address) &JVM_Monitor_getLockState, THREAD);
+  Method::register_native(obj, vmSymbols::getMonitorPolicy_name(),
+                          vmSymbols::void_int_signature(), (address) &JVM_MonitorPolicy, THREAD);
+  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
+                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 // Register native methods of Object
@@ -148,10 +167,6 @@ void java_lang_Object::register_natives(TRAPS) {
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorEnter, THREAD);
   Method::register_native(obj, vmSymbols::monitorExit0_name(),
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorExit, THREAD);
-  Method::register_native(obj, vmSymbols::getMonitorPolicy_name(),
-                          vmSymbols::void_int_signature(), (address) &JVM_MonitorPolicy, THREAD);
-  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
-                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 int JavaClasses::compute_injected_offset(InjectedFieldID id) {
@@ -5223,7 +5238,6 @@ void java_lang_InternalError::serialize_offsets(SerializeClosure* f) {
   //end
 
 #define BASIC_JAVA_CLASSES_DO_PART2(f) \
-  f(java_lang_Object) \
   f(java_lang_System) \
   f(java_lang_ClassLoader) \
   f(java_lang_Throwable) \
@@ -5268,6 +5282,7 @@ void java_lang_InternalError::serialize_offsets(SerializeClosure* f) {
   f(jdk_internal_misc_UnsafeConstants) \
   f(java_lang_boxing_object) \
   f(vector_VectorPayload) \
+  f(java_lang_MonitorSupport)                   \
   //end
 
 #define BASIC_JAVA_CLASSES_DO(f) \

@@ -194,6 +194,8 @@ void vmClasses::resolve_all(TRAPS) {
 
   resolve_until(vmClassID::LIMIT, scan, CHECK);
 
+  java_lang_MonitorSupport::register_natives(CHECK);
+
   CollectedHeap::set_filler_object_klass(vmClasses::FillerObject_klass());
 
   _box_klasses[T_BOOLEAN] = vmClasses::Boolean_klass();

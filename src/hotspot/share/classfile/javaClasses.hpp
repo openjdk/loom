@@ -41,6 +41,13 @@ class RecordComponent;
 // Interface to java.lang.Object objects
 
 class java_lang_Object : AllStatic {
+ public:
+  static void register_natives(TRAPS);
+};
+
+// Interface to java.lang.MonitorSupport objects
+
+class java_lang_MonitorSupport : AllStatic {
   static int _static_sync_enabled_offset;
  public:
   static void compute_offsets();
@@ -49,6 +56,7 @@ class java_lang_Object : AllStatic {
   static void set_sync_enabled();
   static jint sync_enabled();
 };
+
 
 // Interface to java.lang.String objects
 

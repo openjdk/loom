@@ -60,6 +60,7 @@
   template(java_lang_Monitor$Node,                    "java/lang/Monitor$Node")                   \
   template(java_lang_Monitor$LockNode,                "java/lang/Monitor$LockNode")               \
   template(java_lang_Monitor$ConditionNode,           "java/lang/Monitor$ConditionNode")          \
+  template(java_lang_MonitorSupport,                  "java/lang/MonitorSupport")                 \
   template(java_lang_Package,                         "java/lang/Package")                        \
   template(java_lang_Module,                          "java/lang/Module")                         \
   template(java_lang_String,                          "java/lang/String")                         \
@@ -396,6 +397,7 @@
   template(notify_name,                               "notify")                                   \
   template(getMonitorPolicy_name,                     "getMonitorPolicy")                         \
   template(hasLockedObject_name,                      "hasLockedObject")                          \
+  template(abort_name,                                "abort")                                   \
                                                                                                   \
   /* common method and field names */                                                             \
   template(object_initializer_name,                   "<init>")                                   \
