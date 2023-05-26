@@ -470,7 +470,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
     /**
      * Ensures that the current thread is the owner of this task scope and that it joined
-     * (with {@link #join()} or {@link #joinUntil(Instant)} after {@linkplain #fork(Callable)
+     * (with {@link #join()} or {@link #joinUntil(Instant)}) after {@linkplain #fork(Callable)
      * forking} subtasks.
      *
      * @apiNote This method can be used by subclasses that define methods to make available
@@ -518,7 +518,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * {@linkplain ScopedValue scoped value} bindings. The bindings must match the bindings
      * captured when the task scope was created.
      *
-     * <p> This method returns a {@link Subtask Subtask}to represent the <em>forked
+     * <p> This method returns a {@link Subtask Subtask} to represent the <em>forked
      * subtask</em>. The {@code Subtask} object can be used to obtain the result when
      * the subtask completes successfully, or the exception when the subtask fails. To
      * ensure correct usage, the {@link Subtask#get() get()} and {@link Subtask#exception()
