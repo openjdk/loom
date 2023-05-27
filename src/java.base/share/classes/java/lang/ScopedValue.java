@@ -404,7 +404,7 @@ public final class ScopedValue<T> {
         // Carrier#call() in this thread because it needs neither
         // runtime bytecode generation nor any release fencing.
         private static final class CallableAdapter<V> implements Callable<V> {
-            private Supplier<? extends V> s;
+            private /*non-final*/ Supplier<? extends V> s;
             CallableAdapter(Supplier<? extends V> s) {
                 this.s = s;
             }
