@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,7 +28,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Stream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -56,9 +55,6 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
     // name of container, used by toString
     private final String name;
 
-    // the number of threads in the container
-    private final LongAdder threadCount;
-
     // the virtual threads in the container, created lazily
     private volatile Set<Thread> virtualThreads;
 
@@ -75,7 +71,6 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
     private SharedThreadContainer(String name) {
         super(/*shared*/ true);
         this.name = name;
-        this.threadCount = new LongAdder();
     }
 
     /**
@@ -123,19 +118,12 @@ public class SharedThreadContainer extends ThreadContainer implements AutoClosea
             }
             vthreads.add(thread);
         }
-        threadCount.add(1L);
     }
 
     @Override
     public void onExit(Thread thread) {
-        threadCount.add(-1L);
         if (thread.isVirtual())
             virtualThreads.remove(thread);
-    }
-
-    @Override
-    public long threadCount() {
-        return threadCount.sum();
     }
 
     @Override
