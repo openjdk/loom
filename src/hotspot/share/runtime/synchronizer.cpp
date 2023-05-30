@@ -795,7 +795,10 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
 
   // the current locking is from JNI instead of Java code
   current->set_current_pending_monitor_is_from_java(false);
-  if (ObjectMonitorMode::legacy()) {
+
+  // For the "native" policy we simplify things by avoiding the upcall
+  // to Java.
+  if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
     // An async deflation can race after the inflate() call and before
     // enter() can make the ObjectMonitor busy. enter() returns false if
     // we have lost the race to async deflation and we simply try again.
@@ -816,7 +819,9 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
 void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
   JavaThread* current = THREAD;
 
-  if (ObjectMonitorMode::legacy()) {
+  // For the "native" policy we simplify things by avoiding the upcall
+  // to Java.
+  if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
     // The ObjectMonitor* can't be async deflated until ownership is
     // dropped inside exit() and the ObjectMonitor* must be !is_busy().
     ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_exit);
@@ -825,7 +830,7 @@ void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
     // monitor even if an exception was already pending.
     if (monitor->check_owner(THREAD)) {
       monitor->exit(current);
-    current->dec_held_monitor_count(1, true);
+      current->dec_held_monitor_count(1, true);
     }
   } else {
     java_jni_exit(obj, current);

@@ -24,10 +24,13 @@
 
 /*
  * @test SimpleJNI
- * @summary This does a sanity test of JNI monitor enter/exit
+ * @summary This does a sanity test of JNI monitor enter/exit.
+ * @comment This only works for Java Object Monitors as native monitors can't
+ *          tell when a JNI unlock is illegal and we just crash with assertion
+ *          failures.
  * @library /testlibrary /test/lib
  * @build SimpleJNI
- * @run main/native SimpleJNI
+ * @run main/othervm/native -XX:ObjectSynchronizerMode=fast SimpleJNI
  */
 
 public class SimpleJNI {
@@ -47,7 +50,6 @@ public class SimpleJNI {
         if (Thread.holdsLock(o))
             throw new Error("Thread still holds lock");
     }
-
 
     public static void main(String[] args) throws Exception {
         Object o = new Object();

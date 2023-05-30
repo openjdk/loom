@@ -213,12 +213,7 @@ final class MonitorSupport {
 
         @ReservedStackAccess
         public final boolean hasLockedObject(Object o, Thread current) {
-            boolean owned = current.hasLocked(o);
-            // We can sanity check the lockStack
-            if (Thread.holdsLock0(o) != owned) {
-                abort("Lock ownership mismatch for native implementation");
-            }
-            return owned;
+            return Thread.holdsLock0(o);
         }
     }
 
