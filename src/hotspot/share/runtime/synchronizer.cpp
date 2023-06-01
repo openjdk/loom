@@ -1128,7 +1128,7 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
     }
 
     if (mark.is_neutral() ||                           // if this is a normal header
-        ObjectMonitorMode::fast()) {
+        ObjectMonitorMode::java_only()) {
       hash = mark.hash();
       if (hash != 0) {                     // if it has a hash, just return it
         return hash;
@@ -1147,7 +1147,7 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
 
       // For Java Object Monitors the race can only be with another hash installer
       // so just loop again.
-      if (ObjectMonitorMode::fast()) {
+      if (ObjectMonitorMode::java_only()) {
         continue;
       }
     } else if (mark.has_monitor()) {
