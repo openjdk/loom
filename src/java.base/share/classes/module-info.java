@@ -280,6 +280,7 @@ module java.base {
         java.smartcardio,
         jdk.charsets,
         jdk.jlink,
+        jdk.jpackage,
         jdk.net;
     exports sun.net to
         java.net.http,
