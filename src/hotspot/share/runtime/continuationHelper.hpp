@@ -99,9 +99,7 @@ public:
   static int size(const frame& f);
   static inline int expression_stack_size(const frame &f, InterpreterOopMap* mask);
 
-#ifdef ASSERT
-  static bool is_owning_locks(const frame& f);
-#endif
+  static int monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
 
   static bool is_instance(const frame& f);
 
@@ -127,10 +125,8 @@ class ContinuationHelper::CompiledFrame : public ContinuationHelper::NonInterpre
 public:
   static bool is_instance(const frame& f);
 
-#ifdef ASSERT
   template <typename RegisterMapT>
-  static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
-#endif
+  static int monitors_to_fix(JavaThread* thread, RegisterMapT* map, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
 };
 
 class ContinuationHelper::StubFrame : public ContinuationHelper::NonInterpretedFrame {

@@ -625,7 +625,8 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
     lightweight_lock(objReg, tmpReg, thread, scrReg, NO_COUNT);
     jmp(COUNT);
   }
-  jmp(DONE_LABEL);
+  // After recursive stack locking attempt case
+  jmp(NO_COUNT);
 
   bind(IsInflated);
   // The object is inflated. tmpReg contains pointer to ObjectMonitor* + markWord::monitor_value
@@ -697,6 +698,7 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   jccb(Assembler::notEqual, NO_COUNT);    // If not recursive, ZF = 0 at this point (fail)
   incq(Address(scrReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
   xorq(rax, rax); // Set ZF = 1 (success) for recursive lock, denoting locking success
+  jmp(NO_COUNT);
 #endif // _LP64
 #if INCLUDE_RTM_OPT
   } // use_rtm()
@@ -775,7 +777,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
 
   if (LockingMode == LM_LEGACY) {
     cmpptr(Address(boxReg, 0), NULL_WORD);                            // Examine the displaced header
-    jcc   (Assembler::zero, COUNT);                                   // 0 indicates recursive stack-lock
+    jcc   (Assembler::zero, NO_COUNT);                                   // 0 indicates recursive stack-lock
   }
   movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));   // Examine the object's markword
   if (LockingMode != LM_MONITOR) {
@@ -855,9 +857,14 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
 
   // Recursive inflated unlock
   decq(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
-  jmpb(LSuccess);
+  xorl(tmpReg, tmpReg); // Set ZF == 1
+  jmpb(NO_COUNT);
 
   bind(LNotRecursive);
+
+  cmpptr(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(slowpath_on_last_exit)), 0);
+  jccb(Assembler::notEqual, LGoSlowPath);
+
   movptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(cxq)));
   orptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(EntryList)));
   jccb  (Assembler::notZero, CheckSucc);

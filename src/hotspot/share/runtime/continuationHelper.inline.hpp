@@ -108,22 +108,34 @@ inline int ContinuationHelper::InterpretedFrame::expression_stack_size(const fra
 }
 
 #ifdef ASSERT
-inline bool ContinuationHelper::InterpretedFrame::is_owning_locks(const frame& f) {
+inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
   assert(f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
   if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin()) {
-    return false;
+    return 0;
   }
 
+  int monitor_count = 0;
   for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(f.interpreter_frame_monitor_begin());
         current >= f.interpreter_frame_monitor_end();
         current = f.previous_monitor_in_interpreter_frame(current)) {
 
       oop obj = current->obj();
       if (obj != nullptr) {
-        return true;
+        markWord mark = obj->mark();
+        mark.has_monitor();
+        if (mark.has_monitor() && mark.monitor()->has_continuation_owner() && mark.monitor()->is_owner_anonymous()) {
+          // already fixed
+          continue;
+        }
+        bool created;
+        table.put_if_absent(obj, true, &created);
+        if (created) {
+          monitor_count++;
+          log_trace(continuations, monitor)("Found sync on object " INTPTR_FORMAT " in interpreted frame for thread %s", p2i(obj), JavaThread::current()->name());
+        }
       }
   }
-  return false;
+  return monitor_count;
 }
 #endif
 
@@ -158,7 +170,7 @@ inline bool ContinuationHelper::CompiledFrame::is_instance(const frame& f) {
 
 #ifdef ASSERT
 template<typename RegisterMapT>
-bool ContinuationHelper::CompiledFrame::is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f) {
+int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, RegisterMapT* map, const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
   assert(!f.is_interpreted_frame(), "");
   assert(CompiledFrame::is_instance(f), "");
 
@@ -166,10 +178,11 @@ bool ContinuationHelper::CompiledFrame::is_owning_locks(JavaThread* thread, Regi
   assert(!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
 
   if (!cm->has_monitors()) {
-    return false;
+    return 0;
   }
 
   frame::update_map_with_saved_link(map, Frame::callee_link_address(f)); // the monitor object could be stored in the link register
+  int monitor_count = 0;
   ResourceMark rm;
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
@@ -186,12 +199,22 @@ bool ContinuationHelper::CompiledFrame::is_owning_locks(JavaThread* thread, Regi
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
       oop owner = owner_sv->get_obj()();
       if (owner != nullptr) {
-        //assert(cm->has_monitors(), "");
-        return true;
+        markWord mark = owner->mark();
+        mark.has_monitor();
+        if (mark.has_monitor() && mark.monitor()->has_continuation_owner() && mark.monitor()->is_owner_anonymous()) {
+          // already fixed
+          continue;
+        }
+        bool created;
+        table.put_if_absent(owner, true, &created);
+        if (created) {
+          monitor_count++;
+          log_trace(continuations, monitor)("Found sync on object " INTPTR_FORMAT " in compiled frame for thread %s", p2i(owner), thread->name());
+        }
       }
     }
   }
-  return false;
+  return monitor_count;
 }
 #endif
 

@@ -45,6 +45,7 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   assert(hdr == rax, "hdr must be rax, for the cmpxchg instruction");
   assert_different_registers(hdr, obj, disp_hdr, tmp);
   int null_check_offset = -1;
+  Label count_locking, done;
 
   verify_oop(obj);
 
@@ -72,7 +73,6 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
 #endif
     lightweight_lock(obj, hdr, thread, tmp, slow_case);
   } else  if (LockingMode == LM_LEGACY) {
-    Label done;
     // and mark it as unlocked
     orptr(hdr, markWord::unlocked_value);
     // save unlocked object header into the displaced header location on the stack
@@ -83,7 +83,7 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     MacroAssembler::lock(); // must be immediately before cmpxchg!
     cmpxchgptr(disp_hdr, Address(obj, hdr_offset));
     // if the object header was the same, we're done
-    jcc(Assembler::equal, done);
+    jcc(Assembler::equal, count_locking);
     // if the object header was not the same, it is now in the hdr register
     // => test if it is a stack pointer into the same stack (recursive locking), i.e.:
     //
@@ -105,10 +105,12 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // otherwise we don't care about the result and handle locking via runtime call
     jcc(Assembler::notZero, slow_case);
     // done
-    bind(done);
+    jmp(done);
   }
 
+  bind(count_locking);
   inc_held_monitor_count();
+  bind(done);
 
   return null_check_offset;
 }
@@ -147,9 +149,9 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
     // we do unlocking via runtime call
     jcc(Assembler::notEqual, slow_case);
     // done
+    dec_held_monitor_count();
   }
   bind(done);
-  dec_held_monitor_count();
 }
 
 
