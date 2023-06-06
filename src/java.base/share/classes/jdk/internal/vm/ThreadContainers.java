@@ -53,7 +53,7 @@ public class ThreadContainers {
 
     static {
         String s = GetPropertyAction.privilegedGetProperty("jdk.trackAllThreads");
-        if (s != null && (s.isEmpty() || Boolean.parseBoolean(s))) {
+        if (s == null || s.isEmpty() || Boolean.parseBoolean(s)) {
             TRACK_ALL_THREADS = true;
             ROOT_CONTAINER = new RootContainer.TrackingRootContainer();
         } else {
@@ -205,9 +205,8 @@ public class ThreadContainers {
     }
 
     /**
-     * Root container that "contains" all platform threads not started in a
-     * container plus some (or all) virtual threads that are started directly
-     * with the Thread API.
+     * Root container that "contains" all platform threads not started in a container.
+     * It may include all virtual threads started directly with the Thread API.
      */
     private static abstract class RootContainer extends ThreadContainer {
         protected RootContainer() {
