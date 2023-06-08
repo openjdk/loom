@@ -130,6 +130,11 @@ class Universe: AllStatic {
   static LatestMethodCache* _object_monitorWaitUninterruptibly_cache;  // java.lang.Object::monitorWaitUninterruptibly(obj)
   static LatestMethodCache* _object_monitorJNIEnter_cache; // java.lang.Object::monitorEnter(obj)
   static LatestMethodCache* _object_monitorJNIExit_cache;  // java.lang.Object::monitorExit(obj)
+#ifdef C2_PATCH
+  static LatestMethodCache* _object_compilerMonitorEnter_cache;
+  static LatestMethodCache* _object_compilerMonitorExit_cache;
+
+#endif
 
   static Method* _object_monitorEnter; // java.lang.Object::monitorEnter(obj)
   static Method* _object_monitorEnterFrameId; // java.lang.Object::monitorEnter(obj)
@@ -308,6 +313,11 @@ class Universe: AllStatic {
   static Method*      object_monitorJNIEnter_method()   { return _object_monitorJNIEnter_cache->get_method(); }
   static Method*      object_monitorJNIExit_method()    { return _object_monitorJNIExit_cache->get_method(); }
 
+#ifdef C2_PATCH
+  static Method*      object_compilerMonitorEnter_method() { return _object_compilerMonitorEnter_cache->get_method(); }
+  static Method*      object_compilerMonitorExit_method() { return _object_compilerMonitorEnter_cache->get_method(); }
+
+#endif
   static oop          the_null_sentinel();
   static address      the_null_sentinel_addr()        { return (address) &_the_null_sentinel;  }
 

@@ -1138,6 +1138,9 @@ void CompileBroker::compile_method_base(const methodHandle& method,
   assert(!method->method_holder()->is_not_initialized(),
          "method holder must be initialized");
   assert(!method->is_method_handle_intrinsic(), "do not enqueue these guys");
+#ifdef C2_PATCH
+  assert(!method->is_synchronized(), "not doing those yet");
+#endif
 
   if (CIPrintRequests) {
     tty->print("request: ");

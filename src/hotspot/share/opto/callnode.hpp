@@ -411,7 +411,11 @@ public:
   }
   void grow_stack(JVMState* jvms, uint grow_by);
   // Handle monitor stack
+#ifndef C2_PATCH
   void push_monitor( const FastLockNode *lock );
+#else
+  void push_monitor(Node *lock);
+#endif
   void pop_monitor ();
   Node *peek_monitor_box() const;
   Node *peek_monitor_obj() const;

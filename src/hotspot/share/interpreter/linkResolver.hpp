@@ -335,6 +335,11 @@ class LinkResolver: AllStatic {
   static Method* linktime_resolve_virtual_method_or_null  (const LinkInfo& link_info);
   static Method* linktime_resolve_interface_method_or_null(const LinkInfo& link_info);
 
+#ifdef C2_PATCH
+  static void resolve_monitorenter(CallInfo& result, Bytecodes::Code byte, TRAPS);
+  static void resolve_monitorexit(CallInfo& result, Bytecodes::Code byte, TRAPS);
+
+#endif
   // runtime resolving from constant pool
   static void resolve_invoke(CallInfo& result, Handle recv,
                              const constantPoolHandle& pool, int index,

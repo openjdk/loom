@@ -1129,9 +1129,25 @@ Handle SharedRuntime::find_callee_info_helper(vframeStream& vfst, Bytecodes::Cod
   }
 
   Bytecode_invoke bytecode(caller, bci);
+#ifndef C2_PATCH
   int bytecode_index = bytecode.index();
+#endif
   bc = bytecode.invoke_code();
 
+#ifdef C2_PATCH
+  if (bc == Bytecodes::_monitorexit) {
+    bc = Bytecodes::_invokestatic;
+    LinkResolver::resolve_monitorexit(callinfo, bc, CHECK_NH);
+    return receiver;
+  } else if (bc == Bytecodes::_monitorenter) {
+    bc = Bytecodes::_invokestatic;
+    LinkResolver::resolve_monitorenter(callinfo, bc, CHECK_NH);
+    return receiver;
+  }
+
+  int bytecode_index = bytecode.index();
+
+#endif
   methodHandle attached_method(current, extract_attached_method(vfst));
   if (attached_method.not_null()) {
     Method* callee = bytecode.static_target(CHECK_NH);

@@ -33,6 +33,9 @@
 #include "compiler/methodLiveness.hpp"
 #include "compiler/compilerOracle.hpp"
 #include "oops/method.hpp"
+#ifdef C2_PATCH
+#include "memory/universe.hpp"
+#endif
 #include "runtime/handles.hpp"
 #include "utilities/bitMap.hpp"
 
@@ -359,6 +362,11 @@ class ciMethod : public ciMetadata {
   bool is_unboxing_method() const;
   bool is_vector_method() const;
   bool is_object_initializer() const;
+#ifdef C2_PATCH
+  bool is_object_monitorenter()      const { return get_Method() == Universe::object_monitorEnter_method(); }
+  bool is_object_monitorexit()      const { return get_Method() == Universe::object_monitorExit_method(); }
+  bool is_object_monitorenter_exit() const { return is_object_monitorenter() || is_object_monitorexit(); }
+#endif
 
   bool can_be_statically_bound(ciInstanceKlass* context) const;
 

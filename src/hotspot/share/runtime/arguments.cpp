@@ -3013,7 +3013,11 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
       vm_exit_during_initialization("ObjectSynchronizerMode is not compatible with use of LockingMode");
     }
     //  TieredStopAtLevel=1;
+#ifndef C2_PATCH
     set_mode_flags(_int);
+#else
+    //set_mode_flags(_int);
+#endif
     log_info(monitor)("Using new monitors with policy %s", ObjectMonitorMode::as_string());
   }
 

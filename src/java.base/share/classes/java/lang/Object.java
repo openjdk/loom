@@ -626,6 +626,18 @@ public class Object {
         Monitor.jniEnter(Thread.currentThread(), o);
     }
 
+    /* C2_PATCH
+    @ReservedStackAccess
+    private static final void compilerMonitorExit(Object o) {
+        monitorExit(o, 0x8L);
+    }
+
+    @ReservedStackAccess
+    private static final void compilerMonitorEnter(Object o) {
+        monitorEnter(o, 0x8L);
+    }
+    */
+
     /** Entry point for monitor exit from the VM (ObjectLocker) */
     @ReservedStackAccess
     private static final void monitorExit(Object o, long monitorFrameId) {

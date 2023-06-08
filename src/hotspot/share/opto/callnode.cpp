@@ -1043,6 +1043,13 @@ bool CallJavaNode::validate_symbolic_info() const {
   if (method() == nullptr) {
     return true; // call into runtime or uncommon trap
   }
+#ifdef C2_PATCH
+
+  if (method()->is_object_monitorenter_exit()) {
+    return true;
+  }
+
+#endif
   ciMethod* symbolic_info = jvms()->method()->get_method_at_bci(jvms()->bci());
   ciMethod* callee = method();
   if (symbolic_info->is_method_handle_intrinsic() && !callee->is_method_handle_intrinsic()) {
@@ -1393,7 +1400,11 @@ void SafePointNode::grow_stack(JVMState* jvms, uint grow_by) {
   jvms->set_endoff(endoff + grow_by);
 }
 
+#ifndef C2_PATCH
 void SafePointNode::push_monitor(const FastLockNode *lock) {
+#else
+void SafePointNode::push_monitor(Node *lock) {
+#endif
   // Add a LockNode, which points to both the original BoxLockNode (the
   // stack space for the monitor) and the Object being locked.
   const int MonitorEdges = 2;
@@ -1401,8 +1412,19 @@ void SafePointNode::push_monitor(const FastLockNode *lock) {
   assert(req() == jvms()->endoff(), "correct sizing");
   int nextmon = jvms()->scloff();
   if (GenerateSynchronizationCode) {
+#ifndef C2_PATCH
     ins_req(nextmon,   lock->box_node());
     ins_req(nextmon+1, lock->obj_node());
+#else
+    if (ObjectMonitorMode::legacy()) {
+      const FastLockNode* flock = lock->as_FastLock();
+      ins_req(nextmon,   flock->box_node());
+      ins_req(nextmon+1, flock->obj_node());
+    } else {
+      ins_req(nextmon,   lock);
+      ins_req(nextmon+1, lock);
+    }
+#endif
   } else {
     Node* top = Compile::current()->top();
     ins_req(nextmon, top);

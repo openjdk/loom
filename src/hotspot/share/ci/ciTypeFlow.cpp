@@ -1774,6 +1774,18 @@ ciTypeFlow::Block::successors(ciBytecodeStream* str,
         break;
       }
 
+#ifdef C2_PATCH
+      case Bytecodes::_monitorenter:
+      case Bytecodes::_monitorexit: {
+        _successors =
+          new (arena) GrowableArray<Block*>(arena, 1, 0, NULL);
+        assert(_successors->length() == GOTO_TARGET, "");
+        _successors->append(analyzer->block_at(next_bci, jsrs));
+        break;
+      }
+
+
+#endif
       case Bytecodes::_wide:
       default:
         ShouldNotReachHere();

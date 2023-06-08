@@ -269,6 +269,10 @@
   template(jdk_internal_vm_annotation_Contended_signature,                   "Ljdk/internal/vm/annotation/Contended;")    \
   template(jdk_internal_vm_annotation_ReservedStackAccess_signature,         "Ljdk/internal/vm/annotation/ReservedStackAccess;") \
   template(jdk_internal_ValueBased_signature,                                "Ljdk/internal/ValueBased;") \
+  /* C2_PATCH BEGIN */ \
+  template(monitorEnter_name, "compilerMonitorEnter") \
+  template(monitorExit_name, "compilerMonitorExit") \
+  /* C2_PATCH END */ \
                                                                                                   \
   /* class symbols needed by intrinsics */                                                        \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, template, VM_SYMBOL_IGNORE, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
