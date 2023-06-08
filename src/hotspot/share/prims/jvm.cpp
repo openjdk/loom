@@ -833,6 +833,8 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
                                       // points. But the ENTER events happen in the middle of
                                       // code and can leave an inconsistent state.
 
+  ResourceMark rm(thread);
+
   // The id is just a convention:
   //  - BLOCKED_ENTER   => JVMTI_EVENT_MONITOR_CONTENDED_ENTER
   //  - BLOCKED_ENTER+1 => JVMTI_EVENT_MONITOR_CONTENDED_ENTERED
