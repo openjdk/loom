@@ -295,7 +295,14 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
             // acquired it and then released it and so already have unparked
             // the first waiter, which may have cleared its node.
             if (t != null) {
-                U.unparkMonitor(t);
+                /*
+                MonitorSupport.log(Thread.currentThread().getName() +
+                                   " signalFirst of " + t.getName() +
+                                   " on object " + System.identityHashCode(this));
+                */
+                // If we are dealing with a virtual thread we need to switch to
+                // the carrier so that the JVM will be able to locate it.
+                U.unparkMonitor(t.isVirtual() ? ((VirtualThread)t).carrierThread : t);
             }
         }
     }
@@ -348,15 +355,17 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                 node.status = WAITING;          // enable signal
             } else {
                 spins = postSpins = (byte)((postSpins << 1) | 1);
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_ENTER;
+                Thread.FieldHolder holder =
+                    current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                int status = holder.threadStatus;
+                holder.threadStatus = BLOCKED_ENTER;
                 // Post JVMTI_EVENT_MONITOR_CONTENDED_ENTER
                 postJvmtiEvent(BLOCKED_ENTER, current, this.obj.get(), -1 /* ignored */, false /* ignored */);
                 contended = true;
                 try {
                     U.parkMonitor();
                 } finally {
-                    current.holder.threadStatus = status;
+                    holder.threadStatus = status;
                 }
                 node.clearStatus();
             }
@@ -410,7 +419,10 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         if (_owner != current)
             throw new IllegalMonitorStateException();
         if (first != null) {
+            // MonitorSupport.log(current.getName() + " doing signalAll on Monitor " + System.identityHashCode(this));
             doSignal(first, true);
+        } else {
+            // MonitorSupport.log(current.getName() + " doing empty signalAll on Monitor " + System.identityHashCode(this));
         }
     }
 
@@ -523,53 +535,63 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         state = 0;
         signalFirst();
 
-        boolean timed; long deadline;
-        if (millis != 0L) {
-            timed = true;
-            deadline = System.nanoTime() + millis * 1000000L;
-        } else {
-            timed = false;
-            deadline = 0L;
-        }
+        // make sure we re-acquire if anything goes wrong
 
-        // wait for signal, interrupt, or timeout
-        long nanos = 0L;
         boolean cancelled = false, interrupted = false;
-        while (!canReacquire(node)) {
-            if (((interrupted |= Thread.interrupted()) && interruptible) ||
-                (timed && (nanos = deadline - System.nanoTime()) <= 0L)) {
-                if (cancelled = (node.getAndUnsetStatus(COND) & COND) != 0)
-                    break;
-            } else if (timed) {
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_TIMED_WAIT;
-                try {
-                    U.parkMonitorNanos(nanos);
-                } finally {
-                    current.holder.threadStatus = status;
-                }
+        try {
+            boolean timed; long deadline;
+            if (millis != 0L) {
+                timed = true;
+                deadline = System.nanoTime() + millis * 1000000L;
             } else {
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_WAIT;
-                try {
-                    U.parkMonitor();
-                } finally {
-                    current.holder.threadStatus = status;
+                timed = false;
+                deadline = 0L;
+            }
+
+            // wait for signal, interrupt, or timeout
+            long nanos = 0L;
+            while (!canReacquire(node)) {
+                if (((interrupted |= Thread.interrupted()) && interruptible) ||
+                    (timed && (nanos = deadline - System.nanoTime()) <= 0L)) {
+                    if (cancelled = (node.getAndUnsetStatus(COND) & COND) != 0)
+                        break;
+                } else if (timed) {
+                    Thread.FieldHolder holder =
+                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                    int status = holder.threadStatus;
+                    holder.threadStatus = BLOCKED_TIMED_WAIT;
+                    try {
+                        U.parkMonitorNanos(nanos);
+                    } finally {
+                        holder.threadStatus = status;
+                    }
+                } else {
+                    Thread.FieldHolder holder =
+                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                    int status = holder.threadStatus;
+                    holder.threadStatus = BLOCKED_WAIT;
+                    // MonitorSupport.log(current.getName() + " doing park in await on Monitor " + System.identityHashCode(this));
+                    try {
+                        U.parkMonitor();
+                    } finally {
+                        // MonitorSupport.log(current.getName() + " completed park in await on Monitor " + System.identityHashCode(this));
+                        holder.threadStatus = status;
+                    }
                 }
             }
-        }
-
-        // reacquire lock
-        node.clearStatus();
-        acquire(current, node, savedState);
-        if (cancelled)
-            unlinkCancelledWaiters(node);
-        if (interrupted) {
-            if (cancelled && interruptible) {
-                Thread.interrupted();
-                throw new InterruptedException();
+        } finally {
+            // reacquire lock
+            node.clearStatus();
+            acquire(current, node, savedState);
+            if (cancelled)
+                unlinkCancelledWaiters(node);
+            if (interrupted) {
+                if (cancelled && interruptible) {
+                    Thread.interrupted();
+                    throw new InterruptedException();
+                }
+                current.interrupt();
             }
-            current.interrupt();
         }
 
         return !cancelled;
@@ -647,10 +669,13 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
 
         /**
          * For test code, when running with Java Monitors disabled,
-         * so we can test this like a regular library class.
+         * so we can test this like a regular library class. Note that
+         * tests get injected into the java.lang package so they can
+         * change this directly without needing a rebuild. It would be nice
+         * to use a System property to control this but it is loaded
+         * to early in the initialization sequence for that.
          */
         public static boolean debugging = false;
-
         final WeakReference<Object> ref;
         final int hash;  // cached identity hash
 
@@ -701,7 +726,7 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                     public void run() {
                         if (debugging) System.out.println("Cleaner for " + ObjectRef.this);
                         if (Monitor.map.remove(ObjectRef.this) != null && debugging) {
-                            System.out.println("Removed map entry for " + ObjectRef.this);
+                            System.out.println("Removed map entry for " + ObjectRef.this + " - size now " + Monitor.map.size());
                         }
                     }
                 });
@@ -795,6 +820,8 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
             if (ObjectRef.debugging)
                 System.out.println("Computing new Monitor for " + r);
             m = map.computeIfAbsent(r, factory);
+            if (ObjectRef.debugging)
+                System.out.println("Map size " + map.size());
 
             // assertion logic:
             Monitor m2;

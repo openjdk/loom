@@ -499,7 +499,6 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
-
         long nanos = MILLISECONDS.toNanos(millis);
         ThreadSleepEvent event = beforeSleep(nanos);
         try {
@@ -2465,6 +2464,10 @@ public class Thread implements Runnable {
 
     void pop(Object lockee, long fid) {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
+        if (lockStackPos <= 0 || lockStackPos >= lockStack.length)
+            MonitorSupport.abort("pop() ArrayIndexOutOfBoundsException: " + lockStackPos);
         Object o = lockStack[--lockStackPos];
         if (o != lockee) {
             MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
