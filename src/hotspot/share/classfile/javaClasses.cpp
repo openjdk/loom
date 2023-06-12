@@ -167,6 +167,8 @@ void java_lang_Object::register_natives(TRAPS) {
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorEnter, THREAD);
   Method::register_native(obj, vmSymbols::monitorExit0_name(),
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorExit, THREAD);
+  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
+                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 int JavaClasses::compute_injected_offset(InjectedFieldID id) {
