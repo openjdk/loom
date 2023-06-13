@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,22 +58,36 @@ public class MonitorTest {
         checkEquals(holdCount, m.holdCount());
     }
 
-    public static void main(String[] args) {
-        System.out.println("testSingleUse()");
-        testSingleUse();
-        System.out.println("testRecursiveUse()");
-        testRecursiveUse();
-        System.out.println("testTimwedWait()");
-        testTimedAwait();
-        System.out.println("testIMSE()");
-        testIMSE();
+    public static void main(String[] args) throws Throwable {
+        if (args.length == 0)
+            runTests();
+        else {
+            Thread t = Thread.ofVirtual().name("TestThread").start(MonitorTest::runTests);
+            t.join();
+        }
+    }
 
-        System.out.println("testObjectRef()");
-        testObjectRef();
-        System.out.println("testMonitorMap()");
-        testMonitorMap();
-        System.out.println("testCleaner()");
-        testCleaner();
+    static void runTests() {
+        try {
+            System.out.println("testSingleUse()");
+            testSingleUse();
+            System.out.println("testRecursiveUse()");
+            testRecursiveUse();
+            System.out.println("testTimwedWait()");
+            testTimedAwait();
+            System.out.println("testIMSE()");
+            testIMSE();
+            System.out.println("testObjectRef()");
+            testObjectRef();
+            System.out.println("testMonitorMap()");
+            testMonitorMap();
+            System.out.println("testCleaner()");
+            testCleaner();
+            System.out.println("testJoin()");
+            testJoin();
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
     }
 
     static void testIMSE() {
@@ -159,9 +173,13 @@ public class MonitorTest {
         checkOwned(m, 0);
     }
 
-    static void testMonitorMap() {
-        Monitor.ObjectRef.debugging = true;
+    static void runCleaners() {
+        System.gc();
+        // Need to wait for Cleaner thread to run.
+        try { Thread.sleep(1000); } catch (InterruptedException ex) {}
+    }
 
+    static void testMonitorMap() {
         Object o1 = new Object();
         checkEquals(Monitor.map.size(), 0);
         Monitor m1 = Monitor.of(o1);
@@ -186,19 +204,7 @@ public class MonitorTest {
         checkNotEquals(m2, m3);
         checkNotEquals(m2, m4);
         o1 = o2 = null;
-        System.gc();
-        System.gc();
-        System.gc();
-        try { Thread.sleep(5000); } catch (InterruptedException ex) {}
-        if (!m1.obj.isCleared())
-            System.out.println("Monitor ObjRef for o1 is not cleared!");
-        else
-            System.out.println("Monitor ObjRef for o1 is cleared!");
-        if (!m3.obj.isCleared())
-            System.out.println("Monitor ObjRef for o2 is not cleared!");
-        else
-            System.out.println("Monitor ObjRef for o2 is cleared!");
-
+        runCleaners();
         checkEquals(Monitor.map.size(), 0);
 
         final int size = 64;
@@ -237,9 +243,7 @@ public class MonitorTest {
         for (int i = 0; i < size; i++) {
             objs[i] = null;
         }
-        System.gc();
-        System.gc();
-
+        runCleaners();
         checkEquals(Monitor.map.size(), 0);
     }
 
@@ -256,17 +260,28 @@ public class MonitorTest {
         r2.createCleaner();
         checkEquals(m1, m2);
         o1 = null;
-        System.gc();
-        System.gc();
+        runCleaners();
         checkEquals(Monitor.map.size(), 0);
     }
 
     static void testObjectRef() {
-        Monitor.ObjectRef.debugging = true;
         Object o = new Object();
         Monitor.ObjectRef r1 = new Monitor.ObjectRef(o);
         Monitor.ObjectRef r2 = new Monitor.ObjectRef(o);
         checkEquals(r1, r2);
         checkEquals(r1.hashCode(), r2.hashCode());
+    }
+
+    static void testJoin() throws InterruptedException {
+        Runnable r = new Runnable() {
+                public void run() {
+                    try { Thread.sleep(5000); } catch (InterruptedException ie){}
+                }
+            };
+        JoinableThread t = new JoinableThread("JT-1", r);
+        t.start();
+        // Give the JT a chance to mark itself as "alive"
+        try { Thread.sleep(1000); } catch (InterruptedException ie){}
+        t.joinWith();
     }
 }

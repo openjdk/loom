@@ -600,8 +600,14 @@ public class Object {
 
     /* Monitor support functionality */
 
+    /*
+     * getcallerFrameId is private so that MonitorSupport can
+     * override it with a non-intrinsic version that includes logging.
+     * If you want to see that logging, change the calls of
+     * getCallerFrameId() below to MonitorSupport.getCallerFrameId().
+     */
     @IntrinsicCandidate
-    static final native long getCallerFrameId();
+    private static final native long getCallerFrameId();
 
     /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
     @ReservedStackAccess
@@ -609,7 +615,6 @@ public class Object {
         // FIXME: This should really be handled in the interpreter and JIT.
         if (o == null)
             throw new NullPointerException();
-
         long monitorFrameId = getCallerFrameId();
         MonitorSupport.policy().monitorEnter(o, monitorFrameId);
     }

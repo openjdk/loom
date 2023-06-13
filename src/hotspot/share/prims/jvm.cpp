@@ -679,13 +679,22 @@ JVM_LEAF(jint, JVM_MonitorPolicy())
 JVM_END
 
 JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
-  RegisterMap map(JavaThread::current(),
+  JavaThread* cur = JavaThread::current();
+  RegisterMap map(cur,
                   RegisterMap::UpdateMap::skip,
                   RegisterMap::ProcessFrames::skip,
                   RegisterMap::WalkContinuation::skip);
-  frame this_frame = JavaThread::current()->last_frame();
+  frame this_frame = cur->last_frame();
   frame monitor    = this_frame.sender(&map);
   jlong id = (jlong)monitor.link();
+  LogStreamHandle(Debug, monitor) lsh_mon;
+  if (lsh_mon.is_enabled()) {
+    ResourceMark rm(cur);
+    LogStream* log = &lsh_mon;
+    frame caller = monitor.sender(&map);
+    log->print_cr("JVM_CallerFrameId for %s - %s", cur->name(),
+                  caller.interpreter_frame_method()->name_and_sig_as_C_string() );
+  }
   return id;
 JVM_END
 
@@ -805,19 +814,26 @@ JVM_END
 
 JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
                                            jobject jthread, jobject obj, jlong ms, jboolean timedOut))
+
   jint sj = thread->current_system_java();
   thread->set_system_java(0);
 
-  JavaThread* current = java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread));
+  // Note: jthread is unused at the moment. JVMTI extracts the target thread from
+  // thread->vthread().
   oop object = JNIHandles::resolve_non_null(obj);
 
-  assert(current != nullptr && current == JavaThread::current(), "must be");
-
-  ResourceMark rm(current);
+#ifdef ASSERT
+  oop jl_thread = JNIHandles::resolve_non_null(jthread);
+  JavaThread* native_thread = java_lang_Thread::thread(jl_thread);
+  bool is_vthread = (native_thread == nullptr && jl_thread != thread->threadObj());
+  assert(is_vthread || native_thread == thread, "must be");
+#endif
 
   bool exceptions_are_fatal = false;  // WAIT events are safe as they happen on entry and exit
                                       // points. But the ENTER events happen in the middle of
                                       // code and can leave an inconsistent state.
+
+  ResourceMark rm(thread);
 
   // The id is just a convention:
   //  - BLOCKED_ENTER   => JVMTI_EVENT_MONITOR_CONTENDED_ENTER
@@ -828,10 +844,10 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
   switch(id) {
 
   case (int)JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER:
-    log_info(monitor)("Hit postJvmtiEvent for contended enter on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+    log_info(monitor)("Hit postJvmtiEvent for contended enter on thread %s for object " INTPTR_FORMAT, thread->name(), p2i(object));
 
     if (JvmtiExport::should_post_monitor_contended_enter()) {
-      JvmtiExport::post_monitor_contended_enter(current, object);
+      JvmtiExport::post_monitor_contended_enter(thread, object);
     }
 
     // FIXME!
@@ -843,10 +859,10 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
     break;
 
   case ((int)JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER) + 1:
-    log_info(monitor)("Hit postJvmtiEvent for contended entered on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+    log_info(monitor)("Hit postJvmtiEvent for contended entered on thread %s for object " INTPTR_FORMAT, thread->name(), p2i(object));
 
     if (JvmtiExport::should_post_monitor_contended_entered()) {
-      JvmtiExport::post_monitor_contended_entered(current, object);
+      JvmtiExport::post_monitor_contended_entered(thread, object);
     }
 
     // The current thread owns the monitor and is unparked, so the
@@ -857,7 +873,7 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
     break;
 
   case (int)JavaThreadStatus::IN_OBJECT_WAIT:
-    log_info(monitor)("Hit postJvmtiEvent for monitor wait on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+    log_info(monitor)("Hit postJvmtiEvent for monitor wait on thread %s for object " INTPTR_FORMAT, thread->name(), p2i(object));
 
     if (JvmtiExport::should_post_monitor_wait()) {
       JvmtiExport::post_monitor_wait(thread, object, ms);
@@ -866,12 +882,12 @@ JVM_ENTRY(void, JVM_Monitor_postJvmtiEvent(JNIEnv* env, jclass ignored, jint id,
     // The current thread already owns the monitor but is not yet
     // parked. This means that the JVMTI_EVENT_MONITOR_WAIT
     // event handler cannot accidentally consume an unpark() meant for
-    // the associated monitor..
+    // the associated monitor.
 
     break;
 
   case ((int)JavaThreadStatus::IN_OBJECT_WAIT) + 1:
-    log_info(monitor)("Hit postJvmtiEvent for monitor waited on thread %s for object " INTPTR_FORMAT, current->name(), p2i(object));
+    log_info(monitor)("Hit postJvmtiEvent for monitor waited on thread %s for object " INTPTR_FORMAT, thread->name(), p2i(object));
 
     if (JvmtiExport::should_post_monitor_waited()) {
       JvmtiExport::post_monitor_waited(thread, object, timedOut );

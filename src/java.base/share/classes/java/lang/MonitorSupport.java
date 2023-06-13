@@ -221,6 +221,7 @@ final class MonitorSupport {
 
         @ReservedStackAccess
         public void monitorEnter(Object o, long monitorFrameId) {
+            // MonitorSupport.log("Heavy enter for frame " + monitorFrameId);
             if (syncEnabled == 0)
                 return;
             Thread t = Thread.currentThread();
@@ -230,6 +231,7 @@ final class MonitorSupport {
 
         @ReservedStackAccess
         public void monitorExit(Object o, long monitorFrameId) {
+            // MonitorSupport.log("Heavy exit  for frame " + monitorFrameId);
             if (syncEnabled == 0)
                 return;
             Thread t = Thread.currentThread();
@@ -239,6 +241,7 @@ final class MonitorSupport {
 
         @ReservedStackAccess
         public void monitorExit(long monitorFrameId) {
+            // MonitorSupport.log("Heavy exit2 for frame " + monitorFrameId);
             if (syncEnabled == 0)
                 return;
             Thread t = Thread.currentThread();
@@ -484,7 +487,10 @@ final class MonitorSupport {
     final static native boolean casLockState(Object o, int to, int from);
     @IntrinsicCandidate
     final static native int getLockState(Object o);
-
+    // This overrides the intrinsified version in Object so that we can
+    // enable logging. Call this version instead of the Object one if you
+    // want to see that logging.
+    static final native long getCallerFrameId();
     static {
         log("MonitorSupport.<clinit> executing");
     }

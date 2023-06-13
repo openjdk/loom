@@ -137,10 +137,13 @@ public class RedefineClass {
 
     public static final int ITERATIONS = 10;
 
+    static RuntimeException failure;
 
     public static void main(String[] args) throws Exception {
         Thread main = Thread.ofVirtual().name("test").start(RedefineClass::main);
         main.join();
+        if (failure != null)
+            throw failure;
     }
 
     public static void main() {
@@ -172,7 +175,7 @@ public class RedefineClass {
                 threads[i].join();
             }
         } catch (Throwable t) {
-            throw new RuntimeException(t);
+            failure = new RuntimeException(t);
         }
     }
 }

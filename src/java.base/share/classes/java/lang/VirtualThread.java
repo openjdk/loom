@@ -128,7 +128,8 @@ final class VirtualThread extends BaseVirtualThread {
     private volatile boolean parkPermit;
 
     // carrier thread when mounted, accessed by VM
-    private volatile Thread carrierThread;
+    // Package access for Monitor
+    volatile Thread carrierThread;
 
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
