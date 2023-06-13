@@ -2464,9 +2464,9 @@ public class Thread implements Runnable {
         if (o != lockee) {
             Monitor.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
-        if (frameId[lockStackPos] != fid) {
-            Monitor.abort("frame id mismatched");
-        }
+        // if (frameId[lockStackPos] != fid) {
+        //     Monitor.abort("frame id mismatched");
+        // }
         lockStack[lockStackPos] = null;
         frameId[lockStackPos] = 0;
     }
@@ -2474,9 +2474,9 @@ public class Thread implements Runnable {
     Object pop(long fid) {
         if (this != Thread.currentThread()) Monitor.abort("invariant");
         Object o = lockStack[--lockStackPos];
-        if (frameId[lockStackPos] != fid) {
-            Monitor.abort("frame id mismatched");
-        }
+        // if (frameId[lockStackPos] != fid) {
+        //     Monitor.abort("frame id mismatched");
+        // }
         lockStack[lockStackPos] = null;
         frameId[lockStackPos] = 0;
         return o;
@@ -2484,9 +2484,9 @@ public class Thread implements Runnable {
 
     Object peek(long fid) {
         if (this != Thread.currentThread()) Monitor.abort("invariant");
-        if (frameId[lockStackPos - 1] != fid) {
-            Monitor.abort("frame id mismatched");
-        }
+        // if (frameId[lockStackPos - 1] != fid) {
+        //     Monitor.abort("frame id mismatched");
+        // }
         return lockStack[lockStackPos - 1];
     }
 

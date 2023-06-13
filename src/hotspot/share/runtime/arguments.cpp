@@ -2893,6 +2893,9 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     }
   }
 
+  // Forced Xcomp
+  set_mode_flags(_comp);
+  
   // PrintSharedArchiveAndExit will turn on
   //   -Xshare:on
   //   -Xlog:class+path=info
@@ -3013,7 +3016,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
       vm_exit_during_initialization("ObjectSynchronizerMode is not compatible with use of LockingMode");
     }
     //  TieredStopAtLevel=1;
-    set_mode_flags(_int);
+    //set_mode_flags(_int);
     log_info(monitor)("Using new monitors with policy %s", ObjectMonitorMode::as_string());
   }
 
