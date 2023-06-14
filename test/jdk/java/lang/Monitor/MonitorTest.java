@@ -22,40 +22,13 @@
 
 /*
  * @test
+ * @summary basic functional testing of the Monitor class as a standalone
+ *          utility class. The test has to be placed into java.base to get
+ *          package access.
  * @build java.base/*
  * @run main/othervm -XX:ObjectSynchronizerMode=legacy java.lang.MonitorTest
+ * @run main/othervm -XX:ObjectSynchronizerMode=legacy java.lang.MonitorTest virtual
  */
-<<<<<<<< HEAD:src/hotspot/share/compiler/compilationLog.hpp
-
-#ifndef SHARE_COMPILER_COMPILATIONLOG_HPP
-#define SHARE_COMPILER_COMPILATIONLOG_HPP
-
-#include "utilities/events.hpp"
-
-class CompileTask;
-class JavaThread;
-class nmethod;
-
-class CompilationLog : public StringEventLog {
-private:
-  static CompilationLog* _log;
-
-  CompilationLog();
-
-public:
-
-  void log_compile(JavaThread* thread, CompileTask* task);
-  void log_nmethod(JavaThread* thread, nmethod* nm);
-  void log_failure(JavaThread* thread, CompileTask* task, const char* reason, const char* retry_message);
-  void log_metaspace_failure(const char* reason);
-
-  static void init();
-  static CompilationLog* log() { return _log; }
-  using StringEventLog::log;
-};
-
-#endif // SHARE_COMPILER_COMPILATIONLOG_HPP
-========
 public class MonitorTest {
+    // This is a dummy - real test in java.base/java/lang/MonitorTest.java
 }
->>>>>>>> d27f8ccf0c4 (8290025: Remove the Sweeper):test/jdk/java/lang/Monitor/MonitorTest.java

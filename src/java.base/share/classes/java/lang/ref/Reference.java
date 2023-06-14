@@ -293,20 +293,6 @@ public abstract sealed class Reference<T>
         }
     }
 
-    // Deferred initialization - called from System.initPhase1()
-    // FIXME: not public
-    /** Fix me
-     */
-    public static void startThreads() {
-        ThreadGroup tg = Thread.currentThread().getThreadGroup();
-        for (ThreadGroup tgn = tg;
-             tgn != null;
-             tg = tgn, tgn = tg.getParent());
-
-        Reference.startReferenceHandlerThread(tg);
-        Finalizer.startFinalizerThread(tg);
-    }
-
     /**
      * Start the Reference Handler thread as a daemon thread.
      */
@@ -325,6 +311,12 @@ public abstract sealed class Reference<T>
         SharedSecrets.setJavaLangRefAccess(new JavaLangRefAccess() {
             @Override
             public void startThreads() {
+                ThreadGroup tg = Thread.currentThread().getThreadGroup();
+                for (ThreadGroup tgn = tg;
+                     tgn != null;
+                     tg = tgn, tgn = tg.getParent());
+                Reference.startReferenceHandlerThread(tg);
+                Finalizer.startFinalizerThread(tg);
             }
 
             @Override

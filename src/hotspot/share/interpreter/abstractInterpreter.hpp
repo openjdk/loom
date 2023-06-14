@@ -95,8 +95,8 @@ class AbstractInterpreter: AllStatic {
     java_lang_Double_doubleToRawLongBits,                       // implementation of java.lang.Double.doubleToRawLongBits()
     java_lang_Thread_currentThread,                             // implementation of java.lang.Thread.currentThread()
     java_lang_Object_callerFrameId,
-    java_lang_Monitor_getLockState,
-    java_lang_Monitor_casLockState,
+    java_lang_MonitorSupport_getLockState,
+    java_lang_MonitorSupport_casLockState,
     number_of_method_entries,
     invalid = -1
   };

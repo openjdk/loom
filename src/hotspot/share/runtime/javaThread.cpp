@@ -1499,6 +1499,10 @@ void JavaThread::print_on(outputStream *st, bool print_extended_info) const {
       oop vt = vthread();
       assert(vt != nullptr, "");
       st->print_cr("   Carrying virtual thread #" INT64_FORMAT, (int64_t)java_lang_Thread::thread_id(vt));
+      // When we do a thread dump due to a test timeout, it can be very useful
+      // to see the virtual thread stack here.
+      ((JavaThread*)this)->print_vthread_stack_on(st);
+      st->print_cr("# End virtual thread ###");
     } else {
       st->print_cr("   java.lang.Thread.State: %s", java_lang_Thread::thread_status_name(thread_oop));
     }

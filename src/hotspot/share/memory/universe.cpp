@@ -146,6 +146,10 @@ LatestMethodCache* Universe::_object_monitorNotifyAll_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorWaitUninterruptibly_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorJNIEnter_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorJNIExit_cache = nullptr;
+#ifdef C2_PATCH
+LatestMethodCache* Universe::_object_compilerMonitorEnter_cache = NULL;
+LatestMethodCache* Universe::_object_compilerMonitorExit_cache = NULL;
+#endif
 Method* Universe::_object_monitorEnter = nullptr;
 Method* Universe::_object_monitorEnterFrameId = nullptr;
 Method* Universe::_object_monitorExit  = nullptr;
@@ -263,6 +267,10 @@ void Universe::metaspace_pointers_do(MetaspaceClosure* it) {
   _object_monitorWaitUninterruptibly_cache->metaspace_pointers_do(it);
   _object_monitorJNIEnter_cache->metaspace_pointers_do(it);
   _object_monitorJNIExit_cache->metaspace_pointers_do(it);
+#ifdef C2_PATCH
+  _object_compilerMonitorEnter_cache->metaspace_pointers_do(it);
+  _object_compilerMonitorExit_cache->metaspace_pointers_do(it);
+#endif
 }
 
 #if INCLUDE_CDS_JAVA_HEAP
@@ -323,6 +331,10 @@ void Universe::serialize(SerializeClosure* f) {
   _object_monitorWaitUninterruptibly_cache->serialize(f);
   _object_monitorJNIEnter_cache->serialize(f);
   _object_monitorJNIExit_cache->serialize(f);
+#ifdef C2_PATCH
+  _object_compilerMonitorEnter_cache->serialize(f);
+  _object_compilerMonitorExit_cache->serialize(f);
+#endif
 }
 
 
@@ -857,6 +869,10 @@ jint universe_init() {
   Universe::_object_monitorWaitUninterruptibly_cache = new LatestMethodCache();
   Universe::_object_monitorJNIEnter_cache = new LatestMethodCache();
   Universe::_object_monitorJNIExit_cache = new LatestMethodCache();
+#ifdef C2_PATCH
+  Universe::_object_compilerMonitorEnter_cache = new LatestMethodCache();
+  Universe::_object_compilerMonitorExit_cache = new LatestMethodCache();
+#endif
 
 #if INCLUDE_CDS
   DynamicArchive::check_for_dynamic_dump();
@@ -1069,6 +1085,18 @@ void Universe::initialize_known_methods(TRAPS) {
                           vmSymbols::object_void_signature(), true, CHECK);
   _object_monitorJNIExit = object_monitorJNIExit_method();
 
+#ifdef C2_PATCH
+  initialize_known_method(_object_compilerMonitorEnter_cache,
+                          vmClasses::Object_klass(),
+                          "compilerMonitorEnter",
+                          vmSymbols::object_void_signature(), true, CHECK);
+
+  initialize_known_method(_object_compilerMonitorExit_cache,
+                          vmClasses::Object_klass(),
+                          "compilerMonitorEnter",
+                          vmSymbols::object_void_signature(), true, CHECK);
+
+#endif
 }
 
 void universe2_init() {

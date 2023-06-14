@@ -149,8 +149,8 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
       case vmIntrinsics::_dsqrt_strict:      return java_lang_math_sqrt_strict;
       case vmIntrinsics::_Reference_get:     return java_lang_ref_reference_get;
       case vmIntrinsics::_Object_caller_frame_id:     return java_lang_Object_callerFrameId;
-      case vmIntrinsics::_Monitor_get_lock_state:     return java_lang_Monitor_getLockState;
-      case vmIntrinsics::_Monitor_cas_lock_state:     return java_lang_Monitor_casLockState;
+      case vmIntrinsics::_Monitor_get_lock_state:     return java_lang_MonitorSupport_getLockState;
+      case vmIntrinsics::_Monitor_cas_lock_state:     return java_lang_MonitorSupport_casLockState;
       case vmIntrinsics::_Object_init:
         if (RegisterFinalizersAtInit && m->code_size() == 1) {
           // We need to execute the special return bytecode to check for
@@ -237,9 +237,9 @@ vmIntrinsics::ID AbstractInterpreter::method_intrinsic(MethodKind kind) {
   // Java Object Monitors
   case java_lang_Object_callerFrameId
                                   : return vmIntrinsics::_Object_caller_frame_id;
-  case java_lang_Monitor_getLockState
+  case java_lang_MonitorSupport_getLockState
                                   : return vmIntrinsics::_Monitor_get_lock_state;
-  case java_lang_Monitor_casLockState
+  case java_lang_MonitorSupport_casLockState
                                   : return vmIntrinsics::_Monitor_cas_lock_state;
 
   default:
@@ -343,8 +343,8 @@ void AbstractInterpreter::print_method_kind(MethodKind kind) {
     case java_lang_Float_floatToFloat16       : tty->print("java_lang_Float_floatToFloat16"); break;
     // Java Object Monitors
     case java_lang_Object_callerFrameId       : tty->print("java_lang_Object_callerFrameId"); break;
-    case java_lang_Monitor_getLockState       : tty->print("java_lang_Monitor_getLockState"); break;
-    case java_lang_Monitor_casLockState       : tty->print("java_lang_Monitor_casLockState"); break;
+    case java_lang_MonitorSupport_getLockState : tty->print("java_lang_MonitorSupport_getLockState"); break;
+    case java_lang_MonitorSupport_casLockState : tty->print("java_lang_MonitorSupport_casLockState"); break;
 
     default:
       if (kind >= method_handle_invoke_FIRST &&

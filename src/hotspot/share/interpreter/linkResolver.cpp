@@ -1625,6 +1625,17 @@ Method* LinkResolver::resolve_special_call_or_null(const LinkInfo& link_info) {
 }
 
 
+#ifdef C2_PATCH
+void LinkResolver::resolve_monitorenter(CallInfo& result, Bytecodes::Code byte, TRAPS) {
+    methodHandle mh(THREAD, Universe::object_compilerMonitorEnter_method());
+    result.set_static(mh->method_holder(), mh, CHECK);
+}
+
+void LinkResolver::resolve_monitorexit(CallInfo& result, Bytecodes::Code byte, TRAPS) {
+    methodHandle mh(THREAD, Universe::object_compilerMonitorExit_method());
+    result.set_static(mh->method_holder(), mh, CHECK);
+}
+#endif
 
 //------------------------------------------------------------------------------------------------------------------------
 // ConstantPool entries

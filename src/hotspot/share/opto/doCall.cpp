@@ -76,7 +76,19 @@ CallGenerator* Compile::call_generator(ciMethod* callee, int vtable_index, bool 
   ciMethod*       caller      = jvms->method();
   int             bci         = jvms->bci();
   Bytecodes::Code bytecode    = caller->java_code_at_bci(bci);
+#ifndef C2_PATCH
   ciMethod*       orig_callee = caller->get_method_at_bci(bci);
+#else
+  ciMethod*       orig_callee = NULL;
+
+  if (bytecode == Bytecodes::_monitorenter) {
+    orig_callee = ciEnv::current()->Object_klass()->find_method(ciSymbols::monitorEnter_name(), ciSymbols::object_void_signature()); // object_void_signature
+  } else if (bytecode == Bytecodes::_monitorexit) {
+    orig_callee = ciEnv::current()->Object_klass()->find_method(ciSymbols::monitorExit_name(), ciSymbols::object_void_signature()); // object_void_signature
+  } else {
+    orig_callee = caller->get_method_at_bci(bci);
+  }
+#endif
 
   const bool is_virtual_or_interface = (bytecode == Bytecodes::_invokevirtual) ||
                                        (bytecode == Bytecodes::_invokeinterface) ||
@@ -492,6 +504,97 @@ static bool check_call_consistency(JVMState* jvms, CallGenerator* cg) {
 }
 #endif // ASSERT
 
+#ifdef C2_PATCH
+class BytecodeCallInfo : public Parse::ParseCallInfo {
+private:
+  Bytecodes::Code _bc;
+  ciBytecodeStream& _stream;
+
+  bool _will_link;
+  bool _is_virtual;
+  bool _is_virtual_or_interface;
+  bool _has_receiver;
+
+  ciSignature* _declared_signature;
+  ciMethod* _orig_callee;
+  ciInstanceKlass* _holder_klass;
+  ciKlass* _holder;
+  ciInstanceKlass* _klass;
+
+public:
+  BytecodeCallInfo(Bytecodes::Code bc, ciBytecodeStream& stream) : _bc(bc), _stream(stream), _will_link(false), _is_virtual(false), 
+  _is_virtual_or_interface(false), _has_receiver(false),
+  _declared_signature(NULL), _orig_callee(NULL), _holder_klass(NULL), _holder(NULL), _klass(NULL) {
+
+    _is_virtual = _bc == Bytecodes::_invokevirtual;
+    _is_virtual_or_interface = _bc == Bytecodes::_invokevirtual || _bc == Bytecodes::_invokeinterface;;
+    _has_receiver = Bytecodes::has_receiver(_bc);
+
+    _orig_callee = _stream.get_method(_will_link, &_declared_signature);  // callee in the bytecode
+    _holder_klass = _orig_callee->holder();
+    _holder       = _stream.get_declared_method_holder();
+
+    _klass = ciEnv::get_instance_klass_for_declared_method_holder(_holder);
+    assert(_declared_signature != NULL, "cannot be null");
+  }
+
+  virtual bool will_link() const { return _will_link; }
+  virtual bool is_virtual() const { return _is_virtual; }
+  virtual bool is_virtual_or_interface() const { return _is_virtual_or_interface; }
+  virtual bool has_receiver() const { return _has_receiver; }
+  virtual bool has_appendix() const { return _stream.has_appendix(); }
+  virtual ciMethod* orig_callee() const { return _orig_callee; }
+  virtual ciInstanceKlass* holder_klass() const { return _holder_klass; }
+  virtual ciInstanceKlass* klass() const { return _klass; }
+  virtual ciKlass* holder() const { return _holder; }
+  virtual ciSignature* declared_signature() const { return _declared_signature; }
+  virtual Bytecodes::Code bc() const { return _bc; }
+  virtual bool is_raw_invokeinterface() const { return _stream.cur_bc_raw() == Bytecodes::_invokeinterface; }
+  virtual Bytecodes::Code cur_bc_raw() const { return _stream.cur_bc_raw(); }
+  virtual ciObject* get_appendix() { return _stream.get_appendix(); }
+  virtual int next_bci() { return _stream.next_bci(); }
+  virtual int cur_bci() { return _stream.cur_bci(); }
+  virtual bool is_lock_call() { return false; }
+};
+
+class LockCallInfo : public Parse::ParseCallInfo {
+private:
+  ciBytecodeStream& _stream;
+  bool _enter;
+  ciMethod* _target;
+  ciInstanceKlass* _klass;
+
+public:
+  LockCallInfo(ciBytecodeStream& stream, bool enter) : _stream(stream), _enter(enter) {
+    _klass = ciEnv::current()->Object_klass();
+    if (enter) {
+      _target = _klass->find_method(ciSymbols::monitorEnter_name(), ciSymbols::object_void_signature()); // object_void_signature
+    } else {
+      _target = _klass->find_method(ciSymbols::monitorExit_name(), ciSymbols::object_void_signature()); // object_void_signature
+    }
+  }
+
+  virtual bool will_link() const { return true; }
+  virtual bool is_virtual() const { return false; }
+  virtual bool is_virtual_or_interface() const { return false; }
+  virtual bool has_receiver() const { return false; }
+  virtual bool has_appendix() const { return false; }
+  virtual ciMethod* orig_callee() const { return _target; }
+  virtual ciInstanceKlass* holder_klass() const { return _klass; }
+  virtual ciInstanceKlass* klass() const { return _klass; }
+  virtual ciKlass* holder() const { return _klass; }
+  virtual ciSignature* declared_signature() const { return _target->signature(); }
+  virtual Bytecodes::Code bc() const { return cur_bc_raw(); }
+  virtual bool is_raw_invokeinterface() const { return false; }
+  virtual Bytecodes::Code cur_bc_raw() const { return _enter ? Bytecodes::_monitorenter : Bytecodes::_monitorexit; }
+  virtual ciObject* get_appendix() { assert(false, ""); return NULL; }
+  virtual int next_bci() { assert(false, ""); return _stream.next_bci(); }
+  virtual int cur_bci() { assert(false, ""); return _stream.cur_bci(); }
+  virtual bool is_lock_call() { return true; }
+};
+
+
+#endif
 //------------------------------do_call----------------------------------------
 // Handle your basic call.  Inline if we can & want to, else just setup call.
 void Parse::do_call() {
@@ -502,6 +605,7 @@ void Parse::do_call() {
 
   C->print_inlining_assert_ready();
 
+#ifndef C2_PATCH
   // Set frequently used booleans
   const bool is_virtual = bc() == Bytecodes::_invokevirtual;
   const bool is_virtual_or_interface = is_virtual || bc() == Bytecodes::_invokeinterface;
@@ -516,15 +620,65 @@ void Parse::do_call() {
   ciInstanceKlass* klass = ciEnv::get_instance_klass_for_declared_method_holder(holder);
   assert(declared_signature != nullptr, "cannot be null");
   JFR_ONLY(Jfr::on_resolution(this, holder, orig_callee);)
+#else
+  BytecodeCallInfo info(bc(), iter()); /*, orig_callee, holder_klass, holder, klass); */
+
+  do_call(info);
+}
+
+Node* Parse::shared_call_lock(Node* obj) {
+  if( !GenerateSynchronizationCode )
+    return nullptr;             // Not locking things?
+  if (stopped())                // Dead monitor?
+    return nullptr;
+  assert(dead_locals_are_killed(), "should kill locals before sync. point");
+
+  LockCallInfo info(iter(), true);
+  push(obj);
+  map()->push_monitor( obj );
+  do_call(info);
+  return obj;
+}
+
+void Parse::shared_call_unlock(Node* obj) {
+  if( !GenerateSynchronizationCode )
+    return;                // Not locking things?
+  if (stopped())                // Dead monitor?
+    return;
+
+  assert(dead_locals_are_killed(), "should kill locals before sync. point");
+
+  LockCallInfo info(iter(), false);
+  push(obj);
+  do_call(info);
+  map()->pop_monitor( );
+}
+
+void Parse::do_call(ParseCallInfo& info) {
+  ciMethod*        orig_callee  = info.orig_callee();
+  ciInstanceKlass* holder_klass = info.holder_klass();
+  ciInstanceKlass* klass = info.klass();
+  bool is_virtual_or_interface = info.is_virtual_or_interface();
+
+  JFR_ONLY(Jfr::on_resolution(this, info.holder(), orig_callee);)
+#endif
 
   // Bump max node limit for JSR292 users
+#ifndef C2_PATCH
   if (bc() == Bytecodes::_invokedynamic || orig_callee->is_method_handle_intrinsic()) {
+#else
+  if (info.bc() == Bytecodes::_invokedynamic || orig_callee->is_method_handle_intrinsic()) {
+#endif
     C->set_max_node_limit(3*MaxNodeLimit);
   }
 
   // uncommon-trap when callee is unloaded, uninitialized or will not link
   // bailout when too many arguments for register representation
+#ifndef C2_PATCH
   if (!will_link || can_not_compile_call_site(orig_callee, klass)) {
+#else
+  if (!info.will_link() || can_not_compile_call_site(orig_callee, klass)) {
+#endif
     if (PrintOpto && (Verbose || WizardMode)) {
       method()->print_name(); tty->print_cr(" can not compile call at bci %d to:", bci());
       orig_callee->print_name(); tty->cr();
@@ -535,7 +689,11 @@ void Parse::do_call() {
   //assert((bc_callee->is_static() || is_invokedynamic) == !has_receiver , "must match bc");  // XXX invokehandle (cur_bc_raw)
   // Note: this takes into account invokeinterface of methods declared in java/lang/Object,
   // which should be invokevirtuals but according to the VM spec may be invokeinterfaces
+#ifndef C2_PATCH
   assert(holder_klass->is_interface() || holder_klass->super() == nullptr || (bc() != Bytecodes::_invokeinterface), "must match bc");
+#else
+  assert(holder_klass->is_interface() || holder_klass->super() == nullptr || (info.bc() != Bytecodes::_invokeinterface), "must match bc");
+#endif
   // Note:  In the absence of miranda methods, an abstract class K can perform
   // an invokevirtual directly on an interface method I.m if K implements I.
 
@@ -545,8 +703,13 @@ void Parse::do_call() {
   const bool is_signature_polymorphic = MethodHandles::is_signature_polymorphic(orig_callee->intrinsic_id());
 
   // Push appendix argument (MethodType, CallSite, etc.), if one.
+#ifndef C2_PATCH
   if (iter().has_appendix()) {
     ciObject* appendix_arg = iter().get_appendix();
+#else
+  if (info.has_appendix()) {
+    ciObject* appendix_arg = info.get_appendix();
+#endif
     const TypeOopPtr* appendix_arg_type = TypeOopPtr::make_from_constant(appendix_arg, /* require_const= */ true);
     Node* appendix_arg_node = _gvn.makecon(appendix_arg_type);
     push(appendix_arg_node);
@@ -576,23 +739,38 @@ void Parse::do_call() {
     // finalize() won't be compiled as vtable calls (IC call
     // resolution will catch the illegal call) and the few legal calls
     // on array types won't be either.
+#ifndef C2_PATCH
     callee = C->optimize_virtual_call(method(), klass, holder, orig_callee,
                                       receiver_type, is_virtual,
+#else
+    callee = C->optimize_virtual_call(method(), klass, info.holder(), orig_callee,
+                                      receiver_type, info.is_virtual(),
+#endif
                                       call_does_dispatch, vtable_index);  // out-parameters
     speculative_receiver_type = receiver_type != nullptr ? receiver_type->speculative_type() : nullptr;
   }
 
   // Additional receiver subtype checks for interface calls via invokespecial or invokeinterface.
   ciKlass* receiver_constraint = nullptr;
+#ifndef C2_PATCH
   if (iter().cur_bc_raw() == Bytecodes::_invokespecial && !orig_callee->is_object_initializer()) {
+#else
+  if (info.cur_bc_raw() == Bytecodes::_invokespecial && !orig_callee->is_object_initializer()) {
+#endif
     ciInstanceKlass* calling_klass = method()->holder();
     ciInstanceKlass* sender_klass = calling_klass;
     if (sender_klass->is_interface()) {
       receiver_constraint = sender_klass;
     }
+#ifndef C2_PATCH
   } else if (iter().cur_bc_raw() == Bytecodes::_invokeinterface && orig_callee->is_private()) {
     assert(holder->is_interface(), "How did we get a non-interface method here!");
     receiver_constraint = holder;
+#else
+  } else if (info.is_raw_invokeinterface() && orig_callee->is_private()) {
+    assert(info.holder()->is_interface(), "How did we get a non-interface method here!");
+    receiver_constraint = info.holder();
+#endif
   }
 
   if (receiver_constraint != nullptr) {
@@ -636,7 +814,15 @@ void Parse::do_call() {
 
   // Feed profiling data for arguments to the type system so it can
   // propagate it as speculative types
+#ifndef C2_PATCH
   record_profiled_arguments_for_speculation(cg->method(), bc());
+#else
+  if (!info.is_lock_call()) {
+    // Feed profiling data for arguments to the type system so it can
+    // propagate it as speculative types
+    record_profiled_arguments_for_speculation(cg->method(), info.bc());
+  }
+#endif
 
 #ifndef PRODUCT
   // bump global counters for calls
@@ -650,7 +836,11 @@ void Parse::do_call() {
   assert(jvms_in_sync(),       "jvms must carry full info into CG");
 
   // save across call, for a subsequent cast_not_null.
+#ifndef C2_PATCH
   Node* receiver = has_receiver ? argument(0) : nullptr;
+#else
+  Node* receiver = info.has_receiver() ? argument(0) : nullptr;
+#endif
 
   // The extra CheckCastPPs for speculative types mess with PhaseStringOpts
   if (receiver != nullptr && !call_does_dispatch && !cg->is_string_late_inline()) {
@@ -695,7 +885,13 @@ void Parse::do_call() {
     set_jvms(new_jvms);
   }
 
+#ifdef C2_PATCH
+  if (!info.is_lock_call()) {
+#endif
   assert(check_call_consistency(jvms, cg), "inconsistent info");
+#ifdef C2_PATCH
+  }
+#endif
 
   if (!stopped()) {
     // This was some sort of virtual call, which did a null check for us.
@@ -706,9 +902,17 @@ void Parse::do_call() {
     }
 
     ciType* rtype = cg->method()->return_type();
+#ifndef C2_PATCH
     ciType* ctype = declared_signature->return_type();
+#else
+    ciType* ctype = info.declared_signature()->return_type();
+#endif
 
+#ifndef C2_PATCH
     if (Bytecodes::has_optional_appendix(iter().cur_bc_raw()) || is_signature_polymorphic) {
+#else
+    if (Bytecodes::has_optional_appendix(info.cur_bc_raw()) || is_signature_polymorphic) {
+#endif
       // Be careful here with return types.
       if (ctype != rtype) {
         BasicType rt = rtype->basic_type();
@@ -764,9 +968,17 @@ void Parse::do_call() {
                        C->log()->identify(rtype));
       }
       // If there is going to be a trap, put it at the next bytecode:
+#ifndef C2_PATCH
       set_bci(iter().next_bci());
+#else
+      set_bci(info.next_bci());
+#endif
       null_assert(peek());
+#ifndef C2_PATCH
       set_bci(iter().cur_bci()); // put it back
+#else
+      set_bci(info.cur_bci()); // put it back
+#endif
     }
     BasicType ct = ctype->basic_type();
     if (is_reference_type(ct)) {
@@ -776,10 +988,140 @@ void Parse::do_call() {
 
   // Restart record of parsing work after possible inlining of call
 #ifndef PRODUCT
+#ifndef C2_PATCH
   parse_histogram()->set_initial_state(bc());
+#else
+  parse_histogram()->set_initial_state(info.bc());
+#endif
 #endif
 }
 
+#ifdef C2_PATCH
+void Parse::deopt_on_monitor_exception(SafePointNode* ex_map) {
+  // Caller is responsible for saving away the map for normal control flow!
+  assert(stopped(), "call set_map(NULL) first");
+  assert(method()->has_exception_handlers(), "don't come here w/o work to do");
+
+  kill_dead_locals();
+
+  Node* ex_node = saved_ex_oop(ex_map);
+  if (ex_node == top()) {
+    // No action needed.
+    return;
+  }
+  const TypeInstPtr* ex_type = _gvn.type(ex_node)->isa_instptr();
+  NOT_PRODUCT(if (ex_type==NULL) tty->print_cr("*** Exception not InstPtr"));
+  if (ex_type == NULL)
+    ex_type = TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr();
+
+  // determine potential exception handlers
+  ciExceptionHandlerStream handlers(method(), bci(),
+                                    ex_type->klass()->as_instance_klass(),
+                                    ex_type->klass_is_exact());
+
+  // Exceptions are delivered through this channel:
+  Node* i_o = this->i_o();
+
+  // Add a CatchNode.
+  GrowableArray<int>* bcis = new (C->node_arena()) GrowableArray<int>(C->node_arena(), 8, 0, -1);
+  GrowableArray<const Type*>* extypes = new (C->node_arena()) GrowableArray<const Type*>(C->node_arena(), 8, 0, NULL);
+  GrowableArray<int>* saw_unloaded = new (C->node_arena()) GrowableArray<int>(C->node_arena(), 8, 0, 0);
+
+  bool default_handler = false;
+  for (; !handlers.is_done(); handlers.next()) {
+    ciExceptionHandler* h        = handlers.handler();
+    int                 h_bci    = h->handler_bci();
+    ciInstanceKlass*    h_klass  = h->is_catch_all() ? env()->Throwable_klass() : h->catch_klass();
+    // Do not introduce unloaded exception types into the graph:
+    if (!h_klass->is_loaded()) {
+      if (saw_unloaded->contains(h_bci)) {
+        /* We've already seen an unloaded exception with h_bci,
+           so don't duplicate. Duplication will cause the CatchNode to be
+           unnecessarily large. See 4713716. */
+        continue;
+      } else {
+        saw_unloaded->append(h_bci);
+      }
+    }
+    const Type*         h_extype = TypeOopPtr::make_from_klass(h_klass);
+    // (We use make_from_klass because it respects UseUniqueSubclasses.)
+    h_extype = h_extype->join(TypeInstPtr::NOTNULL);
+    assert(!h_extype->empty(), "sanity");
+    // Note:  It's OK if the BCIs repeat themselves.
+    bcis->append(h_bci);
+    extypes->append(h_extype);
+    if (h_bci == -1) {
+      default_handler = true;
+    }
+  }
+
+  if (!default_handler) {
+    bcis->append(-1);
+    extypes->append(TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr());
+  }
+
+  int len = bcis->length();
+  CatchNode *cn = new CatchNode(control(), i_o, len+1);
+  Node *catch_ = _gvn.transform(cn);
+
+    // Start executing from the given throw state.  (Keep its stack, for now.)
+
+  // now branch with the exception state to each of the (potential)
+  // handlers
+  for(int i=0; i < len; i++) {
+    // Setup JVM state to enter the handler.
+    PreserveJVMState pjvms(this);
+    // Locals are just copied from before the call.
+    // Get control from the CatchNode.
+    int handler_bci = bcis->at(i);
+    Node* ctrl = _gvn.transform( new CatchProjNode(catch_, i+1,handler_bci));
+    // This handler cannot happen?
+    if (ctrl == top())  continue;
+    set_control(ctrl);
+
+    // Create exception oop
+    const TypeInstPtr* extype = extypes->at(i)->is_instptr();
+    Node *ex_oop = _gvn.transform(new CreateExNode(extypes->at(i), ctrl, i_o));
+
+    set_bci(handler_bci);
+    push_ex_oop(ex_oop);
+    uncommon_trap(Deoptimization::Reason_unhandled,
+        Deoptimization::Action_reinterpret);
+    set_bci(iter().cur_bci()); // put it back
+  }
+
+  // The first CatchProj is for the normal return.
+  // (Note:  If this is a call to rethrow_Java, this node goes dead.)
+  set_control(_gvn.transform( new CatchProjNode(catch_, CatchProjNode::fall_through_index, CatchProjNode::no_handler_bci)));
+}
+
+void Parse::deopt_on_monitorexit_exception() {
+  assert(this->bci() == -1, "");
+  Node* i_o = this->i_o();
+
+  CatchNode *cn = new CatchNode(control(), i_o, 1+1); // default handler
+  Node *catch_ = _gvn.transform(cn);    // Setup JVM state to enter the handler.
+
+  PreserveJVMState pjvms(this);
+  // Locals are just copied from before the call.
+  // Get control from the CatchNode.
+  int handler_bci = -1;
+  Node* ctrl = _gvn.transform( new CatchProjNode(catch_, 1, handler_bci));
+  // This handler cannot happen?
+  assert(ctrl != top(), "");
+  set_control(ctrl);
+
+  const TypeInstPtr* extype = TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr();
+  Node *ex_oop = _gvn.transform(new CreateExNode(extype, ctrl, i_o));
+
+  set_bci(-1);
+  push_ex_oop(ex_oop);
+  uncommon_trap(Deoptimization::Reason_unhandled,
+      Deoptimization::Action_reinterpret);
+  //set_bci(iter().cur_bci()); // put it back
+}
+
+#endif
 //---------------------------catch_call_exceptions-----------------------------
 // Put a Catch and CatchProj nodes behind a just-created call.
 // Send their caught exceptions to the proper handler.
@@ -878,7 +1220,11 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
     if (handler_bci < 0) {     // merge with corresponding rethrow node
       throw_to_exit(make_exception_state(ex_oop));
     } else {                      // Else jump to corresponding handle
+#ifndef C2_PATCH
       push_ex_oop(ex_oop);        // Clear stack and push just the oop.
+#else
+      //push_ex_oop(ex_oop);        // Clear stack and push just the oop.
+#endif
       merge_exception(handler_bci);
     }
   }
@@ -888,6 +1234,43 @@ void Parse::catch_call_exceptions(ciExceptionHandlerStream& handlers) {
   set_control(_gvn.transform( new CatchProjNode(catch_, CatchProjNode::fall_through_index, CatchProjNode::no_handler_bci)));
 }
 
+#ifdef C2_PATCH
+void Parse::swallow_exceptions(SafePointNode* ex_map) {
+  assert(stopped(), "call set_map(NULL) first");
+  assert(method()->has_exception_handlers(), "don't come here w/o work to do");
+
+  //PreserveJVMState pjvms(this);
+
+  Node* ex_node = saved_ex_oop(ex_map);
+  if (ex_node == top()) {
+    // No action needed.
+    return;
+  }
+  const TypeInstPtr* ex_type = _gvn.type(ex_node)->isa_instptr();
+  NOT_PRODUCT(if (ex_type==NULL) tty->print_cr("*** Exception not InstPtr"));
+  if (ex_type == NULL)
+    ex_type = TypeOopPtr::make_from_klass(env()->Throwable_klass())->is_instptr();
+
+  // Start executing from the given throw state.  (Keep its stack, for now.)
+  // Get the exception oop as known at compile time.
+  ex_node = use_exception_state(ex_map);
+  //push_ex_oop(ex_node);
+  //
+  /*uncommon_trap(Deoptimization::Reason_unhandled,
+      Deoptimization::Action_reinterpret);*/
+
+  kill_dead_locals();
+  int handler_bci = iter().next_bci();
+
+  Node* i_o = this->i_o();
+  CatchNode *cn = new CatchNode(control(), i_o, 1+1);
+  Node *catch_ = _gvn.transform(cn);
+
+  Node* ctrl = _gvn.transform( new CatchProjNode(catch_, 1, handler_bci));
+  set_control(ctrl);
+  merge_exception(handler_bci);
+}
+#endif
 
 //----------------------------catch_inline_exceptions--------------------------
 // Handle all exceptions thrown by an inlined method or individual bytecode.

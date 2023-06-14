@@ -615,7 +615,7 @@ void ObjectSynchronizer::java_wait_uninterruptibly(Handle obj, JavaThread* curre
 
 bool ObjectSynchronizer::current_thread_holds_monitor(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java_only, "must be");
-  Klass* klass = vmClasses::Monitor_klass();
+  Klass* klass = vmClasses::Thread_klass();
   JavaValue result(T_BOOLEAN);
   JavaCallArguments args;
   args.push_oop(obj);
@@ -795,7 +795,10 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
 
   // the current locking is from JNI instead of Java code
   current->set_current_pending_monitor_is_from_java(false);
-  if (ObjectMonitorMode::legacy()) {
+
+  // For the "native" policy we simplify things by avoiding the upcall
+  // to Java.
+  if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
     // An async deflation can race after the inflate() call and before
     // enter() can make the ObjectMonitor busy. enter() returns false if
     // we have lost the race to async deflation and we simply try again.
@@ -816,7 +819,9 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
 void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
   JavaThread* current = THREAD;
 
-  if (ObjectMonitorMode::legacy()) {
+  // For the "native" policy we simplify things by avoiding the upcall
+  // to Java.
+  if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
     // The ObjectMonitor* can't be async deflated until ownership is
     // dropped inside exit() and the ObjectMonitor* must be !is_busy().
     ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_exit);
@@ -825,7 +830,7 @@ void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
     // monitor even if an exception was already pending.
     if (monitor->check_owner(THREAD)) {
       monitor->exit(current);
-    current->dec_held_monitor_count(1, true);
+      current->dec_held_monitor_count(1, true);
     }
   } else {
     java_jni_exit(obj, current);
@@ -1123,7 +1128,7 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
     }
 
     if (mark.is_neutral() ||                           // if this is a normal header
-        ObjectMonitorMode::fast()) {
+        ObjectMonitorMode::java_only()) {
       hash = mark.hash();
       if (hash != 0) {                     // if it has a hash, just return it
         return hash;
@@ -1142,7 +1147,7 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
 
       // For Java Object Monitors the race can only be with another hash installer
       // so just loop again.
-      if (ObjectMonitorMode::fast()) {
+      if (ObjectMonitorMode::java_only()) {
         continue;
       }
     } else if (mark.has_monitor()) {

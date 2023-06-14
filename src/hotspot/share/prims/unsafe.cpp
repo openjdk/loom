@@ -812,6 +812,7 @@ UNSAFE_ENTRY(void, Unsafe_UnparkMonitor(JNIEnv *env, jobject unsafe, jobject jth
     oop java_thread = NULL;
     (void) tlh.cv_internal_thread_to_JavaThread(jthread, &thr, &java_thread);
     if (java_thread != NULL) {
+      assert(!java_lang_VirtualThread::is_instance(java_thread), "Need carrier thread here");
       // This is a valid oop.
       if (thr != NULL) {
         // The JavaThread is alive.

@@ -237,15 +237,33 @@ void Parse::load_interpreter_state(Node* osr_buf) {
 
     store_to_memory(control(), box, displaced_hdr, T_ADDRESS, Compile::AliasIdxRaw, MemNode::unordered);
 
+#ifdef C2_PATCH
+    Node* flock = NULL;
+
+    if (ObjectMonitorMode::legacy()) {
+#endif
     // Build a bogus FastLockNode (no code will be generated) and push the
     // monitor into our debug info.
     const FastLockNode *flock = _gvn.transform(new FastLockNode( 0, lock_object, box ))->as_FastLock();
+#ifdef C2_PATCH
+    } else {
+      flock = lock_object;
+    }
+#endif
     map()->push_monitor(flock);
 
     // If the lock is our method synchronization lock, tuck it away in
     // _sync_lock for return and rethrow exit paths.
     if (index == 0 && method()->is_synchronized()) {
+#ifndef C2_PATCH
       _synch_lock = flock;
+#else
+      if (ObjectMonitorMode::legacy()) {
+        _synch_lock = flock->as_FastLock();
+      } else {
+        _synch_obj = flock;
+      }
+#endif
     }
   }
 
@@ -921,7 +939,16 @@ void Parse::do_exceptions() {
 
   SafePointNode* ex_map;
   while ((ex_map = pop_exception_state()) != nullptr) {
+#ifndef C2_PATCH
     if (!method()->has_exception_handlers()) {
+#else
+    if (bc() == Bytecodes::_monitorenter || bc() == Bytecodes::_monitorexit) {
+      assert(stopped(), "");
+      swallow_exceptions(ex_map);
+      stop_and_kill_map();
+      //throw_to_exit(ex_map);
+    } else if (!method()->has_exception_handlers()) {
+#endif
       // Common case:  Transfer control outward.
       // Doing it this early allows the exceptions to common up
       // even between adjacent method calls.
@@ -1093,10 +1120,20 @@ void Parse::do_exits() {
       ex_jvms->set_bci(   InvocationEntryBci);
       kit.set_jvms(ex_jvms);
       if (do_synch) {
+#ifdef C2_PATCH
+        if (ObjectMonitorMode::legacy()) {
+#endif
         // Add on the synchronized-method box/object combo
         kit.map()->push_monitor(_synch_lock);
         // Unlock!
         kit.shared_unlock(_synch_lock->box_node(), _synch_lock->obj_node());
+#ifdef C2_PATCH
+        } else {
+          ShouldNotReachHere();
+          kit.map()->push_monitor(_synch_obj);
+          shared_call_unlock(_synch_obj);
+        }
+#endif
       }
       if (C->env()->dtrace_method_probes()) {
         kit.make_dtrace_method_exit(method());
@@ -1240,6 +1277,11 @@ void Parse::do_method_entry() {
   // If the method is synchronized, we need to construct a lock node, attach
   // it to the Start node, and pin it there.
   if (method()->is_synchronized()) {
+#ifdef C2_PATCH
+    if (!ObjectMonitorMode::legacy()) {
+      C->record_failure("synchronized method not supported");
+    }
+#endif
     // Insert a FastLockNode right after the Start which takes as arguments
     // the current thread pointer, the "this" pointer & the address of the
     // stack slot pair used for the lock.  The "this" pointer is a projection
@@ -1260,7 +1302,16 @@ void Parse::do_method_entry() {
     // Clear out dead values from the debug info.
     kill_dead_locals();
     // Build the FastLockNode
+#ifdef C2_PATCH
+    if (ObjectMonitorMode::legacy()) {
+#endif
     _synch_lock = shared_lock(lock_obj);
+#ifdef C2_PATCH
+    } else {
+      _synch_obj = shared_call_lock(lock_obj);
+      do_exceptions();
+    }
+#endif
   }
 
   // Feed profiling data for parameters to the type system so it can
@@ -1644,10 +1695,18 @@ void Parse::merge_exception(int target_bci) {
     C->set_exception_backedge();
   }
 #endif
+#ifndef C2_PATCH
   assert(sp() == 1, "must have only the throw exception on the stack");
+#else
+  //assert(sp() == 1, "must have only the throw exception on the stack");
+#endif
   Block* target = successor_for_bci(target_bci);
   if (target == nullptr) { handle_missing_successor(target_bci); return; }
+#ifndef C2_PATCH
   assert(target->is_handler(), "exceptions are handled by special blocks");
+#else
+  //assert(target->is_handler(), "exceptions are handled by special blocks");
+#endif
   int pnum = target->add_new_path();
   merge_common(target, pnum);
 }
@@ -2204,7 +2263,17 @@ void Parse::return_current(Node* value) {
   // Do not set_parse_bci, so that return goo is credited to the return insn.
   set_bci(InvocationEntryBci);
   if (method()->is_synchronized() && GenerateSynchronizationCode) {
+#ifdef C2_PATCH
+    if (ObjectMonitorMode::legacy()) {
+#endif
     shared_unlock(_synch_lock->box_node(), _synch_lock->obj_node());
+#ifdef C2_PATCH
+    } else {
+      shared_call_unlock(_synch_obj);
+      deopt_on_monitorexit_exception();
+      //do_exceptions();
+    }
+#endif
   }
   if (C->env()->dtrace_method_probes()) {
     make_dtrace_method_exit(method());

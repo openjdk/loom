@@ -31,12 +31,8 @@
 #define ARRAY_LENGTH(a) (sizeof(a)/sizeof(a[0]))
 
 static JNINativeMethod methods[] = {
-    {"casLockState",     "(Ljava/lang/Object;II)Z", (void *)&JVM_Monitor_casLockState},
-    {"getLockState",     "(Ljava/lang/Object;)I"  , (void *)&JVM_Monitor_getLockState},
     {"getVMResult",      "()Ljava/lang/Object;"   , (void *)&JVM_Monitor_getVMResult},
     {"storeVMResult",    "(Ljava/lang/Object;)V"  , (void *)&JVM_Monitor_storeVMResult},
-    {"abort",            "(Ljava/lang/String;)V"  , (void *)&JVM_Monitor_abort},
-    {"log",              "(Ljava/lang/String;)V"  , (void *)&JVM_Monitor_log},
     {"logEnter",         "(Ljava/lang/Object;J)V"  , (void *)&JVM_Monitor_log_enter},
     {"logExit",          "(Ljava/lang/Object;J)V"  , (void *)&JVM_Monitor_log_exit},
     {"postJvmtiEvent",   "(ILjava/lang/Thread;Ljava/lang/Object;JZ)V", (void *)&JVM_Monitor_postJvmtiEvent}

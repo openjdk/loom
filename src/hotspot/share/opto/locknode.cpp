@@ -191,7 +191,15 @@ void Parse::do_monitor_enter() {
 
   // Insert a FastLockNode which takes as arguments the current thread pointer,
   // the obj pointer & the address of the stack slot pair used for the lock.
+#ifdef C2_PATCH
+  if (ObjectMonitorMode::legacy()) {
+#endif
   shared_lock(obj);
+#ifdef C2_PATCH
+  } else {
+    shared_call_lock(obj);
+  }
+#endif
 }
 
 //------------------------------do_monitor_exit--------------------------------
@@ -206,5 +214,13 @@ void Parse::do_monitor_exit() {
   // Because monitors are guaranteed paired (else we bail out), we know
   // the matching Lock for this Unlock.  Hence we know there is no need
   // for a null check on Unlock.
+#ifdef C2_PATCH
+  if (ObjectMonitorMode::legacy()) {
+#endif
   shared_unlock(map()->peek_monitor_box(), map()->peek_monitor_obj());
+#ifdef C2_PATCH
+  } else {
+    shared_call_unlock(map()->peek_monitor_obj());
+  }
+#endif
 }

@@ -60,6 +60,7 @@
   template(java_lang_Monitor$Node,                    "java/lang/Monitor$Node")                   \
   template(java_lang_Monitor$LockNode,                "java/lang/Monitor$LockNode")               \
   template(java_lang_Monitor$ConditionNode,           "java/lang/Monitor$ConditionNode")          \
+  template(java_lang_MonitorSupport,                  "java/lang/MonitorSupport")                 \
   template(java_lang_Package,                         "java/lang/Package")                        \
   template(java_lang_Module,                          "java/lang/Module")                         \
   template(java_lang_String,                          "java/lang/String")                         \
@@ -268,6 +269,10 @@
   template(jdk_internal_vm_annotation_Contended_signature,                   "Ljdk/internal/vm/annotation/Contended;")    \
   template(jdk_internal_vm_annotation_ReservedStackAccess_signature,         "Ljdk/internal/vm/annotation/ReservedStackAccess;") \
   template(jdk_internal_ValueBased_signature,                                "Ljdk/internal/ValueBased;") \
+  /* C2_PATCH BEGIN */ \
+  template(monitorEnter_name, "compilerMonitorEnter") \
+  template(monitorExit_name, "compilerMonitorExit") \
+  /* C2_PATCH END */ \
                                                                                                   \
   /* class symbols needed by intrinsics */                                                        \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, template, VM_SYMBOL_IGNORE, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
@@ -396,6 +401,7 @@
   template(notify_name,                               "notify")                                   \
   template(getMonitorPolicy_name,                     "getMonitorPolicy")                         \
   template(hasLockedObject_name,                      "hasLockedObject")                          \
+  template(abort_name,                                "abort")                                   \
                                                                                                   \
   /* common method and field names */                                                             \
   template(object_initializer_name,                   "<init>")                                   \

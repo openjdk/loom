@@ -221,6 +221,10 @@ class Bytecode_invoke: public Bytecode_member_ref {
   bool is_invokespecial() const                  { return invoke_code() == Bytecodes::_invokespecial; }
   bool is_invokedynamic() const                  { return invoke_code() == Bytecodes::_invokedynamic; }
   bool is_invokehandle() const                   { return invoke_code() == Bytecodes::_invokehandle; }
+#ifdef C2_PATCH
+  bool is_monitorenter() const                   { return invoke_code() == Bytecodes::_monitorenter; }
+  bool is_monitorexit() const                    { return invoke_code() == Bytecodes::_monitorexit; }
+#endif
 
   bool has_receiver() const                      { return !is_invokestatic() && !is_invokedynamic(); }
 
@@ -229,7 +233,13 @@ class Bytecode_invoke: public Bytecode_member_ref {
                                                           is_invokestatic()    ||
                                                           is_invokespecial()   ||
                                                           is_invokedynamic()   ||
+#ifndef C2_PATCH
                                                           is_invokehandle(); }
+#else
+                                                          is_invokehandle()    ||
+                                                          is_monitorenter()    ||
+                                                          is_monitorexit(); }
+#endif
 
   bool has_appendix();
 

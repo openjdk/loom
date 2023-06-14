@@ -3408,6 +3408,9 @@ Node* GraphKit::insert_mem_bar_volatile(int opcode, int alias_idx, Node* precede
 //------------------------------shared_lock------------------------------------
 // Emit locking code.
 FastLockNode* GraphKit::shared_lock(Node* obj) {
+#ifdef C2_PATCH
+  assert(ObjectMonitorMode::legacy(), "");
+#endif
   // bci is either a monitorenter bc or InvocationEntryBci
   // %%% SynchronizationEntryBCI is redundant; use InvocationEntryBci in interfaces
   assert(SynchronizationEntryBCI == InvocationEntryBci, "");
@@ -3472,6 +3475,9 @@ FastLockNode* GraphKit::shared_lock(Node* obj) {
 //------------------------------shared_unlock----------------------------------
 // Emit unlocking code.
 void GraphKit::shared_unlock(Node* box, Node* obj) {
+#ifdef C2_PATCH
+  assert(ObjectMonitorMode::legacy(), "");
+#endif
   // bci is either a monitorenter bc or InvocationEntryBci
   // %%% SynchronizationEntryBCI is redundant; use InvocationEntryBci in interfaces
   assert(SynchronizationEntryBCI == InvocationEntryBci, "");

@@ -1252,10 +1252,10 @@ class methodHandle;
   do_intrinsic(_Object_caller_frame_id,  java_lang_Object, object_caller_frame_id, void_long_signature,           F_SN)   \
    do_name(     object_caller_frame_id, "getCallerFrameId")                                                               \
                                                                                                                           \
-  do_intrinsic(_Monitor_get_lock_state,    java_lang_Monitor, monitor_get_lock_state_name, object_int_signature,   F_SN)  \
+  do_intrinsic(_Monitor_get_lock_state,    java_lang_MonitorSupport, monitor_get_lock_state_name, object_int_signature,   F_SN)  \
    do_name(     monitor_get_lock_state_name, "getLockState")                                                              \
                                                                                                                           \
-  do_intrinsic(_Monitor_cas_lock_state, java_lang_Monitor, monitor_cas_lock_state_name, object_int_int_bool_signature, F_SN)  \
+  do_intrinsic(_Monitor_cas_lock_state, java_lang_MonitorSupport, monitor_cas_lock_state_name, object_int_int_bool_signature, F_SN)  \
    do_name(     monitor_cas_lock_state_name, "casLockState")                                                              \
    do_signature(object_int_int_bool_signature, "(Ljava/lang/Object;II)Z" )                                                \
                                                                                                                           \

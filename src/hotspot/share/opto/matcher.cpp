@@ -1196,7 +1196,11 @@ Node *Matcher::xform( Node *n, int max_stack ) {
       for (i = cnt - 1; i >= debug_cnt; --i) { // For all debug inputs do
         Node *m = n->in(i);          // Get input
         int op = m->Opcode();
+#ifndef C2_PATCH
         assert((op == Op_BoxLock) == jvms->is_monitor_use(i), "boxes only at monitor sites");
+#else
+        //assert((op == Op_BoxLock) == jvms->is_monitor_use(i), "boxes only at monitor sites");
+#endif
         if( op == Op_ConI || op == Op_ConP || op == Op_ConN || op == Op_ConNKlass ||
             op == Op_ConF || op == Op_ConD || op == Op_ConL
             // || op == Op_BoxLock  // %%%% enable this and remove (+++) in chaitin.cpp

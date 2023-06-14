@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -197,6 +197,7 @@
   /* support for Java Object Monitors */                                                                        \
   do_klass(Monitor_klass,                               java_lang_Monitor                                     ) \
   do_klass(Monitor$Node_klass,                          java_lang_Monitor$Node                                ) \
+  do_klass(MonitorSupport_klass,                        java_lang_MonitorSupport                              ) \
                                                                                         \
   /*end*/
 

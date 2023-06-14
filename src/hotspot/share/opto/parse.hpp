@@ -365,7 +365,12 @@ class Parse : public GraphKit {
   Block*            _block;     // block currently getting parsed
   ciBytecodeStream  _iter;      // stream of this method's bytecodes
 
+#ifndef C2_PATCH
   const FastLockNode* _synch_lock; // FastLockNode for synchronized method
+#else
+  Node* _synch_obj;
+  FastLockNode* _synch_lock; // FastLockNode for synchronized method
+#endif
 
 #ifndef PRODUCT
   int _max_switch_depth;        // Debugging SwitchRanges.
@@ -521,6 +526,36 @@ class Parse : public GraphKit {
   // Helper function to setup Ideal Call nodes
   void do_call();
 
+#ifdef C2_PATCH
+ public:
+  class ParseCallInfo {
+  public:
+    virtual bool will_link() const = 0;
+    virtual bool is_virtual() const = 0;
+    virtual bool is_virtual_or_interface() const = 0;
+    virtual bool has_receiver() const = 0;
+    virtual bool has_appendix() const = 0;
+    virtual ciMethod* orig_callee() const = 0;
+    virtual ciInstanceKlass* holder_klass() const = 0;
+    virtual ciInstanceKlass* klass() const = 0;
+    virtual ciKlass* holder() const = 0;
+    virtual ciSignature* declared_signature() const = 0;
+    virtual Bytecodes::Code bc() const = 0;
+    virtual Bytecodes::Code cur_bc_raw() const = 0;
+    virtual bool is_raw_invokeinterface() const = 0;
+    virtual ciObject* get_appendix() = 0;
+    virtual int next_bci() = 0;
+    virtual int cur_bci() = 0;
+    virtual bool is_lock_call() = 0;
+  };
+ private:
+
+  void do_call(ParseCallInfo& info);
+  Node* shared_call_lock(Node* obj);
+  void shared_call_unlock(Node* obj);
+
+
+#endif
   // Helper function to uncommon-trap or bailout for non-compilable call-sites
   bool can_not_compile_call_site(ciMethod *dest_method, ciInstanceKlass *klass);
 
@@ -597,6 +632,12 @@ class Parse : public GraphKit {
   // Fix up all exiting control flow at the end of the parse.
   void do_exits();
 
+#ifdef C2_PATCH
+  void deopt_on_monitor_exception(SafePointNode* ex_map);
+  void deopt_on_monitorexit_exception();
+  void swallow_exceptions(SafePointNode* ex_map);
+
+#endif
   // Add Catch/CatchProjs
   // The call is either a Java call or the VM's rethrow stub
   void catch_call_exceptions(ciExceptionHandlerStream&);

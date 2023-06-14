@@ -1013,8 +1013,15 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
             "monitors must always exist for synchronized methods");
 
     // Build the growable array of ScopeValues for exp stack
+#ifdef C2_PATCH
+    GrowableArray<MonitorValue*> *monarray = new GrowableArray<MonitorValue*>(ObjectMonitorMode::legacy() ? num_mon : 0);
+#else
     GrowableArray<MonitorValue*> *monarray = new GrowableArray<MonitorValue*>(num_mon);
+#endif
 
+#ifdef C2_PATCH
+    if (ObjectMonitorMode::legacy()) {
+#endif
     // Loop over monitors and insert into array
     for (idx = 0; idx < num_mon; idx++) {
       // Grab the node that defines this monitor
@@ -1060,6 +1067,9 @@ void PhaseOutput::Process_OopMap_Node(MachNode *mach, int current_offset) {
       bool eliminated = (box_node->is_BoxLock() && box_node->as_BoxLock()->is_eliminated());
       monarray->append(new MonitorValue(scval, basic_lock, eliminated));
     }
+#ifdef C2_PATCH
+    }
+#endif
 
     // We dump the object pool first, since deoptimization reads it in first.
     C->debug_info()->dump_object_pool(objs);

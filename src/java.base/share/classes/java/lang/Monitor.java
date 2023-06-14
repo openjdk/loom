@@ -16,7 +16,6 @@
  *      use the correct ParkEvent in the VM
  *
  * Plus additional supporting infrastructure for monitor lookup via MonitorMap
- * Plus fast-locking layer with inflation (adapted from Robbin's version)
  */
 
 package java.lang;
@@ -27,6 +26,14 @@ import java.lang.ref.WeakReference;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.ref.Cleaner;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
+
+import static java.lang.MonitorSupport.abort;
+import static java.lang.MonitorSupport.casLockState;
+import static java.lang.MonitorSupport.getLockState;
+import static java.lang.MonitorSupport.log;
+import static java.lang.MonitorSupport.Fast.UNLOCKED;
+import static java.lang.MonitorSupport.Fast.LOCKED;
+import static java.lang.MonitorSupport.Fast.INFLATED;
 
 /**
  * A monitor class to be used to implement Java 'synchronized' and the
@@ -62,47 +69,6 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
     }
 
     /**
-     * Return true if the expected thread is the owner of the monitor
-     * for the given Object.
-     * The is the VM upcall to check an object is locked.
-     * @param o the target Object
-     * @param expected the expected owner (should be current thread)
-     * @return true if the owner is the expected thread
-     */
-    @SuppressWarnings("fallthrough")
-    public static boolean hasLockedObject(Object o, Thread expected) {
-        if (Object.monitorPolicy == -1) {
-            abort("ShouldNotReachHere!");
-        }
-
-        if (expected != Thread.currentThread()) {
-            abort("Can only check monitor ownership of current thread");
-        }
-
-        // No matter which policy is used the lockStack will track ownership.
-        // But we can cross-check with other ways for some policies.
-        boolean owned = expected.hasLocked(o);
-
-        switch (Object.monitorPolicy) {
-        case 0: // native
-            if (Thread.holdsLock(0) != owned) {
-                abort("Lock ownership mismatch for native implementation");
-            }
-            break;
-        case 1: // always inflated
-            if (Monitor.of(o).isOwnedBy(expected) != owned) {
-                abort("Lock ownership mismatch for always inflated implementaion");
-            }
-        case 2: // fast-locks
-            break; // no other way to check for fast-locks
-        default:
-            abort("Invalid policy value " + monitorPolicy);
-        }
-
-        return owned;
-    }
-
-    /**
      * Current owning thread of this monitor.
      */
     private transient volatile Thread _owner;
@@ -110,11 +76,10 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
     /**
      * Sentinel owner value for use during the inflation protocol.
      */
-    // NOTE: synchronization is disabled when we execute this, else
-    // we'd trip over the synchronized code in the Thread construction
-    // process. Thread must be named so that we don't surprise tests
-    // that "know" the first un-named thread is always Thread-0.
-    private static final Thread SENTINEL = new Thread("Sentinel");
+    // NOTE: this is a special psuedo-constructor just for our use.
+    // The Thread object is not initialized by normal means and can't
+    // be used like a Thread in any way.
+    private static final Thread SENTINEL = new Thread("Sentinel", (Void)null);
 
     /**
      * The synchronization state: 0 == unlocked, else recursion count.
@@ -330,7 +295,14 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
             // acquired it and then released it and so already have unparked
             // the first waiter, which may have cleared its node.
             if (t != null) {
-                U.unparkMonitor(t);
+                /*
+                MonitorSupport.log(Thread.currentThread().getName() +
+                                   " signalFirst of " + t.getName() +
+                                   " on object " + System.identityHashCode(this));
+                */
+                // If we are dealing with a virtual thread we need to switch to
+                // the carrier so that the JVM will be able to locate it.
+                U.unparkMonitor(t.isVirtual() ? ((VirtualThread)t).carrierThread : t);
             }
         }
     }
@@ -383,15 +355,17 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
                 node.status = WAITING;          // enable signal
             } else {
                 spins = postSpins = (byte)((postSpins << 1) | 1);
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_ENTER;
+                Thread.FieldHolder holder =
+                    current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                int status = holder.threadStatus;
+                holder.threadStatus = BLOCKED_ENTER;
                 // Post JVMTI_EVENT_MONITOR_CONTENDED_ENTER
                 postJvmtiEvent(BLOCKED_ENTER, current, this.obj.get(), -1 /* ignored */, false /* ignored */);
                 contended = true;
                 try {
                     U.parkMonitor();
                 } finally {
-                    current.holder.threadStatus = status;
+                    holder.threadStatus = status;
                 }
                 node.clearStatus();
             }
@@ -445,7 +419,10 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         if (_owner != current)
             throw new IllegalMonitorStateException();
         if (first != null) {
+            // MonitorSupport.log(current.getName() + " doing signalAll on Monitor " + System.identityHashCode(this));
             doSignal(first, true);
+        } else {
+            // MonitorSupport.log(current.getName() + " doing empty signalAll on Monitor " + System.identityHashCode(this));
         }
     }
 
@@ -558,53 +535,63 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         state = 0;
         signalFirst();
 
-        boolean timed; long deadline;
-        if (millis != 0L) {
-            timed = true;
-            deadline = System.nanoTime() + millis * 1000000L;
-        } else {
-            timed = false;
-            deadline = 0L;
-        }
+        // make sure we re-acquire if anything goes wrong
 
-        // wait for signal, interrupt, or timeout
-        long nanos = 0L;
         boolean cancelled = false, interrupted = false;
-        while (!canReacquire(node)) {
-            if (((interrupted |= Thread.interrupted()) && interruptible) ||
-                (timed && (nanos = deadline - System.nanoTime()) <= 0L)) {
-                if (cancelled = (node.getAndUnsetStatus(COND) & COND) != 0)
-                    break;
-            } else if (timed) {
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_TIMED_WAIT;
-                try {
-                    U.parkMonitorNanos(nanos);
-                } finally {
-                    current.holder.threadStatus = status;
-                }
+        try {
+            boolean timed; long deadline;
+            if (millis != 0L) {
+                timed = true;
+                deadline = System.nanoTime() + millis * 1000000L;
             } else {
-                int status = current.holder.threadStatus;
-                current.holder.threadStatus = BLOCKED_WAIT;
-                try {
-                    U.parkMonitor();
-                } finally {
-                    current.holder.threadStatus = status;
+                timed = false;
+                deadline = 0L;
+            }
+
+            // wait for signal, interrupt, or timeout
+            long nanos = 0L;
+            while (!canReacquire(node)) {
+                if (((interrupted |= Thread.interrupted()) && interruptible) ||
+                    (timed && (nanos = deadline - System.nanoTime()) <= 0L)) {
+                    if (cancelled = (node.getAndUnsetStatus(COND) & COND) != 0)
+                        break;
+                } else if (timed) {
+                    Thread.FieldHolder holder =
+                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                    int status = holder.threadStatus;
+                    holder.threadStatus = BLOCKED_TIMED_WAIT;
+                    try {
+                        U.parkMonitorNanos(nanos);
+                    } finally {
+                        holder.threadStatus = status;
+                    }
+                } else {
+                    Thread.FieldHolder holder =
+                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                    int status = holder.threadStatus;
+                    holder.threadStatus = BLOCKED_WAIT;
+                    // MonitorSupport.log(current.getName() + " doing park in await on Monitor " + System.identityHashCode(this));
+                    try {
+                        U.parkMonitor();
+                    } finally {
+                        // MonitorSupport.log(current.getName() + " completed park in await on Monitor " + System.identityHashCode(this));
+                        holder.threadStatus = status;
+                    }
                 }
             }
-        }
-
-        // reacquire lock
-        node.clearStatus();
-        acquire(current, node, savedState);
-        if (cancelled)
-            unlinkCancelledWaiters(node);
-        if (interrupted) {
-            if (cancelled && interruptible) {
-                Thread.interrupted();
-                throw new InterruptedException();
+        } finally {
+            // reacquire lock
+            node.clearStatus();
+            acquire(current, node, savedState);
+            if (cancelled)
+                unlinkCancelledWaiters(node);
+            if (interrupted) {
+                if (cancelled && interruptible) {
+                    Thread.interrupted();
+                    throw new InterruptedException();
+                }
+                current.interrupt();
             }
-            current.interrupt();
         }
 
         return !cancelled;
@@ -656,13 +643,6 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
-
-        // Force initialization of remaining nested classes.
-        Object o = new LockNode();
-        o = new ConditionNode();
-        o = new ObjectRef(o);
-        // And Inflater
-        o = Inflater.locked;
     }
 
 
@@ -689,10 +669,13 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
 
         /**
          * For test code, when running with Java Monitors disabled,
-         * so we can test this like a regular library class.
+         * so we can test this like a regular library class. Note that
+         * tests get injected into the java.lang package so they can
+         * change this directly without needing a rebuild. It would be nice
+         * to use a System property to control this but it is loaded
+         * to early in the initialization sequence for that.
          */
         public static boolean debugging = false;
-
         final WeakReference<Object> ref;
         final int hash;  // cached identity hash
 
@@ -743,7 +726,7 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
                     public void run() {
                         if (debugging) System.out.println("Cleaner for " + ObjectRef.this);
                         if (Monitor.map.remove(ObjectRef.this) != null && debugging) {
-                            System.out.println("Removed map entry for " + ObjectRef.this);
+                            System.out.println("Removed map entry for " + ObjectRef.this + " - size now " + Monitor.map.size());
                         }
                     }
                 });
@@ -837,6 +820,8 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
             if (ObjectRef.debugging)
                 System.out.println("Computing new Monitor for " + r);
             m = map.computeIfAbsent(r, factory);
+            if (ObjectRef.debugging)
+                System.out.println("Map size " + map.size());
 
             // assertion logic:
             Monitor m2;
@@ -902,15 +887,8 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
      */
     private static native void postJvmtiEvent(int id, Thread current, Object obj, long ms, boolean timedOut);
 
-    //------------------------------------------------------------
-
-    // This is the fast-locking support
-
-    //------------------------------------------------------------
-
-    // For the markword operation we could use Unsafe (which will call
-    // into the VM; or we can call directly to the VM and use the existing
-    // markWord API. Robbin did the latter so we use that.
+    // lower-level inflation support - this is unavoidably tightly coupled to the MonitorSupport.Fast
+    // implementation due to the use of the MarkWord accessors.
 
     private static native void registerNatives();
     static {
@@ -918,122 +896,17 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         log("Monitor class registered natives");
     }
 
-    // In the markWord the lower two bits are the lock-bits.
-    // We don't have an INFLATING state as that protocol is
-    // handled in the Java code. Once INFLATED we never deflate.
-    // The Monitor is kept live in the MonitorMap until the associated
-    // Object is eligible for GC and its entry removed from the map.
-
-    static final int UNLOCKED = 1;
-    static final int LOCKED = 0;
-    static final int INFLATED = 2;
-
-    @IntrinsicCandidate
-    final static native boolean casLockState(Object o, int to, int from);
-
-    @IntrinsicCandidate
-    final static native int getLockState(Object o);
-
     // TODO intrinsic
     final static native Object getVMResult();
 
     // TODO intrinsic
     final static native void storeVMResult(Object vmresult);
 
-    final static native void abort(String error);
-
-    final static native void log(String msg);
-
     final static native void logEnter(Object o, long fid);
 
     final static native void logExit(Object o, long fid);
 
-    // lowest level enter/exit via markWord ops
-
-    private static boolean quickLock(Thread current, Object lockee, long fid) {
-        if (casLockState(lockee, LOCKED, UNLOCKED)) {
-            current.push(lockee, fid);
-            return true;
-        }
-        return false;
-    }
-
-    private static boolean quickUnlock(Thread current, Object lockee, long fid) {
-        if (casLockState(lockee, UNLOCKED, LOCKED)) {
-            current.pop(lockee, fid);
-            if (current.lockCount(lockee) > 0) {
-                abort("Bad lockstack: unlocked object still on stack");
-            }
-            return true;
-        }
-        return false;
-    }
-
-    // Attempted fast-path monitor entry and exit - called from Object
-
-    static boolean quickEnter(Thread current, Object lockee, long fid) {
-        while (true) {
-            int lockState = getLockState(lockee);
-            switch (lockState) {
-            case UNLOCKED:
-                if (current.lockCount(lockee) > 0) {
-                    abort("Bad lockstack: lockee unlocked but on stack");
-                }
-                if (quickLock(current, lockee, fid)) {
-                    return true;
-                }
-                break; // re-check, CAS failed
-            case LOCKED:
-                // recursive locking ?
-                if (current.hasLockedDirect(lockee)) {
-                    current.push(lockee, fid);
-                    return true;
-                }
-                return false; // take slow path
-            case INFLATED:
-                return false; // take slow path
-            default:
-                abort("Bad markword state: " + lockState);
-            }
-            Thread.yield();
-        }
-    }
-
-    static boolean quickExit(Thread current, Object lockee, long fid) {
-        while (true) {
-            int lockState = getLockState(lockee);
-            switch (lockState) {
-            case UNLOCKED:
-                abort("Bad markword: unlocked on exit");
-                break;
-            case LOCKED:
-                int locksHeld = current.lockCount(lockee);
-                if (locksHeld == 1) {
-                    if (quickUnlock(current, lockee, fid)) {
-                        return true;
-                    } else {
-                        break; // re-check, CAS failed
-                    }
-                } else if (locksHeld > 1) {
-                    // recursive locking
-                    current.pop(lockee, fid);
-                    return true;
-                } else {
-                    if (current.hasLocked(lockee))
-                        abort("lockCount and hasLocked disagree");
-                    abort("Invalid lockCount when locked: " + locksHeld);
-                }
-                break; // can't reach here but keeps compiler happy
-            case INFLATED:
-                return false; // take slow path
-            default:
-                abort("Bad markword: " + lockState);
-            }
-            Thread.yield();
-        }
-    }
-
-    // Slow-path monitor entry and exit - called from Object
+    // Slow-path monitor entry and exit - called from MonitorSupport.Policy
 
     /**
      * Fetch an existing Monitor for 'o' else go through the
@@ -1066,6 +939,8 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         m.enter(current);
     }
 
+    // We have to special-case this so we can save and restore the native thread's
+    // VMResult field, which is used to communicate results in the interpreter.
     static void slowExitOnRemoveActivation(Thread current, Object o, long fid) {
         Object vmResult = getVMResult();
         if (vmResult != null) {
@@ -1158,6 +1033,15 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         default:
             abort("Bad markword state: " + lockState);
         }
+    }
+
+    static {
+        // Force initialization of remaining nested classes.
+        Object o = new LockNode();
+        o = new ConditionNode();
+        o = new ObjectRef(o);
+        // And Inflater
+        o = Inflater.locked;
     }
 
     //-----------------------------------------------------
