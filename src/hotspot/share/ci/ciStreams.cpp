@@ -544,3 +544,16 @@ int ciBytecodeStream::get_method_signature_index(const constantPoolHandle& cpool
   )
 }
 
+ciMethod* ciBytecodeStream::get_monitor_method(bool& will_link, ciSignature* *declared_signature_result, bool enter) {
+  VM_ENTRY_MARK;
+  ciEnv* env = CURRENT_ENV;
+  ciMethod* m = env->get_monitor_method(enter);
+  will_link = m->is_loaded();
+  (*declared_signature_result) = m->signature();
+  return m;
+}
+
+ciKlass* ciBytecodeStream::get_monitor_holder(bool enter) {
+  VM_ENTRY_MARK;
+  return CURRENT_ENV->get_monitor_klass(enter);
+}

@@ -290,7 +290,9 @@ public:
   ciKlass*      get_declared_method_holder();
   int           get_method_holder_index();
   int           get_method_signature_index(const constantPoolHandle& cpool);
-
+  //
+  ciMethod*     get_monitor_method(bool& will_link, ciSignature* *declared_signature_result, bool enter);
+  ciKlass*      get_monitor_holder(bool enter);
 };
 
 

@@ -154,6 +154,10 @@ private:
                                       int method_index, Bytecodes::Code bc,
                                       ciInstanceKlass* loading_klass);
 
+ //
+  ciMethod*  get_monitor_method(bool enter);
+  ciKlass*   get_monitor_klass(bool enter);
+
   // Helper methods
   bool       check_klass_accessibility(ciKlass* accessing_klass,
                                       Klass* resolved_klass);
