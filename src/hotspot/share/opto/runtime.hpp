@@ -244,6 +244,8 @@ private:
   static const TypeFunc* multianewarrayN_Type(); // multianewarray
   static const TypeFunc* complete_monitor_enter_Type();
   static const TypeFunc* complete_monitor_exit_Type();
+  static const TypeFunc* complete_monitor_enter_Type_new();
+  static const TypeFunc* complete_monitor_exit_Type_new();
   static const TypeFunc* monitor_notify_Type();
   static const TypeFunc* uncommon_trap_Type();
   static const TypeFunc* athrow_Type();

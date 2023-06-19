@@ -190,6 +190,9 @@ private:
   CallNode* make_slow_call(CallNode *oldcall, const TypeFunc* slow_call_type, address slow_call,
                            const char* leaf_name, Node* slow_path, Node* parm0, Node* parm1,
                            Node* parm2);
+  CallNode* make_slow_call_new(CallNode *oldcall, const TypeFunc* slow_call_type, address slow_call,
+                           const char* leaf_name, Node* slow_path, Node* parm0, Node* parm1,
+                           Node* parm2);
 
   Node* initialize_object(AllocateNode* alloc,
                           Node* control, Node* rawmem, Node* object,

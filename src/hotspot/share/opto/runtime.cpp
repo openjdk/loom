@@ -603,7 +603,21 @@ const TypeFunc *OptoRuntime::complete_monitor_enter_Type() {
 
   return TypeFunc::make(domain,range);
 }
+const TypeFunc *OptoRuntime::complete_monitor_enter_Type_new() {
+  int num_input_fields = 1;
+  int num_output_fields = 0;
 
+  // create input type (domain)
+  const Type **fields = TypeTuple::fields(num_input_fields);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+num_input_fields,fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(num_output_fields);
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+num_output_fields,fields);
+
+  return TypeFunc::make(domain,range);
+}
 
 //-----------------------------------------------------------------------------
 const TypeFunc *OptoRuntime::complete_monitor_exit_Type() {
@@ -618,6 +632,21 @@ const TypeFunc *OptoRuntime::complete_monitor_exit_Type() {
   fields = TypeTuple::fields(0);
 
   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0, fields);
+
+  return TypeFunc::make(domain, range);
+}
+const TypeFunc *OptoRuntime::complete_monitor_exit_Type_new() {
+  int num_input_fields = 1;
+  int num_output_fields = 0;
+
+  // create input type (domain)
+  const Type **fields = TypeTuple::fields(num_input_fields);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Unlocked
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+num_input_fields, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(num_output_fields);
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+num_output_fields, fields);
 
   return TypeFunc::make(domain, range);
 }
