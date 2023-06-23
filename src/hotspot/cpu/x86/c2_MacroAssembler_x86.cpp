@@ -553,6 +553,24 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
                                  RTMLockingCounters* stack_rtm_counters,
                                  Metadata* method_data,
                                  bool use_rtm, bool profile_rtm) {
+
+/*
+log when this is running and which Method is being compiledVFrame
+print assembly to a file
+*/
+
+
+ // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
+  if (false) {
+  Label INFINITE_LOOP;
+  bind  (INFINITE_LOOP);
+  testptr(objReg, objReg);
+  jmp(INFINITE_LOOP);
+  } else {
+  testptr(objReg, objReg);
+  }
+
+/*
   // Ensure the register assignments are disjoint
   assert(tmpReg == rax, "");
 
@@ -619,6 +637,10 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
     // Next instruction set ZFlag == 1 (Success) if difference is less then one page.
     andptr(tmpReg, (int32_t) (NOT_LP64(0xFFFFF003) LP64_ONLY(7 - (int)os::vm_page_size())) );
     movptr(Address(boxReg, 0), tmpReg);
+
+
+    //testptr(objReg, objReg);
+
   } else {
     assert(LockingMode == LM_LIGHTWEIGHT, "");
     fast_lock_impl(objReg, tmpReg, thread, scrReg, NO_COUNT);
@@ -714,6 +736,8 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 
   bind(NO_COUNT);
 
+  */
+
   // At NO_COUNT the icc ZFlag is set as follows ...
   // fast_unlock uses the same protocol.
   // ZFlag == 1 -> Success
@@ -753,7 +777,21 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 // Xcheck:jni is enabled.
 
 void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpReg, bool use_rtm) {
-  assert(boxReg == rax, "");
+
+   // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
+
+  if (false) {
+  Label INFINITE_LOOP;
+  bind  (INFINITE_LOOP);
+  testptr(objReg, objReg);
+  testptr(objReg, objReg);
+  jmp(INFINITE_LOOP);
+  } else {
+  testptr(objReg, objReg);
+  testptr(objReg, objReg);
+  }
+
+/*  assert(boxReg == rax, "");
   assert_different_registers(objReg, boxReg, tmpReg);
 
   Label DONE_LABEL, Stacked, COUNT, NO_COUNT;
@@ -952,6 +990,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   xorl(tmpReg, tmpReg); // Set ZF == 1
 
   bind(NO_COUNT);
+  */
 }
 
 //-------------------------------------------------------------------------------------------

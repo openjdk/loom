@@ -667,7 +667,45 @@ public class Object {
 
     /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
     @ReservedStackAccess
+    private static final void monitorEnterC2(Object o) {
+
+        //Monitor.abort("monitorEnterC2: ShouldNotReachHere!");
+        while(o != null);
+
+        // FIXME: This should really be handled in the interpreter and JIT.
+        if (o == null)
+            throw new NullPointerException();
+
+        if (monitorPolicy == -1) {
+            Monitor.abort("ShouldNotReachHere!");
+        }
+
+        if (syncEnabled == 0) return;
+
+        Thread t = Thread.currentThread();
+
+        long monitorFrameId = getCallerFrameId();
+        if (monitorPolicy == 2) {  // fast-locks
+            if (!Monitor.quickEnter(t, o, monitorFrameId)) {
+                Monitor.slowEnter(t, o, monitorFrameId);
+            }
+        } else {
+            t.push(o, monitorFrameId);
+            if (monitorPolicy == 0) { // native
+                monitorEnter0(o);
+            } else {  // always inflated
+                Monitor.of(o).enter(t);
+            }
+        }
+    }
+
+    /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
+    @ReservedStackAccess
     private static final void monitorEnter(Object o) {
+
+        //Monitor.abort("monitorEnter: ShouldNotReachHere!");
+        //while(o != null);
+
         // FIXME: This should really be handled in the interpreter and JIT.
         if (o == null)
             throw new NullPointerException();
@@ -733,6 +771,11 @@ public class Object {
     /** Entry point for monitor exit from the VM (ObjectLocker) */
     @ReservedStackAccess
     private static final void monitorExit(Object o, long monitorFrameId) {
+
+
+       // Monitor.abort("monitorExit: ShouldNotReachHere!");
+        //while(o != null);
+
         if (monitorPolicy == -1) {
             Monitor.abort("ShouldNotReachHere!");
         }
@@ -757,7 +800,37 @@ public class Object {
 
     /** Entry point for monitor exit from the VM (bytecode) */
     @ReservedStackAccess
+    private static final void monitorExitC2(Object o) {
+
+        //Monitor.abort("monitorExitC2: ShouldNotReachHere!");
+        while(o != null);
+
+        if (monitorPolicy == -1) {
+            Monitor.abort("ShouldNotReachHere!");
+        }
+
+        if (syncEnabled == 0) return;
+
+        Thread t = Thread.currentThread();
+
+        long monitorFrameId = getCallerFrameId();
+        if (monitorPolicy == 2) {  // fast-locks
+            if (!Monitor.quickExit(t, o, monitorFrameId)) {
+                Monitor.slowExit(t, o, monitorFrameId);
+            }
+        } else {
+            t.pop(o, monitorFrameId);
+            if (monitorPolicy == 0) { // native
+                monitorExit0(o);
+            } else {  // always inflated
+                Monitor.of(o).exit(t);
+            }
+        }
+    }
+    /** Entry point for monitor exit from the VM (bytecode) */
+    @ReservedStackAccess
     private static final void monitorExit(Object o) {
+
         if (monitorPolicy == -1) {
             Monitor.abort("ShouldNotReachHere!");
         }

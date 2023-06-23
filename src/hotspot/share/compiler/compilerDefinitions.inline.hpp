@@ -47,14 +47,13 @@ inline bool CompilerConfig::is_jvmci()             { return JVMCI_ONLY(has_jvmci
 
 // Is the JVM in a configuration that permits only c1-compiled methods (level 1,2,3)?
 inline bool CompilerConfig::is_c1_only() {
-  return false;
-  // if (!is_interpreter_only() && has_c1()) {
-  //   const bool c1_only = !has_c2() && !is_jvmci_compiler();
-  //   const bool tiered_degraded_to_c1_only = TieredCompilation && TieredStopAtLevel >= CompLevel_simple && TieredStopAtLevel < CompLevel_full_optimization;
-  //   const bool c1_only_compilation_mode = CompilationModeFlag::quick_only();
-  //   return c1_only || tiered_degraded_to_c1_only || c1_only_compilation_mode;
-  // }
-  // return false;
+  if (!is_interpreter_only() && has_c1()) {
+     const bool c1_only = !has_c2() && !is_jvmci_compiler();
+     const bool tiered_degraded_to_c1_only = TieredCompilation && TieredStopAtLevel >= CompLevel_simple && TieredStopAtLevel < CompLevel_full_optimization;
+     const bool c1_only_compilation_mode = CompilationModeFlag::quick_only();
+     return c1_only || tiered_degraded_to_c1_only || c1_only_compilation_mode;
+   }
+   return false;
 }
 
 inline bool CompilerConfig::is_c1_or_interpreter_only_no_jvmci() {
@@ -86,16 +85,15 @@ inline bool CompilerConfig::is_jvmci_compiler_enabled() {
 }
 // Is the JVM in a configuration that permits only c2-compiled methods?
 inline bool CompilerConfig::is_c2_only() {
-  return true;
-  // if (is_c2_enabled()) {
-  //   const bool c2_only = !has_c1();
-  //   // There is no JVMCI compiler to replace C2 in the broker, and the user (or ergonomics)
-  //   // is forcing C1 off.
-  //   const bool c2_only_compilation_mode = CompilationModeFlag::high_only();
-  //   const bool tiered_off = !TieredCompilation;
-  //   return c2_only || c2_only_compilation_mode || tiered_off;
-  // }
-  // return false;
+  if (is_c2_enabled()) {
+     const bool c2_only = !has_c1();
+    // There is no JVMCI compiler to replace C2 in the broker, and the user (or ergonomics)
+     // is forcing C1 off.
+     const bool c2_only_compilation_mode = CompilationModeFlag::high_only();
+     const bool tiered_off = !TieredCompilation;
+     return c2_only || c2_only_compilation_mode || tiered_off;
+   }
+  return false;
 }
 
 // Is the JVM in a configuration that permits only jvmci-compiled methods?

@@ -1897,6 +1897,7 @@ void GenerateOopMap::do_return_monitor_check() {
 // For UseNewMonitors
 
 void GenerateOopMap::do_monitor_enter() {
+
   assert(ObjectMonitorMode::java(), "must be");
  // Dig up signature for field in constant pool
   Symbol* signature = vmSymbols::object_void_signature();
@@ -1934,6 +1935,7 @@ void GenerateOopMap::do_monitor_enter() {
 }
 
 void GenerateOopMap::do_monitor_exit() {
+
   assert(ObjectMonitorMode::java(), "must be");
   do_monitor_enter();
 }

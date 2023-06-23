@@ -138,8 +138,10 @@ LatestMethodCache* Universe::_do_stack_walk_cache     = nullptr;
 
 // Java object monitor support
 LatestMethodCache* Universe::_object_monitorEnter_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorEnterC2_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorEnterFrameId_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorExit_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorExitC2_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorExitFrameId_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorExitVoid_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorNotifyAll_cache = nullptr;
@@ -147,8 +149,10 @@ LatestMethodCache* Universe::_object_monitorWaitUninterruptibly_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorJNIEnter_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorJNIExit_cache = nullptr;
 Method* Universe::_object_monitorEnter = nullptr;
+Method* Universe::_object_monitorEnterC2 = nullptr;
 Method* Universe::_object_monitorEnterFrameId = nullptr;
 Method* Universe::_object_monitorExit  = nullptr;
+Method* Universe::_object_monitorExitC2  = nullptr;
 Method* Universe::_object_monitorExitFrameId  = nullptr;
 Method* Universe::_object_monitorExitVoid  = nullptr;
 Method* Universe::_object_monitorNotifyAll  = nullptr;
@@ -255,8 +259,10 @@ void Universe::metaspace_pointers_do(MetaspaceClosure* it) {
   _throw_no_such_method_error_cache->metaspace_pointers_do(it);
   _do_stack_walk_cache->metaspace_pointers_do(it);
   _object_monitorEnter_cache->metaspace_pointers_do(it);
+  _object_monitorEnterC2_cache->metaspace_pointers_do(it);
   _object_monitorEnterFrameId_cache->metaspace_pointers_do(it);
   _object_monitorExit_cache->metaspace_pointers_do(it);
+ _object_monitorExitC2_cache->metaspace_pointers_do(it);
   _object_monitorExitFrameId_cache->metaspace_pointers_do(it);
   _object_monitorExitVoid_cache->metaspace_pointers_do(it);
   _object_monitorNotifyAll_cache->metaspace_pointers_do(it);
@@ -315,8 +321,10 @@ void Universe::serialize(SerializeClosure* f) {
   _throw_no_such_method_error_cache->serialize(f);
   _do_stack_walk_cache->serialize(f);
   _object_monitorEnter_cache->serialize(f);
+  _object_monitorEnterC2_cache->serialize(f);
   _object_monitorEnterFrameId_cache->serialize(f);
   _object_monitorExit_cache->serialize(f);
+  _object_monitorExitC2_cache->serialize(f);
   _object_monitorExitFrameId_cache->serialize(f);
   _object_monitorExitVoid_cache->serialize(f);
   _object_monitorNotifyAll_cache->serialize(f);
@@ -849,8 +857,10 @@ jint universe_init() {
   Universe::_throw_no_such_method_error_cache = new LatestMethodCache();
   Universe::_do_stack_walk_cache = new LatestMethodCache();
   Universe::_object_monitorEnter_cache = new LatestMethodCache();
+  Universe::_object_monitorEnterC2_cache = new LatestMethodCache();
   Universe::_object_monitorEnterFrameId_cache = new LatestMethodCache();
   Universe::_object_monitorExit_cache = new LatestMethodCache();
+  Universe::_object_monitorExitC2_cache = new LatestMethodCache();
   Universe::_object_monitorExitFrameId_cache = new LatestMethodCache();
   Universe::_object_monitorExitVoid_cache = new LatestMethodCache();
   Universe::_object_monitorNotifyAll_cache = new LatestMethodCache();
@@ -1021,6 +1031,13 @@ void Universe::initialize_known_methods(TRAPS) {
                           vmSymbols::object_void_signature(), true, CHECK);
   _object_monitorEnter = object_monitorEnter_method();
 
+  // setup Object monitor methods
+  initialize_known_method(_object_monitorEnterC2_cache,
+                          vmClasses::Object_klass(),
+                          "monitorEnterC2",
+                          vmSymbols::object_void_signature(), true, CHECK);
+  _object_monitorEnterC2 = object_monitorEnterC2_method();
+
   initialize_known_method(_object_monitorEnterFrameId_cache,
                           vmClasses::Object_klass(),
                           "monitorEnter",
@@ -1032,6 +1049,12 @@ void Universe::initialize_known_methods(TRAPS) {
                           "monitorExit",
                           vmSymbols::object_void_signature(), true, CHECK);
   _object_monitorExit = object_monitorExit_method();
+
+  initialize_known_method(_object_monitorExitC2_cache,
+                          vmClasses::Object_klass(),
+                          "monitorExitC2",
+                          vmSymbols::object_void_signature(), true, CHECK);
+  _object_monitorExitC2 = object_monitorExitC2_method();
 
   initialize_known_method(_object_monitorExitFrameId_cache,
                           vmClasses::Object_klass(),
