@@ -684,10 +684,18 @@ JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
                   RegisterMap::ProcessFrames::skip,
                   RegisterMap::WalkContinuation::skip);
   frame this_frame = JavaThread::current()->last_frame();
-  assert(!this_frame.is_interpreted_frame(), "Hmz");
+  // MNCMNC: added for C1
+  // MNCMNC:   original
   frame monitor    = this_frame.sender(&map);
-  // jlong id = (jlong)monitor.link();
-  return 89;
+  jlong id = (jlong)monitor.link();
+  return id;
+  // MNCMNC:   end original
+
+  // MNCMNC:  new
+  //assert(!this_frame.is_interpreted_frame(), "Hmz");
+  //frame monitor    = this_frame.sender(&map);
+  //return 89;
+  // MNCMNC: end NEW
 JVM_END
 
 JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))

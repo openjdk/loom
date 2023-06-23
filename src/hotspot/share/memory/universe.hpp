@@ -122,8 +122,10 @@ class Universe: AllStatic {
   static LatestMethodCache* _do_stack_walk_cache;      // method for stack walker callback
 
   static LatestMethodCache* _object_monitorEnter_cache; // java.lang.Object::monitorEnter(obj)
+  static LatestMethodCache* _object_monitorEnterC2_cache; // java.lang.Object::monitorEnterC2(obj)
   static LatestMethodCache* _object_monitorEnterFrameId_cache; // java.lang.Object::monitorEnter(obj)
   static LatestMethodCache* _object_monitorExit_cache;  // java.lang.Object::monitorExit(obj)
+  static LatestMethodCache* _object_monitorExitC2_cache;  // java.lang.Object::monitorExitC2(obj)
   static LatestMethodCache* _object_monitorExitFrameId_cache;  // java.lang.Object::monitorExit(obj)
   static LatestMethodCache* _object_monitorExitVoid_cache;  // java.lang.Object::monitorExit()
   static LatestMethodCache* _object_monitorNotifyAll_cache;  // java.lang.Object::monitorNotifyAll(obj)
@@ -132,8 +134,10 @@ class Universe: AllStatic {
   static LatestMethodCache* _object_monitorJNIExit_cache;  // java.lang.Object::monitorExit(obj)
 
   static Method* _object_monitorEnter; // java.lang.Object::monitorEnter(obj)
+  static Method* _object_monitorEnterC2; // java.lang.Object::monitorEnterC2(obj)
   static Method* _object_monitorEnterFrameId; // java.lang.Object::monitorEnter(obj)
   static Method* _object_monitorExit;  // java.lang.Object::monitorExit(obj)
+  static Method* _object_monitorExitC2;  // java.lang.Object::monitorExitC2(obj)
   static Method* _object_monitorExitFrameId;  // java.lang.Object::monitorExit(obj)
   static Method* _object_monitorExitVoid;  // java.lang.Object::monitorExit()
   static Method* _object_monitorNotifyAll;  // java.lang.Object::monitorNotifyAll(obj)
@@ -294,8 +298,10 @@ class Universe: AllStatic {
   static Method*      do_stack_walk_method()          { return _do_stack_walk_cache->get_method(); }
 
   static Method*      object_monitorEnter_method()        { return _object_monitorEnter_cache->get_method(); }
+  static Method*      object_monitorEnterC2_method()        { return _object_monitorEnterC2_cache->get_method(); }
   static Method*      object_monitorEnterFrameId_method() { return _object_monitorEnterFrameId_cache->get_method(); }
   static Method*      object_monitorExit_method()         { return _object_monitorExit_cache->get_method(); }
+  static Method*      object_monitorExitC2_method()         { return _object_monitorExitC2_cache->get_method(); }
   static Method*      object_monitorExitFrameId_method()  { return _object_monitorExitFrameId_cache->get_method(); }
   static Method*      object_monitorExitVoid_method()     { return _object_monitorExitVoid_cache->get_method(); }
   static Method**     object_monitorEnter_addr()          { return &_object_monitorEnter; }

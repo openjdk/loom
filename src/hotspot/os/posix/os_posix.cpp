@@ -2008,7 +2008,7 @@ void os::shutdown() {
 // Also note we can abort while other threads continue to run, so we can
 // easily trigger secondary faults in those threads. To reduce the likelihood
 // of that we use _exit rather than exit, so that no atexit hooks get run.
-// But note that os::shutdown() could also trigger secondary faults.
+// But note that os::`shutdown() could also trigger secondary faults.
 void os::abort(bool dump_core, void* siginfo, const void* context) {
   os::shutdown();
   if (dump_core) {
