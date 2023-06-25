@@ -51,6 +51,8 @@ java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
 # Undelrying implementation is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
+java/lang/ScopedValue/StressStackOverflow.java#default 8309646 generic-all
+
 ##########
 ## Tests incompatible with virtual test thread factory.
 ## There is no goal to run all test with virtual test thread factory.
