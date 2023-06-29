@@ -692,8 +692,8 @@ JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
     ResourceMark rm(cur);
     LogStream* log = &lsh_mon;
     frame caller = monitor.sender(&map);
-    log->print_cr("JVM_CallerFrameId for %s - %s", cur->name(),
-                  caller.interpreter_frame_method()->name_and_sig_as_C_string() );
+    log->print_cr("JVM_CallerFrameId for %s - %s (" JLONG_FORMAT ")", cur->name(),
+                  caller.interpreter_frame_method()->name_and_sig_as_C_string(), id );
   }
   return id;
 JVM_END
