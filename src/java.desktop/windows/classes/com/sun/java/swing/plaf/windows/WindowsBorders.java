@@ -225,7 +225,7 @@ public class WindowsBorders {
         }
 
         public Insets getBorderInsets(Component c, Insets insets) {
-            insets.set(1,1,1,1);
+            insets.set(1, 1, 1, 1);
             if (!(c instanceof JToolBar)) {
                 return insets;
             }
@@ -247,6 +247,7 @@ public class WindowsBorders {
 
     /**
      * This class is an implementation of a dashed border.
+     *
      * @since 1.4
      */
     @SuppressWarnings("serial") // Superclass is not serializable across versions
@@ -299,6 +300,7 @@ public class WindowsBorders {
 
     /**
      * This class is an implementation of the InternalFrameLine border.
+     *
      * @since 1.4
      */
     @SuppressWarnings("serial") // Superclass is not serializable across versions
@@ -319,17 +321,15 @@ public class WindowsBorders {
                 int width, int height) {
 
             JInternalFrame jif = null;
-            if (c instanceof JInternalFrame) {
+            if (c instanceof JInternalFrame)
                 jif = (JInternalFrame)c;
-            } else if (c instanceof JInternalFrame.JDesktopIcon) {
+            else if (c instanceof JInternalFrame.JDesktopIcon)
                 jif = ((JInternalFrame.JDesktopIcon)c).getInternalFrame();
-            } else {
+            else
                 return;
-            }
 
             if (jif.isSelected()) {
-                // Set the line color so the line border gets the correct
-                // color.
+                // Set the line color so the line border gets the correct color.
                 lineColor = activeColor;
                 super.paintBorder(c, g, x, y, width, height);
             } else {
