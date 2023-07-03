@@ -308,7 +308,7 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
     }
 
     private void acquire(Thread current, Node node, int arg) {
-        boolean interrupted = false, first = false;
+        boolean first = false;
         byte spins = 0, postSpins = 0;   // retries upon unpark of first thread
         Node pred = (node != null) ? node.prev : null;
 
@@ -322,8 +322,6 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                     node.prev = null;        // detach before assign head
                     head = node;
                     pred.next = null;
-                    if (interrupted)
-                        current.interrupt();
                 }
                 _owner = current;
                 if (contended) {
@@ -349,7 +347,6 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                 --spins;                        // reduce unfairness on rewaits
                 Thread.onSpinWait();
             } else if (node.status == 0) {
-                interrupted |= Thread.interrupted();  // clear before park
                 if (node.waiter == null)
                     node.waiter = current;
                 node.status = WAITING;          // enable signal
