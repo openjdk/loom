@@ -550,6 +550,7 @@ void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
   methodHandle mh (current, Universe::object_monitorExitFrameId_method());
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
+  assert(!current->has_pending_exception(), "No IMSE should be possible");
   current->clear_system_java();
   current->dec_held_monitor_count(1);
 }
@@ -566,12 +567,14 @@ void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
 
 void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
-  current->dec_held_monitor_count(1, true);
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
   methodHandle mh (current, Universe::object_monitorJNIExit_method());
   JavaCalls::call(&result, mh, &args, current);
+  if (!current->has_pending_exception()) {
+    current->dec_held_monitor_count(1, true);
+  }
 }
 
 void ObjectSynchronizer::java_notify(Handle obj, JavaThread* current) {
