@@ -4350,6 +4350,8 @@ void TemplateTable::monitorenter() {
     // set system java
     __ incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
+    __ inc_held_monitor_count();
+
     const address addr = (address) Interpreter::monitor_enter_return_entry_adr();
     ExternalAddress entry(addr);
     __ lea(flags, entry);
@@ -4474,6 +4476,8 @@ void TemplateTable::monitorexit() {
 
     // set system java
     __ incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+    __ dec_held_monitor_count();
 
     const address addr = (address) Interpreter::monitor_exit_return_entry_adr();
     ExternalAddress entry(addr);

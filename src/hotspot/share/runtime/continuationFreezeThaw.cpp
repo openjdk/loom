@@ -1465,6 +1465,8 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
 
 #ifdef ASSERT
 static bool monitors_on_stack(JavaThread* thread) {
+  assert(ObjectMonitorMode::legacy(), "monitors_on_stack can't work for Java Object Monitors");
+
   ContinuationEntry* ce = thread->last_continuation();
   RegisterMap map(thread,
                   RegisterMap::UpdateMap::include,
@@ -1541,8 +1543,11 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   assert(entry->is_virtual_thread() == (entry->scope(current) == java_lang_VirtualThread::vthread_scope()), "");
 
-  assert(monitors_on_stack(current) == ((current->held_monitor_count() - current->jni_monitor_count()) > 0),
-         "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)current->held_monitor_count(), (int64_t)current->jni_monitor_count());
+  // With Java Object Monitors we need to check the lock-stack, but at this point in the freeze process
+  // we no longer have a reference to the virtual thread that is yielding, so we have to skip this assert.
+  if (ObjectMonitorMode::legacy())
+    assert(monitors_on_stack(current) == ((current->held_monitor_count() - current->jni_monitor_count()) > 0),
+           "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)current->held_monitor_count(), (int64_t)current->jni_monitor_count());
 
   if (entry->is_pinned() || current->held_monitor_count() > 0) {
     log_develop_debug(continuations)("PINNED due to critical section/hold monitor");

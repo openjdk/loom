@@ -1587,6 +1587,8 @@ void InterpreterMacroAssembler::lock_object() {
   // set system java
   incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
+  inc_held_monitor_count(); // we don't hold it yet but this is simple
+
   push(rax);
 
   InternalAddress radr(return_adr);
@@ -1639,6 +1641,8 @@ void InterpreterMacroAssembler::unlock_object() {
 
   // set system jav
   incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
+
+  dec_held_monitor_count();
 
   InternalAddress radr(return_adr);
   lea(method, radr);

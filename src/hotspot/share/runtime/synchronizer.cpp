@@ -535,6 +535,7 @@ void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) 
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
   current->clear_system_java();
+  current->inc_held_monitor_count(1);
 }
 
 void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
@@ -550,10 +551,12 @@ void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
   current->clear_system_java();
+  current->dec_held_monitor_count(1);
 }
 
 void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
+  current->inc_held_monitor_count(1, true);
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
@@ -563,6 +566,7 @@ void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
 
 void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
+  current->dec_held_monitor_count(1, true);
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
