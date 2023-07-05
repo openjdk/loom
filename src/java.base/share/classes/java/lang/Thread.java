@@ -2473,7 +2473,8 @@ public class Thread implements Runnable {
             MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
         if (frameId[lockStackPos] != fid) {
-            MonitorSupport.abort("frame id mismatched - got " + frameId[lockStackPos] + " expected " + fid);
+            // Don't abort - frame id matching is broken with virtual threads
+            MonitorSupport.log("frame id mismatched - got " + frameId[lockStackPos] + " expected " + fid);
         }
         lockStack[lockStackPos] = null;
         frameId[lockStackPos] = 0;

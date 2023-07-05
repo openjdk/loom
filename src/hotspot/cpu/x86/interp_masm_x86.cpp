@@ -1587,7 +1587,9 @@ void InterpreterMacroAssembler::lock_object() {
   // set system java
   incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
-  inc_held_monitor_count(); // we don't hold it yet but this is simple
+  if (ObjectMonitorMode::native()) {
+    inc_held_monitor_count(); // we don't hold it yet but this is simple
+  }
 
   push(rax);
 
@@ -1639,10 +1641,12 @@ void InterpreterMacroAssembler::unlock_object() {
   // save 'interpreter return address'
   save_bcp();
 
-  // set system jav
+  // set system java
   incrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
-  dec_held_monitor_count();
+  if (ObjectMonitorMode::native()) {
+    dec_held_monitor_count();
+  }
 
   InternalAddress radr(return_adr);
   lea(method, radr);

@@ -1550,7 +1550,13 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
            "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)current->held_monitor_count(), (int64_t)current->jni_monitor_count());
 
   if (entry->is_pinned() || current->held_monitor_count() > 0) {
-    log_develop_debug(continuations)("PINNED due to critical section/hold monitor");
+    if (entry->is_pinned()) {
+      log_develop_debug(continuations)("PINNED due to critical section");
+    }
+    if (current->held_monitor_count() > 0) {
+      log_develop_debug(continuations)("PINNED due to held monitor count");
+    }
+
     verify_continuation(cont.continuation());
     freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
     log_develop_trace(continuations)("=== end of freeze (fail %d)", res);

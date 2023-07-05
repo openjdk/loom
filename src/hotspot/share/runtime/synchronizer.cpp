@@ -535,7 +535,9 @@ void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) 
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
   current->clear_system_java();
-  current->inc_held_monitor_count(1);
+  if (ObjectMonitorMode::native()) {
+    current->inc_held_monitor_count(1);
+  }
 }
 
 void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
@@ -552,17 +554,21 @@ void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
   JavaCalls::call(&result, mh, &args, current);
   assert(!current->has_pending_exception(), "No IMSE should be possible");
   current->clear_system_java();
-  current->dec_held_monitor_count(1);
+  if (ObjectMonitorMode::native()) {
+    current->dec_held_monitor_count(1);
+  }
 }
 
 void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
-  current->inc_held_monitor_count(1, true);
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
   methodHandle mh (current, Universe::object_monitorJNIEnter_method());
   JavaCalls::call(&result, mh, &args, current);
+  if (ObjectMonitorMode::native()) {
+    current->inc_held_monitor_count(1, true);
+  }
 }
 
 void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
@@ -572,7 +578,7 @@ void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
   args.push_oop(obj);
   methodHandle mh (current, Universe::object_monitorJNIExit_method());
   JavaCalls::call(&result, mh, &args, current);
-  if (!current->has_pending_exception()) {
+  if (ObjectMonitorMode::native() && !current->has_pending_exception()) {
     current->dec_held_monitor_count(1, true);
   }
 }
@@ -2061,7 +2067,9 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count(rec + 1);
+    if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
+      _thread->dec_held_monitor_count(rec + 1);
+    }
   }
 };
 
