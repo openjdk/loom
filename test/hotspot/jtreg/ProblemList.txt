@@ -172,6 +172,8 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 
 vmTestbase/nsk/monitoring/ThreadMXBean/ThreadInfo/Multi/Multi005/TestDescription.java 8076494 windows-x64
 
+vmTestbase/nsk/jdb/interrupt/interrupt001/interrupt001.java 8310551 linux-all
+
 #############################################################################
 
 # Loom, fibers branch
