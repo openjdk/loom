@@ -103,8 +103,11 @@ address OptoRuntime::_multianewarray5_Java                        = nullptr;
 address OptoRuntime::_multianewarrayN_Java                        = nullptr;
 address OptoRuntime::_vtable_must_compile_Java                    = nullptr;
 address OptoRuntime::_complete_monitor_locking_Java               = nullptr;
+address OptoRuntime::_complete_monitor_unlocking_Java               = nullptr;
 address OptoRuntime::_monitor_notify_Java                         = nullptr;
 address OptoRuntime::_monitor_notifyAll_Java                      = nullptr;
+address OptoRuntime::_monitor_enter_Java                          = nullptr;
+address OptoRuntime::_monitor_exit_Java                           = nullptr;
 address OptoRuntime::_rethrow_Java                                = nullptr;
 
 address OptoRuntime::_slow_arraycopy_Java                         = nullptr;
@@ -160,7 +163,10 @@ bool OptoRuntime::generate(ciEnv* env) {
   gen(env, _notify_jvmti_vthread_mount     , notify_jvmti_vthread_Type    , SharedRuntime::notify_jvmti_vthread_mount, 0, true, false);
   gen(env, _notify_jvmti_vthread_unmount   , notify_jvmti_vthread_Type    , SharedRuntime::notify_jvmti_vthread_unmount, 0, true, false);
 #endif
-  gen(env, _complete_monitor_locking_Java  , complete_monitor_enter_Type  , SharedRuntime::complete_monitor_locking_C, 0, false, false);
+  gen(env, _monitor_enter_Java             , complete_monitor_enter_Type           , SharedRuntime::monitor_enter_C, 0, false, false);
+  gen(env, _monitor_exit_Java              , complete_monitor_exit_Type            , SharedRuntime::monitor_exit_C,      0, false, false);
+  gen(env, _complete_monitor_locking_Java  , complete_monitor_enter_Type           , SharedRuntime::complete_monitor_locking_C,   0, false, false);
+  gen(env, _complete_monitor_unlocking_Java  , complete_monitor_exit_Type           , SharedRuntime::complete_monitor_unlocking_C,   0, false, false);
   gen(env, _monitor_notify_Java            , monitor_notify_Type          , monitor_notify_C                ,    0 , false, false);
   gen(env, _monitor_notifyAll_Java         , monitor_notify_Type          , monitor_notifyAll_C             ,    0 , false, false);
   gen(env, _rethrow_Java                   , rethrow_Type                 , rethrow_C                       ,    2 , true , true );
@@ -589,21 +595,7 @@ const TypeFunc *OptoRuntime::uncommon_trap_Type() {
 
 //-----------------------------------------------------------------------------
 // Monitor Handling
-const TypeFunc *OptoRuntime::complete_monitor_enter_Type() {
-  // create input type (domain)
-  const Type **fields = TypeTuple::fields(2);
-  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
-  fields[TypeFunc::Parms+1] = TypeRawPtr::BOTTOM;   // Address of stack location for lock
-  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+2,fields);
-
-  // create result type (range)
-  fields = TypeTuple::fields(0);
-
-  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0,fields);
-
-  return TypeFunc::make(domain,range);
-}
-const TypeFunc *OptoRuntime::complete_monitor_enter_Type_new() {
+const TypeFunc *OptoRuntime::monitor_enter_Type() {
   int num_input_fields = 1;
   int num_output_fields = 0;
 
@@ -620,22 +612,7 @@ const TypeFunc *OptoRuntime::complete_monitor_enter_Type_new() {
 }
 
 //-----------------------------------------------------------------------------
-const TypeFunc *OptoRuntime::complete_monitor_exit_Type() {
-  // create input type (domain)
-  const Type **fields = TypeTuple::fields(3);
-  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
-  fields[TypeFunc::Parms+1] = TypeRawPtr::BOTTOM;    // Address of stack location for lock - BasicLock
-  fields[TypeFunc::Parms+2] = TypeRawPtr::BOTTOM;    // Thread pointer (Self)
-  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+3, fields);
-
-  // create result type (range)
-  fields = TypeTuple::fields(0);
-
-  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0, fields);
-
-  return TypeFunc::make(domain, range);
-}
-const TypeFunc *OptoRuntime::complete_monitor_exit_Type_new() {
+const TypeFunc *OptoRuntime::monitor_exit_Type() {
   int num_input_fields = 1;
   int num_output_fields = 0;
 
@@ -647,6 +624,40 @@ const TypeFunc *OptoRuntime::complete_monitor_exit_Type_new() {
   // create result type (range)
   fields = TypeTuple::fields(num_output_fields);
   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+num_output_fields, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+const TypeFunc *OptoRuntime::complete_monitor_enter_Type() {
+  // create input type (domain)
+  const Type **fields = TypeTuple::fields(2);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
+  fields[TypeFunc::Parms+1] = TypeRawPtr::BOTTOM;   // Address of stack location for lock
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+2,fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0,fields);
+
+  return TypeFunc::make(domain,range);
+}
+//-----------------------------------------------------------------------------
+const TypeFunc *OptoRuntime::complete_monitor_exit_Type() {
+  // create input type (domain)
+  const int num_fields = 3;
+  const Type **fields = TypeTuple::fields(num_fields);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
+  fields[TypeFunc::Parms+1] = TypeRawPtr::BOTTOM;    // Address of stack location for lock - BasicLock
+  if (num_fields == 3) {
+    fields[TypeFunc::Parms+2] = TypeRawPtr::BOTTOM;    // Thread pointer (Self)
+  }
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+num_fields, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0, fields);
 
   return TypeFunc::make(domain, range);
 }

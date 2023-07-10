@@ -153,32 +153,6 @@ CallNode* PhaseMacroExpand::make_slow_call(CallNode *oldcall, const TypeFunc* sl
 
   return call;
 }
-CallNode *PhaseMacroExpand::make_slow_call_new(bool leafNode, CallNode *oldcall, const TypeFunc *slow_call_type,
-                                           address slow_call_address, const char *slow_call_name, Node *slow_path,
-                                           Node *parm0, Node *parm1, Node *parm2)
-{
-
-  // Slow-path call
- CallNode *call =  leafNode
-   ? (CallNode*)new CallLeafNode      ( slow_call_type, slow_call_address, slow_call_name, TypeRawPtr::BOTTOM )
-   : (CallNode*)new CallStaticJavaNode( slow_call_type, slow_call_address, slow_call_name, TypeRawPtr::BOTTOM );
-
-  //CallNode *call = (CallNode *)new CallStaticJavaNode(slow_call_type, slow_call_address, slow_call_name, TypeRawPtr::BOTTOM);
-  // Slow path call has no side-effects, uses few values
-  // java DOES have side-effects - what do we do?
-  copy_predefined_input_for_runtime_call(slow_path, oldcall, call);
-  if (parm0 != NULL)
-    call->init_req(TypeFunc::Parms + 0, parm0);
-
-  // MNCMNC: jvms == null issue
-  call->copy_call_debug_info(&_igvn, oldcall);
-  call->set_cnt(PROB_UNLIKELY_MAG(4)); // Same effect as RC_UNCOMMON.
-  _igvn.replace_node(oldcall, call);
-  transform_later(call);
-
-  return call;
-}
-
 
 void PhaseMacroExpand::eliminate_gc_barrier(Node* p2x) {
   BarrierSetC2 *bs = BarrierSet::barrier_set()->barrier_set_c2();
@@ -2192,30 +2166,7 @@ void PhaseMacroExpand::expand_lock_node(LockNode *lock) {
   slow_path = opt_bits_test(ctrl, region, 2, flock, 0, 0);
   mem_phi->init_req(2, mem);
 
-  bool use_jom = true;
-  CallNode *call = nullptr;
-
-  // Make slow path call
-  if (use_jom)
-  {
-    ciBytecodeStream str;
-    bool will_link;
-    ciSignature *declared_signature = NULL;
-    bool isMonitorEnter = true;
-    ciMethod *monitor_method = str.get_monitor_method(will_link, &declared_signature, isMonitorEnter);
-
-    assert(will_link == true, "methodEnter not found");
-    address slow_call_address = monitor_method->code();
-    ciSymbol *slow_call_name = monitor_method->name();
-
-    call = make_slow_call_new(false, (CallNode *)lock, OptoRuntime::complete_monitor_enter_Type_new(), slow_call_address, slow_call_name->as_quoted_ascii(), slow_path, obj, box, NULL);
-  }
-  else
-  {
-
-    call = make_slow_call((CallNode *)lock, OptoRuntime::complete_monitor_enter_Type(), OptoRuntime::complete_monitor_locking_Java(), nullptr, slow_path, obj, box, nullptr);
-  }
-
+  CallNode *call = make_slow_call((CallNode *)lock, OptoRuntime::complete_monitor_enter_Type(), OptoRuntime::complete_monitor_locking_Java(), nullptr, slow_path, obj, box, NULL);
   call->extract_projections(&_callprojs, false /*separate_io_proj*/, false /*do_asserts*/);
 
   // Slow path can only throw asynchronous exceptions, which are always
@@ -2272,28 +2223,9 @@ void PhaseMacroExpand::expand_unlock_node(UnlockNode *unlock) {
   Node *slow_path = opt_bits_test(ctrl, region, 2, funlock, 0, 0);
   Node *thread = transform_later(new ThreadLocalNode());
 
-  bool use_jom = true;
-  CallNode *call = nullptr;
+  CallNode *call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(), CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C), "complete_monitor_unlocking_C", slow_path, obj, box, thread);
 
-  // Make slow path call
-  if (use_jom)
-  {
-    ciBytecodeStream str;
-    bool will_link;
-    ciSignature *declared_signature = NULL;
-    bool isMonitorEnter = false;
-    ciMethod *monitor_method = str.get_monitor_method(will_link, &declared_signature, isMonitorEnter);
-
-    assert(will_link == true, "methodExit not found");
-    address slow_call_address = monitor_method->code();
-    ciSymbol *slow_call_name = monitor_method->name();
-
-    call = make_slow_call_new(true, (CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type_new(), slow_call_address, slow_call_name->as_quoted_ascii(), slow_path, obj, box, thread);
-  }
-  else
-  {
-    call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(), CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C), "complete_monitor_unlocking_C", slow_path, obj, box, thread);
-  }
+  //CallNode *call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(), OptoRuntime::complete_monitor_unlocking_Java(), "complete_monitor_unlocking_C", slow_path, obj, box, NULL);//thread);
 
   call->extract_projections(&_callprojs, false /*separate_io_proj*/, false /*do_asserts*/);
   assert(_callprojs.fallthrough_ioproj == nullptr && _callprojs.catchall_ioproj == nullptr &&

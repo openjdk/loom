@@ -47,6 +47,7 @@ import jdk.jfr.events.FileReadEvent;
 import jdk.jfr.events.FileWriteEvent;
 import jdk.jfr.events.DeserializationEvent;
 import jdk.jfr.events.InitialSecurityPropertyEvent;
+import jdk.jfr.events.ObjectMonitorEvent;
 import jdk.jfr.events.ProcessStartEvent;
 import jdk.jfr.events.SecurityPropertyModificationEvent;
 import jdk.jfr.events.SecurityProviderServiceEvent;
@@ -72,6 +73,7 @@ import jdk.internal.platform.Metrics;
 public final class JDKEvents {
     private static final Class<?>[] mirrorEventClasses = {
         DeserializationEvent.class,
+        ObjectMonitorEvent.class,
         ProcessStartEvent.class,
         SecurityPropertyModificationEvent.class,
         SecurityProviderServiceEvent.class,
@@ -97,6 +99,7 @@ public final class JDKEvents {
         ActiveSettingEvent.class,
         ActiveRecordingEvent.class,
         jdk.internal.event.DeserializationEvent.class,
+        jdk.internal.event.ObjectMonitorEvent.class,
         jdk.internal.event.ProcessStartEvent.class,
         jdk.internal.event.SecurityPropertyModificationEvent.class,
         jdk.internal.event.SecurityProviderServiceEvent.class,

@@ -564,8 +564,11 @@ print assembly to a file
   if (false) {
   Label INFINITE_LOOP;
   bind  (INFINITE_LOOP);
+  testptr(boxReg, boxReg);
   testptr(objReg, objReg);
+  //xorq(rax, rax);
   jmp(INFINITE_LOOP);
+  //jccb(Assembler::notZero, INFINITE_LOOP);
   } else {
   testptr(objReg, objReg);
   }
@@ -781,11 +784,12 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
    // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
 
   if (false) {
-  Label INFINITE_LOOP;
-  bind  (INFINITE_LOOP);
-  testptr(objReg, objReg);
-  testptr(objReg, objReg);
-  jmp(INFINITE_LOOP);
+  //Label INFINITE_LOOP;
+  //bind  (INFINITE_LOOP);
+  //testptr(objReg, objReg);
+  ///testptr(objReg, objReg);
+  //jccb(Assembler::notZero, INFINITE_LOOP);
+  //jmp(INFINITE_LOOP);
   } else {
   testptr(objReg, objReg);
   testptr(objReg, objReg);

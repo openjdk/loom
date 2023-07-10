@@ -686,15 +686,15 @@ JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
   frame this_frame = JavaThread::current()->last_frame();
   // MNCMNC: added for C1
   // MNCMNC:   original
-  frame monitor    = this_frame.sender(&map);
-  jlong id = (jlong)monitor.link();
-  return id;
+  //frame monitor    = this_frame.sender(&map);
+  //jlong id = (jlong)monitor.link();
+  //return id;
   // MNCMNC:   end original
 
   // MNCMNC:  new
-  //assert(!this_frame.is_interpreted_frame(), "Hmz");
-  //frame monitor    = this_frame.sender(&map);
-  //return 89;
+  assert(!this_frame.is_interpreted_frame(), "Hmz");
+  frame monitor    = this_frame.sender(&map);
+  return 89;
   // MNCMNC: end NEW
 JVM_END
 

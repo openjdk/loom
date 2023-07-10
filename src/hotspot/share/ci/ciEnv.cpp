@@ -452,12 +452,11 @@ ciMethod* ciEnv::get_method_from_handle(Method* method) {
   return get_metadata(method)->as_method();
 }
 
-//
 ciMethod* ciEnv::get_monitor_method(bool enter) {
   if (enter) {
-    return get_method(Universe::object_monitorEnterC2_method());
+    return get_method(Universe::object_monitorEnter_method());
   }
-  return get_method(Universe::object_monitorExitC2_method());
+  return get_method(Universe::object_monitorExit_method());
 }
 
 ciKlass* ciEnv::get_monitor_klass(bool enter) {
