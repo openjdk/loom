@@ -3486,7 +3486,7 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   // Memory barrier to avoid floating things down past the locked region
   insert_mem_bar(Op_MemBarReleaseLock);
 
-  // MNCMC: this might be a problem
+  // MNCMNC: this might be a problem
 
   const TypeFunc *tf = OptoRuntime::complete_monitor_exit_Type();
   UnlockNode *unlock = new UnlockNode(C, tf);

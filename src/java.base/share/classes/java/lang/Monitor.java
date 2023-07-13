@@ -944,9 +944,9 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
 
     final static native void log(String msg);
 
-    final static native void logEnter(Object o, long fid);
+    final static native void logEnter(Object o, long fid, String msg);
 
-    final static native void logExit(Object o, long fid);
+    final static native void logExit(Object o, long fid, String msg);
 
     // lowest level enter/exit via markWord ops
 
@@ -976,8 +976,9 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
             int lockState = getLockState(lockee);
             switch (lockState) {
             case UNLOCKED:
-                if (current.lockCount(lockee) > 0) {
-                    abort("Bad lockstack: lockee unlocked but on stack");
+                int lc = current.lockCount(lockee);
+                if (lc > 0) {
+                    abort("Bad lockstack: lockee unlocked but on stack:"+lc);
                 }
                 if (quickLock(current, lockee, fid)) {
                     return true;

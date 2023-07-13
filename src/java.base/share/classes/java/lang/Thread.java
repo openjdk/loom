@@ -2461,6 +2461,7 @@ public class Thread implements Runnable {
     void pop(Object lockee, long fid) {
         if (this != Thread.currentThread()) Monitor.abort("invariant");
         Object o = lockStack[--lockStackPos];
+        Monitor.log("Thread.pop(Object,long):"+o);
         if (o != lockee) {
             Monitor.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
@@ -2489,9 +2490,9 @@ public class Thread implements Runnable {
     Object peek(long fid) {
         if (this != Thread.currentThread()) Monitor.abort("invariant");
         // from C1 hack start - commented ut
-         if (frameId[lockStackPos - 1] != fid) {
+        /* if (frameId[lockStackPos - 1] != fid) {
              Monitor.abort("frame id mismatched");
-         }
+         }*/
         // from C1 hack start
         return lockStack[lockStackPos - 1];
     }

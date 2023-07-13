@@ -306,9 +306,11 @@ public class Object {
         switch(monitorPolicy) {
         case -1:
         case 0: // native
+            Monitor.abort("ShouldntGetHereRight");
             notify0();
             break;
         case 1: // always inflated
+            Monitor.abort("ShouldntGetHereRight");
             Monitor.of(this).signal(Thread.currentThread());
             break;
         case 2: // fast-locks
@@ -352,9 +354,11 @@ public class Object {
         switch(monitorPolicy) {
         case -1:
         case 0: // native
+            Monitor.abort("ShouldntGetHereRight");
             notifyAll0();
             break;
         case 1: // always inflated
+            Monitor.abort("ShouldntGetHereRight");
             Monitor.of(this).signalAll(Thread.currentThread());
             break;
         case 2: // fast-locks
@@ -419,6 +423,7 @@ public class Object {
         switch(monitorPolicy) {
         case -1:
         case 0: // native
+            Monitor.abort("ShouldntGetHereRight");
         	long comp = Blocker.begin();
 		try {
 		    wait0(timeoutMillis);
@@ -432,6 +437,7 @@ public class Object {
 		}
             break;
         case 1: // always inflated
+            Monitor.abort("ShouldntGetHereRight");
             Monitor.of(this).await(Thread.currentThread(), timeoutMillis);
             break;
         case 2: // fast-locks
@@ -670,14 +676,6 @@ public class Object {
     @ReservedStackAccess
     private static final void monitorEnter(Object o) {
 
-        /*var event = new  ObjectMonitorEvent();
-        if (event.isEnabled()) {
-            event.javaThreadId = t.threadId();
-            event.method = "monitorEnter(Object)";
-            event.objectString = o.toString();
-            event.commit();
-        }*/
-
         // FIXME: This should really be handled in the interpreter and JIT.
         if (o == null)
             throw new NullPointerException();
@@ -688,14 +686,18 @@ public class Object {
 
         if (syncEnabled == 0) return;
 
+
         Thread t = Thread.currentThread();
 
         long monitorFrameId = getCallerFrameId();
+        Monitor.logEnter(o,monitorFrameId, "monitorEnter(Object o)");
+
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickEnter(t, o, monitorFrameId)) {
                 Monitor.slowEnter(t, o, monitorFrameId);
             }
         } else {
+            Monitor.abort("ShouldntGetHereRight");
             t.push(o, monitorFrameId);
             if (monitorPolicy == 0) { // native
                 monitorEnter0(o);
@@ -721,11 +723,14 @@ public class Object {
 
         Thread t = Thread.currentThread();
 
+        Monitor.logEnter(o,monitorFrameId, "Object.monitorEnter(Object,long)");
+
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickEnter(t, o, monitorFrameId)) {
                 Monitor.slowEnter(t, o, monitorFrameId);
             }
         } else {
+            Monitor.abort("ShouldntGetHereRight");
             t.push(o, monitorFrameId);
             if (monitorPolicy == 0) { // native
                 monitorEnter0(o);
@@ -738,6 +743,8 @@ public class Object {
     /** Entry point for monitor enter from the JNI */
     @ReservedStackAccess
     private static final void jniEnter(Object o) {
+
+        Monitor.logEnter(o,0, "Object.jniEnter(Object)");
         Monitor.jniEnter(Thread.currentThread(), o);
     }
 
@@ -752,11 +759,14 @@ public class Object {
 
         Thread t = Thread.currentThread();
 
+        Monitor.logExit(o,monitorFrameId, "Object.monitorExit(Object,long)");
+
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickExit(t, o, monitorFrameId)) {
                 Monitor.slowExit(t, o, monitorFrameId);
             }
         } else {
+            Monitor.abort("ShouldntGetHereRight");
             t.pop(o, monitorFrameId);
             if (monitorPolicy == 0) { // native
                 monitorExit0(o);
@@ -779,11 +789,15 @@ public class Object {
         Thread t = Thread.currentThread();
 
         long monitorFrameId = getCallerFrameId();
+
+        Monitor.logExit(o,monitorFrameId, "Object.monitorExit(Object)");
+
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickExit(t, o, monitorFrameId)) {
                 Monitor.slowExit(t, o, monitorFrameId);
             }
         } else {
+            Monitor.abort("ShouldntGetHereRight");
             t.pop(o, monitorFrameId);
             if (monitorPolicy == 0) { // native
                 monitorExit0(o);
@@ -796,6 +810,8 @@ public class Object {
     /** Entry point for monitor exit from the JNI */
     @ReservedStackAccess
     private static final void jniExit(Object o) {
+
+        Monitor.logExit(o,0, "Object.jniExit(Object)");
         Monitor.jniExit(Thread.currentThread(), o);
     }
 
@@ -811,7 +827,11 @@ public class Object {
         Thread t = Thread.currentThread();
 
         long monitorFrameId = getCallerFrameId();
+
+        Monitor.logExit(t,monitorFrameId, "Object.monitorExit()");
+
         if (monitorPolicy == 0) { // native
+            Monitor.abort("ShouldntGetHereRight");
             Object o = t.peek(monitorFrameId);
             if (o instanceof Monitor)
                 Monitor.abort("Impossible!");
@@ -828,7 +848,7 @@ public class Object {
             // - The method contains asymmetric locking, which should not happen.
             //   This case is currently only notice when exiting the monitor we already
             //   exited here.
-            do {
+            /*do {
                 Object o = t.peek(monitorFrameId);
                 if (o instanceof Monitor) { // inflated
                     Monitor m = (Monitor)o;
@@ -837,8 +857,9 @@ public class Object {
                 } else if (!Monitor.quickExit(t, o, monitorFrameId)) {
                     Monitor.slowExitOnRemoveActivation(t, o, monitorFrameId);
                 }
-            } while (t.peekId() == monitorFrameId);
+            } while (t.peekId() == monitorFrameId);*/
         } else { // always inflated
+            Monitor.abort("ShouldntGetHereRight");
             do {
                 Object o = t.pop(monitorFrameId);
                 Monitor.of(o).exit(t);
@@ -857,10 +878,15 @@ public class Object {
         if (syncEnabled == 0) Monitor.abort("invariant");
 
         Thread t = Thread.currentThread();
+
+
+        Monitor.logExit(o,0, "Object.monitorWaitUninterruptibly(Object o)");
+
         if (monitorPolicy == 2) { // fast-locks
             Monitor.slowWaitUninterruptibly(t, o);
             return;
         } else { // always inflated
+            Monitor.abort("ShouldntGetHereRight");
             Monitor.of(o).awaitUninterruptibly(t);
         }
     }

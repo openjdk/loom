@@ -97,10 +97,10 @@ JNIEXPORT void JNICALL
 JVM_Monitor_abort(JNIEnv* env, jclass ignored, jstring estr);
 
 JNIEXPORT void JNICALL
-JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
+JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid, jstring msg);
 
 JNIEXPORT void JNICALL
-JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
+JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid, jstring msg);
 
 JNIEXPORT void JNICALL
 JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg);
