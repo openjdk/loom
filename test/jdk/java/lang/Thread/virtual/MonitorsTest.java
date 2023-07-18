@@ -26,7 +26,9 @@
  * @summary Test virtual threads using synchronized
  * @library /test/lib
  * @modules java.base/java.lang:+open
- * @run junit/othervm/timeout=10 MonitorsTest
+ * @run junit/othervm/timeout=10 -Xint MonitorsTest
+ * @run junit/othervm/timeout=30 -Xcomp MonitorsTest
+ * @run junit/othervm/timeout=30 MonitorsTest
  */
 
 import java.time.Duration;

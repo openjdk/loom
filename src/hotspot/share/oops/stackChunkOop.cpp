@@ -69,6 +69,21 @@ public:
   }
 };
 
+class LockStackOopIterator : public OopIterator {
+private:
+  const stackChunkOop _chunk;
+public:
+  LockStackOopIterator(const stackChunkOop chunk) : _chunk(chunk) {}
+
+  virtual void oops_do(OopClosure* cl) override {
+    int cnt = _chunk->lockStackSize();
+    oop* lockstack_start = (oop*)_chunk->start_address();
+    for (int i = 0; i < cnt; i++) {
+      cl->do_oop(&lockstack_start[i]);
+    }
+  }
+};
+
 frame stackChunkOopDesc::top_frame(RegisterMap* map) {
   assert(!is_empty(), "");
   StackChunkFrameStream<ChunkFrames::Mixed> fs(this);
@@ -324,6 +339,14 @@ public:
 
     return true;
   }
+
+  bool do_lockstack() {
+    BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
+    LockStackOopIterator iterator(_chunk);
+    bs_chunk->encode_gc_mode(_chunk, &iterator);
+
+    return true;
+  }
 };
 
 void stackChunkOopDesc::transform() {
@@ -336,6 +359,7 @@ void stackChunkOopDesc::transform() {
 
   TransformStackChunkClosure closure(this);
   iterate_stack(&closure);
+  closure.do_lockstack();
 }
 
 template <stackChunkOopDesc::BarrierType barrier, bool compressedOopsWithBitmap>
@@ -411,6 +435,34 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
 
 template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMap* map);
 template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const SmallRegisterMap* map);
+
+void stackChunkOopDesc::copy_lockstack(oop* dst) {
+  int cnt = lockStackSize();
+
+  if (!(is_gc_mode() || requires_barriers())) {
+    oop* lockstack_start = (oop*)start_address();
+    for (int i = 0; i < cnt; i++) {
+      dst[i] = lockstack_start[i];
+    }
+    return;
+  }
+
+  if (has_bitmap() && UseCompressedOops) {
+    narrowOop* lockstack_start = (narrowOop*)start_address();
+    for (int i = 0; i < cnt; i++) {
+      oop mon_owner = (oop)HeapAccess<>::oop_load(lockstack_start + i);
+      dst[i] = mon_owner;
+      HeapAccess<>::oop_store(lockstack_start + i, mon_owner); // ????
+    }
+  } else {
+    oop* lockstack_start = (oop*)start_address();
+    for (int i = 0; i < cnt; i++) {
+      oop mon_owner = (oop)HeapAccess<>::oop_load(lockstack_start + i);
+      dst[i] = mon_owner;
+      HeapAccess<>::oop_store(lockstack_start + i, mon_owner); // ????
+    }
+  }
+}
 
 void stackChunkOopDesc::print_on(bool verbose, outputStream* st) const {
   if (*((juint*)this) == badHeapWordVal) {

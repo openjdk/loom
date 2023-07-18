@@ -1323,8 +1323,8 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
 
       // zero for simple unlock of a stack-lock case
       jcc(Assembler::notZero, slow_case);
-      dec_held_monitor_count();
     }
+    dec_held_monitor_count();
     jmp(done);
 
     bind(slow_case);

@@ -372,6 +372,7 @@ protected:
   JavaThread* _current;
 
   int _monitors_to_fix;
+  int _monitors_in_lockstack;
 
   int _freeze_size; // total size of all frames plus metadata in words.
   int _total_align_size;
@@ -536,7 +537,10 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
   assert(monitors_cnt == _monitors_to_fix, "wrong monitor count. Found %d in the stack but counter is %d", monitors_cnt, _monitors_to_fix);
   thread->clear_held_monitor_count();
 
-  //log_trace(continuations, monitor)("Called freeze with %d monitors to fix for thread " INTPTR_FORMAT " %s", _monitors_to_fix, p2i(_thread), _thread->name());
+  _monitors_in_lockstack = LockingMode == LM_LIGHTWEIGHT ? current->lock_stack().monitor_count() : 0;
+  assert(_monitors_in_lockstack >= 0, "_monitors_in_lockstack=%d", _monitors_in_lockstack);
+  assert(_monitors_in_lockstack <= 8, "_monitors_in_lockstack=%d", _monitors_in_lockstack);
+  assert(_monitors_in_lockstack <= _monitors_to_fix, "lockstack_cnt=%d, _monitors_to_fix=%d", _monitors_in_lockstack, _monitors_to_fix);
 }
 
 void FreezeBase::init_rest() { // we want to postpone some initialization after chunk handling
@@ -546,42 +550,47 @@ void FreezeBase::init_rest() { // we want to postpone some initialization after 
 }
 
 void FreezeBase::fix_monitors_in_interpreted_frame(frame& f) {
-  assert(f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
-  if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin()) {
+  BasicObjectLock* first_mon = f.interpreter_frame_monitor_begin();
+  BasicObjectLock* last_mon = f.interpreter_frame_monitor_end();
+  assert(last_mon <= first_mon, "must be");
+
+  if (first_mon == last_mon) {
     return;
   }
 
   int initial_monitors = _monitors_to_fix;
-  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(f.interpreter_frame_monitor_begin());
-        current >= f.interpreter_frame_monitor_end();
-        current = f.previous_monitor_in_interpreter_frame(current)) {
-      oop obj = current->obj();
-      if (obj != nullptr) {
-        ObjectMonitor* om = nullptr;
-        markWord mark = obj->mark();
-        // Inflate lock if not already inflated.
-        if (!mark.has_monitor()) {
-          om = ObjectSynchronizer::inflate(_current, obj, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
-        } else {
-          om = mark.monitor();
-        }
-        assert(om != nullptr, "invariant");
-        void* owner = om->owner();
-        assert((_thread == (JavaThread*)owner || _thread->is_lock_owned((address)owner)) ||
-               (om->is_owner_anonymous() && om->continuation_owner() ==  _cont.continuation()), "invariant");
+  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(first_mon);
+       current >= last_mon; current = f.previous_monitor_in_interpreter_frame(current)) {
+    oop obj = current->obj();
+    if (obj == nullptr) {
+      continue;
+    }
+    assert(LockingMode != LM_LIGHTWEIGHT || !_thread->lock_stack().contains(obj), "lockstack should be empty by now");
 
-        if (om->is_owner_anonymous()) {
-          // Already fixed.
-          continue;
-        }
+    ObjectMonitor* om = nullptr;
+    markWord mark = obj->mark();
+    assert(LockingMode != LM_LIGHTWEIGHT || (mark.has_monitor() || mark.is_being_inflated()), "should be already inflated or being inflated");
+    // Inflate lock if not already inflated.
+    if (!mark.has_monitor()) {
+      om = ObjectSynchronizer::inflate(_current, obj, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
+    } else {
+      om = mark.monitor();
+    }
+    assert(om != nullptr, "invariant");
 
-        // Set owner to be the continuation.
-        om->set_continuation_owner(owner, _cont.continuation());
-        om->set_slowpath_on_last_exit(true);
-        if (--_monitors_to_fix == 0) break;
-      }
+    void* owner = om->owner();
+    assert((JavaThread*)owner == _thread || (LockingMode != LM_LIGHTWEIGHT && _thread->is_lock_owned((address)owner)) ||
+           (om->has_continuation_owner() && om->continuation_owner() ==  _cont.continuation()), "invariant");
+    if (om->has_continuation_owner()) {
+      // Already fixed.
+      continue;
+    }
+
+    // Set owner to be the continuation.
+    om->set_continuation_owner(owner, _cont.continuation());
+    om->set_slowpath_on_last_exit(true);
+    if (--_monitors_to_fix == 0) break;
   }
-  //log_trace(continuations, monitor)("Called fix_monitors_in_interpreted_frame(): monitors fixed = %d", initial_monitors - _monitors_to_fix);
   assert(_monitors_to_fix >= 0, "invariant");
 }
 
@@ -613,46 +622,60 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
       }
       ScopeValue* ov = mon->owner();
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
-      oop owner = owner_sv->get_obj()();
-      if (owner != nullptr) {
-        ObjectMonitor* om = nullptr;
-        markWord mark = owner->mark();
-        // Inflate lock if not already inflated.
-        if (!mark.has_monitor()) {
-          om = ObjectSynchronizer::inflate(_current, owner, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
-        } else {
-          om = mark.monitor();
-        }
-        assert(om != nullptr, "invariant");
-        void* owner = om->owner();
-        assert((_thread == (JavaThread*)owner || _thread->is_lock_owned((address)owner)) ||
-               (om->is_owner_anonymous() && om->continuation_owner() ==  _cont.continuation()), "invariant");
-
-        if (om->is_owner_anonymous()) {
-          // Already fixed.
-          continue;
-        }
-
-        // Set owner to be the continuation.
-        om->set_continuation_owner(owner, _cont.continuation());
-        om->set_slowpath_on_last_exit(true);
-        if (--_monitors_to_fix == 0) break;
+      oop obj = owner_sv->get_obj()();
+      if (obj == nullptr) {
+        continue;
       }
+      assert(LockingMode != LM_LIGHTWEIGHT || !_thread->lock_stack().contains(obj), "lockstack should be empty by now");
+
+      ObjectMonitor* om = nullptr;
+      markWord mark = obj->mark();
+      assert(LockingMode != LM_LIGHTWEIGHT || (mark.has_monitor() || mark.is_being_inflated()), "should be already inflated or being inflated");
+      // Inflate lock if not already inflated.
+      if (!mark.has_monitor()) {
+        om = ObjectSynchronizer::inflate(_current, obj, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
+      } else {
+        om = mark.monitor();
+      }
+      assert(om != nullptr, "invariant");
+
+      void* owner = om->owner();
+      assert((JavaThread*)owner == _thread || (LockingMode != LM_LIGHTWEIGHT && _thread->is_lock_owned((address)owner)) ||
+             (om->has_continuation_owner() && om->continuation_owner() ==  _cont.continuation()), "invariant");
+      if (om->has_continuation_owner()) {
+        // Already fixed.
+        continue;
+      }
+
+      // Set owner to be the continuation.
+      om->set_continuation_owner(owner, _cont.continuation());
+      om->set_slowpath_on_last_exit(true);
+      if (--_monitors_to_fix == 0) break;
     }
   }
-  //log_trace(continuations, monitor)("Called fix_monitors_in_compiled_frame(): monitors fixed = %d", initial_monitors - _monitors_to_fix);
   assert(_monitors_to_fix >= 0, "invariant");
   return;
 }
 
 void FreezeBase::fix_monitors_in_fast_path() {
+  if (_monitors_in_lockstack > 0) {
+    assert(LockingMode == LM_LIGHTWEIGHT, "invariant");
+    assert(_cont.tail()->sp_address() - _cont.tail()->start_address() >= _monitors_in_lockstack, "no room for lockstack");
+    _thread->lock_stack().move_to_address((oop*)_cont.tail()->start_address());
+    _cont.tail()->set_lockStackSize((uint8_t)_monitors_in_lockstack);
+    _monitors_to_fix -= _monitors_in_lockstack;
+    assert(_monitors_to_fix >= 0, "invariant");
+    if (_monitors_to_fix == 0) return;
+  }
+
   ResourceMark rm(_current);
   RegisterMap map(JavaThread::current(),
                 RegisterMap::UpdateMap::include,
                 RegisterMap::ProcessFrames::skip,
                 RegisterMap::WalkContinuation::skip);
   map.set_include_argument_oops(false);
-  for (frame f = _thread->last_frame(); _monitors_to_fix > 0 && Continuation::is_frame_in_continuation(_cont.entry(), f); f = f.sender(&map)) {
+  frame last_frame(_cont_stack_top);
+  for (frame f = last_frame; _monitors_to_fix > 0 && Continuation::is_frame_in_continuation(_cont.entry(), f); f = f.sender(&map)) {
     fix_monitors_in_compiled_frame(f, SmallRegisterMap::instance);
   }
   assert(_monitors_to_fix == 0, "missing monitors in stack");
@@ -688,7 +711,7 @@ freeze_result Freeze<ConfigT>::try_freeze_fast() {
   DEBUG_ONLY(_fast_freeze_size = size_if_fast_freeze_available();)
   assert(_fast_freeze_size == 0, "");
 
-  stackChunkOop chunk = allocate_chunk(cont_size() + frame::metadata_words);
+  stackChunkOop chunk = allocate_chunk(cont_size() + frame::metadata_words + _monitors_in_lockstack);
   if (freeze_fast_new_chunk(chunk)) {
     return freeze_ok;
   }
@@ -720,6 +743,8 @@ int FreezeBase::size_if_fast_freeze_available() {
   if (chunk_sp < chunk->stack_size()) {
     total_size_needed -= _cont.argsize() + frame::metadata_words_at_top;
   }
+
+  total_size_needed += _monitors_in_lockstack;
 
   int chunk_free_room = chunk_sp - frame::metadata_words_at_bottom;
   bool available = chunk_free_room >= total_size_needed;
@@ -803,7 +828,7 @@ bool FreezeBase::freeze_fast_new_chunk(stackChunkOop chunk) {
 
   // in a fresh chunk, we freeze *with* the bottom-most frame's stack arguments.
   // They'll then be stored twice: in the chunk and in the parent chunk's top frame
-  const int chunk_start_sp = cont_size() + frame::metadata_words;
+  const int chunk_start_sp = cont_size() + frame::metadata_words + _monitors_in_lockstack;
   assert(chunk_start_sp == chunk->stack_size(), "");
 
   DEBUG_ONLY(_orig_chunk_sp = chunk->start_address() + chunk_start_sp;)
@@ -821,11 +846,6 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
   assert(!chunk->requires_barriers(), "");
   assert(chunk == _cont.tail(), "");
 
-  if (_monitors_to_fix > 0) {
-    // Fix monitors now before unwinding frames
-    fix_monitors_in_fast_path();
-  }
-
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
   // writing into the chunk. This is so that an asynchronous stack walk (not at a safepoint) that suspends us here
   // will either see no continuation on the stack, or a consistent chunk.
@@ -837,7 +857,7 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
   assert(chunk_start_sp >= cont_size(), "no room in the chunk");
 
   const int chunk_new_sp = chunk_start_sp - cont_size(); // the chunk's new sp, after freeze
-  assert(!(_fast_freeze_size > 0) || _orig_chunk_sp - (chunk->start_address() + chunk_new_sp) == _fast_freeze_size, "");
+  assert(!(_fast_freeze_size > 0) || (_orig_chunk_sp - (chunk->start_address() + chunk_new_sp)) == (_fast_freeze_size - _monitors_in_lockstack), "");
 
   intptr_t* chunk_top = chunk->start_address() + chunk_new_sp;
 #ifdef ASSERT
@@ -877,6 +897,11 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
   // set chunk->pc to the return address of the topmost frame in the chunk
   chunk->set_pc(ContinuationHelper::return_address_at(
                   _cont_stack_top - frame::sender_sp_ret_address_offset()));
+
+  // Fix monitors after unwinding frames to make sure oops are valid.
+  if (_monitors_to_fix > 0) {
+    fix_monitors_in_fast_path();
+  }
 
   _cont.write();
 
@@ -1084,6 +1109,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
           || unextended_sp == chunk->to_offset(StackChunkFrameStream<ChunkFrames::Mixed>(chunk).unextended_sp()), "");
   assert(chunk != nullptr || unextended_sp < _freeze_size, "");
 
+  _freeze_size += _monitors_in_lockstack;
+
   // _barriers can be set to true by an allocation in freeze_fast, in which case the chunk is available
   bool allocated_old_in_freeze_fast = _barriers;
   assert(!allocated_old_in_freeze_fast || (unextended_sp >= _freeze_size && chunk->is_empty()),
@@ -1176,12 +1203,22 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   // will either see no continuation or a consistent chunk.
   unwind_frames();
 
-  chunk->set_max_thawing_size(chunk->max_thawing_size() + _freeze_size - frame::metadata_words);
+  chunk->set_max_thawing_size(chunk->max_thawing_size() + _freeze_size - _monitors_in_lockstack - frame::metadata_words);
 
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("top chunk:");
     chunk->print_on(&ls);
+  }
+
+  // Fix monitors after unwinding frames to make sure oops are valid. Also do it now to avoid unnecessary
+  // calls to fix_monitors_in_interpreted_frame/fix_monitors_in_compiled_frame() later.
+  if (_monitors_in_lockstack > 0) {
+    assert(LockingMode == LM_LIGHTWEIGHT, "invariant");
+    assert(chunk->sp_address() - chunk->start_address() >= _monitors_in_lockstack, "no room for lockstack");
+    _thread->lock_stack().move_to_address((oop*)chunk->start_address());
+    chunk->set_lockStackSize((uint8_t)_monitors_in_lockstack);
+    _monitors_to_fix -= _monitors_in_lockstack;
   }
 
   // The topmost existing frame in the chunk; or an empty frame if the chunk is empty
@@ -1426,6 +1463,9 @@ NOINLINE void FreezeBase::finish_freeze(const frame& f, const frame& top) {
 
   chunk->set_max_thawing_size(chunk->max_thawing_size() + _total_align_size);
 
+  assert(chunk->sp_address() - chunk->start_address() >= _monitors_in_lockstack, "clash with lockstack");
+  assert(_monitors_to_fix == 0, "missing monitors in stack");
+
   // At this point the chunk is consistent
 
   if (UNLIKELY(_barriers)) {
@@ -1600,6 +1640,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->argsize() == 0, "");
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
+  assert(chunk->lockStackSize() == 0, "");
 
   // fields are uninitialized
   chunk->set_parent_access<IS_DEST_UNINITIALIZED>(_cont.last_nonempty_chunk());
@@ -2052,6 +2093,22 @@ inline intptr_t* Thaw<ConfigT>::thaw(Continuation::thaw_kind kind) {
   stackChunkOop chunk = _cont.tail();
   assert(chunk != nullptr, "guaranteed by prepare_thaw");
   assert(!chunk->is_empty(), "guaranteed by prepare_thaw");
+
+  if (kind == Continuation::thaw_top && LockingMode == LM_LIGHTWEIGHT) {
+    // First thaw after freeze. If there were oops in the staclock
+    // during freeze, restore them now.
+    int lockStackSize = chunk->lockStackSize();
+    if (lockStackSize > 0) {
+      oop tmp_lockstack[8];
+
+      chunk->copy_lockstack(tmp_lockstack);
+      _thread->lock_stack().move_from_address(tmp_lockstack, lockStackSize);
+      assert(_thread->held_monitor_count() == 0, "carrier has monitors");
+      _thread->set_held_monitor_count(lockStackSize);
+
+      chunk->set_lockStackSize(0);
+    }
+  }
 
   _barriers = chunk->requires_barriers();
   return (LIKELY(can_thaw_fast(chunk))) ? thaw_fast(chunk)
@@ -2741,7 +2798,7 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   assert(is_aligned(sp, frame::frame_alignment), "");
 
   // All the frames have been thawed so we know they don't hold any monitors
-  assert(thread->held_monitor_count() == 0, "Must be");
+  assert(thread->held_monitor_count() == thread->lock_stack().monitor_count(), "Must be");
 
 #ifdef ASSERT
   intptr_t* sp0 = sp;

@@ -88,6 +88,9 @@ inline void stackChunkOopDesc::set_max_thawing_size(int value)  {
   jdk_internal_vm_StackChunk::set_maxThawingSize(this, (jint)value);
 }
 
+inline uint8_t stackChunkOopDesc::lockStackSize() const         { return jdk_internal_vm_StackChunk::lockStackSize(as_oop()); }
+inline void stackChunkOopDesc::set_lockStackSize(uint8_t value) { jdk_internal_vm_StackChunk::set_lockStackSize(this, value); }
+
 inline oop stackChunkOopDesc::cont() const                {
   if (UseZGC && !ZGenerational) {
     assert(!UseCompressedOops, "Non-generational ZGC does not support compressed oops");
@@ -193,6 +196,18 @@ void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, 
     f.handle_deopted();
   }
   do_barriers0<barrier>(f, map);
+}
+
+template <typename OopT, class StackChunkLockStackClosureType>
+inline void stackChunkOopDesc::iterate_lockstack(StackChunkLockStackClosureType* closure) {
+  if (LockingMode != LM_LIGHTWEIGHT) {
+    return;
+  }
+  int cnt = lockStackSize();
+  OopT* lockstart_addr = (OopT*)start_address();
+  for (int i = 0; i < cnt; i++) {
+    closure->do_oop(&lockstart_addr[i]);
+  }
 }
 
 template <class StackChunkFrameClosureType>

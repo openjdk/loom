@@ -159,9 +159,11 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 public:
   // NOTE: Typed as uintptr_t so that we can pick it up in SA, via vmStructs.
   static const uintptr_t ANONYMOUS_OWNER = 1;
+  static const uintptr_t VTHREAD_OWNER = 4;
 
 private:
   static void* anon_owner_ptr() { return reinterpret_cast<void*>(ANONYMOUS_OWNER); }
+  static void* vthread_owner_ptr() { return reinterpret_cast<void*>(VTHREAD_OWNER); }
 
   void* volatile _owner;            // pointer to owning thread OR BasicLock
   OopHandle      _cont;             // continuation where lock was acquired (set on continuation freeze only)
@@ -294,14 +296,14 @@ private:
     set_owner_from(anon_owner_ptr(), owner);
   }
 
-  bool has_continuation_owner() { return !_cont.is_empty(); }
+  bool has_continuation_owner() { return owner_raw() == vthread_owner_ptr(); }
   oop  continuation_owner()     { return _cont.resolve(); }
   void set_continuation_owner(void* owner, oop continuation) {
     _cont = OopHandle(JavaThread::thread_oop_storage(), continuation);
-    set_owner_from(owner, anon_owner_ptr());
+    set_owner_from(owner, vthread_owner_ptr());
   }
   void clear_continuation_owner(JavaThread* thread) {
-    set_owner_from_anonymous(thread);
+    set_owner_from(vthread_owner_ptr(), thread);
     _cont.release(JavaThread::thread_oop_storage());
     _cont = OopHandle();
   }

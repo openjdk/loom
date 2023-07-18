@@ -858,7 +858,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   // Recursive inflated unlock
   decq(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
   xorl(tmpReg, tmpReg); // Set ZF == 1
-  jmpb(NO_COUNT);
+  jmp(NO_COUNT);
 
   bind(LNotRecursive);
 

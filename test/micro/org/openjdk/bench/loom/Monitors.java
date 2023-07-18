@@ -125,6 +125,18 @@ public class Monitors {
         }
     }
 
+    static void inflateAllLocks(ReentrantLock[] lockArray) {
+        for (ReentrantLock lock : lockArray) {
+            if (lock != null) {
+                synchronized (lock) {
+                    try {
+                        lock.wait(1);
+                    } catch (Exception e) {}
+                }
+            }
+        }
+    }
+
     static ReentrantLock[] createLockArray(int stackDepth, int monitorCount) {
         ReentrantLock[] lockArray = new ReentrantLock[stackDepth + 1];
 
@@ -157,6 +169,7 @@ public class Monitors {
     static Continuation createContinuation(int stackDepth, ReentrantLock[] lockArray, boolean useSyncronized) {
         Runnable task = useSyncronized ? new RunSynchronized(stackDepth, lockArray)
                                        : new RunReentrantLock(stackDepth, lockArray);
+        //inflateAllLocks(lockArray);
         return new Continuation(SCOPE, task);
     }
 

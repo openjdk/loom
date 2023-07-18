@@ -605,8 +605,9 @@ private:
 
   intx held_monitor_count() { return _held_monitor_count; }
   void clear_held_monitor_count() { _held_monitor_count = 0; }
+  void set_held_monitor_count(int val) { _held_monitor_count = val; }
   intx jni_monitor_count()  { return _jni_monitor_count;  }
-  void clear_jni_monitor_count() { _jni_monitor_count = 0;   }
+  void clear_jni_monitor_count() { _jni_monitor_count = 0; }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;

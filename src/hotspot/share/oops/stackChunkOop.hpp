@@ -92,6 +92,9 @@ public:
   inline int max_thawing_size() const;
   inline void set_max_thawing_size(int value);
 
+  inline uint8_t lockStackSize() const;
+  inline void set_lockStackSize(uint8_t value);
+
   inline oop cont() const;
   template<typename P>
   inline oop cont() const;
@@ -149,6 +152,11 @@ public:
 
   template <typename RegisterMapT>
   void fix_thawed_frame(const frame& f, const RegisterMapT* map);
+
+  void copy_lockstack(oop* start);
+
+  template <typename OopT, class StackChunkLockStackClosureType>
+  inline void iterate_lockstack(StackChunkLockStackClosureType* closure);
 
   template <class StackChunkFrameClosureType>
   inline void iterate_stack(StackChunkFrameClosureType* closure);

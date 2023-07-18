@@ -75,6 +75,7 @@ class jdk_internal_vm_Continuation: AllStatic {
   macro(jdk_internal_vm_StackChunk, flags,          byte_signature,         false) \
   macro(jdk_internal_vm_StackChunk, pc,             intptr_signature,       false) \
   macro(jdk_internal_vm_StackChunk, maxThawingSize, int_signature,          false) \
+  macro(jdk_internal_vm_StackChunk, lockStackSize,  byte_signature,         false) \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
@@ -86,6 +87,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _argsize_offset;
   static int _flags_offset;
   static int _maxThawingSize_offset;
+  static int _lockStackSize_offset;
   static int _cont_offset;
 
 
@@ -122,6 +124,9 @@ class jdk_internal_vm_StackChunk: AllStatic {
 
   static inline int maxThawingSize(oop chunk);
   static inline void set_maxThawingSize(oop chunk, int value);
+
+  static inline uint8_t lockStackSize(oop chunk);
+  static inline void set_lockStackSize(oop chunk, uint8_t value);
 
   // cont oop's processing is essential for the chunk's GC protocol
   static inline oop cont(oop chunk);

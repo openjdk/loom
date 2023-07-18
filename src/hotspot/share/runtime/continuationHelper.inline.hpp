@@ -122,8 +122,7 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f,
       oop obj = current->obj();
       if (obj != nullptr) {
         markWord mark = obj->mark();
-        mark.has_monitor();
-        if (mark.has_monitor() && mark.monitor()->has_continuation_owner() && mark.monitor()->is_owner_anonymous()) {
+        if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
           // already fixed
           continue;
         }
@@ -131,7 +130,6 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f,
         table.put_if_absent(obj, true, &created);
         if (created) {
           monitor_count++;
-          log_trace(continuations, monitor)("Found sync on object " INTPTR_FORMAT " in interpreted frame for thread %s", p2i(obj), JavaThread::current()->name());
         }
       }
   }
@@ -183,7 +181,6 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
 
   frame::update_map_with_saved_link(map, Frame::callee_link_address(f)); // the monitor object could be stored in the link register
   int monitor_count = 0;
-  ResourceMark rm;
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
     if (mons == nullptr || mons->is_empty()) {
@@ -201,7 +198,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
       if (owner != nullptr) {
         markWord mark = owner->mark();
         mark.has_monitor();
-        if (mark.has_monitor() && mark.monitor()->has_continuation_owner() && mark.monitor()->is_owner_anonymous()) {
+        if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
           // already fixed
           continue;
         }
@@ -209,7 +206,6 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
         table.put_if_absent(owner, true, &created);
         if (created) {
           monitor_count++;
-          log_trace(continuations, monitor)("Found sync on object " INTPTR_FORMAT " in compiled frame for thread %s", p2i(owner), thread->name());
         }
       }
     }

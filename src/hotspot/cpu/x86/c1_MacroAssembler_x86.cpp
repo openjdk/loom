@@ -149,8 +149,8 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
     // we do unlocking via runtime call
     jcc(Assembler::notEqual, slow_case);
     // done
-    dec_held_monitor_count();
   }
+  dec_held_monitor_count();
   bind(done);
 }
 
