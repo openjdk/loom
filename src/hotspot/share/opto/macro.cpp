@@ -2166,7 +2166,9 @@ void PhaseMacroExpand::expand_lock_node(LockNode *lock) {
   slow_path = opt_bits_test(ctrl, region, 2, flock, 0, 0);
   mem_phi->init_req(2, mem);
 
-  CallNode *call = make_slow_call((CallNode *)lock, OptoRuntime::complete_monitor_enter_Type(), OptoRuntime::complete_monitor_locking_Java(), nullptr, slow_path, obj, box, NULL);
+  CallNode *call = make_slow_call((CallNode *)lock, OptoRuntime::complete_monitor_enter_Type(),
+    (lock->_fromMethod) ? OptoRuntime::complete_monitor_locking_method_Java() : OptoRuntime::complete_monitor_locking_block_Java(),
+    nullptr, slow_path, obj, box, NULL);
   call->extract_projections(&_callprojs, false /*separate_io_proj*/, false /*do_asserts*/);
 
   // Slow path can only throw asynchronous exceptions, which are always
@@ -2223,7 +2225,10 @@ void PhaseMacroExpand::expand_unlock_node(UnlockNode *unlock) {
   Node *slow_path = opt_bits_test(ctrl, region, 2, funlock, 0, 0);
   Node *thread = transform_later(new ThreadLocalNode());
 
-  CallNode *call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(), CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C), "complete_monitor_unlocking_C", slow_path, obj, box, thread);
+  CallNode *call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(),
+    CAST_FROM_FN_PTR(address, (unlock->_fromMethod) ? SharedRuntime::complete_monitor_unlocking_method_C : SharedRuntime::complete_monitor_unlocking_block_C),
+    (unlock->_fromMethod) ? "complete_monitor_unlocking_method_C" : "complete_monitor_unlocking_block_C",
+    slow_path, obj, box, thread);
 
   //CallNode *call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(), OptoRuntime::complete_monitor_unlocking_Java(), "complete_monitor_unlocking_C", slow_path, obj, box, NULL);//thread);
 

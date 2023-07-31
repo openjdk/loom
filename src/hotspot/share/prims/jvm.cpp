@@ -783,6 +783,15 @@ JVM_ENTRY(void, JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, 
   log_debug(monitor)("Monitor enter: %s by %s (%p) with fid: %ld, %s", str, thread->name(), thread, fid, msg_str);
 JVM_END
 
+JVM_ENTRY(void, JVM_Monitor_log_object(JNIEnv* env, jclass ignored, jobject obj, jstring msg))
+  ResourceMark rm(thread);
+  oop obj_oop = JNIHandles::resolve(obj);
+  char* str = obj_oop->print_value_string();
+  Handle msg_h(thread, JNIHandles::resolve_non_null(msg));
+  char* msg_str = java_lang_String::as_utf8_string(msg_h());
+  log_debug(monitor)("Monitor log object: %s by %s (%p), %s", str, thread->name(), thread, msg_str);
+JVM_END
+
 JVM_ENTRY(void, JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid, jstring msg))
   ResourceMark rm(thread);
   oop obj_oop = JNIHandles::resolve(obj);

@@ -1644,6 +1644,7 @@ void InterpreterMacroAssembler::unlock_object() {
   lea(method, radr);
   push(method);
 
+  // MNCMNC: why does this get called
   ExternalAddress fetch_addr((address) Universe::object_monitorExitVoid_addr()); // no obj param
   movptr(method, fetch_addr);
 

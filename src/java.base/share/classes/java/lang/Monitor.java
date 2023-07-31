@@ -942,6 +942,8 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
 
     final static native void abort(String error);
 
+    final static native void logObject(Object o, String msg);
+
     final static native void log(String msg);
 
     final static native void logEnter(Object o, long fid, String msg);
@@ -961,7 +963,9 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
     private static boolean quickUnlock(Thread current, Object lockee, long fid) {
         if (casLockState(lockee, UNLOCKED, LOCKED)) {
             current.pop(lockee, fid);
-            if (current.lockCount(lockee) > 0) {
+            int lc = current.lockCount(lockee);
+            if (lc > 0) {
+                logObject(lockee, "Monitor.quickUnlock:lc="+lc);
                 abort("Bad lockstack: unlocked object still on stack");
             }
             return true;
@@ -978,7 +982,8 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
             case UNLOCKED:
                 int lc = current.lockCount(lockee);
                 if (lc > 0) {
-                    abort("Bad lockstack: lockee unlocked but on stack:"+lc);
+                    logObject(lockee, "Monitor.quickEnter:lc="+lc);
+                    abort("Bad lockstack: lockee unlocked but on stack");
                 }
                 if (quickLock(current, lockee, fid)) {
                     return true;
@@ -1000,11 +1005,30 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         }
     }
 
+    static boolean dbgIsLocked(Thread current, Object lockee, long fid) {
+        while (true) {
+            int lockState = getLockState(lockee);
+            switch (lockState) {
+            case UNLOCKED:
+                return false;
+            case LOCKED:
+                return true;
+            case INFLATED:
+                return true;
+            default:
+                abort("Bad markword: " + lockState);
+            }
+            Thread.yield();
+        }
+    }
+
     static boolean quickExit(Thread current, Object lockee, long fid) {
         while (true) {
             int lockState = getLockState(lockee);
             switch (lockState) {
             case UNLOCKED:
+                // MNCMNC: current crash
+                logObject(lockee, "Monitor.quickExit");
                 abort("Bad markword: unlocked on exit");
                 break;
             case LOCKED:
@@ -1020,8 +1044,11 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
                     current.pop(lockee, fid);
                     return true;
                 } else {
+                    logObject(lockee, "Monitor.quickExit");
                     if (current.hasLocked(lockee))
+                    {
                         abort("lockCount and hasLocked disagree");
+                    }
                     abort("Invalid lockCount when locked: " + locksHeld);
                 }
                 break; // can't reach here but keeps compiler happy
@@ -1137,6 +1164,7 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
             m.signal(current);
             break;
         default:
+            logObject(o, "Monitor.slowNotify");
             abort("Bad markword state: " + lockState);
         }
     }
@@ -1148,15 +1176,19 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
         case LOCKED:
             break;
         case UNLOCKED:
+            logObject(o, "Monitor.slowNotifyAll error UNLOCKED");
             throw new IllegalMonitorStateException();
         case INFLATED:
-            if (!current.hasLocked(o))
+            if (!current.hasLocked(o)) {
+                logObject(o, "Monitor.slowNotifyAll error INFLATED UNLOCKED");
                 throw new IllegalMonitorStateException();
+            }
 
             Monitor m = monitorFor(o, current, true /* isOwned */);
             m.signalAll(current);
             break;
         default:
+            logObject(o, "Monitor.slowNotifyAll");
             abort("Bad markword state: " + lockState);
         }
     }
@@ -1243,7 +1275,10 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
                     do {
                         if (casLockState(lockee, INFLATED, UNLOCKED)) {
                             // assert: not owner
-                            if (is_owner) abort("Inflation by owner found unlocked obj");
+                            if (is_owner) {
+                                logObject(lockee, "Monitor.inflate");
+                                abort("Inflation by owner found unlocked obj");
+                            }
 
                             // The current thread is trying to inflate to enter but
                             // object is now unlocked, so after inflation we can take
@@ -1265,7 +1300,10 @@ import jdk.internal.vm.annotation.IntrinsicCandidate;
                     ObjectRef r = new ObjectRef(lockee);
                     m = map.get(r);
 
-                    if (m == null) abort("Monitor was not found in map!");
+                    if (m == null) {
+                        logObject(lockee, "Monitor.inflate");
+                        abort("Monitor was not found in map!");
+                    }
                 }
             } catch (Throwable t) {
                 t.printStackTrace();

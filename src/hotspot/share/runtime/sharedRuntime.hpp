@@ -353,8 +353,12 @@ class SharedRuntime: AllStatic {
   static void monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current);
 
   static void monitor_enter_helper_new(oopDesc* obj, BasicLock* lock, JavaThread* thread);
+  static void monitor_enter_helper_method(oopDesc* obj, BasicLock* lock, JavaThread* thread);
+  static void monitor_enter_helper_block(oopDesc* obj, BasicLock* lock, JavaThread* thread);
 
   static void monitor_exit_helper_new(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void monitor_exit_helper_method(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void monitor_exit_helper_block(oopDesc* obj, BasicLock* lock, JavaThread* current);
 
  private:
   static Handle find_callee_info(Bytecodes::Code& bc, CallInfo& callinfo, TRAPS);
@@ -502,6 +506,10 @@ class SharedRuntime: AllStatic {
   // Slow-path Locking and Unlocking
   static void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
   static void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void complete_monitor_locking_block_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void complete_monitor_unlocking_block_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void complete_monitor_locking_method_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void complete_monitor_unlocking_method_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
   static void monitor_enter_C(oopDesc* obj,BasicLock* lock,  JavaThread* current);
   static void monitor_exit_C(oopDesc* obj,BasicLock* lock,  JavaThread* current);
 

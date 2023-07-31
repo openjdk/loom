@@ -523,6 +523,7 @@ static bool useHeavyMonitors() {
 // Java-based monitor methods
 
 void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) {
+
   assert(ObjectMonitorMode::java(), "must be");
 
   SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
@@ -840,6 +841,7 @@ void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
 
 ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
   _thread(current), _obj(obj), _do_lock(do_lock), _old_nae(current->no_async_exception()) {
+
   _thread->check_for_valid_safepoint_state();
   _thread->set_no_async_exception(true);
   if (_obj() != nullptr && _do_lock) {

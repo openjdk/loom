@@ -2220,6 +2220,8 @@ JRT_END
 
 // Handles the uncommon case in locking, i.e., contention or an inflated lock.
 JRT_BLOCK_ENTRY(void, SharedRuntime::monitor_enter_C(oopDesc* obj,BasicLock* lock, JavaThread* current))
+
+  assert("MNCMNC: Shouldnt get here");
   Handle h_obj(current, obj);
   // Pass the handle as argument, JavaCalls::call expects oop as jobjects
   JavaValue result(T_VOID);
@@ -2229,6 +2231,8 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::monitor_enter_C(oopDesc* obj,BasicLock* loc
 JRT_END
 
 void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+
+  assert("MNCMNC: Shouldnt get here");
   if (!SafepointSynchronize::is_synchronizing()) {
     // Only try quick_enter() if we're not trying to reach a safepoint
     // so that the calling thread reaches the safepoint more quickly.
@@ -2255,12 +2259,41 @@ void SharedRuntime::monitor_enter_helper_new(oopDesc* obj, BasicLock* lock, Java
   JavaValue result(T_VOID);
   JavaCallArguments args(h_obj);
   methodHandle mh(current, Universe::object_monitorEnter_method());
+  //current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
+  JRT_BLOCK_END
+}
+
+void SharedRuntime::monitor_enter_helper_method(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+  JRT_BLOCK
+  Handle h_obj(current, obj);
+  // Pass the handle as argument, JavaCalls::call expects oop as jobjects
+  JavaValue result(T_VOID);
+  JavaCallArguments args(h_obj);
+  methodHandle mh(current, Universe::object_monitorEnter_method_method());
+  //current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
+  JRT_BLOCK_END
+}
+
+void SharedRuntime::monitor_enter_helper_block(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+  JRT_BLOCK
+  Handle h_obj(current, obj);
+  // Pass the handle as argument, JavaCalls::call expects oop as jobjects
+  JavaValue result(T_VOID);
+  JavaCallArguments args(h_obj);
+  methodHandle mh(current, Universe::object_monitorEnter_block_method());
+  //current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
   JRT_BLOCK_END
 }
 
 // Handles the uncommon case in locking, i.e., contention or an inflated lock.
 JRT_BLOCK_ENTRY(void, SharedRuntime::monitor_exit_C(oopDesc* obj, BasicLock* lock,JavaThread* current))
+  assert("MNCMNC: Shouldnt get here");
   Handle h_obj(current, obj);
   // Pass the handle as argument, JavaCalls::call expects oop as jobjects
   JavaValue result(T_VOID);
@@ -2271,6 +2304,7 @@ JRT_END
 
 
 void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+  assert("MNCMNC: Shouldnt get here");
   assert(JavaThread::current() == current, "invariant");
   // Exit must be non-blocking, and therefore no exceptions can be thrown.
   ExceptionMark em(current);
@@ -2287,12 +2321,43 @@ void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThrea
 
 void SharedRuntime::monitor_exit_helper_new(oopDesc* obj, BasicLock* lock, JavaThread* current) {
   JRT_BLOCK
+  assert(obj != nullptr, "null object");
   Handle h_obj(current, obj);
   // Pass the handle as argument, JavaCalls::call expects oop as jobjects
   JavaValue result(T_VOID);
   JavaCallArguments args(h_obj);
   methodHandle mh(current, Universe::object_monitorExit_method());
+  //current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
+  JRT_BLOCK_END
+}
+
+void SharedRuntime::monitor_exit_helper_method(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+  JRT_BLOCK
+  assert(obj != nullptr, "null object");
+  Handle h_obj(current, obj);
+  // Pass the handle as argument, JavaCalls::call expects oop as jobjects
+  JavaValue result(T_VOID);
+  JavaCallArguments args(h_obj);
+  methodHandle mh(current, Universe::object_monitorExit_method_method());
+  //current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
+  JRT_BLOCK_END
+}
+
+void SharedRuntime::monitor_exit_helper_block(oopDesc* obj, BasicLock* lock, JavaThread* current) {
+  JRT_BLOCK
+  assert(obj != nullptr, "null object");
+  Handle h_obj(current, obj);
+  // Pass the handle as argument, JavaCalls::call expects oop as jobjects
+  JavaValue result(T_VOID);
+  JavaCallArguments args(h_obj);
+  methodHandle mh(current, Universe::object_monitorExit_block_method());
+  //current->set_system_java();
+  JavaCalls::call(&result, mh, &args, current);
+  //current->clear_system_java();
   JRT_BLOCK_END
 }
 
@@ -2305,6 +2370,28 @@ JRT_END
 JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
   //assert(current == JavaThread::current(), "pre-condition");
   SharedRuntime::monitor_exit_helper_new(obj, lock, current);
+JRT_END
+
+// Handles the uncommon case in locking, i.e., contention or an inflated lock.
+JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_block_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
+  SharedRuntime::monitor_enter_helper_block(obj, lock, current);
+JRT_END
+
+// Handles the uncommon cases of monitor unlocking in compiled code
+JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_unlocking_block_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
+  //assert(current == JavaThread::current(), "pre-condition");
+  SharedRuntime::monitor_exit_helper_block(obj, lock, current);
+JRT_END
+
+// Handles the uncommon case in locking, i.e., contention or an inflated lock.
+JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_method_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
+  SharedRuntime::monitor_enter_helper_method(obj, lock, current);
+JRT_END
+
+// Handles the uncommon cases of monitor unlocking in compiled code
+JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_unlocking_method_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
+  //assert(current == JavaThread::current(), "pre-condition");
+  SharedRuntime::monitor_exit_helper_method(obj, lock, current);
 JRT_END
 
 #ifndef PRODUCT

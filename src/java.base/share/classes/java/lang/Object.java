@@ -26,6 +26,7 @@
 package java.lang;
 
 import jdk.internal.misc.Blocker;
+
 import jdk.internal.event.ObjectMonitorEvent;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.ReservedStackAccess;
@@ -674,7 +675,27 @@ public class Object {
 
     /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
     @ReservedStackAccess
+    private static final void monitorEnterBlock(Object o) {
+
+        monitorEnterImpl(o, "BLOCK: Object.monitorEnter(Object o)");
+    }
+
+    /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
+    @ReservedStackAccess
+    private static final void monitorEnterMethod(Object o) {
+
+        monitorEnterImpl(o, "METHOD: Object.monitorEnter(Object o)");
+    }
+
+    /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
+    @ReservedStackAccess
     private static final void monitorEnter(Object o) {
+        monitorEnterImpl(o, "UNKNOWN: Object.monitorEnter(Object o)");
+    }
+
+    /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
+    @ReservedStackAccess
+    private static final void monitorEnterImpl(Object o, String debugText) {
 
         // FIXME: This should really be handled in the interpreter and JIT.
         if (o == null)
@@ -686,14 +707,14 @@ public class Object {
 
         if (syncEnabled == 0) return;
 
-
         Thread t = Thread.currentThread();
 
         long monitorFrameId = getCallerFrameId();
-        Monitor.logEnter(o,monitorFrameId, "monitorEnter(Object o)");
+        Monitor.logEnter(o,monitorFrameId, debugText);
 
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickEnter(t, o, monitorFrameId)) {
+                Monitor.logEnter(o,monitorFrameId, "DEBUG: Object.monitorEnter(Object o) SLOW");
                 Monitor.slowEnter(t, o, monitorFrameId);
             }
         } else {
@@ -723,10 +744,11 @@ public class Object {
 
         Thread t = Thread.currentThread();
 
-        Monitor.logEnter(o,monitorFrameId, "Object.monitorEnter(Object,long)");
+        Monitor.logEnter(o,monitorFrameId, "UNKNOWN: Object.monitorEnter(Object,long)");
 
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickEnter(t, o, monitorFrameId)) {
+                Monitor.logEnter(o,monitorFrameId, "DEBUG: Object.monitorEnter(Object, long) SLOW");
                 Monitor.slowEnter(t, o, monitorFrameId);
             }
         } else {
@@ -744,7 +766,7 @@ public class Object {
     @ReservedStackAccess
     private static final void jniEnter(Object o) {
 
-        Monitor.logEnter(o,0, "Object.jniEnter(Object)");
+        Monitor.logEnter(o,0, "UNKNOWN: Object.jniEnter(Object)");
         Monitor.jniEnter(Thread.currentThread(), o);
     }
 
@@ -759,10 +781,12 @@ public class Object {
 
         Thread t = Thread.currentThread();
 
-        Monitor.logExit(o,monitorFrameId, "Object.monitorExit(Object,long)");
+        Monitor.logExit(o,monitorFrameId, "UNKNOWN: Object.monitorExit(Object,long)");
 
         if (monitorPolicy == 2) {  // fast-locks
             if (!Monitor.quickExit(t, o, monitorFrameId)) {
+
+                Monitor.logExit(o,monitorFrameId, "DEBUG: Object.monitorExit(Object,long) SLOW");
                 Monitor.slowExit(t, o, monitorFrameId);
             }
         } else {
@@ -775,10 +799,29 @@ public class Object {
             }
         }
     }
+    /** Entry point for monitor exit from the VM (bytecode) */
+    @ReservedStackAccess
+    private static final void monitorExitMethod(Object o) {
+        monitorExitImpl(o, "METHOD: Object.monitorExit(Object o)");
+    }
+
+
+    /** Entry point for monitor exit from the VM (bytecode) */
+    @ReservedStackAccess
+    private static final void monitorExitBlock(Object o) {
+        monitorExitImpl(o, "BLOCK: Object.monitorExit(Object o)");
+    }
+
 
     /** Entry point for monitor exit from the VM (bytecode) */
     @ReservedStackAccess
     private static final void monitorExit(Object o) {
+        monitorExitImpl(o, "UNKNOWN: Object.monitorExit(Object o)");
+    }
+
+    /** Entry point for monitor exit from the VM (bytecode) */
+    @ReservedStackAccess
+    private static final void monitorExitImpl(Object o, String debugText) {
 
         if (monitorPolicy == -1) {
             Monitor.abort("ShouldNotReachHere!");
@@ -790,10 +833,20 @@ public class Object {
 
         long monitorFrameId = getCallerFrameId();
 
-        Monitor.logExit(o,monitorFrameId, "Object.monitorExit(Object)");
+        Monitor.logExit(o,monitorFrameId, debugText);
+        //Monitor.abort("MNCMNC: ShouldntGetHereRight");
 
         if (monitorPolicy == 2) {  // fast-locks
-            if (!Monitor.quickExit(t, o, monitorFrameId)) {
+
+            // has it already been unlocked
+            if (!Monitor.dbgIsLocked(t, o, monitorFrameId))
+            {
+                Monitor.logExit(o,monitorFrameId, "DEBUG: Object.monitorExit(Object) ALREADY UINLOCKED");
+            }
+
+            else if (!Monitor.quickExit(t, o, monitorFrameId)) {
+
+                Monitor.logExit(o,monitorFrameId, "DEBUG: Object.monitorExit(Object) SLOW");
                 Monitor.slowExit(t, o, monitorFrameId);
             }
         } else {
@@ -811,7 +864,7 @@ public class Object {
     @ReservedStackAccess
     private static final void jniExit(Object o) {
 
-        Monitor.logExit(o,0, "Object.jniExit(Object)");
+        Monitor.logExit(o,0, "UNKNOWN: Object.jniExit(Object)");
         Monitor.jniExit(Thread.currentThread(), o);
     }
 
@@ -828,7 +881,6 @@ public class Object {
 
         long monitorFrameId = getCallerFrameId();
 
-        Monitor.logExit(t,monitorFrameId, "Object.monitorExit()");
 
         if (monitorPolicy == 0) { // native
             Monitor.abort("ShouldntGetHereRight");
@@ -848,16 +900,48 @@ public class Object {
             // - The method contains asymmetric locking, which should not happen.
             //   This case is currently only notice when exiting the monitor we already
             //   exited here.
-            /*do {
-                Object o = t.peek(monitorFrameId);
-                if (o instanceof Monitor) { // inflated
-                    Monitor m = (Monitor)o;
-                    t.pop(m, monitorFrameId);
-                    m.exit(t);
-                } else if (!Monitor.quickExit(t, o, monitorFrameId)) {
-                    Monitor.slowExitOnRemoveActivation(t, o, monitorFrameId);
-                }
-            } while (t.peekId() == monitorFrameId);*/
+
+            if (true) {//monitorFrameId == 89) {
+                Monitor.logExit(t,monitorFrameId, "UNKNOWN: Object.monitorExit() NOP");
+            }
+            else
+            {
+                /*do {
+
+                   if (t.peekId() == 0)
+                    {
+                        Monitor.logExit(t,monitorFrameId, "UNKNOWN: Object.monitorExit() NOTHING ON STACK");
+                    }
+                    else
+                    {
+
+                        Object o = t.peek(monitorFrameId);
+                        Monitor.logExit(o,monitorFrameId, "UNKNOWN : Object.monitorExit() JUSTONE");
+
+                    // Monitor.abort("MNCMNC: ShouldntGetHereRight");
+                        if (o instanceof Monitor) { // inflated
+
+                            Monitor.logExit(o,monitorFrameId, "DEBUG: Object.monitorExit(), instance of Monitor");
+                            Monitor m = (Monitor)o;
+                            t.pop(m, monitorFrameId);
+                            m.exit(t);
+                        } else {
+                            Monitor.logExit(o,monitorFrameId, "DEBUG: Object.monitorExit(), not instance of Monitor");
+                            if (o.getClass() == Object.class) {
+                                Monitor.logExit(o,monitorFrameId, "ODEBUG: Object.monitorExit(), lockee is an object");
+                                //Monitor.abort("MNCMNC: StopRightThere");
+                                //for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+                                //    Monitor.logExit(o,monitorFrameId, "Object.monitorExit(), stack");
+                                //}
+                            }
+                            if (!Monitor.quickExit(t, o, monitorFrameId)) {
+                                Monitor.logExit(o,monitorFrameId, "Object.monitorExit() SLOW");
+                                Monitor.slowExitOnRemoveActivation(t, o, monitorFrameId);
+                            }
+                        }
+                    }*/
+                //} while (t.peekId() == monitorFrameId);
+            }
         } else { // always inflated
             Monitor.abort("ShouldntGetHereRight");
             do {

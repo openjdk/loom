@@ -2461,7 +2461,6 @@ public class Thread implements Runnable {
     void pop(Object lockee, long fid) {
         if (this != Thread.currentThread()) Monitor.abort("invariant");
         Object o = lockStack[--lockStackPos];
-        Monitor.log("Thread.pop(Object,long):"+o);
         if (o != lockee) {
             Monitor.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }

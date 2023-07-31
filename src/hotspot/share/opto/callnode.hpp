@@ -1093,6 +1093,7 @@ public:
 class LockNode : public AbstractLockNode {
 public:
 
+  bool _fromMethod;
   static const TypeFunc *lock_type() {
     // create input type (domain)
     const Type **fields = TypeTuple::fields(3);
@@ -1111,7 +1112,8 @@ public:
 
   virtual int Opcode() const;
   virtual uint size_of() const; // Size is bigger
-  LockNode(Compile* C, const TypeFunc *tf) : AbstractLockNode( tf ) {
+  LockNode(Compile* C, const TypeFunc *tf, bool fromMethod) : AbstractLockNode( tf ) {
+    _fromMethod = fromMethod;
     init_class_id(Class_Lock);
     init_flags(Flag_is_macro);
     C->add_macro_node(this);
@@ -1124,6 +1126,7 @@ public:
 
   bool is_nested_lock_region(); // Is this Lock nested?
   bool is_nested_lock_region(Compile * c); // Why isn't this Lock nested?
+
 };
 
 //------------------------------Unlock---------------------------------------
@@ -1134,13 +1137,16 @@ private:
   JVMState* const _dbg_jvms;      // Pointer to list of JVM State objects
 #endif
 public:
+  bool _fromMethod;
   virtual int Opcode() const;
   virtual uint size_of() const; // Size is bigger
-  UnlockNode(Compile* C, const TypeFunc *tf) : AbstractLockNode( tf )
+  UnlockNode(Compile* C, const TypeFunc *tf,bool fromMethod) : AbstractLockNode( tf )
 #ifdef ASSERT
     , _dbg_jvms(nullptr)
 #endif
   {
+
+    _fromMethod = fromMethod;
     init_class_id(Class_Unlock);
     init_flags(Flag_is_macro);
     C->add_macro_node(this);

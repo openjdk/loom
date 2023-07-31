@@ -3407,7 +3407,7 @@ Node* GraphKit::insert_mem_bar_volatile(int opcode, int alias_idx, Node* precede
 
 //------------------------------shared_lock------------------------------------
 // Emit locking code.
-FastLockNode* GraphKit::shared_lock(Node* obj) {
+FastLockNode* GraphKit::shared_lock(Node* obj, bool fromMethod) {
   // bci is either a monitorenter bc or InvocationEntryBci
   // %%% SynchronizationEntryBCI is redundant; use InvocationEntryBci in interfaces
   assert(SynchronizationEntryBCI == InvocationEntryBci, "");
@@ -3433,7 +3433,7 @@ FastLockNode* GraphKit::shared_lock(Node* obj) {
   map()->push_monitor( flock );
 
   const TypeFunc *tf = LockNode::lock_type();
-  LockNode *lock = new LockNode(C, tf);
+  LockNode *lock = new LockNode(C, tf, fromMethod);
 
   lock->init_req( TypeFunc::Control, control() );
   lock->init_req( TypeFunc::Memory , mem );
@@ -3471,7 +3471,7 @@ FastLockNode* GraphKit::shared_lock(Node* obj) {
 
 //------------------------------shared_unlock----------------------------------
 // Emit unlocking code.
-void GraphKit::shared_unlock(Node* box, Node* obj) {
+void GraphKit::shared_unlock(Node* box, Node* obj, bool fromMethod) {
   // bci is either a monitorenter bc or InvocationEntryBci
   // %%% SynchronizationEntryBCI is redundant; use InvocationEntryBci in interfaces
   assert(SynchronizationEntryBCI == InvocationEntryBci, "");
@@ -3489,7 +3489,7 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   // MNCMNC: this might be a problem
 
   const TypeFunc *tf = OptoRuntime::complete_monitor_exit_Type();
-  UnlockNode *unlock = new UnlockNode(C, tf);
+  UnlockNode *unlock = new UnlockNode(C, tf, fromMethod);
 #ifdef ASSERT
   unlock->set_dbg_jvms(sync_jvms());
 #endif
