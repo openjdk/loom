@@ -613,8 +613,10 @@ public class Object {
     @ReservedStackAccess
     private static final void monitorEnter(Object o) {
         // FIXME: This should really be handled in the interpreter and JIT.
-        if (o == null)
+        if (o == null) {
+            MonitorSupport.abort("Target was null");
             throw new NullPointerException();
+        }
         long monitorFrameId = getCallerFrameId();
         MonitorSupport.policy().monitorEnter(o, monitorFrameId);
     }
@@ -667,6 +669,13 @@ public class Object {
     private static final void monitorExit() {
         long monitorFrameId = getCallerFrameId();
         MonitorSupport.policy().monitorExit(monitorFrameId);
+    }
+
+    /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
+    @ReservedStackAccess
+    private static final void monitorExitAll(int count) {
+        MonitorSupport.log_exitAll(count);
+        MonitorSupport.policy().monitorExitAll(count);
     }
 
     /** Entry point for uninterruptible monitor wait from the VM

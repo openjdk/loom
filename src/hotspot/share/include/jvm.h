@@ -103,6 +103,9 @@ JNIEXPORT void JNICALL
 JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
 
 JNIEXPORT void JNICALL
+JVM_Monitor_log_exitAll(JNIEnv* env, jclass ignored, int count);
+
+JNIEXPORT void JNICALL
 JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg);
 
 JNIEXPORT jboolean JNICALL

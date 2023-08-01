@@ -1894,7 +1894,7 @@ void GenerateOopMap::do_return_monitor_check() {
   }
 }
 
-// For UseNewMonitors
+// For Java object monitors
 
 void GenerateOopMap::do_monitor_enter() {
   assert(ObjectMonitorMode::java(), "must be");

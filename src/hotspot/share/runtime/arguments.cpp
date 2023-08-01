@@ -3010,7 +3010,8 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
 #else
     //set_mode_flags(_int);
 #endif
-    log_info(monitor)("Using new monitors with policy %s", ObjectMonitorMode::as_string());
+    log_info(monitor)("Using Java object monitors with policy %s %s",
+                      ObjectMonitorMode::as_string(), UseBasicObjectLockWithJOM ? "(using BasicObjectLocks)" : "");
   }
 
   // CompileThresholdScaling == 0.0 is same as -Xint: Disable compilation (enable interpreter-only mode),

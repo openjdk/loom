@@ -232,7 +232,11 @@ class InterpreterMacroAssembler: public MacroAssembler {
     if (ObjectMonitorMode::legacy()) {
       remove_activation_legacy(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
     } else {
-      remove_activation_java(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
+      if (UseBasicObjectLockWithJOM) {
+        remove_activation_java2(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
+      } else {
+        remove_activation_java(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
+      }
     }
   }
 
@@ -242,6 +246,10 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
  private:
   void remove_activation_java(TosState state, Register ret_addr,
+                              bool throw_monitor_exception = true,
+                              bool install_monitor_exception = true,
+                              bool notify_jvmdi = true);
+  void remove_activation_java2(TosState state, Register ret_addr,
                               bool throw_monitor_exception = true,
                               bool install_monitor_exception = true,
                               bool notify_jvmdi = true);
@@ -260,6 +268,8 @@ class InterpreterMacroAssembler: public MacroAssembler {
   // For direct Java Object Monitors
   void lock_object  ();
   void unlock_object();
+  void java_unlock_object(Register lock_reg);
+  void java_unlock_all_objects();
 
   // Interpreter profiling operations
   void set_method_data_pointer_for_bcp();

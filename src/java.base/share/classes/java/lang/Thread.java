@@ -2491,6 +2491,38 @@ public class Thread implements Runnable {
         return o;
     }
 
+    Object pop() {
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
+        if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
+        Object o = lockStack[--lockStackPos];
+        lockStack[lockStackPos] = null;
+        frameId[lockStackPos] = 0;
+        return o;
+    }
+
+    void pop(Object lockee) {
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
+        if (lockStackPos <= 0 || lockStackPos >= lockStack.length)
+            MonitorSupport.abort("pop() ArrayIndexOutOfBoundsException: " + lockStackPos);
+        Object o = lockStack[--lockStackPos];
+        if (o != lockee) {
+            MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
+        }
+        lockStack[lockStackPos] = null;
+        frameId[lockStackPos] = 0;
+    }
+
+    Object peek() {
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
+        // Throwing ArrayIndexOutOfBoundsException can be a problem so do a check.
+        if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
+        return lockStack[lockStackPos - 1];
+    }
+
     Object peek(long fid) {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (frameId[lockStackPos - 1] != fid) {

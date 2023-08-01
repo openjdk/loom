@@ -1057,6 +1057,8 @@ const int ObjectAlignmentInBytes = 8;
           "Checks that no stack locking happens when using "                \
           "+UseHeavyMonitors")                                              \
                                                                             \
+  product(bool, UseBasicObjectLockWithJOM, true,                            \
+          "Maintain on-stack BasicObjectLock's when using JOM")             \
   product(ccstr, ObjectSynchronizerMode, "fast",                            \
           "ObjectSynchronizer modes: "                                      \
           "legacy: legacy native system; "                                  \

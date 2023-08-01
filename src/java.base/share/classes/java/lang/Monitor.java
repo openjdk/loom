@@ -1017,6 +1017,29 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         m.exit(current);
     }
 
+    // We have to special-case this so we can save and restore the native thread's
+    // VMResult field, which is used to communicate results in the interpreter.
+    static void slowExitOnRemoveActivation(Thread current, Object o) {
+        Object vmResult = getVMResult();
+        if (vmResult != null) {
+            storeVMResult(null);
+            slowExit(current, o);
+            storeVMResult(vmResult);
+        } else {
+            slowExit(current, o);
+        }
+    }
+
+    static void slowExit(Thread current, Object o) {
+        if (!current.hasLocked(o))
+            throw new IllegalMonitorStateException();
+
+        Monitor m = monitorFor(o, current, true /* isOwned */);
+        // Caution: does the order here matter?
+        current.pop(m);
+        m.exit(current);
+    }
+
     static void jniExit(Thread current, Object o) {
         if (!current.hasLocked(o))
             throw new IllegalMonitorStateException();

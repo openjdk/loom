@@ -655,6 +655,9 @@ JVM_ENTRY(void, JVM_MonitorEnter(JNIEnv* env, jclass unused, jobject handle))
     ObjectMonitor* monitor = ObjectSynchronizer::inflate(THREAD, obj(),
                                                          ObjectSynchronizer::inflate_cause_monitor_enter);
     if (monitor->enter(THREAD)) {
+      if (ObjectMonitorMode::native()) {
+        THREAD->inc_held_monitor_count(1);
+      }
       return;
     }
   }
@@ -672,6 +675,9 @@ JVM_ENTRY(void, JVM_MonitorExit(JNIEnv* env, jclass unused, jobject handle))
   // There's no deflation race for exit as the monitor is busy
   ObjectSynchronizer::inflate(THREAD, obj(),
                               ObjectSynchronizer::inflate_cause_monitor_exit)->exit(THREAD);
+  if (ObjectMonitorMode::native()) {
+    THREAD->dec_held_monitor_count(1);
+  }
 JVM_END
 
 JVM_LEAF(jint, JVM_MonitorPolicy())
@@ -772,6 +778,7 @@ JVM_ENTRY(void, JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg))
   Handle msg_h(thread, JNIHandles::resolve_non_null(msg));
   char* str = java_lang_String::as_utf8_string(msg_h());
   log_debug(monitor)("Monitor log: %s by %s (%p)", str, thread->name(), thread);
+//tty->print_cr("Monitor log: %s by %s (%p)", str, thread->name(), thread);
 JVM_END
 
 JVM_ENTRY(void, JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid))
@@ -786,6 +793,12 @@ JVM_ENTRY(void, JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, j
   oop obj_oop = JNIHandles::resolve(obj);
   char* str = obj_oop->print_value_string();
   log_debug(monitor)("Monitor exit: %s by %s (%p) with fid: %ld", str, thread->name(), thread, fid);
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_log_exitAll(JNIEnv* env, jclass ignored, int count))
+  ResourceMark rm(thread);
+  log_debug(monitor)("Monitor exitAll by %s (%p) with count: %d", thread->name(), thread, count);
+//tty->print_cr("Monitor exitAll by %s (%p) with count: %d", thread->name(), thread, count);
 JVM_END
 
 

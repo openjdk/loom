@@ -402,6 +402,7 @@
   template(getMonitorPolicy_name,                     "getMonitorPolicy")                         \
   template(hasLockedObject_name,                      "hasLockedObject")                          \
   template(abort_name,                                "abort")                                   \
+  template(log_exitAll_name,                          "log_exitAll")                              \
                                                                                                   \
   /* common method and field names */                                                             \
   template(object_initializer_name,                   "<init>")                                   \

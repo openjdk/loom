@@ -129,12 +129,15 @@ jint java_lang_MonitorSupport::sync_enabled() {
   return base->int_field(_static_sync_enabled_offset);
 }
 
-// Register native methods of MonitorSupport
+// Register native methods of MonitorSupport directly
 void java_lang_MonitorSupport::register_natives(TRAPS) {
   InstanceKlass* obj = vmClasses::MonitorSupport_klass();
   Method::register_native(obj, vmSymbols::log_name(),
                           vmSymbols::string_void_signature(),
                           (address) &JVM_Monitor_log, THREAD);
+  Method::register_native(obj, vmSymbols::log_exitAll_name(),
+                          vmSymbols::int_void_signature(),
+                          (address) &JVM_Monitor_log_exitAll, THREAD);
   Method::register_native(obj, vmSymbols::abort_name(),
                           vmSymbols::string_void_signature(),
                           (address) &JVM_Monitor_abort, THREAD);
