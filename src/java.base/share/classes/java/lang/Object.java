@@ -614,7 +614,6 @@ public class Object {
     private static final void monitorEnter(Object o) {
         // FIXME: This should really be handled in the interpreter and JIT.
         if (o == null) {
-            MonitorSupport.abort("Target was null");
             throw new NullPointerException();
         }
         long monitorFrameId = getCallerFrameId();
