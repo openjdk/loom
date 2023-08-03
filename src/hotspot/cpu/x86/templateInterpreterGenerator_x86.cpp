@@ -638,34 +638,20 @@ void TemplateInterpreterGenerator::lock_method() {
     __ bind(done);
   }
 
-  if (UseBasicObjectLockWithJOM) {
-    // add space for monitor
-    __ subptr(rsp, entry_size); // add space for a monitor entry
-    __ movptr(monitor_block_top, rsp);  // set new monitor block top
-    // store object
-    __ movptr(Address(rsp, BasicObjectLock::obj_offset()), rax);
-  }
+  // add space for monitor
+  __ subptr(rsp, entry_size); // add space for a monitor entry
+  __ movptr(monitor_block_top, rsp);  // set new monitor block top
+  // store object
+  __ movptr(Address(rsp, BasicObjectLock::obj_offset()), rax);
 
   const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
 
   if (ObjectMonitorMode::legacy()) {
-    if (!UseBasicObjectLockWithJOM) {
-      // add space for monitor
-      __ subptr(rsp, entry_size); // add space for a monitor entry
-      __ movptr(monitor_block_top, rsp);  // set new monitor block top
-      // store object
-      __ movptr(Address(rsp, BasicObjectLock::obj_offset()), rax);
-    }
     __ movptr(lockreg, rsp); // object address
     __ lock_object(lockreg);
   } else {
-    __ lock_object();
+    __ java_lock_object();
   }
-}
-
-void TemplateInterpreterGenerator::unlock_method() {
-  assert(ObjectMonitorMode::java(), "must be");
-    __ unlock_object();
 }
 
 // Generate a fixed interpreter frame. This is identical setup for
@@ -1288,51 +1274,39 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // do unlocking if necessary
   if (ObjectMonitorMode::java()) {
-    if (UseBasicObjectLockWithJOM) {
-      Label L;
-      __ movl(t, Address(method, Method::access_flags_offset()));
-      __ testl(t, JVM_ACC_SYNCHRONIZED);
-      __ jcc(Assembler::zero, L);
-      // the code below should be shared with interpreter macro
-      // assembler implementation
-      const Register regmon = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
-      {
-        Label unlock;
-        // BasicObjectLock will be first in list, since this is a
-        // synchronized method. However, need to check that the object
-        // has not been unlocked by an explicit monitorexit bytecode.
-        const Address monitor(rbp,
-                              (intptr_t)(frame::interpreter_frame_initial_sp_offset *
-                                         wordSize - (int)sizeof(BasicObjectLock)));
+    Label L;
+    __ movl(t, Address(method, Method::access_flags_offset()));
+    __ testl(t, JVM_ACC_SYNCHRONIZED);
+    __ jcc(Assembler::zero, L);
+    // the code below should be shared with interpreter macro
+    // assembler implementation
+    const Register regmon = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
+    {
+      Label unlock;
+      // BasicObjectLock will be first in list, since this is a
+      // synchronized method. However, need to check that the object
+      // has not been unlocked by an explicit monitorexit bytecode.
+      const Address monitor(rbp,
+                            (intptr_t)(frame::interpreter_frame_initial_sp_offset *
+                                       wordSize - (int)sizeof(BasicObjectLock)));
 
-        // monitor expect in c_rarg1 for slow unlock path
-        __ lea(regmon, monitor); // address of first monitor
+      // monitor expect in c_rarg1 for slow unlock path
+      __ lea(regmon, monitor); // address of first monitor
 
-        __ movptr(t, Address(regmon, BasicObjectLock::obj_offset()));
-        __ testptr(t, t);
-        __ jcc(Assembler::notZero, unlock);
+      __ movptr(t, Address(regmon, BasicObjectLock::obj_offset()));
+      __ testptr(t, t);
+      __ jcc(Assembler::notZero, unlock);
 
-        // Entry already unlocked, need to throw exception
-        __ MacroAssembler::call_VM(noreg,
-                                   CAST_FROM_FN_PTR(address,
-                       InterpreterRuntime::throw_illegal_monitor_state_exception));
-        __ should_not_reach_here();
+      // Entry already unlocked, need to throw exception
+      __ MacroAssembler::call_VM(noreg,
+                                 CAST_FROM_FN_PTR(address,
+                                                  InterpreterRuntime::throw_illegal_monitor_state_exception));
+      __ should_not_reach_here();
 
-        __ bind(unlock);
-        __ java_unlock_object(regmon);
-        __ bind(L);
-      }
-    } else {
-      Label L;
-      __ movl(t, Address(method, Method::access_flags_offset()));
-      __ testl(t, JVM_ACC_SYNCHRONIZED);
-      __ jcc(Assembler::zero, L);
-      // the code below should be shared with interpreter macro
-      // assembler implementation
-      unlock_method();
+      __ bind(unlock);
+      __ java_unlock_object(regmon);
       __ bind(L);
     }
-
   } else {
     Label L;
     __ movl(t, Address(method, Method::access_flags_offset()));
@@ -1361,7 +1335,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
       // Entry already unlocked, need to throw exception
       __ MacroAssembler::call_VM(noreg,
                                  CAST_FROM_FN_PTR(address,
-                   InterpreterRuntime::throw_illegal_monitor_state_exception));
+                                                  InterpreterRuntime::throw_illegal_monitor_state_exception));
       __ should_not_reach_here();
 
       __ bind(unlock);

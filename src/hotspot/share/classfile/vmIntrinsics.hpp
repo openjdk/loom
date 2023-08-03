@@ -1249,9 +1249,6 @@ class methodHandle;
   do_intrinsic(_Object_init,              java_lang_Object, object_initializer_name, void_method_signature,        F_R)   \
   /*    (symbol object_initializer_name defined above) */                                                                 \
                                                                                                                           \
-  do_intrinsic(_Object_caller_frame_id,  java_lang_Object, object_caller_frame_id, void_long_signature,           F_SN)   \
-   do_name(     object_caller_frame_id, "getCallerFrameId")                                                               \
-                                                                                                                          \
   do_intrinsic(_Monitor_get_lock_state,    java_lang_MonitorSupport, monitor_get_lock_state_name, object_int_signature,   F_SN)  \
    do_name(     monitor_get_lock_state_name, "getLockState")                                                              \
                                                                                                                           \

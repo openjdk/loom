@@ -64,16 +64,13 @@ final class MonitorSupport {
     static interface Policy {
 
         /** Entry point for monitor entry from the VM (all cases) */
-        void monitorEnter(Object o, long monitorFrameId);
+        void monitorEnter(Object o);
 
-        /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
-        void monitorExit(long monitorFrameId);
+        /** Entry point for monitor exit from the VM (bytecode, ObjectLocker)*/
+        void monitorExit(Object o);
 
         /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
         void monitorExitAll(int count);
-
-        /** Entry point for monitor exit from the VM (bytecode, ObjectLocker)*/
-        void monitorExit(Object o, long monitorFrameId);
 
         /** Entry point for uninterruptible monitor wait from the VM
          *  (used only for class initialization when using Java monitors)
@@ -135,15 +132,11 @@ final class MonitorSupport {
 
     static final class Legacy implements Policy {
 
-        public void monitorEnter(Object o, long monitorFrameid) {
+        public void monitorEnter(Object o) {
             abort("monitorEnter: Should not reach here for legacy sync");
         }
 
-        public void monitorExit(Object o, long monitorFrameId) {
-            abort("monitorExit: Should not reach here for legacy sync");
-        }
-
-        public void monitorExit(long monitorFrameId) {
+        public void monitorExit(Object o) {
             abort("monitorExit: Should not reach here for legacy sync");
         }
 
@@ -179,14 +172,14 @@ final class MonitorSupport {
     static final class Native implements Policy {
 
         @ReservedStackAccess
-        public void monitorEnter(Object o, long monitorFrameId) {
-            Thread.currentThread().push(o, monitorFrameId);
+        public void monitorEnter(Object o) {
+            Thread.currentThread().push(o);
             Object.monitorEnter0(o);
         }
 
         @ReservedStackAccess
-        public void monitorExit(Object o, long monitorFrameId) {
-            Thread.currentThread().pop(o, monitorFrameId);
+        public void monitorExit(Object o) {
+            Thread.currentThread().pop(o);
             Object.monitorExit0(o);
         }
 
@@ -199,15 +192,6 @@ final class MonitorSupport {
                     abort("Impossible!");
                 Object.monitorExit0(o);
             }
-        }
-
-        @ReservedStackAccess
-        public void monitorExit(long monitorFrameId) {
-            Thread t = Thread.currentThread();
-            Object o = t.pop(monitorFrameId);
-            if (o instanceof Monitor)  // sanity check
-                abort("Impossible!");
-            Object.monitorExit0(o);
         }
 
         public void monitorWaitUninterruptibly(Object o){
@@ -238,22 +222,20 @@ final class MonitorSupport {
     static class Heavy implements Policy {
 
         @ReservedStackAccess
-        public void monitorEnter(Object o, long monitorFrameId) {
-            // MonitorSupport.log("Heavy enter for frame " + monitorFrameId);
+        public void monitorEnter(Object o) {
             if (syncEnabled == 0)
                 return;
             Thread t = Thread.currentThread();
-            t.push(o, monitorFrameId);
+            t.push(o);
             Monitor.of(o).enter(t);
         }
 
         @ReservedStackAccess
-        public void monitorExit(Object o, long monitorFrameId) {
-            // MonitorSupport.log("Heavy exit  for frame " + monitorFrameId);
+        public void monitorExit(Object o) {
             if (syncEnabled == 0)
                 return;
             Thread t = Thread.currentThread();
-            t.pop(o, monitorFrameId);
+            t.pop(o);
             Monitor.of(o).exit(t);
         }
 
@@ -266,20 +248,6 @@ final class MonitorSupport {
                     abort("Impossible!");
                 Monitor.of(o).exit(t);
             }
-        }
-
-        @ReservedStackAccess
-        public void monitorExit(long monitorFrameId) {
-            // MonitorSupport.log("Heavy exit2 for frame " + monitorFrameId);
-            if (syncEnabled == 0)
-                return;
-            Thread t = Thread.currentThread();
-            do {
-                Object o = t.pop(monitorFrameId);
-                if (o instanceof Monitor)  // sanity check
-                    abort("Impossible!");
-                Monitor.of(o).exit(t);
-            } while (t.peekId() == monitorFrameId);
         }
 
         @ReservedStackAccess
@@ -322,23 +290,22 @@ final class MonitorSupport {
     static class Fast implements Policy {
 
         @ReservedStackAccess
-        public void monitorEnter(Object o, long monitorFrameId) {
+        public void monitorEnter(Object o) {
             if (syncEnabled == 0)
                 abort("Synchronization not ready for use");
-
             Thread t = Thread.currentThread();
-            if (!quickEnter(t, o, monitorFrameId)) {
-                Monitor.slowEnter(t, o, monitorFrameId);
+            if (!quickEnter(t, o)) {
+                Monitor.slowEnter(t, o);
             }
         }
 
         @ReservedStackAccess
-        public void monitorExit(Object o, long monitorFrameId) {
+        public void monitorExit(Object o) {
             if (syncEnabled == 0)
                 abort("Synchronization not ready for use");
             Thread t = Thread.currentThread();
-            if (!quickExit(t, o, monitorFrameId)) {
-                Monitor.slowExit(t, o, monitorFrameId);
+            if (!quickExit(t, o)) {
+                Monitor.slowExit(t, o);
             }
         }
 
@@ -358,36 +325,6 @@ final class MonitorSupport {
                     Monitor.slowExitOnRemoveActivation(t, o);
                 }
             }
-        }
-
-
-        @ReservedStackAccess
-        public void monitorExit(long monitorFrameId) {
-            Thread t = Thread.currentThread();
-
-            // We are removing frame with monitorFrameId.
-            // We either came here due to the method for that frame is
-            // synchronized, and/or we still own a monitor taken in that method.
-            // In normal excution there should be at max one monitor with that
-            // monitorFrameId if this is a synchronized method, else zero.
-            // If there is more monitors than that we:
-            // - Unexpectedly exit method due to debugger, thus the monitor should be exited.
-            // - The method contains asymmetric locking, which should not happen.
-            //   This case is currently only notice when exiting the monitor we already
-            //   exited here.
-            do {
-                Object o = t.peek(monitorFrameId);
-                if (o instanceof Monitor) { // inflated
-                    Monitor m = (Monitor)o;
-                    t.pop(m, monitorFrameId);
-                    m.exit(t);
-                } else if (!quickExit(t, o, monitorFrameId)) {
-                    if (syncEnabled == 0)
-                        abort("Synchronization not ready for use");
-
-                    Monitor.slowExitOnRemoveActivation(t, o, monitorFrameId);
-                }
-            } while (t.peekId() == monitorFrameId);
         }
 
         @ReservedStackAccess
@@ -439,20 +376,9 @@ final class MonitorSupport {
 
         // lowest level enter/exit via markWord ops
 
-        private static boolean quickLock(Thread current, Object lockee, long fid) {
+        private static boolean quickLock(Thread current, Object lockee) {
             if (casLockState(lockee, LOCKED, UNLOCKED)) {
-                current.push(lockee, fid);
-                return true;
-            }
-            return false;
-        }
-
-        private static boolean quickUnlock(Thread current, Object lockee, long fid) {
-            if (casLockState(lockee, UNLOCKED, LOCKED)) {
-                current.pop(lockee, fid);
-                if (current.lockCount(lockee) > 0) {
-                    abort("Bad lockstack: unlocked object still on stack");
-                }
+                current.push(lockee);
                 return true;
             }
             return false;
@@ -472,7 +398,7 @@ final class MonitorSupport {
 
         // Attempted fast-path monitor entry and exit
 
-        static boolean quickEnter(Thread current, Object lockee, long fid) {
+        static boolean quickEnter(Thread current, Object lockee) {
             while (true) {
                 int lockState = getLockState(lockee);
                 switch (lockState) {
@@ -480,14 +406,14 @@ final class MonitorSupport {
                     if (current.lockCount(lockee) > 0) {
                         abort("Bad lockstack: lockee unlocked but on stack");
                     }
-                    if (quickLock(current, lockee, fid)) {
+                    if (quickLock(current, lockee)) {
                         return true;
                     }
                     break; // re-check, CAS failed
                 case LOCKED:
                     // recursive locking ?
                     if (current.hasLockedDirect(lockee)) {
-                        current.push(lockee, fid);
+                        current.push(lockee);
                         return true;
                     }
                     return false; // take slow path
@@ -495,40 +421,6 @@ final class MonitorSupport {
                     return false; // take slow path
                 default:
                     abort("Bad markword state: " + lockState);
-                }
-                Thread.yield();
-            }
-        }
-
-        static boolean quickExit(Thread current, Object lockee, long fid) {
-            while (true) {
-                int lockState = getLockState(lockee);
-                switch (lockState) {
-                case UNLOCKED:
-                    abort("Bad markword: unlocked on exit");
-                    break;
-                case LOCKED:
-                    int locksHeld = current.lockCount(lockee);
-                    if (locksHeld == 1) {
-                        if (quickUnlock(current, lockee, fid)) {
-                            return true;
-                        } else {
-                            break; // re-check, CAS failed
-                        }
-                    } else if (locksHeld > 1) {
-                        // recursive locking
-                        current.pop(lockee, fid);
-                        return true;
-                    } else {
-                        if (current.hasLocked(lockee))
-                            abort("lockCount and hasLocked disagree");
-                        abort("Invalid lockCount for " + lockee + " when locked: " + locksHeld);
-                    }
-                    break; // can't reach here but keeps compiler happy
-                case INFLATED:
-                    return false; // take slow path
-                default:
-                    abort("Bad markword: " + lockState);
                 }
                 Thread.yield();
             }
@@ -578,14 +470,12 @@ final class MonitorSupport {
     final static native void log(String msg);
     final static native void log_exitAll(int count);
     final static native void abort(String error);
+    final static native void abortException(String msg, Throwable t);
     @IntrinsicCandidate
     final static native boolean casLockState(Object o, int to, int from);
     @IntrinsicCandidate
     final static native int getLockState(Object o);
-    // This overrides the intrinsified version in Object so that we can
-    // enable logging. Call this version instead of the Object one if you
-    // want to see that logging.
-    static final native long getCallerFrameId();
+
     static {
         log("MonitorSupport.<clinit> executing");
     }

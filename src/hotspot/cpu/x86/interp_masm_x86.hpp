@@ -217,7 +217,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
   //
   // Removes the current activation (incl. unlocking of monitors)
   // and sets up the return address.  This code is also used for
-  // exception unwindwing. In that case, we do not want to throw
+  // exception unwinding. In that case, we do not want to throw
   // IllegalMonitorStateExceptions, since that might get us into an
   // infinite rethrow exception loop.
   // Additionally this code is used for popFrame and earlyReturn.
@@ -232,11 +232,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
     if (ObjectMonitorMode::legacy()) {
       remove_activation_legacy(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
     } else {
-      if (UseBasicObjectLockWithJOM) {
-        remove_activation_java2(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
-      } else {
         remove_activation_java(state, ret_addr, throw_monitor_exception, install_monitor_exception, notify_jvmdi);
-      }
     }
   }
 
@@ -246,10 +242,6 @@ class InterpreterMacroAssembler: public MacroAssembler {
 
  private:
   void remove_activation_java(TosState state, Register ret_addr,
-                              bool throw_monitor_exception = true,
-                              bool install_monitor_exception = true,
-                              bool notify_jvmdi = true);
-  void remove_activation_java2(TosState state, Register ret_addr,
                               bool throw_monitor_exception = true,
                               bool install_monitor_exception = true,
                               bool notify_jvmdi = true);
@@ -266,8 +258,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
   void unlock_object(Register lock_reg);
 
   // For direct Java Object Monitors
-  void lock_object  ();
-  void unlock_object();
+  void java_lock_object();
   void java_unlock_object(Register lock_reg);
   void java_unlock_all_objects();
 

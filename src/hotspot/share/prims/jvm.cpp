@@ -684,26 +684,6 @@ JVM_LEAF(jint, JVM_MonitorPolicy())
   return ObjectMonitorMode::as_int();
 JVM_END
 
-JVM_ENTRY(jlong, JVM_CallerFrameId(JNIEnv* env, jclass unused))
-  JavaThread* cur = JavaThread::current();
-  RegisterMap map(cur,
-                  RegisterMap::UpdateMap::skip,
-                  RegisterMap::ProcessFrames::skip,
-                  RegisterMap::WalkContinuation::skip);
-  frame this_frame = cur->last_frame();
-  frame monitor    = this_frame.sender(&map);
-  jlong id = (jlong)monitor.link();
-  LogStreamHandle(Debug, monitor) lsh_mon;
-  if (lsh_mon.is_enabled()) {
-    ResourceMark rm(cur);
-    LogStream* log = &lsh_mon;
-    frame caller = monitor.sender(&map);
-    log->print_cr("JVM_CallerFrameId for %s - %s (" JLONG_FORMAT ")", cur->name(),
-                  caller.interpreter_frame_method()->name_and_sig_as_C_string(), id );
-  }
-  return id;
-JVM_END
-
 JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   Klass* klass = obj->klass();
@@ -766,11 +746,22 @@ JVM_LEAF(jboolean, JVM_IsFinalizationEnabled(JNIEnv * env))
 JVM_END
 
 // java.lang.Monitor //////////////////////////////////////////////////////////
+
 JVM_ENTRY(void, JVM_Monitor_abort(JNIEnv* env, jclass jc, jstring estr))
-ResourceMark rm(thread);
+  ResourceMark rm(thread);
   Handle es(thread, JNIHandles::resolve_non_null(estr));
   char* str = java_lang_String::as_utf8_string(es());
   fatal("Monitor fatal error: %s", str);
+JVM_END
+
+JVM_ENTRY(void, JVM_Monitor_abortException(JNIEnv* env, jclass jc, jstring estr, jthrowable t))
+  ResourceMark rm(thread);
+  Handle ht(thread, JNIHandles::resolve_non_null(t));
+  java_lang_Throwable::print(ht(), tty);
+  java_lang_Throwable::print_stack_trace(ht, tty);
+  Handle es(thread, JNIHandles::resolve_non_null(estr));
+  char* str = java_lang_String::as_utf8_string(es());
+  fatal("Monitor fatal error due to exception : %s", str);
 JVM_END
 
 JVM_ENTRY(void, JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg))

@@ -759,8 +759,8 @@ private:
   bool system_java() { return _system_java != 0; }
   jint current_system_java() { return _system_java; }
   void set_system_java(jint v) { _system_java = v; }
-  void set_system_java() { ++_system_java; assert(_system_java == 1, "Must be"); }
-  void clear_system_java() { --_system_java; assert(_system_java == 0, "Must be"); }
+  void set_system_java() { ++_system_java; assert(_system_java == 1, "Should be 1: got %d", _system_java); }
+  void clear_system_java() { --_system_java; assert(_system_java == 0, "Should be 0: got %d", _system_java); }
 
   // For assembly stub generation
   static ByteSize threadObj_offset()             { return byte_offset_of(JavaThread, _threadObj); }

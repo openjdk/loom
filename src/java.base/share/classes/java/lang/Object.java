@@ -600,36 +600,27 @@ public class Object {
 
     /* Monitor support functionality */
 
-    /*
-     * getcallerFrameId is private so that MonitorSupport can
-     * override it with a non-intrinsic version that includes logging.
-     * If you want to see that logging, change the calls of
-     * getCallerFrameId() below to MonitorSupport.getCallerFrameId().
-     */
-    @IntrinsicCandidate
-    private static final native long getCallerFrameId();
-
-    /** Entry point for monitor entry from the VM (bytecode and sync methods)*/
+    /** Entry point for monitor entry from the VM (bytecode and sync methods, ObjectLocker)*/
     @ReservedStackAccess
     private static final void monitorEnter(Object o) {
-        // FIXME: This should really be handled in the interpreter and JIT.
-        if (o == null) {
-            throw new NullPointerException();
+        // o is null-checked already
+        try {
+            MonitorSupport.policy().monitorEnter(o);
         }
-        long monitorFrameId = getCallerFrameId();
-        MonitorSupport.policy().monitorEnter(o, monitorFrameId);
-    }
-
-    /** Entry point for monitor entry from the VM (ObjectLocker) */
-    @ReservedStackAccess
-    private static final void monitorEnter(Object o, long monitorFrameId) {
-        MonitorSupport.policy().monitorEnter(o, monitorFrameId);
+        catch (Throwable t) {
+            MonitorSupport.abortException("monitorEnter", t);
+        }
     }
 
     /** Entry point for monitor enter from the JNI */
     @ReservedStackAccess
     private static final void jniEnter(Object o) {
-        Monitor.jniEnter(Thread.currentThread(), o);
+        try {
+            Monitor.jniEnter(Thread.currentThread(), o);
+        }
+        catch (Throwable t) {
+            MonitorSupport.abortException("jniEnter", t);
+        }
     }
 
     /* C2_PATCH
@@ -644,37 +635,38 @@ public class Object {
     }
     */
 
-    /** Entry point for monitor exit from the VM (ObjectLocker) */
-    @ReservedStackAccess
-    private static final void monitorExit(Object o, long monitorFrameId) {
-        MonitorSupport.policy().monitorExit(o, monitorFrameId);
-    }
-
-    /** Entry point for monitor exit from the VM (bytecode) */
+    /** Entry point for monitor exit from the VM (bytecode and ObjectLocker) */
     @ReservedStackAccess
     private static final void monitorExit(Object o) {
-        long monitorFrameId = getCallerFrameId();
-        MonitorSupport.policy().monitorExit(o, monitorFrameId);
+        try {
+            MonitorSupport.policy().monitorExit(o);
+        }
+        catch (Throwable t) {
+            MonitorSupport.abortException("monitorExit", t);
+        }
     }
 
     /** Entry point for monitor exit from the JNI */
     @ReservedStackAccess
     private static final void jniExit(Object o) {
-        Monitor.jniExit(Thread.currentThread(), o);
+        try {
+            Monitor.jniExit(Thread.currentThread(), o);
+        }
+        catch (Throwable t) {
+            MonitorSupport.abortException("jniExit", t);
+        }
     }
 
-    /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
-    @ReservedStackAccess
-    private static final void monitorExit() {
-        long monitorFrameId = getCallerFrameId();
-        MonitorSupport.policy().monitorExit(monitorFrameId);
-    }
-
-    /** Entry point for direct monitor exit from the VM (sync methods, early returns) */
+    /** Entry point for monitor exit from the VM (sync methods, early returns) */
     @ReservedStackAccess
     private static final void monitorExitAll(int count) {
-        MonitorSupport.log_exitAll(count);
-        MonitorSupport.policy().monitorExitAll(count);
+        try {
+            MonitorSupport.log_exitAll(count);
+            MonitorSupport.policy().monitorExitAll(count);
+        }
+        catch (Throwable t) {
+            MonitorSupport.abortException("monitorExitAll", t);
+        }
     }
 
     /** Entry point for uninterruptible monitor wait from the VM
@@ -682,7 +674,12 @@ public class Object {
      */
     @ReservedStackAccess
     private static final void monitorWaitUninterruptibly(Object o) {
-        MonitorSupport.policy().monitorWaitUninterruptibly(o);
+        try {
+            MonitorSupport.policy().monitorWaitUninterruptibly(o);
+        }
+        catch (Throwable t) {
+            MonitorSupport.abortException("monitorWaitUninterruptibly", t);
+        }
     }
 
     @IntrinsicCandidate

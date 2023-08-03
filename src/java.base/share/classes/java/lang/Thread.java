@@ -2416,34 +2416,28 @@ public class Thread implements Runnable {
         holder = null;
     }
 
-    // Temporary tracking of locked objects to replace the native
+    // Tracking of locked objects to complement the use of native
     // BasicObjectLock in the VM frames. Synchronized method exit
-    // specifically needs this to find which object to unlock.
+    // specifically needs this to find which object(s) to unlock.
     // Note that only enter/exit cause pushes and pops so an object
     // (or monitor) on the stack may not actually be locked as
     // Object.wait() may have been called. However checking by the
     // current thread is always correct - so holdsLock can either
     // check the Monitor or the stack entries (fast-locking uses the
     // stack). External queries must do more detailed checks.
-    // We also need to track the frameId's of the monitors that have
-    // been locked so that they can be unlocked on-demand i.e. by JVM TI.
     // As JNI locking is not required to be strictly nested/balanced we
     // need a seperate list to track that.
 
     static final String LOCKSTACK_OOME = "OutOfMemoryError when growing lockStack";
     static final int BLOCK_SIZE = 16;  // The lockStack grows by this amount
     Object[] lockStack = new Object[BLOCK_SIZE];
-    long[]   frameId   = new long[BLOCK_SIZE];
     int lockStackPos   = 0;
 
     void grow() {
         try {
             Object[] newStack = new Object[lockStack.length + BLOCK_SIZE];
-            long[] newFrameId = new long[lockStack.length + BLOCK_SIZE];
             System.arraycopy(lockStack, 0, newStack, 0, lockStack.length);
-            System.arraycopy(frameId, 0, newFrameId, 0, frameId.length);
             lockStack = newStack;
-            frameId = newFrameId;
         } catch (OutOfMemoryError oome) {
             // For simplicity we abort on OOME.
             // We are out of memory so any allocation here is potentially
@@ -2453,42 +2447,12 @@ public class Thread implements Runnable {
         MonitorSupport.log("Expanded thread lockStack to size " + lockStack.length);
     }
 
-    void push(Object lockee, long fid) {
+    void push(Object lockee) {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (lockStackPos == lockStack.length) {
             grow();
         }
-        frameId[lockStackPos] = fid;
         lockStack[lockStackPos++] = lockee;
-    }
-
-    void pop(Object lockee, long fid) {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        // If we have a bug we can't trigger throwing AIOOBE as that uses
-        // synchronized code and we get infinite recursion.
-        if (lockStackPos <= 0 || lockStackPos >= lockStack.length)
-            MonitorSupport.abort("pop() ArrayIndexOutOfBoundsException: " + lockStackPos);
-        Object o = lockStack[--lockStackPos];
-        if (o != lockee) {
-            MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
-        }
-        if (frameId[lockStackPos] != fid) {
-            // Don't abort - frame id matching is broken with virtual threads
-            MonitorSupport.log("frame id mismatched - got " + frameId[lockStackPos] + " expected " + fid);
-        }
-        lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
-    }
-
-    Object pop(long fid) {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        Object o = lockStack[--lockStackPos];
-        if (frameId[lockStackPos] != fid) {
-            MonitorSupport.abort("frame id mismatched");
-        }
-        lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
-        return o;
     }
 
     Object pop() {
@@ -2498,7 +2462,6 @@ public class Thread implements Runnable {
         if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
         Object o = lockStack[--lockStackPos];
         lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
         return o;
     }
 
@@ -2513,27 +2476,14 @@ public class Thread implements Runnable {
             MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
         lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
     }
 
     Object peek() {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        // Throwing ArrayIndexOutOfBoundsException can be a problem so do a check.
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
         if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
         return lockStack[lockStackPos - 1];
-    }
-
-    Object peek(long fid) {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        if (frameId[lockStackPos - 1] != fid) {
-            MonitorSupport.abort("frame id mismatched");
-        }
-        return lockStack[lockStackPos - 1];
-    }
-
-    long peekId() {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        return lockStackPos > 0 ? frameId[lockStackPos - 1] : 0;
     }
 
     // This count is only useful for fast-locked lockees

@@ -141,6 +141,9 @@ void java_lang_MonitorSupport::register_natives(TRAPS) {
   Method::register_native(obj, vmSymbols::abort_name(),
                           vmSymbols::string_void_signature(),
                           (address) &JVM_Monitor_abort, THREAD);
+  Method::register_native(obj, vmSymbols::abortException_name(),
+                          vmSymbols::string_throwable_void_signature(),
+                          (address) &JVM_Monitor_abortException, THREAD);
   Method::register_native(obj, vmSymbols::monitor_cas_lock_state_name(),
                           vmSymbols::object_int_int_bool_signature(),
                           (address) &JVM_Monitor_casLockState, THREAD);
@@ -149,8 +152,6 @@ void java_lang_MonitorSupport::register_natives(TRAPS) {
                           (address) &JVM_Monitor_getLockState, THREAD);
   Method::register_native(obj, vmSymbols::getMonitorPolicy_name(),
                           vmSymbols::void_int_signature(), (address) &JVM_MonitorPolicy, THREAD);
-  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
-                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 // Register native methods of Object
@@ -170,8 +171,6 @@ void java_lang_Object::register_natives(TRAPS) {
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorEnter, THREAD);
   Method::register_native(obj, vmSymbols::monitorExit0_name(),
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorExit, THREAD);
-  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
-                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 int JavaClasses::compute_injected_offset(InjectedFieldID id) {
@@ -1605,7 +1604,6 @@ int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
 int java_lang_Thread::_scopedValueBindings_offset;
 JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
-int java_lang_Thread::_frame_id_offset;
 int java_lang_Thread::_lock_stack_pos_offset;
 
 #define THREAD_FIELDS_DO(macro) \
@@ -1619,7 +1617,6 @@ int java_lang_Thread::_lock_stack_pos_offset;
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
   macro(_scopedValueBindings_offset, k, "scopedValueBindings", object_signature, false); \
-  macro(_frame_id_offset,      k, "frameId", long_array_signature, false); \
   macro(_lock_stack_pos_offset,k, "lockStackPos", int_signature, false)
 
 void java_lang_Thread::compute_offsets() {

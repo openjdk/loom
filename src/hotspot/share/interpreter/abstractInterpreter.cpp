@@ -148,7 +148,6 @@ AbstractInterpreter::MethodKind AbstractInterpreter::method_kind(const methodHan
       case vmIntrinsics::_dsqrt:             return java_lang_math_sqrt;
       case vmIntrinsics::_dsqrt_strict:      return java_lang_math_sqrt_strict;
       case vmIntrinsics::_Reference_get:     return java_lang_ref_reference_get;
-      case vmIntrinsics::_Object_caller_frame_id:     return java_lang_Object_callerFrameId;
       case vmIntrinsics::_Monitor_get_lock_state:     return java_lang_MonitorSupport_getLockState;
       case vmIntrinsics::_Monitor_cas_lock_state:     return java_lang_MonitorSupport_casLockState;
       case vmIntrinsics::_Object_init:
@@ -235,8 +234,6 @@ vmIntrinsics::ID AbstractInterpreter::method_intrinsic(MethodKind kind) {
   case java_lang_Float_floatToFloat16
                                   : return vmIntrinsics::_floatToFloat16;
   // Java Object Monitors
-  case java_lang_Object_callerFrameId
-                                  : return vmIntrinsics::_Object_caller_frame_id;
   case java_lang_MonitorSupport_getLockState
                                   : return vmIntrinsics::_Monitor_get_lock_state;
   case java_lang_MonitorSupport_casLockState
@@ -342,7 +339,6 @@ void AbstractInterpreter::print_method_kind(MethodKind kind) {
     case java_lang_Float_float16ToFloat       : tty->print("java_lang_Float_float16ToFloat"); break;
     case java_lang_Float_floatToFloat16       : tty->print("java_lang_Float_floatToFloat16"); break;
     // Java Object Monitors
-    case java_lang_Object_callerFrameId       : tty->print("java_lang_Object_callerFrameId"); break;
     case java_lang_MonitorSupport_getLockState : tty->print("java_lang_MonitorSupport_getLockState"); break;
     case java_lang_MonitorSupport_casLockState : tty->print("java_lang_MonitorSupport_casLockState"); break;
 

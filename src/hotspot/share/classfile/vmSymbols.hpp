@@ -402,6 +402,7 @@
   template(getMonitorPolicy_name,                     "getMonitorPolicy")                         \
   template(hasLockedObject_name,                      "hasLockedObject")                          \
   template(abort_name,                                "abort")                                   \
+  template(abortException_name,                        "abortException")                         \
   template(log_exitAll_name,                          "log_exitAll")                              \
                                                                                                   \
   /* common method and field names */                                                             \
@@ -620,6 +621,7 @@
   template(string_int_signature,                      "(Ljava/lang/String;)I")                    \
   template(string_byte_array_signature,               "(Ljava/lang/String;)[B")                   \
   template(string_bool_byte_array_signature,          "(Ljava/lang/String;Z)[B")                  \
+  template(string_throwable_void_signature,           "(Ljava/lang/String;Ljava/lang/Throwable;)V") \
   template(throwable_signature,                       "Ljava/lang/Throwable;")                    \
   template(throwable_void_signature,                  "(Ljava/lang/Throwable;)V")                 \
   template(void_throwable_signature,                  "()Ljava/lang/Throwable;")                  \

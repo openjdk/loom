@@ -60,7 +60,6 @@ class TemplateInterpreterGenerator: public AbstractInterpreterGenerator {
   void    generate_throw_exception();
 
   void lock_method();
-  void unlock_method();
 
   void bang_stack_shadow_pages(bool native_call);
 
