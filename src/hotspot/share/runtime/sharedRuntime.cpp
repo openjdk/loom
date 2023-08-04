@@ -2284,6 +2284,7 @@ void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThrea
 }
 
 // Handles the uncommon cases of monitor unlocking in compiled code
+// MNCMNC: can't be a leaft because if the need for object handle, does this cause problems based on where its called from???
 JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
   assert(current == JavaThread::current(), "pre-condition");
   SharedRuntime::monitor_exit_helper(obj, lock, current);

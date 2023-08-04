@@ -3006,6 +3006,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     }
     //  TieredStopAtLevel=1;
 #ifndef C2_PATCH
+    // MNCMNC: for testing purposes for c2 (but not the 'old' c2-path) we stop the interpreter being enabled
     //set_mode_flags(_int);
 #else
     //set_mode_flags(_int);
