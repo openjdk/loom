@@ -135,7 +135,7 @@ public:
   static bool fast()   { return _mode == Mode::FAST; };
 
   static int  as_int()    { return (int)_mode; };
-  static const char* const as_string() {
+  static const char* as_string() {
     switch(_mode) {
     case Mode::LEGACY: return "legacy";
     case Mode::NATIVE: return "native";
@@ -189,8 +189,8 @@ class ObjectSynchronizer : AllStatic {
   static bool quick_enter(oop obj, JavaThread* current, BasicLock* Lock);
 
   // This is the Java-based version of monitor operations.
-  static void java_enter(Handle obj, JavaThread* current, jlong fid);
-  static void java_exit(Handle obj, JavaThread* current, jlong fid);
+  static void java_enter(Handle obj, JavaThread* current);
+  static void java_exit(Handle obj, JavaThread* current);
   static void java_wait_uninterruptibly(Handle obj, JavaThread* current);
   static void java_wait(Handle obj, jlong millis, JavaThread* current);
   static void java_notify(Handle obj, JavaThread* current);

@@ -124,13 +124,47 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
      * Transitions the Monitor from SENTINEL owned to
      * the actual owner.
      * @param current the actual owner
-     * @param heldCount the number of times the lock is held
+     * @param holdCount the number of times the lock is held
      */
     private void enterByOwner(Thread current, int holdCount) {
         if (_owner != SENTINEL) abort("Should be in SENTINEL state - owner: " + _owner);
         _owner = current;
         if (state != 1) abort("Should be in SENTINEL state - state = " + state);
         state = holdCount;
+    }
+
+    /*
+     * Virtual thread dispatch hooks
+     *
+     * NOTE: we are using the same park permit as used by j.u.c.LockSupport
+     *       which is not really correct. Because we might consume an unrelated
+     *       unpark we always issue an extra unpark for virtual threads. This
+     *       might be spurious but it is allowed. That said we also put the thread
+     *       in the wrong state so we probably need a dedicated Object Monitor
+     *       yielding mechanism.
+     */
+    static void park(Thread current) {
+        if (current.isVirtual()) {
+            ((BaseVirtualThread) current).park();
+        } else {
+            U.parkMonitor();
+        }
+    }
+
+    static void parkNanos(Thread current, long nanos) {
+        if (current.isVirtual()) {
+            ((BaseVirtualThread) current).parkNanos(nanos);
+        } else {
+            U.parkMonitorNanos(nanos);
+        }
+    }
+
+    static void unpark(Thread target) {
+        if (target.isVirtual()) {
+            ((BaseVirtualThread) target).unpark();
+        } else {
+            U.unparkMonitor(target);
+        }
     }
 
     /**
@@ -300,19 +334,20 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                                    " signalFirst of " + t.getName() +
                                    " on object " + System.identityHashCode(this));
                 */
-                // If we are dealing with a virtual thread we need to switch to
-                // the carrier so that the JVM will be able to locate it.
-                U.unparkMonitor(t.isVirtual() ? ((VirtualThread)t).carrierThread : t);
+                unpark(t);
             }
         }
     }
 
     private void acquire(Thread current, Node node, int arg) {
-        boolean interrupted = false, first = false;
+        boolean first = false;
         byte spins = 0, postSpins = 0;   // retries upon unpark of first thread
         Node pred = (node != null) ? node.prev : null;
 
         boolean contended = false;  // for JVM TI event posting
+
+        boolean unparked = false;   // only set true for virtual threads
+        boolean isVirtual = current.isVirtual();
 
         for (;;) {
             if ((first || pred == null || (first = (pred.prev == null))) &&
@@ -322,10 +357,15 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                     node.prev = null;        // detach before assign head
                     head = node;
                     pred.next = null;
-                    if (interrupted)
-                        current.interrupt();
                 }
                 _owner = current;
+
+                // Need to ensure we didn't consume an unpark not related
+                // to monitors.
+                if (unparked) {
+                    unpark(current);
+                }
+
                 if (contended) {
                     // Post JVMTI_EVENT_MONITOR_CONTENDED_ENTERED
                     postJvmtiEvent(BLOCKED_ENTER + 1, current, this.obj.get(), -1 /* ignored */, false /* ignored */);
@@ -349,22 +389,25 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                 --spins;                        // reduce unfairness on rewaits
                 Thread.onSpinWait();
             } else if (node.status == 0) {
-                interrupted |= Thread.interrupted();  // clear before park
                 if (node.waiter == null)
                     node.waiter = current;
                 node.status = WAITING;          // enable signal
             } else {
                 spins = postSpins = (byte)((postSpins << 1) | 1);
+                boolean trueVirtual = current.isVirtual() && current instanceof VirtualThread;
                 Thread.FieldHolder holder =
-                    current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                    trueVirtual ? ((VirtualThread)current).carrierThread.holder : current.holder;
                 int status = holder.threadStatus;
                 holder.threadStatus = BLOCKED_ENTER;
                 // Post JVMTI_EVENT_MONITOR_CONTENDED_ENTER
                 postJvmtiEvent(BLOCKED_ENTER, current, this.obj.get(), -1 /* ignored */, false /* ignored */);
                 contended = true;
                 try {
-                    U.parkMonitor();
+                    park(current);
                 } finally {
+                    if (isVirtual) {
+                        unparked = true;
+                    }
                     holder.threadStatus = status;
                 }
                 node.clearStatus();
@@ -518,6 +561,8 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         throws InterruptedException {
 
         int savedState = state;
+        boolean unparked = false; // only set true for virtual threads
+        boolean isVirtual = current.isVirtual();
         ConditionNode node = new ConditionNode();
         node.waiter = current;
         node.setRelaxedStatus(COND | WAITING);
@@ -556,25 +601,33 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
                     if (cancelled = (node.getAndUnsetStatus(COND) & COND) != 0)
                         break;
                 } else if (timed) {
+                    boolean trueVirtual = current.isVirtual() && current instanceof VirtualThread;
                     Thread.FieldHolder holder =
-                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                        trueVirtual ? ((VirtualThread)current).carrierThread.holder : current.holder;
                     int status = holder.threadStatus;
                     holder.threadStatus = BLOCKED_TIMED_WAIT;
                     try {
-                        U.parkMonitorNanos(nanos);
+                        parkNanos(current, nanos);
                     } finally {
+                        if (isVirtual) {
+                            unparked = true; // !! FIXME: timeout
+                        }
                         holder.threadStatus = status;
                     }
                 } else {
+                    boolean trueVirtual = current.isVirtual() && current instanceof VirtualThread;
                     Thread.FieldHolder holder =
-                        current.isVirtual() ? ((VirtualThread)current).carrierThread.holder : current.holder;
+                        trueVirtual ? ((VirtualThread)current).carrierThread.holder : current.holder;
                     int status = holder.threadStatus;
                     holder.threadStatus = BLOCKED_WAIT;
                     // MonitorSupport.log(current.getName() + " doing park in await on Monitor " + System.identityHashCode(this));
                     try {
-                        U.parkMonitor();
+                        park(current);
                     } finally {
                         // MonitorSupport.log(current.getName() + " completed park in await on Monitor " + System.identityHashCode(this));
+                        if (isVirtual) {
+                            unparked = true;
+                        }
                         holder.threadStatus = status;
                     }
                 }
@@ -585,6 +638,11 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
             acquire(current, node, savedState);
             if (cancelled)
                 unlinkCancelledWaiters(node);
+            // Need to ensure we didn't consume an unpark not related
+            // to monitors.
+            if (unparked) {
+                unpark(current);
+            }
             if (interrupted) {
                 if (cancelled && interruptible) {
                     Thread.interrupted();
@@ -902,10 +960,6 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
     // TODO intrinsic
     final static native void storeVMResult(Object vmresult);
 
-    final static native void logEnter(Object o, long fid);
-
-    final static native void logExit(Object o, long fid);
-
     // Slow-path monitor entry and exit - called from MonitorSupport.Policy
 
     /**
@@ -925,11 +979,11 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         return m;
     }
 
-    static void slowEnter(Thread current, Object o, long fid) {
+    static void slowEnter(Thread current, Object o) {
         boolean isOwned = current.hasLocked(o);
         Monitor m = monitorFor(o, current, isOwned);
         m.enter(current);
-        current.push(m, fid);
+        current.push(m);
     }
 
     static void jniEnter(Thread current, Object o) {
@@ -939,27 +993,27 @@ import static java.lang.MonitorSupport.Fast.INFLATED;
         m.enter(current);
     }
 
-    // We have to special-case this so we can save and restore the native thread's
-    // VMResult field, which is used to communicate results in the interpreter.
-    static void slowExitOnRemoveActivation(Thread current, Object o, long fid) {
-        Object vmResult = getVMResult();
-        if (vmResult != null) {
-            storeVMResult(null);
-            slowExit(current, o, fid);
-            storeVMResult(vmResult);
-        } else {
-            slowExit(current, o, fid);
-        }
-    }
-
-    static void slowExit(Thread current, Object o, long fid) {
+    static void slowExit(Thread current, Object o) {
         if (!current.hasLocked(o))
             throw new IllegalMonitorStateException();
 
         Monitor m = monitorFor(o, current, true /* isOwned */);
         // Caution: does the order here matter?
-        current.pop(m, fid);
+        current.pop(m);
         m.exit(current);
+    }
+
+    // We have to special-case this so we can save and restore the native thread's
+    // VMResult field, which is used to communicate results in the interpreter.
+    static void slowExitOnRemoveActivation(Thread current, Object o) {
+        Object vmResult = getVMResult();
+        if (vmResult != null) {
+            storeVMResult(null);
+            slowExit(current, o);
+            storeVMResult(vmResult);
+        } else {
+            slowExit(current, o);
+        }
     }
 
     static void jniExit(Thread current, Object o) {

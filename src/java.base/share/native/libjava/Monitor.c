@@ -33,8 +33,6 @@
 static JNINativeMethod methods[] = {
     {"getVMResult",      "()Ljava/lang/Object;"   , (void *)&JVM_Monitor_getVMResult},
     {"storeVMResult",    "(Ljava/lang/Object;)V"  , (void *)&JVM_Monitor_storeVMResult},
-    {"logEnter",         "(Ljava/lang/Object;J)V"  , (void *)&JVM_Monitor_log_enter},
-    {"logExit",          "(Ljava/lang/Object;J)V"  , (void *)&JVM_Monitor_log_exit},
     {"postJvmtiEvent",   "(ILjava/lang/Thread;Ljava/lang/Object;JZ)V", (void *)&JVM_Monitor_postJvmtiEvent}
 };
 

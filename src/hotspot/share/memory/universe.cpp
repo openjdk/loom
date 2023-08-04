@@ -114,6 +114,7 @@ enum OutOfMemoryInstance { _oom_java_heap,
                            _oom_count };
 
 OopHandle Universe::_out_of_memory_errors;
+OopHandle Universe:: _class_init_stack_overflow_error;
 OopHandle Universe::_delayed_stack_overflow_error_message;
 OopHandle Universe::_preallocated_out_of_memory_error_array;
 volatile jint Universe::_preallocated_out_of_memory_error_avail_count = 0;
@@ -138,10 +139,8 @@ LatestMethodCache* Universe::_do_stack_walk_cache     = nullptr;
 
 // Java object monitor support
 LatestMethodCache* Universe::_object_monitorEnter_cache = nullptr;
-LatestMethodCache* Universe::_object_monitorEnterFrameId_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorExit_cache = nullptr;
-LatestMethodCache* Universe::_object_monitorExitFrameId_cache = nullptr;
-LatestMethodCache* Universe::_object_monitorExitVoid_cache = nullptr;
+LatestMethodCache* Universe::_object_monitorExitAll_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorNotifyAll_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorWaitUninterruptibly_cache = nullptr;
 LatestMethodCache* Universe::_object_monitorJNIEnter_cache = nullptr;
@@ -151,10 +150,8 @@ LatestMethodCache* Universe::_object_compilerMonitorEnter_cache = NULL;
 LatestMethodCache* Universe::_object_compilerMonitorExit_cache = NULL;
 #endif
 Method* Universe::_object_monitorEnter = nullptr;
-Method* Universe::_object_monitorEnterFrameId = nullptr;
 Method* Universe::_object_monitorExit  = nullptr;
-Method* Universe::_object_monitorExitFrameId  = nullptr;
-Method* Universe::_object_monitorExitVoid  = nullptr;
+Method* Universe::_object_monitorExitAll  = nullptr;
 Method* Universe::_object_monitorNotifyAll  = nullptr;
 Method* Universe::_object_monitorWaitUninterruptibly  = nullptr;
 Method* Universe::_object_monitorJNIEnter = nullptr;
@@ -259,10 +256,8 @@ void Universe::metaspace_pointers_do(MetaspaceClosure* it) {
   _throw_no_such_method_error_cache->metaspace_pointers_do(it);
   _do_stack_walk_cache->metaspace_pointers_do(it);
   _object_monitorEnter_cache->metaspace_pointers_do(it);
-  _object_monitorEnterFrameId_cache->metaspace_pointers_do(it);
   _object_monitorExit_cache->metaspace_pointers_do(it);
-  _object_monitorExitFrameId_cache->metaspace_pointers_do(it);
-  _object_monitorExitVoid_cache->metaspace_pointers_do(it);
+  _object_monitorExitAll_cache->metaspace_pointers_do(it);
   _object_monitorNotifyAll_cache->metaspace_pointers_do(it);
   _object_monitorWaitUninterruptibly_cache->metaspace_pointers_do(it);
   _object_monitorJNIEnter_cache->metaspace_pointers_do(it);
@@ -323,10 +318,8 @@ void Universe::serialize(SerializeClosure* f) {
   _throw_no_such_method_error_cache->serialize(f);
   _do_stack_walk_cache->serialize(f);
   _object_monitorEnter_cache->serialize(f);
-  _object_monitorEnterFrameId_cache->serialize(f);
   _object_monitorExit_cache->serialize(f);
-  _object_monitorExitFrameId_cache->serialize(f);
-  _object_monitorExitVoid_cache->serialize(f);
+  _object_monitorExitAll_cache->serialize(f);
   _object_monitorNotifyAll_cache->serialize(f);
   _object_monitorWaitUninterruptibly_cache->serialize(f);
   _object_monitorJNIEnter_cache->serialize(f);
@@ -660,6 +653,9 @@ oop Universe::out_of_memory_error_realloc_objects() {
 
 // Throw default _out_of_memory_error_retry object as it will never propagate out of the VM
 oop Universe::out_of_memory_error_retry()              { return out_of_memory_errors()->obj_at(_oom_retry);  }
+
+oop Universe::class_init_out_of_memory_error()         { return out_of_memory_errors()->obj_at(_oom_java_heap); }
+oop Universe::class_init_stack_overflow_error()        { return _class_init_stack_overflow_error.resolve(); }
 oop Universe::delayed_stack_overflow_error_message()   { return _delayed_stack_overflow_error_message.resolve(); }
 
 
@@ -861,10 +857,8 @@ jint universe_init() {
   Universe::_throw_no_such_method_error_cache = new LatestMethodCache();
   Universe::_do_stack_walk_cache = new LatestMethodCache();
   Universe::_object_monitorEnter_cache = new LatestMethodCache();
-  Universe::_object_monitorEnterFrameId_cache = new LatestMethodCache();
   Universe::_object_monitorExit_cache = new LatestMethodCache();
-  Universe::_object_monitorExitFrameId_cache = new LatestMethodCache();
-  Universe::_object_monitorExitVoid_cache = new LatestMethodCache();
+  Universe::_object_monitorExitAll_cache = new LatestMethodCache();
   Universe::_object_monitorNotifyAll_cache = new LatestMethodCache();
   Universe::_object_monitorWaitUninterruptibly_cache = new LatestMethodCache();
   Universe::_object_monitorJNIEnter_cache = new LatestMethodCache();
@@ -1037,29 +1031,17 @@ void Universe::initialize_known_methods(TRAPS) {
                           vmSymbols::object_void_signature(), true, CHECK);
   _object_monitorEnter = object_monitorEnter_method();
 
-  initialize_known_method(_object_monitorEnterFrameId_cache,
-                          vmClasses::Object_klass(),
-                          "monitorEnter",
-                          vmSymbols::object_long_void_signature(), true, CHECK);
-  _object_monitorEnterFrameId = object_monitorEnterFrameId_method();
-
   initialize_known_method(_object_monitorExit_cache,
                           vmClasses::Object_klass(),
                           "monitorExit",
                           vmSymbols::object_void_signature(), true, CHECK);
   _object_monitorExit = object_monitorExit_method();
 
-  initialize_known_method(_object_monitorExitFrameId_cache,
+  initialize_known_method(_object_monitorExitAll_cache,
                           vmClasses::Object_klass(),
-                          "monitorExit",
-                          vmSymbols::object_long_void_signature(), true, CHECK);
-  _object_monitorExitFrameId = object_monitorExitFrameId_method();
-
-  initialize_known_method(_object_monitorExitVoid_cache,
-                          vmClasses::Object_klass(),
-                          "monitorExit",
-                          vmSymbols::void_method_signature(), true, CHECK);
-  _object_monitorExitVoid = object_monitorExitVoid_method();
+                          "monitorExitAll",
+                          vmSymbols::int_void_signature(), true, CHECK);
+  _object_monitorExitAll = object_monitorExitAll_method();
 
   initialize_known_method(_object_monitorNotifyAll_cache,
                           vmClasses::Object_klass(),
@@ -1158,6 +1140,11 @@ bool universe_post_init() {
 
   Handle msg = java_lang_String::create_from_str("/ by zero", CHECK_false);
   java_lang_Throwable::set_message(Universe::arithmetic_exception_instance(), msg());
+
+  // Setup preallocated StackOverflowError for use with class initialization failure
+  k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_StackOverflowError(), true, CHECK_false);
+  instance = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
+  Universe::_class_init_stack_overflow_error = OopHandle(Universe::vm_global(), instance);
 
   Universe::initialize_known_methods(CHECK_false);
 

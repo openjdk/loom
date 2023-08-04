@@ -479,6 +479,25 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Sleep for the specified number of nanoseconds, subject to the precision
+     * and accuracy of system timers and schedulers.
+     */
+    private static void sleepNanos(long nanos) throws InterruptedException {
+        ThreadSleepEvent event = beforeSleep(nanos);
+        try {
+            if (currentThread() instanceof VirtualThread vthread) {
+                vthread.sleepNanos(nanos);
+            } else {
+                sleepNanos0(nanos);
+            }
+        } finally {
+            afterSleep(event);
+        }
+    }
+
+    private static native void sleepNanos0(long nanos) throws InterruptedException;
+
+    /**
      * Causes the currently executing thread to sleep (temporarily cease
      * execution) for the specified number of milliseconds, subject to
      * the precision and accuracy of system timers and schedulers. The thread
@@ -500,19 +519,8 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException("timeout value is negative");
         }
         long nanos = MILLISECONDS.toNanos(millis);
-        ThreadSleepEvent event = beforeSleep(nanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(nanos);
-            } else {
-                sleep0(nanos);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(nanos);
     }
-
-    private static native void sleep0(long nanos) throws InterruptedException;
 
     /**
      * Causes the currently executing thread to sleep (temporarily cease
@@ -548,17 +556,7 @@ public class Thread implements Runnable {
         // total sleep time, in nanoseconds
         long totalNanos = MILLISECONDS.toNanos(millis);
         totalNanos += Math.min(Long.MAX_VALUE - totalNanos, nanos);
-
-        ThreadSleepEvent event = beforeSleep(totalNanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(totalNanos);
-            } else {
-                sleep0(totalNanos);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(totalNanos);
     }
 
     /**
@@ -582,17 +580,7 @@ public class Thread implements Runnable {
         if (nanos < 0) {
             return;
         }
-
-        ThreadSleepEvent event = beforeSleep(nanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(nanos);
-            } else {
-                sleep0(nanos);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(nanos);
     }
 
     /**
@@ -1590,7 +1578,7 @@ public class Thread implements Runnable {
      */
     @Hidden
     @ForceInline
-    private void runWith(Object bindings, Runnable op) {
+    final void runWith(Object bindings, Runnable op) {
         ensureMaterializedForStackWalk(bindings);
         op.run();
         Reference.reachabilityFence(bindings);
@@ -1701,7 +1689,7 @@ public class Thread implements Runnable {
      *
      * @implNote In the JDK Reference Implementation, interruption of a thread
      * that is not alive still records that the interrupt request was made and
-     * will report it via {@link #interrupted} and {@link #isInterrupted()}.
+     * will report it via {@link #interrupted()} and {@link #isInterrupted()}.
      *
      * @throws  SecurityException
      *          if the current thread cannot modify this thread
@@ -2008,22 +1996,6 @@ public class Thread implements Runnable {
      */
     public static int enumerate(Thread[] tarray) {
         return currentThread().getThreadGroup().enumerate(tarray);
-    }
-
-    /**
-     * Throws {@code UnsupportedOperationException}.
-     *
-     * @return     nothing
-     *
-     * @deprecated This method was originally designed to count the number of
-     *             stack frames but the results were never well-defined and it
-     *             depended on thread-suspension.
-     *             This method is subject to removal in a future version of Java SE.
-     * @see        StackWalker
-     */
-    @Deprecated(since="1.2", forRemoval=true)
-    public int countStackFrames() {
-        throw new UnsupportedOperationException();
     }
 
     /**
@@ -2416,34 +2388,28 @@ public class Thread implements Runnable {
         holder = null;
     }
 
-    // Temporary tracking of locked objects to replace the native
+    // Tracking of locked objects to complement the use of native
     // BasicObjectLock in the VM frames. Synchronized method exit
-    // specifically needs this to find which object to unlock.
+    // specifically needs this to find which object(s) to unlock.
     // Note that only enter/exit cause pushes and pops so an object
     // (or monitor) on the stack may not actually be locked as
     // Object.wait() may have been called. However checking by the
     // current thread is always correct - so holdsLock can either
     // check the Monitor or the stack entries (fast-locking uses the
     // stack). External queries must do more detailed checks.
-    // We also need to track the frameId's of the monitors that have
-    // been locked so that they can be unlocked on-demand i.e. by JVM TI.
     // As JNI locking is not required to be strictly nested/balanced we
     // need a seperate list to track that.
 
     static final String LOCKSTACK_OOME = "OutOfMemoryError when growing lockStack";
     static final int BLOCK_SIZE = 16;  // The lockStack grows by this amount
     Object[] lockStack = new Object[BLOCK_SIZE];
-    long[]   frameId   = new long[BLOCK_SIZE];
     int lockStackPos   = 0;
 
     void grow() {
         try {
             Object[] newStack = new Object[lockStack.length + BLOCK_SIZE];
-            long[] newFrameId = new long[lockStack.length + BLOCK_SIZE];
             System.arraycopy(lockStack, 0, newStack, 0, lockStack.length);
-            System.arraycopy(frameId, 0, newFrameId, 0, frameId.length);
             lockStack = newStack;
-            frameId = newFrameId;
         } catch (OutOfMemoryError oome) {
             // For simplicity we abort on OOME.
             // We are out of memory so any allocation here is potentially
@@ -2453,16 +2419,25 @@ public class Thread implements Runnable {
         MonitorSupport.log("Expanded thread lockStack to size " + lockStack.length);
     }
 
-    void push(Object lockee, long fid) {
+    void push(Object lockee) {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         if (lockStackPos == lockStack.length) {
             grow();
         }
-        frameId[lockStackPos] = fid;
         lockStack[lockStackPos++] = lockee;
     }
 
-    void pop(Object lockee, long fid) {
+    Object pop() {
+        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
+        if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
+        Object o = lockStack[--lockStackPos];
+        lockStack[lockStackPos] = null;
+        return o;
+    }
+
+    void pop(Object lockee) {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
         // If we have a bug we can't trigger throwing AIOOBE as that uses
         // synchronized code and we get infinite recursion.
@@ -2472,35 +2447,15 @@ public class Thread implements Runnable {
         if (o != lockee) {
             MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
         }
-        /*if (frameId[lockStackPos] != fid) {
-            MonitorSupport.abort("frame id mismatched");
-        }*/
         lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
     }
 
-    Object pop(long fid) {
+    Object peek() {
         if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        Object o = lockStack[--lockStackPos];
-        /*if (frameId[lockStackPos] != fid) {
-            MonitorSupport.abort("frame id mismatched");
-        }*/
-        lockStack[lockStackPos] = null;
-        frameId[lockStackPos] = 0;
-        return o;
-    }
-
-    Object peek(long fid) {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        /*if (frameId[lockStackPos - 1] != fid) {
-            MonitorSupport.abort("frame id mismatched");
-        }*/
+        // If we have a bug we can't trigger throwing AIOOBE as that uses
+        // synchronized code and we get infinite recursion.
+        if (lockStackPos == 0) MonitorSupport.abort("nothing to pop!");
         return lockStack[lockStackPos - 1];
-    }
-
-    long peekId() {
-        if (this != Thread.currentThread()) MonitorSupport.abort("invariant");
-        return lockStackPos > 0 ? frameId[lockStackPos - 1] : 0;
     }
 
     // This count is only useful for fast-locked lockees

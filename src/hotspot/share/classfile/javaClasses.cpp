@@ -129,15 +129,21 @@ jint java_lang_MonitorSupport::sync_enabled() {
   return base->int_field(_static_sync_enabled_offset);
 }
 
-// Register native methods of MonitorSupport
+// Register native methods of MonitorSupport directly
 void java_lang_MonitorSupport::register_natives(TRAPS) {
   InstanceKlass* obj = vmClasses::MonitorSupport_klass();
   Method::register_native(obj, vmSymbols::log_name(),
                           vmSymbols::string_void_signature(),
                           (address) &JVM_Monitor_log, THREAD);
+  Method::register_native(obj, vmSymbols::log_exitAll_name(),
+                          vmSymbols::int_void_signature(),
+                          (address) &JVM_Monitor_log_exitAll, THREAD);
   Method::register_native(obj, vmSymbols::abort_name(),
                           vmSymbols::string_void_signature(),
                           (address) &JVM_Monitor_abort, THREAD);
+  Method::register_native(obj, vmSymbols::abortException_name(),
+                          vmSymbols::string_throwable_void_signature(),
+                          (address) &JVM_Monitor_abortException, THREAD);
   Method::register_native(obj, vmSymbols::monitor_cas_lock_state_name(),
                           vmSymbols::object_int_int_bool_signature(),
                           (address) &JVM_Monitor_casLockState, THREAD);
@@ -146,8 +152,6 @@ void java_lang_MonitorSupport::register_natives(TRAPS) {
                           (address) &JVM_Monitor_getLockState, THREAD);
   Method::register_native(obj, vmSymbols::getMonitorPolicy_name(),
                           vmSymbols::void_int_signature(), (address) &JVM_MonitorPolicy, THREAD);
-  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
-                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 // Register native methods of Object
@@ -167,8 +171,6 @@ void java_lang_Object::register_natives(TRAPS) {
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorEnter, THREAD);
   Method::register_native(obj, vmSymbols::monitorExit0_name(),
                           vmSymbols::object_void_signature(), (address) &JVM_MonitorExit, THREAD);
-  Method::register_native(obj, vmSymbols::object_caller_frame_id(),
-                          vmSymbols::void_long_signature(), (address) &JVM_CallerFrameId, THREAD);
 }
 
 int JavaClasses::compute_injected_offset(InjectedFieldID id) {
@@ -873,16 +875,16 @@ static void initialize_static_primitive_field(fieldDescriptor* fd, Handle mirror
   BasicType t = fd->field_type();
   switch (t) {
   case T_BYTE:
-    mirror()->byte_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->byte_field_put(fd->offset(), (jbyte)(fd->int_initial_value()));
     break;
   case T_BOOLEAN:
-    mirror()->bool_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->bool_field_put(fd->offset(), (jboolean)(fd->int_initial_value()));
     break;
   case T_CHAR:
-    mirror()->char_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->char_field_put(fd->offset(), (jchar)(fd->int_initial_value()));
     break;
   case T_SHORT:
-    mirror()->short_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->short_field_put(fd->offset(), (jshort)(fd->int_initial_value()));
     break;
   case T_INT:
     mirror()->int_field_put(fd->offset(), fd->int_initial_value());
@@ -1602,7 +1604,6 @@ int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
 int java_lang_Thread::_scopedValueBindings_offset;
 JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
-int java_lang_Thread::_frame_id_offset;
 int java_lang_Thread::_lock_stack_pos_offset;
 
 #define THREAD_FIELDS_DO(macro) \
@@ -1616,7 +1617,6 @@ int java_lang_Thread::_lock_stack_pos_offset;
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
   macro(_continuation_offset,  k, "cont", continuation_signature, false); \
   macro(_scopedValueBindings_offset, k, "scopedValueBindings", object_signature, false); \
-  macro(_frame_id_offset,      k, "frameId", long_array_signature, false); \
   macro(_lock_stack_pos_offset,k, "lockStackPos", int_signature, false)
 
 void java_lang_Thread::compute_offsets() {
@@ -2821,15 +2821,19 @@ Handle java_lang_Throwable::create_initialization_error(JavaThread* current, Han
   assert(throwable.not_null(), "shouldn't be");
 
   // Now create the message from the original exception and thread name.
-  Symbol* message = java_lang_Throwable::detail_message(throwable());
   ResourceMark rm(current);
+  const char *message = nullptr;
+  oop detailed_message = java_lang_Throwable::message(throwable());
+  if (detailed_message != nullptr) {
+    message = java_lang_String::as_utf8_string(detailed_message);
+  }
   stringStream st;
   st.print("Exception %s%s ", throwable()->klass()->name()->as_klass_external_name(),
              message == nullptr ? "" : ":");
   if (message == nullptr) {
     st.print("[in thread \"%s\"]", current->name());
   } else {
-    st.print("%s [in thread \"%s\"]", message->as_C_string(), current->name());
+    st.print("%s [in thread \"%s\"]", message, current->name());
   }
 
   Symbol* exception_name = vmSymbols::java_lang_ExceptionInInitializerError();
@@ -2837,7 +2841,7 @@ Handle java_lang_Throwable::create_initialization_error(JavaThread* current, Han
   // If new_exception returns a different exception while creating the exception,
   // abandon the attempt to save the initialization error and return null.
   if (init_error->klass()->name() != exception_name) {
-    log_info(class, init)("Exception thrown while saving initialization exception %s",
+    log_info(class, init)("Exception %s thrown while saving initialization exception",
                         init_error->klass()->external_name());
     return Handle();
   }
@@ -3682,21 +3686,6 @@ ConstantPool* reflect_ConstantPool::get_cp(oop reflect) {
   return InstanceKlass::cast(k)->constants();
 }
 
-int reflect_UnsafeStaticFieldAccessorImpl::_base_offset;
-
-#define UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(macro) \
-  macro(_base_offset, k, "base", object_signature, false)
-
-void reflect_UnsafeStaticFieldAccessorImpl::compute_offsets() {
-  InstanceKlass* k = vmClasses::reflect_UnsafeStaticFieldAccessorImpl_klass();
-  UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(FIELD_COMPUTE_OFFSET);
-}
-
-#if INCLUDE_CDS
-void reflect_UnsafeStaticFieldAccessorImpl::serialize_offsets(SerializeClosure* f) {
-  UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
-}
-#endif
 
 // Support for java_lang_ref_Reference
 
@@ -4693,7 +4682,8 @@ bool java_lang_ClassLoader::is_trusted_loader(oop loader) {
 }
 
 // Return true if this is one of the class loaders associated with
-// the generated bytecodes for reflection.
+// the generated bytecodes for serialization constructor returned
+// by sun.reflect.ReflectionFactory::newConstructorForSerialization
 bool java_lang_ClassLoader::is_reflection_class_loader(oop loader) {
   if (loader != nullptr) {
     Klass* delegating_cl_class = vmClasses::reflect_DelegatingClassLoader_klass();
@@ -5283,7 +5273,6 @@ void java_lang_InternalError::serialize_offsets(SerializeClosure* f) {
   f(java_lang_reflect_Field) \
   f(java_lang_reflect_RecordComponent) \
   f(reflect_ConstantPool) \
-  f(reflect_UnsafeStaticFieldAccessorImpl) \
   f(java_lang_reflect_Parameter) \
   f(java_lang_Module) \
   f(java_lang_StackTraceElement) \

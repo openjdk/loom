@@ -84,9 +84,6 @@ JVM_MonitorExit(JNIEnv *env, jclass unused, jobject obj);
 JNIEXPORT jint JNICALL
 JVM_MonitorPolicy(void);
 
-JNIEXPORT jlong JNICALL
-JVM_CallerFrameId(JNIEnv* env, jclass ignored);
-
 JNIEXPORT jobject JNICALL
 JVM_Clone(JNIEnv *env, jobject obj);
 
@@ -97,10 +94,16 @@ JNIEXPORT void JNICALL
 JVM_Monitor_abort(JNIEnv* env, jclass ignored, jstring estr);
 
 JNIEXPORT void JNICALL
+JVM_Monitor_abortException(JNIEnv* env, jclass ignored, jstring estr, jthrowable t);
+
+JNIEXPORT void JNICALL
 JVM_Monitor_log_enter(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
 
 JNIEXPORT void JNICALL
 JVM_Monitor_log_exit(JNIEnv* env, jclass ignored, jobject obj, jlong fid);
+
+JNIEXPORT void JNICALL
+JVM_Monitor_log_exitAll(JNIEnv* env, jclass ignored, int count);
 
 JNIEXPORT void JNICALL
 JVM_Monitor_log(JNIEnv* env, jclass ignored, jstring msg);
@@ -319,7 +322,7 @@ JNIEXPORT void JNICALL
 JVM_Yield(JNIEnv *env, jclass threadClass);
 
 JNIEXPORT void JNICALL
-JVM_Sleep(JNIEnv *env, jclass threadClass, jlong nanos);
+JVM_SleepNanos(JNIEnv *env, jclass threadClass, jlong nanos);
 
 JNIEXPORT jobject JNICALL
 JVM_CurrentCarrierThread(JNIEnv *env, jclass threadClass);

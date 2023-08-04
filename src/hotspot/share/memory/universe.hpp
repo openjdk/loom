@@ -110,6 +110,7 @@ class Universe: AllStatic {
 
   // preallocated error objects (no backtrace)
   static OopHandle    _out_of_memory_errors;
+  static OopHandle    _class_init_stack_overflow_error;
 
   // preallocated cause message for delayed StackOverflowError
   static OopHandle    _delayed_stack_overflow_error_message;
@@ -121,10 +122,8 @@ class Universe: AllStatic {
   static LatestMethodCache* _do_stack_walk_cache;      // method for stack walker callback
 
   static LatestMethodCache* _object_monitorEnter_cache; // java.lang.Object::monitorEnter(obj)
-  static LatestMethodCache* _object_monitorEnterFrameId_cache; // java.lang.Object::monitorEnter(obj)
   static LatestMethodCache* _object_monitorExit_cache;  // java.lang.Object::monitorExit(obj)
-  static LatestMethodCache* _object_monitorExitFrameId_cache;  // java.lang.Object::monitorExit(obj)
-  static LatestMethodCache* _object_monitorExitVoid_cache;  // java.lang.Object::monitorExit()
+  static LatestMethodCache* _object_monitorExitAll_cache;  // java.lang.Object::monitorExitAll(count)
   static LatestMethodCache* _object_monitorNotifyAll_cache;  // java.lang.Object::monitorNotifyAll(obj)
   static LatestMethodCache* _object_monitorWaitUninterruptibly_cache;  // java.lang.Object::monitorWaitUninterruptibly(obj)
   static LatestMethodCache* _object_monitorJNIEnter_cache; // java.lang.Object::monitorEnter(obj)
@@ -136,10 +135,8 @@ class Universe: AllStatic {
 #endif
 
   static Method* _object_monitorEnter; // java.lang.Object::monitorEnter(obj)
-  static Method* _object_monitorEnterFrameId; // java.lang.Object::monitorEnter(obj)
   static Method* _object_monitorExit;  // java.lang.Object::monitorExit(obj)
-  static Method* _object_monitorExitFrameId;  // java.lang.Object::monitorExit(obj)
-  static Method* _object_monitorExitVoid;  // java.lang.Object::monitorExit()
+  static Method* _object_monitorExitAll;  // java.lang.Object::monitorExitAll(count)
   static Method* _object_monitorNotifyAll;  // java.lang.Object::monitorNotifyAll(obj)
   static Method* _object_monitorWaitUninterruptibly;  // java.lang.Object::monitorWaitUninterruptibly(obj)
   static Method* _object_monitorJNIEnter; // java.lang.Object::monitorEnter(obj)
@@ -299,13 +296,11 @@ class Universe: AllStatic {
   static Method*      do_stack_walk_method()          { return _do_stack_walk_cache->get_method(); }
 
   static Method*      object_monitorEnter_method()        { return _object_monitorEnter_cache->get_method(); }
-  static Method*      object_monitorEnterFrameId_method() { return _object_monitorEnterFrameId_cache->get_method(); }
   static Method*      object_monitorExit_method()         { return _object_monitorExit_cache->get_method(); }
-  static Method*      object_monitorExitFrameId_method()  { return _object_monitorExitFrameId_cache->get_method(); }
-  static Method*      object_monitorExitVoid_method()     { return _object_monitorExitVoid_cache->get_method(); }
+  static Method*      object_monitorExitAll_method()      { return _object_monitorExitAll_cache->get_method(); }
   static Method**     object_monitorEnter_addr()          { return &_object_monitorEnter; }
   static Method**     object_monitorExit_addr()           { return &_object_monitorExit; }
-  static Method**     object_monitorExitVoid_addr()       { return &_object_monitorExitVoid; }
+  static Method**     object_monitorExitAll_addr()        { return &_object_monitorExitAll; }
   static Method*      object_monitorNotifyAll_method()    { return _object_monitorNotifyAll_cache->get_method(); }
   static Method**     object_monitorNotifyAll_addr()      { return &_object_monitorNotifyAll; }
   static Method*      object_monitorWaitUninterruptibly_method()    { return _object_monitorWaitUninterruptibly_cache->get_method(); }
@@ -357,6 +352,11 @@ class Universe: AllStatic {
   // Throw default _out_of_memory_error_retry object as it will never propagate out of the VM
   static oop out_of_memory_error_retry();
   static oop delayed_stack_overflow_error_message();
+
+  // Saved StackOverflowError and OutOfMemoryError for use when
+  // class initialization can't create ExceptionInInitializerError.
+  static oop class_init_stack_overflow_error();
+  static oop class_init_out_of_memory_error();
 
   // If it's a certain type of OOME object
   static bool is_out_of_memory_error_metaspace(oop ex_obj);

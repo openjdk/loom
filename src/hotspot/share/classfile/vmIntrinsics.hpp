@@ -968,6 +968,24 @@ class methodHandle;
                                                "Ljdk/internal/vm/vector/VectorSupport$VectorPayload;")                                         \
    do_name(vector_frombits_coerced_name, "fromBitsCoerced")                                                                                    \
                                                                                                                                                \
+  do_intrinsic(_VectorShuffleIota, jdk_internal_vm_vector_VectorSupport, vector_shuffle_step_iota_name, vector_shuffle_step_iota_sig, F_S)     \
+   do_signature(vector_shuffle_step_iota_sig, "(Ljava/lang/Class;"                                                                             \
+                                               "Ljava/lang/Class;"                                                                             \
+                                               "Ljdk/internal/vm/vector/VectorSupport$VectorSpecies;"                                          \
+                                               "IIII"                                                                                          \
+                                               "Ljdk/internal/vm/vector/VectorSupport$ShuffleIotaOperation;)"                                  \
+                                               "Ljdk/internal/vm/vector/VectorSupport$VectorShuffle;")                                         \
+   do_name(vector_shuffle_step_iota_name, "shuffleIota")                                                                                       \
+                                                                                                                                               \
+  do_intrinsic(_VectorShuffleToVector, jdk_internal_vm_vector_VectorSupport, vector_shuffle_to_vector_name, vector_shuffle_to_vector_sig, F_S) \
+   do_signature(vector_shuffle_to_vector_sig, "(Ljava/lang/Class;"                                                                             \
+                                               "Ljava/lang/Class;"                                                                             \
+                                               "Ljava/lang/Class;"                                                                             \
+                                               "Ljdk/internal/vm/vector/VectorSupport$VectorShuffle;"                                          \
+                                               "ILjdk/internal/vm/vector/VectorSupport$ShuffleToVectorOperation;)"                             \
+                                               "Ljdk/internal/vm/vector/VectorSupport$Vector;")                                                \
+   do_name(vector_shuffle_to_vector_name, "shuffleToVector")                                                                                   \
+                                                                                                                                               \
   do_intrinsic(_VectorLoadOp, jdk_internal_vm_vector_VectorSupport, vector_load_op_name, vector_load_op_sig, F_S)                              \
    do_signature(vector_load_op_sig, "(Ljava/lang/Class;"                                                                                       \
                                      "Ljava/lang/Class;"                                                                                       \
@@ -1089,7 +1107,7 @@ class methodHandle;
    do_signature(vector_extract_sig, "(Ljava/lang/Class;"                                                                                       \
                                      "Ljava/lang/Class;"                                                                                       \
                                      "I"                                                                                                       \
-                                     "Ljdk/internal/vm/vector/VectorSupport$Vector;"                                                           \
+                                     "Ljdk/internal/vm/vector/VectorSupport$VectorPayload;"                                                    \
                                      "I"                                                                                                       \
                                      "Ljdk/internal/vm/vector/VectorSupport$VecExtractOp;)"                                                    \
                                      "J")                                                                                                      \
@@ -1248,9 +1266,6 @@ class methodHandle;
                                                                                                                           \
   do_intrinsic(_Object_init,              java_lang_Object, object_initializer_name, void_method_signature,        F_R)   \
   /*    (symbol object_initializer_name defined above) */                                                                 \
-                                                                                                                          \
-  do_intrinsic(_Object_caller_frame_id,  java_lang_Object, object_caller_frame_id, void_long_signature,           F_SN)   \
-   do_name(     object_caller_frame_id, "getCallerFrameId")                                                               \
                                                                                                                           \
   do_intrinsic(_Monitor_get_lock_state,    java_lang_MonitorSupport, monitor_get_lock_state_name, object_int_signature,   F_SN)  \
    do_name(     monitor_get_lock_state_name, "getLockState")                                                              \

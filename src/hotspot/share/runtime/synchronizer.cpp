@@ -56,6 +56,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/threads.hpp"
 #include "runtime/timer.hpp"
+#include "runtime/trimNativeHeap.hpp"
 #include "runtime/vframe.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"
@@ -522,7 +523,7 @@ static bool useHeavyMonitors() {
 
 // Java-based monitor methods
 
-void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) {
+void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 
   SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
@@ -530,14 +531,16 @@ void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current, jlong fid) 
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
-  args.push_long(fid);
-  methodHandle mh (current, Universe::object_monitorEnterFrameId_method());
+  methodHandle mh (current, Universe::object_monitorEnter_method());
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
   current->clear_system_java();
+  if (ObjectMonitorMode::native()) {
+    current->inc_held_monitor_count(1);
+  }
 }
 
-void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
+void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 
   SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
@@ -545,11 +548,14 @@ void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current, jlong fid) {
   JavaValue result(T_VOID);
   JavaCallArguments args;
   args.push_oop(obj);
-  args.push_long(fid);
-  methodHandle mh (current, Universe::object_monitorExitFrameId_method());
+  methodHandle mh (current, Universe::object_monitorExit_method());
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
+  assert(!current->has_pending_exception(), "No IMSE should be possible");
   current->clear_system_java();
+  if (ObjectMonitorMode::native()) {
+    current->dec_held_monitor_count(1);
+  }
 }
 
 void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
@@ -559,6 +565,9 @@ void ObjectSynchronizer::java_jni_enter(Handle obj, JavaThread* current) {
   args.push_oop(obj);
   methodHandle mh (current, Universe::object_monitorJNIEnter_method());
   JavaCalls::call(&result, mh, &args, current);
+  if (ObjectMonitorMode::native()) {
+    current->inc_held_monitor_count(1, true);
+  }
 }
 
 void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
@@ -568,6 +577,9 @@ void ObjectSynchronizer::java_jni_exit(Handle obj, JavaThread* current) {
   args.push_oop(obj);
   methodHandle mh (current, Universe::object_monitorJNIExit_method());
   JavaCalls::call(&result, mh, &args, current);
+  if (ObjectMonitorMode::native() && !current->has_pending_exception()) {
+    current->dec_held_monitor_count(1, true);
+  }
 }
 
 void ObjectSynchronizer::java_notify(Handle obj, JavaThread* current) {
@@ -786,8 +798,6 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
 // JNI locks on java objects
 // NOTE: must use heavy weight monitor to handle jni monitor enter
 
-#define JNI_FRAME_ID 951 //Non-zero, non-valid FP
-
 void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
   if (obj->klass()->is_value_based()) {
     handle_sync_on_value_based_class(obj, current);
@@ -841,8 +851,6 @@ void ObjectSynchronizer::jni_exit(Handle obj, TRAPS) {
 // Internal VM locks on java objects
 // standard constructor, allows locking failures
 
-#define OBJECT_LOCKER_FRAME_ID 785 //Non-zero, non-valid FP
-
 ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
   _thread(current), _obj(obj), _do_lock(do_lock), _old_nae(current->no_async_exception()) {
   _thread->check_for_valid_safepoint_state();
@@ -854,7 +862,7 @@ ObjectLocker::ObjectLocker(Handle obj, JavaThread* current, bool do_lock) :
       // Weak only restores old exception if there is no exception.
       // Any exception from enter will thus be kept.
       WeakPreserveExceptionMark pem(_thread);
-      ObjectSynchronizer::java_enter(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+      ObjectSynchronizer::java_enter(_obj, _thread);
     }
   }
 }
@@ -867,7 +875,7 @@ ObjectLocker::~ObjectLocker() {
       // Weak only restores old exception if there is no exception.
       // Any exception from exit will thus be kept.
       WeakPreserveExceptionMark pem(_thread);
-      ObjectSynchronizer::java_exit(_obj, _thread, OBJECT_LOCKER_FRAME_ID);
+      ObjectSynchronizer::java_exit(_obj, _thread);
     }
   }
   _thread->set_no_async_exception(_old_nae);
@@ -1903,6 +1911,7 @@ public:
 };
 
 static size_t delete_monitors(GrowableArray<ObjectMonitor*>* delete_list) {
+  NativeHeapTrimmer::SuspendMark sm("monitor deletion");
   size_t count = 0;
   for (ObjectMonitor* monitor: *delete_list) {
     delete monitor;
@@ -2054,7 +2063,9 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count(rec + 1);
+    if (ObjectMonitorMode::legacy() || ObjectMonitorMode::native()) {
+      _thread->dec_held_monitor_count(rec + 1);
+    }
   }
 };
 

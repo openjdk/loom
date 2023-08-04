@@ -214,7 +214,6 @@ void TemplateInterpreterGenerator::generate_all() {
 #ifdef AMD64
   method_entry(java_lang_MonitorSupport_getLockState)
   method_entry(java_lang_MonitorSupport_casLockState)
-  method_entry(java_lang_Object_callerFrameId)
 #endif
 
   AbstractInterpreter::initialize_method_handle_entries();
@@ -502,8 +501,6 @@ address TemplateInterpreterGenerator::generate_intrinsic_entry(AbstractInterpret
                                            : entry_point = generate_Float_floatToFloat16_entry(); break;
 
 #ifdef AMD64
-  case Interpreter::java_lang_Object_callerFrameId
-                                           : entry_point = generate_caller_frame_id(); break;
   case Interpreter::java_lang_MonitorSupport_getLockState
                                            : entry_point = generate_get_lock_state(); break;
   case Interpreter::java_lang_MonitorSupport_casLockState

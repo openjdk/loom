@@ -36,6 +36,7 @@
 #include "oops/methodData.hpp"
 #include "oops/objArrayKlass.hpp"
 #include "oops/oop.inline.hpp"
+#include "oops/resolvedIndyEntry.hpp"
 #include "prims/jvmtiExport.hpp"
 #include "prims/methodHandles.hpp"
 #include "runtime/frame.inline.hpp"
@@ -4338,6 +4339,85 @@ void TemplateTable::athrow() {
 // [saved rbp    ] <--- rbp
 void TemplateTable::monitorenter() {
   if (ObjectMonitorMode::java()) {
+
+    // check for null object
+    __ null_check(rax);
+
+    const Address monitor_block_top(
+          rbp, frame::interpreter_frame_monitor_block_top_offset * wordSize);
+    const Address monitor_block_bot(
+          rbp, frame::interpreter_frame_initial_sp_offset * wordSize);
+    const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
+
+    Label allocated;
+
+    Register rtop = LP64_ONLY(c_rarg3) NOT_LP64(rcx);
+    Register rbot = LP64_ONLY(c_rarg2) NOT_LP64(rbx);
+    Register rmon = LP64_ONLY(c_rarg1) NOT_LP64(rdx);
+
+    // initialize entry pointer
+    __ xorl(rmon, rmon); // points to free slot or null
+
+    // find a free slot in the monitor block (result in rmon)
+    {
+      Label entry, loop, exit;
+      __ movptr(rtop, monitor_block_top); // points to current entry,
+                                          // starting with top-most entry
+      __ lea(rbot, monitor_block_bot);    // points to word before bottom
+                                          // of monitor block
+      __ jmpb(entry);
+
+      __ bind(loop);
+      // check if current entry is used
+      __ cmpptr(Address(rtop, BasicObjectLock::obj_offset()), NULL_WORD);
+      // if not used then remember entry in rmon
+      __ cmovptr(Assembler::equal, rmon, rtop);   // cmov => cmovptr
+      // check if current entry is for same object
+      __ cmpptr(rax, Address(rtop, BasicObjectLock::obj_offset()));
+      // if same object then stop searching
+      __ jccb(Assembler::equal, exit);
+      // otherwise advance to next entry
+      __ addptr(rtop, entry_size);
+      __ bind(entry);
+      // check if bottom reached
+      __ cmpptr(rtop, rbot);
+      // if not at bottom then check this entry
+      __ jcc(Assembler::notEqual, loop);
+      __ bind(exit);
+    }
+
+    __ testptr(rmon, rmon); // check if a slot has been found
+    __ jcc(Assembler::notZero, allocated); // if found, continue with that one
+
+    // allocate one if there's no free slot
+    {
+      Label entry, loop;
+      // 1. compute new pointers          // rsp: old expression stack top
+      __ movptr(rmon, monitor_block_bot); // rmon: old expression stack bottom
+      __ subptr(rsp, entry_size);         // move expression stack top
+      __ subptr(rmon, entry_size);        // move expression stack bottom
+      __ mov(rtop, rsp);                  // set start value for copy loop
+      __ movptr(monitor_block_bot, rmon); // set new monitor block bottom
+      __ jmp(entry);
+      // 2. move expression stack contents
+      __ bind(loop);
+      __ movptr(rbot, Address(rtop, entry_size)); // load expression stack
+      // word from old location
+      __ movptr(Address(rtop, 0), rbot);          // and store it at new location
+      __ addptr(rtop, wordSize);                  // advance to next word
+      __ bind(entry);
+      __ cmpptr(rtop, rmon);                      // check if bottom reached
+      __ jcc(Assembler::notEqual, loop);          // if not at bottom then
+                                                  // copy next word
+      }
+
+    // call run-time routine
+    // rmon: points to monitor entry
+    __ bind(allocated);
+
+    // store object
+    __ movptr(Address(rmon, BasicObjectLock::obj_offset()), rax);
+
     assert(Bytecodes::_monitorenter == bytecode(), "Bad BC");
 
     transition(vtos, vtos);
@@ -4364,7 +4444,8 @@ void TemplateTable::monitorenter() {
     __ jump_from_interpreted(method, rdx);
 
     return;
-  }
+
+  } // end Java object monitors
 
   transition(atos, vtos);
 
@@ -4465,6 +4546,55 @@ void TemplateTable::monitorenter() {
 void TemplateTable::monitorexit() {
 
   if (ObjectMonitorMode::java()) {
+
+    // check for null object
+    __ null_check(rax);
+
+    const Address monitor_block_top(
+             rbp, frame::interpreter_frame_monitor_block_top_offset * wordSize);
+    const Address monitor_block_bot(
+              rbp, frame::interpreter_frame_initial_sp_offset * wordSize);
+    const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
+
+    Register rtop = LP64_ONLY(c_rarg1) NOT_LP64(rdx);
+    Register rbot = LP64_ONLY(c_rarg2) NOT_LP64(rbx);
+
+    Label found;
+
+    // find matching slot
+    {
+      Label entry, loop;
+      __ movptr(rtop, monitor_block_top); // points to current entry,
+      // starting with top-most entry
+      __ lea(rbot, monitor_block_bot);    // points to word before bottom
+      // of monitor block
+      __ jmpb(entry);
+
+      __ bind(loop);
+      // check if current entry is for same object
+      __ cmpptr(rax, Address(rtop, BasicObjectLock::obj_offset()));
+      // if same object then stop searching
+      __ jcc(Assembler::equal, found);
+      // otherwise advance to next entry
+      __ addptr(rtop, entry_size);
+      __ bind(entry);
+      // check if bottom reached
+      __ cmpptr(rtop, rbot);
+      // if not at bottom then check this entry
+      __ jcc(Assembler::notEqual, loop);
+    }
+
+    // error handling. Unlocking was not block-structured
+    __ call_VM(noreg, CAST_FROM_FN_PTR(address,
+                                       InterpreterRuntime::throw_illegal_monitor_state_exception));
+    __ should_not_reach_here();
+
+    // call run-time routine
+    __ bind(found);
+
+    // Free entry
+    __ movptr(Address(rtop, BasicObjectLock::obj_offset()), NULL_WORD);
+
     transition(vtos, vtos);
 
     Register method = rbx;
@@ -4487,8 +4617,10 @@ void TemplateTable::monitorexit() {
     __ profile_arguments_type(rax, rbx, rbcp, false);
 
     __ jump_from_interpreted(rbx, rdx);
+
     return;
-  }
+
+  } // end Java object monitors
 
   transition(atos, vtos);
 
