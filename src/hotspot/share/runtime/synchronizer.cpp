@@ -522,6 +522,11 @@ static bool useHeavyMonitors() {
 
 // Java-based monitor methods
 
+bool ObjectSynchronizer::java_quick_enter(oop obj, JavaThread* current) {
+  // for now we can't differentiate
+  return false;
+}
+
 void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 
@@ -539,14 +544,15 @@ void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current) {
   }
 }
 
-void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current) {
+void ObjectSynchronizer::java_exit(oop obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 
   SafepointMechanism::process_if_requested(current, true, false); // Clear any pending suspend
 
   JavaValue result(T_VOID);
   JavaCallArguments args;
-  args.push_oop(obj);
+  Handle h_obj(current, obj);
+  args.push_oop(h_obj);
   methodHandle mh (current, Universe::object_monitorExit_method());
   current->set_system_java();
   JavaCalls::call(&result, mh, &args, current);
@@ -874,7 +880,7 @@ ObjectLocker::~ObjectLocker() {
       // Weak only restores old exception if there is no exception.
       // Any exception from exit will thus be kept.
       WeakPreserveExceptionMark pem(_thread);
-      ObjectSynchronizer::java_exit(_obj, _thread);
+      ObjectSynchronizer::java_exit(_obj(), _thread);
     }
   }
   _thread->set_no_async_exception(_old_nae);

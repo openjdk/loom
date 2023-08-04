@@ -553,6 +553,11 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
                                  RTMLockingCounters* stack_rtm_counters,
                                  Metadata* method_data,
                                  bool use_rtm, bool profile_rtm) {
+
+  // for now always pick 'slow-path' as JOM will do quick/slow determination
+  testptr(objReg, objReg);
+
+  /*
   // Ensure the register assignments are disjoint
   assert(tmpReg == rax, "");
 
@@ -718,6 +723,8 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   // fast_unlock uses the same protocol.
   // ZFlag == 1 -> Success
   // ZFlag == 0 -> Failure - force control through the slow path
+
+  */
 }
 
 // obj: object to unlock
@@ -753,6 +760,12 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 // Xcheck:jni is enabled.
 
 void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpReg, bool use_rtm) {
+
+  // for now always pick 'slow-path' as JOM will do quick/slow determination
+  testptr(objReg, objReg);
+
+  /*
+
   assert(boxReg == rax, "");
   assert_different_registers(objReg, boxReg, tmpReg);
 
@@ -952,6 +965,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   xorl(tmpReg, tmpReg); // Set ZF == 1
 
   bind(NO_COUNT);
+  */
 }
 
 //-------------------------------------------------------------------------------------------

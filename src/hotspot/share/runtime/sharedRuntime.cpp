@@ -2244,7 +2244,7 @@ void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThre
   if (!SafepointSynchronize::is_synchronizing()) {
     // Only try quick_enter() if we're not trying to reach a safepoint
     // so that the calling thread reaches the safepoint more quickly.
-    if (ObjectSynchronizer::quick_enter(obj, current, lock)) {
+    if (ObjectSynchronizer::java_quick_enter(obj, current)) {
       return;
     }
   }
@@ -2254,7 +2254,7 @@ void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThre
   // and the model is that an exception implies the method failed.
   JRT_BLOCK_NO_ASYNC
   Handle h_obj(THREAD, obj);
-  ObjectSynchronizer::enter(h_obj, lock, current);
+  ObjectSynchronizer::java_enter(h_obj, current);
   assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
   JRT_BLOCK_END
 }
@@ -2276,11 +2276,15 @@ void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThrea
     }
     return;
   }
-  ObjectSynchronizer::exit(obj, lock, current);
+  JRT_BLOCK_NO_ASYNC
+  Handle h_obj(THREAD, obj);
+  ObjectSynchronizer::java_exit(obj, current);
+  assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
+  JRT_BLOCK_END
 }
 
 // Handles the uncommon cases of monitor unlocking in compiled code
-JRT_LEAF(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
+JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
   assert(current == JavaThread::current(), "pre-condition");
   SharedRuntime::monitor_exit_helper(obj, lock, current);
 JRT_END

@@ -3006,7 +3006,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     }
     //  TieredStopAtLevel=1;
 #ifndef C2_PATCH
-    set_mode_flags(_int);
+    //set_mode_flags(_int);
 #else
     //set_mode_flags(_int);
 #endif
