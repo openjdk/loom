@@ -135,7 +135,7 @@ public:
   static bool fast()   { return _mode == Mode::FAST; };
 
   static int  as_int()    { return (int)_mode; };
-  static const char* const as_string() {
+  static const char* as_string() {
     switch(_mode) {
     case Mode::LEGACY: return "legacy";
     case Mode::NATIVE: return "native";

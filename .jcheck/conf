@@ -2,7 +2,7 @@
 project=loom
 repository=loom
 jbs=JDK
-version=21
+version=22
 
 [checks]
 error=author,committer,whitespace

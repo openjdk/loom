@@ -2,14 +2,16 @@ Test: hotspot/jtreg :tier1_runtime
 
 Source info:
 
-commit 0c1d2d02bbe2d94909ddca7d74b74b2c166f473e (HEAD -> jom-master-merge)
-Merge: d285c088a4e bb377b26730
+commit 2b4b367d463f6a994fa6b6fda9079566c6679b70 (HEAD -> jom-master-merge)
+Merge: 2d69f29cc97 a9d21c61fb1
 Author: David Holmes <david.holmes@oracle.com>
-Date:   Tue Jun 13 21:28:21 2023 -0400
+Date:   Thu Aug 3 19:52:23 2023 -0400
 
     Merge
 
-Test results: passed: 603; failed: 16; error: 3
+Test results: passed: 617; failed: 18; error: 2
+
+(previous logged run: passed: 603; failed: 16; error: 3
 
 1. runtime/logging/MonitorInflationTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'inflate(has_locker):' missing from stdout/stderr
 
@@ -29,48 +31,47 @@ Also appears to be an issue with async exception delivery. The InternalError get
 
 5. runtime/Thread/TestThreadDumpClassInitMonitor.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected initial stack line: "TestThread" #12 prio=5 os_prio=0 cpu=1.03ms elapsed=0.89s tid=0x00007feee8027e80 nid=2094 runnable [0x00007fef303ba000]
 
-Intermittent. Stack has changed with JOM, so test needs adjusting.
+Intermittent. Stack has changed with JOM, so test may need adjusting. Now we se BasicObjectLock again this may be resolved.
 
 6. runtime/BootClassAppendProp/BootClassPathAppend.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.Object' missing from stdout/stderr
 
 Won't work in interpreted mode
 
-7. runtime/exceptionMsgs/NullPointerException/NullPointerExceptionTest.java#id0: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Got null but expected this message: "Cannot enter synchronized block because "this.nullInstanceField" is null".
-8. runtime/exceptionMsgs/NullPointerException/NullPointerExceptionTest.java#id1: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Got null but expected this message: "Cannot enter synchronized block because "this.nullInstanceField" is null".
+7. runtime/ClassInitErrors/TestStackOverflowDuringInit.java: Failed. Unexpected exit from test [exit code: 134]
 
-JOM changes the NPE error message as we throw directly from Java code not from in the VM.
+Test triggers stackoverflow then tries to recover, but it hits in the monitorEnter code and so we abort.
 
-9.  runtime/handshake/HandshakeDirectTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
+8.  runtime/handshake/HandshakeDirectTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
 
 Intermittent
 
-10. runtime/HiddenClasses/GCHiddenClass.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out
+9. runtime/HiddenClasses/GCHiddenClass.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out
 
 Intermittent. May not be suitable for interpreter mode
 
-11. runtime/HiddenClasses/TestHiddenClassUnloading.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Background compilation enabled
+10. runtime/HiddenClasses/TestHiddenClassUnloading.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Background compilation enabled
 
 Won't work in interpreted mode
 
-12. runtime/logging/loadLibraryTest/LoadLibraryTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out (timeout set to 1800000ms, elapsed time including timeout handling was 1800688ms).
+11. runtime/logging/loadLibraryTest/LoadLibraryTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out (timeout set to 1800000ms, elapsed time including timeout handling was 1800688ms).
 
 Intermittent. Unknown failure mode.
 
-13.  runtime/memory/LargePages/TestLargePagesFlags.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
+12.  runtime/memory/LargePages/TestLargePagesFlags.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
 
 Intermittent. Seems stuck at safepoint.
 
-14 - 17. runtime/Monitor/DeflationIntervalsTest.java#guaranteed_threshold_noSafepoint: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Async deflation needed: monitors used are above the threshold' missing from stdout/stder
-18. runtime/Monitor/MonitorUsedDeflationThresholdTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Did not find too_many string in output.
+13 - 16. runtime/Monitor/DeflationIntervalsTest.java#guaranteed_threshold_noSafepoint: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Async deflation needed: monitors used are above the threshold' missing from stdout/stder
+17. runtime/Monitor/MonitorUsedDeflationThresholdTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Did not find too_many string in output.
 
 Not applicable for JOM: no deflation
 
-19. runtime/Monitor/SyncOnValueBasedClassTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Synchronizing on object' missing from stdout/stderr
+18. runtime/Monitor/SyncOnValueBasedClassTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Synchronizing on object' missing from stdout/stderr
 
-This check may be missing in the JOM prototype.
+This check is missing in the JOM prototype.
 
-20. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
-21. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+19. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+20. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
 
 Won't work in interpreted mode.
 
