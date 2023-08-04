@@ -663,6 +663,9 @@ public class Object {
             Monitor.jniExit(Thread.currentThread(), o);
         }
         catch (Throwable t) {
+            // IMSE is not a fatal error
+            if (t instanceof IllegalMonitorStateException)
+                throw t;
             MonitorSupport.abortException("jniExit", t);
         }
     }
