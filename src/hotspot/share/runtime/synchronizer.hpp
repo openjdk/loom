@@ -191,6 +191,7 @@ class ObjectSynchronizer : AllStatic {
 
   // This is the Java-based version of monitor operations.
   static void java_enter(Handle obj, JavaThread* current);
+  static void java_exit(Handle obj, JavaThread* current);
   static void java_exit(oop obj, JavaThread* current);
   static void java_wait_uninterruptibly(Handle obj, JavaThread* current);
   static void java_wait(Handle obj, jlong millis, JavaThread* current);
