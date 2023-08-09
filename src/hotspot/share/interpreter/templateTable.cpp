@@ -427,7 +427,7 @@ void TemplateTable::initialize() {
   def(Bytecodes::_checkcast           , ubcp|____|clvm|____, atos, atos, checkcast           ,  _           );
   def(Bytecodes::_instanceof          , ubcp|____|clvm|____, atos, itos, instanceof          ,  _           );
   if (ObjectMonitorMode::java()) {
-    def(Bytecodes::_monitorenter      , ____|disp|clvm|____, atos, vtos, monitorenter        ,  _           );
+    def(Bytecodes::_monitorenter      , ____|disp|____|____, atos, vtos, monitorenter        ,  _           );
     def(Bytecodes::_monitorexit       , ____|disp|clvm|____, atos, vtos, monitorexit         ,  _           );
   } else {
     def(Bytecodes::_monitorenter      , ____|disp|clvm|____, atos, vtos, monitorenter        ,  _           );
