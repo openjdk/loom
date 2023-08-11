@@ -129,6 +129,7 @@ class OptoRuntime : public AllStatic {
   static address _multianewarrayN_Java;
   static address _vtable_must_compile_Java;
   static address _complete_monitor_locking_Java;
+  static address _complete_monitor_unlocking_Java;
   static address _rethrow_Java;
   static address _monitor_notify_Java;
   static address _monitor_notifyAll_Java;
@@ -209,6 +210,7 @@ private:
   static address multianewarrayN_Java()                  { return _multianewarrayN_Java; }
   static address vtable_must_compile_stub()              { return _vtable_must_compile_Java; }
   static address complete_monitor_locking_Java()         { return _complete_monitor_locking_Java; }
+  static address complete_monitor_unlocking_Java()       { return _complete_monitor_unlocking_Java; }
   static address monitor_notify_Java()                   { return _monitor_notify_Java; }
   static address monitor_notifyAll_Java()                { return _monitor_notifyAll_Java; }
 

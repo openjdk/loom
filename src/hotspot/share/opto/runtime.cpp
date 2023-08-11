@@ -103,6 +103,7 @@ address OptoRuntime::_multianewarray5_Java                        = nullptr;
 address OptoRuntime::_multianewarrayN_Java                        = nullptr;
 address OptoRuntime::_vtable_must_compile_Java                    = nullptr;
 address OptoRuntime::_complete_monitor_locking_Java               = nullptr;
+address OptoRuntime::_complete_monitor_unlocking_Java             = nullptr;
 address OptoRuntime::_monitor_notify_Java                         = nullptr;
 address OptoRuntime::_monitor_notifyAll_Java                      = nullptr;
 address OptoRuntime::_rethrow_Java                                = nullptr;
@@ -161,6 +162,7 @@ bool OptoRuntime::generate(ciEnv* env) {
   gen(env, _notify_jvmti_vthread_unmount   , notify_jvmti_vthread_Type    , SharedRuntime::notify_jvmti_vthread_unmount, 0, true, false);
 #endif
   gen(env, _complete_monitor_locking_Java  , complete_monitor_enter_Type  , SharedRuntime::complete_monitor_locking_C, 0, false, false);
+  gen(env, _complete_monitor_unlocking_Java, complete_monitor_exit_Type   , SharedRuntime::complete_monitor_unlocking_C, 0, false, false);
   gen(env, _monitor_notify_Java            , monitor_notify_Type          , monitor_notify_C                ,    0 , false, false);
   gen(env, _monitor_notifyAll_Java         , monitor_notify_Type          , monitor_notifyAll_C             ,    0 , false, false);
   gen(env, _rethrow_Java                   , rethrow_Type                 , rethrow_C                       ,    2 , true , true );

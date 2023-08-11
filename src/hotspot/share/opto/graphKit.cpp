@@ -919,6 +919,7 @@ void GraphKit::add_safepoint_edges(SafePointNode* call, bool must_throw) {
 
   // For a known set of bytecodes, the interpreter should reexecute them if
   // deoptimization happens. We set the reexecute state for them here
+  // AM: sometimes the JVMState does not have a method, we should fix this
   if (out_jvms->is_reexecute_undefined() && //don't change if already specified
       should_reexecute_implied_by_bytecode(out_jvms, call->is_AllocateArray())) {
 #ifdef ASSERT
@@ -3496,6 +3497,7 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   const TypeFunc *tf = OptoRuntime::complete_monitor_exit_Type();
   UnlockNode *unlock = new UnlockNode(C, tf);
 #ifdef ASSERT
+  // AM: this might not be needed anymore since we are not adding jvms to the unlock node
   unlock->set_dbg_jvms(sync_jvms());
 #endif
   uint raw_idx = Compile::AliasIdxRaw;
@@ -3507,6 +3509,8 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
 
   unlock->init_req(TypeFunc::Parms + 0, obj);
   unlock->init_req(TypeFunc::Parms + 1, box);
+  add_safepoint_edges(unlock);
+
   unlock = _gvn.transform(unlock)->as_Unlock();
 
   Node* mem = reset_memory();
