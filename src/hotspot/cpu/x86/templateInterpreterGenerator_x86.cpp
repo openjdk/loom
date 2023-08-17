@@ -385,6 +385,45 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
   return entry;
 }
 
+address TemplateInterpreterGenerator::generate_cont_preempt_rerun_adapter() {
+  if (!Continuations::enabled()) return nullptr;
+  address start = __ pc();
+
+  // Either nullptr or ObjectMonitor* pointer.
+  const Register mon_reg = rcx;
+  __ pop(mon_reg);
+  __ pop(mon_reg);
+
+  __ pop(rbp);
+
+  // We will return to the intermediate call made in call_VM skipping the restoration
+  // of bcp and locals done in InterpreterMacroAssembler::call_VM_base, so fix them here.
+  __ restore_bcp();
+  __ restore_locals();
+
+  // Get return address before adjusting rsp
+  __ movptr(rax, Address(rsp, 0));
+
+  // Restore stack bottom
+  __ movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  __ lea(rsp, Address(rbp, rcx, Address::times_ptr));
+  // and NULL it as marker that esp is now tos until next java call
+  __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), NULL_WORD);
+
+  Label not_monitorenter;
+  __ testptr(mon_reg, mon_reg);
+  __ jcc(Assembler::equal, not_monitorenter);
+  __ call_VM(noreg,
+             CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter),
+             mon_reg);
+  // We have the lock now, just need to dispatch to next instruction.
+  __ dispatch_next(vtos);
+
+  __ bind(not_monitorenter);
+  __ jmp(rax);
+
+  return start;
+}
 
 
 // Helpers for commoning out cases in the various type of method entries.

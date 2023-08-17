@@ -235,7 +235,7 @@ StackValue *compiledVFrame::create_stack_value(ScopeValue *sv) const {
 }
 
 BasicLock* compiledVFrame::resolve_monitor_lock(Location location) const {
-  return StackValue::resolve_monitor_lock(&_fr, location);
+  return StackValue::resolve_monitor_lock(stack_chunk() == nullptr ? _fr : stack_chunk()->derelativize(_fr), location);
 }
 
 

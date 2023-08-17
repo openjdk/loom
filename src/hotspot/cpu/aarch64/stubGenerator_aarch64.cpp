@@ -7107,41 +7107,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_preempt_rerun_interpreter_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines", "Continuation preempt interpreter adapter");
-    address start = __ pc();
-
-    // Restore rfp first since we need it to restore rest of registers
-    __ leave();
-
-    // Restore constant pool cache
-    __ ldr(rcpool, Address(rfp, frame::interpreter_frame_cache_offset * wordSize));
-
-    // Restore Java expression stack pointer
-    __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-    __ lea(esp, Address(rfp, rscratch1, Address::lsl(Interpreter::logStackElementSize)));
-    // and NULL it as marker that esp is now tos until next java call
-    __ str(zr, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
-
-    // Restore machine SP
-    __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
-    __ lea(sp, Address(rfp, rscratch1, Address::lsl(LogBytesPerWord)));
-
-    // Prepare for adjustment on return to call_VM_leaf_base()
-    __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize));
-    __ stp(rscratch1, rmethod, Address(__ pre(sp, -2 * wordSize)));
-
-    // Restore dispatch
-    uint64_t offset;
-    __ adrp(rdispatch, ExternalAddress((address)Interpreter::dispatch_table()), offset);
-    __ add(rdispatch, rdispatch, offset);
-
-    __ ret(lr);
-
-    return start;
-  }
-
   address generate_cont_preempt_rerun_safepointblob_adapter() {
     if (!Continuations::enabled()) return nullptr;
     StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
@@ -8428,7 +8393,6 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
     StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)

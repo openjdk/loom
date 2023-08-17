@@ -91,6 +91,9 @@ inline void stackChunkOopDesc::set_max_thawing_size(int value)  {
 inline uint8_t stackChunkOopDesc::lockStackSize() const         { return jdk_internal_vm_StackChunk::lockStackSize(as_oop()); }
 inline void stackChunkOopDesc::set_lockStackSize(uint8_t value) { jdk_internal_vm_StackChunk::set_lockStackSize(this, value); }
 
+inline ObjectMonitor* stackChunkOopDesc::objectMonitor() const       { return (ObjectMonitor*)jdk_internal_vm_StackChunk::objectMonitor(as_oop()); }
+inline void stackChunkOopDesc::set_objectMonitor(ObjectMonitor* mon) { jdk_internal_vm_StackChunk::set_objectMonitor(this, (address)mon); }
+
 inline oop stackChunkOopDesc::cont() const                {
   if (UseZGC && !ZGenerational) {
     assert(!UseCompressedOops, "Non-generational ZGC does not support compressed oops");
@@ -204,9 +207,9 @@ inline void stackChunkOopDesc::iterate_lockstack(StackChunkLockStackClosureType*
     return;
   }
   int cnt = lockStackSize();
-  OopT* lockstart_addr = (OopT*)start_address();
+  intptr_t* lockstart_addr = start_address();
   for (int i = 0; i < cnt; i++) {
-    closure->do_oop(&lockstart_addr[i]);
+    closure->do_oop((OopT*)&lockstart_addr[i]);
   }
 }
 

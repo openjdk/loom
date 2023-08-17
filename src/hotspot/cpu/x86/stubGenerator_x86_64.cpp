@@ -3728,40 +3728,28 @@ address StubGenerator::generate_cont_preempt_stub() {
   return start;
 }
 
-address StubGenerator::generate_cont_preempt_rerun_interpreter_adapter() {
-  if (!Continuations::enabled()) return nullptr;
-  StubCodeMark mark(this, "StubRoutines", "Continuation preempt interpreter adapter");
-  address start = __ pc();
-
-  __ pop(rbp);
-
-  static const Register _locals_register = r14;
-  static const Register _bcp_register    = r13;
-
-  // We will return to the intermediate call made in call_VM skipping the restoration
-  // of bcp and locals done in InterpreterMacroAssembler::call_VM_base, so fix them here.
-  __ movptr(_bcp_register,    Address(rbp, frame::interpreter_frame_bcp_offset    * wordSize));
-  __ movptr(_locals_register, Address(rbp, frame::interpreter_frame_locals_offset * wordSize));
-  __ lea(_locals_register, Address(rbp, _locals_register, Address::times_ptr));
-
-  // Get return address before adjusting rsp
-  __ movptr(rax, Address(rsp, 0));
-
-  // Restore stack bottom
-  __ movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
-  __ lea(rsp, Address(rbp, rcx, Address::times_ptr));
-  // and NULL it as marker that esp is now tos until next java call
-  __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), NULL_WORD);
-
-  __ jmp(rax);
-
-  return start;
-}
-
 address StubGenerator::generate_cont_preempt_rerun_safepointblob_adapter() {
   if (!Continuations::enabled()) return nullptr;
   StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
   address start = __ pc();
+
+  // Either nullptr or ObjectMonitor* pointer.
+  const Register mon_reg = rcx;
+  __ pop(mon_reg);
+  __ pop(mon_reg);
+
+  Label not_monitorenter;
+  __ testptr(mon_reg, mon_reg);
+  __ jcc(Assembler::equal, not_monitorenter);
+  __ lea(rscratch1, Address(rsp, 2*wordSize));
+  __ set_last_Java_frame(rscratch1, noreg, nullptr, rscratch2);
+  __ mov(c_rarg0, r15_thread);
+  __ mov(c_rarg1, mon_reg);
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
+  __ pop(rbp);
+  __ ret(0);
+
+  __ bind(not_monitorenter);
 
   // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
   // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
@@ -4082,7 +4070,6 @@ void StubGenerator::generate_continuation_stubs() {
   StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
   StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
   StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-  StubRoutines::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
   StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
   JFR_ONLY(generate_jfr_stubs();)

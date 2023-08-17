@@ -420,6 +420,7 @@ JavaThread::JavaThread() :
   _active_handles(nullptr),
   _free_handle_block(nullptr),
   _Stalled(0),
+  _on_monitorenter(false),
 
   _monitor_chunks(nullptr),
 

@@ -71,11 +71,12 @@ class jdk_internal_vm_Continuation: AllStatic {
 
 // Interface to jdk.internal.vm.StackChunk objects
 #define STACKCHUNK_INJECTED_FIELDS(macro)                                          \
-  macro(jdk_internal_vm_StackChunk, cont,           continuation_signature, false) \
-  macro(jdk_internal_vm_StackChunk, flags,          byte_signature,         false) \
-  macro(jdk_internal_vm_StackChunk, pc,             intptr_signature,       false) \
-  macro(jdk_internal_vm_StackChunk, maxThawingSize, int_signature,          false) \
-  macro(jdk_internal_vm_StackChunk, lockStackSize,  byte_signature,         false) \
+  macro(jdk_internal_vm_StackChunk, cont,            continuation_signature, false) \
+  macro(jdk_internal_vm_StackChunk, flags,           byte_signature,         false) \
+  macro(jdk_internal_vm_StackChunk, pc,              intptr_signature,       false) \
+  macro(jdk_internal_vm_StackChunk, maxThawingSize,  int_signature,          false) \
+  macro(jdk_internal_vm_StackChunk, lockStackSize,   byte_signature,         false) \
+  macro(jdk_internal_vm_StackChunk, objectMonitor,   intptr_signature,       false) \
 
 class jdk_internal_vm_StackChunk: AllStatic {
   friend class JavaClasses;
@@ -88,6 +89,7 @@ class jdk_internal_vm_StackChunk: AllStatic {
   static int _flags_offset;
   static int _maxThawingSize_offset;
   static int _lockStackSize_offset;
+  static int _objectMonitor_offset;
   static int _cont_offset;
 
 
@@ -127,6 +129,9 @@ class jdk_internal_vm_StackChunk: AllStatic {
 
   static inline uint8_t lockStackSize(oop chunk);
   static inline void set_lockStackSize(oop chunk, uint8_t value);
+
+  static inline address objectMonitor(oop chunk);
+  static inline void set_objectMonitor(oop chunk, address mon);
 
   // cont oop's processing is essential for the chunk's GC protocol
   static inline oop cont(oop chunk);

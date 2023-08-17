@@ -95,6 +95,9 @@ public:
   inline uint8_t lockStackSize() const;
   inline void set_lockStackSize(uint8_t value);
 
+  inline ObjectMonitor* objectMonitor() const;
+  inline void set_objectMonitor(ObjectMonitor* monitor);
+
   inline oop cont() const;
   template<typename P>
   inline oop cont() const;

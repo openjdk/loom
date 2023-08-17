@@ -207,9 +207,10 @@ int StubAssembler::call_RT(Register oop_result1, Register metadata_result, addre
 class StubFrame: public StackObj {
  private:
   StubAssembler* _sasm;
+  bool _use_pop_on_epilog;
 
  public:
-  StubFrame(StubAssembler* sasm, const char* name, bool must_gc_arguments);
+  StubFrame(StubAssembler* sasm, const char* name, bool must_gc_arguments, bool use_pop_on_epilog = false);
   void load_argument(int offset_in_words, Register reg);
 
   ~StubFrame();
@@ -220,15 +221,16 @@ void StubAssembler::prologue(const char* name, bool must_gc_arguments) {
   enter();
 }
 
-void StubAssembler::epilogue() {
-  leave();
+void StubAssembler::epilogue(bool use_pop) {
+  use_pop ? pop(rbp) : leave();
   ret(0);
 }
 
 #define __ _sasm->
 
-StubFrame::StubFrame(StubAssembler* sasm, const char* name, bool must_gc_arguments) {
+StubFrame::StubFrame(StubAssembler* sasm, const char* name, bool must_gc_arguments, bool use_pop_on_epilog) {
   _sasm = sasm;
+  _use_pop_on_epilog = use_pop_on_epilog;
   __ prologue(name, must_gc_arguments);
 }
 
@@ -240,7 +242,7 @@ void StubFrame::load_argument(int offset_in_words, Register reg) {
 
 
 StubFrame::~StubFrame() {
-  __ epilogue();
+  __ epilogue(_use_pop_on_epilog);
 }
 
 #undef __
@@ -623,6 +625,9 @@ void Runtime1::initialize_pd() {
   // nothing to do
 }
 
+uint Runtime1::runtime_blob_current_thread_offset(frame f) {
+  return r15_off / 2;
+}
 
 // Target: the entry point of the method that creates and posts the exception oop.
 // has_argument: true if the exception needs arguments (passed on the stack because
@@ -1300,7 +1305,7 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
       // fall through
     case monitorenter_id:
       {
-        StubFrame f(sasm, "monitorenter", dont_gc_arguments);
+        StubFrame f(sasm, "monitorenter", dont_gc_arguments, true /* use_pop_on_epilog */);
         OopMap* map = save_live_registers(sasm, 3, save_fpu_registers);
 
         // Called with store_parameter and not C abi

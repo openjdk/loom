@@ -273,13 +273,15 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
-inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, ObjectMonitor* monitor, bool is_interpreted_frame) {
   intptr_t* sp = top.sp();
   intptr_t* fp = sp - frame::sender_sp_offset;
-  address pc = is_interpreted_frame ? StubRoutines::cont_preempt_rerun_interpreter_adapter()
+  address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_adapter()
                                     : StubRoutines::cont_preempt_rerun_safepointblob_adapter();
+  sp -= 2 * frame::metadata_words;
+  sp[1] = (intptr_t)monitor; // alignment
+  sp[0] = (intptr_t)monitor;
 
-  sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
 

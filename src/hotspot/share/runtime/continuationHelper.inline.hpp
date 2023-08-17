@@ -109,29 +109,34 @@ inline int ContinuationHelper::InterpretedFrame::expression_stack_size(const fra
 
 #ifdef ASSERT
 inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
-  assert(f.interpreter_frame_monitor_end() <= f.interpreter_frame_monitor_begin(), "must be");
-  if (f.interpreter_frame_monitor_end() == f.interpreter_frame_monitor_begin()) {
+  BasicObjectLock* first_mon = f.interpreter_frame_monitor_begin();
+  BasicObjectLock* last_mon = f.interpreter_frame_monitor_end();
+  assert(last_mon <= first_mon, "must be");
+
+  if (first_mon == last_mon) {
     return 0;
   }
 
   int monitor_count = 0;
-  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(f.interpreter_frame_monitor_begin());
-        current >= f.interpreter_frame_monitor_end();
-        current = f.previous_monitor_in_interpreter_frame(current)) {
+  JavaThread* current = JavaThread::current();
+  oop monitorenter_oop = current->is_on_monitorenter() ? ((ObjectMonitor*)(current->_Stalled))->object() : nullptr;
 
-      oop obj = current->obj();
-      if (obj != nullptr) {
-        markWord mark = obj->mark();
-        if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
-          // already fixed
-          continue;
-        }
-        bool created;
-        table.put_if_absent(obj, true, &created);
-        if (created) {
-          monitor_count++;
-        }
+  for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(first_mon);
+       current >= last_mon; current = f.previous_monitor_in_interpreter_frame(current)) {
+    oop obj = current->obj();
+
+    if (obj != nullptr && obj != monitorenter_oop) {
+      markWord mark = obj->mark();
+      if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
+        // already fixed
+        continue;
       }
+      bool created;
+      table.put_if_absent(obj, true, &created);
+      if (created) {
+        monitor_count++;
+      }
+    }
   }
   return monitor_count;
 }
@@ -179,8 +184,10 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
     return 0;
   }
 
-  frame::update_map_with_saved_link(map, Frame::callee_link_address(f)); // the monitor object could be stored in the link register
   int monitor_count = 0;
+  JavaThread* current = JavaThread::current();
+  oop monitorenter_oop = current->is_on_monitorenter() ? ((ObjectMonitor*)(current->_Stalled))->object() : nullptr;
+
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
     if (mons == nullptr || mons->is_empty()) {
@@ -195,7 +202,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
       ScopeValue* ov = mon->owner();
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
       oop owner = owner_sv->get_obj()();
-      if (owner != nullptr) {
+      if (owner != nullptr && owner != monitorenter_oop) {
         markWord mark = owner->mark();
         mark.has_monitor();
         if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {

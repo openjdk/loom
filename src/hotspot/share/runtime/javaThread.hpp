@@ -159,6 +159,10 @@ class JavaThread: public Thread {
 
  public:
   volatile intptr_t _Stalled;
+  bool _on_monitorenter;
+
+  bool is_on_monitorenter() { return _on_monitorenter; }
+  void set_on_monitorenter(bool val) { _on_monitorenter = val; }
 
   // For tracking the heavyweight monitor the thread is pending on.
   ObjectMonitor* current_pending_monitor() {
@@ -1247,6 +1251,15 @@ class JNIHandleMark : public StackObj {
     thread->push_jni_handle_block();
   }
   ~JNIHandleMark() { _thread->pop_jni_handle_block(); }
+};
+
+class ThreadOnMonitorEnter {
+  JavaThread* _thread;
+ public:
+  ThreadOnMonitorEnter(JavaThread* thread) : _thread(thread) {
+    _thread->set_on_monitorenter(true);
+  }
+  ~ThreadOnMonitorEnter() { _thread->set_on_monitorenter(false); }
 };
 
 #endif // SHARE_RUNTIME_JAVATHREAD_HPP

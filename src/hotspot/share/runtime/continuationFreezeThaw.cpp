@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "c1/c1_Runtime1.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.inline.hpp"
@@ -67,6 +68,7 @@
 #include "utilities/debug.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/vmError.hpp"
 #if INCLUDE_ZGC
 #include "gc/z/zStackChunkGCData.inline.hpp"
 #endif
@@ -314,18 +316,19 @@ static void set_anchor_to_entry(JavaThread* thread, ContinuationEntry* entry) {
 
 #ifdef ASSERT
 static int monitors_to_fix_on_stack(JavaThread* thread) {
-  ResourceMark rm(thread);
+  ResourceMark rm(JavaThread::current());
   ContinuationEntry* ce = thread->last_continuation();
   RegisterMap map(thread,
                   RegisterMap::UpdateMap::include,
                   RegisterMap::ProcessFrames::include,
-                  RegisterMap::WalkContinuation::skip);
+                  RegisterMap::WalkContinuation::include);
   map.set_include_argument_oops(false);
   ResourceHashtable<oopDesc*, bool> rhtable;
   int monitor_count = 0;
-  for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
+  for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(thread, f); f = f.sender(&map)) {
     if (f.is_interpreted_frame()) {
-      monitor_count += ContinuationHelper::InterpretedFrame::monitors_to_fix(f, rhtable);
+      frame abs = !f.is_heap_frame() ? f : map.stack_chunk()->derelativize(f);
+      monitor_count += ContinuationHelper::InterpretedFrame::monitors_to_fix(abs, rhtable);
     } else if (f.is_compiled_frame()) {
       monitor_count += ContinuationHelper::CompiledFrame::monitors_to_fix(map.thread(), &map, f, rhtable);
     }
@@ -373,6 +376,7 @@ protected:
 
   int _monitors_to_fix;
   int _monitors_in_lockstack;
+  oop _monitorenter_obj;
 
   int _freeze_size; // total size of all frames plus metadata in words.
   int _total_align_size;
@@ -425,7 +429,7 @@ protected:
 private:
   // slow path
   frame freeze_start_frame();
-  frame freeze_start_frame_at_safepoint(frame f);
+  frame freeze_start_frame_on_preempt(frame f);
   NOINLINE freeze_result recurse_freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top);
   inline frame freeze_start_frame_yield_stub(frame f);
   template<typename FKind>
@@ -535,9 +539,8 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
   assert(_monitors_to_fix >= 0, "invariant");
   DEBUG_ONLY(int monitors_cnt = monitors_to_fix_on_stack(_thread);)
   assert(monitors_cnt == _monitors_to_fix, "wrong monitor count. Found %d in the stack but counter is %d", monitors_cnt, _monitors_to_fix);
-  thread->clear_held_monitor_count();
 
-  _monitors_in_lockstack = LockingMode == LM_LIGHTWEIGHT ? current->lock_stack().monitor_count() : 0;
+  _monitors_in_lockstack = _monitors_to_fix > 0 && LockingMode == LM_LIGHTWEIGHT ? current->lock_stack().monitor_count() : 0;
   assert(_monitors_in_lockstack >= 0, "_monitors_in_lockstack=%d", _monitors_in_lockstack);
   assert(_monitors_in_lockstack <= 8, "_monitors_in_lockstack=%d", _monitors_in_lockstack);
   assert(_monitors_in_lockstack <= _monitors_to_fix, "lockstack_cnt=%d, _monitors_to_fix=%d", _monitors_in_lockstack, _monitors_to_fix);
@@ -565,11 +568,20 @@ void FreezeBase::fix_monitors_in_interpreted_frame(frame& f) {
     if (obj == nullptr) {
       continue;
     }
-    assert(LockingMode != LM_LIGHTWEIGHT || !_thread->lock_stack().contains(obj), "lockstack should be empty by now");
+    if (obj == _monitorenter_obj) {
+      assert(_preempt, "should be preemption on monitorenter case");
+      assert(obj->mark().monitor() != nullptr, "failed to acquire the lock but its not inflated");
+      continue;
+    }
 
     ObjectMonitor* om = nullptr;
     markWord mark = obj->mark();
-    assert(LockingMode != LM_LIGHTWEIGHT || (mark.has_monitor() || mark.is_being_inflated()), "should be already inflated or being inflated");
+    if (LockingMode == LM_LIGHTWEIGHT && (!mark.has_monitor() || mark.monitor()->is_owner_anonymous())) {
+      // it's in the lockstack, nothing to do
+      //assert(_thread->lock_stack().contains(obj), "should be in lockstack");
+      continue;
+    }
+
     // Inflate lock if not already inflated.
     if (!mark.has_monitor()) {
       om = ObjectSynchronizer::inflate(_current, obj, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
@@ -605,9 +617,6 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
     return;
   }
 
-  // the monitor object could be stored in the link register
-  frame::update_map_with_saved_link(map, ContinuationHelper::Frame::callee_link_address(f));
-
   int initial_monitors = _monitors_to_fix;
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
@@ -626,11 +635,20 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
       if (obj == nullptr) {
         continue;
       }
-      assert(LockingMode != LM_LIGHTWEIGHT || !_thread->lock_stack().contains(obj), "lockstack should be empty by now");
+      if (obj == _monitorenter_obj) {
+        assert(_preempt, "should be preemption on monitorenter case");
+        assert(obj->mark().monitor() != nullptr, "failed to acquire the lock but its not inflated");
+        continue;
+      }
 
       ObjectMonitor* om = nullptr;
       markWord mark = obj->mark();
-      assert(LockingMode != LM_LIGHTWEIGHT || (mark.has_monitor() || mark.is_being_inflated()), "should be already inflated or being inflated");
+      if (LockingMode == LM_LIGHTWEIGHT && (!mark.has_monitor() || mark.monitor()->is_owner_anonymous())) {
+        // it's in the lockstack, nothing to do
+        //assert(_thread->lock_stack().contains(obj), "should be in lockstack");
+        continue;
+      }
+
       // Inflate lock if not already inflated.
       if (!mark.has_monitor()) {
         om = ObjectSynchronizer::inflate(_current, obj, ObjectSynchronizer::InflateCause::inflate_cause_cont_freeze);
@@ -654,10 +672,11 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
     }
   }
   assert(_monitors_to_fix >= 0, "invariant");
-  return;
 }
 
 void FreezeBase::fix_monitors_in_fast_path() {
+  _thread->clear_held_monitor_count();
+
   if (_monitors_in_lockstack > 0) {
     assert(LockingMode == LM_LIGHTWEIGHT, "invariant");
     assert(_cont.tail()->sp_address() - _cont.tail()->start_address() >= _monitors_in_lockstack, "no room for lockstack");
@@ -667,6 +686,8 @@ void FreezeBase::fix_monitors_in_fast_path() {
     assert(_monitors_to_fix >= 0, "invariant");
     if (_monitors_to_fix == 0) return;
   }
+
+  _monitorenter_obj = _thread->is_on_monitorenter() ? ((ObjectMonitor*)(_thread->_Stalled))->object() : nullptr;
 
   ResourceMark rm(_current);
   RegisterMap map(JavaThread::current(),
@@ -970,7 +991,7 @@ frame FreezeBase::freeze_start_frame() {
   if (LIKELY(!_preempt)) {
     return freeze_start_frame_yield_stub(f);
   } else {
-    return freeze_start_frame_at_safepoint(f);
+    return freeze_start_frame_on_preempt(f);
   }
 }
 
@@ -981,7 +1002,7 @@ frame FreezeBase::freeze_start_frame_yield_stub(frame f) {
   return f;
 }
 
-frame FreezeBase::freeze_start_frame_at_safepoint(frame f) {
+frame FreezeBase::freeze_start_frame_on_preempt(frame f) {
   assert((ContinuationHelper::Frame::is_stub(f.cb()) && f.oop_map() != nullptr) || Interpreter::contains(f.pc()), "must be");
   assert(Continuation::is_frame_in_continuation(_thread->last_continuation(), f), "");
   return f;
@@ -1003,10 +1024,15 @@ NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int c
     }
     return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
   } else if (f.is_interpreted_frame()) {
-    assert(!f.interpreter_frame_method()->is_native(), "");
+    assert(!f.interpreter_frame_method()->is_native() || (_preempt && top && _thread->is_on_monitorenter()), "");
     return recurse_freeze_interpreted_frame(f, caller, callee_argsize, callee_interpreted);
-  } else if (_preempt && top && ContinuationHelper::Frame::is_stub(f.cb())) {
-    return recurse_freeze_stub_frame(f, caller);
+  } else if (_preempt && top) {
+    assert(ContinuationHelper::Frame::is_stub(f.cb()) || (f.is_native_frame() && _thread->is_on_monitorenter()), "invariant");
+    if (f.is_native_frame()) {
+      return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
+    } else {
+      return recurse_freeze_stub_frame(f, caller);
+    }
   } else {
     return freeze_pinned_native;
   }
@@ -1067,7 +1093,7 @@ inline void FreezeBase::after_freeze_java_frame(const frame& hf, bool is_bottom_
 freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, int argsize_md) {
   int argsize = argsize_md - frame::metadata_words_at_top;
   assert(callee.is_interpreted_frame()
-    || callee.is_safepoint_blob_frame()
+    || ContinuationHelper::Frame::is_stub(callee.cb())
     || callee.cb()->as_nmethod()->is_osr_method()
     || argsize == _cont.argsize(), "argsize: %d cont.argsize: %d", argsize, _cont.argsize());
   log_develop_trace(continuations)("bottom: " INTPTR_FORMAT " count %d size: %d argsize: %d",
@@ -1177,6 +1203,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     }
 
     if (_thread->return_oop() != nullptr) {
+      assert(!_thread->is_on_monitorenter(), "should be external preemption at safepoint case");
       // First restore the oop in case there was a safepoint. Then mark the chunk as
       // having an oop in the freezed stub.
       frame stubframe = f;
@@ -1211,14 +1238,18 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     chunk->print_on(&ls);
   }
 
-  // Fix monitors after unwinding frames to make sure oops are valid. Also do it now to avoid unnecessary
-  // calls to fix_monitors_in_interpreted_frame/fix_monitors_in_compiled_frame() later.
-  if (_monitors_in_lockstack > 0) {
-    assert(LockingMode == LM_LIGHTWEIGHT, "invariant");
-    assert(chunk->sp_address() - chunk->start_address() >= _monitors_in_lockstack, "no room for lockstack");
-    _thread->lock_stack().move_to_address((oop*)chunk->start_address());
-    chunk->set_lockStackSize((uint8_t)_monitors_in_lockstack);
-    _monitors_to_fix -= _monitors_in_lockstack;
+  if (_monitors_to_fix > 0) {
+    // Fix monitors after unwinding frames to make sure oops are valid. Also do it now to avoid unnecessary
+    // calls to fix_monitors_in_interpreted_frame/fix_monitors_in_compiled_frame() later.
+    if (_monitors_in_lockstack > 0) {
+      assert(LockingMode == LM_LIGHTWEIGHT, "invariant");
+      assert(chunk->sp_address() - chunk->start_address() >= _monitors_in_lockstack, "no room for lockstack");
+      _thread->lock_stack().move_to_address((oop*)chunk->start_address());
+      chunk->set_lockStackSize((uint8_t)_monitors_in_lockstack);
+      _monitors_to_fix -= _monitors_in_lockstack;
+    }
+    _monitorenter_obj = _thread->is_on_monitorenter() ? ((ObjectMonitor*)(_thread->_Stalled))->object() : nullptr;
+    _thread->clear_held_monitor_count();
   }
 
   // The topmost existing frame in the chunk; or an empty frame if the chunk is empty
@@ -1641,6 +1672,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size) {
   assert(chunk->flags() == 0, "");
   assert(chunk->is_gc_mode() == false, "");
   assert(chunk->lockStackSize() == 0, "");
+  assert(chunk->objectMonitor() == nullptr, "");
 
   // fields are uninitialized
   chunk->set_parent_access<IS_DEST_UNINITIALIZED>(_cont.last_nonempty_chunk());
@@ -1808,6 +1840,10 @@ static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& o
 
   patch_return_pc_with_preempt_stub(old_last_frame);
   cont.set_preempted(true);
+
+  if (cont.thread()->is_on_monitorenter()) {
+    cont.tail()->set_objectMonitor((ObjectMonitor*)cont.thread()->_Stalled);
+  }
   return freeze_epilog(cont);
 }
 
@@ -1816,7 +1852,7 @@ static inline int freeze_internal(JavaThread* thread, intptr_t* const sp) {
   assert(!thread->has_pending_exception(), "");
 
 #ifdef ASSERT
-  log_trace(continuations)("~~~~ freeze sp: " INTPTR_FORMAT, p2i(thread->last_continuation()->entry_sp()));
+  log_trace(continuations)("~~~~ freeze sp: " INTPTR_FORMAT "JavaThread: " INTPTR_FORMAT, p2i(thread->last_continuation()->entry_sp()), p2i(thread));
   log_frames(thread);
 #endif
 
@@ -2051,13 +2087,16 @@ private:
   void recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_frames);
   void finish_thaw(frame& f);
 
+  intptr_t* handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp);
+  void patch_thread_register(frame& top);
+
   void push_return_frame(frame& f);
   inline frame new_entry_frame();
   template<typename FKind> frame new_stack_frame(const frame& hf, frame& caller, bool bottom);
   inline void patch_pd(frame& f, const frame& sender);
   inline intptr_t* align(const frame& hf, intptr_t* frame_sp, frame& caller, bool bottom);
 
-  inline intptr_t* push_preempt_rerun_adapter(frame top, bool is_interpreted_frame);
+  inline intptr_t* push_preempt_rerun_adapter(frame top, ObjectMonitor* objlock, bool is_interpreted_frame);
 
   void maybe_set_fastpath(intptr_t* sp) { if (sp > _fastpath) _fastpath = sp; }
 
@@ -2313,6 +2352,8 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp_before_thaw = _stream.unextended_sp();
 
+  oop original_chunk = chunk;
+
   frame heap_frame = _stream.to_frame();
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
@@ -2342,39 +2383,8 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
 
   assert(!_cont.is_preempted() || !return_barrier, "if preempted kind should be thaw_top");
   if (!return_barrier && _cont.is_preempted()) {
-    frame top(sp);
-    assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
-    bool top_is_interpreted = Interpreter::contains(top.pc());
-
-    // finish_thaw() could have changed _tail so use the chunk value saved during recurse_thaw()
-    assert(top_is_interpreted || _saved_chunk != nullptr, "");
-    bool has_oop_on_stub = top_is_interpreted ? false : _saved_chunk->has_oop_on_stub();
-
-    if (has_oop_on_stub && _saved_chunk == _cont.tail()) {
-      _saved_chunk->set_has_oop_on_stub(false);
-    }
-    _cont.set_preempted(false);
-
-#if INCLUDE_JVMTI
-    bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
-    if (is_vthread) {
-      if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
-        jvmti_mount_end(_thread, _cont, top, has_oop_on_stub);
-      } else {
-        _thread->set_is_in_VTMS_transition(false);
-        java_lang_Thread::set_is_in_VTMS_transition(_thread->vthread(), false);
-      }
-    }
-#endif
-
-    if (top_is_interpreted) {
-      sp = push_preempt_rerun_adapter(top, true /* is_interpreted_frame */);
-    } else {
-      assert(top.is_safepoint_blob_frame(), "");
-      sp = push_preempt_rerun_adapter(top, false /* is_interpreted_frame */);
-    }
+    return handle_preempted_continuation(original_chunk, sp);
   }
-
   return sp;
 }
 
@@ -2384,8 +2394,7 @@ void ThawBase::recurse_thaw(const frame& heap_frame, frame& caller, int num_fram
   assert(num_frames > 0, "");
   assert(!heap_frame.is_empty(), "");
 
-  if (top && heap_frame.is_safepoint_blob_frame()) {
-    assert(ContinuationHelper::Frame::is_stub(heap_frame.cb()), "cb: %s", heap_frame.cb()->name());
+  if (top && ContinuationHelper::Frame::is_stub(heap_frame.cb())) {
     recurse_thaw_stub_frame(heap_frame, caller, num_frames);
   } else if (!heap_frame.is_interpreted_frame()) {
     recurse_thaw_compiled_frame(heap_frame, caller, num_frames, false);
@@ -2496,6 +2505,97 @@ void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
   stackChunkOop chunk = _cont.tail();
   chunk->bitmap().clear_range(chunk->bit_index_for(start),
                               chunk->bit_index_for(start+range));
+}
+
+#ifdef ASSERT
+static address get_thread_register_address_in_stub(frame& stub_fr) {
+  CodeBlob* stub_cb = stub_fr.cb();
+  assert(stub_cb->is_runtime_stub(), "must be a runtime stub");
+  RegisterMap map(JavaThread::current(),
+                  RegisterMap::UpdateMap::include,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  frame caller_fr = stub_fr.sender(&map);
+  const ImmutableOopMap* oopmap = stub_fr.oop_map();
+
+  VMReg rthread = SharedRuntime::thread_register();
+  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
+    OopMapValue omv = oms.current();
+    if (omv.content_reg() == rthread) {
+      return stub_fr.oopmapreg_to_location(omv.reg(), &map);
+    }
+  }
+  return nullptr;
+}
+#endif
+
+void ThawBase::patch_thread_register(frame& top) {
+  JavaThread** thread_addr;
+  CodeBlob* cb = top.cb();
+
+  if (cb->is_safepoint_stub()) {
+    thread_addr = frame::saved_thread_address(top);
+  } else {
+    assert(cb->is_runtime_stub(), "invariant");
+    if (cb == Runtime1::blob_for(Runtime1::monitorenter_id) ||
+        cb == Runtime1::blob_for(Runtime1::monitorenter_nofpu_id)) {
+      thread_addr = (JavaThread**)(top.sp() + Runtime1::runtime_blob_current_thread_offset(top));
+    } else {
+      // c2 only saves rbp in the stub frame so nothing to do.
+      assert(get_thread_register_address_in_stub(top) == nullptr, "thread register was saved??");
+      return;
+    }
+  }
+  assert(get_thread_register_address_in_stub(top) == (address)thread_addr, "wrong patch address");
+  JavaThread* old_thread = *thread_addr;
+  *thread_addr = _thread;
+}
+
+intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp) {
+  Handle chunk_h(_thread, original_chunk);
+
+  frame top(sp);
+  assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
+  bool top_is_interpreted = Interpreter::contains(top.pc());
+
+  // finish_thaw() could have changed _tail so use the chunk value saved during recurse_thaw()
+  bool has_oop_on_stub = top_is_interpreted ? false : original_chunk->has_oop_on_stub();
+  if (has_oop_on_stub && original_chunk == _cont.tail()) {
+    original_chunk->set_has_oop_on_stub(false);
+  }
+
+  _cont.set_preempted(false);
+
+#if INCLUDE_JVMTI
+  bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
+  if (is_vthread) {
+    if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
+      jvmti_mount_end(_thread, _cont, top, has_oop_on_stub);
+    } else {
+      _thread->set_is_in_VTMS_transition(false);
+      java_lang_Thread::set_is_in_VTMS_transition(_thread->vthread(), false);
+    }
+  }
+#endif
+
+  original_chunk = chunk_h();
+  ObjectMonitor* monitor = original_chunk->objectMonitor();
+  if (monitor != nullptr && original_chunk == _cont.tail()) {
+    original_chunk->set_objectMonitor(nullptr);
+  }
+
+  if (top_is_interpreted) {
+    sp = push_preempt_rerun_adapter(top, monitor, true /* is_interpreted_frame */);
+  } else {
+    assert(ContinuationHelper::Frame::is_stub(top.cb()) || (top.is_native_frame() && monitor != nullptr), "invariant");
+    if (ContinuationHelper::Frame::is_stub(top.cb())) {
+      // The continuation might now run on a different platform thread than the previous time so
+      // we need to adjust the current thread saved in the stub frame before restoring registers.
+      patch_thread_register(top);
+    }
+    sp = push_preempt_rerun_adapter(top, monitor, false /* is_interpreted_frame */);
+  }
+  return sp;
 }
 
 NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
@@ -2683,11 +2783,6 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
 
   patch(f, caller, is_bottom_frame);
 
-  // The continuation might now run on a different platform thread than the previous time so
-  // we need to adjust the current thread saved in the safepoint blob before restoring registers.
-  JavaThread** thread_addr = frame::saved_thread_address(f);
-  *thread_addr = _thread;
-
   // Save the chunk now because finish_thaw() might change the tail if this chunk becomes empty.
   // We need the chunk to read and possibly clear the FLAG_HAS_OOP_ON_STUB during the last
   // part of thaw. See thaw_slow().
@@ -2804,9 +2899,9 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   intptr_t* sp0 = sp;
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
 
-  if (pc0 == StubRoutines::cont_preempt_rerun_interpreter_adapter() ||
+  if (pc0 == Interpreter::cont_preempt_rerun_adapter() ||
       pc0 == StubRoutines::cont_preempt_rerun_safepointblob_adapter()) {
-    sp0 += frame::metadata_words;   // see push_preempt_rerun_adapter
+    sp0 += 2*frame::metadata_words;   // see push_preempt_rerun_adapter
   }
   set_anchor(thread, sp0);
   log_frames(thread);
@@ -2920,14 +3015,14 @@ static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, output
 }
 
 static void log_frames(JavaThread* thread) {
-  const static int show_entry_callers = 3;
+  const static int show_entry_callers = 100;
   LogTarget(Trace, continuations) lt;
   if (!lt.develop_is_enabled()) {
     return;
   }
   LogStream ls(lt);
 
-  ls.print_cr("------- frames ---------");
+  ls.print_cr("------- frames --------- for thread " INTPTR_FORMAT, p2i(thread));
   if (!thread->has_last_Java_frame()) {
     ls.print_cr("NO ANCHOR!");
   }
@@ -2951,7 +3046,7 @@ static void log_frames(JavaThread* thread) {
 
     int i = 0;
     int post_entry = -1;
-    for (frame f = thread->last_frame(); !f.is_entry_frame(); f = f.sender(&map), i++) {
+    for (frame f = thread->last_frame(); !f.is_first_frame(); f = f.sender(&map), i++) {
       f.describe(values, i, &map, i == 0);
       if (post_entry >= 0 || Continuation::is_continuation_enterSpecial(f))
         post_entry++;

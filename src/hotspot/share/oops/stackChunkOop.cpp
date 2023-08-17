@@ -443,23 +443,24 @@ void stackChunkOopDesc::copy_lockstack(oop* dst) {
     oop* lockstack_start = (oop*)start_address();
     for (int i = 0; i < cnt; i++) {
       dst[i] = lockstack_start[i];
+      assert(oopDesc::is_oop(dst[i]), "not an oop");
     }
     return;
   }
 
   if (has_bitmap() && UseCompressedOops) {
-    narrowOop* lockstack_start = (narrowOop*)start_address();
+    intptr_t* lockstack_start = start_address();
     for (int i = 0; i < cnt; i++) {
-      oop mon_owner = (oop)HeapAccess<>::oop_load(lockstack_start + i);
+      oop mon_owner = HeapAccess<>::oop_load((narrowOop*)&lockstack_start[i]);
+      assert(oopDesc::is_oop(mon_owner), "not an oop");
       dst[i] = mon_owner;
-      HeapAccess<>::oop_store(lockstack_start + i, mon_owner); // ????
     }
   } else {
-    oop* lockstack_start = (oop*)start_address();
+    intptr_t* lockstack_start = start_address();
     for (int i = 0; i < cnt; i++) {
-      oop mon_owner = (oop)HeapAccess<>::oop_load(lockstack_start + i);
+      oop mon_owner = HeapAccess<>::oop_load((oop*)&lockstack_start[i]);
+      assert(oopDesc::is_oop(mon_owner), "not an oop");
       dst[i] = mon_owner;
-      HeapAccess<>::oop_store(lockstack_start + i, mon_owner); // ????
     }
   }
 }

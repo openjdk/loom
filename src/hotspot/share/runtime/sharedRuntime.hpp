@@ -470,6 +470,7 @@ class SharedRuntime: AllStatic {
   static uint safepoint_blob_return_value_offset(frame f);
   // Offset from safepoint stub's sp() where register with current thread is saved.
   static uint safepoint_blob_current_thread_offset(frame f);
+  static VMReg thread_register();
 
   static void continuation_enter_cleanup(MacroAssembler* masm);
 
@@ -504,6 +505,7 @@ class SharedRuntime: AllStatic {
   // Slow-path Locking and Unlocking
   static void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
   static void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void redo_monitorenter(JavaThread* current, ObjectMonitor* monitor);
 
   // Resolving of calls
   static address resolve_static_call_C     (JavaThread* current);

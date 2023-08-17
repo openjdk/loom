@@ -2579,6 +2579,10 @@ uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
   return reg_save.r28_offset_in_bytes() >> LogBytesPerWord;
 }
 
+VMReg SharedRuntime::thread_register() {
+  return rthread->as_VMReg();
+}
+
 #ifdef COMPILER2
 //------------------------------generate_uncommon_trap_blob--------------------
 void SharedRuntime::generate_uncommon_trap_blob() {

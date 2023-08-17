@@ -2416,6 +2416,11 @@ uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
   return 0;
 }
 
+VMReg SharedRuntime::thread_register() {
+  Unimplemented();
+  return nullptr;
+}
+
 //
 // Frame generation for deopt and uncommon trap blobs.
 //

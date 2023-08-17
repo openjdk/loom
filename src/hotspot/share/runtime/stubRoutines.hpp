@@ -262,7 +262,6 @@ class StubRoutines: AllStatic {
   static address _cont_returnBarrier;
   static address _cont_returnBarrierExc;
   static address _cont_preempt_stub;
-  static address _cont_preempt_rerun_interpreter_adapter;
   static address _cont_preempt_rerun_safepointblob_adapter;
 
   JFR_ONLY(static RuntimeStub* _jfr_write_checkpoint_stub;)
@@ -471,7 +470,6 @@ class StubRoutines: AllStatic {
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
   static address cont_preempt_stub()   { return _cont_preempt_stub; }
-  static address cont_preempt_rerun_interpreter_adapter() { return _cont_preempt_rerun_interpreter_adapter; }
   static address cont_preempt_rerun_safepointblob_adapter() { return _cont_preempt_rerun_safepointblob_adapter; }
 
   JFR_ONLY(static address jfr_write_checkpoint() { return _jfr_write_checkpoint; })

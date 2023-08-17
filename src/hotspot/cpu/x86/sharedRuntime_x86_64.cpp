@@ -2536,6 +2536,10 @@ uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
   return RegisterSaver::r15_offset_in_bytes() >> LogBytesPerWord;
 }
 
+VMReg SharedRuntime::thread_register() {
+  return r15_thread->as_VMReg();
+}
+
 //------------------------------generate_deopt_blob----------------------------
 void SharedRuntime::generate_deopt_blob() {
   // Allocate space for the code

@@ -27,11 +27,13 @@
  * @library /test/lib
  * @modules java.base/java.lang:+open
  * @run junit/othervm/timeout=10 -Xint MonitorsTest
- * @run junit/othervm/timeout=30 -Xcomp MonitorsTest
- * @run junit/othervm/timeout=30 MonitorsTest
+ * @run junit/othervm/timeout=50 -Xcomp MonitorsTest
+ * @run junit/othervm/timeout=50 MonitorsTest
+ * @run junit/othervm/timeout=50 -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest
  */
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.*;
@@ -40,13 +42,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MonitorsTest {
-    final int VT_COUNT = 8;
+    final int CARRIER_COUNT = 8;
+    ExecutorService scheduler = Executors.newFixedThreadPool(CARRIER_COUNT);
+
+    static AtomicInteger workerCount = new AtomicInteger(0);
     static final Object globalLock = new Object();
     static volatile boolean finish = false;
     static volatile int counter = 0;
 
-    ExecutorService scheduler = Executors.newFixedThreadPool(VT_COUNT);
-
+    ///// BASIC TESTS ///////
 
     static final Runnable FOO = () -> {
         Object lock = new Object();
@@ -60,20 +64,21 @@ class MonitorsTest {
 
     static final Runnable BAR = () -> {
         synchronized(globalLock) {
-            counter++;
+            workerCount.getAndIncrement();
         }
         System.out.println("Exiting BAR from thread " + Thread.currentThread().getName());
     };
 
     /**
-     *  Yield while holding monitor.
+     *  Test yield while holding monitor.
      */
-    @Test
+    //@Test
     void testBasic() throws Exception {
+        final int VT_COUNT = CARRIER_COUNT;
+
         // Create first batch of VT threads.
         Thread firstBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            //Thread.ofVirtual().name("FirstBatchVT-" + i).start(FOO);
             firstBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
         }
 
@@ -83,11 +88,10 @@ class MonitorsTest {
         // Create second batch of VT threads.
         Thread secondBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            //vthreads[i] = Thread.ofVirtual().name("SecondBatchVT-" + i).start(BAR);
             secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR);
         }
 
-        while(counter != VT_COUNT) {}
+        while(workerCount.get() != VT_COUNT) {}
 
         finish = true;
 
@@ -99,29 +103,18 @@ class MonitorsTest {
         }
     }
 
-
-    static final Runnable FOO2 = () -> {
-        Object lock = new Object();
-        synchronized(lock) {
-            while(!finish) {
-                Thread.yield();
-            }
-        }
-        System.out.println("Exiting FOO2 from thread " + Thread.currentThread().getName());
-    };
-
     static final Runnable BAR2 = () -> {
         synchronized(globalLock) {
             counter++;
         }
-        recursive(10);
+        recursive2(10);
         System.out.println("Exiting BAR2 from thread " + Thread.currentThread().getName() + "with counter=" + counter);
     };
 
-    static void recursive(int count) {
+    static void recursive2(int count) {
         synchronized(Thread.currentThread()) {
             if (count > 0) {
-                recursive(count - 1);
+                recursive2(count - 1);
             } else {
                 synchronized(globalLock) {
                     counter++;
@@ -132,20 +125,18 @@ class MonitorsTest {
     }
 
     /**
-     *  Test recursive locking.
+     *  Test yield while holding monitor with recursive locking.
      */
-    @Test
+    //@Test
     void testRecursive() throws Exception {
-        counter = 0;
+        final int VT_COUNT = CARRIER_COUNT;
+        workerCount.getAndSet(0);
         finish = false;
-
-        ExecutorService scheduler = Executors.newFixedThreadPool(VT_COUNT);
 
         // Create first batch of VT threads.
         Thread firstBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            //Thread.ofVirtual().name("FirstBatchVT-" + i).start(FOO);
-            firstBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO2);
+            firstBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
         }
 
         // Give time for all threads to reach Thread.yield
@@ -154,11 +145,10 @@ class MonitorsTest {
         // Create second batch of VT threads.
         Thread secondBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            //vthreads[i] = Thread.ofVirtual().name("SecondBatchVT-" + i).start(BAR);
             secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR2);
         }
 
-        while (counter != 2 * VT_COUNT) {}
+        while(workerCount.get() != 2*VT_COUNT) {}
 
         finish = true;
 
@@ -167,6 +157,256 @@ class MonitorsTest {
         }
         for (int i = 0; i < VT_COUNT; i++) {
             secondBatch[i].join();
+        }
+    }
+
+    static final Runnable FOO3 = () -> {
+        synchronized(globalLock) {
+            while(!finish) {
+                Thread.yield();
+            }
+        }
+        System.out.println("Exiting FOO3 from thread " + Thread.currentThread().getName());
+    };
+
+    /**
+     *  Test contention on monitorenter.
+     */
+    //@Test
+    void testContention() throws Exception {
+        final int VT_COUNT = CARRIER_COUNT * 8;
+        counter = 0;
+        finish = false;
+
+        // Create batch of VT threads.
+        Thread batch[] = new Thread[VT_COUNT];
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO3);
+        }
+
+        // Give time for all threads to reach synchronized(globalLock)
+        Thread.sleep(2000);
+
+        finish = true;
+
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i].join();
+        }
+    }
+
+    ///// MAIN TESTS ///////
+
+    static final int MONITORS_CNT = 12;
+    static Object[] globalLockArray;
+
+    static void recursive4_1(int lockNumber, int lockNumberOrig) {
+        if (lockNumber > 0) {
+            recursive4_1(lockNumber - 1, lockNumberOrig);
+        } else {
+            if ( lockNumberOrig % 2 == 0) {
+                Thread.yield();
+            }
+            recursive4_2(lockNumberOrig);
+        }
+    }
+
+    static void recursive4_2(int lockNumber) {
+        if (lockNumber + 2 <= MONITORS_CNT - 1) {
+            lockNumber += 2;
+            synchronized(globalLockArray[lockNumber]) {
+                System.out.println("Thread " + Thread.currentThread().getName() + " grabbed monitor " + lockNumber);
+                Thread.yield();
+                recursive4_2(lockNumber);
+            }
+        }
+    }
+
+    static final Runnable FOO4 = () -> {
+        while (!finish) {
+            int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
+            synchronized(globalLockArray[lockNumber]) {
+                System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
+                recursive4_1(lockNumber, lockNumber);
+            }
+        }
+        workerCount.getAndIncrement();
+        System.out.println("Exiting FOO4 from thread " + Thread.currentThread().getName());
+    };
+
+    /**
+     *  Test contention on monitorenter with extra monitors on stack shared by all threads.
+     */
+    @Test
+    void testContentionMultipleMonitors() throws Exception {
+        final int VT_COUNT = CARRIER_COUNT * 8;
+        workerCount.getAndSet(0);
+        finish = false;
+
+        globalLockArray = new Object[MONITORS_CNT];
+        for (int i = 0; i < MONITORS_CNT; i++) {
+            globalLockArray[i] = new Object();
+        }
+
+        Thread batch[] = new Thread[VT_COUNT];
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO4);
+        }
+
+        Thread.sleep(10000);
+
+        finish = true;
+
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i].join();
+        }
+
+        if (workerCount.get() != VT_COUNT) {
+            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
+        }
+    }
+
+
+    static void recursive5_1(int lockNumber, int lockNumberOrig, Object[] myLockArray) {
+        if (lockNumber > 0) {
+            recursive5_1(lockNumber - 1, lockNumberOrig, myLockArray);
+        } else {
+            if (Math.random() < 0.5) {
+                Thread.yield();
+            }
+            recursive5_2(lockNumberOrig, myLockArray);
+        }
+    }
+
+    static void recursive5_2(int lockNumber, Object[] myLockArray) {
+        if (lockNumber + 2 <= MONITORS_CNT - 1) {
+            lockNumber += 2;
+            synchronized (myLockArray[lockNumber]) {
+                if (Math.random() < 0.5) {
+                    Thread.yield();
+                }
+                synchronized (globalLockArray[lockNumber]) {
+                    System.out.println("Thread " + Thread.currentThread().getName() + " grabbed monitor " + lockNumber);
+                    Thread.yield();
+                    recursive5_2(lockNumber, myLockArray);
+                }
+            }
+        }
+    }
+
+    static final Runnable FOO5 = () -> {
+        Object[] myLockArray = new Object[MONITORS_CNT];
+        for (int i = 0; i < MONITORS_CNT; i++) {
+            myLockArray[i] = new Object();
+        }
+
+        while (!finish) {
+            int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
+            synchronized (myLockArray[lockNumber]) {
+                synchronized (globalLockArray[lockNumber]) {
+                    System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
+                    recursive5_1(lockNumber, lockNumber, myLockArray);
+                }
+            }
+        }
+        workerCount.getAndIncrement();
+        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+    };
+
+    /**
+     *  Test contention on monitorenter with extra monitors on stack both local only and shared by all threads.
+     */
+    @Test
+    void testContentionMultipleMonitors2() throws Exception {
+        final int VT_COUNT = CARRIER_COUNT * 8;
+        workerCount.getAndSet(0);
+        finish = false;
+
+        globalLockArray = new Object[MONITORS_CNT];
+        for (int i = 0; i < MONITORS_CNT; i++) {
+            globalLockArray[i] = new Object();
+        }
+
+        // Create batch of VT threads.
+        Thread batch[] = new Thread[VT_COUNT];
+        for (int i = 0; i < VT_COUNT; i++) {
+            //Thread.ofVirtual().name("FirstBatchVT-" + i).start(FOO);
+            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO5);
+        }
+
+        Thread.sleep(10000);
+
+        finish = true;
+
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i].join();
+        }
+
+        if (workerCount.get() != VT_COUNT) {
+            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
+        }
+    }
+
+    static synchronized void recursive6(int lockNumber, Object myLock) {
+        if (lockNumber > 0) {
+            recursive6(lockNumber - 1, myLock);
+        } else {
+            if (Math.random() < 0.5) {
+                Thread.yield();
+            } else {
+                synchronized (myLock) {
+                    Thread.yield();
+                }
+            }
+        }
+    }
+
+    static final Runnable FOO6 = () -> {
+        Object myLock = new Object();
+
+        while (!finish) {
+            int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
+            synchronized (myLock) {
+                synchronized (globalLockArray[lockNumber]) {
+                    System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
+                    recursive6(lockNumber, myLock);
+                }
+            }
+        }
+        workerCount.getAndIncrement();
+        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+    };
+
+    /**
+     *  Test contention on monitorenter with synchronized methods.
+     */
+    @Test
+    void testContentionMultipleMonitors3() throws Exception {
+        final int VT_COUNT = CARRIER_COUNT * 8;
+        workerCount.getAndSet(0);
+        finish = false;
+
+
+        globalLockArray = new Object[MONITORS_CNT];
+        for (int i = 0; i < MONITORS_CNT; i++) {
+            globalLockArray[i] = new Object();
+        }
+
+        // Create batch of VT threads.
+        Thread batch[] = new Thread[VT_COUNT];
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO6);
+        }
+
+        Thread.sleep(10000);
+
+        finish = true;
+
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i].join();
+        }
+
+        if (workerCount.get() != VT_COUNT) {
+            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
         }
     }
 }

@@ -70,7 +70,7 @@ public:
 
   void do_thread(Thread* thr) {
     JavaThread* target = JavaThread::cast(thr);
-    _result = Continuation::try_preempt(target, _cont);
+    _result = Continuation::try_preempt(target, _cont());
   }
   int result() { return _result; }
 };
@@ -182,6 +182,13 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop cont) {
 }
 
 static bool is_safe_pc_to_preempt(address pc, JavaThread* target) {
+  assert(pc != nullptr, "has last Java frame but no pc set");
+
+  if (target->is_on_monitorenter() && target == JavaThread::current()) {
+    assert(target->_Stalled != 0, "preemption on monitorenter but no ObjectMonitor*");
+    return true;
+  }
+
   if (Interpreter::contains(pc)) {
     InterpreterCodelet* codelet = Interpreter::codelet_containing(pc);
     if (codelet == nullptr) {
@@ -222,7 +229,7 @@ static bool is_safe_to_preempt(JavaThread* target, oop continuation, bool is_vth
   if (target->has_pending_exception()) {
     return false;
   }
-  if (!is_safe_pc_to_preempt(target->last_Java_pc(), target)) {
+  if (!is_safe_pc_to_preempt(target->last_frame().pc(), target)) {
     return false;
   }
   if (is_vthread && !is_safe_vthread_to_preempt(target, continuation)) {
@@ -243,7 +250,7 @@ int Continuation::try_preempt(JavaThread* target, Handle continuation) {
     return freeze_not_mounted;
   }
   oop mounted_cont = ce->cont_oop(target);
-  if (mounted_cont != continuation() || is_continuation_done(mounted_cont)) {
+  if (mounted_cont != continuation || is_continuation_done(mounted_cont)) {
     return freeze_not_mounted;
   }
 

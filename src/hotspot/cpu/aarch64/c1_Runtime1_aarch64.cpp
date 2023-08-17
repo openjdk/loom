@@ -184,7 +184,7 @@ void StubAssembler::prologue(const char* name, bool must_gc_arguments) {
   enter();
 }
 
-void StubAssembler::epilogue() {
+void StubAssembler::epilogue(bool use_pop) {
   leave();
   ret(lr);
 }
@@ -338,6 +338,10 @@ void Runtime1::initialize_pd() {
   }
 }
 
+uint Runtime1::runtime_blob_current_thread_offset(frame f) {
+  Unimplemented();
+  return 0;
+}
 
 // target: the entry point of the method that creates and posts the exception oop
 // has_argument: true if the exception needs arguments (passed in rscratch1 and rscratch2)

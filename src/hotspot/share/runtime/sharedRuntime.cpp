@@ -65,6 +65,7 @@
 #include "runtime/java.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
+#include "runtime/objectMonitor.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stubRoutines.hpp"
@@ -2234,6 +2235,7 @@ void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThre
   // and the model is that an exception implies the method failed.
   JRT_BLOCK_NO_ASYNC
   Handle h_obj(THREAD, obj);
+  ThreadOnMonitorEnter tme(current);
   ObjectSynchronizer::enter(h_obj, lock, current);
   assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
   JRT_BLOCK_END
@@ -2242,6 +2244,17 @@ void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThre
 // Handles the uncommon case in locking, i.e., contention or an inflated lock.
 JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current))
   SharedRuntime::monitor_enter_helper(obj, lock, current);
+JRT_END
+
+JRT_ENTRY_NO_ASYNC(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
+  assert(current == JavaThread::current(), "invariant");
+  assert(monitor->contentions() > 0, "invariant");
+
+  current->inc_held_monitor_count();
+  ThreadOnMonitorEnter tme(current);
+  monitor->enter(current);
+  assert(monitor->owner_raw() == current || current->preempting(), "invariant");
+  assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
 JRT_END
 
 void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
