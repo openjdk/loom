@@ -1118,6 +1118,7 @@ void Parse::do_exits() {
       JVMState* ex_jvms = caller->clone_shallow(C);
       ex_jvms->bind_map(kit.clone_map());
       ex_jvms->set_bci(   InvocationEntryBci);
+      ex_jvms->set_method(method());
       kit.set_jvms(ex_jvms);
       if (do_synch) {
 #ifdef C2_PATCH
