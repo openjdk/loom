@@ -1504,6 +1504,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   __ bind(L_thaw);
 
+  ContinuationEntry::_thaw_call_pc_offset = __ pc() - start;
   __ call(RuntimeAddress(StubRoutines::cont_thaw()));
 
   ContinuationEntry::_return_pc_offset = __ pc() - start;

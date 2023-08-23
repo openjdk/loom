@@ -86,7 +86,7 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
 
-  static int try_preempt(JavaThread* target, oop continuation);
+  static int try_preempt(JavaThread* target, oop continuation, bool set_state_yielding = false);
   DEBUG_ONLY(static bool verify_preemption(JavaThread* thread);)
 
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);

@@ -1985,6 +1985,10 @@ int java_lang_VirtualThread::state(oop vthread) {
   return vthread->int_field_acquire(_state_offset);
 }
 
+void java_lang_VirtualThread::set_state(oop vthread, int state) {
+  vthread->int_field_put(_state_offset, state);
+}
+
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
   JavaThreadStatus status = JavaThreadStatus::NEW;
   switch (state & ~SUSPENDED) {

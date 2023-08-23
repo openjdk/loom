@@ -34,6 +34,7 @@
 #include "prims/jvmtiExport.hpp"
 #include "prims/upcallLinker.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/javaThread.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
@@ -3715,15 +3716,36 @@ address StubGenerator::generate_cont_preempt_stub() {
 
   __ reset_last_Java_frame(true);
 
-  // reset the flag
+  // reset _preempting flag
+#ifdef ASSERT
+  { Label L;
+    __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
+    __ testl(rscratch1, rscratch1);
+    __ jcc(Assembler::notZero, L);
+    __ stop("preempting flag should be set");
+    __ bind(L);
+  }
+#endif
   __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
 
-  // Set rsp to enterSpecial frame and then remove it from the stack
+  // Set rsp to enterSpecial frame
   __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
-  SharedRuntime::continuation_enter_cleanup(_masm);
 
+  Label cancel_preemption;
+  __ movbool(rscratch1, Address(r15_thread, JavaThread::cancel_preemption_offset()));
+  __ testl(rscratch1, rscratch1);
+  __ jcc(Assembler::notZero, cancel_preemption);
+
+  // Remove enterSpecial frame from the stack and return to Continuation.run()
+  SharedRuntime::continuation_enter_cleanup(_masm);
   __ pop(rbp);
   __ ret(0);
+
+  __ bind(cancel_preemption);
+  __ movbool(Address(r15_thread, JavaThread::cancel_preemption_offset()), false);
+  __ lea(rbp, Address(rsp, checked_cast<int32_t>(ContinuationEntry::size())));
+  __ movptr(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
+  __ jmp(rscratch1);
 
   return start;
 }
@@ -3746,11 +3768,11 @@ address StubGenerator::generate_cont_preempt_rerun_safepointblob_adapter() {
   __ mov(c_rarg0, r15_thread);
   __ mov(c_rarg1, mon_reg);
   __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
+  // We have the lock now, just return to caller
   __ pop(rbp);
   __ ret(0);
 
   __ bind(not_monitorenter);
-
   // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
   // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
   // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this

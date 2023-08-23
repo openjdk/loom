@@ -480,6 +480,7 @@ JavaThread::JavaThread() :
   _held_monitor_count(0),
   _jni_monitor_count(0),
   _preempting(false),
+  _cancel_preemption(false),
 
   _handshake(this),
   DEBUG_ONLY(_current_handshake_op(nullptr) COMMA)

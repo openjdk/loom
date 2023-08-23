@@ -195,6 +195,14 @@ const ContinuationEntry* JavaThread::vthread_continuation() const {
   return nullptr;
 }
 
+void JavaThread::cancel_preemption() {
+  _cancel_preemption = true;
+  oop oopCont = last_continuation()->cont_oop(this);
+  stackChunkOop chunk = jdk_internal_vm_Continuation::tail(oopCont);
+  assert(chunk != nullptr && chunk->objectMonitor() != nullptr, "invariant");
+  chunk->set_objectMonitor(nullptr);
+}
+
 void JavaThread::enter_critical() {
   assert(Thread::current() == this ||
          (Thread::current()->is_VM_thread() &&

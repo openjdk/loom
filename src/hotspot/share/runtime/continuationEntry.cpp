@@ -36,16 +36,20 @@
 #include "runtime/stubRoutines.hpp"
 
 int ContinuationEntry::_return_pc_offset = 0;
+int ContinuationEntry::_thaw_call_pc_offset = 0;
 address ContinuationEntry::_return_pc = nullptr;
+address ContinuationEntry::_thaw_call_pc = nullptr;
 CompiledMethod* ContinuationEntry::_enter_special = nullptr;
 int ContinuationEntry::_interpreted_entry_offset = 0;
 
 void ContinuationEntry::set_enter_code(CompiledMethod* cm, int interpreted_entry_offset) {
   assert(_return_pc_offset != 0, "");
   _return_pc = cm->code_begin() + _return_pc_offset;
+  _thaw_call_pc = cm->code_begin() + _thaw_call_pc_offset;
 
   _enter_special = cm;
   _interpreted_entry_offset = interpreted_entry_offset;
+
   assert(_enter_special->code_contains(compiled_entry()),    "entry not in enterSpecial");
   assert(_enter_special->code_contains(interpreted_entry()), "entry not in enterSpecial");
   assert(interpreted_entry() < compiled_entry(), "unexpected code layout");

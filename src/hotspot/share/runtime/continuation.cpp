@@ -70,7 +70,7 @@ public:
 
   void do_thread(Thread* thr) {
     JavaThread* target = JavaThread::cast(thr);
-    _result = Continuation::try_preempt(target, _cont());
+    _result = Continuation::try_preempt(target, _cont(), true /* set_state_yielding */);
   }
   int result() { return _result; }
 };
@@ -240,7 +240,7 @@ static bool is_safe_to_preempt(JavaThread* target, oop continuation, bool is_vth
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
 
-int Continuation::try_preempt(JavaThread* target, Handle continuation) {
+int Continuation::try_preempt(JavaThread* target, oop continuation, bool set_state_yielding) {
   if (!VM_Version::supports_cont_preemption()) {
     return unsupported;
   }
@@ -274,6 +274,8 @@ int Continuation::try_preempt(JavaThread* target, Handle continuation) {
   JVMTI_ONLY(jubm.set_preempt_result(res);)
   if (res != freeze_ok) {
     target->set_preempting(false);
+  } else if (set_state_yielding) {
+    java_lang_VirtualThread::set_state(target->vthread(), java_lang_VirtualThread::YIELDING);
   }
   return res;
 }

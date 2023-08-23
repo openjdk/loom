@@ -2250,9 +2250,8 @@ JRT_ENTRY_NO_ASYNC(void, SharedRuntime::redo_monitorenter(JavaThread* current, O
   assert(current == JavaThread::current(), "invariant");
   assert(monitor->contentions() > 0, "invariant");
 
-  current->inc_held_monitor_count();
   ThreadOnMonitorEnter tme(current);
-  monitor->enter(current);
+  monitor->redo_enter(current);
   assert(monitor->owner_raw() == current || current->preempting(), "invariant");
   assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
 JRT_END

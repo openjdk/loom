@@ -554,6 +554,7 @@ class java_lang_VirtualThread : AllStatic {
   static oop carrier_thread(oop vthread);
   static oop continuation(oop vthread);
   static int state(oop vthread);
+  static void set_state(oop vthread, int state);
   static bool is_preempted(oop vthread);
   static bool is_preemption_disabled(oop vthread);
   static void inc_preemption_disabled(oop vthread);

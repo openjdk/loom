@@ -56,6 +56,8 @@ public:
 
 public:
   static int _return_pc_offset; // friend gen_continuation_enter
+  static int _thaw_call_pc_offset;
+  static address _thaw_call_pc;
   static void set_enter_code(CompiledMethod* cm, int interpreted_entry_offset);
   static bool is_interpreted_call(address call_address);
 

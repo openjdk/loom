@@ -43,12 +43,13 @@ class ParkEvent;
 // knows about ObjectWaiters, so we'll have to reconcile that code.
 // See next_waiter(), first_waiter(), etc.
 
-class ObjectWaiter : public StackObj {
+class ObjectWaiter : public CHeapObj<mtThread> {
  public:
   enum TStates { TS_UNDEF, TS_READY, TS_RUN, TS_WAIT, TS_ENTER, TS_CXQ };
   ObjectWaiter* volatile _next;
   ObjectWaiter* volatile _prev;
   JavaThread*   _thread;
+  OopHandle _vthread;
   uint64_t      _notifier_tid;
   ParkEvent *   _event;
   volatile int  _notified;
@@ -56,7 +57,15 @@ class ObjectWaiter : public StackObj {
   bool          _active;           // Contention monitoring is enabled
  public:
   ObjectWaiter(JavaThread* current);
-
+  ObjectWaiter(oop vthread);
+  ~ObjectWaiter() {
+    if (is_vthread()) {
+      assert(_vthread.resolve() != nullptr, "invariant");
+      _vthread.release(JavaThread::thread_oop_storage());
+    }
+  }
+  oop vthread() { return _vthread.resolve(); }
+  bool is_vthread() { return _thread == nullptr; }
   void wait_reenter_begin(ObjectMonitor *mon);
   void wait_reenter_end(ObjectMonitor *mon);
 };
@@ -356,6 +365,7 @@ private:
   };
  public:
   bool      enter(JavaThread* current);
+  void      redo_enter(JavaThread* current);
   void      exit(JavaThread* current, bool not_suspended = true);
   void      wait(jlong millis, bool interruptible, TRAPS);
   void      notify(TRAPS);
@@ -375,9 +385,13 @@ private:
   void      INotify(JavaThread* current);
   ObjectWaiter* DequeueWaiter();
   void      DequeueSpecificWaiter(ObjectWaiter* waiter);
+  void      EnterContended(JavaThread* current);
   void      EnterI(JavaThread* current);
   void      ReenterI(JavaThread* current, ObjectWaiter* current_node);
-  void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node);
+  bool      HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce, bool first_time);
+  void      VThreadEpilog(JavaThread* current);
+  void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node, oop vthread = nullptr);
+  ObjectWaiter* LookupWaiter(int64_t threadid);
   int       TryLock(JavaThread* current);
   int       NotRunnable(JavaThread* current, JavaThread* Owner);
   int       TrySpin(JavaThread* current);
