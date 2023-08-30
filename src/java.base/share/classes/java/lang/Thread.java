@@ -39,8 +39,6 @@ import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.locks.LockSupport;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
@@ -225,8 +223,15 @@ public class Thread implements Runnable {
         registerNatives();
     }
 
-    /* Reserved for exclusive use by the JVM, maybe move to FieldHolder */
-    private long eetop;
+    /*
+     * Reserved for exclusive use by the JVM. Cannot be moved to the FieldHolder
+     * as it needs to be set by the VM for JNI attaching threads, before executing
+     * the constructor that will create the FieldHolder. The historically named
+     * `eetop` holds the address of the underlying VM JavaThread, and is set to
+     * non-zero when the thread is started, and reset to zero when the thread terminates.
+     * A non-zero value indicates this thread isAlive().
+     */
+    private volatile long eetop;
 
     // thread id
     private final long tid;
@@ -271,7 +276,8 @@ public class Thread implements Runnable {
 
     /*
      * ThreadLocal values pertaining to this thread. This map is maintained
-     * by the ThreadLocal class. */
+     * by the ThreadLocal class.
+     */
     ThreadLocal.ThreadLocalMap threadLocals;
 
     /*
@@ -443,7 +449,7 @@ public class Thread implements Runnable {
     private static native void yield0();
 
     /**
-     * Called before sleeping to create a jdk.ThreadSleepEvent event.
+     * Called before sleeping to create a jdk.ThreadSleep event.
      */
     private static ThreadSleepEvent beforeSleep(long nanos) {
         ThreadSleepEvent event = null;
@@ -460,7 +466,7 @@ public class Thread implements Runnable {
     }
 
     /**
-     * Called after sleeping to commit the jdk.ThreadSleepEvent event.
+     * Called after sleeping to commit the jdk.ThreadSleep event.
      */
     private static void afterSleep(ThreadSleepEvent event) {
         if (event != null) {
@@ -471,6 +477,25 @@ public class Thread implements Runnable {
             }
         }
     }
+
+    /**
+     * Sleep for the specified number of nanoseconds, subject to the precision
+     * and accuracy of system timers and schedulers.
+     */
+    private static void sleepNanos(long nanos) throws InterruptedException {
+        ThreadSleepEvent event = beforeSleep(nanos);
+        try {
+            if (currentThread() instanceof VirtualThread vthread) {
+                vthread.sleepNanos(nanos);
+            } else {
+                sleepNanos0(nanos);
+            }
+        } finally {
+            afterSleep(event);
+        }
+    }
+
+    private static native void sleepNanos0(long nanos) throws InterruptedException;
 
     /**
      * Causes the currently executing thread to sleep (temporarily cease
@@ -493,21 +518,9 @@ public class Thread implements Runnable {
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
-
         long nanos = MILLISECONDS.toNanos(millis);
-        ThreadSleepEvent event = beforeSleep(nanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(nanos);
-            } else {
-                sleep0(millis);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(nanos);
     }
-
-    private static native void sleep0(long millis) throws InterruptedException;
 
     /**
      * Causes the currently executing thread to sleep (temporarily cease
@@ -543,21 +556,7 @@ public class Thread implements Runnable {
         // total sleep time, in nanoseconds
         long totalNanos = MILLISECONDS.toNanos(millis);
         totalNanos += Math.min(Long.MAX_VALUE - totalNanos, nanos);
-
-        ThreadSleepEvent event = beforeSleep(totalNanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(totalNanos);
-            } else {
-                // millisecond precision
-                if (nanos > 0 && millis < Long.MAX_VALUE) {
-                    millis++;
-                }
-                sleep0(millis);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(totalNanos);
     }
 
     /**
@@ -581,22 +580,7 @@ public class Thread implements Runnable {
         if (nanos < 0) {
             return;
         }
-
-        ThreadSleepEvent event = beforeSleep(nanos);
-        try {
-            if (currentThread() instanceof VirtualThread vthread) {
-                vthread.sleepNanos(nanos);
-            } else {
-                // millisecond precision
-                long millis = NANOSECONDS.toMillis(nanos);
-                if (nanos > MILLISECONDS.toNanos(millis)) {
-                    millis += 1L;
-                }
-                sleep0(millis);
-            }
-        } finally {
-            afterSleep(event);
-        }
+        sleepNanos(nanos);
     }
 
     /**
@@ -1603,7 +1587,7 @@ public class Thread implements Runnable {
      */
     @Hidden
     @ForceInline
-    private void runWith(Object bindings, Runnable op) {
+    final void runWith(Object bindings, Runnable op) {
         ensureMaterializedForStackWalk(bindings);
         op.run();
         Reference.reachabilityFence(bindings);
@@ -1714,12 +1698,10 @@ public class Thread implements Runnable {
      *
      * @implNote In the JDK Reference Implementation, interruption of a thread
      * that is not alive still records that the interrupt request was made and
-     * will report it via {@link #interrupted} and {@link #isInterrupted()}.
+     * will report it via {@link #interrupted()} and {@link #isInterrupted()}.
      *
      * @throws  SecurityException
      *          if the current thread cannot modify this thread
-     *
-     * @revised 6.0, 14
      */
     public void interrupt() {
         if (this != Thread.currentThread()) {
@@ -1751,7 +1733,6 @@ public class Thread implements Runnable {
      * @return  {@code true} if the current thread has been interrupted;
      *          {@code false} otherwise.
      * @see #isInterrupted()
-     * @revised 6.0, 14
      */
     public static boolean interrupted() {
         return currentThread().getAndClearInterrupt();
@@ -1764,7 +1745,6 @@ public class Thread implements Runnable {
      * @return  {@code true} if this thread has been interrupted;
      *          {@code false} otherwise.
      * @see     #interrupted()
-     * @revised 6.0, 14
      */
     public boolean isInterrupted() {
         return interrupted;
@@ -1814,9 +1794,8 @@ public class Thread implements Runnable {
      * This method is non-final so it can be overridden.
      */
     boolean alive() {
-        return isAlive0();
+        return eetop != 0;
     }
-    private native boolean isAlive0();
 
     /**
      * Throws {@code UnsupportedOperationException}.
@@ -1930,6 +1909,8 @@ public class Thread implements Runnable {
      * @param      name   the new name for this thread.
      * @throws     SecurityException  if the current thread cannot modify this
      *             thread.
+     *
+     * @spec jni/index.html Java Native Interface Specification
      * @see        #getName
      * @see        #checkAccess()
      */
@@ -2020,22 +2001,6 @@ public class Thread implements Runnable {
      */
     public static int enumerate(Thread[] tarray) {
         return currentThread().getThreadGroup().enumerate(tarray);
-    }
-
-    /**
-     * Throws {@code UnsupportedOperationException}.
-     *
-     * @return     nothing
-     *
-     * @deprecated This method was originally designed to count the number of
-     *             stack frames but the results were never well-defined and it
-     *             depended on thread-suspension.
-     *             This method is subject to removal in a future version of Java SE.
-     * @see        StackWalker
-     */
-    @Deprecated(since="1.2", forRemoval=true)
-    public int countStackFrames() {
-        throw new UnsupportedOperationException();
     }
 
     /**

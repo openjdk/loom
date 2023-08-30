@@ -150,8 +150,8 @@ module java.base {
         java.compiler,
         jdk.compiler,
         jdk.incubator.vector, // participates in preview features
-        jdk.jartool, // participates in preview features
-        jdk.jshell;
+        jdk.jshell,
+        jdk.management;
     exports jdk.internal.access to
         java.desktop,
         java.logging,
@@ -244,7 +244,8 @@ module java.base {
         jdk.jfr;
     exports jdk.internal.ref to
         java.desktop,
-        java.net.http;
+        java.net.http,
+        jdk.naming.dns;
     exports jdk.internal.reflect to
         java.logging,
         java.sql,
@@ -256,7 +257,8 @@ module java.base {
         java.management,
         jdk.internal.jvmstat,
         jdk.management,
-        jdk.management.agent;
+        jdk.management.agent,
+        jdk.internal.vm.ci;
     exports jdk.internal.vm.annotation to
         java.instrument,
         jdk.internal.vm.ci,
@@ -265,8 +267,6 @@ module java.base {
         jdk.unsupported;
     exports jdk.internal.vm.vector to
         jdk.incubator.vector;
-    exports jdk.internal.util.jar to
-        jdk.jartool;
     exports jdk.internal.util.xml to
         jdk.jfr;
     exports jdk.internal.util.xml.impl to
@@ -274,7 +274,15 @@ module java.base {
     exports jdk.internal.util.random to
         jdk.random;
     exports jdk.internal.util to
-        java.desktop;
+        java.desktop,
+        java.prefs,
+        java.security.jgss,
+        java.smartcardio,
+        jdk.charsets,
+        jdk.internal.vm.ci,
+        jdk.jlink,
+        jdk.jpackage,
+        jdk.net;
     exports sun.net to
         java.net.http,
         jdk.naming.dns;
@@ -315,25 +323,21 @@ module java.base {
         java.sql.rowset;
     exports sun.security.action to
         java.desktop,
-        java.security.jgss,
-        jdk.crypto.ec;
+        java.security.jgss;
     exports sun.security.internal.interfaces to
         jdk.crypto.cryptoki;
     exports sun.security.internal.spec to
         jdk.crypto.cryptoki;
     exports sun.security.jca to
         java.smartcardio,
-        jdk.crypto.ec,
         jdk.crypto.cryptoki,
         jdk.naming.dns;
     exports sun.security.pkcs to
-        jdk.crypto.ec,
         jdk.jartool;
     exports sun.security.provider to
         java.rmi,
         java.security.jgss,
         jdk.crypto.cryptoki,
-        jdk.crypto.ec,
         jdk.security.auth;
     exports sun.security.provider.certpath to
         java.naming,
@@ -352,17 +356,11 @@ module java.base {
         java.security.sasl,
         java.smartcardio,
         java.xml.crypto,
-        jdk.crypto.ec,
         jdk.crypto.cryptoki,
         jdk.jartool,
         jdk.security.auth,
         jdk.security.jgss;
-    exports sun.security.util.math to
-        jdk.crypto.ec;
-    exports sun.security.util.math.intpoly to
-        jdk.crypto.ec;
     exports sun.security.x509 to
-        jdk.crypto.ec,
         jdk.crypto.cryptoki,
         jdk.jartool;
     exports sun.security.validator to

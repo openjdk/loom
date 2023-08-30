@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Stress test ScopedValue with many bindings and rebinings
+ * @summary Stress test ScopedValue with many bindings and rebindings
  * @enablePreview
  * @library /test/lib
  * @key randomness
@@ -128,7 +128,7 @@ class ManyBindings {
             test(newArray, depth+1);
         });
 
-        // check that the scoped values have the origina values
+        // check that the scoped values have the original values
         check(array);
     }
 

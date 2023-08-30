@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -451,7 +451,7 @@ public class ThreadFlock implements AutoCloseable {
     }
 
     /**
-     * {@return a stream of the live threads in this flock}
+     * {@return a stream of the threads in this flock}
      * The elements of the stream are threads that were started in this flock
      * but have not terminated. The stream will reflect the set of threads in the
      * flock at some point at or since the creation of the stream. It may or may
@@ -459,7 +459,7 @@ public class ThreadFlock implements AutoCloseable {
      * stream.
      */
     public Stream<Thread> threads() {
-        return threads.stream().filter(Thread::isAlive);
+        return threads.stream();
     }
 
     /**
@@ -512,14 +512,15 @@ public class ThreadFlock implements AutoCloseable {
 
         @Override
         public ThreadContainerImpl push() {
-            // Virtual threads in the root containers are not tracked so need
+            // Virtual threads in the root containers may not be tracked so need
             // to register container to ensure that it is found
-            Thread thread = Thread.currentThread();
-            if (thread.isVirtual()
-                    && JLA.threadContainer(thread) == ThreadContainers.root()) {
-                this.key = ThreadContainers.registerContainer(this);
+            if (!ThreadContainers.trackAllThreads()) {
+                Thread thread = Thread.currentThread();
+                if (thread.isVirtual()
+                        && JLA.threadContainer(thread) == ThreadContainers.root()) {
+                    this.key = ThreadContainers.registerContainer(this);
+                }
             }
-
             super.push();
             return this;
         }
@@ -563,6 +564,10 @@ public class ThreadFlock implements AutoCloseable {
         }
 
         @Override
+        public String name() {
+            return flock.name();
+        }
+        @Override
         public long threadCount() {
             return flock.threadCount();
         }
@@ -577,10 +582,6 @@ public class ThreadFlock implements AutoCloseable {
         @Override
         public void onExit(Thread thread) {
             flock.onExit(thread);
-        }
-        @Override
-        public String toString() {
-            return flock.toString();
         }
         @Override
         public ScopedValueContainer.BindingsSnapshot scopedValueBindings() {

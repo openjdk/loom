@@ -30,7 +30,7 @@
 template<typename FKind>
 static inline intptr_t** link_address(const frame& f) {
   Unimplemented();
-  return NULL;
+  return nullptr;
 }
 
 static inline void patch_return_pc_with_preempt_stub(frame& f) {
@@ -47,11 +47,11 @@ inline intptr_t* ContinuationHelper::frame_align_pointer(intptr_t* p) {
 
 template<typename FKind>
 inline void ContinuationHelper::update_register_map(const frame& f, RegisterMap* map) {
-  Unimplemented();
+  // Currently all registers are considered to be volatile and saved in the caller (java) frame if needed
 }
 
 inline void ContinuationHelper::update_register_map_with_callee(const frame& f, RegisterMap* map) {
-  Unimplemented();
+  // Currently all registers are considered to be volatile and saved in the caller (java) frame if needed
 }
 
 inline void ContinuationHelper::push_pd(const frame& f) {
@@ -90,7 +90,7 @@ inline void ContinuationHelper::InterpretedFrame::patch_sender_sp(frame& f, cons
   intptr_t* sp = caller.unextended_sp();
   if (!f.is_heap_frame() && caller.is_interpreted_frame()) {
     // See diagram "Interpreter Calling Procedure on PPC" at the end of continuationFreezeThaw_ppc.inline.hpp
-    sp = (intptr_t*)caller.at(ijava_idx(top_frame_sp));
+    sp = (intptr_t*)caller.at_relative(ijava_idx(top_frame_sp));
   }
   assert(f.is_interpreted_frame(), "");
   assert(f.is_heap_frame() || is_aligned(sp, frame::alignment_in_bytes), "");
@@ -111,7 +111,7 @@ inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
 }
 
 //                     | Minimal ABI          |
-//                     | (frame::abi_minframe)|
+//                     | (frame::java_abi)    |
 //                     | 4 words              |
 //                     | Caller's SP          |<- FP of f's caller
 //                     |======================|
@@ -128,7 +128,7 @@ inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
 //                     | SP alignment (opt.)  |
 //                     |----------------------|
 //                     | Minimal ABI          |
-//                     | (frame::abi_minframe)|
+//                     | (frame::java_abi)    |
 //                     | 4 words              |
 //                     | Caller's SP          |<- SP of f's caller / FP of f
 //                     |======================|
@@ -149,7 +149,7 @@ inline void ContinuationHelper::Frame::patch_pc(const frame& f, address pc) {
 //                     | SP alignment (opt.)  |
 //                     |----------------------|
 //                     | Minimal ABI          |
-//                     | (frame::abi_minframe)|
+//                     | (frame::java_abi)    |
 //                     | 4 words              |
 //                     | Caller's SP          |<- SP of f / FP of f's callee
 //                     |======================|

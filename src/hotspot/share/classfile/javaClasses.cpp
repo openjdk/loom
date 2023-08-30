@@ -86,6 +86,7 @@
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vm_version.hpp"
 #include "utilities/align.hpp"
+#include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
 #include "utilities/preserveException.hpp"
 #include "utilities/utf8.hpp"
@@ -765,8 +766,13 @@ void java_lang_String::print(oop java_string, outputStream* st) {
 
   st->print("\"");
   for (int index = 0; index < length; index++) {
-    st->print("%c", (!is_latin1) ?  value->char_at(index) :
-                           ((jchar) value->byte_at(index)) & 0xff );
+    jchar c = (!is_latin1) ?  value->char_at(index) :
+                             ((jchar) value->byte_at(index)) & 0xff;
+    if (c < ' ') {
+      st->print("\\x%02X", c); // print control characters e.g. \x0A
+    } else {
+      st->print("%c", c);
+    }
   }
   st->print("\"");
 }
@@ -812,16 +818,16 @@ static void initialize_static_primitive_field(fieldDescriptor* fd, Handle mirror
   BasicType t = fd->field_type();
   switch (t) {
   case T_BYTE:
-    mirror()->byte_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->byte_field_put(fd->offset(), (jbyte)(fd->int_initial_value()));
     break;
   case T_BOOLEAN:
-    mirror()->bool_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->bool_field_put(fd->offset(), (jboolean)(fd->int_initial_value()));
     break;
   case T_CHAR:
-    mirror()->char_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->char_field_put(fd->offset(), (jchar)(fd->int_initial_value()));
     break;
   case T_SHORT:
-    mirror()->short_field_put(fd->offset(), fd->int_initial_value());
+    mirror()->short_field_put(fd->offset(), (jshort)(fd->int_initial_value()));
     break;
   case T_INT:
     mirror()->int_field_put(fd->offset(), fd->int_initial_value());
@@ -889,7 +895,7 @@ void java_lang_Class::fixup_mirror(Klass* k, TRAPS) {
   }
 
   if (k->is_shared() && k->has_archived_mirror_index()) {
-    if (ArchiveHeapLoader::are_archived_mirrors_available()) {
+    if (ArchiveHeapLoader::is_in_use()) {
       bool present = restore_archived_mirror(k, Handle(), Handle(), Handle(), CHECK);
       assert(present, "Missing archived mirror for %s", k->external_name());
       return;
@@ -1121,9 +1127,6 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 
   // mirror is archived, restore
   log_debug(cds, mirror)("Archived mirror is: " PTR_FORMAT, p2i(m));
-  if (ArchiveHeapLoader::is_mapped()) {
-    assert(Universe::heap()->is_archived_object(m), "must be archived mirror object");
-  }
   assert(as_Klass(m) == k, "must be");
   Handle mirror(THREAD, m);
 
@@ -1362,7 +1365,15 @@ BasicType java_lang_Class::primitive_type(oop java_class) {
   } else {
     assert(java_class == Universe::void_mirror(), "only valid non-array primitive");
   }
-  assert(Universe::java_mirror(type) == java_class, "must be consistent");
+#ifdef ASSERT
+  if (DumpSharedSpaces) {
+    oop mirror = Universe::java_mirror(type);
+    oop scratch_mirror = HeapShared::scratch_java_mirror(type);
+    assert(java_class == mirror || java_class == scratch_mirror, "must be consistent");
+  } else {
+    assert(Universe::java_mirror(type) == java_class, "must be consistent");
+  }
+#endif
   return type;
 }
 
@@ -1568,8 +1579,16 @@ JavaThread* java_lang_Thread::thread(oop java_thread) {
   return reinterpret_cast<JavaThread*>(java_thread->address_field(_eetop_offset));
 }
 
+JavaThread* java_lang_Thread::thread_acquire(oop java_thread) {
+  return reinterpret_cast<JavaThread*>(java_thread->address_field_acquire(_eetop_offset));
+}
+
 void java_lang_Thread::set_thread(oop java_thread, JavaThread* thread) {
   java_thread->address_field_put(_eetop_offset, (address)thread);
+}
+
+void java_lang_Thread::release_set_thread(oop java_thread, JavaThread* thread) {
+  java_thread->release_address_field_put(_eetop_offset, (address)thread);
 }
 
 JvmtiThreadState* java_lang_Thread::jvmti_thread_state(oop java_thread) {
@@ -1603,6 +1622,10 @@ bool java_lang_Thread::is_in_VTMS_transition(oop java_thread) {
 
 void java_lang_Thread::set_is_in_VTMS_transition(oop java_thread, bool val) {
   java_thread->bool_field_put_volatile(_jvmti_is_in_VTMS_transition_offset, val);
+}
+
+int java_lang_Thread::is_in_VTMS_transition_offset() {
+  return _jvmti_is_in_VTMS_transition_offset;
 }
 
 void java_lang_Thread::clear_scopedValueBindings(oop java_thread) {
@@ -2762,15 +2785,19 @@ Handle java_lang_Throwable::create_initialization_error(JavaThread* current, Han
   assert(throwable.not_null(), "shouldn't be");
 
   // Now create the message from the original exception and thread name.
-  Symbol* message = java_lang_Throwable::detail_message(throwable());
   ResourceMark rm(current);
+  const char *message = nullptr;
+  oop detailed_message = java_lang_Throwable::message(throwable());
+  if (detailed_message != nullptr) {
+    message = java_lang_String::as_utf8_string(detailed_message);
+  }
   stringStream st;
   st.print("Exception %s%s ", throwable()->klass()->name()->as_klass_external_name(),
              message == nullptr ? "" : ":");
   if (message == nullptr) {
     st.print("[in thread \"%s\"]", current->name());
   } else {
-    st.print("%s [in thread \"%s\"]", message->as_C_string(), current->name());
+    st.print("%s [in thread \"%s\"]", message, current->name());
   }
 
   Symbol* exception_name = vmSymbols::java_lang_ExceptionInInitializerError();
@@ -2778,7 +2805,7 @@ Handle java_lang_Throwable::create_initialization_error(JavaThread* current, Han
   // If new_exception returns a different exception while creating the exception,
   // abandon the attempt to save the initialization error and return null.
   if (init_error->klass()->name() != exception_name) {
-    log_info(class, init)("Exception thrown while saving initialization exception %s",
+    log_info(class, init)("Exception %s thrown while saving initialization exception",
                         init_error->klass()->external_name());
     return Handle();
   }
@@ -3623,21 +3650,6 @@ ConstantPool* reflect_ConstantPool::get_cp(oop reflect) {
   return InstanceKlass::cast(k)->constants();
 }
 
-int reflect_UnsafeStaticFieldAccessorImpl::_base_offset;
-
-#define UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(macro) \
-  macro(_base_offset, k, "base", object_signature, false)
-
-void reflect_UnsafeStaticFieldAccessorImpl::compute_offsets() {
-  InstanceKlass* k = vmClasses::reflect_UnsafeStaticFieldAccessorImpl_klass();
-  UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(FIELD_COMPUTE_OFFSET);
-}
-
-#if INCLUDE_CDS
-void reflect_UnsafeStaticFieldAccessorImpl::serialize_offsets(SerializeClosure* f) {
-  UNSAFESTATICFIELDACCESSORIMPL_FIELDS_DO(FIELD_SERIALIZE_OFFSET);
-}
-#endif
 
 // Support for java_lang_ref_Reference
 
@@ -4634,7 +4646,8 @@ bool java_lang_ClassLoader::is_trusted_loader(oop loader) {
 }
 
 // Return true if this is one of the class loaders associated with
-// the generated bytecodes for reflection.
+// the generated bytecodes for serialization constructor returned
+// by sun.reflect.ReflectionFactory::newConstructorForSerialization
 bool java_lang_ClassLoader::is_reflection_class_loader(oop loader) {
   if (loader != nullptr) {
     Klass* delegating_cl_class = vmClasses::reflect_DelegatingClassLoader_klass();
@@ -4722,7 +4735,7 @@ public:
   UnsafeConstantsFixup() {
     // round up values for all static final fields
     _address_size = sizeof(void*);
-    _page_size = (int)os::vm_page_size();
+    _page_size = AIX_ONLY(sysconf(_SC_PAGESIZE)) NOT_AIX((int)os::vm_page_size());
     _big_endian = LITTLE_ENDIAN_ONLY(false) BIG_ENDIAN_ONLY(true);
     _use_unaligned_access = UseUnalignedAccesses;
     _data_cache_line_flush_size = (int)VM_Version::data_cache_line_flush_size();
@@ -5224,7 +5237,6 @@ void java_lang_InternalError::serialize_offsets(SerializeClosure* f) {
   f(java_lang_reflect_Field) \
   f(java_lang_reflect_RecordComponent) \
   f(reflect_ConstantPool) \
-  f(reflect_UnsafeStaticFieldAccessorImpl) \
   f(java_lang_reflect_Parameter) \
   f(java_lang_Module) \
   f(java_lang_StackTraceElement) \

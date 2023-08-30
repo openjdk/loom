@@ -141,7 +141,7 @@ public class ScopedValueContainer extends StackableScope {
     /**
      * For use by ScopedValue to call a value returning operation in a structured context.
      */
-    public static <V> V call(Callable<V> op) throws Exception {
+    public static <V> V call(Callable<V> op) {
         if (head() == null) {
             // no need to push scope when stack is empty
             return callWithoutScope(op);
