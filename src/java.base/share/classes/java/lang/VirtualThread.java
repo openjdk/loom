@@ -77,6 +77,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final long PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
     private static final long CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread");
     private static final long TERMINATION = U.objectFieldOffset(VirtualThread.class, "termination");
+    private static final long ON_WAITING_LIST = U.objectFieldOffset(VirtualThread.class, "onWaitingList");
 
     // scheduler and continuation
     private final Executor scheduler;
@@ -153,6 +154,10 @@ final class VirtualThread extends BaseVirtualThread {
 
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
+
+    // Next waiting vthread to unpark()
+    private VirtualThread next;
+    private byte onWaitingList;
 
     private int preemptionDisabled;
 
@@ -1180,6 +1185,16 @@ final class VirtualThread extends BaseVirtualThread {
         state = newValue;  // volatile write
     }
 
+    private VirtualThread next() {
+        return next;
+    }
+
+    private void removeFromWaitingList() {
+        next = null;
+        boolean res = U.compareAndSetByte(this, ON_WAITING_LIST, (byte)0x01, (byte)0x00);
+        assert res;
+    }
+
     private boolean compareAndSetState(int expectedValue, int newValue) {
         return U.compareAndSetInt(this, STATE, expectedValue, newValue);
     }
@@ -1340,8 +1355,19 @@ final class VirtualThread extends BaseVirtualThread {
      * Unblock virtual threads that are ready to be scheduled again.
      */
     private static void processPendingList() {
-        // TBD invoke unblock
+        while (true) {
+            VirtualThread currentWaitingVThread = waitForPendingList();
+            VirtualThread nextWaitingVThread = null;
+            while (currentWaitingVThread != null) {
+                nextWaitingVThread = currentWaitingVThread.next();
+                currentWaitingVThread.removeFromWaitingList();
+                currentWaitingVThread.unpark();
+                currentWaitingVThread = nextWaitingVThread;
+            }
+        }
     }
+
+    private static native VirtualThread waitForPendingList();
 
     static {
         var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",

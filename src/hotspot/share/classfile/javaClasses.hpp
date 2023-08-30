@@ -518,6 +518,8 @@ class java_lang_VirtualThread : AllStatic {
   static int _carrierThread_offset;
   static int _continuation_offset;
   static int _state_offset;
+  static int _next_offset;
+  static int _onWaitingList_offset;
   static int _preemptionDisabled_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
  public:
@@ -555,6 +557,9 @@ class java_lang_VirtualThread : AllStatic {
   static oop continuation(oop vthread);
   static int state(oop vthread);
   static void set_state(oop vthread, int state);
+  static oop next(oop vthread);
+  static void set_next(oop vthread, oop next_vthread);
+  static bool set_onWaitingList(oop vthread);
   static bool is_preempted(oop vthread);
   static bool is_preemption_disabled(oop vthread);
   static void inc_preemption_disabled(oop vthread);

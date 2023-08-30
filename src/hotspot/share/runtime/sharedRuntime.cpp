@@ -2248,7 +2248,6 @@ JRT_END
 
 JRT_ENTRY_NO_ASYNC(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
   assert(current == JavaThread::current(), "invariant");
-  assert(monitor->contentions() > 0, "invariant");
 
   ThreadOnMonitorEnter tme(current);
   monitor->redo_enter(current);

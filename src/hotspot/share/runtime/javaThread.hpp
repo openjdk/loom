@@ -620,6 +620,8 @@ private:
   bool preempting()           { return _preempting; }
   void set_preempting(bool b) { _preempting = b; }
 
+  bool is_preemption_cancelled() { return _cancel_preemption; }
+
   inline void cancel_preemption();
 
  private:

@@ -122,6 +122,8 @@ static int Knob_PreSpin             = 10;      // 20-100 likely better
 DEBUG_ONLY(static volatile bool InitDone = false;)
 
 OopStorage* ObjectMonitor::_oop_storage = nullptr;
+OopHandle ObjectMonitor::_vthread_cxq_head;
+int ObjectMonitor::_vthread_cnt = 0;
 
 // -----------------------------------------------------------------------------
 // Theory of operations -- Monitors lists, thread residency, etc:
@@ -401,6 +403,10 @@ bool ObjectMonitor::enter(JavaThread* current) {
     current->inc_held_monitor_count();
     if (result == freeze_ok) {
       HandlePreemptedVThread(current, ce, true /* first_time */);
+      add_to_contentions(-1);
+      DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
+      assert((owner() == current && current->is_preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
+             (owner() != current && !current->is_preemption_cancelled() && (state == java_lang_VirtualThread::PARKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
       return true;
     }
   }
@@ -1055,6 +1061,7 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntr
 
   // We are going to preempt so decrement the already increment monitor count.
   current->dec_held_monitor_count();
+
   return false;
 }
 
@@ -1137,14 +1144,17 @@ void ObjectMonitor::ReenterI(JavaThread* current, ObjectWaiter* currentNode) {
 }
 
 void ObjectMonitor::redo_enter(JavaThread* current) {
+  assert(java_lang_VirtualThread::state(current->vthread()) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
+
   if (TryLock (current) > 0) {
     VThreadEpilog(current);
+    return;
   }
 
   current->_Stalled = intptr_t(this);
   ContinuationEntry* ce = current->last_continuation();
   int result = Continuation::try_preempt(current, ce->cont_oop(current));
-  assert(result == freeze_ok, "assert true for now");
+  assert(result == freeze_ok, "preemption failed: %d", result);
   HandlePreemptedVThread(current, ce, false /* first_time */);
 }
 
@@ -1513,9 +1523,16 @@ void ObjectMonitor::ExitEpilog(JavaThread* current, ObjectWaiter* Wakee) {
   if (vthread == nullptr) {
     // Platform thread case
     Trigger->unpark();
-  } else {
-    // Add to queue and notify special unparker thread
-
+  } else if (java_lang_VirtualThread::set_onWaitingList(vthread)) {
+    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
+    assert(_vthread_cnt >= 0, "invariant");
+    oop vthread_head = vthread_pending_list();
+    assert(vthread_head == nullptr || _vthread_cnt > 0, "invariant");
+    assert(java_lang_VirtualThread::next(vthread) == nullptr && vthread != vthread_head, "vthread on list already");
+    java_lang_VirtualThread::set_next(vthread, vthread_head);
+    replace_vthread_pending_list(vthread);
+    _vthread_cnt += 1;
+    ml.notify();
   }
 
   // Maintain stats and report events to JVMTI
@@ -2227,6 +2244,27 @@ int ObjectMonitor::NotRunnable(JavaThread* current, JavaThread* ox) {
   return jst == _thread_blocked || jst == _thread_in_native;
 }
 
+oop ObjectMonitor::vthread_pending_list() {
+  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
+  return _vthread_cxq_head.resolve();
+}
+
+bool ObjectMonitor::has_vthread_pending_list() {
+  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
+  assert(_vthread_cnt >= 0, "invariant");
+  return _vthread_cnt > 0;
+}
+
+void ObjectMonitor::replace_vthread_pending_list(oop vthread) {
+  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
+  _vthread_cxq_head.replace(vthread);
+}
+
+void ObjectMonitor::clear_vthread_pending_list() {
+  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
+  _vthread_cxq_head.replace(nullptr);
+  _vthread_cnt = 0;
+}
 
 // -----------------------------------------------------------------------------
 // WaitSet management ...
@@ -2238,9 +2276,9 @@ ObjectWaiter::ObjectWaiter(JavaThread* current) {
   _notifier_tid = 0;
   TState    = TS_RUN;
   _thread   = current;
-  _event    = _thread->_ParkEvent;
+  _event    = _thread != nullptr ? _thread->_ParkEvent : nullptr;
   _active   = false;
-  assert(_event != nullptr, "invariant");
+  assert(_event != nullptr || _thread == nullptr, "invariant");
 }
 
 ObjectWaiter::ObjectWaiter(oop vthread) : ObjectWaiter(nullptr) {
@@ -2360,6 +2398,11 @@ void ObjectMonitor::Initialize() {
   _oop_storage = OopStorageSet::create_weak("ObjectSynchronizer Weak", mtSynchronizer);
 
   DEBUG_ONLY(InitDone = true;)
+}
+
+void ObjectMonitor::Initialize2() {
+  _vthread_cxq_head = OopHandle(JavaThread::thread_oop_storage(), nullptr);
+  _vthread_cnt = 0;
 }
 
 void ObjectMonitor::print_on(outputStream* st) const {

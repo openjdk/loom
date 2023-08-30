@@ -4014,6 +4014,23 @@ JVM_ENTRY(void, JVM_VirtualThreadHideFrames(JNIEnv* env, jobject vthread, jboole
 #endif
 JVM_END
 
+JVM_ENTRY(jobject, JVM_VirtualThreadWaitForPendingList(JNIEnv* env))
+  oop vthread_head = nullptr;
+  {
+    ThreadBlockInVM tbivm(thread);
+    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
+    while (!ObjectMonitor::has_vthread_pending_list()) {
+      ml.wait();
+    }
+  }
+  {
+    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
+    vthread_head = ObjectMonitor::vthread_pending_list();
+    ObjectMonitor::clear_vthread_pending_list();
+  }
+  return JNIHandles::make_local(THREAD, vthread_head);
+JVM_END
+
 /*
  * Return the current class's class file version.  The low order 16 bits of the
  * returned jint contain the class's major version.  The high order 16 bits

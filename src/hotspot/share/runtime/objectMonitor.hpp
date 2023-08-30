@@ -146,6 +146,9 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 
   static OopStorage* _oop_storage;
 
+  static OopHandle _vthread_cxq_head;
+  static int _vthread_cnt;
+
   // The sync code expects the header field to be at offset zero (0).
   // Enforced by the assert() in header_addr().
   volatile markWord _header;        // displaced object header word - mark
@@ -210,6 +213,7 @@ private:
  public:
 
   static void Initialize();
+  static void Initialize2();
 
   // Only perform a PerfData operation if the PerfData object has been
   // allocated and if the PerfDataManager has not freed the PerfData
@@ -319,6 +323,11 @@ private:
 
   bool slowpath_on_last_exit()             { return _slowpath_on_last_exit; }
   void set_slowpath_on_last_exit(bool val) { _slowpath_on_last_exit = val; }
+
+  static oop   vthread_pending_list();
+  static bool  has_vthread_pending_list();
+  static void  replace_vthread_pending_list(oop vthread);
+  static void  clear_vthread_pending_list();
 
   // Simply get _next_om field.
   ObjectMonitor* next_om() const;

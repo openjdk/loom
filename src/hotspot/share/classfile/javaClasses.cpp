@@ -1952,6 +1952,8 @@ int java_lang_VirtualThread::static_vthread_scope_offset;
 int java_lang_VirtualThread::_carrierThread_offset;
 int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
+int java_lang_VirtualThread::_next_offset;
+int java_lang_VirtualThread::_onWaitingList_offset;
 int java_lang_VirtualThread::_preemptionDisabled_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
@@ -1959,6 +1961,8 @@ int java_lang_VirtualThread::_preemptionDisabled_offset;
   macro(_carrierThread_offset,             k, "carrierThread",      thread_signature,            false); \
   macro(_continuation_offset,              k, "cont",               continuation_signature,      false); \
   macro(_state_offset,                     k, "state",              int_signature,               false); \
+  macro(_next_offset,                      k, "next",               vthread_signature,           false); \
+  macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
   macro(_preemptionDisabled_offset,        k, "preemptionDisabled", int_signature,               false);
 
 
@@ -1987,6 +1991,25 @@ int java_lang_VirtualThread::state(oop vthread) {
 
 void java_lang_VirtualThread::set_state(oop vthread, int state) {
   vthread->int_field_put(_state_offset, state);
+}
+
+oop java_lang_VirtualThread::next(oop vthread) {
+  return vthread->obj_field(_next_offset);
+}
+
+void java_lang_VirtualThread::set_next(oop vthread, oop next_vthread) {
+  vthread->obj_field_put(_next_offset, next_vthread);
+}
+
+bool java_lang_VirtualThread::set_onWaitingList(oop vthread) {
+  uint8_t* addr = vthread->field_addr<uint8_t>(_onWaitingList_offset);
+  uint8_t value = Atomic::load(addr);
+  assert(value == 0x00 || value == 0x01, "invariant");
+  if (value == 0x00) {
+    value = Atomic::cmpxchg(addr, (uint8_t)0x00, (uint8_t)0x01);
+    if (value == 0x00) return true;
+  }
+  return false; // already on waiting list
 }
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {

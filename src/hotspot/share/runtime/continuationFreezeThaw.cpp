@@ -2142,8 +2142,8 @@ inline intptr_t* Thaw<ConfigT>::thaw(Continuation::thaw_kind kind) {
 
       chunk->copy_lockstack(tmp_lockstack);
       _thread->lock_stack().move_from_address(tmp_lockstack, lockStackSize);
-      assert(_thread->held_monitor_count() == 0, "carrier has monitors");
-      _thread->set_held_monitor_count(lockStackSize);
+      assert(_thread->held_monitor_count() <= 1, "should have 1 monitor max in case of redo_enter");
+      _thread->inc_held_monitor_count(lockStackSize);
 
       chunk->set_lockStackSize(0);
     }
@@ -2510,7 +2510,6 @@ void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
 #ifdef ASSERT
 static address get_thread_register_address_in_stub(frame& stub_fr) {
   CodeBlob* stub_cb = stub_fr.cb();
-  assert(stub_cb->is_runtime_stub(), "must be a runtime stub");
   RegisterMap map(JavaThread::current(),
                   RegisterMap::UpdateMap::include,
                   RegisterMap::ProcessFrames::skip,
@@ -2892,8 +2891,10 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   intptr_t* const sp = thw.thaw(kind);
   assert(is_aligned(sp, frame::frame_alignment), "");
 
-  // All the frames have been thawed so we know they don't hold any monitors
-  assert(thread->held_monitor_count() == thread->lock_stack().monitor_count(), "Must be");
+  // First time we thaw after freeze so _held_monitor_count should equal the monitors we copied into the lockstack.
+  // When we cancel preemption after successfully acquiring the lock we call thaw again with Continuation::thaw_top
+  // but now we have one monitor extra so we cannot assert equality.
+  //assert(kind != Continuation::thaw_top || thread->held_monitor_count() == thread->lock_stack().monitor_count(), "invariant");
 
 #ifdef ASSERT
   intptr_t* sp0 = sp;

@@ -26,16 +26,14 @@
  * @summary Test virtual threads using synchronized
  * @library /test/lib
  * @modules java.base/java.lang:+open
+ *
  * @run junit/othervm/timeout=10 -Xint MonitorsTest
  * @run junit/othervm/timeout=50 -Xcomp MonitorsTest
  * @run junit/othervm/timeout=50 MonitorsTest
  * @run junit/othervm/timeout=50 -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest
  */
 
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.*;
 
 import org.junit.jupiter.api.Test;
@@ -45,12 +43,13 @@ class MonitorsTest {
     final int CARRIER_COUNT = 8;
     ExecutorService scheduler = Executors.newFixedThreadPool(CARRIER_COUNT);
 
-    static AtomicInteger workerCount = new AtomicInteger(0);
     static final Object globalLock = new Object();
     static volatile boolean finish = false;
     static volatile int counter = 0;
 
-    ///// BASIC TESTS ///////
+    /////////////////////////////////////////////////////////////////////
+    //////////////////////////// BASIC TESTS ////////////////////////////
+    /////////////////////////////////////////////////////////////////////
 
     static final Runnable FOO = () -> {
         Object lock = new Object();
@@ -64,7 +63,7 @@ class MonitorsTest {
 
     static final Runnable BAR = () -> {
         synchronized(globalLock) {
-            workerCount.getAndIncrement();
+            counter++;
         }
         System.out.println("Exiting BAR from thread " + Thread.currentThread().getName());
     };
@@ -72,7 +71,7 @@ class MonitorsTest {
     /**
      *  Test yield while holding monitor.
      */
-    //@Test
+    @Test
     void testBasic() throws Exception {
         final int VT_COUNT = CARRIER_COUNT;
 
@@ -91,7 +90,7 @@ class MonitorsTest {
             secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR);
         }
 
-        while(workerCount.get() != VT_COUNT) {}
+        while(counter != VT_COUNT) {}
 
         finish = true;
 
@@ -127,10 +126,10 @@ class MonitorsTest {
     /**
      *  Test yield while holding monitor with recursive locking.
      */
-    //@Test
+    @Test
     void testRecursive() throws Exception {
         final int VT_COUNT = CARRIER_COUNT;
-        workerCount.getAndSet(0);
+        counter = 0;
         finish = false;
 
         // Create first batch of VT threads.
@@ -148,7 +147,7 @@ class MonitorsTest {
             secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR2);
         }
 
-        while(workerCount.get() != 2*VT_COUNT) {}
+        while(counter != 2*VT_COUNT) {}
 
         finish = true;
 
@@ -172,7 +171,7 @@ class MonitorsTest {
     /**
      *  Test contention on monitorenter.
      */
-    //@Test
+    @Test
     void testContention() throws Exception {
         final int VT_COUNT = CARRIER_COUNT * 8;
         counter = 0;
@@ -194,19 +193,22 @@ class MonitorsTest {
         }
     }
 
-    ///// MAIN TESTS ///////
+    /////////////////////////////////////////////////////////////////////
+    //////////////////////////// MAIN TESTS /////////////////////////////
+    /////////////////////////////////////////////////////////////////////
 
     static final int MONITORS_CNT = 12;
     static Object[] globalLockArray;
+    static AtomicInteger workerCount = new AtomicInteger(0);
 
-    static void recursive4_1(int lockNumber, int lockNumberOrig) {
-        if (lockNumber > 0) {
-            recursive4_1(lockNumber - 1, lockNumberOrig);
+    static void recursive4_1(int depth, int lockNumber) {
+        if (depth > 0) {
+            recursive4_1(depth - 1, lockNumber);
         } else {
-            if ( lockNumberOrig % 2 == 0) {
+            if (Math.random() < 0.5) {
                 Thread.yield();
             }
-            recursive4_2(lockNumberOrig);
+            recursive4_2(lockNumber);
         }
     }
 
@@ -214,7 +216,6 @@ class MonitorsTest {
         if (lockNumber + 2 <= MONITORS_CNT - 1) {
             lockNumber += 2;
             synchronized(globalLockArray[lockNumber]) {
-                System.out.println("Thread " + Thread.currentThread().getName() + " grabbed monitor " + lockNumber);
                 Thread.yield();
                 recursive4_2(lockNumber);
             }
@@ -225,7 +226,6 @@ class MonitorsTest {
         while (!finish) {
             int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
             synchronized(globalLockArray[lockNumber]) {
-                System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
                 recursive4_1(lockNumber, lockNumber);
             }
         }
@@ -253,7 +253,6 @@ class MonitorsTest {
         }
 
         Thread.sleep(10000);
-
         finish = true;
 
         for (int i = 0; i < VT_COUNT; i++) {
@@ -266,14 +265,14 @@ class MonitorsTest {
     }
 
 
-    static void recursive5_1(int lockNumber, int lockNumberOrig, Object[] myLockArray) {
-        if (lockNumber > 0) {
-            recursive5_1(lockNumber - 1, lockNumberOrig, myLockArray);
+    static void recursive5_1(int depth, int lockNumber, Object[] myLockArray) {
+        if (depth > 0) {
+            recursive5_1(depth - 1, lockNumber, myLockArray);
         } else {
             if (Math.random() < 0.5) {
                 Thread.yield();
             }
-            recursive5_2(lockNumberOrig, myLockArray);
+            recursive5_2(lockNumber, myLockArray);
         }
     }
 
@@ -285,7 +284,6 @@ class MonitorsTest {
                     Thread.yield();
                 }
                 synchronized (globalLockArray[lockNumber]) {
-                    System.out.println("Thread " + Thread.currentThread().getName() + " grabbed monitor " + lockNumber);
                     Thread.yield();
                     recursive5_2(lockNumber, myLockArray);
                 }
@@ -303,7 +301,6 @@ class MonitorsTest {
             int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
             synchronized (myLockArray[lockNumber]) {
                 synchronized (globalLockArray[lockNumber]) {
-                    System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
                     recursive5_1(lockNumber, lockNumber, myLockArray);
                 }
             }
@@ -346,9 +343,9 @@ class MonitorsTest {
         }
     }
 
-    static synchronized void recursive6(int lockNumber, Object myLock) {
-        if (lockNumber > 0) {
-            recursive6(lockNumber - 1, myLock);
+    static synchronized void recursive6(int depth, Object myLock) {
+        if (depth > 0) {
+            recursive6(depth - 1, myLock);
         } else {
             if (Math.random() < 0.5) {
                 Thread.yield();
@@ -367,7 +364,6 @@ class MonitorsTest {
             int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT - 1);
             synchronized (myLock) {
                 synchronized (globalLockArray[lockNumber]) {
-                    System.out.println(Thread.currentThread().getName() + "grabbed monitor " + lockNumber);
                     recursive6(lockNumber, myLock);
                 }
             }

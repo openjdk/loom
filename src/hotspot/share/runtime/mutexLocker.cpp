@@ -92,6 +92,7 @@ Monitor* InitCompleted_lock           = nullptr;
 Monitor* BeforeExit_lock              = nullptr;
 Monitor* Notify_lock                  = nullptr;
 Mutex*   ExceptionCache_lock          = nullptr;
+Monitor* MonitorEnterUnparker_lock    = nullptr;
 #ifndef PRODUCT
 Mutex*   FullGCALot_lock              = nullptr;
 #endif
@@ -243,6 +244,8 @@ void mutex_init() {
   } else {
     Notification_lock = Service_lock;
   }
+
+  MUTEX_DEFN(MonitorEnterUnparker_lock       , PaddedMonitor  , nosafepoint);
 
   MUTEX_DEFN(JmethodIdCreation_lock          , PaddedMutex  , nosafepoint-2); // used for creating jmethodIDs.
   MUTEX_DEFN(InvokeMethodTypeTable_lock      , PaddedMutex  , safepoint);

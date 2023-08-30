@@ -3720,7 +3720,7 @@ address StubGenerator::generate_cont_preempt_stub() {
 #ifdef ASSERT
   { Label L;
     __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
-    __ testl(rscratch1, rscratch1);
+    __ testbool(rscratch1);
     __ jcc(Assembler::notZero, L);
     __ stop("preempting flag should be set");
     __ bind(L);
@@ -3733,7 +3733,7 @@ address StubGenerator::generate_cont_preempt_stub() {
 
   Label cancel_preemption;
   __ movbool(rscratch1, Address(r15_thread, JavaThread::cancel_preemption_offset()));
-  __ testl(rscratch1, rscratch1);
+  __ testbool(rscratch1);
   __ jcc(Assembler::notZero, cancel_preemption);
 
   // Remove enterSpecial frame from the stack and return to Continuation.run()
