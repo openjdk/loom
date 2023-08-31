@@ -421,6 +421,7 @@ private:
   inline void set_top_frame_metadata_pd(const frame& hf);
   inline void patch_pd(frame& callee, const frame& caller);
   void adjust_interpreted_frame_unextended_sp(frame& f);
+  static inline void prepare_freeze_interpreted_top_frame(const frame& f);
   static inline void relativize_interpreted_frame_metadata(const frame& f, const frame& hf);
 
 protected:
@@ -952,25 +953,33 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
   assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).is_done(), "");
   assert(!is_empty(chunk) || StackChunkFrameStream<ChunkFrames::Mixed>(chunk).to_frame().is_empty(), "");
 
-  if (_preempt && _thread->return_oop() != nullptr) {
-    // First restore the oop in case there was a safepoint. Then mark the chunk as
-    // having an oop in the freezed stub.
-    frame stubframe = _thread->last_frame();
-    oop* return_oop_addr = frame::saved_oop_result_address(stubframe);
-    *return_oop_addr = _thread->return_oop();
-    chunk->set_has_oop_on_stub(true);
+  if (_preempt) {
+    frame f = _thread->last_frame();
+    if (f.is_interpreted_frame()) {
+      // Do it now that we know freezing will be successful.
+      prepare_freeze_interpreted_top_frame(f);
+    }
 
-#ifdef ASSERT
-    oop returnoop = *return_oop_addr;
-    assert(oopDesc::is_oop(returnoop) && returnoop->klass()->is_klass(), "");
-    assert(stubframe.cb()->is_safepoint_stub(), "must be a safepoint stub");
-    RegisterMap map(_thread,
-                    RegisterMap::UpdateMap::include,
-                    RegisterMap::ProcessFrames::skip,
-                    RegisterMap::WalkContinuation::skip);
-    stubframe.oop_map()->update_register_map(&stubframe, &map);
-    assert(frame::saved_oop_result_address(&map) == return_oop_addr, "");
-#endif
+    if (_thread->return_oop() != nullptr) {
+      // First restore the oop in case there was a safepoint. Then mark the chunk as
+      // having an oop in the freezed stub.
+      frame stubframe = f;
+      oop* return_oop_addr = frame::saved_oop_result_address(stubframe);
+      *return_oop_addr = _thread->return_oop();
+      chunk->set_has_oop_on_stub(true);
+
+  #ifdef ASSERT
+      oop returnoop = *return_oop_addr;
+      assert(oopDesc::is_oop(returnoop) && returnoop->klass()->is_klass(), "");
+      assert(stubframe.cb()->is_safepoint_stub(), "must be a safepoint stub");
+      RegisterMap map(_thread,
+                      RegisterMap::UpdateMap::include,
+                      RegisterMap::ProcessFrames::skip,
+                      RegisterMap::WalkContinuation::skip);
+      stubframe.oop_map()->update_register_map(&stubframe, &map);
+      assert(frame::saved_oop_result_address(&map) == return_oop_addr, "");
+  #endif
+    }
   }
 
   // We unwind frames after the last safepoint so that the GC will have found the oops in the frames, but before
@@ -2097,10 +2106,14 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
     _cont.set_preempted(false);
 
 #if INCLUDE_JVMTI
-    if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
-      jvmti_mount_end(_thread, _cont, top, has_oop_on_stub);
-    } else {
-      _thread->set_is_in_VTMS_transition(false);
+    bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
+    if (is_vthread) {
+      if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
+        jvmti_mount_end(_thread, _cont, top, has_oop_on_stub);
+      } else {
+        _thread->set_is_in_VTMS_transition(false);
+        java_lang_Thread::set_is_in_VTMS_transition(_thread->vthread(), false);
+      }
     }
 #endif
 

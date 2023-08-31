@@ -127,6 +127,10 @@ void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
   }
 }
 
+inline void FreezeBase::prepare_freeze_interpreted_top_frame(const frame& f) {
+  Unimplemented();
+}
+
 static inline void relativize_one(intptr_t* const vfp, intptr_t* const hfp, int offset) {
   assert(*(hfp + offset) == *(vfp + offset), "");
   intptr_t* addr = hfp + offset;

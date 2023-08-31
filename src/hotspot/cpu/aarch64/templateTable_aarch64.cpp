@@ -2212,6 +2212,13 @@ void TemplateTable::_return(TosState state)
     __ push(state);
     __ push_cont_fastpath(rthread);
     __ call_VM(noreg, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint));
+    // Check preemption
+    Label ok;
+    __ ldrb(rscratch1, Address(rthread, in_bytes(JavaThread::preempting_offset())));
+    __ cbz(rscratch1, ok);
+    __ lea(rscratch1, RuntimeAddress(StubRoutines::cont_preempt_stub()));
+    __ br(rscratch1);
+    __ bind(ok);
     __ pop_cont_fastpath(rthread);
     __ pop(state);
     __ bind(no_safepoint);

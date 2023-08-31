@@ -52,8 +52,8 @@
 * @modules java.base/java.lang:+open
 * @enablePreview
 *
-* @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,VThreadPreemption VThreadPreemption
-* @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,VThreadPreemption VThreadPreemption
+* @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk.internal.vm.Continuation::*,VThreadPreemption::* VThreadPreemption
+* @run main/othervm/native -agentlib:VThreadPreemption -XX:+UnlockDiagnosticVMOptions -XX:+ShowHiddenFrames -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk.internal.vm.Continuation::*,VThreadPreemption::* VThreadPreemption
 */
 
 /**

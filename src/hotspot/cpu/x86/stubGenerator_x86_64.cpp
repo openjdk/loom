@@ -3754,7 +3754,8 @@ address StubGenerator::generate_cont_preempt_rerun_interpreter_adapter() {
   __ movptr(rax, Address(rsp, 0));
 
   // Restore stack bottom
-  __ movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  __ movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  __ lea(rsp, Address(rbp, rcx, Address::times_ptr));
   // and NULL it as marker that esp is now tos until next java call
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), NULL_WORD);
 

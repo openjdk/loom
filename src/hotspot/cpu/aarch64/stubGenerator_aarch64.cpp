@@ -7100,7 +7100,8 @@ class StubGenerator: public StubCodeGenerator {
     __ ldr(rcpool, Address(rfp, frame::interpreter_frame_cache_offset * wordSize));
 
     // Restore Java expression stack pointer
-    __ ldr(esp, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
+    __ lea(esp, Address(rfp, rscratch1, Address::lsl(Interpreter::logStackElementSize)));
     // and NULL it as marker that esp is now tos until next java call
     __ str(zr, Address(rfp, frame::interpreter_frame_last_sp_offset * wordSize));
 

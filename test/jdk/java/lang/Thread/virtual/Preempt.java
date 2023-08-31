@@ -48,8 +48,8 @@
 * @modules java.base/java.lang:+open
 * @enablePreview
 *
-* @run testng/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk/internal/vm/Continuation,Preempt Preempt
-* @run testng/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk/internal/vm/Continuation,Preempt Preempt
+* @run testng/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:-TieredCompilation -XX:CompileOnly=jdk.internal.vm.Continuation::*,Preempt::* Preempt
+* @run testng/othervm -XX:+IgnoreUnrecognizedVMOptions -XX:-VerifyContinuations -Xcomp -XX:TieredStopAtLevel=3 -XX:CompileOnly=jdk.internal.vm.Continuation::*,Preempt::* Preempt
 */
 
 /**

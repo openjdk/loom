@@ -98,23 +98,22 @@ JVM_END
 class JvmtiUnmountBeginMark : public StackObj {
   JavaThread* _target;
   int _preempt_result;
-  bool _do_full_VTMS_transition;
   bool _transition_succeded;
   bool _is_vthread;
 
  public:
   JvmtiUnmountBeginMark(JavaThread* t, bool is_vthread) :
-    _target(t), _preempt_result(freeze_pinned_native), _do_full_VTMS_transition(false), _transition_succeded(true), _is_vthread(is_vthread) {
-    assert(!_target->is_in_VTMS_transition(), "must be");
+    _target(t), _preempt_result(freeze_pinned_native), _transition_succeded(true), _is_vthread(is_vthread) {
+    assert(!_target->is_in_any_VTMS_transition(), "must be");
     assert(!_target->is_suspended(), "must be");
 
     if (!_is_vthread) return;
 
-    _do_full_VTMS_transition = JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events();
-    if (_do_full_VTMS_transition) {
+    if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
       _transition_succeded = JvmtiVTMSTransitionDisabler::start_VTMS_transition(JavaThread::current(), _target, _target->vthread(), /* is_mount */ false);
     } else {
       _target->set_is_in_VTMS_transition(true);
+      java_lang_Thread::set_is_in_VTMS_transition(_target->vthread(), true);
     }
   }
   ~JvmtiUnmountBeginMark() {
@@ -122,17 +121,26 @@ class JvmtiUnmountBeginMark : public StackObj {
 
     if (!_is_vthread) return;
 
-    if (_preempt_result == freeze_ok) {
-      assert(_target->is_in_VTMS_transition(), "must be");
-      _target->rebind_to_jvmti_thread_state_of(_target->threadObj());
-    } else {
+    assert(_target->is_in_VTMS_transition(), "must be");
+    assert(java_lang_Thread::is_in_VTMS_transition(_target->vthread()), "must be");
+
+    // Read it again since for late binding agents the flag could have
+    // been set while blocked in the allocation path during freeze.
+    bool jvmti_present = JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events();
+
+    if (_preempt_result != freeze_ok) {
       // Undo transition
-      if (_do_full_VTMS_transition) {
+      if (jvmti_present) {
         JvmtiVTMSTransitionDisabler::finish_VTMS_transition(JavaThread::current(), _target, _target->vthread(), false);
       } else {
         _target->set_is_in_VTMS_transition(false);
+        java_lang_Thread::set_is_in_VTMS_transition(_target->vthread(), false);
       }
-    }        
+    } else {
+      if (jvmti_present) {
+        _target->rebind_to_jvmti_thread_state_of(_target->threadObj());
+      }
+    }
   }
   bool transition_succeded()  { return _transition_succeded; }
   void set_preempt_result(int res) { _preempt_result = res; }
