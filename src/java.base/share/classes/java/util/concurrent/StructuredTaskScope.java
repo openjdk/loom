@@ -1473,13 +1473,24 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         /**
+         * Wait for each subtask in this task scope to finish, push it into the stream,
+         * until either the stream final operation ends, there is no more subtasks or
+         * the scope is shutdown.
          *
-         * TODO
+         * <p> This method waits for each subtask by waiting for each thread {@linkplain
+         * #fork(Callable) started} in this task scope to finish its execution.
+         * It stops waiting when the stream is short-circuited, all threads finish,
+         * the task scope is {@linkplain #shutdown() shut down}, or the current thread is
+         * {@linkplain Thread#interrupt() interrupted}.
+         *
+         * <p> This method may only be invoked by the task scope owner.
          *
          * @param mapper a function that takes a stream and return a value
+         * @param <U>    the type of the return value
          * @return the value returned by the mapper function
-         * @param <U> the type of the return value
-         * @throws InterruptedException if an IO exception occurs
+         * @throws IllegalStateException if this task scope is closed
+         * @throws WrongThreadException  if the current thread is not the task scope owner
+         * @throws InterruptedException  if interrupted while waiting
          */
         public <U> U joinWhen(Function<? super Stream<Subtask<T>>, ? extends U> mapper) throws InterruptedException {
             Objects.requireNonNull(mapper, "mapper is null");
@@ -1503,18 +1514,21 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         @Override
         public void shutdown() {
-            throw new UnsupportedOperationException();
+            super.shutdown();
         }
 
         @Override
         public Streamable<T> join() throws InterruptedException {
-            throw new UnsupportedOperationException();
+            super.join();
+            return this;
         }
 
         @Override
         public Streamable<T> joinUntil(Instant deadline)
-                throws InterruptedException, TimeoutException {
-            throw new UnsupportedOperationException();
+                throws InterruptedException, TimeoutException
+        {
+            super.joinUntil(deadline);
+            return this;
         }
     }
 }
