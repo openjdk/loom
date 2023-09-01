@@ -321,9 +321,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     // Counters to support checking that the task scope owner joins before processing
     // results and attempts join before closing the task scope. These counters are
     // accessed only by the owner thread.
-    private int forkRound;         // incremented when the first subtask is forked after join
-    private int lastJoinAttempted; // set to the current fork round when join is attempted
-    private int lastJoinCompleted; // set to the current fork round when join completes
+    int forkRound;         // incremented when the first subtask is forked after join
+    int lastJoinAttempted; // set to the current fork round when join is attempted
+    int lastJoinCompleted; // set to the current fork round when join completes
 
     /**
      * Represents a subtask forked with {@link #fork(Callable)}.
@@ -1386,40 +1386,35 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         private final class SubTaskSpliterator implements Spliterator<Subtask<T>> {
-            private int taskCount;
-
-            private SubTaskSpliterator(int taskCount) {
-                this.taskCount = taskCount;
-            }
+            private boolean finished;
 
             @Override
             public boolean tryAdvance(Consumer<? super Subtask<T>> action) {
                 for(;;) {
-                    if (taskCount == 0) {
+                    if (isShutdown()) {
                         return false;
                     }
-                    Subtask<T> subtask;
-                    queueLock.lock();
-                    try {
-                        while(queue.isEmpty()) {
-                            try {
-                                queueCondition.await();
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                taskCount = 0;
-                                return false;
-                            }
+                    if (queue.isEmpty()) {
+                        if (finished) {
+                            return false;
                         }
-                        subtask = queue.removeFirst();
-                    } finally {
-                        queueLock.unlock();
+                        try {
+                            finished = flock.awaitAll();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            finished = true;
+                            return false;
+                        }
                     }
-                    taskCount--;
+                    if (queue.isEmpty()) {
+                      continue;  // awaken by shutdown or finished
+                    }
+                    Subtask<T> subtask = queue.remove();
                     if (subtask.state() == Subtask.State.UNAVAILABLE) {
                         continue;
                     }
                     action.accept(subtask);
-                    return taskCount != 0;
+                    return true;
                 }
             }
 
@@ -1439,10 +1434,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             }
         }
 
-        private final ArrayDeque<PlainSubTask<T>> queue = new ArrayDeque<>();
-        private final ReentrantLock queueLock = new ReentrantLock();
-        private final Condition queueCondition = queueLock.newCondition();
-        private int taskCounter;  // only the owner thread can mutate this field
+        private final ConcurrentLinkedQueue<PlainSubTask<T>> queue = new ConcurrentLinkedQueue<>();
 
         /**
          * Constructs a new {@code Streamable} with the given name and thread factory.
@@ -1475,27 +1467,14 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         @Override
-        public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
-            ensureOwner();
-            Subtask<U> subtask = super.fork(task);
-            taskCounter++;
-            return subtask;
-        }
-
-        @Override
         protected void handleComplete(Subtask<? extends T> subtask) {
             PlainSubTask<T> newTask = switch (subtask.state()) {
                 case FAILED -> new PlainSubTask<>(Subtask.State.FAILED, null, subtask.exception());
                 case SUCCESS -> new PlainSubTask<>(Subtask.State.SUCCESS, subtask.get(), null);
                 case UNAVAILABLE -> new PlainSubTask<>(Subtask.State.UNAVAILABLE, null, null);  // scope is shutdown
             };
-            queueLock.lock();
-            try {
-                queue.add(newTask);
-                queueCondition.signal();
-            } finally {
-                queueLock.unlock();
-            }
+            queue.add(newTask);
+            flock.wakeup();
         }
 
         /**
@@ -1509,20 +1488,18 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          */
         public <U> U joinWhen(Function<? super Stream<Subtask<T>>, ? extends U> mapper) throws InterruptedException {
             Objects.requireNonNull(mapper, "mapper is null");
+
             ensureOwner();
-            int open = ensureOpen();
-            if (open != OPEN) {
-                throw new IllegalStateException("Task scope is shutdown");
-            }
+            lastJoinAttempted = forkRound;
+            ensureOpen();  // throws ISE if closed
 
-            flock.shutdown();
-
-            int taskCount = taskCounter;
-            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(taskCount), false);
+            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(), false);
             U result = mapper.apply(stream);
 
+            lastJoinCompleted = forkRound;
+
             super.shutdown();
-            super.join();
+            //super.join();
 
             if (Thread.interrupted()) {
                 throw new InterruptedException();
