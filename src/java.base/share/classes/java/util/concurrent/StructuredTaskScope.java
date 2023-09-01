@@ -30,11 +30,9 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -902,9 +900,6 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
             // nothing to do if task scope is shutdown, apart if it's a Streamable
             if (scope.isShutdown()) {
-                if (scope instanceof StructuredTaskScope.Streamable<?>) {
-                    scope.handleComplete(this);
-                }
                 return;
             }
 
@@ -1471,7 +1466,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             PlainSubTask<T> newTask = switch (subtask.state()) {
                 case FAILED -> new PlainSubTask<>(Subtask.State.FAILED, null, subtask.exception());
                 case SUCCESS -> new PlainSubTask<>(Subtask.State.SUCCESS, subtask.get(), null);
-                case UNAVAILABLE -> new PlainSubTask<>(Subtask.State.UNAVAILABLE, null, null);  // scope is shutdown
+                case UNAVAILABLE -> throw new AssertionError();
             };
             queue.add(newTask);
             flock.wakeup();
@@ -1499,7 +1494,6 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             lastJoinCompleted = forkRound;
 
             super.shutdown();
-            //super.join();
 
             if (Thread.interrupted()) {
                 throw new InterruptedException();
