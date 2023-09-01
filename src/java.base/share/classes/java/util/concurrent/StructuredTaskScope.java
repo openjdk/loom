@@ -30,11 +30,17 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Spliterator;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.ThreadFlock;
 
@@ -301,7 +307,7 @@ import jdk.internal.misc.ThreadFlock;
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public class StructuredTaskScope<T> implements AutoCloseable {
     private final ThreadFactory factory;
-    private final ThreadFlock flock;
+    final ThreadFlock flock;
     private final ReentrantLock shutdownLock = new ReentrantLock();
 
     // states: OPEN -> SHUTDOWN -> CLOSED
@@ -325,7 +331,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @since 21
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public sealed interface Subtask<T> extends Supplier<T> permits SubtaskImpl {
+    public sealed interface Subtask<T> extends Supplier<T> permits SubtaskImpl, Streamable.PlainSubTask {
         /**
          * {@return the value returning task provided to the {@code fork} method}
          *
@@ -443,7 +449,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * Throws IllegalStateException if the scope is closed, returning the state if not
      * closed.
      */
-    private int ensureOpen() {
+    int ensureOpen() {
         int s = state;
         if (s == CLOSED)
             throw newIllegalStateExceptionScopeClosed();
@@ -453,7 +459,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     /**
      * Throws WrongThreadException if the current thread is not the owner.
      */
-    private void ensureOwner() {
+    void ensureOwner() {
         if (Thread.currentThread() != flock.owner())
             throw new WrongThreadException("Current thread not owner");
     }
@@ -894,9 +900,13 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 ex = e;
             }
 
-            // nothing to do if task scope is shutdown
-            if (scope.isShutdown())
+            // nothing to do if task scope is shutdown, apart if it's a Streamable
+            if (scope.isShutdown()) {
+                if (scope instanceof StructuredTaskScope.Streamable<?>) {
+                    scope.handleComplete(this);
+                }
                 return;
+            }
 
             // capture result or exception, invoke handleComplete
             if (ex == null) {
@@ -1324,6 +1334,216 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 Objects.requireNonNull(ex, "esf returned null");
                 throw ex;
             }
+        }
+    }
+
+    /**
+     * A {@code StructuredTaskScope} that captures the result of the first subtask to
+     * complete {@linkplain Subtask.State#SUCCESS successfully}. Once captured, it
+     * {@linkplain #shutdown() shuts down} the task scope to interrupt unfinished threads
+     * and wakeup the task scope owner. The policy implemented by this class is intended
+     * for cases where the result of any subtask will do ("invoke any") and where the
+     * results of other unfinished subtasks are no longer needed.
+     *
+     * <p> Unless otherwise specified, passing a {@code null} argument to a method
+     * in this class will cause a {@link NullPointerException} to be thrown.
+     *
+     * @apiNote This class implements a policy to shut down the task scope when a subtask
+     * completes successfully. There shouldn't be any need to directly shut down the task
+     * scope with the {@link #shutdown() shutdown} method.
+     *
+     * @param <T> the result type
+     * @since 22
+     */
+    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
+    public static final class Streamable<T> extends StructuredTaskScope<T> {
+        private record PlainSubTask<T>(State state, T result, Throwable exception) implements Subtask<T> {
+            @Override
+            public Callable<? extends T> task() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public T get() {
+                if (state != State.SUCCESS) {
+                    throw new IllegalStateException();
+                }
+                return result;
+            }
+
+            @Override
+            public T result() {
+                return get();
+            }
+
+            @Override
+            public Throwable exception() {
+                if (state != State.FAILED) {
+                    throw new IllegalStateException();
+                }
+                return exception;
+            }
+        }
+
+        private final class SubTaskSpliterator implements Spliterator<Subtask<T>> {
+            private int taskCount;
+
+            private SubTaskSpliterator(int taskCount) {
+                this.taskCount = taskCount;
+            }
+
+            @Override
+            public boolean tryAdvance(Consumer<? super Subtask<T>> action) {
+                for(;;) {
+                    if (taskCount == 0) {
+                        return false;
+                    }
+                    Subtask<T> subtask;
+                    queueLock.lock();
+                    try {
+                        while(queue.isEmpty()) {
+                            try {
+                                queueCondition.await();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                taskCount = 0;
+                                return false;
+                            }
+                        }
+                        subtask = queue.removeFirst();
+                    } finally {
+                        queueLock.unlock();
+                    }
+                    taskCount--;
+                    if (subtask.state() == Subtask.State.UNAVAILABLE) {
+                        continue;
+                    }
+                    action.accept(subtask);
+                    return taskCount != 0;
+                }
+            }
+
+            @Override
+            public Spliterator<Subtask<T>> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return Long.MAX_VALUE;
+            }
+
+            @Override
+            public int characteristics() {
+                return CONCURRENT | DISTINCT | NONNULL;
+            }
+        }
+
+        private final ArrayDeque<PlainSubTask<T>> queue = new ArrayDeque<>();
+        private final ReentrantLock queueLock = new ReentrantLock();
+        private final Condition queueCondition = queueLock.newCondition();
+        private int taskCounter;  // only the owner thread can mutate this field
+
+        /**
+         * Constructs a new {@code Streamable} with the given name and thread factory.
+         * The task scope is optionally named for the purposes of monitoring and management.
+         * The thread factory is used to {@link ThreadFactory#newThread(Runnable) create}
+         * threads when subtasks are {@linkplain #fork(Callable) forked}. The task scope
+         * is owned by the current thread.
+         *
+         * <p> Construction captures the current thread's {@linkplain ScopedValue scoped
+         * value} bindings for inheritance by threads started in the task scope. The
+         * <a href="#TreeStructure">Tree Structure</a> section in the class description
+         * details how parent-child relations are established implicitly for the purpose
+         * of inheritance of scoped value bindings.
+         *
+         * @param name the name of the task scope, can be null
+         * @param factory the thread factory
+         */
+        public Streamable(String name, ThreadFactory factory) {
+            super(name, factory);
+        }
+
+        /**
+         * Constructs a new unnamed {@code Streamable} that creates virtual threads.
+         *
+         * @implSpec This constructor is equivalent to invoking the 2-arg constructor with
+         * a name of {@code null} and a thread factory that creates virtual threads.
+         */
+        public Streamable() {
+            this(null, Thread.ofVirtual().factory());
+        }
+
+        @Override
+        public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
+            ensureOwner();
+            Subtask<U> subtask = super.fork(task);
+            taskCounter++;
+            return subtask;
+        }
+
+        @Override
+        protected void handleComplete(Subtask<? extends T> subtask) {
+            PlainSubTask<T> newTask = switch (subtask.state()) {
+                case FAILED -> new PlainSubTask<>(Subtask.State.FAILED, null, subtask.exception());
+                case SUCCESS -> new PlainSubTask<>(Subtask.State.SUCCESS, subtask.get(), null);
+                case UNAVAILABLE -> new PlainSubTask<>(Subtask.State.UNAVAILABLE, null, null);  // scope is shutdown
+            };
+            queueLock.lock();
+            try {
+                queue.add(newTask);
+                queueCondition.signal();
+            } finally {
+                queueLock.unlock();
+            }
+        }
+
+        /**
+         *
+         * TODO
+         *
+         * @param mapper a function that takes a stream and return a value
+         * @return the value returned by the mapper function
+         * @param <U> the type of the return value
+         * @throws InterruptedException if an IO exception occurs
+         */
+        public <U> U joinWhen(Function<? super Stream<Subtask<T>>, ? extends U> mapper) throws InterruptedException {
+            Objects.requireNonNull(mapper, "mapper is null");
+            ensureOwner();
+            int open = ensureOpen();
+            if (open != OPEN) {
+                throw new IllegalStateException("Task scope is shutdown");
+            }
+
+            flock.shutdown();
+
+            int taskCount = taskCounter;
+            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(taskCount), false);
+            U result = mapper.apply(stream);
+
+            super.shutdown();
+            super.join();
+
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
+            }
+            return result;
+        }
+
+        @Override
+        public void shutdown() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Streamable<T> join() throws InterruptedException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Streamable<T> joinUntil(Instant deadline)
+                throws InterruptedException, TimeoutException {
+            throw new UnsupportedOperationException();
         }
     }
 }
