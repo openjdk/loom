@@ -898,10 +898,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 ex = e;
             }
 
-            // nothing to do if task scope is shutdown, apart if it's a Streamable
-            if (scope.isShutdown()) {
+            // nothing to do if task scope is shutdown
+            if (scope.isShutdown())
                 return;
-            }
 
             // capture result or exception, invoke handleComplete
             if (ex == null) {
