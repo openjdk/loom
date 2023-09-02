@@ -1578,6 +1578,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             U result= mapper.apply(stream);
             lastJoinCompleted = forkRound;
             super.shutdown();
+            queue.clear();
             if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
