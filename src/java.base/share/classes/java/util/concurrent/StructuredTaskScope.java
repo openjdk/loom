@@ -24,6 +24,7 @@
  */
 package java.util.concurrent;
 
+import java.io.Serial;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.security.AccessController;
@@ -1379,8 +1380,31 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             }
         }
 
+        /**
+         * Used to tunnel a TimeoutException from {@link SubTaskSpliterator#tryAdvance(Consumer)}
+         * to {@link #joinUntilWhile(Instant, Function)}.
+         */
+        private static final class UncheckedTimeoutException extends RuntimeException {
+            @Serial
+            private static final long serialVersionUID = -4311199705453810913L;
+
+            private UncheckedTimeoutException(TimeoutException cause) {
+                super(cause);
+            }
+
+            @Override
+            public TimeoutException getCause() {
+                return (TimeoutException) super.getCause();
+            }
+        }
+
         private final class SubTaskSpliterator implements Spliterator<Subtask<T>> {
+            private final Instant deadline;
             private boolean finished;
+
+            private SubTaskSpliterator(Instant deadline) {
+                this.deadline = deadline;
+            }
 
             @Override
             public boolean tryAdvance(Consumer<? super Subtask<T>> action) {
@@ -1393,7 +1417,15 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                             return false;
                         }
                         try {
-                            finished = flock.awaitAll();
+                            // wait for all threads, wakeup, interrupt, or timeout
+                            if (deadline != null) {
+                                Duration timeout = Duration.between(Instant.now(), deadline);
+                                finished = flock.awaitAll(timeout);
+                            } else {
+                                finished = flock.awaitAll();
+                            }
+                        } catch(TimeoutException e) {
+                            throw new UncheckedTimeoutException(e);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             finished = true;
@@ -1491,29 +1523,65 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * @throws WrongThreadException  if the current thread is not the task scope owner
          * @throws InterruptedException  if interrupted while waiting
          */
-        public <U> U joinWhen(Function<? super Stream<Subtask<T>>, ? extends U> mapper) throws InterruptedException {
+        public <U> U joinWhile(Function<? super Stream<Subtask<T>>, ? extends U> mapper) throws InterruptedException {
             Objects.requireNonNull(mapper, "mapper is null");
 
+            try {
+                return implJoinWhile(null, mapper);
+            } catch (UncheckedTimeoutException e) {
+                throw new InternalError();
+            }
+        }
+
+        /**
+         * Wait for each subtask in this task scope to finish, push it into the stream,
+         * until either the stream final operation ends, there is no more subtasks,
+         * the scope is shutdown up to a given deadline.
+         *
+         * <p> This method waits for each subtask by waiting for each thread {@linkplain
+         * #fork(Callable) started} in this task scope to finish its execution.
+         * It stops waiting when the stream is short-circuited, all threads finish,
+         * the task scope is {@linkplain #shutdown() shut down}, the deadline is
+         * reached or the current thread is {@linkplain Thread#interrupt() interrupted}.
+         *
+         * <p> This method may only be invoked by the task scope owner.
+         *
+         * @param deadline the deadline
+         * @param mapper   a function that takes a stream and return a value
+         * @param <U>      the type of the return value
+         * @return the value returned by the mapper function
+         * @throws IllegalStateException if this task scope is closed
+         * @throws WrongThreadException  if the current thread is not the task scope owner
+         * @throws InterruptedException  if interrupted while waiting
+         * @throws TimeoutException      if the deadline is reached while waiting
+         */
+        public <U> U joinUntilWhile(Instant deadline, Function<? super Stream<Subtask<T>>, ? extends U> mapper)
+                throws InterruptedException, TimeoutException
+        {
+            Objects.requireNonNull(deadline, "deadline is null");
+            Objects.requireNonNull(mapper, "mapper is null");
+
+            try {
+                return implJoinWhile(deadline, mapper);
+            } catch (UncheckedTimeoutException e) {
+                throw e.getCause();
+            }
+        }
+
+        private <U> U implJoinWhile(Instant deadline, Function<? super Stream<Subtask<T>>, ? extends U> mapper)
+                throws InterruptedException, UncheckedTimeoutException
+        {
             ensureOwner();
             lastJoinAttempted = forkRound;
             ensureOpen();  // throws ISE if closed
-
-            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(), false);
-            U result = mapper.apply(stream);
-
+            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(deadline), false);
+            U result= mapper.apply(stream);
             lastJoinCompleted = forkRound;
-
             super.shutdown();
-
             if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
             return result;
-        }
-
-        @Override
-        public void shutdown() {
-            super.shutdown();
         }
 
         @Override
