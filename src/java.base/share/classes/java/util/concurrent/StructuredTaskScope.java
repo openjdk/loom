@@ -1576,12 +1576,12 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             ensureOpen();  // throws ISE if closed
             Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(deadline), false);
             U result= mapper.apply(stream);
-            lastJoinCompleted = forkRound;
-            super.shutdown();
-            queue.clear();
             if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
+            super.shutdown();
+            queue.clear();
+            lastJoinCompleted = forkRound;
             return result;
         }
 
