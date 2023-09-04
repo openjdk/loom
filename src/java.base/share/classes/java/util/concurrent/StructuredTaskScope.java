@@ -306,7 +306,7 @@ import jdk.internal.misc.ThreadFlock;
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public class StructuredTaskScope<T> implements AutoCloseable {
     private final ThreadFactory factory;
-    final ThreadFlock flock;
+    private final ThreadFlock flock;
     private final ReentrantLock shutdownLock = new ReentrantLock();
 
     // states: OPEN -> SHUTDOWN -> CLOSED
@@ -320,9 +320,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
     // Counters to support checking that the task scope owner joins before processing
     // results and attempts join before closing the task scope. These counters are
     // accessed only by the owner thread.
-    int forkRound;         // incremented when the first subtask is forked after join
-    int lastJoinAttempted; // set to the current fork round when join is attempted
-    int lastJoinCompleted; // set to the current fork round when join completes
+    private int forkRound;         // incremented when the first subtask is forked after join
+    private int lastJoinAttempted; // set to the current fork round when join is attempted
+    private int lastJoinCompleted; // set to the current fork round when join completes
 
     /**
      * Represents a subtask forked with {@link #fork(Callable)}.
@@ -1388,21 +1388,16 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          */
         private static final class UncheckedTimeoutException extends RuntimeException {
             @Serial
-            private static final long serialVersionUID = -4311199705453810913L;
+            private static final long serialVersionUID = -5575676091114831713L;
 
-            private UncheckedTimeoutException(TimeoutException cause) {
-                super(cause);
-            }
-
-            @Override
-            public TimeoutException getCause() {
-                return (TimeoutException) super.getCause();
+            private UncheckedTimeoutException() {
+                super();
             }
         }
 
         private final class SubTaskSpliterator implements Spliterator<Subtask<T>> {
             private final Instant deadline;
-            private boolean finished;
+            private int taken;
 
             private SubTaskSpliterator(Instant deadline) {
                 this.deadline = deadline;
@@ -1410,35 +1405,35 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
             @Override
             public boolean tryAdvance(Consumer<? super Subtask<T>> action) {
-                for(;;) {
-                    if (!queue.isEmpty()) {
-                        PlainSubtask<?> subtaskOrStop = queue.remove();
-                        if (subtaskOrStop == PlainSubtask.STOP) {
-                            return false;
-                        }
-                        @SuppressWarnings("unchecked")
-                        PlainSubtask<T> subtask = (PlainSubtask<T>) subtaskOrStop;
-                        action.accept(subtask);
-                        return true;
-                    }
-                    if (finished) {
+                PlainSubtask<?> subtaskOrStop = queue.poll();
+                if (subtaskOrStop == null) {
+                    if (forkCount == taken) {  // volatile read
                         return false;
                     }
                     try {
                         // wait for all threads, wakeup, interrupt, or timeout
                         if (deadline != null) {
                             Duration timeout = Duration.between(Instant.now(), deadline);
-                            finished = flock.awaitAll(timeout);
+                            subtaskOrStop = queue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                            if (subtaskOrStop == null) {
+                                throw new UncheckedTimeoutException();
+                            }
                         } else {
-                            finished = flock.awaitAll();
+                            subtaskOrStop = queue.take();
                         }
-                    } catch (TimeoutException e) {
-                        throw new UncheckedTimeoutException(e);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return false;
                     }
                 }
+                if (subtaskOrStop == PlainSubtask.STOP) {
+                    return false;
+                }
+                @SuppressWarnings("unchecked")
+                PlainSubtask<T> subtask = (PlainSubtask<T>) subtaskOrStop;
+                action.accept(subtask);
+                taken++;
+                return true;
             }
 
             @Override
@@ -1457,7 +1452,17 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             }
         }
 
-        private final ConcurrentLinkedQueue<PlainSubtask<?>> queue = new ConcurrentLinkedQueue<>();
+        private static final VarHandle FORK_COUNT;
+        static {
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+            try {
+                FORK_COUNT = lookup.findVarHandle(Streamable.class, "forkCount", int.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+        private final LinkedTransferQueue<PlainSubtask<?>> queue = new LinkedTransferQueue<>();
+        private volatile int forkCount;
 
         /**
          * Constructs a new {@code Streamable} with the given name and thread factory.
@@ -1490,20 +1495,25 @@ public class StructuredTaskScope<T> implements AutoCloseable {
         }
 
         @Override
+        public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
+            int dummy = (int) FORK_COUNT.getAndAdd(this, 1);
+            return super.fork(task);
+        }
+
+        @Override
         protected void handleComplete(Subtask<? extends T> subtask) {
             PlainSubtask<T> newTask = switch (subtask.state()) {
                 case FAILED -> new PlainSubtask<>(Subtask.State.FAILED, null, subtask.exception());
                 case SUCCESS -> new PlainSubtask<>(Subtask.State.SUCCESS, subtask.get(), null);
                 case UNAVAILABLE -> throw new AssertionError();
             };
-            queue.add(newTask);
-            flock.wakeup();
+            queue.offer(newTask);
         }
 
         @Override
         public void shutdown() {
             if (ensureOpen() == OPEN) {
-                queue.add(PlainSubtask.STOP);
+                queue.offer(PlainSubtask.STOP);
             }
             super.shutdown();
         }
@@ -1569,7 +1579,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             try {
                 return implJoinWhile(deadline, mapper);
             } catch (UncheckedTimeoutException e) {
-                throw e.getCause();
+                throw new TimeoutException();
             }
         }
 
@@ -1577,32 +1587,31 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 throws InterruptedException, UncheckedTimeoutException
         {
             ensureOwner();
-            lastJoinAttempted = forkRound;
-            ensureOpen();  // throws ISE if closed
-            SubTaskSpliterator spliterator = new SubTaskSpliterator(deadline);
-            Stream<Subtask<T>> stream = StreamSupport.stream(spliterator, false);
-            U result= mapper.apply(stream);
+            int open = ensureOpen();  // throws ISE if closed
+            if (open == SHUTDOWN) {
+                throw new IllegalStateException();
+            }
+            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(deadline), false);
+            U result = mapper.apply(stream);
             if (Thread.interrupted()) {
                 throw new InterruptedException();
             }
             super.shutdown();
             queue.clear();
-            lastJoinCompleted = forkRound;
+            super.join();  // update the forkRound
             return result;
         }
 
         @Override
         public Streamable<T> join() throws InterruptedException {
-            super.join();
-            return this;
+            throw new UnsupportedOperationException();
         }
 
         @Override
         public Streamable<T> joinUntil(Instant deadline)
                 throws InterruptedException, TimeoutException
         {
-            super.joinUntil(deadline);
-            return this;
+            throw new UnsupportedOperationException();
         }
     }
 }
