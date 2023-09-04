@@ -330,7 +330,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      * @since 21
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public sealed interface Subtask<T> extends Supplier<T> permits SubtaskImpl, Streamable.PlainSubTask {
+    public sealed interface Subtask<T> extends Supplier<T> permits SubtaskImpl, Streamable.PlainSubtask {
         /**
          * {@return the value returning task provided to the {@code fork} method}
          *
@@ -1352,7 +1352,9 @@ public class StructuredTaskScope<T> implements AutoCloseable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     public static final class Streamable<T> extends StructuredTaskScope<T> {
-        private record PlainSubTask<T>(State state, T result, Throwable exception) implements Subtask<T> {
+        private record PlainSubtask<T>(State state, T result, Throwable exception) implements Subtask<T> {
+            private final static PlainSubtask<?> STOP = new PlainSubtask<>(null, null, null);
+
             @Override
             public Callable<? extends T> task() {
                 throw new UnsupportedOperationException();
@@ -1409,38 +1411,33 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             @Override
             public boolean tryAdvance(Consumer<? super Subtask<T>> action) {
                 for(;;) {
-                    if (isShutdown()) {
+                    if (!queue.isEmpty()) {
+                        PlainSubtask<?> subtaskOrStop = queue.remove();
+                        if (subtaskOrStop == PlainSubtask.STOP) {
+                            return false;
+                        }
+                        @SuppressWarnings("unchecked")
+                        PlainSubtask<T> subtask = (PlainSubtask<T>) subtaskOrStop;
+                        action.accept(subtask);
+                        return true;
+                    }
+                    if (finished) {
                         return false;
                     }
-                    if (queue.isEmpty()) {
-                        if (finished) {
-                            return false;
+                    try {
+                        // wait for all threads, wakeup, interrupt, or timeout
+                        if (deadline != null) {
+                            Duration timeout = Duration.between(Instant.now(), deadline);
+                            finished = flock.awaitAll(timeout);
+                        } else {
+                            finished = flock.awaitAll();
                         }
-                        try {
-                            // wait for all threads, wakeup, interrupt, or timeout
-                            if (deadline != null) {
-                                Duration timeout = Duration.between(Instant.now(), deadline);
-                                finished = flock.awaitAll(timeout);
-                            } else {
-                                finished = flock.awaitAll();
-                            }
-                        } catch(TimeoutException e) {
-                            throw new UncheckedTimeoutException(e);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            finished = true;
-                            return false;
-                        }
+                    } catch (TimeoutException e) {
+                        throw new UncheckedTimeoutException(e);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return false;
                     }
-                    if (queue.isEmpty()) {
-                      continue;  // awaken by shutdown or finished
-                    }
-                    Subtask<T> subtask = queue.remove();
-                    if (subtask.state() == Subtask.State.UNAVAILABLE) {
-                        continue;
-                    }
-                    action.accept(subtask);
-                    return true;
                 }
             }
 
@@ -1460,7 +1457,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             }
         }
 
-        private final ConcurrentLinkedQueue<PlainSubTask<T>> queue = new ConcurrentLinkedQueue<>();
+        private final ConcurrentLinkedQueue<PlainSubtask<?>> queue = new ConcurrentLinkedQueue<>();
 
         /**
          * Constructs a new {@code Streamable} with the given name and thread factory.
@@ -1494,13 +1491,21 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         @Override
         protected void handleComplete(Subtask<? extends T> subtask) {
-            PlainSubTask<T> newTask = switch (subtask.state()) {
-                case FAILED -> new PlainSubTask<>(Subtask.State.FAILED, null, subtask.exception());
-                case SUCCESS -> new PlainSubTask<>(Subtask.State.SUCCESS, subtask.get(), null);
+            PlainSubtask<T> newTask = switch (subtask.state()) {
+                case FAILED -> new PlainSubtask<>(Subtask.State.FAILED, null, subtask.exception());
+                case SUCCESS -> new PlainSubtask<>(Subtask.State.SUCCESS, subtask.get(), null);
                 case UNAVAILABLE -> throw new AssertionError();
             };
             queue.add(newTask);
             flock.wakeup();
+        }
+
+        @Override
+        public void shutdown() {
+            if (ensureOpen() == OPEN) {
+                queue.add(PlainSubtask.STOP);
+            }
+            super.shutdown();
         }
 
         /**
@@ -1574,7 +1579,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             ensureOwner();
             lastJoinAttempted = forkRound;
             ensureOpen();  // throws ISE if closed
-            Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(deadline), false);
+            SubTaskSpliterator spliterator = new SubTaskSpliterator(deadline);
+            Stream<Subtask<T>> stream = StreamSupport.stream(spliterator, false);
             U result= mapper.apply(stream);
             if (Thread.interrupted()) {
                 throw new InterruptedException();
