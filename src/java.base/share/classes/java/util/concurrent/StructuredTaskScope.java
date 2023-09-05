@@ -1496,8 +1496,11 @@ public class StructuredTaskScope<T> implements AutoCloseable {
 
         @Override
         public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
-            int dummy = (int) FORK_COUNT.getAndAdd(this, 1);
-            return super.fork(task);
+            Subtask<U> subtask = super.fork(task);
+            if (ensureOpen() == OPEN) {
+                int dummy = (int) FORK_COUNT.getAndAdd(this, 1);
+            }
+            return subtask;
         }
 
         @Override
@@ -1529,6 +1532,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * the task scope is {@linkplain #shutdown() shut down}, or the current thread is
          * {@linkplain Thread#interrupt() interrupted}.
          *
+         * <p> This method {@link #shutdown()} all unfinished threads.
+         *
          * <p> This method may only be invoked by the task scope owner.
          *
          * @param mapper a function that takes a stream and return a value
@@ -1559,6 +1564,8 @@ public class StructuredTaskScope<T> implements AutoCloseable {
          * the task scope is {@linkplain #shutdown() shut down}, the deadline is
          * reached or the current thread is {@linkplain Thread#interrupt() interrupted}.
          *
+         * <p> This method {@link #shutdown()} all unfinished threads.
+         *
          * <p> This method may only be invoked by the task scope owner.
          *
          * @param deadline the deadline
@@ -1587,10 +1594,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
                 throws InterruptedException, UncheckedTimeoutException
         {
             ensureOwner();
-            int open = ensureOpen();  // throws ISE if closed
-            if (open == SHUTDOWN) {
-                throw new IllegalStateException();
-            }
+            ensureOpen();  // throws ISE if closed
             Stream<Subtask<T>> stream = StreamSupport.stream(new SubTaskSpliterator(deadline), false);
             U result = mapper.apply(stream);
             if (Thread.interrupted()) {
@@ -1599,6 +1603,7 @@ public class StructuredTaskScope<T> implements AutoCloseable {
             super.shutdown();
             queue.clear();
             super.join();  // update the forkRound
+            forkCount = 0;
             return result;
         }
 
