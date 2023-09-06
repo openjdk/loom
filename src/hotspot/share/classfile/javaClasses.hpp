@@ -559,7 +559,7 @@ class java_lang_VirtualThread : AllStatic {
   static void set_state(oop vthread, int state);
   static oop next(oop vthread);
   static void set_next(oop vthread, oop next_vthread);
-  static bool set_onWaitingList(oop vthread);
+  static bool set_onWaitingList(oop vthread, OopHandle& list_head);
   static bool is_preempted(oop vthread);
   static bool is_preemption_disabled(oop vthread);
   static void inc_preemption_disabled(oop vthread);

@@ -328,7 +328,7 @@ static int monitors_to_fix_on_stack(JavaThread* thread) {
   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(thread, f); f = f.sender(&map)) {
     if (f.is_interpreted_frame()) {
       frame abs = !f.is_heap_frame() ? f : map.stack_chunk()->derelativize(f);
-      monitor_count += ContinuationHelper::InterpretedFrame::monitors_to_fix(abs, rhtable);
+      monitor_count += ContinuationHelper::InterpretedFrame::monitors_to_fix(abs, rhtable, map.stack_chunk()());
     } else if (f.is_compiled_frame()) {
       monitor_count += ContinuationHelper::CompiledFrame::monitors_to_fix(map.thread(), &map, f, rhtable);
     }
@@ -2352,7 +2352,7 @@ NOINLINE intptr_t* ThawBase::thaw_slow(stackChunkOop chunk, bool return_barrier)
   _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp_before_thaw = _stream.unextended_sp();
 
-  oop original_chunk = chunk;
+  stackChunkOop original_chunk = chunk;
 
   frame heap_frame = _stream.to_frame();
   if (lt.develop_is_enabled()) {
@@ -2551,7 +2551,7 @@ void ThawBase::patch_thread_register(frame& top) {
 }
 
 intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp) {
-  Handle chunk_h(_thread, original_chunk);
+  stackChunkHandle chunk_h(_thread, original_chunk);
 
   frame top(sp);
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");

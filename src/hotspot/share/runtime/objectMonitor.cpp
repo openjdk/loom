@@ -122,8 +122,9 @@ static int Knob_PreSpin             = 10;      // 20-100 likely better
 DEBUG_ONLY(static volatile bool InitDone = false;)
 
 OopStorage* ObjectMonitor::_oop_storage = nullptr;
+
 OopHandle ObjectMonitor::_vthread_cxq_head;
-int ObjectMonitor::_vthread_cnt = 0;
+ParkEvent* ObjectMonitor::_vthread_unparker_ParkEvent = nullptr;
 
 // -----------------------------------------------------------------------------
 // Theory of operations -- Monitors lists, thread residency, etc:
@@ -1242,9 +1243,9 @@ void ObjectMonitor::UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* curren
 // Fix this. Save ObjectWaiter* when freezing. Or use hashtable.
 ObjectWaiter* ObjectMonitor::LookupWaiter(int64_t threadid) {
   ObjectWaiter* p;
-  for (p = _cxq; p != nullptr && (!p->is_vthread() || java_lang_Thread::thread_id(p->vthread()) != threadid); p = p->_next) {}
-  if (p != nullptr) return p;
   for (p = _EntryList; p != nullptr && (!p->is_vthread() || java_lang_Thread::thread_id(p->vthread()) != threadid); p = p->_next) {}
+  if (p != nullptr) return p;
+  for (p = _cxq; p != nullptr && (!p->is_vthread() || java_lang_Thread::thread_id(p->vthread()) != threadid); p = p->_next) {}
   assert(p != nullptr, "should be on either _cxq or _EntryList");
   return p;
 }
@@ -1496,17 +1497,16 @@ void ObjectMonitor::ExitEpilog(JavaThread* current, ObjectWaiter* Wakee) {
   // 2. ST _owner = nullptr
   // 3. unpark(wakee)
 
-  ParkEvent * Trigger;
   oop vthread = nullptr;
-
   if (Wakee->_thread != nullptr) {
+    // Platform thread case
     _succ = Wakee->_thread;
-    Trigger = Wakee->_event;
   } else {
     assert(Wakee->vthread() != nullptr, "invariant");
     vthread = Wakee->vthread();
     _succ = (JavaThread*)java_lang_Thread::thread_id(vthread);
   }
+  ParkEvent * Trigger = Wakee->_event;
 
   // Hygiene -- once we've set _owner = nullptr we can't safely dereference Wakee again.
   // The thread associated with Wakee may have grabbed the lock and "Wakee" may be
@@ -1523,16 +1523,8 @@ void ObjectMonitor::ExitEpilog(JavaThread* current, ObjectWaiter* Wakee) {
   if (vthread == nullptr) {
     // Platform thread case
     Trigger->unpark();
-  } else if (java_lang_VirtualThread::set_onWaitingList(vthread)) {
-    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
-    assert(_vthread_cnt >= 0, "invariant");
-    oop vthread_head = vthread_pending_list();
-    assert(vthread_head == nullptr || _vthread_cnt > 0, "invariant");
-    assert(java_lang_VirtualThread::next(vthread) == nullptr && vthread != vthread_head, "vthread on list already");
-    java_lang_VirtualThread::set_next(vthread, vthread_head);
-    replace_vthread_pending_list(vthread);
-    _vthread_cnt += 1;
-    ml.notify();
+  } else if (java_lang_VirtualThread::set_onWaitingList(vthread, _vthread_cxq_head)) {
+    Trigger->unpark();
   }
 
   // Maintain stats and report events to JVMTI
@@ -2244,28 +2236,6 @@ int ObjectMonitor::NotRunnable(JavaThread* current, JavaThread* ox) {
   return jst == _thread_blocked || jst == _thread_in_native;
 }
 
-oop ObjectMonitor::vthread_pending_list() {
-  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
-  return _vthread_cxq_head.resolve();
-}
-
-bool ObjectMonitor::has_vthread_pending_list() {
-  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
-  assert(_vthread_cnt >= 0, "invariant");
-  return _vthread_cnt > 0;
-}
-
-void ObjectMonitor::replace_vthread_pending_list(oop vthread) {
-  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
-  _vthread_cxq_head.replace(vthread);
-}
-
-void ObjectMonitor::clear_vthread_pending_list() {
-  assert(MonitorEnterUnparker_lock->owned_by_self(), "Lock must be held");
-  _vthread_cxq_head.replace(nullptr);
-  _vthread_cnt = 0;
-}
-
 // -----------------------------------------------------------------------------
 // WaitSet management ...
 
@@ -2276,12 +2246,12 @@ ObjectWaiter::ObjectWaiter(JavaThread* current) {
   _notifier_tid = 0;
   TState    = TS_RUN;
   _thread   = current;
-  _event    = _thread != nullptr ? _thread->_ParkEvent : nullptr;
+  _event    = _thread != nullptr ? _thread->_ParkEvent : ObjectMonitor::vthread_unparker_ParkEvent();
   _active   = false;
-  assert(_event != nullptr || _thread == nullptr, "invariant");
+  assert(_event != nullptr, "invariant");
 }
 
-ObjectWaiter::ObjectWaiter(oop vthread) : ObjectWaiter(nullptr) {
+ObjectWaiter::ObjectWaiter(oop vthread) : ObjectWaiter((JavaThread*)nullptr) {
   _vthread = OopHandle(JavaThread::thread_oop_storage(), vthread);
 }
 
@@ -2402,7 +2372,7 @@ void ObjectMonitor::Initialize() {
 
 void ObjectMonitor::Initialize2() {
   _vthread_cxq_head = OopHandle(JavaThread::thread_oop_storage(), nullptr);
-  _vthread_cnt = 0;
+  _vthread_unparker_ParkEvent = ParkEvent::Allocate(nullptr);
 }
 
 void ObjectMonitor::print_on(outputStream* st) const {

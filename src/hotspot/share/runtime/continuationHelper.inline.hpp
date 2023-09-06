@@ -108,7 +108,7 @@ inline int ContinuationHelper::InterpretedFrame::expression_stack_size(const fra
 }
 
 #ifdef ASSERT
-inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
+inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) {
   BasicObjectLock* first_mon = f.interpreter_frame_monitor_begin();
   BasicObjectLock* last_mon = f.interpreter_frame_monitor_end();
   assert(last_mon <= first_mon, "must be");
@@ -118,12 +118,22 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f,
   }
 
   int monitor_count = 0;
-  JavaThread* current = JavaThread::current();
-  oop monitorenter_oop = current->is_on_monitorenter() ? ((ObjectMonitor*)(current->_Stalled))->object() : nullptr;
+  JavaThread* self = JavaThread::current();
+  oop monitorenter_oop = self->is_on_monitorenter() ? ((ObjectMonitor*)(self->_Stalled))->object() : nullptr;
 
   for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(first_mon);
        current >= last_mon; current = f.previous_monitor_in_interpreter_frame(current)) {
-    oop obj = current->obj();
+    oop* obj_adr = current->obj_adr();
+
+    oop obj;
+    if (f.is_heap_frame()) {
+      assert(chunk != nullptr, "null stackChunk");
+      obj = chunk->has_bitmap() && UseCompressedOops ? chunk->load_oop((narrowOop*)obj_adr) : chunk->load_oop(obj_adr);
+    } else {
+      // We have already processed oops when getting this frame.
+      obj = *obj_adr;
+    }
+    assert(obj == nullptr || dbg_is_good_oop(obj), "obj_adr: " PTR_FORMAT " obj: " PTR_FORMAT, p2i(obj_adr), p2i(obj));
 
     if (obj != nullptr && obj != monitorenter_oop) {
       markWord mark = obj->mark();
@@ -185,8 +195,8 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
   }
 
   int monitor_count = 0;
-  JavaThread* current = JavaThread::current();
-  oop monitorenter_oop = current->is_on_monitorenter() ? ((ObjectMonitor*)(current->_Stalled))->object() : nullptr;
+  JavaThread* self = JavaThread::current();
+  oop monitorenter_oop = self->is_on_monitorenter() ? ((ObjectMonitor*)(self->_Stalled))->object() : nullptr;
 
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();

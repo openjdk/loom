@@ -4015,20 +4015,23 @@ JVM_ENTRY(void, JVM_VirtualThreadHideFrames(JNIEnv* env, jobject vthread, jboole
 JVM_END
 
 JVM_ENTRY(jobject, JVM_VirtualThreadWaitForPendingList(JNIEnv* env))
+  ParkEvent* parkEvent = ObjectMonitor::vthread_unparker_ParkEvent();
+  assert(parkEvent != nullptr, "not initialized");
+
+  OopHandle& list_head = ObjectMonitor::vthread_cxq_head();
   oop vthread_head = nullptr;
-  {
-    ThreadBlockInVM tbivm(thread);
-    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
-    while (!ObjectMonitor::has_vthread_pending_list()) {
-      ml.wait();
+  while (true) {
+    if (list_head.peek() != nullptr) {
+      for (;;) {
+        oop head = list_head.resolve();
+        if (list_head.cmpxchg(head, nullptr) == head) {
+          return JNIHandles::make_local(THREAD, head);
+        }
+      }
     }
+    ThreadBlockInVM tbivm(THREAD);
+    parkEvent->park();
   }
-  {
-    MonitorLocker ml(MonitorEnterUnparker_lock, Mutex::_no_safepoint_check_flag);
-    vthread_head = ObjectMonitor::vthread_pending_list();
-    ObjectMonitor::clear_vthread_pending_list();
-  }
-  return JNIHandles::make_local(THREAD, vthread_head);
 JVM_END
 
 /*
