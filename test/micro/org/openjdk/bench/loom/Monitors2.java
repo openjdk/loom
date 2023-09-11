@@ -38,6 +38,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.*;
 
 import java.lang.reflect.Constructor;
@@ -53,18 +54,24 @@ import java.lang.reflect.InvocationTargetException;
 @SuppressWarnings("preview")
 public class Monitors2 {
     static Object[] globalLockArray;
+    static ReentrantLock[] globalReentrantLockArray;
     static AtomicInteger workerCount = new AtomicInteger(0);
+    static AtomicInteger dummyCounter = new AtomicInteger(0);
+    static int workIterations;
 
     static int VT_COUNT;
     static int CARRIER_COUNT = 8;
     static ExecutorService scheduler = Executors.newFixedThreadPool(CARRIER_COUNT);
 
-    @Param({"8", "32", "256"})
+    //@Param({"8", "32", "256", "4096", "131072"})
+    @Param({"8", "32", "256", "4096"})
     static int VT_MULTIPLIER;
 
-    @Param({"5", "12", "20"})
+    @Param({"1", "5", "12", "32"})
     static int MONITORS_CNT;
 
+    @Param({"0", "50000", "100000", "200000"})
+    static int WORKLOAD;
 
     void recursive4_1(int depth, int lockNumber) {
         if (depth > 0) {
@@ -101,7 +108,7 @@ public class Monitors2 {
     /**
      *  Test contention on monitorenter with extra monitors on stack shared by all threads.
      */
-    @Benchmark
+    //@Benchmark
     public void testContentionMultipleMonitors(MyState state) throws Exception {
         workerCount.getAndSet(0);
 
@@ -166,7 +173,7 @@ public class Monitors2 {
     /**
      *  Test contention on monitorenter with extra monitors on stack both local only and shared by all threads.
      */
-    @Benchmark
+    //@Benchmark
     public void testContentionMultipleMonitors2(MyState state) throws Exception {
         workerCount.getAndSet(0);
 
@@ -186,17 +193,85 @@ public class Monitors2 {
         }
     }
 
+    static final Runnable SYNC = () -> {
+        int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
+        synchronized(globalLockArray[lockNumber]) {
+            //Thread.yield();
+            for (int i = 0; i < WORKLOAD; i++) {
+                dummyCounter.getAndIncrement();
+            }
+            workerCount.getAndIncrement();
+        }
+    };
+
+    static final Runnable REENTRANTLOCK = () -> {
+        int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
+        globalReentrantLockArray[lockNumber].lock();
+        //Thread.yield();
+        for (int i = 0; i < WORKLOAD; i++) {
+            dummyCounter.getAndIncrement();
+        }
+        workerCount.getAndIncrement();
+        globalReentrantLockArray[lockNumber].unlock();
+    };
+
+    public void runBenchmark(Runnable r) throws Exception {
+        workerCount.getAndSet(0);
+
+        // Create batch of VT threads.
+        Thread batch[] = new Thread[VT_COUNT];
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i] = virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(r);
+        }
+
+        for (int i = 0; i < VT_COUNT; i++) {
+            batch[i].join();
+        }
+
+        if (workerCount.get() != VT_COUNT) {
+            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
+        }
+    }
+
+    @Benchmark
+    public void testContentionReentrantLock(MyState state) throws Exception {
+        runBenchmark(REENTRANTLOCK);
+    }
+
+    @Benchmark
+    public void testContentionSync(MyState state) throws Exception {
+        runBenchmark(SYNC);
+    }
+
+    //@Benchmark
+    public void testExtraTime(MyState state) throws Exception {
+        dummyCounter.getAndSet(0);
+        // Takes ~120us
+        for (int i = 0; i < 50000; i++) {
+            dummyCounter.getAndIncrement();
+        }
+        if (dummyCounter.get() != 50000) {
+            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + 50000 + "but found " + dummyCounter.get());
+        }
+    }
+
     @State(Scope.Thread)
     public static class MyState {
 
         @Setup(Level.Trial)
         public void doSetup() {
+            // Setup up monitors/locks
             globalLockArray = new Object[MONITORS_CNT];
+            globalReentrantLockArray = new ReentrantLock[MONITORS_CNT];
             for (int i = 0; i < MONITORS_CNT; i++) {
                 globalLockArray[i] = new Object();
+                globalReentrantLockArray[i] = new ReentrantLock();
             }
+            // Setup VirtualThread count
             VT_COUNT = CARRIER_COUNT * VT_MULTIPLIER;
-            System.out.println("Running test with MONITORS_CNT = " + MONITORS_CNT + " and VT_COUNT = " + VT_COUNT);
+
+            System.out.println("Running test with MONITORS_CNT = " + MONITORS_CNT + " VT_COUNT = " + VT_COUNT + " and WORKLOAD = " + WORKLOAD);
+            //System.out.println("Running test with VT_COUNT = " + VT_COUNT);
         }
 
         @TearDown(Level.Trial)
