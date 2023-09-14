@@ -92,6 +92,11 @@ inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpr
   return nullptr;
 }
 
+inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+  Unimplemented();
+  return nullptr;
+}
+
 template <typename ConfigT>
 inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
   Unimplemented();

@@ -306,9 +306,8 @@ inline void StackChunkFrameStream<ChunkFrames::Mixed>::update_reg_map(RegisterMa
 template<>
 template<>
 inline void StackChunkFrameStream<ChunkFrames::CompiledOnly>::update_reg_map(RegisterMap* map) {
-  assert(map->in_cont(), "");
-  assert(map->stack_chunk()() == _chunk, "");
-  if (map->update_map()) {
+  assert(!map->in_cont() || map->stack_chunk() == _chunk, "");
+  if (map->update_map() && is_stub()) {
     frame f = to_frame();
     oopmap()->update_register_map(&f, map); // we have callee-save registers in this case
   }

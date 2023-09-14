@@ -1236,6 +1236,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
 
     bind(slow_case);
 
+    push_cont_fastpath();
     // Call the runtime routine for slow case
     if (LockingMode == LM_LIGHTWEIGHT) {
       call_VM(noreg,
@@ -1246,6 +1247,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
               lock_reg);
     }
+    pop_cont_fastpath();
     bind(done);
   }
 }

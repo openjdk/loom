@@ -403,7 +403,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
     int result = Continuation::try_preempt(current, ce->cont_oop(current));
     current->inc_held_monitor_count();
     if (result == freeze_ok) {
-      HandlePreemptedVThread(current, ce, true /* first_time */);
+      HandlePreemptedVThread(current, ce);
       add_to_contentions(-1);
       DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
       assert((owner() == current && current->is_preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
@@ -957,7 +957,7 @@ void ObjectMonitor::EnterI(JavaThread* current) {
   return;
 }
 
-bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce, bool first_time) {
+bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce) {
   // Either because we acquire the lock below or because we will preempt the
   // vthread clear the _Stalled field from the current JavaThread.
   current->_Stalled = 0;
@@ -965,10 +965,9 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntr
   // Try once more after freezing the continuation.
   if (TryLock (current) > 0) {
     assert(owner_raw() == current, "invariant");
-    assert(!first_time || _succ != current, "invariant");
-    assert(!first_time || _Responsible != current, "invariant");
+    assert(_succ != current, "invariant");
+    assert(_Responsible != current, "invariant");
     current->cancel_preemption();
-    if (!first_time) VThreadEpilog(current);
     return true;
   }
 
@@ -985,32 +984,15 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntr
     // occurs in enter(). The deflater thread will decrement contentions
     // after it recognizes that the async deflation was cancelled.
     add_to_contentions(1);
-    assert(!first_time || _succ != current, "invariant");
-    assert(!first_time || _Responsible != current, "invariant");
+    assert(_succ != current, "invariant");
+    assert(_Responsible != current, "invariant");
     current->cancel_preemption();
-    if (!first_time) VThreadEpilog(current);
     return true;
   }
 
   oop vthread = current->vthread();
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
-  bool should_yield = !first_time && _Responsible == (JavaThread*)java_lang_Thread::thread_id(vthread);
-  java_lang_VirtualThread::set_state(vthread, should_yield ? java_lang_VirtualThread::YIELDING : java_lang_VirtualThread::PARKING);
-
-  if (!first_time) {
-    if (_succ == (JavaThread*)java_lang_Thread::thread_id(vthread)) _succ = nullptr;
-
-    // Invariant: after clearing _succ a thread *must* retry _owner before parking.
-    OrderAccess::fence();
-
-    if (TryLock (current) > 0) {
-      assert(owner_raw() == current, "invariant");
-      current->cancel_preemption();
-      VThreadEpilog(current);
-      return true;
-    }
-    return false;
-  }
+  java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::PARKING);
 
   ObjectWaiter* node = new ObjectWaiter(vthread);
   node->_prev   = (ObjectWaiter*) 0xBAD;
@@ -1152,11 +1134,26 @@ void ObjectMonitor::redo_enter(JavaThread* current) {
     return;
   }
 
-  current->_Stalled = intptr_t(this);
-  ContinuationEntry* ce = current->last_continuation();
-  int result = Continuation::try_preempt(current, ce->cont_oop(current));
-  assert(result == freeze_ok, "preemption failed: %d", result);
-  HandlePreemptedVThread(current, ce, false /* first_time */);
+  oop vthread = current->vthread();
+  if (_succ == (JavaThread*)java_lang_Thread::thread_id(vthread)) _succ = nullptr;
+
+  // Invariant: after clearing _succ a thread *must* retry _owner before parking.
+  OrderAccess::fence();
+
+  if (TryLock (current) > 0) {
+    assert(owner_raw() == current, "invariant");
+    VThreadEpilog(current);
+    return;
+  }
+
+  // Fast preemption. The JT will read this variable on return to the
+  // monitorenter_redo stub and will just remove enterSpecial frame
+  // from the stack and return to Continuation.run()
+  current->set_preempting(true);
+
+  assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
+  bool should_yield = _Responsible == (JavaThread*)java_lang_Thread::thread_id(vthread);
+  java_lang_VirtualThread::set_state(vthread, should_yield ? java_lang_VirtualThread::YIELDING : java_lang_VirtualThread::PARKING);
 }
 
 void ObjectMonitor::VThreadEpilog(JavaThread* current) {

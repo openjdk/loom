@@ -298,6 +298,11 @@ inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpr
   return sp;
 }
 
+inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+  Unimplemented();
+  return nullptr;
+}
+
 static inline void derelativize_one(intptr_t* const fp, int offset) {
   intptr_t* addr = fp + offset;
   *addr = (intptr_t)(fp + *addr);

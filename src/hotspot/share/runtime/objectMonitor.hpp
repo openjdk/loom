@@ -395,7 +395,7 @@ private:
   void      EnterContended(JavaThread* current);
   void      EnterI(JavaThread* current);
   void      ReenterI(JavaThread* current, ObjectWaiter* current_node);
-  bool      HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce, bool first_time);
+  bool      HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce);
   void      VThreadEpilog(JavaThread* current);
   void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node, oop vthread = nullptr);
   ObjectWaiter* LookupWaiter(int64_t threadid);

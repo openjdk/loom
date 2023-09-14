@@ -536,6 +536,7 @@ class StubGenerator: public StubCodeGenerator {
   address generate_cont_returnBarrier_exception();
 
   address generate_cont_preempt_stub();
+  address generate_cont_preempt_monitorenter_redo();
   address generate_cont_preempt_rerun_safepointblob_adapter();
 
 #if INCLUDE_JFR

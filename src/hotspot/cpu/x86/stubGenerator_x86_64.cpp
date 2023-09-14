@@ -3750,29 +3750,65 @@ address StubGenerator::generate_cont_preempt_stub() {
   return start;
 }
 
+address StubGenerator::generate_cont_preempt_monitorenter_redo() {
+  if (!Continuations::enabled()) return nullptr;
+  StubCodeMark mark(this, "StubRoutines","Continuation monitorenter redo stub");
+  address start = __ pc();
+
+#ifdef ASSERT
+  __ push(rax);
+  { Label L;
+    __ get_thread(rax);
+    __ cmpptr(r15_thread, rax);
+    __ jcc(Assembler::equal, L);
+    __ stop("r15 should have been preserved across VM call");
+    __ bind(L);
+  }
+  __ pop(rax);
+#endif
+
+  const Register mon_reg = c_rarg1;
+  __ pop(mon_reg);
+  __ pop(mon_reg);
+
+#ifdef ASSERT
+  { Label L;
+    __ testptr(mon_reg, mon_reg);
+    __ jcc(Assembler::notEqual, L);
+    __ stop("ObjectMonitor to use is null");
+    __ bind(L);
+  }
+#endif // ASSERT
+
+  __ mov(c_rarg0, r15_thread);
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
+
+  Label failAcquire;
+  __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
+  __ testbool(rscratch1);
+  __ jcc(Assembler::notEqual, failAcquire);
+  // We have the lock now, just return to caller (we will actually hit the
+  // return barrier to thaw more frames)
+  __ pop(rbp);
+  __ ret(0);
+
+  __ bind(failAcquire);
+  __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
+  // Set rsp to enterSpecial frame
+  __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+  // Remove enterSpecial frame from the stack and return to Continuation.run()
+  SharedRuntime::continuation_enter_cleanup(_masm);
+  __ pop(rbp);
+  __ ret(0);
+
+  return start;
+}
+
 address StubGenerator::generate_cont_preempt_rerun_safepointblob_adapter() {
   if (!Continuations::enabled()) return nullptr;
   StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
   address start = __ pc();
 
-  // Either nullptr or ObjectMonitor* pointer.
-  const Register mon_reg = rcx;
-  __ pop(mon_reg);
-  __ pop(mon_reg);
-
-  Label not_monitorenter;
-  __ testptr(mon_reg, mon_reg);
-  __ jcc(Assembler::equal, not_monitorenter);
-  __ lea(rscratch1, Address(rsp, 2*wordSize));
-  __ set_last_Java_frame(rscratch1, noreg, nullptr, rscratch2);
-  __ mov(c_rarg0, r15_thread);
-  __ mov(c_rarg1, mon_reg);
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
-  // We have the lock now, just return to caller
-  __ pop(rbp);
-  __ ret(0);
-
-  __ bind(not_monitorenter);
   // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
   // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
   // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this
@@ -4092,6 +4128,7 @@ void StubGenerator::generate_continuation_stubs() {
   StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
   StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
   StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
+  StubRoutines::_cont_preempt_monitorenter_redo = generate_cont_preempt_monitorenter_redo();
   StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
   JFR_ONLY(generate_jfr_stubs();)

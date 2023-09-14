@@ -552,6 +552,11 @@ inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpr
   return nullptr;
 }
 
+inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+  Unimplemented();
+  return nullptr;
+}
+
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
   // Prevent assertion if f gets deoptimized right away before it's fully initialized

@@ -273,20 +273,40 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
-inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, ObjectMonitor* monitor, bool is_interpreted_frame) {
+inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
   intptr_t* sp = top.sp();
   intptr_t* fp = sp - frame::sender_sp_offset;
   address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_adapter()
                                     : StubRoutines::cont_preempt_rerun_safepointblob_adapter();
-  sp -= 2 * frame::metadata_words;
-  sp[1] = (intptr_t)monitor; // alignment
-  sp[0] = (intptr_t)monitor;
 
+  sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
 
   log_develop_trace(continuations, preempt)("push_preempt_rerun_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
     is_interpreted_frame ? "interpreter" : "safepointblob", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+  return sp;
+}
+
+inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+  frame enterSpecial = new_entry_frame();
+  intptr_t* sp = enterSpecial.sp();
+
+  // First push the return barrier frame
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)StubRoutines::cont_returnBarrier();
+  sp[0] = (intptr_t)enterSpecial.fp();
+
+  // Now push the ObjectMonitor*
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)chunk->objectMonitor(); // alignment
+  sp[0] = (intptr_t)chunk->objectMonitor();
+
+  // Finally arrange to return to the monitorenter_redo stub
+  sp[-1] = (intptr_t)StubRoutines::cont_preempt_monitorenter_redo();
+  sp[-2] = (intptr_t)enterSpecial.fp();
+
+  log_develop_trace(continuations, preempt)("push_preempt_monitorenter_redo initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
 }
 

@@ -2246,13 +2246,12 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_C(oopDesc* obj, Ba
   SharedRuntime::monitor_enter_helper(obj, lock, current);
 JRT_END
 
-JRT_ENTRY_NO_ASYNC(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
+JRT_LEAF(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
   assert(current == JavaThread::current(), "invariant");
 
   ThreadOnMonitorEnter tme(current);
   monitor->redo_enter(current);
   assert(monitor->owner_raw() == current || current->preempting(), "invariant");
-  assert(!HAS_PENDING_EXCEPTION, "Should have no exception here");
 JRT_END
 
 void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {

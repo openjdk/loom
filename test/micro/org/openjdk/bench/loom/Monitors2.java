@@ -73,6 +73,9 @@ public class Monitors2 {
     @Param({"0", "50000", "100000", "200000"})
     static int WORKLOAD;
 
+    @Param({"10"})
+    static int STACK_DEPTH;
+
     void recursive4_1(int depth, int lockNumber) {
         if (depth > 0) {
             recursive4_1(depth - 1, lockNumber);
@@ -193,26 +196,42 @@ public class Monitors2 {
         }
     }
 
+    static void recursiveSync(int depth) {
+        if (depth > 0) {
+            recursiveSync(depth - 1);
+        } else {
+            int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
+            synchronized(globalLockArray[lockNumber]) {
+                //Thread.yield();
+                for (int i = 0; i < WORKLOAD; i++) {
+                    dummyCounter.getAndIncrement();
+                }
+                workerCount.getAndIncrement();
+            }
+        }
+    }
+
     static final Runnable SYNC = () -> {
-        int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
-        synchronized(globalLockArray[lockNumber]) {
+        recursiveSync(STACK_DEPTH);
+    };
+
+    static void recursiveReentrant(int depth) {
+        if (depth > 0) {
+            recursiveReentrant(depth - 1);
+        } else {
+            int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
+            globalReentrantLockArray[lockNumber].lock();
             //Thread.yield();
             for (int i = 0; i < WORKLOAD; i++) {
                 dummyCounter.getAndIncrement();
             }
             workerCount.getAndIncrement();
+            globalReentrantLockArray[lockNumber].unlock();
         }
-    };
+    }
 
     static final Runnable REENTRANTLOCK = () -> {
-        int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITORS_CNT);
-        globalReentrantLockArray[lockNumber].lock();
-        //Thread.yield();
-        for (int i = 0; i < WORKLOAD; i++) {
-            dummyCounter.getAndIncrement();
-        }
-        workerCount.getAndIncrement();
-        globalReentrantLockArray[lockNumber].unlock();
+        recursiveReentrant(STACK_DEPTH);
     };
 
     public void runBenchmark(Runnable r) throws Exception {
@@ -239,7 +258,7 @@ public class Monitors2 {
     }
 
     @Benchmark
-    public void testContentionSync(MyState state) throws Exception {
+    public void testContentionASync(MyState state) throws Exception {
         runBenchmark(SYNC);
     }
 
