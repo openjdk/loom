@@ -2,16 +2,15 @@ Test: hotspot/jtreg :tier1_runtime
 
 Source info:
 
-commit 2b4b367d463f6a994fa6b6fda9079566c6679b70 (HEAD -> jom-master-merge)
-Merge: 2d69f29cc97 a9d21c61fb1
+commit 1f73bed74f65f430971789ce6c4cf2c8ee547594 (HEAD -> jom-master)
 Author: David Holmes <david.holmes@oracle.com>
-Date:   Thu Aug 3 19:52:23 2023 -0400
+Date:   Wed Sep 13 22:42:23 2023 -0400
 
-    Merge
+Apply fixes needed in JOM for interpreter_frame_last_sp relativisation changes
 
-Test results: passed: 617; failed: 18; error: 2
+Test results: passed: 625; failed: 16; error: 2
 
-(previous logged run: passed: 603; failed: 16; error: 3
+(previous logged run: passed: 617; failed: 18; error: 2)
 
 1. runtime/logging/MonitorInflationTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'inflate(has_locker):' missing from stdout/stderr
 
