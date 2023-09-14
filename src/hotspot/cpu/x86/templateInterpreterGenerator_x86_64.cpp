@@ -538,21 +538,16 @@ address TemplateInterpreterGenerator::generate_cas_lock_state() {
   const Register robj   = rcx;
   const Register rtmp   = r8;
   const Register rto    = r10;
-  const Register rr2tmp = r11;
   const Register rfrom  = rax; // Must be rax
 
   __ movptr(robj,   Address(rsp, 3*wordSize));
-  __ movptr(rto,    Address(rsp, 2*wordSize));
-  __ movptr(rfrom,  Address(rsp, 1*wordSize));
+  __ movl  (rto,    Address(rsp, 2*wordSize));
+  __ movl  (rfrom,  Address(rsp, 1*wordSize));
 
   __ movptr(rtmp, Address(robj, oopDesc::mark_offset_in_bytes()));
 
-  __ movq(rr2tmp, markWord::lock_mask_in_place);
-  __ notq(rr2tmp);
-
-  __ andptr(rtmp, rr2tmp);
-
   // Clean MW in rtmp
+  __ andptr(rtmp, ~(int32_t)markWord::lock_mask_in_place);
   __ orptr(rto,   rtmp);
   __ orptr(rfrom, rtmp);
 
