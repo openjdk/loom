@@ -2119,7 +2119,7 @@ void InterpreterMacroAssembler::load_field_entry(Register cache, Register index,
   }
   lea(cache, Address(cache, index, Address::times_1, Array<ResolvedFieldEntry>::base_offset_in_bytes()));
 }
-  
+
 // Java monitor support
 //
 
@@ -2138,7 +2138,9 @@ void InterpreterMacroAssembler::java_lock_object() {
   decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
   // Restore stack bottom in case i2c adjusted stack
-  movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  lea(rsp, Address(rbp, rcx, Address::times_ptr));
+
   // and null it as marker that esp is now tos until next java call
   movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
@@ -2197,7 +2199,9 @@ void InterpreterMacroAssembler::java_unlock_object(Register lock_reg) {
   decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
   // Restore stack bottom in case i2c adjusted stack
-  movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  lea(rsp, Address(rbp, rcx, Address::times_ptr));
+
   // and null it as marker that esp is now tos until next java call
   movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
@@ -2264,7 +2268,9 @@ void InterpreterMacroAssembler::java_unlock_all_objects() {
   decrementl(Address(r15_thread, JavaThread::system_java_offset()), 1);
 
   // Restore stack bottom in case i2c adjusted stack
-  movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  lea(rsp, Address(rbp, rcx, Address::times_ptr));
+
   // and null it as marker that esp is now tos until next java call
   movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
@@ -2343,7 +2349,7 @@ void InterpreterMacroAssembler::remove_activation_java(
 
   {
     Label done, loop, loop_cond;
-    const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
+    const int entry_size = frame::interpreter_frame_monitor_size_in_bytes();
     const Address monitor_block_top(rbp,
                                     frame::interpreter_frame_monitor_block_top_offset * wordSize);
     const Address monitor_block_bot(rbp,

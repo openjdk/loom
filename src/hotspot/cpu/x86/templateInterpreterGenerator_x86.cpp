@@ -267,7 +267,9 @@ address TemplateInterpreterGenerator::generate_return_entry_for_monitor(int step
   NOT_LP64(__ empty_FPU_stack();)  // remove possible return value from FPU-stack, otherwise stack could overflow
 
   // Restore stack bottom in case i2c adjusted stack
-  __ movptr(rsp, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  __ movptr(rcx, Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize));
+  __ lea(rsp, Address(rbp, rcx, Address::times_ptr));
+
   // and null it as marker that esp is now tos until next java call
   __ movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), (int32_t)NULL_WORD);
 
