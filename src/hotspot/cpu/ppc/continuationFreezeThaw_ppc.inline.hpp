@@ -563,6 +563,10 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   f.mark_not_fully_initialized();
 }
 
+inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
+  Unimplemented();
+}
+
 //
 // Interpreter Calling Procedure on PPC
 //

@@ -139,6 +139,7 @@ class JvmtiUnmountBeginMark : public StackObj {
     } else {
       if (jvmti_present) {
         _target->rebind_to_jvmti_thread_state_of(_target->threadObj());
+        _target->set_jvmti_unmount_event_pending(true);
       }
     }
   }

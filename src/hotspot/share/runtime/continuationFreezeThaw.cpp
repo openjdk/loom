@@ -739,7 +739,7 @@ void FreezeBase::unwind_frames() {
 
 template <typename ConfigT>
 freeze_result Freeze<ConfigT>::try_freeze_fast() {
-  assert(_thread->thread_state() == _thread_in_vm, "");
+  assert(_current->thread_state() == _thread_in_vm, "");
   assert(_thread->cont_fastpath(), "");
 
   DEBUG_ONLY(_fast_freeze_size = size_if_fast_freeze_available();)
@@ -1018,7 +1018,7 @@ frame FreezeBase::freeze_start_frame_yield_stub() {
 }
 
 frame FreezeBase::freeze_start_frame_on_preempt() {
-  _last_frame = _thread->last_frame();
+  assert(_last_frame.sp() == _thread->last_frame().sp(), "_last_frame should be already initialized");
   assert((ContinuationHelper::Frame::is_stub(_last_frame.cb()) && _last_frame.oop_map() != nullptr) || Interpreter::contains(_last_frame.pc()), "must be");
   assert(Continuation::is_frame_in_continuation(_thread->last_continuation(), _last_frame), "");
   return _last_frame;
@@ -1801,8 +1801,13 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
     assert(!current->is_in_tmp_VTMS_transition(), "sanity check");
     JvmtiVTMSTransitionDisabler::finish_VTMS_transition(current, current, vth(), /* is_mount */ true);
 
-    if (JvmtiExport::should_post_vthread_mount()) {
+    if (JvmtiExport::should_post_vthread_mount() && !current->jvmti_unmount_event_pending()) {
       JvmtiExport::post_vthread_mount((jthread)vth.raw_value());
+    } else if (current->jvmti_unmount_event_pending()) {
+      // We freezed on monitorenter but on the retry after freezing we succeded. Since preemption
+      // was cancelled and the unmount event was never posted we don't post the mount either.
+      // Just clear the flag.
+      current->set_jvmti_unmount_event_pending(false);
     }
   JRT_BLOCK_END
 
@@ -1865,6 +1870,7 @@ static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& o
   if (cont.thread()->is_on_monitorenter()) {
     cont.tail()->set_objectMonitor((ObjectMonitor*)cont.thread()->_Stalled);
   }
+
   return freeze_epilog(cont);
 }
 
@@ -1903,6 +1909,21 @@ static inline int freeze_internal(JavaThread* thread, intptr_t* const sp) {
 
   Freeze<ConfigT> freeze(thread, cont, sp, preempt);
 
+  if (preempt) {
+    freeze.set_last_frame();  // remember last frame
+    frame last_frame = freeze.last_frame();
+    if (last_frame.is_safepoint_blob_frame() && !thread->is_at_poll_safepoint() AARCH64_ONLY(|| true)) {
+      // External preemption while target is at a return safepoint poll. Force freeze slow path in this
+      // case. This is to avoid adding extra logic in the fast path to handle the case where the safepoint
+      // stub is the only frame to freeze and cont.argsize() is > 0. It also avoids having to deal with a
+      // possible return oop on the stub in the fast path. Also force aarch64 always to slow path for now
+      // (needs extra instructions to correctly set the last pc since it will not necessarily be at sp[-1]).
+      freeze_result res = freeze.freeze_slow();
+      CONT_JFR_ONLY(cont.post_jfr_event(&event, oopCont, thread);)
+      return preempt_epilog(cont, res, freeze.last_frame());
+    }
+  }
+
   // There are no interpreted frames if we're not called from the interpreter and we haven't ancountered an i2c
   // adapter or called Deoptimization::unpack_frames. Calls from native frames also go through the interpreter
   // (see JavaCalls::call_helper).
@@ -1910,7 +1931,6 @@ static inline int freeze_internal(JavaThread* thread, intptr_t* const sp) {
          || (thread->cont_fastpath_thread_state() && !freeze.interpreted_native_or_deoptimized_on_stack()), "");
   bool fast = UseContinuationFastPath && thread->cont_fastpath();
   if (fast && freeze.size_if_fast_freeze_available() > 0) {
-    if (preempt) freeze.set_last_frame();  // remember last frame
     freeze.freeze_fast_existing_chunk();
     CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, thread);)
     return !preempt ? freeze_epilog(cont) : preempt_epilog(cont, freeze_ok, freeze.last_frame());
@@ -1921,7 +1941,6 @@ static inline int freeze_internal(JavaThread* thread, intptr_t* const sp) {
   if (preempt) {
     JvmtiSampledObjectAllocEventCollector jsoaec(false);
     freeze.set_jvmti_event_collector(&jsoaec);
-    freeze.set_last_frame(); // remember last frame
 
     freeze_result res = fast ? freeze.try_freeze_fast() : freeze.freeze_slow();
 
@@ -2094,7 +2113,7 @@ protected:
   inline void prefetch_chunk_pd(void* start, int size_words);
   void patch_return(intptr_t* sp, bool is_last);
 
-  intptr_t* handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp);
+  intptr_t* handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp, bool fast_case);
   inline intptr_t* push_preempt_rerun_adapter(frame top, bool is_interpreted_frame);
   inline intptr_t* push_preempt_monitorenter_redo(stackChunkOop chunk);
 
@@ -2122,6 +2141,7 @@ private:
   inline frame new_entry_frame();
   template<typename FKind> frame new_stack_frame(const frame& hf, frame& caller, bool bottom);
   inline void patch_pd(frame& f, const frame& sender);
+  inline void patch_pd(frame& f, intptr_t* caller_sp);
   inline intptr_t* align(const frame& hf, intptr_t* frame_sp, frame& caller, bool bottom);
 
   void maybe_set_fastpath(intptr_t* sp) { if (sp > _fastpath) _fastpath = sp; }
@@ -2397,7 +2417,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
     intptr_t* sp = thaw_fast(chunk);
     if (preempted_case) {
       assert(_cont.is_preempted(), "must be");
-      return handle_preempted_continuation(chunk, sp);
+      return handle_preempted_continuation(chunk, sp, true /* fast_case */);
     }
     return sp;
   }
@@ -2456,7 +2476,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
 
   if (preempted_case) {
     assert(_cont.is_preempted(), "must be");
-    return handle_preempted_continuation(original_chunk, sp);
+    return handle_preempted_continuation(original_chunk, sp, false /* fast_case */);
   }
   return sp;
 }
@@ -2623,17 +2643,24 @@ void ThawBase::patch_thread_register(frame& top) {
   *thread_addr = _thread;
 }
 
-intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp) {
+intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp, bool fast_case) {
   frame top(sp);
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
   bool top_is_interpreted = Interpreter::contains(top.pc());
 
+  if (fast_case) {
+    assert(ContinuationHelper::Frame::is_stub(top.cb()), "invariant");
+    int fsize = ContinuationHelper::StubFrame::size(top);
+    patch_pd(top, sp + fsize);
+  }
+
   _cont.set_preempted(false);
 
   bool has_oop_on_stub = top_is_interpreted ? false : original_chunk->has_oop_on_stub();
+  assert(!has_oop_on_stub || oopDesc::is_oop_or_null(*frame::saved_oop_result_address(top)), "must be oop");
   // finish_thaw() could have changed _tail in which case we don't bother changing flags
-  if (original_chunk == _cont.tail()) {
-    if (has_oop_on_stub) original_chunk->set_has_oop_on_stub(false);
+  if (has_oop_on_stub && original_chunk == _cont.tail()) {
+    original_chunk->set_has_oop_on_stub(false);
   }
 
 #if INCLUDE_JVMTI

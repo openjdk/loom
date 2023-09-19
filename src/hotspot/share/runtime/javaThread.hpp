@@ -464,6 +464,7 @@ class JavaThread: public Thread {
   intx _jni_monitor_count;
   bool _preempting;
   bool _cancel_preemption;
+  bool _jvmti_unmount_event_pending;
 
 private:
 
@@ -621,6 +622,9 @@ private:
   void set_preempting(bool b) { _preempting = b; }
 
   bool is_preemption_cancelled() { return _cancel_preemption; }
+
+  bool jvmti_unmount_event_pending() { return _jvmti_unmount_event_pending; }
+  void set_jvmti_unmount_event_pending(bool val) { _jvmti_unmount_event_pending = val; }
 
   inline void cancel_preemption();
 

@@ -486,7 +486,7 @@ JvmtiVTMSTransitionDisabler::finish_VTMS_transition(JavaThread* current, JavaThr
 
   Atomic::dec(&_VTMS_transition_count);
 
-  // Failed preemption case, just return without blocking.
+  // Failed preemption or cancelled preemption case, just return without blocking.
   if (current != target) return;
 
   // Unblock waiting VTMS transition disablers.
@@ -649,11 +649,10 @@ JvmtiVTMSTransitionDisabler::VTMS_unmount_end(jobject vthread) {
   assert(!thread->is_in_tmp_VTMS_transition(), "sanity check");
   finish_VTMS_transition(vthread, /* is_mount */ false);
 
-  if (JvmtiExport::should_post_vthread_unmount()) {
-    if (java_lang_VirtualThread::is_preempted(JNIHandles::resolve(vthread))) {
-      // For preemption case post the unmount event here.
-      JvmtiExport::post_vthread_unmount(vthread);
-    }
+  if (JvmtiExport::should_post_vthread_unmount() && thread->jvmti_unmount_event_pending()) {
+    assert(java_lang_VirtualThread::is_preempted(JNIHandles::resolve(vthread)), "should be marked preempted");
+    JvmtiExport::post_vthread_unmount(vthread);
+    thread->set_jvmti_unmount_event_pending(false);
   }
 }
 

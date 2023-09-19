@@ -273,11 +273,26 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
 }
 
+inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
+  intptr_t* fp = caller_sp - frame::sender_sp_offset;
+  patch_callee_link(f, fp);
+}
+
 inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
   intptr_t* sp = top.sp();
   intptr_t* fp = sp - frame::sender_sp_offset;
   address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_adapter()
                                     : StubRoutines::cont_preempt_rerun_safepointblob_adapter();
+
+#ifdef ASSERT
+  RegisterMap map(JavaThread::current(),
+                  RegisterMap::UpdateMap::skip,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  frame caller = top.sender(&map);
+  intptr_t link_addr = (intptr_t)ContinuationHelper::Frame::callee_link_address(caller);
+  assert(sp[-2] == link_addr, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr);
+#endif
 
   sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
