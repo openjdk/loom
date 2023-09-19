@@ -523,11 +523,6 @@ static bool useHeavyMonitors() {
 
 // Java-based monitor methods
 
-bool ObjectSynchronizer::java_quick_enter(oop obj, JavaThread* current) {
-  // MNCMNC: used to keep original pattern, BUT doesn't do anything as we don't have (need?) a quick enter
-  return false;
-}
-
 void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 

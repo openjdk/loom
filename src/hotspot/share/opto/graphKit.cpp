@@ -877,8 +877,7 @@ void GraphKit::add_safepoint_edges(SafePointNode* call, bool must_throw) {
   // Make sure dead locals are set to top.  This
   // should help register allocation time and cut down on the size
   // of the deoptimization information.
-  // AM: comment out this assert while we investigate why it is failing after JOM updates
-  //assert(dead_locals_are_killed(), "garbage in debug info before safepoint");
+  assert(dead_locals_are_killed(), "garbage in debug info before safepoint");
 
   // Walk the inline list to fill in the correct set of JVMState's
   // Also fill in the associated edges for each JVMState.
@@ -920,7 +919,6 @@ void GraphKit::add_safepoint_edges(SafePointNode* call, bool must_throw) {
 
   // For a known set of bytecodes, the interpreter should reexecute them if
   // deoptimization happens. We set the reexecute state for them here
-  // AM: sometimes the JVMState does not have a method, we should fix this
   if (out_jvms->is_reexecute_undefined() && //don't change if already specified
       should_reexecute_implied_by_bytecode(out_jvms, call->is_AllocateArray())) {
 #ifdef ASSERT
@@ -3498,7 +3496,6 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   const TypeFunc *tf = OptoRuntime::complete_monitor_exit_Type();
   UnlockNode *unlock = new UnlockNode(C, tf);
 #ifdef ASSERT
-  // AM: this might not be needed anymore since we are not adding jvms to the unlock node
   unlock->set_dbg_jvms(sync_jvms());
 #endif
   uint raw_idx = Compile::AliasIdxRaw;
@@ -3510,7 +3507,18 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
 
   unlock->init_req(TypeFunc::Parms + 0, obj);
   unlock->init_req(TypeFunc::Parms + 1, box);
-  add_safepoint_edges(unlock);
+
+  if (ObjectMonitorMode::java()) {
+    // For some reason, we sometimes end up with dead locals that must be killed
+    // before we call add_safepoint_edges.
+    if (!dead_locals_are_killed()) {
+      kill_dead_locals();
+    }
+
+    // This will set the jvms pointer in the unlock node
+    // In JOM mode we want unlock to behave like lock.
+    add_safepoint_edges(unlock);
+  }
 
   unlock = _gvn.transform(unlock)->as_Unlock();
 

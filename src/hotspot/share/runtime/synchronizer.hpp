@@ -187,7 +187,6 @@ class ObjectSynchronizer : AllStatic {
 
   static bool quick_notify(oopDesc* obj, JavaThread* current, bool All);
   static bool quick_enter(oop obj, JavaThread* current, BasicLock* Lock);
-  static bool java_quick_enter(oop obj, JavaThread* current);
 
   // This is the Java-based version of monitor operations.
   static void java_enter(Handle obj, JavaThread* current);

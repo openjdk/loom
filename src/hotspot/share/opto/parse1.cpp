@@ -41,6 +41,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/synchronizer.hpp"
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/copy.hpp"
 
@@ -1118,12 +1119,26 @@ void Parse::do_exits() {
       JVMState* ex_jvms = caller->clone_shallow(C);
       ex_jvms->bind_map(kit.clone_map());
       ex_jvms->set_bci(   InvocationEntryBci);
-      ex_jvms->set_method(method());
-      kit.set_jvms(ex_jvms);
+
       if (do_synch) {
 #ifdef C2_PATCH
         if (ObjectMonitorMode::legacy()) {
 #endif
+        // Ensure that the jvms object has a method pointer inorder to
+        // avoid asserts.
+        if (ObjectMonitorMode::java()) {
+          if (!ex_jvms->has_method()){
+            ex_jvms->set_method(method());
+          } else {
+            // We reach here when _invokeinterface gets parsed.
+            // This is most likely because ex_jvms->method() is the caller and
+            // this->method() is the callee.
+
+            //assert(ex_jvms->method() == method(), "They should be the same.");
+          }
+        }
+        kit.set_jvms(ex_jvms);
+
         // Add on the synchronized-method box/object combo
         kit.map()->push_monitor(_synch_lock);
         // Unlock!
@@ -1135,7 +1150,10 @@ void Parse::do_exits() {
           shared_call_unlock(_synch_obj);
         }
 #endif
+      } else {
+        kit.set_jvms(ex_jvms);
       }
+
       if (C->env()->dtrace_method_probes()) {
         kit.make_dtrace_method_exit(method());
       }
