@@ -27,7 +27,7 @@
  * @key randomness
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit MonitorEnterUnblocking
+ * @run junit MonitorUnblocking
  */
 
 import java.util.concurrent.CountDownLatch;
@@ -37,7 +37,7 @@ import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.RepeatedTest;
 import static org.junit.jupiter.api.Assertions.*;
 
-class MonitorEnterUnblocking {
+class MonitorUnblocking {
 
     /**
      * Test unblocking a virtual thread waiting to enter a monitor.
