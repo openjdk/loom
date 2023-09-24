@@ -21,9 +21,17 @@
  * questions.
  */
 
+#include <stdio.h>
+
+#ifdef _WIN64
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT
+#endif
+
 /*
- * Call a functions with the given function pointer.
+ * Call a function with the given function pointer.
  */
-void call(void *(*f)(void)) {
+EXPORT void call(void *(*f)(void)) {
     (*f)();
 }
