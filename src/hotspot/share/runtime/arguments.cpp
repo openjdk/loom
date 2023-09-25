@@ -3006,6 +3006,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     // "high-only" compilation mode will ensure that all compilation
     // happens in C2.
     FLAG_SET_CMDLINE(CompilationMode, "high-only");
+    FLAG_SET_CMDLINE(ProfileInterpreter, false);
 
     log_info(monitor)("Using Java object monitors with policy %s",
                       ObjectMonitorMode::as_string());
