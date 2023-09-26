@@ -21,6 +21,9 @@
 # questions.
 #
 
+# Some loom repo specific entries
+java/lang/Thread/virtual/stress/ParkALot.java#id1               0000000 generic-all
+
 com/sun/jdi/EATests.java#id0                                    8264699 generic-all
 
 ##########
