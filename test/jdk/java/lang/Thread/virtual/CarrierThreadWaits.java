@@ -82,7 +82,7 @@ class CarrierThreadWaits {
 
                 // carrier thread should be on WAITING on virtual thread
                 ThreadInfo ti = ManagementFactory.getThreadMXBean().getThreadInfo(carrierId);
-                assertTrue(ti.getThreadState() == Thread.State.WAITING);
+                assertEquals(Thread.State.WAITING, ti.getThreadState());
                 assertEquals(vthread.getClass().getName(), ti.getLockInfo().getClassName());
                 assertTrue(ti.getLockInfo().getIdentityHashCode() == System.identityHashCode(vthread));
                 assertTrue(ti.getLockOwnerId() == vthreadId);
