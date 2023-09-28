@@ -61,7 +61,7 @@ class WEPollPoller extends Poller {
     }
 
     @Override
-    int poll(int timeout) throws IOException {
+    void poll(int timeout) throws IOException {
         int n = WEPoll.wait(handle, address, MAX_EVENTS_TO_POLL, timeout);
         int i = 0;
         while (i < n) {
@@ -70,7 +70,6 @@ class WEPollPoller extends Poller {
             polled(fdVal);
             i++;
         }
-        return n;
     }
 }
 

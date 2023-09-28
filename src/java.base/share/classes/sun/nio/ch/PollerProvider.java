@@ -32,13 +32,10 @@ abstract class PollerProvider {
     PollerProvider() { }
 
     /**
-     * Returns true if threads should register file descriptors directly,
-     * false to queue registrations to an updater thread.
-     *
-     * The default implementation returns false.
+     * Default Poller mode.
      */
-    boolean useDirectRegister() {
-        return false;
+    int defaultPollingMode() {
+        return 1;
     }
 
     /**

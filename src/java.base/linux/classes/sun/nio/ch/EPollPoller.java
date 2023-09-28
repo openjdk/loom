@@ -39,16 +39,18 @@ class EPollPoller extends Poller {
     private final int event;
     private final long address;
 
+    private final EventFD eventfd;
+    private final Object lock = new Object();
+    private boolean wakeupTriggered;
+
     EPollPoller(boolean read) throws IOException {
         super(read);
         this.epfd = EPoll.create();
         this.event = (read) ? EPOLLIN : EPOLLOUT;
         this.address = EPoll.allocatePollArray(MAX_EVENTS_TO_POLL);
-    }
 
-    @Override
-    int fdVal() {
-        return epfd;
+        this.eventfd = new EventFD();
+        EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
     }
 
     @Override
@@ -67,16 +69,36 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    int poll(int timeout) throws IOException {
+    void wakeup() {
+        synchronized (lock) {
+            if (!wakeupTriggered) {
+                try {
+                    eventfd.set();
+                } catch (IOException ioe) {
+                    throw new InternalError(ioe);
+                }
+                wakeupTriggered = true;
+            }
+        }
+    }
+
+    @Override
+    void poll(int timeout) throws IOException {
         int n = EPoll.wait(epfd, address, MAX_EVENTS_TO_POLL, timeout);
         int i = 0;
         while (i < n) {
             long eventAddress = EPoll.getEvent(address, i);
             int fdVal = EPoll.getDescriptor(eventAddress);
-            polled(fdVal);
+            if (fdVal == eventfd.efd()) {
+                synchronized (lock) {
+                    eventfd.reset();
+                    wakeupTriggered = false;
+                }
+            } else {
+                polled(fdVal);
+            }
             i++;
         }
-        return n;
     }
 }
 
