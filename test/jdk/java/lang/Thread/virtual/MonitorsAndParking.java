@@ -24,7 +24,7 @@
 /**
  * @test
  * @summary Test that monitor enter/exit does not interfere with the thread's parking permit.
- * @run junit ParkingPermitInference
+ * @run junit MonitorsAndParking
  */
 
 import java.time.Duration;
@@ -36,7 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
-class ParkingPermitInference {
+class MonitorsAndParking {
 
     static Stream<ThreadFactory> factories() {
         return Stream.of(
