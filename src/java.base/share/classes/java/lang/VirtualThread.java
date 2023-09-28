@@ -86,44 +86,66 @@ final class VirtualThread extends BaseVirtualThread {
     private volatile int state;
 
     /*
-     * Virtual thread state and transitions:
+     * Virtual thread state transitions:
      *
-     *      NEW -> STARTED         // Thread.start
+     *      NEW -> STARTED         // Thread.start, schedule to run
      *  STARTED -> TERMINATED      // failed to start
      *  STARTED -> RUNNING         // first run
+     *  RUNNING -> TERMINATED      // done
      *
-     *  RUNNING -> PARKING         // Thread attempts to park
-     *  PARKING -> PARKED          // cont.yield successful, thread is parked
-     *  PARKING -> PINNED          // cont.yield failed, thread is pinned
+     *  RUNNING -> PARKING         // Thread parking with LockSupport.park
+     *  PARKING -> PARKED          // cont.yield successful, parked indefinitely
+     *  PARKING -> PINNED          // cont.yield failed, parked indefinitely on carrier
+     *   PARKED -> RUNNABLE        // unparked, schedule to continue
+     *   PINNED -> RUNNING         // unparked, continue execution on same carrier
      *
-     *   PARKED -> RUNNABLE        // unpark or interrupted
-     *   PINNED -> RUNNABLE        // unpark or interrupted
+     *       RUNNING -> TIMED_PARKING   // Thread parking with LockSupport.parkNanos
+     * TIMED_PARKING -> TIMED_PARKED    // cont.yield successful, timed-parked
+     * TIMED_PARKING -> TIMED_PINNED    // cont.yield failed, timed-parked on carrier
+     *  TIMED_PARKED -> RUNNABLE        // unparked, schedule to continue
+     *  TIMED_PINNED -> RUNNING         // unparked, continue execution on same carrier
      *
      * RUNNABLE -> RUNNING         // continue execution
+     *
+     *  RUNNABLE -> BLOCKING       // blocking on monitor enter
+     *  BLOCKING -> BLOCKED        // blocked on monitor enter
+     *   BLOCKED -> RUNNABLE       // unblocked
      *
      *  RUNNING -> YIELDING        // Thread.yield
      * YIELDING -> RUNNABLE        // yield successful
      * YIELDING -> RUNNING         // yield failed
-     *
-     *  RUNNING -> TERMINATED      // done
      */
     private static final int NEW      = 0;
     private static final int STARTED  = 1;
     private static final int RUNNABLE = 2;     // runnable-unmounted
     private static final int RUNNING  = 3;     // runnable-mounted
+
+    // untimed parking
     private static final int PARKING  = 4;
     private static final int PARKED   = 5;     // unmounted
     private static final int PINNED   = 6;     // mounted
-    private static final int YIELDING = 7;     // Thread.yield
+
+    // timed parking
+    private static final int TIMED_PARKING = 7;
+    private static final int TIMED_PARKED  = 8;
+    private static final int TIMED_PINNED  = 9;
+
+    private static final int YIELDING   = 10;  // Thread.yield
+
+    // monitor enter
+    private static final int BLOCKING   = 11;
+    private static final int BLOCKED    = 12;
+
     private static final int TERMINATED = 99;  // final state
 
     // can be suspended from scheduling when unmounted
     private static final int SUSPENDED = 1 << 8;
-    private static final int RUNNABLE_SUSPENDED = (RUNNABLE | SUSPENDED);
-    private static final int PARKED_SUSPENDED   = (PARKED | SUSPENDED);
 
     // parking permit
     private volatile boolean parkPermit;
+
+    // unblocked
+    private volatile boolean unblocked;
 
     // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
@@ -196,8 +218,11 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Runs or continues execution of the continuation on the current thread.
+     * Runs or continues execution on the current thread. The virtual thread is mounted
+     * on the current thread before the task runs or continues. It unmounts when the
+     * task completes or yields.
      */
+    @ChangesCurrentThread
     private void runContinuation() {
         // the carrier must be a platform thread
         if (Thread.currentThread().isVirtual()) {
@@ -219,15 +244,13 @@ final class VirtualThread extends BaseVirtualThread {
         // notify JVMTI before mount
         notifyJvmtiMount(/*hide*/true);
 
-        if (cont.isPreempted()) {
-            mount();
-        }
-
+        mount();
         try {
             cont.run();
         } finally {
+            unmount();
             if (cont.isDone()) {
-                afterTerminate();
+                afterDone();
             } else {
                 if (cont.isPreempted()) {
                     setState(YIELDING);
@@ -295,16 +318,12 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Runs a task in the context of this virtual thread. The virtual thread is
-     * mounted on the current (carrier) thread before the task runs. It unmounts
-     * from its carrier thread when the task completes.
+     * Runs a task in the context of this virtual thread.
      */
-    @ChangesCurrentThread
     private void run(Runnable task) {
-        assert state == RUNNING;
+        assert Thread.currentThread() == this && state == RUNNING;
 
-        // first mount
-        mount();
+        // notify JVMTI, may post VirtualThreadStart event
         notifyJvmtiStart();
 
         // emit JFR event if enabled
@@ -332,12 +351,8 @@ final class VirtualThread extends BaseVirtualThread {
                 }
 
             } finally {
-                // last unmount
+                // notify JVMTI, may post VirtualThreadEnd event
                 notifyJvmtiEnd();
-                unmount();
-
-                // final state
-                setState(TERMINATED);
             }
         }
     }
@@ -429,21 +444,15 @@ final class VirtualThread extends BaseVirtualThread {
      }
 
     /**
-     * Unmounts this virtual thread, invokes Continuation.yield, and re-mounts the
-     * thread when continued. When enabled, JVMTI must be notified from this method.
-     * @return true if the yield was successful
+     * Invokes Continuation.yield, notifying JVMTI (if enabled) to hide frames until
+     * the continuation continues.
      */
     @Hidden
-    @ChangesCurrentThread
     private boolean yieldContinuation() {
-        // unmount
         notifyJvmtiUnmount(/*hide*/true);
-        unmount();
         try {
             return Continuation.yield(VTHREAD_SCOPE);
         } finally {
-            // re-mount
-            mount();
             notifyJvmtiMount(/*hide*/false);
         }
     }
@@ -454,17 +463,19 @@ final class VirtualThread extends BaseVirtualThread {
      * If yielding due to Thread.yield then it just submits the task to continue.
      */
     private void afterYield() {
+        assert carrierThread == null;
         int s = state();
-        assert (s == PARKING || s == YIELDING) && (carrierThread == null);
 
-        if (s == PARKING) {
-            setState(PARKED);
+        // LockSupport.park/parkNanos
+        if (s == PARKING || s == TIMED_PARKING) {
+            int newState = (s == PARKING) ? PARKED : TIMED_PARKED;
+            setState(newState);
 
             // notify JVMTI that unmount has completed, thread is parked
             notifyJvmtiUnmount(/*hide*/false);
 
             // may have been unparked while parking
-            if (parkPermit && compareAndSetState(PARKED, RUNNABLE)) {
+            if (parkPermit && compareAndSetState(newState, RUNNABLE)) {
                 // lazy submit to continue on the current thread as carrier if possible
                 if (currentThread() instanceof CarrierThread ct) {
                     lazySubmitRunContinuation(ct.getPool());
@@ -473,7 +484,11 @@ final class VirtualThread extends BaseVirtualThread {
                 }
 
             }
-        } else if (s == YIELDING) {   // Thread.yield
+            return;
+        }
+
+        // Thread.yield
+        if (s == YIELDING) {
             setState(RUNNABLE);
 
             // notify JVMTI that unmount has completed, thread is runnable
@@ -485,26 +500,39 @@ final class VirtualThread extends BaseVirtualThread {
             } else {
                 submitRunContinuation();
             }
+            return;
         }
+
+        // blocking on monitorenter
+        if (s == BLOCKING) {
+            setState(BLOCKED);
+            if (unblocked && compareAndSetState(BLOCKED, RUNNABLE)) {
+                unblocked = false;
+                submitRunContinuation();
+            }
+            return;
+        }
+
+        assert false;
     }
 
     /**
-     * Invoked after the thread terminates execution. It notifies anyone
-     * waiting for the thread to terminate.
+     * Invoked after the continuation completes.
      */
-    private void afterTerminate() {
-        afterTerminate(true, true);
+    private void afterDone() {
+        afterDone(true, true);
     }
 
     /**
-     * Invoked after the thread terminates (or start failed). This method
-     * notifies anyone waiting for the thread to terminate.
+     * Invoked after the continuation completes (or start failed). Sets the thread
+     * state to TERMINATED and notifies anyone waiting for the thread to terminate.
      *
      * @param notifyContainer true if its container should be notified
      * @param executed true if the thread executed, false if it failed to start
      */
-    private void afterTerminate(boolean notifyContainer, boolean executed) {
-        assert (state() == TERMINATED) && (carrierThread == null);
+    private void afterDone(boolean notifyContainer, boolean executed) {
+        assert carrierThread == null;
+        setState(TERMINATED);
 
         if (executed) {
             notifyJvmtiUnmount(/*hide*/false);
@@ -558,8 +586,7 @@ final class VirtualThread extends BaseVirtualThread {
             started = true;
         } finally {
             if (!started) {
-                setState(TERMINATED);
-                afterTerminate(addedToContainer, /*executed*/false);
+                afterDone(addedToContainer, /*executed*/false);
             }
         }
     }
@@ -627,14 +654,14 @@ final class VirtualThread extends BaseVirtualThread {
             long startTime = System.nanoTime();
 
             boolean yielded = false;
-            setState(PARKING);
+            setState(TIMED_PARKING);
             Future<?> unparker = scheduleUnpark(this::unpark, nanos);
             try {
                 yielded = yieldContinuation();  // may throw
             } finally {
                 assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
                 if (!yielded) {
-                    assert state() == PARKING;
+                    assert state() == TIMED_PARKING;
                     setState(RUNNING);
                 }
                 cancel(unparker);
@@ -642,10 +669,8 @@ final class VirtualThread extends BaseVirtualThread {
 
             // park on carrier thread for remaining time when pinned
             if (!yielded) {
-                long deadline = startTime + nanos;
-                if (deadline < 0L)
-                    deadline = Long.MAX_VALUE;
-                parkOnCarrierThread(true, deadline - System.nanoTime());
+                long remainingNanos = nanos - (System.nanoTime() - startTime);
+                parkOnCarrierThread(true, remainingNanos);
             }
         }
     }
@@ -668,7 +693,7 @@ final class VirtualThread extends BaseVirtualThread {
             event = null;
         }
 
-        setState(PINNED);
+        setState(timed ? TIMED_PINNED : PINNED);
         try {
             if (!parkPermit) {
                 if (!timed) {
@@ -760,7 +785,8 @@ final class VirtualThread extends BaseVirtualThread {
         Thread currentThread = Thread.currentThread();
         if (!getAndSetParkPermit(true) && currentThread != this) {
             int s = state();
-            if (s == PARKED && compareAndSetState(PARKED, RUNNABLE)) {
+            boolean parked = (s == PARKED) || (s == TIMED_PARKED);
+            if (parked && compareAndSetState(s, RUNNABLE)) {
                 if (currentThread instanceof VirtualThread vthread) {
                     vthread.switchToCarrierThread();
                     try {
@@ -771,15 +797,28 @@ final class VirtualThread extends BaseVirtualThread {
                 } else {
                     submitRunContinuation();
                 }
-            } else if (s == PINNED) {
+            } else if ((s == PINNED) || (s == TIMED_PINNED)) {
                 // unpark carrier thread when pinned.
                 synchronized (carrierThreadAccessLock()) {
                     Thread carrier = carrierThread;
-                    if (carrier != null && state() == PINNED) {
+                    if (carrier != null && ((s = state()) == PINNED || s == TIMED_PINNED)) {
                         U.unpark(carrier);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Re-enables this virtual thread for scheduling after blocking on monitor enter.
+     * @throws RejectedExecutionException if the scheduler cannot accept a task
+     */
+    private void unblock() {
+        assert !Thread.currentThread().isVirtual();
+        unblocked = true;
+        if (state() == BLOCKED && compareAndSetState(BLOCKED, RUNNABLE)) {
+            unblocked = false;
+            submitRunContinuation();
         }
     }
 
@@ -912,7 +951,8 @@ final class VirtualThread extends BaseVirtualThread {
 
     @Override
     Thread.State threadState() {
-        switch (state()) {
+        int s = state();
+        switch (s & ~SUSPENDED) {
             case NEW:
                 return Thread.State.NEW;
             case STARTED:
@@ -923,7 +963,6 @@ final class VirtualThread extends BaseVirtualThread {
                     return Thread.State.RUNNABLE;
                 }
             case RUNNABLE:
-            case RUNNABLE_SUSPENDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
             case RUNNING:
@@ -937,13 +976,19 @@ final class VirtualThread extends BaseVirtualThread {
                 // runnable, mounted
                 return Thread.State.RUNNABLE;
             case PARKING:
+            case TIMED_PARKING:
             case YIELDING:
-                // runnable, mounted, not yet waiting
+            case BLOCKING:
+                // runnable, not yet waiting/blocked
                 return Thread.State.RUNNABLE;
             case PARKED:
-            case PARKED_SUSPENDED:
             case PINNED:
-                return Thread.State.WAITING;
+                return State.WAITING;
+            case TIMED_PARKED:
+            case TIMED_PINNED:
+                return State.TIMED_WAITING;
+            case BLOCKED:
+                return State.BLOCKED;
             case TERMINATED:
                 return Thread.State.TERMINATED;
             default:
@@ -983,7 +1028,7 @@ final class VirtualThread extends BaseVirtualThread {
     private StackTraceElement[] tryGetStackTrace() {
         int initialState = state();
         return switch (initialState) {
-            case RUNNABLE, PARKED -> {
+            case RUNNABLE, PARKED, BLOCKED, TIMED_PARKED -> {
                 int suspendedState = initialState | SUSPENDED;
                 if (compareAndSetState(initialState, suspendedState)) {
                     try {
@@ -993,9 +1038,10 @@ final class VirtualThread extends BaseVirtualThread {
                         setState(initialState);
 
                         // re-submit if runnable
-                        // re-submit if unparked while suspended
+                        // re-submit if unparked or unblocked while suspended
                         if (initialState == RUNNABLE
-                            || (parkPermit && compareAndSetState(PARKED, RUNNABLE))) {
+                                || ((parkPermit || unblocked)
+                                    && compareAndSetState(initialState, RUNNABLE))) {
                             try {
                                 submitRunContinuation();
                             } catch (RejectedExecutionException ignore) { }
@@ -1214,5 +1260,18 @@ final class VirtualThread extends BaseVirtualThread {
                 return 2;
         }
         return 0;
+    }
+
+    /**
+     * Unblock virtual threads that are ready to scheduled again.
+     */
+    private static void processPendingList() {
+        // TBD invoke unblock
+    }
+
+    static {
+        var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",
+                VirtualThread::processPendingList);
+        unblocker.start();
     }
 }

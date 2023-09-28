@@ -24,7 +24,7 @@
 /*
  * @test
  * @library /test/lib
- * @run junit/othervm -Djdk.trackAllThreads=true TrackAllThreads
+ * @run junit/othervm TrackAllThreads
  */
 
 import java.lang.ref.WeakReference;

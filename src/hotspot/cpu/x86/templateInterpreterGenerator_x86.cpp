@@ -35,6 +35,7 @@
 #include "interpreter/templateInterpreterGenerator.hpp"
 #include "interpreter/templateTable.hpp"
 #include "oops/arrayOop.hpp"
+#include "oops/methodCounters.hpp"
 #include "oops/methodData.hpp"
 #include "oops/method.hpp"
 #include "oops/oop.inline.hpp"
@@ -51,6 +52,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/timer.hpp"
 #include "runtime/vframeArray.hpp"
+#include "utilities/checkedCast.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
 
@@ -84,9 +86,10 @@ address TemplateInterpreterGenerator::generate_StackOverflowError_handler() {
 #ifdef ASSERT
   {
     Label L;
-    __ lea(rax, Address(rbp,
-                        frame::interpreter_frame_monitor_block_top_offset *
-                        wordSize));
+    __ movptr(rax, Address(rbp,
+                           frame::interpreter_frame_monitor_block_top_offset *
+                           wordSize));
+    __ lea(rax, Address(rbp, rax, Address::times_ptr));
     __ cmpptr(rax, rsp); // rax = maximal rsp for current rbp (stack
                          // grows negative)
     __ jcc(Assembler::aboveEqual, L); // check if frame is complete
@@ -477,7 +480,7 @@ void TemplateInterpreterGenerator::generate_counter_overflow(Label& do_continue)
 void TemplateInterpreterGenerator::generate_stack_overflow_check(void) {
 
   // monitor entry size: see picture of stack in frame_x86.hpp
-  const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
+  const int entry_size = frame::interpreter_frame_monitor_size_in_bytes();
 
   // total overhead size: entry_size + (saved rbp through expr stack
   // bottom).  be sure to change this if you add/subtract anything
@@ -566,7 +569,7 @@ void TemplateInterpreterGenerator::lock_method() {
   const Address monitor_block_top(
         rbp,
         frame::interpreter_frame_monitor_block_top_offset * wordSize);
-  const int entry_size = frame::interpreter_frame_monitor_size() * wordSize;
+  const int entry_size = frame::interpreter_frame_monitor_size_in_bytes();
 
 #ifdef ASSERT
   {
@@ -604,7 +607,7 @@ void TemplateInterpreterGenerator::lock_method() {
 
   // add space for monitor & lock
   __ subptr(rsp, entry_size); // add space for a monitor entry
-  __ movptr(monitor_block_top, rsp);  // set new monitor block top
+  __ subptr(monitor_block_top, entry_size / wordSize); // set new monitor block top
   // store object
   __ movptr(Address(rsp, BasicObjectLock::obj_offset()), rax);
   const Register lockreg = NOT_LP64(rdx) LP64_ONLY(c_rarg1);
@@ -660,8 +663,8 @@ void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
   } else {
     __ push(rbcp); // set bcp
   }
-  __ push(0); // reserve word for pointer to expression stack bottom
-  __ movptr(Address(rsp, 0), rsp); // set expression stack bottom
+  // initialize relativized pointer to expression stack bottom
+  __ push(frame::interpreter_frame_initial_sp_offset);
 }
 
 // End of helpers
@@ -900,6 +903,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     const Address monitor_block_top(rbp,
                  frame::interpreter_frame_monitor_block_top_offset * wordSize);
     __ movptr(rax, monitor_block_top);
+    __ lea(rax, Address(rbp, rax, Address::times_ptr));
     __ cmpptr(rax, rsp);
     __ jcc(Assembler::equal, L);
     __ stop("broken stack frame setup in interpreter 5");
@@ -1454,6 +1458,7 @@ address TemplateInterpreterGenerator::generate_normal_entry(bool synchronized) {
      const Address monitor_block_top (rbp,
                  frame::interpreter_frame_monitor_block_top_offset * wordSize);
     __ movptr(rax, monitor_block_top);
+    __ lea(rax, Address(rbp, rax, Address::times_ptr));
     __ cmpptr(rax, rsp);
     __ jcc(Assembler::equal, L);
     __ stop("broken stack frame setup in interpreter 6");

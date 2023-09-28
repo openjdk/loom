@@ -34,7 +34,7 @@
  * @test
  * @requires vm.continuations & vm.debug
  * @modules java.base/java.lang:+open
- * @run junit/othervm -XX:+UseHeavyMonitors CarrierThreadWaits
+ * @run junit/othervm -XX:LockingMode=0 CarrierThreadWaits
  */
 
 import java.lang.management.LockInfo;
@@ -82,7 +82,7 @@ class CarrierThreadWaits {
 
                 // carrier thread should be on WAITING on virtual thread
                 ThreadInfo ti = ManagementFactory.getThreadMXBean().getThreadInfo(carrierId);
-                assertTrue(ti.getThreadState() == Thread.State.WAITING);
+                assertEquals(Thread.State.WAITING, ti.getThreadState());
                 assertEquals(vthread.getClass().getName(), ti.getLockInfo().getClassName());
                 assertTrue(ti.getLockInfo().getIdentityHashCode() == System.identityHashCode(vthread));
                 assertTrue(ti.getLockOwnerId() == vthreadId);

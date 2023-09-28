@@ -24,8 +24,10 @@
 /**
  * @test
  * @summary Basic test for JFR jdk.VirtualThreadXXX events
+ * @enablePreview
  * @requires vm.continuations
  * @modules jdk.jfr java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm JfrEvents
  */
 
@@ -48,11 +50,11 @@ import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
+import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JfrEvents {
-    private static final Object lock = new Object();
 
     /**
      * Test jdk.VirtualThreadStart and jdk.VirtualThreadEnd events.
@@ -105,9 +107,7 @@ class JfrEvents {
                     var threadRef = new AtomicReference<Thread>();
                     executor.submit(() -> {
                         threadRef.set(Thread.currentThread());
-                        synchronized (lock) {
-                            parker.run();   // should pin carrier
-                        }
+                        VThreadPinner.runPinned(parker::run);
                     });
 
                     // wait for the task to start and the virtual thread to park
