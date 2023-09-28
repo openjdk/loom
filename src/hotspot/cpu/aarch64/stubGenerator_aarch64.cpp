@@ -7110,7 +7110,7 @@ class StubGenerator: public StubCodeGenerator {
 
     // Restore machine SP
     __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
-    __ mov(sp, rscratch1);
+    __ lea(sp, Address(rfp, rscratch1, Address::lsl(LogBytesPerWord)));
 
     // Prepare for adjustment on return to call_VM_leaf_base()
     __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize));

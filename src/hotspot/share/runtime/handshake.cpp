@@ -481,7 +481,7 @@ void HandshakeState::add_operation(HandshakeOperation* op) {
 }
 
 bool HandshakeState::operation_pending(HandshakeOperation* op) {
-  MutexLocker ml(_lock.owned_by_self() ? NULL : &_lock, Mutex::_no_safepoint_check_flag);
+  ConditionalMutexLocker ml(&_lock, !_lock.owned_by_self(), Mutex::_no_safepoint_check_flag);
   MatchOp mo(op);
   return _queue.contains(mo);
 }

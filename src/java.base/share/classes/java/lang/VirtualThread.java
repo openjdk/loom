@@ -254,7 +254,6 @@ final class VirtualThread extends BaseVirtualThread {
             } else {
                 if (cont.isPreempted()) {
                     setState(YIELDING);
-                    unmount();
                 }
                 afterYield();
             }
