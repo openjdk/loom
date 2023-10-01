@@ -1230,6 +1230,7 @@ final class VirtualThread extends BaseVirtualThread {
     static {
         var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",
                 VirtualThread::processPendingList);
+        unblocker.setDaemon(true);
         unblocker.start();
     }
 }

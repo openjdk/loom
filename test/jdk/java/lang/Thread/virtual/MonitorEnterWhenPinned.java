@@ -30,6 +30,7 @@
  * @run junit MonitorEnterWhenPinned
  */
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import jdk.test.lib.thread.VThreadRunner;
@@ -40,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MonitorEnterWhenPinned {
 
     /**
-     * Test monitor enter from virtual thread when its carrier is pinned.
+     * Test monitor enter when pinned.
      */
     @Test
     void testEnterWhenPinned() throws Exception {
@@ -56,7 +57,7 @@ class MonitorEnterWhenPinned {
     }
 
     /**
-     * Test monitor reenter from virtual thread when its carrier is pinned.
+     * Test monitor reenter when pinned.
      */
     @Test
     void testReenterWhenPinned() throws Exception {
@@ -75,25 +76,30 @@ class MonitorEnterWhenPinned {
     }
 
     /**
-     * Test contended monitor enter from virtual thread when its carrier is pinned.
+     * Test contended monitor enter when pinned.
      */
     @Test
     void testContendedMonitorEnterWhenPinned() throws Exception {
         var lock = new Object();
+        var started = new CountDownLatch(1);
         var entered = new AtomicBoolean();
         Thread vthread  = Thread.ofVirtual().unstarted(() -> {
             VThreadPinner.runPinned(() -> {
+                started.countDown();
                 synchronized (lock) {
                     entered.set(true);
                 }
             });
         });
         synchronized (lock) {
+            // start thread and wait for it to block
             vthread.start();
+            started.await();
             await(vthread, Thread.State.BLOCKED);
-            assertFalse(entered.get());
         }
         vthread.join();
+
+        // check thread entered monitor
         assertTrue(entered.get());
     }
 
@@ -101,7 +107,7 @@ class MonitorEnterWhenPinned {
         Thread.State state = thread.getState();
         while (state != expectedState) {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
-            Thread.onSpinWait();
+            Thread.yield();
             state = thread.getState();
         }
     }

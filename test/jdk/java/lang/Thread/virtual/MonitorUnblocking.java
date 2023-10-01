@@ -90,7 +90,7 @@ class MonitorUnblocking {
         Thread.State state = thread.getState();
         while (state != expectedState) {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
-            Thread.onSpinWait();
+            Thread.yield();
             state = thread.getState();
         }
     }

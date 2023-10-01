@@ -28,6 +28,7 @@
  */
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Stream;
@@ -53,16 +54,20 @@ class MonitorsAndParking {
     @MethodSource("factories")
     void testParkPermitNotConsumed(ThreadFactory factory) throws Exception {
         var lock = new Object();
+        var started = new CountDownLatch(1);
         var thread = factory.newThread(() -> {
-            synchronized (lock) {
-            }
-
-            LockSupport.park();  // should park
+            started.countDown();
+            synchronized (lock) { }  // should block
+            LockSupport.park();      // should park
         });
+
         synchronized (lock) {
             thread.start();
+            // wait for thread to start and block
+            started.await();
             await(thread, Thread.State.BLOCKED);
         }
+
         try {
             // wait for thread to park, it should not terminate
             await(thread, Thread.State.WAITING);
@@ -78,7 +83,7 @@ class MonitorsAndParking {
         Thread.State state = thread.getState();
         while (state != expectedState) {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
-            Thread.onSpinWait();
+            Thread.yield();
             state = thread.getState();
         }
     }
