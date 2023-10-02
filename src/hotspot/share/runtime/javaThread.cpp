@@ -1138,6 +1138,7 @@ void JavaThread::send_async_exception(JavaThread* target, oop java_throwable) {
 
 #if INCLUDE_JVMTI
 void JavaThread::set_is_in_VTMS_transition(bool val) {
+  assert(is_in_VTMS_transition() != val, "already %s transition", val ? "inside" : "outside");
   _is_in_VTMS_transition = val;
 }
 

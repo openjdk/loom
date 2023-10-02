@@ -407,7 +407,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
       add_to_contentions(-1);
       DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
       assert((owner() == current && current->is_preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
-             (owner() != current && !current->is_preemption_cancelled() && (state == java_lang_VirtualThread::PARKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
+             (owner() != current && !current->is_preemption_cancelled() && (state == java_lang_VirtualThread::BLOCKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
       return true;
     }
   }
@@ -992,7 +992,7 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntr
 
   oop vthread = current->vthread();
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
-  java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::PARKING);
+  java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::BLOCKING);
 
   ObjectWaiter* node = new ObjectWaiter(vthread);
   node->_prev   = (ObjectWaiter*) 0xBAD;
@@ -1036,7 +1036,7 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntr
     // having that check happening before we added the node to _cxq and the release
     // of the monitor happening after the last TryLock attempt we need to do something
     // to avoid stranding. We set the _Responsible field which platform threads results
-    // in a timed-wait. For vthreads we will set the state to YIELDING instead of PARKING
+    // in a timed-wait. For vthreads we will set the state to YIELDING instead of BLOCKING
     // so that the vthread is just added again into the scheduler queue.
     Atomic::replace_if_null(&_Responsible, (JavaThread*)java_lang_Thread::thread_id(vthread));
     java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::YIELDING);
@@ -1153,7 +1153,7 @@ void ObjectMonitor::redo_enter(JavaThread* current) {
 
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
   bool should_yield = _Responsible == (JavaThread*)java_lang_Thread::thread_id(vthread);
-  java_lang_VirtualThread::set_state(vthread, should_yield ? java_lang_VirtualThread::YIELDING : java_lang_VirtualThread::PARKING);
+  java_lang_VirtualThread::set_state(vthread, should_yield ? java_lang_VirtualThread::YIELDING : java_lang_VirtualThread::BLOCKING);
 }
 
 void ObjectMonitor::VThreadEpilog(JavaThread* current) {

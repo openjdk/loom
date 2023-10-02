@@ -529,6 +529,7 @@ final class VirtualThread extends BaseVirtualThread {
         // blocking on monitorenter
         if (s == BLOCKING) {
             setState(BLOCKED);
+
             if (unblocked && compareAndSetState(BLOCKED, RUNNABLE)) {
                 unblocked = false;
                 submitRunContinuation();
@@ -1361,7 +1362,7 @@ final class VirtualThread extends BaseVirtualThread {
             while (currentWaitingVThread != null) {
                 nextWaitingVThread = currentWaitingVThread.next();
                 currentWaitingVThread.removeFromWaitingList();
-                currentWaitingVThread.unpark();
+                currentWaitingVThread.unblock();
                 currentWaitingVThread = nextWaitingVThread;
             }
         }
