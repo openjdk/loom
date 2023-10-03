@@ -24,13 +24,14 @@
 /**
  * @test
  * @summary Test virtual threads using synchronized
+ * @requires os.arch=="amd64" | os.arch=="x86_64"
  * @library /test/lib
  * @modules java.base/java.lang:+open
  *
  * @run junit/othervm/timeout=10 -Xint MonitorsTest
  * @run junit/othervm/timeout=50 -Xcomp MonitorsTest
  * @run junit/othervm/timeout=50 MonitorsTest
- * @run junit/othervm/timeout=50 -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest
+ * @run junit/othervm/timeout=50 -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest
  */
 
 import java.util.concurrent.atomic.AtomicInteger;
