@@ -1019,7 +1019,6 @@ frame FreezeBase::freeze_start_frame_yield_stub() {
 
 frame FreezeBase::freeze_start_frame_on_preempt() {
   assert(_last_frame.sp() == _thread->last_frame().sp(), "_last_frame should be already initialized");
-  assert((ContinuationHelper::Frame::is_stub(_last_frame.cb()) && _last_frame.oop_map() != nullptr) || Interpreter::contains(_last_frame.pc()), "must be");
   assert(Continuation::is_frame_in_continuation(_thread->last_continuation(), _last_frame), "");
   return _last_frame;
 }
@@ -1027,7 +1026,8 @@ frame FreezeBase::freeze_start_frame_on_preempt() {
 // The parameter callee_argsize includes metadata that has to be part of caller/callee overlap.
 NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int callee_argsize, bool callee_interpreted, bool top) {
   assert(f.unextended_sp() < _bottom_address, ""); // see recurse_freeze_java_frame
-  assert(f.is_interpreted_frame() || ((top && _preempt) == ContinuationHelper::Frame::is_stub(f.cb())), "");
+  assert(f.is_interpreted_frame() || ((top && _preempt) == ContinuationHelper::Frame::is_stub(f.cb()))
+         || ((top && _preempt) == f.is_native_frame()), "");
 
   if (stack_overflow()) {
     return freeze_exception;
@@ -1041,11 +1041,16 @@ NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int c
     return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
   } else if (f.is_interpreted_frame()) {
     assert(!f.interpreter_frame_method()->is_native() || (_preempt && top && _thread->is_on_monitorenter()), "");
+    if (_preempt && top && f.interpreter_frame_method()->is_native()) {
+      // TODO: Allow preemption for this case too
+      return freeze_pinned_native;
+    }
     return recurse_freeze_interpreted_frame(f, caller, callee_argsize, callee_interpreted);
   } else if (_preempt && top) {
     assert(ContinuationHelper::Frame::is_stub(f.cb()) || (f.is_native_frame() && _thread->is_on_monitorenter()), "invariant");
     if (f.is_native_frame()) {
-      return recurse_freeze_compiled_frame(f, caller, callee_argsize, callee_interpreted);
+      // TODO: Allow preemption for this case too
+      return freeze_pinned_native;
     } else {
       return recurse_freeze_stub_frame(f, caller);
     }

@@ -2414,7 +2414,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ mov(c_rarg2, r15_thread);
 
     // Not a leaf but we have last_Java_frame setup as we want
+    // Force freeze slow path on ObjectMonitor::enter() for now which will fail with freeze_pinned_native.
+    __ push_cont_fastpath();
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_locking_C), 3);
+    __ pop_cont_fastpath();
     restore_args(masm, total_c_args, c_arg, out_regs);
 
 #ifdef ASSERT
