@@ -357,8 +357,9 @@ bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
       return false;
     }
 
-    if (m->has_continuation_owner() && current->last_continuation() != nullptr) {
-      if (m->continuation_owner() == current->last_continuation()->cont_oop(current)) {
+    if (m->has_vthread_owner() && current->is_vthread_mounted()) {
+      if (m->vthread_owner() == current->vthread()) {
+        assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
         m->_recursions++;
         return true;
       }
@@ -529,8 +530,9 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
   // we have lost the race to async deflation and we simply try again.
   while (true) {
     ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_monitor_enter);
-    if (monitor->has_continuation_owner() && current->last_continuation() != nullptr) {
-      if (monitor->continuation_owner() == current->last_continuation()->cont_oop(current)) {
+    if (monitor->has_vthread_owner() && current->is_vthread_mounted()) {
+      if (monitor->vthread_owner() == current->vthread()) {
+        assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
         // Recursive case
         monitor->_recursions++;
         // Compensate for the already executed increment.
@@ -626,9 +628,11 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
     monitor->set_owner_from_anonymous(current);
   }
   if (monitor->slowpath_on_last_exit()) {
+    assert(monitor->has_vthread_owner() && monitor->vthread_owner() == current->vthread(), "invariant");
+    assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
     if (monitor->recursions() == 0) {
       // Last unlock, fix the monitor now
-      monitor->clear_continuation_owner(current);
+      monitor->clear_vthread_owner(current);
       monitor->set_slowpath_on_last_exit(false);
       // Compensate for the already executed decrement.
       current->inc_held_monitor_count();

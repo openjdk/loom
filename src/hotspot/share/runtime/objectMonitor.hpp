@@ -178,7 +178,7 @@ private:
   static void* vthread_owner_ptr() { return reinterpret_cast<void*>(VTHREAD_OWNER); }
 
   void* volatile _owner;            // pointer to owning thread OR BasicLock
-  OopHandle      _cont;             // continuation where lock was acquired (set on continuation freeze only)
+  OopHandle      _vthread;          // vthread owner when _owner == VTHREAD_OWNER (set on continuation freeze only)
   volatile uint64_t _previous_owner_tid;  // thread id of the previous owner of the monitor
   // Separate _owner and _next_om on different cache lines since
   // both can have busy multi-threaded access. _previous_owner_tid is only
@@ -312,16 +312,16 @@ private:
     set_owner_from(anon_owner_ptr(), owner);
   }
 
-  bool has_continuation_owner() { return owner_raw() == vthread_owner_ptr(); }
-  oop  continuation_owner()     { return _cont.resolve(); }
-  void set_continuation_owner(void* owner, oop continuation) {
-    _cont = OopHandle(JavaThread::thread_oop_storage(), continuation);
+  bool has_vthread_owner() const { return owner_raw() == vthread_owner_ptr(); }
+  oop  vthread_owner() const { return _vthread.resolve(); }
+  void set_vthread_owner(void* owner, oop vthread) {
+    _vthread = OopHandle(JavaThread::thread_oop_storage(), vthread);
     set_owner_from(owner, vthread_owner_ptr());
   }
-  void clear_continuation_owner(JavaThread* thread) {
+  void clear_vthread_owner(JavaThread* thread) {
     set_owner_from(vthread_owner_ptr(), thread);
-    _cont.release(JavaThread::thread_oop_storage());
-    _cont = OopHandle();
+    _vthread.release(JavaThread::thread_oop_storage());
+    _vthread = OopHandle();
   }
 
   bool slowpath_on_last_exit()             { return _slowpath_on_last_exit; }
@@ -395,7 +395,7 @@ private:
   void      EnterContended(JavaThread* current);
   void      EnterI(JavaThread* current);
   void      ReenterI(JavaThread* current, ObjectWaiter* current_node);
-  bool      HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce);
+  bool      HandlePreemptedVThread(JavaThread* current);
   void      VThreadEpilog(JavaThread* current);
   void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node, oop vthread = nullptr);
   ObjectWaiter* LookupWaiter(int64_t threadid);

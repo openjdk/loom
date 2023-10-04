@@ -396,14 +396,14 @@ bool ObjectMonitor::enter(JavaThread* current) {
 
 #if defined(X86)
   ContinuationEntry* ce = current->last_continuation();
-  if (ce != nullptr && current->is_on_monitorenter()) {
-    // Try to avoid pinning and preempt continuation. Compensate for already
+  if (ce != nullptr && ce->is_virtual_thread() && current->is_on_monitorenter()) {
+    // Try to avoid pinning and preempt vthread. Compensate for already
     // incremented counter before the call to avoid monitor overcount.
     current->dec_held_monitor_count();
     int result = Continuation::try_preempt(current, ce->cont_oop(current));
     current->inc_held_monitor_count();
     if (result == freeze_ok) {
-      HandlePreemptedVThread(current, ce);
+      HandlePreemptedVThread(current);
       add_to_contentions(-1);
       DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
       assert((owner() == current && current->is_preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
@@ -957,7 +957,7 @@ void ObjectMonitor::EnterI(JavaThread* current) {
   return;
 }
 
-bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current, ContinuationEntry* ce) {
+bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
   // Either because we acquire the lock below or because we will preempt the
   // vthread clear the _Stalled field from the current JavaThread.
   current->_Stalled = 0;

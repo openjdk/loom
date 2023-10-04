@@ -599,14 +599,15 @@ void FreezeBase::fix_monitors_in_interpreted_frame(frame& f) {
 
     void* owner = om->owner();
     assert((JavaThread*)owner == _thread || (LockingMode != LM_LIGHTWEIGHT && _thread->is_lock_owned((address)owner)) ||
-           (om->has_continuation_owner() && om->continuation_owner() ==  _cont.continuation()), "invariant");
-    if (om->has_continuation_owner()) {
+           (om->has_vthread_owner() && om->vthread_owner() == _thread->vthread()), "invariant");
+    if (om->has_vthread_owner()) {
       // Already fixed.
       continue;
     }
 
     // Set owner to be the continuation.
-    om->set_continuation_owner(owner, _cont.continuation());
+    assert(java_lang_VirtualThread::is_instance(_thread->vthread()), "wrong identity");
+    om->set_vthread_owner(owner, _thread->vthread());
     om->set_slowpath_on_last_exit(true);
     if (--_monitors_to_fix == 0) break;
   }
@@ -666,14 +667,15 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
 
       void* owner = om->owner();
       assert((JavaThread*)owner == _thread || (LockingMode != LM_LIGHTWEIGHT && _thread->is_lock_owned((address)owner)) ||
-             (om->has_continuation_owner() && om->continuation_owner() ==  _cont.continuation()), "invariant");
-      if (om->has_continuation_owner()) {
+             (om->has_vthread_owner() && om->vthread_owner() == _thread->vthread()), "invariant");
+      if (om->has_vthread_owner()) {
         // Already fixed.
         continue;
       }
 
       // Set owner to be the continuation.
-      om->set_continuation_owner(owner, _cont.continuation());
+      assert(java_lang_VirtualThread::is_instance(_thread->vthread()), "wrong identity");
+      om->set_vthread_owner(owner, _thread->vthread());
       om->set_slowpath_on_last_exit(true);
       if (--_monitors_to_fix == 0) break;
     }
@@ -1905,11 +1907,12 @@ static inline int freeze_internal(JavaThread* thread, intptr_t* const sp) {
   //assert(monitors_on_stack(thread) == ((thread->held_monitor_count() - thread->jni_monitor_count()) > 0),
   //      "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)thread->held_monitor_count(), (int64_t)thread->jni_monitor_count());
 
-  if (entry->is_pinned() || (thread->held_monitor_count() > 0 X86_ONLY(&& !entry->is_virtual_thread()))) {
+  if (entry->is_pinned() || (thread->held_monitor_count() > 0 X86_ONLY(&& (thread->jni_monitor_count() > 0 || !entry->is_virtual_thread())))) {
     log_develop_debug(continuations)("PINNED due to critical section/hold monitor");
     verify_continuation(cont.continuation());
-    log_develop_trace(continuations)("=== end of freeze (fail %d)", freeze_pinned_cs);
-    return freeze_pinned_cs;
+    freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
+    log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
+    return res;
   }
 
   Freeze<ConfigT> freeze(thread, cont, sp, preempt);

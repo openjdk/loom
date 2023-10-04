@@ -137,7 +137,7 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f,
 
     if (obj != nullptr && obj != monitorenter_oop) {
       markWord mark = obj->mark();
-      if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
+      if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
         // already fixed
         continue;
       }
@@ -215,7 +215,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
       if (owner != nullptr && owner != monitorenter_oop) {
         markWord mark = owner->mark();
         mark.has_monitor();
-        if (mark.has_monitor() && mark.monitor()->has_continuation_owner()) {
+        if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
           // already fixed
           continue;
         }
