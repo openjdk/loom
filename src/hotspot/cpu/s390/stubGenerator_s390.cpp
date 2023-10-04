@@ -3080,24 +3080,6 @@ class StubGenerator: public StubCodeGenerator {
     return nullptr;
   }
 
-  address generate_cont_preempt_stub() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
-  address generate_cont_preempt_rerun_interpreter_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
-  address generate_cont_preempt_rerun_safepointblob_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
   #if INCLUDE_JFR
   RuntimeStub* generate_jfr_write_checkpoint() {
     if (!Continuations::enabled()) return nullptr;
@@ -3173,9 +3155,6 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_thaw          = generate_cont_thaw();
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
-    StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
-    StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)
   }

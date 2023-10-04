@@ -3914,24 +3914,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_preempt_stub() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
-  address generate_cont_preempt_rerun_interpreter_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
-  address generate_cont_preempt_rerun_safepointblob_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    Unimplemented();
-    return nullptr;
-  }
-
   // Set of L registers that correspond to a contiguous memory area.
   // Each 64-bit register typically corresponds to 2 32-bit integers.
   template <uint L>
@@ -4790,9 +4772,6 @@ static const int64_t right_3_bits = right_n_bits(3);
     StubRoutines::_cont_thaw             = generate_cont_thaw();
     StubRoutines::_cont_returnBarrier    = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
-    StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
-    StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)
   }

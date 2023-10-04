@@ -234,6 +234,10 @@ static bool is_safe_to_preempt(JavaThread* target, oop continuation, bool is_vth
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
 
 int Continuation::try_preempt(JavaThread* target, Handle continuation) {
+  if (!VM_Version::supports_cont_preemption()) {
+    return unsupported;
+  }
+
   ContinuationEntry* ce = target->last_continuation();
   if (ce == nullptr) {
     return freeze_not_mounted;

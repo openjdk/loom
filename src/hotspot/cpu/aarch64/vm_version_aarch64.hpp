@@ -166,6 +166,7 @@ enum Ampere_CPU_Model {
   static int get_initial_sve_vector_length()  { return _initial_sve_vector_length; };
 
   static bool supports_fast_class_init_checks() { return true; }
+  static bool supports_cont_preemption() { return true; }
   constexpr static bool supports_stack_watermark_barrier() { return true; }
 
   static void get_compatible_board(char *buf, int buflen);
