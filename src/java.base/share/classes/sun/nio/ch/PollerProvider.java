@@ -32,9 +32,32 @@ abstract class PollerProvider {
     PollerProvider() { }
 
     /**
-     * Default Poller mode.
+     * The default poller mode.
+     *
+     * Mode 1: Virtual thread (the client) arms file descriptor and parks. ReadPoller and
+     * WritePoller threads unpark the virtual thread when file descriptor ready for I/O.
+     *
+     * Mode 2: Virtual thread (the client) arms file descriptor and parks. ReadPoller and
+     * WritePoller threads are virtual threads that poll and yield a few times before
+     * parking. If a file descriptor becomes ready for I/O then the client is unparked.
+     * A Master Poller unparks the ReadPoller and WritePoller threads when there are I/O
+     * events to read.
      */
-    int defaultPollingMode() {
+    int defaultPollerMode() {
+        return 1;
+    }
+
+    /**
+     * Default number of read pollers.
+     */
+    int defaultReadPollers() {
+        return 1;
+    }
+
+    /**
+     * Default number of write pollers.
+     */
+    int defaultWritePollers() {
         return 1;
     }
 

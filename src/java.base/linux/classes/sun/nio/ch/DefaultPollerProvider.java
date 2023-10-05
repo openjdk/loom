@@ -33,6 +33,22 @@ class DefaultPollerProvider extends PollerProvider {
     DefaultPollerProvider() { }
 
     @Override
+    int defaultPollerMode() {
+        return 2;
+    }
+
+    @Override
+    int defaultReadPollers() {
+        int nprocs = Runtime.getRuntime().availableProcessors();
+        return Math.clamp(nprocs/2, 1, 4);
+    }
+
+    @Override
+    int defaultWritePollers() {
+        return 1;
+    }
+
+    @Override
     Poller readPoller() throws IOException {
         return new EPollPoller(true);
     }

@@ -37,21 +37,16 @@ class KQueuePoller extends Poller {
     private final int filter;
     private final long address;
 
-    private final int fd0;
-    private final int fd1;
-    private final Object lock = new Object();
-    private boolean wakeupTriggered;
-
     KQueuePoller(boolean read) throws IOException {
         super(read);
         this.kqfd = KQueue.create();
         this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.address = KQueue.allocatePollArray(MAX_EVENTS_TO_POLL);
+    }
 
-        long fds = IOUtil.makePipe(false);
-        this.fd0 = (int) (fds >>> 32);
-        this.fd1 = (int) fds;
-        KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+    @Override
+    int fdVal() {
+        return kqfd;
     }
 
     @Override
@@ -67,35 +62,15 @@ class KQueuePoller extends Poller {
     }
 
     @Override
-    void wakeup() {
-        synchronized (lock) {
-            if (!wakeupTriggered) {
-                try {
-                    IOUtil.write1(fd1, (byte)0);
-                } catch (IOException ioe) {
-                    throw new InternalError(ioe);
-                }
-                wakeupTriggered = true;
-            }
-        }
-    }
-
-    @Override
-    void poll(int timeout) throws IOException {
+    int poll(int timeout) throws IOException {
         int n = KQueue.poll(kqfd, address, MAX_EVENTS_TO_POLL, timeout);
         int i = 0;
         while (i < n) {
             long keventAddress = KQueue.getEvent(address, i);
             int fdVal = KQueue.getDescriptor(keventAddress);
-            if (fdVal == fd0) {
-                synchronized (lock) {
-                    IOUtil.drain(fd0);
-                    wakeupTriggered = false;
-                }
-            } else {
-                polled(fdVal);
-            }
+            polled(fdVal);
             i++;
         }
+        return n;
     }
 }

@@ -78,7 +78,7 @@ class PollsetPoller extends Poller {
       * To address this difficulty, we break poll calls into 100ms sub-calls and emulate the timout.
       */
     @Override
-    void poll(int timeout) throws IOException {
+    int poll(int timeout) throws IOException {
         int n;
         switch (timeout) {
             case 0:
@@ -92,6 +92,7 @@ class PollsetPoller extends Poller {
                 do { n = pollInner(100); } while (n == 0 && Instant.now().isBefore(end));
                 break;
         }
+        return n;
     }
 
     int pollInner(int subInterval) throws IOException {

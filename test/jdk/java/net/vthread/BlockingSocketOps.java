@@ -37,15 +37,9 @@
 
 /**
  * @test id=jdk-poller-mode-2
- * @library /test/lib
- * @run junit/othervm -Djdk.pollerMode=2 BlockingSocketOps
- */
-
-/**
- * @test id=jdk-poller-mode-3
  * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
- * @run junit/othervm -Djdk.pollerMode=3 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 BlockingSocketOps
  */
 
 /**
