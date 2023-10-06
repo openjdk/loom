@@ -306,7 +306,7 @@ inline MemRegion stackChunkOopDesc::range() {
 }
 
 inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int usp_offset_in_bytes) const {
-  assert(fr.is_compiled_frame() || fr.cb()->is_safepoint_stub(), "");
+  assert(fr.is_compiled_frame() || fr.cb()->is_runtime_stub() || fr.cb()->is_safepoint_stub(), "");
   assert(is_in_chunk(fr.unextended_sp()), "");
 
   intptr_t* base = fr.real_fp(); // equal to the caller's sp
