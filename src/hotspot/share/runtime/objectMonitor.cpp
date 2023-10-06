@@ -394,30 +394,6 @@ bool ObjectMonitor::enter(JavaThread* current) {
     return false;
   }
 
-#if defined(X86)
-  ContinuationEntry* ce = current->last_continuation();
-  if (ce != nullptr && ce->is_virtual_thread() && current->is_on_monitorenter()) {
-    // Try to avoid pinning and preempt vthread. Compensate for already
-    // incremented counter before the call to avoid monitor overcount.
-    current->dec_held_monitor_count();
-    int result = Continuation::try_preempt(current, ce->cont_oop(current));
-    current->inc_held_monitor_count();
-    if (result == freeze_ok) {
-      HandlePreemptedVThread(current);
-      add_to_contentions(-1);
-      DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
-      assert((owner() == current && current->is_preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
-             (owner() != current && !current->is_preemption_cancelled() && (state == java_lang_VirtualThread::BLOCKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
-      return true;
-    }
-  }
-#endif
-
-  EnterContended(current);
-  return true;
-}
-
-void ObjectMonitor::EnterContended(JavaThread* current) {
   JFR_ONLY(JfrConditionalFlush<EventJavaMonitorEnter> flush(current);)
   EventJavaMonitorEnter event;
   if (event.is_started()) {
@@ -444,6 +420,24 @@ void ObjectMonitor::EnterContended(JavaThread* current) {
       // handler cannot accidentally consume an unpark() meant for the
       // ParkEvent associated with this ObjectMonitor.
     }
+
+#if defined(X86)
+    ContinuationEntry* ce = current->last_continuation();
+    if (ce != nullptr && ce->is_virtual_thread() && current->is_on_monitorenter()) {
+      // Try to avoid pinning and preempt vthread. Compensate for already
+      // incremented counter before the call to avoid monitor overcount.
+      current->dec_held_monitor_count();
+      int result = Continuation::try_preempt(current, ce->cont_oop(current));
+      current->inc_held_monitor_count();
+      if (result == freeze_ok) {
+        bool acquired = HandlePreemptedVThread(current);
+        DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
+        assert((acquired && current->preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
+               (!acquired && !current->preemption_cancelled() && (state == java_lang_VirtualThread::BLOCKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
+        return true;
+      }
+    }
+#endif
 
     OSThreadContendState osts(current->osthread());
 
@@ -511,6 +505,7 @@ void ObjectMonitor::EnterContended(JavaThread* current) {
     event.commit();
   }
   OM_PERFDATA_OP(ContendedLockAttempts, inc());
+  return true;
 }
 
 // Caveat: TryLock() is not necessarily serializing if it returns failure.
@@ -959,34 +954,31 @@ void ObjectMonitor::EnterI(JavaThread* current) {
 
 bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
   // Either because we acquire the lock below or because we will preempt the
-  // vthread clear the _Stalled field from the current JavaThread.
+  // vthread clear the _Stalled/_current_pending_monitor field from the current JavaThread.
   current->_Stalled = 0;
+  current->set_current_pending_monitor(nullptr);
 
   // Try once more after freezing the continuation.
   if (TryLock (current) > 0) {
     assert(owner_raw() == current, "invariant");
     assert(_succ != current, "invariant");
     assert(_Responsible != current, "invariant");
-    current->cancel_preemption();
+    current->set_preemption_cancelled(true);
+    add_to_contentions(-1);
     return true;
   }
 
   if (try_set_owner_from(DEFLATER_MARKER, current) == DEFLATER_MARKER) {
     // Cancelled the in-progress async deflation by changing owner from
     // DEFLATER_MARKER to current. As part of the contended enter protocol,
-    // contentions was incremented to a positive value before EnterI()
-    // was called and that prevents the deflater thread from winning the
-    // last part of the 2-part async deflation protocol. After EnterI()
-    // returns to enter(), contentions is decremented because the caller
-    // now owns the monitor. We bump contentions an extra time here to
+    // contentions was incremented to a positive value before this call to
+    // HandlePreemptedVThread(). We avoid decrementing contentions to
     // prevent the deflater thread from winning the last part of the
-    // 2-part async deflation protocol after the regular decrement
-    // occurs in enter(). The deflater thread will decrement contentions
-    // after it recognizes that the async deflation was cancelled.
-    add_to_contentions(1);
+    // 2-part async deflation protocol. The deflater thread will decrement
+    // contentions after it recognizes that the async deflation was cancelled.
     assert(_succ != current, "invariant");
     assert(_Responsible != current, "invariant");
-    current->cancel_preemption();
+    current->set_preemption_cancelled(true);
     return true;
   }
 
@@ -1010,8 +1002,9 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
       assert(owner_raw() == current, "invariant");
       assert(_succ != current, "invariant");
       assert(_Responsible != current, "invariant");
-      current->cancel_preemption();
+      current->set_preemption_cancelled(true);
       java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::RUNNING);
+      add_to_contentions(-1);
       delete node;
       return true;
     }
@@ -1022,11 +1015,12 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
   if (TryLock(current) > 0) {
     assert(owner_raw() == current, "invariant");
     assert(_Responsible != current, "invariant");
-    current->cancel_preemption();
+    current->set_preemption_cancelled(true);
     java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::RUNNING);
     UnlinkAfterAcquire(current, node, vthread);
     delete node;
     if (_succ == (JavaThread*)java_lang_Thread::thread_id(vthread)) _succ = nullptr;
+    add_to_contentions(-1);
     return true;
   }
 
@@ -1128,6 +1122,7 @@ void ObjectMonitor::ReenterI(JavaThread* current, ObjectWaiter* currentNode) {
 
 void ObjectMonitor::redo_enter(JavaThread* current) {
   assert(java_lang_VirtualThread::state(current->vthread()) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
+  assert(current->is_in_VTMS_transition(), "must be");
 
   if (TryLock (current) > 0) {
     VThreadEpilog(current);
@@ -1158,7 +1153,9 @@ void ObjectMonitor::redo_enter(JavaThread* current) {
 
 void ObjectMonitor::VThreadEpilog(JavaThread* current) {
   assert(owner_raw() == current, "invariant");
+  add_to_contentions(-1);
   current->inc_held_monitor_count();
+
   oop vthread = current->vthread();
   int64_t threadid = java_lang_Thread::thread_id(vthread);
   if (_succ == (JavaThread*)threadid) _succ = nullptr;

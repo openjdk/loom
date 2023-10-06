@@ -30,10 +30,16 @@
 #include "logging/log.hpp"
 #include "oops/access.inline.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/javaThread.inline.hpp"
 #include "runtime/lockStack.inline.hpp"
 #include "runtime/synchronizer.hpp"
 
 inline bool ObjectMonitor::is_entered(JavaThread* current) const {
+  if (has_vthread_owner() && current->is_vthread_mounted()) {
+    if (vthread_owner() == current->vthread()) {
+      return true;
+    }
+  }
   if (LockingMode == LM_LIGHTWEIGHT) {
     if (is_owner_anonymous()) {
       return current->lock_stack().contains(object());

@@ -3731,18 +3731,17 @@ address StubGenerator::generate_cont_preempt_stub() {
   // Set rsp to enterSpecial frame
   __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
 
-  Label cancel_preemption;
-  __ movbool(rscratch1, Address(r15_thread, JavaThread::cancel_preemption_offset()));
+  Label preemption_cancelled;
+  __ movbool(rscratch1, Address(r15_thread, JavaThread::preemption_cancelled_offset()));
   __ testbool(rscratch1);
-  __ jcc(Assembler::notZero, cancel_preemption);
+  __ jcc(Assembler::notZero, preemption_cancelled);
 
   // Remove enterSpecial frame from the stack and return to Continuation.run()
   SharedRuntime::continuation_enter_cleanup(_masm);
   __ pop(rbp);
   __ ret(0);
 
-  __ bind(cancel_preemption);
-  __ movbool(Address(r15_thread, JavaThread::cancel_preemption_offset()), false);
+  __ bind(preemption_cancelled);
   __ lea(rbp, Address(rsp, checked_cast<int32_t>(ContinuationEntry::size())));
   __ movptr(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
   __ jmp(rscratch1);

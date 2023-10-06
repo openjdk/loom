@@ -392,7 +392,6 @@ private:
   void      INotify(JavaThread* current);
   ObjectWaiter* DequeueWaiter();
   void      DequeueSpecificWaiter(ObjectWaiter* waiter);
-  void      EnterContended(JavaThread* current);
   void      EnterI(JavaThread* current);
   void      ReenterI(JavaThread* current, ObjectWaiter* current_node);
   bool      HandlePreemptedVThread(JavaThread* current);

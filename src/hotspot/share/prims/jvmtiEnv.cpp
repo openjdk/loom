@@ -1369,13 +1369,17 @@ JvmtiEnv::GetOwnedMonitorInfo(jthread thread, jint* owned_monitor_count_ptr, job
   }
 
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    // There is no monitor info to collect if target virtual thread is unmounted.
     if (java_thread != nullptr) {
       VirtualThreadGetOwnedMonitorInfoClosure op(this,
                                                  Handle(calling_thread, thread_oop),
                                                  owned_monitors_list);
       Handshake::execute(&op, java_thread);
       err = op.result();
+    } else {
+      VirtualThreadGetOwnedMonitorInfoClosure op(this,
+                                                 Handle(calling_thread, thread_oop),
+                                                 owned_monitors_list);
+      op.do_thread(nullptr);
     }
   } else {
     EscapeBarrier eb(true, calling_thread, java_thread);
@@ -1449,6 +1453,11 @@ JvmtiEnv::GetOwnedMonitorStackDepthInfo(jthread thread, jint* monitor_info_count
                                                  owned_monitors_list);
       Handshake::execute(&op, java_thread);
       err = op.result();
+    } else {
+      VirtualThreadGetOwnedMonitorInfoClosure op(this,
+                                                 Handle(calling_thread, thread_oop),
+                                                 owned_monitors_list);
+      op.do_thread(nullptr);
     }
   } else {
     EscapeBarrier eb(true, calling_thread, java_thread);
@@ -1505,22 +1514,29 @@ JvmtiEnv::GetCurrentContendedMonitor(jthread thread, jobject* monitor_ptr) {
 
   JavaThread* java_thread = nullptr;
   oop thread_oop = nullptr;
+  *monitor_ptr = nullptr;
   jvmtiError err = get_threadOop_and_JavaThread(tlh.list(), thread, &java_thread, &thread_oop);
   if (err != JVMTI_ERROR_NONE) {
     return err;
   }
 
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
-    // There is no monitor info to collect if target virtual thread is unmounted.
+    if (!JvmtiEnvBase::is_vthread_alive(thread_oop)) {
+      return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
     if (java_thread != nullptr) {
       GetCurrentContendedMonitorClosure op(calling_thread, this, monitor_ptr, /* is_virtual */ true);
       Handshake::execute(&op, java_thread);
       err = op.result();
     } else {
-      *monitor_ptr = nullptr;
-      if (!JvmtiEnvBase::is_vthread_alive(thread_oop)) {
-        err = JVMTI_ERROR_THREAD_NOT_ALIVE;
+      oop cont = java_lang_VirtualThread::continuation(thread_oop);
+      assert(cont != nullptr, "vthread with no continuation");
+      stackChunkOop chunk = jdk_internal_vm_Continuation::tail(cont);
+      assert(chunk != nullptr, "unmounted vthread should have a chunk");
+      if (chunk->objectMonitor() != nullptr) {
+        *monitor_ptr = JNIHandles::make_local(calling_thread, chunk->objectMonitor()->object());
       }
+      err = JVMTI_ERROR_NONE;
     }
     return err;
   }

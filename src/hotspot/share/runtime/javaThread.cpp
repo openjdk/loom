@@ -480,7 +480,7 @@ JavaThread::JavaThread() :
   _held_monitor_count(0),
   _jni_monitor_count(0),
   _preempting(false),
-  _cancel_preemption(false),
+  _preemption_cancelled(false),
   _jvmti_unmount_event_pending(false),
 
   _handshake(this),

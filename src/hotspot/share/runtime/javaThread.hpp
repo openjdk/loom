@@ -463,7 +463,7 @@ class JavaThread: public Thread {
   intx _held_monitor_count;  // used by continuations for fast lock detection
   intx _jni_monitor_count;
   bool _preempting;
-  bool _cancel_preemption;
+  bool _preemption_cancelled;
   bool _jvmti_unmount_event_pending;
 
 private:
@@ -621,12 +621,11 @@ private:
   bool preempting()           { return _preempting; }
   void set_preempting(bool b) { _preempting = b; }
 
-  bool is_preemption_cancelled() { return _cancel_preemption; }
+  bool preemption_cancelled() { return _preemption_cancelled; }
+  void set_preemption_cancelled(bool val) { _preemption_cancelled = val; }
 
   bool jvmti_unmount_event_pending() { return _jvmti_unmount_event_pending; }
   void set_jvmti_unmount_event_pending(bool val) { _jvmti_unmount_event_pending = val; }
-
-  inline void cancel_preemption();
 
  private:
   DEBUG_ONLY(void verify_frame_info();)
@@ -850,7 +849,7 @@ private:
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
   static ByteSize preempting_offset()         { return byte_offset_of(JavaThread, _preempting); }
-  static ByteSize cancel_preemption_offset()  { return byte_offset_of(JavaThread, _cancel_preemption); }
+  static ByteSize preemption_cancelled_offset()  { return byte_offset_of(JavaThread, _preemption_cancelled); }
 
 #if INCLUDE_JVMTI
   static ByteSize is_in_VTMS_transition_offset()     { return byte_offset_of(JavaThread, _is_in_VTMS_transition); }

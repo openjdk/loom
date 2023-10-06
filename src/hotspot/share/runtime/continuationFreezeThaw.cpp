@@ -1775,7 +1775,7 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
   invalidate_jvmti_stack(thread);
 }
 
-static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, frame top, bool has_oop_on_stub) {
+static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, frame top, bool has_oop_on_stub, ObjectMonitor* mon, bool post_mount_event) {
   assert(current->vthread() != nullptr, "must be");
 
   HandleMarkCleaner hm(current);
@@ -1809,13 +1809,18 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
     assert(!current->is_in_tmp_VTMS_transition(), "sanity check");
     JvmtiVTMSTransitionDisabler::finish_VTMS_transition(current, current, vth(), /* is_mount */ true);
 
-    if (JvmtiExport::should_post_vthread_mount() && !current->jvmti_unmount_event_pending()) {
+    if (post_mount_event && JvmtiExport::should_post_vthread_mount()) {
       JvmtiExport::post_vthread_mount((jthread)vth.raw_value());
-    } else if (current->jvmti_unmount_event_pending()) {
-      // We freezed on monitorenter but on the retry after freezing we succeded. Since preemption
-      // was cancelled and the unmount event was never posted we don't post the mount either.
-      // Just clear the flag.
+    }
+
+    if (!post_mount_event) {
+      // Cancelled preemption case. Clear the unmount event pending flag.
+      assert(current->jvmti_unmount_event_pending(), "should be set");
       current->set_jvmti_unmount_event_pending(false);
+    }
+
+    if (mon != nullptr) {
+      JvmtiExport::post_monitor_contended_entered(current, mon);
     }
   JRT_BLOCK_END
 
@@ -2390,14 +2395,10 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   bool preempted_case = chunk->is_preempted();
   if (preempted_case) {
     assert(_cont.is_preempted(), "must be");
-    if (chunk->preempted_on_monitorenter()) {
-      if (kind == Continuation::thaw_top) {
-        // First time we thaw after being preempted on monitorenter
-        return push_preempt_monitorenter_redo(chunk);
-      }
-      assert(kind == Continuation::thaw_return_barrier, "must be");
-      assert(chunk->objectMonitor()->owner() == _thread, "should be the owner by now");
-      chunk->set_objectMonitor(nullptr);
+
+    ObjectMonitor* mon = chunk->objectMonitor();
+    if (mon != nullptr && mon->owner() != _thread) {
+      return push_preempt_monitorenter_redo(chunk);
     }
     chunk->set_is_preempted(false);
     retry_fast_path = true;
@@ -2664,19 +2665,32 @@ intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, 
   }
 
   _cont.set_preempted(false);
+  bool same_chunk = original_chunk == _cont.tail();
 
   bool has_oop_on_stub = top_is_interpreted ? false : original_chunk->has_oop_on_stub();
   assert(!has_oop_on_stub || oopDesc::is_oop_or_null(*frame::saved_oop_result_address(top)), "must be oop");
   // finish_thaw() could have changed _tail in which case we don't bother changing flags
-  if (has_oop_on_stub && original_chunk == _cont.tail()) {
+  if (same_chunk && has_oop_on_stub) {
     original_chunk->set_has_oop_on_stub(false);
+  }
+
+  ObjectMonitor* mon = original_chunk->objectMonitor();
+  if (same_chunk && mon != nullptr) {
+    original_chunk->set_objectMonitor(nullptr);
+  }
+
+  bool post_mount_event = true;
+  if (_thread->preemption_cancelled()) {
+    // Since we never actually unmounted don't post the mount event.
+    post_mount_event = false;
+    _thread->set_preemption_cancelled(false);
   }
 
 #if INCLUDE_JVMTI
   bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
   if (is_vthread) {
     if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
-      jvmti_mount_end(_thread, _cont, top, has_oop_on_stub);
+      jvmti_mount_end(_thread, _cont, top, has_oop_on_stub, mon, post_mount_event);
     } else {
       _thread->set_is_in_VTMS_transition(false);
       java_lang_Thread::set_is_in_VTMS_transition(_thread->vthread(), false);

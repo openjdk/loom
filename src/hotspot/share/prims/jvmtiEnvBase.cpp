@@ -998,27 +998,33 @@ JvmtiEnvBase::get_owned_monitors(JavaThread *calling_thread, JavaThread* java_th
 }
 
 jvmtiError
-JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_thread, javaVFrame* jvf,
-                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list) {
+JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* carrier, javaVFrame* jvf,
+                                 GrowableArray<jvmtiMonitorStackDepthInfo*> *owned_monitors_list, oop vthread) {
   jvmtiError err = JVMTI_ERROR_NONE;
   Thread *current_thread = Thread::current();
-  assert(java_thread->is_handshake_safe_for(current_thread),
+  assert(carrier == nullptr || carrier->is_handshake_safe_for(current_thread),
          "call by myself or at handshake");
 
   int depth = 0;
   for ( ; jvf != nullptr; jvf = jvf->java_sender()) {
     if (MaxJavaStackTraceDepth == 0 || depth++ < MaxJavaStackTraceDepth) {  // check for stack too deep
       // Add locked objects for this frame into list.
-      err = get_locked_objects_in_frame(calling_thread, java_thread, jvf, owned_monitors_list, depth - 1);
+      err = get_locked_objects_in_frame(calling_thread, carrier, jvf, owned_monitors_list, depth - 1, vthread);
       if (err != JVMTI_ERROR_NONE) {
         return err;
       }
     }
   }
 
+  if (carrier == nullptr) {
+    // vthread gets pinned if monitors are acquired via jni MonitorEnter
+    // so nothing else to do for unmounted case.
+    return err;
+  }
+
   // Get off stack monitors. (e.g. acquired via jni MonitorEnter).
   JvmtiMonitorClosure jmc(calling_thread, owned_monitors_list, this);
-  ObjectSynchronizer::owned_monitors_iterate(&jmc, java_thread);
+  ObjectSynchronizer::owned_monitors_iterate(&jmc, carrier);
   err = jmc.error();
 
   return err;
@@ -1026,8 +1032,9 @@ JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* java_th
 
 // Save JNI local handles for any objects that this frame owns.
 jvmtiError
-JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread* java_thread,
-                                 javaVFrame *jvf, GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitors_list, jint stack_depth) {
+JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread* target,
+                                 javaVFrame *jvf, GrowableArray<jvmtiMonitorStackDepthInfo*>* owned_monitors_list,
+                                 jint stack_depth, oop vthread) {
   jvmtiError err = JVMTI_ERROR_NONE;
   Thread* current_thread = Thread::current();
   ResourceMark rm(current_thread);
@@ -1044,9 +1051,9 @@ JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread
     // at a safepoint or the calling thread is operating on itself so
     // it cannot leave the underlying wait() call.
     // Save object of current wait() call (if any) for later comparison.
-    ObjectMonitor *mon = java_thread->current_waiting_monitor();
-    if (mon != nullptr) {
-      wait_obj = mon->object();
+    if (target != nullptr) {
+      ObjectMonitor *mon = target->current_waiting_monitor();
+      if (mon != nullptr) wait_obj = mon->object();
     }
   }
   oop pending_obj = nullptr;
@@ -1055,9 +1062,17 @@ JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread
     // at a safepoint or the calling thread is operating on itself so
     // it cannot leave the underlying enter() call.
     // Save object of current enter() call (if any) for later comparison.
-    ObjectMonitor *mon = java_thread->current_pending_monitor();
-    if (mon != nullptr) {
-      pending_obj = mon->object();
+    if (target != nullptr) {
+      ObjectMonitor *mon = target->current_pending_monitor();
+      if (mon != nullptr) pending_obj = mon->object();
+    } else {
+      assert(vthread != nullptr, "no vthread oop");
+      oop oopCont = java_lang_VirtualThread::continuation(vthread);
+      assert(oopCont != nullptr, "vthread with no continuation");
+      stackChunkOop chunk = jdk_internal_vm_Continuation::tail(oopCont);
+      assert(chunk != nullptr, "unmounted vthread should have a chunk");
+      ObjectMonitor *mon = chunk->objectMonitor();
+      if (mon != nullptr) pending_obj = mon->object();
     }
   }
 
@@ -2566,18 +2581,19 @@ VirtualThreadGetOwnedMonitorInfoClosure::do_thread(Thread *target) {
     _result = JVMTI_ERROR_THREAD_NOT_ALIVE;
     return;
   }
-  JavaThread* java_thread = JavaThread::cast(target);
-  Thread* cur_thread = Thread::current();
+  JavaThread* carrier = target != nullptr ? JavaThread::cast(target) : nullptr;
+  JavaThread* cur_thread = JavaThread::current();
   ResourceMark rm(cur_thread);
   HandleMark hm(cur_thread);
 
   javaVFrame *jvf = JvmtiEnvBase::get_vthread_jvf(_vthread_h());
 
-  if (!java_thread->is_exiting() && java_thread->threadObj() != nullptr) {
-    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(java_thread,
-                                                         java_thread,
+  if (carrier == nullptr || (!carrier->is_exiting() && carrier->threadObj() != nullptr)) {
+    _result = ((JvmtiEnvBase *)_env)->get_owned_monitors(cur_thread,
+                                                         carrier,
                                                          jvf,
-                                                         _owned_monitors_list);
+                                                         _owned_monitors_list,
+                                                         _vthread_h());
   }
 }
 

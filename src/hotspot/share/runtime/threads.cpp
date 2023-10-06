@@ -1248,6 +1248,16 @@ JavaThread* Threads::owning_thread_from_object(ThreadsList * t_list, oop obj) {
 }
 
 JavaThread* Threads::owning_thread_from_monitor(ThreadsList* t_list, ObjectMonitor* monitor) {
+  if (monitor->has_vthread_owner()) {
+    // TODO: fix this case to return the real owner. The vthread might be unmounted
+    // so we would only be able to return the vthread oop.
+    oop vthread_owner = monitor->vthread_owner();
+    if (vthread_owner != nullptr) {
+      oop carrier_thread = java_lang_VirtualThread::carrier_thread(vthread_owner);
+      return carrier_thread == nullptr ? nullptr : java_lang_Thread::thread(carrier_thread);
+    }
+    return nullptr;
+  }
   if (LockingMode == LM_LIGHTWEIGHT) {
     if (monitor->is_owner_anonymous()) {
       return owning_thread_from_object(t_list, monitor->object());
