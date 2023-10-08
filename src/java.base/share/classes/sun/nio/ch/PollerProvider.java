@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,36 +28,33 @@ import java.io.IOException;
 import java.util.ServiceConfigurationError;
 import sun.security.action.GetPropertyAction;
 
+/**
+ * Provider class for Poller implementations.
+ */
 abstract class PollerProvider {
     PollerProvider() { }
 
     /**
-     * The default poller mode.
-     *
-     * Mode 1: Virtual thread (the client) arms file descriptor and parks. ReadPoller and
-     * WritePoller threads unpark the virtual thread when file descriptor ready for I/O.
-     *
-     * Mode 2: Virtual thread (the client) arms file descriptor and parks. ReadPoller and
-     * WritePoller threads are virtual threads that poll and yield a few times before
-     * parking. If a file descriptor becomes ready for I/O then the client is unparked.
-     * A Master Poller unparks the ReadPoller and WritePoller threads when there are I/O
-     * events to read.
+     * Returns the default poller mode.
+     * @implSpec The default implementation uses system threads.
      */
-    int defaultPollerMode() {
+    Poller.Mode defaultPollerMode() {
+        return Poller.Mode.SYSTEM_THREADS;
+    }
+
+    /**
+     * Default number of read pollers for the given mode.
+     * @implSpec The default implementation returns 1.
+     */
+    int defaultReadPollers(Poller.Mode mode) {
         return 1;
     }
 
     /**
-     * Default number of read pollers.
+     * Default number of write pollers for the given mode.
+     * @implSpec The default implementation returns 1.
      */
-    int defaultReadPollers() {
-        return 1;
-    }
-
-    /**
-     * Default number of write pollers.
-     */
-    int defaultWritePollers() {
+    int defaultWritePollers(Poller.Mode mode) {
         return 1;
     }
 
