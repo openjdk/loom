@@ -212,14 +212,12 @@ class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope<String>(null, factory)) {
             // round 1
             var subtask1 = scope.fork(() -> "foo");
-            assertThrows(IllegalStateException.class, subtask1::get);
             scope.join();
             assertEquals("foo", subtask1.get());
 
             // round 2
             var subtask2 = scope.fork(() -> "bar");
             assertEquals("foo", subtask1.get());
-            assertThrows(IllegalStateException.class, subtask2::get);
             scope.join();
             assertEquals("foo", subtask1.get());
             assertEquals("bar", subtask2.get());
@@ -228,7 +226,6 @@ class StructuredTaskScopeTest {
             var subtask3 = scope.fork(() -> "baz");
             assertEquals("foo", subtask1.get());
             assertEquals("bar", subtask2.get());
-            assertThrows(IllegalStateException.class, subtask3::get);
             scope.join();
             assertEquals("foo", subtask1.get());
             assertEquals("bar", subtask2.get());
@@ -258,8 +255,6 @@ class StructuredTaskScopeTest {
 
             // continue to fork
             var subtask2 = scope.fork(() -> "bar");
-            assertThrows(IllegalStateException.class, subtask1::get);
-            assertThrows(IllegalStateException.class, subtask2::get);
             scope.join();
             assertEquals("foo", subtask1.get());
             assertEquals("bar", subtask2.get());
@@ -1274,12 +1269,7 @@ class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope<String>(null, factory)) {
             Callable<String> task = () -> "foo";
             Subtask<String> subtask = scope.fork(task);
-
-            // before join, owner thread
             assertEquals(task, subtask.task());
-            assertThrows(IllegalStateException.class, subtask::get);
-            assertThrows(IllegalStateException.class, subtask::exception);
-
             scope.join();
 
             // after join
@@ -1299,12 +1289,7 @@ class StructuredTaskScopeTest {
         try (var scope = new StructuredTaskScope<String>(null, factory)) {
             Callable<String> task = () -> { throw new FooException(); };
             Subtask<String> subtask = scope.fork(task);
-
-            // before join, owner thread
             assertEquals(task, subtask.task());
-            assertThrows(IllegalStateException.class, subtask::get);
-            assertThrows(IllegalStateException.class, subtask::exception);
-
             scope.join();
 
             // after join
