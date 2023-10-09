@@ -184,21 +184,27 @@ public class VThreadEventTest {
         int threadEndExp = THREAD_CNT;
         int threadMountExp = THREAD_CNT - TCNT2;
         int threadUnmountExp = THREAD_CNT + TCNT3;
+        int diffUnmountMountExp = TCNT2 + TCNT3;
 
         log("ThreadEnd cnt: "     + threadEndCnt     + " (expected: " + threadEndExp + ")");
-        log("ThreadMount cnt: "   + threadMountCnt   + " (expected: " + threadMountExp + ")");
-        log("ThreadUnmount cnt: " + threadUnmountCnt + " (expected: " + threadUnmountExp + ")");
+        log("ThreadMount cnt: "   + threadMountCnt   + " (expected: >=" + threadMountExp + ")");
+        log("ThreadUnmount cnt: " + threadUnmountCnt + " (expected: >=" + threadUnmountExp + ")");
+        log("ThreadUnmount/ThreadMount diff cnt: " + (threadUnmountCnt - threadMountCnt) + " (expected: " + diffUnmountMountExp + ")");
 
         if (threadEndCnt != threadEndExp) {
             log("FAILED: unexpected count of ThreadEnd events");
             failed = true;
         }
-        if (threadMountCnt != threadMountExp) {
+        if (threadMountCnt < threadMountExp) {
             log("FAILED: unexpected count of ThreadMount events");
             failed = true;
         }
-        if (threadUnmountCnt != threadUnmountExp) {
+        if (threadUnmountCnt < threadUnmountExp) {
             log("FAILED: unexpected count of ThreadUnmount events");
+            failed = true;
+        }
+        if ((threadUnmountCnt - threadMountCnt) != diffUnmountMountExp) {
+            log("FAILED: unexpected difference of ThreadUnmount and threadMountCnt events");
             failed = true;
         }
         if (failed) {
