@@ -1034,6 +1034,7 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
     // so that the vthread is just added again into the scheduler queue.
     Atomic::replace_if_null(&_Responsible, (JavaThread*)java_lang_Thread::thread_id(vthread));
     java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::YIELDING);
+    java_lang_VirtualThread::set_isMonitorResponsible(vthread, true);
   }
 
   // We are going to preempt so decrement the already increment monitor count.
@@ -1157,6 +1158,9 @@ void ObjectMonitor::VThreadEpilog(JavaThread* current) {
   current->inc_held_monitor_count();
 
   oop vthread = current->vthread();
+  if (java_lang_VirtualThread::isMonitorResponsible(vthread)) {
+    java_lang_VirtualThread::set_isMonitorResponsible(vthread, false);
+  }
   int64_t threadid = java_lang_Thread::thread_id(vthread);
   if (_succ == (JavaThread*)threadid) _succ = nullptr;
   if (_Responsible == (JavaThread*)threadid) {

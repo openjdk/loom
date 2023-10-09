@@ -158,6 +158,7 @@ final class VirtualThread extends BaseVirtualThread {
     // Next waiting vthread to unpark()
     private VirtualThread next;
     private byte onWaitingList;
+    private boolean isMonitorResponsible;
 
     private int preemptionDisabled;
 
@@ -984,6 +985,9 @@ final class VirtualThread extends BaseVirtualThread {
 
     @Override
     Thread.State threadState() {
+        if (isMonitorResponsible) {
+            return Thread.State.BLOCKED;
+        }
         int s = state();
         switch (s & ~SUSPENDED) {
             case NEW:

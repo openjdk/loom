@@ -520,6 +520,7 @@ class java_lang_VirtualThread : AllStatic {
   static int _state_offset;
   static int _next_offset;
   static int _onWaitingList_offset;
+  static int _isMonitorResponsible_offset;
   static int _preemptionDisabled_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
  public:
@@ -560,6 +561,8 @@ class java_lang_VirtualThread : AllStatic {
   static oop next(oop vthread);
   static void set_next(oop vthread, oop next_vthread);
   static bool set_onWaitingList(oop vthread, OopHandle& list_head);
+  static bool isMonitorResponsible(oop vthread);
+  static void set_isMonitorResponsible(oop vthread, bool value);
   static bool is_preempted(oop vthread);
   static bool is_preemption_disabled(oop vthread);
   static void inc_preemption_disabled(oop vthread);
