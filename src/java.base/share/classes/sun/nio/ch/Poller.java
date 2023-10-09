@@ -212,18 +212,29 @@ public abstract class Poller {
     /**
      * Sub-poller polling loop. The {@link #polled(int)} method is invoked for each file
      * descriptor that is polled.
+     *
+     * The sub-poller registers its file descriptor with the master poller to park until
+     * there are events to poll. When unparked, it does a few non-blocking polls and parks
+     * again when there are no more events. The sub-poller yields after each poll to help
+     * with fairness and to avoid re-registering with the master poller where possible.
      */
     private void subPollerLoop() {
         assert Thread.currentThread().isVirtual();
         try {
-            int polled = 0;
+            // park until a file descriptor registered with this sub-poller is ready
+            MASTER_POLLER.poll(fdVal(),0, () -> true);
+
+            int NSPINS = 2;
             for (;;) {
-                if (polled == 0) {
-                    MASTER_POLLER.poll(fdVal(),0, () -> true);
-                }
-                for (int i = 0; i < 3; i++) {
-                    polled = poll(0);
+                int spins = NSPINS;
+                while (spins-- > 0) {
+                    poll(0);
                     Thread.yield();
+                }
+                if (poll(0) > 0) {
+                    Thread.yield();
+                } else {
+                    MASTER_POLLER.poll(fdVal(), 0, () -> true);  // park
                 }
             }
         } catch (Exception e) {
