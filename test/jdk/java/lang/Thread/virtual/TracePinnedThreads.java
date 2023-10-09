@@ -36,6 +36,7 @@ import java.io.PrintStream;
 import java.time.Duration;
 import java.util.concurrent.locks.LockSupport;
 
+import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,7 +68,11 @@ class TracePinnedThreads {
                 park();
             }
         });
-        assertContains(output, "<== monitors:1");
+        if (Platform.isX64()) {
+            assertDoesNotContain(output, "<== monitors:1");
+        } else {
+            assertContains(output, "<== monitors:1");
+        }
         assertDoesNotContain(output, "(Native Method)");
     }
 
