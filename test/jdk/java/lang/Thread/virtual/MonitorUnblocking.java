@@ -57,7 +57,7 @@ class MonitorUnblocking {
                 vthread.start();
                 started.await();
 
-                // random delay
+                // random delay before exiting monitor
                 switch (ThreadLocalRandom.current().nextInt(4)) {
                     case 0 -> { /* no delay */}
                     case 1 -> Thread.onSpinWait();

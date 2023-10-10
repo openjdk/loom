@@ -142,9 +142,12 @@ public abstract class Poller {
     }
 
     /**
-     * Returns the poller file descriptor, for use with hierarchical polling.
+     * Returns the poller file descriptor, used when the read and write poller threads
+     * are virtual threads.
      */
-    abstract int fdVal();
+    int fdVal() {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Register the file descriptor.

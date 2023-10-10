@@ -283,7 +283,6 @@ class Monitors {
                 });
                 vthread2.join();
                 assertTrue(executed.get());
-
             } finally {
                 LockSupport.unpark(vthread1);
                 vthread1.join();
@@ -325,7 +324,6 @@ class Monitors {
                     });
                     vthread2.join();
                     assertTrue(executed.get());
-
                 } finally {
                     LockSupport.unpark(vthread1);
                     vthread1.join();

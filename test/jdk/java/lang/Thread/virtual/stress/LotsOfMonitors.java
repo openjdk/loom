@@ -24,6 +24,7 @@
 /**
  * @test
  * @summary Test virtual thread entering (and owning) a lot of monitors
+ * @key randomness
  * @library /test/lib
  * @run junit LotsOfMonitors
  */

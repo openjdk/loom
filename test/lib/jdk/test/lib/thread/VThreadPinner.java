@@ -36,7 +36,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Helper class to support tests running an action in virtual thread that pins its carrier.
+ * Helper class to support tests running an action in a virtual thread that pins its carrier.
  */
 public class VThreadPinner {
     private VThreadPinner() { }

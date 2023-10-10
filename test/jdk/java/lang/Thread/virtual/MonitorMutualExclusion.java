@@ -24,13 +24,11 @@
 /**
  * @test
  * @summary Test mutual exclusion of monitors with platform and virtual threads
- * @key randomness
  * @run junit MonitorMutualExclusion
  */
 
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -39,8 +37,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MonitorMutualExclusion {
 
-    // 0,2,4,..16 platform threads
-    // 2,4,6,..32 virtual threads
+    /**
+     * Returns a stream of elements that are ordered pairs of platform and virtual thread
+     * counts (0,2,4,..16 platform threads, 2,4,6,..32 virtual threads).
+     */
     static Stream<Arguments> threadCounts() {
         return IntStream.range(0, 17)
                 .filter(i -> i % 2 == 0)
@@ -57,11 +57,7 @@ class MonitorMutualExclusion {
             int count;
             synchronized void increment() {
                 count++;
-                if (ThreadLocalRandom.current().nextBoolean()) {
-                    Thread.onSpinWait();
-                } else {
-                    Thread.yield();
-                }
+                Thread.yield();
             }
         }
         var counter = new Counter();
