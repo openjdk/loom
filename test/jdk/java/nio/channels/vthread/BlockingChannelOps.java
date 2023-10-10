@@ -30,11 +30,10 @@
  */
 
 /**
- * @test id=direct-register
- * @summary Test virtual threads doing blocking I/O on NIO channels and with
- *    the I/O poller configured to use direct registration
+ * @test id=system-threads
+ * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
- * @run junit/othervm -Djdk.useDirectRegister BlockingChannelOps
+ * @run junit/othervm -Djdk.pollerMode=SYSTEM_THREADS BlockingChannelOps
  */
 
 /**

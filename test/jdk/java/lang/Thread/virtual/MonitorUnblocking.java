@@ -40,10 +40,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class MonitorUnblocking {
 
     /**
-     * Test unblocking a virtual thread waiting to enter a monitor.
+     * Test unblocking a virtual thread waiting to enter a monitor held by a platform thread.
      */
-    @RepeatedTest(10)
-    void testUnblocking1() throws Exception {
+    @RepeatedTest(50)
+    void testUnblocking() throws Exception {
         var lock = new Object();
         var started = new CountDownLatch(1);
         var vthread = Thread.ofVirtual().unstarted(() -> {
@@ -72,15 +72,15 @@ class MonitorUnblocking {
     }
 
     /**
-     * Test unblocking a virtual thread waiting to enter a monitor that is held by a
+     * Test unblocking a virtual thread waiting to enter a monitor held by another
      * virtual thread.
      */
-    @RepeatedTest(10)
+    @RepeatedTest(50)
     void testUnblocking2() throws Exception {
         // need at least two carrier threads
         int previousParallelism = VThreadRunner.ensureParallelism(2);
         try {
-            VThreadRunner.run(this::testUnblocking1);
+            VThreadRunner.run(this::testUnblocking);
         } finally {
             VThreadRunner.setParallelism(previousParallelism);
         }
@@ -90,7 +90,7 @@ class MonitorUnblocking {
         Thread.State state = thread.getState();
         while (state != expectedState) {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
-            Thread.onSpinWait();
+            Thread.yield();
             state = thread.getState();
         }
     }

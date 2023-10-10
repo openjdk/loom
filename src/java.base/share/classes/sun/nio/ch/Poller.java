@@ -24,15 +24,12 @@
  */
 package sun.nio.ch;
 
-import java.io.IOError;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
-import java.util.stream.Stream;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -44,10 +41,10 @@ import sun.security.action.GetPropertyAction;
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+    private static final Poller MASTER_POLLER;
     private static final Poller[] READ_POLLERS;
     private static final Poller[] WRITE_POLLERS;
     private static final int READ_MASK, WRITE_MASK;
-    private static final boolean USE_DIRECT_REGISTER;
 
     // true if this is a poller for reading, false for writing
     private final boolean read;
@@ -55,21 +52,34 @@ public abstract class Poller {
     // maps file descriptors to parked Thread
     private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
 
-    // the queue of updates to the updater Thread
-    private final BlockingQueue<Request> queue = new LinkedTransferQueue<>();
-
     /**
-     * Initialize a Poller for reading or writing.
+     * Poller mode.
      */
-    protected Poller(boolean read) {
-        this.read = read;
+    public enum Mode {
+        /**
+         * ReadPoller and WritePoller are dedicated platform threads that block waiting
+         * for events and unpark virtual threads when file descriptors are ready for I/O.
+         */
+        SYSTEM_THREADS,
+
+        /**
+         * ReadPoller and WritePoller threads are virtual threads that poll for events,
+         * yielding between polls and unparking virtual threads when file descriptors are
+         * ready for I/O. If there are no events then the poller threads park until there
+         * are I/O events to poll. This mode helps to integrate polling with virtual
+         * thread scheduling. The approach is similar to the default scheme in "User-level
+         * Threading: Have Your Cake and Eat It Too" by Karsten and Barghi 2020
+         * (https://dl.acm.org/doi/10.1145/3379483).
+         */
+        VTHREAD_POLLERS
     }
 
     /**
-     * Returns true if this poller is for read (POLLIN) events.
+     * Initialize a Poller for reading or writing.
+     * @param read true if this poller is for read events, false for write events
      */
-    final boolean reading() {
-        return read;
+    protected Poller(boolean read) {
+        this.read = read;
     }
 
     /**
@@ -96,18 +106,6 @@ public abstract class Poller {
      * Parks the current thread until a file descriptor is ready.
      */
     private void poll(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
-        if (USE_DIRECT_REGISTER) {
-            pollDirect(fdVal, nanos, supplier);
-        } else {
-            pollIndirect(fdVal, nanos, supplier);
-        }
-    }
-
-    /**
-     * Parks the current thread until a file descriptor is ready. This implementation
-     * registers the file descriptor, then parks until the file descriptor is polled.
-     */
-    private void pollDirect(int fdVal, long nanos, BooleanSupplier supplier) throws IOException {
         register(fdVal);
         try {
             boolean isOpen = supplier.getAsBoolean();
@@ -124,46 +122,12 @@ public abstract class Poller {
     }
 
     /**
-     * Parks the current thread until a file descriptor is ready. This implementation
-     * queues the file descriptor to the update thread, then parks until the file
-     * descriptor is polled.
-     */
-    private void pollIndirect(int fdVal, long nanos, BooleanSupplier supplier) {
-        Request request = registerAsync(fdVal);
-        try {
-            boolean isOpen = supplier.getAsBoolean();
-            if (isOpen) {
-                if (nanos > 0) {
-                    LockSupport.parkNanos(nanos);
-                } else {
-                    LockSupport.park();
-                }
-            }
-        } finally {
-            request.awaitFinish();
-            deregister(fdVal);
-        }
-    }
-
-    /**
      * Registers the file descriptor.
      */
     private void register(int fdVal) throws IOException {
         Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
         assert previous == null;
         implRegister(fdVal);
-    }
-
-    /**
-     * Queues the file descriptor to be registered by the updater thread, returning
-     * a Request object to track the request.
-     */
-    private Request registerAsync(int fdVal) {
-        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
-        assert previous == null;
-        Request request = new Request(fdVal);
-        queue.add(request);
-        return request;
     }
 
     /**
@@ -178,51 +142,9 @@ public abstract class Poller {
     }
 
     /**
-     * A registration request queued to the updater thread.
+     * Returns the poller file descriptor, for use with hierarchical polling.
      */
-    private static class Request {
-        private final int fdVal;
-        private volatile boolean done;
-        private volatile Thread waiter;
-
-        Request(int fdVal) {
-            this.fdVal = fdVal;
-        }
-
-        private int fdVal() {
-            return fdVal;
-        }
-
-        /**
-         * Invoked by the updater when the request has been processed.
-         */
-        void finish() {
-            done = true;
-            Thread waiter = this.waiter;
-            if (waiter != null) {
-                LockSupport.unpark(waiter);
-            }
-        }
-
-        /**
-         * Waits for a request to be processed.
-         */
-        void awaitFinish() {
-            if (!done) {
-                waiter = Thread.currentThread();
-                boolean interrupted = false;
-                while (!done) {
-                    LockSupport.park();
-                    if (Thread.interrupted()) {
-                        interrupted = true;
-                    }
-                }
-                if (interrupted) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        }
-    }
+    abstract int fdVal();
 
     /**
      * Register the file descriptor.
@@ -235,26 +157,27 @@ public abstract class Poller {
     abstract void implDeregister(int fdVal);
 
     /**
-     * Starts the poller threads.
+     * Starts a poller thread.
      */
-    private Poller start() {
+    private void start() {
         String prefix = (read) ? "Read" : "Write";
-        startThread(prefix + "-Poller", this::pollLoop);
-        if (!USE_DIRECT_REGISTER) {
-            startThread(prefix + "-Updater", this::updateLoop);
+        if (MASTER_POLLER == null) {
+            startPlatformThread(prefix + "-Poller", this::pollerLoop);
+        } else {
+            startVirtualThread(prefix + "-Poller", this::subPollerLoop);
         }
-        return this;
     }
 
     /**
      * Starts a platform thread to run the given task.
      */
-    private void startThread(String name, Runnable task) {
+    private void startPlatformThread(String name, Runnable task) {
         try {
             Thread thread = JLA.executeOnCarrierThread(() ->
                 InnocuousThread.newSystemThread(name, task)
             );
             thread.setDaemon(true);
+            thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
             thread.start();
         } catch (Exception e) {
             throw new InternalError(e);
@@ -262,9 +185,21 @@ public abstract class Poller {
     }
 
     /**
-     * Polling loop.
+     * Starts a virtual thread to run the given task.
      */
-    private void pollLoop() {
+    private void startVirtualThread(String name, Runnable task) {
+        Thread.ofVirtual()
+                .name(name)
+                .inheritInheritableThreadLocals(false)
+                .uncaughtExceptionHandler((t, e) -> e.printStackTrace())
+                .start(task);
+    }
+
+    /**
+     * Master polling loop. The {@link #polled(int)} method is invoked for each file
+     * descriptor that is polled.
+     */
+    private void pollerLoop() {
         try {
             for (;;) {
                 poll();
@@ -275,19 +210,21 @@ public abstract class Poller {
     }
 
     /**
-     * The update loop to handle updates to the interest set.
+     * Sub-poller polling loop. The {@link #polled(int)} method is invoked for each file
+     * descriptor that is polled.
      */
-    private void updateLoop() {
+    private void subPollerLoop() {
+        assert Thread.currentThread().isVirtual();
         try {
+            int polled = 0;
             for (;;) {
-                Request req = null;
-                while (req == null) {
-                    try {
-                        req = queue.take();
-                    } catch (InterruptedException ignore) { }
+                if (polled == 0) {
+                    MASTER_POLLER.poll(fdVal(),0, () -> true);
                 }
-                implRegister(req.fdVal());
-                req.finish();
+                for (int i = 0; i < 3; i++) {
+                    polled = poll(0);
+                    Thread.yield();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -353,28 +290,16 @@ public abstract class Poller {
      *
      * @param timeout if positive then block for up to {@code timeout} milliseconds,
      *     if zero then don't block, if -1 then block indefinitely
+     * @return the number of file descriptors polled
      */
     abstract int poll(int timeout) throws IOException;
 
     /**
      * Poll for events, blocks indefinitely.
+     * @return the number of file descriptors polled
      */
     final int poll() throws IOException {
         return poll(-1);
-    }
-
-    /**
-     * Poll for events, non-blocking.
-     */
-    final int pollNow() throws IOException {
-        return poll(0);
-    }
-
-    /**
-     * Returns the poller's file descriptor, or -1 if none.
-     */
-    int fdVal() {
-        return -1;
     }
 
     /**
@@ -382,33 +307,57 @@ public abstract class Poller {
      */
     static {
         PollerProvider provider = PollerProvider.provider();
-        String s = GetPropertyAction.privilegedGetProperty("jdk.useDirectRegister");
-        if (s == null) {
-            USE_DIRECT_REGISTER = provider.useDirectRegister();
+        Poller.Mode mode;
+        String s = GetPropertyAction.privilegedGetProperty("jdk.pollerMode");
+        if (s != null) {
+            if (s.equalsIgnoreCase(Mode.SYSTEM_THREADS.name()) || s.equals("1")) {
+                mode = Mode.SYSTEM_THREADS;
+            } else if (s.equalsIgnoreCase(Mode.VTHREAD_POLLERS.name()) || s.equals("2")) {
+                mode = Mode.VTHREAD_POLLERS;
+            } else {
+                throw new IllegalArgumentException("Can't parse '" + s + "' as polling mode");
+            }
         } else {
-            USE_DIRECT_REGISTER = "".equals(s) || Boolean.parseBoolean(s);
+            mode = provider.defaultPollerMode();
         }
+
         try {
-            Poller[] readPollers = createReadPollers(provider);
+            // master poller
+            MASTER_POLLER = switch (mode) {
+                case SYSTEM_THREADS -> null;
+                case VTHREAD_POLLERS -> {
+                    var poller = provider.readPoller();
+                    poller.startPlatformThread("NetPoller", poller::pollerLoop);
+                    yield poller;
+                }
+            };
+
+            // read pollers
+            Poller[] readPollers = createReadPollers(mode, provider);
             READ_POLLERS = readPollers;
             READ_MASK = readPollers.length - 1;
-            Poller[] writePollers = createWritePollers(provider);
+            Arrays.stream(readPollers).forEach(p -> p.start());
+
+            // write pollers
+            Poller[] writePollers = createWritePollers(mode, provider);
             WRITE_POLLERS = writePollers;
             WRITE_MASK = writePollers.length - 1;
-        } catch (IOException ioe) {
-            throw new IOError(ioe);
+            Arrays.stream(writePollers).forEach(p -> p.start());
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
         }
     }
 
     /**
      * Create the read poller(s).
      */
-    private static Poller[] createReadPollers(PollerProvider provider) throws IOException {
-        int readPollerCount = pollerCount("jdk.readPollers");
+    private static Poller[] createReadPollers(Poller.Mode mode, PollerProvider provider)
+        throws IOException
+    {
+        int readPollerCount = pollerCount("jdk.readPollers", provider.defaultReadPollers(mode));
         Poller[] readPollers = new Poller[readPollerCount];
-        for (int i = 0; i< readPollerCount; i++) {
-            var poller = provider.readPoller();
-            readPollers[i] = poller.start();
+        for (int i = 0; i < readPollerCount; i++) {
+            readPollers[i] = provider.readPoller();
         }
         return readPollers;
     }
@@ -416,12 +365,13 @@ public abstract class Poller {
     /**
      * Create the write poller(s).
      */
-    private static Poller[] createWritePollers(PollerProvider provider) throws IOException {
-        int writePollerCount = pollerCount("jdk.writePollers");
+    private static Poller[] createWritePollers(Poller.Mode mode, PollerProvider provider)
+        throws IOException
+    {
+        int writePollerCount = pollerCount("jdk.writePollers", provider.defaultWritePollers(mode));
         Poller[] writePollers = new Poller[writePollerCount];
-        for (int i = 0; i< writePollerCount; i++) {
-            var poller = provider.writePoller();
-            writePollers[i] = poller.start();
+        for (int i = 0; i < writePollerCount; i++) {
+            writePollers[i] = provider.writePoller();
         }
         return writePollers;
     }
@@ -433,9 +383,9 @@ public abstract class Poller {
      * @throws IllegalArgumentException if the property is set to a value that
      * is not a power of 2.
      */
-    private static int pollerCount(String propName) {
-        String s = GetPropertyAction.privilegedGetProperty(propName, "1");
-        int count = Integer.parseInt(s);
+    private static int pollerCount(String propName, int defaultCount) {
+        String s = GetPropertyAction.privilegedGetProperty(propName);
+        int count = (s != null) ? Integer.parseInt(s) : defaultCount;
 
         // check power of 2
         if (count != (1 << log2(count))) {
@@ -447,23 +397,5 @@ public abstract class Poller {
 
     private static int log2(int n) {
         return 31 - Integer.numberOfLeadingZeros(n);
-    }
-
-    /**
-     * Return a stream of all threads blocked waiting for I/O operations.
-     */
-    public static Stream<Thread> blockedThreads() {
-        Stream<Thread> s = Stream.empty();
-        for (int i = 0; i < READ_POLLERS.length; i++) {
-            s = Stream.concat(s, READ_POLLERS[i].registeredThreads());
-        }
-        for (int i = 0; i < WRITE_POLLERS.length; i++) {
-            s = Stream.concat(s, WRITE_POLLERS[i].registeredThreads());
-        }
-        return s;
-    }
-
-    private Stream<Thread> registeredThreads() {
-        return map.values().stream();
     }
 }

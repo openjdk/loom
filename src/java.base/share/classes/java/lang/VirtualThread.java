@@ -1262,7 +1262,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Unblock virtual threads that are ready to scheduled again.
+     * Unblock virtual threads that are ready to be scheduled again.
      */
     private static void processPendingList() {
         // TBD invoke unblock
@@ -1271,6 +1271,7 @@ final class VirtualThread extends BaseVirtualThread {
     static {
         var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",
                 VirtualThread::processPendingList);
+        unblocker.setDaemon(true);
         unblocker.start();
     }
 }
