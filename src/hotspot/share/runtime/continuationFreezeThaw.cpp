@@ -1587,6 +1587,7 @@ class StackChunkAllocator : public MemAllocator {
 
     // zero out fields (but not the stack)
     const size_t hs = oopDesc::header_size();
+    oopDesc::set_klass_gap(mem, 0);
     Copy::fill_to_aligned_words(mem + hs, vmClasses::StackChunk_klass()->size_helper() - hs);
 
     jdk_internal_vm_StackChunk::set_size(mem, (int)_stack_size);
