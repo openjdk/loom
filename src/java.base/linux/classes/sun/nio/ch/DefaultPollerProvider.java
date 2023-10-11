@@ -44,21 +44,21 @@ class DefaultPollerProvider extends PollerProvider {
 
     @Override
     int defaultReadPollers(Poller.Mode mode) {
+        int ncpus = Runtime.getRuntime().availableProcessors();
         if (mode == Poller.Mode.VTHREAD_POLLERS) {
-            int nprocs = Runtime.getRuntime().availableProcessors();
-            return Math.clamp(nprocs / 2, 1, 4);
+            return Integer.highestOneBit(Math.min(ncpus, 32));
         } else {
-            return 1;
+            return Integer.highestOneBit(Math.max(ncpus / 4, 1));
         }
     }
 
     @Override
-    Poller readPoller() throws IOException {
-        return new EPollPoller(true);
+    Poller readPoller(boolean subPoller) throws IOException {
+        return new EPollPoller(subPoller, true);
     }
 
     @Override
-    Poller writePoller() throws IOException {
-        return new EPollPoller(false);
+    Poller writePoller(boolean subPoller) throws IOException {
+        return new EPollPoller(subPoller, false);
     }
 }

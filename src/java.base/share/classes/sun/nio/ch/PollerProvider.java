@@ -43,7 +43,7 @@ abstract class PollerProvider {
     }
 
     /**
-     * Default number of read pollers for the given mode.
+     * Default number of read pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
     int defaultReadPollers(Poller.Mode mode) {
@@ -51,7 +51,7 @@ abstract class PollerProvider {
     }
 
     /**
-     * Default number of write pollers for the given mode.
+     * Default number of write pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
     int defaultWritePollers(Poller.Mode mode) {
@@ -60,13 +60,15 @@ abstract class PollerProvider {
 
     /**
      * Creates a Poller for read ops.
+     * @param subPoller true to create a sub-poller
      */
-    abstract Poller readPoller() throws IOException;
+    abstract Poller readPoller(boolean subPoller) throws IOException;
 
     /**
      * Creates a Poller for write ops.
+     * @param subPoller true to create a sub-poller
      */
-    abstract Poller writePoller() throws IOException;
+    abstract Poller writePoller(boolean subPoller) throws IOException;
 
     /**
      * Creates the PollerProvider.

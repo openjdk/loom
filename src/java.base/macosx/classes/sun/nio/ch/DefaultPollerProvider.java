@@ -25,7 +25,6 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import jdk.internal.vm.ContinuationSupport;
 
 /**
  * Default PollerProvider for macOS.
@@ -34,31 +33,12 @@ class DefaultPollerProvider extends PollerProvider {
     DefaultPollerProvider() { }
 
     @Override
-    Poller.Mode defaultPollerMode() {
-        if (ContinuationSupport.isSupported()) {
-            return Poller.Mode.VTHREAD_POLLERS;
-        } else {
-            return Poller.Mode.SYSTEM_THREADS;
-        }
+    Poller readPoller(boolean subPoller) throws IOException {
+        return new KQueuePoller(subPoller, true);
     }
 
     @Override
-    int defaultReadPollers(Poller.Mode mode) {
-        if (mode == Poller.Mode.VTHREAD_POLLERS) {
-            int nprocs = Runtime.getRuntime().availableProcessors();
-            return Math.clamp(nprocs / 2, 1, 4);
-        } else {
-            return 1;
-        }
-    }
-
-    @Override
-    Poller readPoller() throws IOException {
-        return new KQueuePoller(true);
-    }
-
-    @Override
-    Poller writePoller() throws IOException {
-        return new KQueuePoller(false);
+    Poller writePoller(boolean subPoller) throws IOException {
+        return new KQueuePoller(subPoller, false);
     }
 }
