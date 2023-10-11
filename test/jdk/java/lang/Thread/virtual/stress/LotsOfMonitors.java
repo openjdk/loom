@@ -34,9 +34,11 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 
+import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LotsOfMonitors {
@@ -88,8 +90,8 @@ class LotsOfMonitors {
     /**
      * Test entering lots of monitors with contention.
      */
-    @Disabled
     @Test
+    @EnabledIf("platformIsX64")
     void testEnterWithContention() throws Exception {
         VThreadRunner.run(() -> {
             var threads = new ArrayList<Thread>();
@@ -157,5 +159,9 @@ class LotsOfMonitors {
             Thread.yield();
             state = thread.getState();
         }
+    }
+
+    private boolean platformIsX64() {
+        return Platform.isX64();
     }
 }

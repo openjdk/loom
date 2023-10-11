@@ -41,19 +41,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
+import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class Monitors {
-    // change this to availableProcessors() * 4 when monitor pining issue resolved
-    static final int MAX_VTHREAD_COUNT = Runtime.getRuntime().availableProcessors();
-
-    // change this to 256 when monitor pining issue resolved
-    static final int MAX_ENTER_DEPTH = MAX_VTHREAD_COUNT - 1;
+    static final int MAX_VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
+    static final int MAX_ENTER_DEPTH = MAX_VTHREAD_COUNT;
 
     static ThreadFactory randomThreadFactory() {
         return ThreadLocalRandom.current().nextBoolean()
@@ -107,7 +106,6 @@ class Monitors {
     /**
      * Test monitor enter where monitor is held by virtual thread.
      */
-    @Disabled(value="Disabled due to pinning")
     @Test
     void testEnterWithContention2() throws Exception {
         VThreadRunner.run(this::testEnterWithContention);
@@ -140,6 +138,7 @@ class Monitors {
      * Test monitor reenter when there are threads blocked trying to enter the monitor.
      */
     @Test
+    @EnabledIf("platformIsX64")
     void testReenterWithContention() throws Exception {
         var lock = new Object();
         VThreadRunner.run(() -> {
@@ -246,7 +245,6 @@ class Monitors {
     /**
      * Test contended monitor enter when pinned. Monitor is held by virtual thread.
      */
-    @Disabled(value="Disabled due to pinning")
     @Test
     void testContendedMonitorEnterWhenPinned2() throws Exception {
         VThreadRunner.run(this::testContendedMonitorEnterWhenPinned);
@@ -255,8 +253,8 @@ class Monitors {
     /**
      * Test that parking while holding a monitor releases the carrier.
      */
-    @Disabled(value="Disabled due to pinning")
     @Test
+    @EnabledIf("platformIsX64")
     void testReleaseWhenParked() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -295,8 +293,8 @@ class Monitors {
     /**
      * Test that blocked waiting to enter a monitor releases the carrier.
      */
-    @Disabled(value="Disabled due to pinning")
     @Test
+    @EnabledIf("platformIsX64")
     void testReleaseWhenBlocked() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -339,6 +337,7 @@ class Monitors {
      * carriers aren't released.
      */
     @Test
+    @EnabledIf("platformIsX64")
     void testManyParkedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var done = new AtomicBoolean();
@@ -374,6 +373,7 @@ class Monitors {
      * carriers aren't released.
      */
     @Test
+    @EnabledIf("platformIsX64")
     void testManyBlockedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var lock = new Object();
@@ -402,6 +402,7 @@ class Monitors {
      * Test that unblocking a virtual thread waiting to enter a monitor does not consume
      * the thread's parking permit.
      */
+    @Disabled
     @Test
     void testParkingPermitNotConsumed() throws Exception {
         var lock = new Object();
@@ -464,5 +465,9 @@ class Monitors {
             Thread.yield();
             state = thread.getState();
         }
+    }
+
+    private boolean platformIsX64() {
+        return Platform.isX64();
     }
 }

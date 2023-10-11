@@ -75,7 +75,7 @@ class MonitorSyncNativeMethod {
             });
             // wait for thread to start
             started.await();
-            //await(vthread, Thread.State.BLOCKED);
+            await(vthread, Thread.State.BLOCKED);
             vthreads[i] = vthread;
         }
     }
