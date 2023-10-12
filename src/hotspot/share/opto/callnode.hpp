@@ -289,6 +289,7 @@ public:
     _locoff = _stkoff = _monoff = _scloff = _endoff = off;
   }
   void              set_map(SafePointNode* map) { _map = map; }
+  void              set_method(ciMethod *m) { _method = m; }
   void              bind_map(SafePointNode* map); // set_map() and set_jvms() for the SafePointNode
   void              set_sp(uint sp) { _sp = sp; }
                     // _reexecute is initialized to "undefined" for a new bci

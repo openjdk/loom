@@ -35,6 +35,7 @@
 #include "opto/subnode.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "runtime/synchronizer.hpp"
 
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
@@ -553,6 +554,13 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
                                  RTMLockingCounters* stack_rtm_counters,
                                  Metadata* method_data,
                                  bool use_rtm, bool profile_rtm) {
+
+  if (ObjectMonitorMode::java()) {
+    // for now always pick 'slow-path' as JOM will do quick/slow determination
+    testptr(objReg, objReg);
+    return;
+  }
+
   // Ensure the register assignments are disjoint
   assert(tmpReg == rax, "");
 
@@ -753,6 +761,13 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 // Xcheck:jni is enabled.
 
 void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpReg, bool use_rtm) {
+
+  if (ObjectMonitorMode::java()) {
+    // for now always pick 'slow-path' as JOM will do quick/slow determination
+    testptr(objReg, objReg);
+    return;
+  }
+
   assert(boxReg == rax, "");
   assert_different_registers(objReg, boxReg, tmpReg);
 

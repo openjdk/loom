@@ -3507,6 +3507,22 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
 
   unlock->init_req(TypeFunc::Parms + 0, obj);
   unlock->init_req(TypeFunc::Parms + 1, box);
+
+  if (ObjectMonitorMode::java()) {
+
+#ifdef ASSERT
+    // For some reason, we sometimes end up with dead locals that must be killed
+    // before we call add_safepoint_edges.
+    if (!dead_locals_are_killed()) {
+      kill_dead_locals();
+    }
+#endif //ASSERT
+
+    // This will set the jvms pointer in the unlock node
+    // In JOM mode we want unlock to behave like lock.
+    add_safepoint_edges(unlock);
+  }
+
   unlock = _gvn.transform(unlock)->as_Unlock();
 
   Node* mem = reset_memory();

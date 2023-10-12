@@ -136,7 +136,7 @@ CallNode* PhaseMacroExpand::make_slow_call(CallNode *oldcall, const TypeFunc* sl
                                            address slow_call, const char* leaf_name, Node* slow_path,
                                            Node* parm0, Node* parm1, Node* parm2) {
 
-  // Slow-path call
+ // Slow-path call
  CallNode *call = leaf_name
    ? (CallNode*)new CallLeafNode      ( slow_call_type, slow_call, leaf_name, TypeRawPtr::BOTTOM )
    : (CallNode*)new CallStaticJavaNode( slow_call_type, slow_call, OptoRuntime::stub_name(slow_call), TypeRawPtr::BOTTOM );
@@ -2035,7 +2035,10 @@ void PhaseMacroExpand::mark_eliminated_locking_nodes(AbstractLockNode *alock) {
     } else if (!alock->is_non_esc_obj()) { // Not eliminated or coarsened
       // Only Lock node has JVMState needed here.
       // Not that preceding claim is documented anywhere else.
-      if (alock->jvms() != nullptr) {
+
+      // The above statement is no longer true therefore, we should
+      // use a more explicit check for node type.
+      if (alock->is_Lock()) {
         if (alock->as_Lock()->is_nested_lock_region()) {
           // Mark eliminated related nested locks and unlocks.
           Node* obj = alock->obj_node();
@@ -2258,10 +2261,18 @@ void PhaseMacroExpand::expand_unlock_node(UnlockNode *unlock) {
   // Optimize test; set region slot 2
   Node *slow_path = opt_bits_test(ctrl, region, 2, funlock, 0, 0);
   Node *thread = transform_later(new ThreadLocalNode());
+  CallNode *call = nullptr;
 
-  CallNode *call = make_slow_call((CallNode *) unlock, OptoRuntime::complete_monitor_exit_Type(),
-                                  CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C),
-                                  "complete_monitor_unlocking_C", slow_path, obj, box, thread);
+  // If JOM is used we don't want to create a CallLeafNode for our slow call.
+  if (ObjectMonitorMode::java()) {
+    call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(),
+                          OptoRuntime::complete_monitor_unlocking_Java(),
+                          nullptr, slow_path, obj, box, thread);
+  } else {
+    call = make_slow_call((CallNode *)unlock, OptoRuntime::complete_monitor_exit_Type(),
+                          CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C),
+                          "complete_monitor_unlocking_C", slow_path, obj, box, thread);
+  }
 
   call->extract_projections(&_callprojs, false /*separate_io_proj*/, false /*do_asserts*/);
   assert(_callprojs.fallthrough_ioproj == nullptr && _callprojs.catchall_ioproj == nullptr &&

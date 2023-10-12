@@ -540,6 +540,12 @@ void ObjectSynchronizer::java_enter(Handle obj, JavaThread* current) {
   }
 }
 
+void ObjectSynchronizer::java_exit(oop obj, JavaThread* current) {
+  assert(ObjectMonitorMode::java(), "must be");
+  Handle h_obj(current, obj);
+  java_exit(h_obj, current);
+}
+
 void ObjectSynchronizer::java_exit(Handle obj, JavaThread* current) {
   assert(ObjectMonitorMode::java(), "must be");
 

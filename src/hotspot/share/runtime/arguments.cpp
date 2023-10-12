@@ -3001,12 +3001,12 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     if (FLAG_IS_CMDLINE(LockingMode)) {
       vm_exit_during_initialization("ObjectSynchronizerMode is not compatible with use of LockingMode");
     }
-    //  TieredStopAtLevel=1;
-#ifndef C2_PATCH
-    set_mode_flags(_int);
-#else
-    //set_mode_flags(_int);
-#endif
+
+    // JOM is currently only supported by the interpreter and C2
+    // "high-only" compilation mode will ensure that all compilation
+    // happens in C2.
+    FLAG_SET_CMDLINE(CompilationMode, "high-only");
+
     log_info(monitor)("Using Java object monitors with policy %s",
                       ObjectMonitorMode::as_string());
   }
