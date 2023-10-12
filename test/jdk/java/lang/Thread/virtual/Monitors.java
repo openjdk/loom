@@ -310,8 +310,8 @@ class Monitors {
                 }
             });
 
-            synchronized (lock) {
-                try {
+            try {
+                synchronized (lock) {
                     // start thread and wait for it to block
                     vthread1.start();
                     started.await();
@@ -324,10 +324,9 @@ class Monitors {
                     });
                     vthread2.join();
                     assertTrue(executed.get());
-                } finally {
-                    LockSupport.unpark(vthread1);
-                    vthread1.join();
                 }
+            } finally {
+                vthread1.join();
             }
         }
     }
