@@ -46,9 +46,9 @@ class DefaultPollerProvider extends PollerProvider {
     int defaultReadPollers(Poller.Mode mode) {
         int ncpus = Runtime.getRuntime().availableProcessors();
         if (mode == Poller.Mode.VTHREAD_POLLERS) {
-            return Integer.highestOneBit(Math.min(ncpus, 32));
+            return Math.min(Integer.highestOneBit(ncpus), 32);
         } else {
-            return Integer.highestOneBit(Math.max(ncpus / 4, 1));
+            return Math.max(Integer.highestOneBit(ncpus / 4), 1);
         }
     }
 
