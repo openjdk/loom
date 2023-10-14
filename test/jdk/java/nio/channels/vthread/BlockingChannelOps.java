@@ -507,7 +507,7 @@ class BlockingChannelOps {
      */
     @Test
     void testDatagramSocketAdaptorReceive2() throws Exception {
-        testDatagramSocketAdaptorReceive(60_1000);
+        testDatagramSocketAdaptorReceive(60_000);
     }
 
     private void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
