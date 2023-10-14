@@ -247,6 +247,10 @@ final class VirtualThread extends BaseVirtualThread {
             cont.run();
         } finally {
             unmount();
+
+            // notify JVMTI after unmount
+            notifyJvmtiUnmount(/*hide*/false);
+
             if (cont.isDone()) {
                 afterDone();
             } else {
@@ -456,15 +460,13 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private void afterYield() {
         assert carrierThread == null;
+
         int s = state();
 
         // LockSupport.park/parkNanos
         if (s == PARKING || s == TIMED_PARKING) {
             int newState = (s == PARKING) ? PARKED : TIMED_PARKED;
             setState(newState);
-
-            // notify JVMTI that unmount has completed, thread is parked
-            notifyJvmtiUnmount(/*hide*/false);
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(newState, RUNNABLE)) {
@@ -482,9 +484,6 @@ final class VirtualThread extends BaseVirtualThread {
         // Thread.yield
         if (s == YIELDING) {
             setState(RUNNABLE);
-
-            // notify JVMTI that unmount has completed, thread is runnable
-            notifyJvmtiUnmount(/*hide*/false);
 
             // external submit if there are no tasks in the local task queue
             if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
@@ -512,7 +511,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Invoked after the continuation completes.
      */
     private void afterDone() {
-        afterDone(true, true);
+        afterDone(true);
     }
 
     /**
@@ -520,15 +519,10 @@ final class VirtualThread extends BaseVirtualThread {
      * state to TERMINATED and notifies anyone waiting for the thread to terminate.
      *
      * @param notifyContainer true if its container should be notified
-     * @param executed true if the thread executed, false if it failed to start
      */
-    private void afterDone(boolean notifyContainer, boolean executed) {
+    private void afterDone(boolean notifyContainer) {
         assert carrierThread == null;
         setState(TERMINATED);
-
-        if (executed) {
-            notifyJvmtiUnmount(/*hide*/false);
-        }
 
         // notify anyone waiting for this virtual thread to terminate
         CountDownLatch termination = this.termination;
@@ -578,7 +572,7 @@ final class VirtualThread extends BaseVirtualThread {
             started = true;
         } finally {
             if (!started) {
-                afterDone(addedToContainer, /*executed*/false);
+                afterDone(addedToContainer);
             }
         }
     }
