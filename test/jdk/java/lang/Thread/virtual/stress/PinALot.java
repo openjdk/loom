@@ -24,7 +24,6 @@
 /*
  * @test
  * @summary Stress test timed park when pinned
- * @enablePreview
  * @requires vm.debug != true
  * @library /test/lib
  * @run main PinALot 500000
@@ -32,7 +31,6 @@
 
 /*
  * @test
- * @enablePreview
  * @requires vm.debug == true
  * @library /test/lib
  * @run main/othervm/timeout=300 PinALot 200000

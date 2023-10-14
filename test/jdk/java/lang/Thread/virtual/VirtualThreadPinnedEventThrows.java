@@ -24,7 +24,6 @@
 /**
  * @test
  * @summary Test parking when pinned and emitting the JFR VirtualThreadPinnedEvent throws
- * @enablePreview
  * @modules java.base/jdk.internal.event
  * @library /test/lib
  * @compile/module=java.base jdk/internal/event/VirtualThreadPinnedEvent.java

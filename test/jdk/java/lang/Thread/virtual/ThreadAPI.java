@@ -25,7 +25,6 @@
  * @test id=default
  * @bug 8284161 8286788
  * @summary Test Thread API with virtual threads
- * @enablePreview
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit ThreadAPI
@@ -33,7 +32,6 @@
 
 /*
  * @test id=no-vmcontinuations
- * @enablePreview
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib

@@ -24,7 +24,6 @@
 /**
  * @test
  * @summary Basic test for JFR jdk.VirtualThreadXXX events
- * @enablePreview
  * @requires vm.continuations
  * @modules jdk.jfr java.base/java.lang:+open
  * @library /test/lib

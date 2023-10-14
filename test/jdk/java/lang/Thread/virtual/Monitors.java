@@ -25,7 +25,6 @@
  * @test
  * @summary Test virtual thread monitor enter/exit
  * @key randomness
- * @enablePreview
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit Monitors
