@@ -182,9 +182,7 @@ public abstract class Poller {
      */
     private void startPlatformThread(String name, Runnable task) {
         try {
-            Thread thread = JLA.executeOnCarrierThread(() ->
-                InnocuousThread.newSystemThread(name, task)
-            );
+            Thread thread = InnocuousThread.newSystemThread(name, task);
             thread.setDaemon(true);
             thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
             thread.start();
