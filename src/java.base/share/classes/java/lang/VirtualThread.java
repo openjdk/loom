@@ -158,7 +158,7 @@ final class VirtualThread extends BaseVirtualThread {
     // Next waiting vthread to unpark()
     private VirtualThread next;
     private byte onWaitingList;
-    private boolean isMonitorResponsible;
+    private byte recheckInterval;
 
     private int preemptionDisabled;
 
@@ -529,9 +529,14 @@ final class VirtualThread extends BaseVirtualThread {
 
         // blocking on monitorenter
         if (s == BLOCKING) {
+            Future<?> unblocker = null;
+            if (recheckInterval > 0) {
+                unblocker = UNPARKER.schedule(this::unblock, getBlockTime(recheckInterval), MILLISECONDS);
+            }
             setState(BLOCKED);
 
             if (unblocked && compareAndSetState(BLOCKED, RUNNABLE)) {
+                if (unblocker != null) unblocker.cancel(false);
                 unblocked = false;
                 submitRunContinuation();
             }
@@ -985,7 +990,7 @@ final class VirtualThread extends BaseVirtualThread {
 
     @Override
     Thread.State threadState() {
-        if (isMonitorResponsible) {
+        if (recheckInterval > 0) {
             return Thread.State.BLOCKED;
         }
         int s = state();
@@ -1354,6 +1359,11 @@ final class VirtualThread extends BaseVirtualThread {
                 return 2;
         }
         return 0;
+    }
+
+    private static long getBlockTime(byte recheckVal) {
+        assert recheckVal >= 1 && recheckVal <= 6;
+        return (long) Math.pow(4, recheckVal - 1);
     }
 
     /**

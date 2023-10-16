@@ -1365,10 +1365,9 @@ void JvmtiExport::post_class_load(JavaThread *thread, Klass* klass) {
   if (state == nullptr) {
     return;
   }
-  if (thread->is_in_tmp_VTMS_transition()) {
-    return; // skip ClassLoad events in tmp VTMS transition
+  if (thread->is_in_any_VTMS_transition()) {
+    return; // skip ClassLoad events in VTMS transition
   }
-  assert(!thread->is_in_any_VTMS_transition(), "class load events are not allowed in any VTMS transition");
 
   EVT_TRIG_TRACE(JVMTI_EVENT_CLASS_LOAD, ("[%s] Trg Class Load triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));
@@ -1403,10 +1402,9 @@ void JvmtiExport::post_class_prepare(JavaThread *thread, Klass* klass) {
   if (state == nullptr) {
     return;
   }
-  if (thread->is_in_tmp_VTMS_transition()) {
-    return; // skip ClassPrepare events in tmp VTMS transition
+  if (thread->is_in_any_VTMS_transition()) {
+    return; // skip ClassPrepare events in VTMS transition
   }
-  assert(!thread->is_in_any_VTMS_transition(), "class prepare events are not allowed in any VTMS transition");
 
   EVT_TRIG_TRACE(JVMTI_EVENT_CLASS_PREPARE, ("[%s] Trg Class Prepare triggered",
                       JvmtiTrace::safe_get_thread_name(thread)));

@@ -433,7 +433,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
         bool acquired = HandlePreemptedVThread(current);
         DEBUG_ONLY(int state = java_lang_VirtualThread::state(current->vthread()));
         assert((acquired && current->preemption_cancelled() && state == java_lang_VirtualThread::RUNNING) ||
-               (!acquired && !current->preemption_cancelled() && (state == java_lang_VirtualThread::BLOCKING || state == java_lang_VirtualThread::YIELDING)), "invariant");
+               (!acquired && !current->preemption_cancelled() && state == java_lang_VirtualThread::BLOCKING), "invariant");
         return true;
       }
     }
@@ -1029,12 +1029,10 @@ bool ObjectMonitor::HandlePreemptedVThread(JavaThread* current) {
     // if they are it just clears the _owner field. Since we always run the risk of
     // having that check happening before we added the node to _cxq and the release
     // of the monitor happening after the last TryLock attempt we need to do something
-    // to avoid stranding. We set the _Responsible field which platform threads results
-    // in a timed-wait. For vthreads we will set the state to YIELDING instead of BLOCKING
-    // so that the vthread is just added again into the scheduler queue.
-    Atomic::replace_if_null(&_Responsible, (JavaThread*)java_lang_Thread::thread_id(vthread));
-    java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::YIELDING);
-    java_lang_VirtualThread::set_isMonitorResponsible(vthread, true);
+    // to avoid stranding. We set the _Responsible field which results in a timed-wait.
+    if (Atomic::replace_if_null(&_Responsible, (JavaThread*)java_lang_Thread::thread_id(vthread))) {
+      java_lang_VirtualThread::set_recheckInterval(vthread, 1);
+    }
   }
 
   // We are going to preempt so decrement the already increment monitor count.
@@ -1147,9 +1145,18 @@ void ObjectMonitor::redo_enter(JavaThread* current) {
   // from the stack and return to Continuation.run()
   current->set_preempting(true);
 
-  assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
-  bool should_yield = _Responsible == (JavaThread*)java_lang_Thread::thread_id(vthread);
-  java_lang_VirtualThread::set_state(vthread, should_yield ? java_lang_VirtualThread::YIELDING : java_lang_VirtualThread::BLOCKING);
+  java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::BLOCKING);
+  if (_Responsible == (JavaThread*)java_lang_Thread::thread_id(vthread)) {
+    int recheckInterval = java_lang_VirtualThread::recheckInterval(vthread);
+    assert(recheckInterval >= 1 && recheckInterval <= 6, "invariant");
+    if (recheckInterval < 6) {
+      recheckInterval++;
+      java_lang_VirtualThread::set_recheckInterval(vthread, recheckInterval);
+    }
+  } else if (java_lang_VirtualThread::recheckInterval(vthread) > 0) {
+    // No need to do timed park anymore
+    java_lang_VirtualThread::set_recheckInterval(vthread, 0);
+  }
 }
 
 void ObjectMonitor::VThreadEpilog(JavaThread* current) {
@@ -1158,8 +1165,8 @@ void ObjectMonitor::VThreadEpilog(JavaThread* current) {
   current->inc_held_monitor_count();
 
   oop vthread = current->vthread();
-  if (java_lang_VirtualThread::isMonitorResponsible(vthread)) {
-    java_lang_VirtualThread::set_isMonitorResponsible(vthread, false);
+  if (java_lang_VirtualThread::recheckInterval(vthread) > 0) {
+    java_lang_VirtualThread::set_recheckInterval(vthread, 0);
   }
   int64_t threadid = java_lang_Thread::thread_id(vthread);
   if (_succ == (JavaThread*)threadid) _succ = nullptr;

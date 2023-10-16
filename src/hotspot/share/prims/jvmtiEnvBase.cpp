@@ -785,7 +785,7 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
 jint
 JvmtiEnvBase::get_vthread_state(oop thread_oop, JavaThread* java_thread) {
   jint state = 0;
-  bool is_mon_responsible = java_lang_VirtualThread::isMonitorResponsible(thread_oop);
+  bool is_mon_responsible = java_lang_VirtualThread::recheckInterval(thread_oop) > 0;
   bool ext_suspended = JvmtiVTSuspender::is_vthread_suspended(thread_oop);
   jint interrupted = java_lang_Thread::interrupted(thread_oop);
 
@@ -2611,7 +2611,7 @@ VirtualThreadGetThreadClosure::do_thread(Thread *target) {
 void
 VirtualThreadGetThreadStateClosure::do_thread(Thread *target) {
   assert(target->is_Java_thread(), "just checking");
-  bool is_mon_responsible = java_lang_VirtualThread::isMonitorResponsible(_vthread_h());
+  bool is_mon_responsible = java_lang_VirtualThread::recheckInterval(_vthread_h()) > 0;
   int vthread_state = java_lang_VirtualThread::state(_vthread_h());
   oop carrier_thread_oop = java_lang_VirtualThread::carrier_thread(_vthread_h());
   jint state;

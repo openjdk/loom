@@ -1955,7 +1955,7 @@ int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
 int java_lang_VirtualThread::_next_offset;
 int java_lang_VirtualThread::_onWaitingList_offset;
-int java_lang_VirtualThread::_isMonitorResponsible_offset;
+int java_lang_VirtualThread::_recheckInterval_offset;
 int java_lang_VirtualThread::_preemptionDisabled_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
@@ -1965,7 +1965,7 @@ int java_lang_VirtualThread::_preemptionDisabled_offset;
   macro(_state_offset,                     k, "state",              int_signature,               false); \
   macro(_next_offset,                      k, "next",               vthread_signature,           false); \
   macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
-  macro(_isMonitorResponsible_offset,      k, "isMonitorResponsible", bool_signature,            false); \
+  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
   macro(_preemptionDisabled_offset,        k, "preemptionDisabled", int_signature,               false);
 
 
@@ -2021,12 +2021,12 @@ bool java_lang_VirtualThread::set_onWaitingList(oop vthread, OopHandle& list_hea
   return false; // already on waiting list
 }
 
-bool java_lang_VirtualThread::isMonitorResponsible(oop vthread) {
-  return vthread->bool_field(_isMonitorResponsible_offset);
+jbyte java_lang_VirtualThread::recheckInterval(oop vthread) {
+  return vthread->byte_field(_recheckInterval_offset);
 }
 
-void java_lang_VirtualThread::set_isMonitorResponsible(oop vthread, bool value) {
-  vthread->bool_field_put(_isMonitorResponsible_offset, value);
+void java_lang_VirtualThread::set_recheckInterval(oop vthread, jbyte value) {
+  vthread->byte_field_put(_recheckInterval_offset, value);
 }
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
