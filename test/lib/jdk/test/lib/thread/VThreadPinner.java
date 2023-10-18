@@ -41,6 +41,38 @@ import java.util.concurrent.atomic.AtomicReference;
 public class VThreadPinner {
     private VThreadPinner() { }
 
+    /**
+     * Thread local with the action to run.
+     */
+    private static final ThreadLocal<ActionRunner> ACTION_RUNNER = new ThreadLocal<>();
+
+    /**
+     * Runs an action, capturing any exception or error thrown.
+     */
+    private static class ActionRunner {
+        private final ThrowingAction<?> action;
+        private Throwable throwable;
+
+        ActionRunner(ThrowingAction<?> action) {
+            this.action = action;
+        }
+
+        void run() {
+            try {
+                action.run();
+            } catch (Throwable ex) {
+                throwable = ex;
+            }
+        }
+
+        Throwable exception() {
+            return throwable;
+        }
+    }
+
+    /**
+     * A function to run from a virtual thread pinned to its carrier.
+     */
     @FunctionalInterface
     public interface ThrowingAction<X extends Throwable> {
         void run() throws X;
@@ -72,35 +104,6 @@ public class VThreadPinner {
             throw (X) ex;
         }
     }
-
-    /**
-     * Runs an action, capturing any exception or error thrown.
-     */
-    private static class ActionRunner {
-        private final ThrowingAction<?> action;
-        private Throwable throwable;
-
-        ActionRunner(ThrowingAction<?> action) {
-            this.action = action;
-        }
-
-        void run() {
-            try {
-                action.run();
-            } catch (Throwable ex) {
-                throwable = ex;
-            }
-        }
-
-        Throwable exception() {
-            return throwable;
-        }
-    }
-
-    /**
-     * Thread local with the action to run.
-     */
-    private static final ThreadLocal<ActionRunner> ACTION_RUNNER = new ThreadLocal<>();
 
     /**
      * Called by the native function to run the action with the native frame on the stack.
