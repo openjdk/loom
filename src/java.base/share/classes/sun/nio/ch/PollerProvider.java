@@ -25,14 +25,21 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import java.util.ServiceConfigurationError;
-import sun.security.action.GetPropertyAction;
 
 /**
  * Provider class for Poller implementations.
  */
 abstract class PollerProvider {
+    private static final PollerProvider INSTANCE = new DefaultPollerProvider();
+
     PollerProvider() { }
+
+    /**
+     * Returns the system-wide PollerProvider.
+     */
+    static PollerProvider provider() {
+        return INSTANCE;
+    }
 
     /**
      * Returns the default poller mode.
@@ -69,21 +76,4 @@ abstract class PollerProvider {
      * @param subPoller true to create a sub-poller
      */
     abstract Poller writePoller(boolean subPoller) throws IOException;
-
-    /**
-     * Creates the PollerProvider.
-     */
-    static PollerProvider provider() {
-        String cn = GetPropertyAction.privilegedGetProperty("jdk.PollerProvider");
-        if (cn != null) {
-            try {
-                Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-                return (PollerProvider) clazz.getConstructor().newInstance();
-            } catch (Exception e) {
-                throw new ServiceConfigurationError(null, e);
-            }
-        } else {
-            return new DefaultPollerProvider();
-        }
-    }
 }
