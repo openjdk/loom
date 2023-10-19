@@ -239,18 +239,11 @@ final class VirtualThread extends BaseVirtualThread {
             return;
         }
 
-        // notify JVMTI before mount
-        notifyJvmtiMount(/*hide*/true);
-
         mount();
         try {
             cont.run();
         } finally {
             unmount();
-
-            // notify JVMTI after unmount
-            notifyJvmtiUnmount(/*hide*/false);
-
             if (cont.isDone()) {
                 afterDone();
             } else {
@@ -362,6 +355,9 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     @ReservedStackAccess
     private void mount() {
+        // notify JVMTI before mount
+        notifyJvmtiMount(/*hide*/true);
+
         // sets the carrier thread
         Thread carrier = Thread.currentCarrierThread();
         setCarrierThread(carrier);
@@ -398,6 +394,9 @@ final class VirtualThread extends BaseVirtualThread {
             setCarrierThread(null);
         }
         carrier.clearInterrupt();
+
+        // notify JVMTI after unmount
+        notifyJvmtiUnmount(/*hide*/false);
     }
 
     /**
