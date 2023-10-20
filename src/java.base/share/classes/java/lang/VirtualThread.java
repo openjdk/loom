@@ -69,7 +69,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
     private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
-    private static final ScheduledExecutorService UNPARKER = createDelayedTaskScheduler();
+    private static final ScheduledExecutorService[] DELAYED_TASK_SCHEDULERS = createDelayedTaskSchedulers();
     private static final int TRACE_PINNING_MODE = tracePinningMode();
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
@@ -711,7 +711,7 @@ final class VirtualThread extends BaseVirtualThread {
         // need to switch to current carrier thread to avoid nested parking
         switchToCarrierThread();
         try {
-            return UNPARKER.schedule(unparker, nanos, NANOSECONDS);
+            return delayedTaskScheduler().schedule(unparker, nanos, NANOSECONDS);
         } finally {
             switchToVirtualThread(this);
         }
@@ -1058,6 +1058,15 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns a ScheduledExecutorService to execute a delayed task.
+     */
+    private ScheduledExecutorService delayedTaskScheduler() {
+        long tid = Thread.currentThread().threadId();
+        int index = (int) tid & (DELAYED_TASK_SCHEDULERS.length - 1);
+        return DELAYED_TASK_SCHEDULERS[index];
+    }
+
+    /**
      * Returns the termination object, creating it if needed.
      */
     private CountDownLatch getTermination() {
@@ -1179,22 +1188,31 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Creates the ScheduledThreadPoolExecutor used for timed unpark.
+     * Creates the ScheduledThreadPoolExecutors used to execute delayed tasks.
      */
-    private static ScheduledExecutorService createDelayedTaskScheduler() {
-        String propValue = GetPropertyAction.privilegedGetProperty("jdk.unparker.maxPoolSize");
-        int poolSize;
+    private static ScheduledExecutorService[] createDelayedTaskSchedulers() {
+        String propName = "jdk.virtualThreadScheduler.timerQueues";
+        String propValue = GetPropertyAction.privilegedGetProperty(propName);
+        int queueCount;
         if (propValue != null) {
-            poolSize = Integer.parseInt(propValue);
+            queueCount = Integer.parseInt(propValue);
+            if (queueCount != Integer.highestOneBit(queueCount)) {
+                throw new RuntimeException("Value of " + propName + " must be power of 2");
+            }
         } else {
-            poolSize = 1;
+            int ncpus = Runtime.getRuntime().availableProcessors();
+            queueCount = Math.max(Integer.highestOneBit(ncpus / 4), 1);
         }
-        ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
-            Executors.newScheduledThreadPool(poolSize, task -> {
-                return InnocuousThread.newThread("VirtualThread-unparker", task);
-            });
-        stpe.setRemoveOnCancelPolicy(true);
-        return stpe;
+        var schedulers = new ScheduledExecutorService[queueCount];
+        for (int i = 0; i < queueCount; i++) {
+            ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
+                Executors.newScheduledThreadPool(1, task -> {
+                    return InnocuousThread.newThread("VirtualThread-unparker", task);
+                });
+            stpe.setRemoveOnCancelPolicy(true);
+            schedulers[i] = stpe;
+        }
+        return schedulers;
     }
 
     /**
