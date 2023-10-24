@@ -3780,7 +3780,9 @@ address StubGenerator::generate_cont_preempt_monitorenter_redo() {
 #endif // ASSERT
 
   __ mov(c_rarg0, r15_thread);
+  __ subptr(rsp, frame::arg_reg_save_area_bytes);
   __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
+  __ addptr(rsp, frame::arg_reg_save_area_bytes);
 
   Label failAcquire;
   __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
