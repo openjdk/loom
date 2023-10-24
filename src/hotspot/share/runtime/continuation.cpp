@@ -119,7 +119,7 @@ class JvmtiUnmountBeginMark : public StackObj {
   ~JvmtiUnmountBeginMark() {
     assert(!_target->is_suspended(), "must be");
 
-    if (!_is_vthread) return;
+    if (!_is_vthread || !_transition_succeded) return;
 
     assert(_target->is_in_VTMS_transition(), "must be");
     assert(java_lang_Thread::is_in_VTMS_transition(_target->vthread()), "must be");
