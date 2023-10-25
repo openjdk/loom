@@ -529,16 +529,21 @@ final class VirtualThread extends BaseVirtualThread {
 
         // blocking on monitorenter
         if (s == BLOCKING) {
-            Future<?> unblocker = null;
-            if (recheckInterval > 0) {
-                unblocker = UNPARKER.schedule(this::unblock, getBlockTime(recheckInterval), MILLISECONDS);
-            }
             setState(BLOCKED);
 
             if (unblocked && compareAndSetState(BLOCKED, RUNNABLE)) {
-                if (unblocker != null) unblocker.cancel(false);
                 unblocked = false;
                 submitRunContinuation();
+            } else {
+                Future<?> unblocker = null;
+                int recheckInterval = this.recheckInterval;
+                if (recheckInterval > 0 && state() == BLOCKED) {
+                    unblocker = delayedTaskScheduler().schedule(this::unblock, getBlockTime(recheckInterval), MILLISECONDS);
+                    // Check if we were unblocked while scheduling unblock task.
+                    if (state() != BLOCKED) {
+                        unblocker.cancel(false);
+                    }
+                }
             }
             return;
         }
@@ -1361,7 +1366,7 @@ final class VirtualThread extends BaseVirtualThread {
         return 0;
     }
 
-    private static long getBlockTime(byte recheckVal) {
+    private static long getBlockTime(int recheckVal) {
         assert recheckVal >= 1 && recheckVal <= 6;
         return (long) Math.pow(4, recheckVal - 1);
     }
