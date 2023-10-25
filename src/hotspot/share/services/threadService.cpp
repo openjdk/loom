@@ -464,7 +464,7 @@ DeadlockCycle* ThreadService::find_deadlocks_at_safepoint(ThreadsList * t_list, 
       } else if (waitingToLockMonitor != nullptr) {
         if (waitingToLockMonitor->has_owner()) {
           currentThread = Threads::owning_thread_from_monitor(t_list, waitingToLockMonitor);
-          if (currentThread == nullptr) {
+          if (currentThread == nullptr && !(waitingToLockMonitor->has_vthread_owner() || waitingToLockMonitor->is_owner_anonymous())) {
             // This function is called at a safepoint so the JavaThread
             // that owns waitingToLockMonitor should be findable, but
             // if it is not findable, then the previous currentThread is
