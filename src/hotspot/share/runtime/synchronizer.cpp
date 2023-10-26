@@ -627,21 +627,19 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
     assert(popped == object, "must be owned by this thread");
     monitor->set_owner_from_anonymous(current);
   }
-  if (monitor->slowpath_on_last_exit()) {
+  if (monitor->was_fixed_on_freeze()) {
     assert(monitor->has_vthread_owner() && monitor->vthread_owner() == current->vthread(), "invariant");
     assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
+    // Compensate for the already executed decrement.
+    current->inc_held_monitor_count();
     if (monitor->recursions() == 0) {
-      // Last unlock, fix the monitor now
+      // Last unlock, revert owner to JavaThread*
       monitor->clear_vthread_owner(current);
-      monitor->set_slowpath_on_last_exit(false);
-      // Compensate for the already executed decrement.
-      current->inc_held_monitor_count();
+      monitor->set_was_fixed_on_freeze(false);
       // Falthough to exit() ...
     } else {
       // Recursive case
       monitor->_recursions--;
-      // Compensate for the already executed decrement.
-      current->inc_held_monitor_count();
       return;
     }
   }

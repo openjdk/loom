@@ -208,7 +208,7 @@ private:
   volatile int  _waiters;           // number of waiting threads
  private:
   volatile int _WaitSetLock;        // protects Wait Queue - simple spinlock
-  bool _slowpath_on_last_exit;
+  bool _was_fixed_on_freeze;
 
  public:
 
@@ -245,7 +245,7 @@ private:
   static ByteSize cxq_offset()         { return byte_offset_of(ObjectMonitor, _cxq); }
   static ByteSize succ_offset()        { return byte_offset_of(ObjectMonitor, _succ); }
   static ByteSize EntryList_offset()   { return byte_offset_of(ObjectMonitor, _EntryList); }
-  static ByteSize slowpath_on_last_exit_offset()   { return byte_offset_of(ObjectMonitor, _slowpath_on_last_exit); }
+  static ByteSize was_fixed_on_freeze_offset()   { return byte_offset_of(ObjectMonitor, _was_fixed_on_freeze); }
 
   // ObjectMonitor references can be ORed with markWord::monitor_value
   // as part of the ObjectMonitor tagging mechanism. When we combine an
@@ -324,8 +324,8 @@ private:
     _vthread = OopHandle();
   }
 
-  bool slowpath_on_last_exit()             { return _slowpath_on_last_exit; }
-  void set_slowpath_on_last_exit(bool val) { _slowpath_on_last_exit = val; }
+  bool was_fixed_on_freeze()             { return _was_fixed_on_freeze; }
+  void set_was_fixed_on_freeze(bool val) { _was_fixed_on_freeze = val; }
 
   // Simply get _next_om field.
   ObjectMonitor* next_om() const;

@@ -862,7 +862,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
 
   bind(LNotRecursive);
 
-  cmpptr(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(slowpath_on_last_exit)), 0);
+  cmpptr(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(was_fixed_on_freeze)), 0);
   jccb(Assembler::notEqual, LGoSlowPath);
 
   movptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(cxq)));

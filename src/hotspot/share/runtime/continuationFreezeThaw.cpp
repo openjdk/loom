@@ -608,7 +608,7 @@ void FreezeBase::fix_monitors_in_interpreted_frame(frame& f) {
     // Set owner to be the continuation.
     assert(java_lang_VirtualThread::is_instance(_thread->vthread()), "wrong identity");
     om->set_vthread_owner(owner, _thread->vthread());
-    om->set_slowpath_on_last_exit(true);
+    om->set_was_fixed_on_freeze(true);
     if (--_monitors_to_fix == 0) break;
   }
   assert(_monitors_to_fix >= 0, "invariant");
@@ -676,7 +676,7 @@ void FreezeBase::fix_monitors_in_compiled_frame(frame& f, RegisterMapT* map) {
       // Set owner to be the continuation.
       assert(java_lang_VirtualThread::is_instance(_thread->vthread()), "wrong identity");
       om->set_vthread_owner(owner, _thread->vthread());
-      om->set_slowpath_on_last_exit(true);
+      om->set_was_fixed_on_freeze(true);
       if (--_monitors_to_fix == 0) break;
     }
   }

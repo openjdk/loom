@@ -276,7 +276,7 @@ ObjectMonitor::ObjectMonitor(oop object) :
   _WaitSet(nullptr),
   _waiters(0),
   _WaitSetLock(0),
-  _slowpath_on_last_exit(false)
+  _was_fixed_on_freeze(false)
 { }
 
 ObjectMonitor::~ObjectMonitor() {
@@ -1590,6 +1590,9 @@ bool ObjectMonitor::check_owner(TRAPS) {
     _recursions = 0;
     return true;
   }
+  if (cur == vthread_owner_ptr() && vthread_owner() == current->vthread()) {
+    return true;
+  }
   THROW_MSG_(vmSymbols::java_lang_IllegalMonitorStateException(),
              "current thread is not owner", false);
 }
@@ -1662,6 +1665,13 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   assert(current->_Stalled == 0, "invariant");
   current->_Stalled = intptr_t(this);
   current->set_current_waiting_monitor(this);
+
+  bool convert_owner = was_fixed_on_freeze();
+  if (convert_owner) {
+    // Revert fix since we are going to exit the monitor.
+    clear_vthread_owner(current);
+    set_was_fixed_on_freeze(false);
+  }
 
   // create a node to be put into the queue
   // Critically, after we reset() the event but prior to park(), we must check
@@ -1837,6 +1847,16 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     if (interruptible && current->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
       THROW(vmSymbols::java_lang_InterruptedException());
     }
+  }
+
+  if (convert_owner) {
+    // We could leave the monitor as is but if we later freeze while holding
+    // this monitor we might have to walk into the stackChunk to find the frame
+    // where this monitor was initially acquired to fix it back again. To avoid
+    // adding extra code paths and complexity to handle that case in the freeze
+    // logic just revert the state of the monitor as it was before.
+    set_vthread_owner(current, current->vthread());
+    set_was_fixed_on_freeze(true);
   }
 
   // NOTE: Spurious wake up will be consider as timeout.
