@@ -2205,7 +2205,7 @@ class ThreadAPI {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread[] threads = new Thread[100];
             int n = vgroup.enumerate(threads, /*recurse*/false);
-            assertTrue(n == 0);
+            assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
     }
 

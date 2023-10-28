@@ -639,7 +639,7 @@ final class VirtualThread extends BaseVirtualThread {
             long startTime = System.nanoTime();
 
             boolean yielded = false;
-            Future<?> unparker = scheduleUnpark(this::unpark, nanos);
+            Future<?> unparker = scheduleUnpark(nanos);  // may throw OOME
             setState(TIMED_PARKING);
             try {
                 yielded = yieldContinuation();  // may throw
@@ -704,14 +704,15 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Schedule an unpark task to run after a given delay.
+     * Schedule this virtual thread to be unparked after a given delay.
      */
     @ChangesCurrentThread
-    private Future<?> scheduleUnpark(Runnable unparker, long nanos) {
+    private Future<?> scheduleUnpark(long nanos) {
+        assert Thread.currentThread() == this;
         // need to switch to current carrier thread to avoid nested parking
         switchToCarrierThread();
         try {
-            return delayedTaskScheduler().schedule(unparker, nanos, NANOSECONDS);
+            return delayedTaskScheduler().schedule(this::unpark, nanos, NANOSECONDS);
         } finally {
             switchToVirtualThread(this);
         }
@@ -722,6 +723,7 @@ final class VirtualThread extends BaseVirtualThread {
      */
     @ChangesCurrentThread
     private void cancel(Future<?> future) {
+        assert Thread.currentThread() == this;
         if (!future.isDone()) {
             // need to switch to current carrier thread to avoid nested parking
             switchToCarrierThread();
@@ -878,7 +880,13 @@ final class VirtualThread extends BaseVirtualThread {
                 interrupted = true;
                 Interruptible b = nioBlocker;
                 if (b != null) {
-                    b.interrupt(this);
+                    // ensure current thread doesn't unmount while holding interruptLock
+                    Continuation.pin();
+                    try {
+                        b.interrupt(this);
+                    } finally {
+                        Continuation.unpin();
+                    }
                 }
 
                 // interrupt carrier thread if mounted
@@ -902,9 +910,15 @@ final class VirtualThread extends BaseVirtualThread {
         assert Thread.currentThread() == this;
         boolean oldValue = interrupted;
         if (oldValue) {
-            synchronized (interruptLock) {
-                interrupted = false;
-                carrierThread.clearInterrupt();
+            // ensure current thread doesn't unmount trying to enter interruptLock
+            Continuation.pin();
+            try {
+                synchronized (interruptLock) {
+                    interrupted = false;
+                    carrierThread.clearInterrupt();
+                }
+            } finally {
+                Continuation.unpin();
             }
         }
         return oldValue;
@@ -928,10 +942,12 @@ final class VirtualThread extends BaseVirtualThread {
                 return Thread.State.RUNNABLE;
             case RUNNING:
                 // if mounted then return state of carrier thread
-                synchronized (carrierThreadAccessLock()) {
-                    Thread carrierThread = this.carrierThread;
-                    if (carrierThread != null) {
-                        return carrierThread.threadState();
+                if (Thread.currentThread() != this) {
+                    synchronized (carrierThreadAccessLock()) {
+                        Thread carrier = this.carrierThread;
+                        if (carrier != null) {
+                            return carrier.threadState();
+                        }
                     }
                 }
                 // runnable, mounted
@@ -1026,25 +1042,38 @@ final class VirtualThread extends BaseVirtualThread {
             sb.append(name);
         }
         sb.append("]/");
+
+        // include the carrier thread state and name when mounted
         Thread carrier = carrierThread;
-        if (carrier != null) {
-            // include the carrier thread state and name when mounted
-            synchronized (carrierThreadAccessLock()) {
-                carrier = carrierThread;
-                if (carrier != null) {
-                    String stateAsString = carrier.threadState().toString();
-                    sb.append(stateAsString.toLowerCase(Locale.ROOT));
-                    sb.append('@');
-                    sb.append(carrier.getName());
+        if (Thread.currentThread() == this) {
+            appendCarrierInfo(sb, carrier);
+        } else if (carrier != null) {
+            if (Thread.currentThread() != this) {
+                synchronized (carrierThreadAccessLock()) {
+                    carrier = carrierThread;  // re-read
+                    appendCarrierInfo(sb, carrier);
                 }
             }
         }
+
         // include virtual thread state when not mounted
         if (carrier == null) {
             String stateAsString = threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
         }
         return sb.toString();
+    }
+
+    /**
+     * Appends the carrier's state and name to the given string builder when mounted.
+     */
+    private void appendCarrierInfo(StringBuilder sb, Thread carrier) {
+        if (carrier != null) {
+            String stateAsString = carrier.threadState().toString();
+            sb.append(stateAsString.toLowerCase(Locale.ROOT));
+            sb.append('@');
+            sb.append(carrier.getName());
+        }
     }
 
     @Override
