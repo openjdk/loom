@@ -24,6 +24,7 @@
  */
 package java.lang;
 
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Locale;
@@ -385,6 +386,8 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     @ReservedStackAccess
     private void unmount() {
+        assert !Thread.holdsLock(interruptLock);
+
         // set Thread.currentThread() to return the platform thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
@@ -1214,6 +1217,14 @@ final class VirtualThread extends BaseVirtualThread {
                          0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
+    }
+
+    /**
+     * Invoked by the VM for the Thread.vthread_scheduler diagnostic command.
+     */
+    private static byte[] printDefaultScheduler() {
+        return String.format("%s%n", DEFAULT_SCHEDULER.toString())
+                .getBytes(StandardCharsets.UTF_8);
     }
 
     /**
