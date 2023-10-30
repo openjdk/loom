@@ -24,13 +24,15 @@
 
 #include "precompiled.hpp"
 #include "cds/cds_globals.hpp"
+#include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/classLoaderHierarchyDCmd.hpp"
 #include "classfile/classLoaderStats.hpp"
-#include "classfile/classLoaderDataGraph.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmClasses.hpp"
 #include "code/codeCache.hpp"
+#include "compiler/compilationMemoryStatistic.hpp"
+#include "compiler/compiler_globals.hpp"
 #include "compiler/compileBroker.hpp"
 #include "compiler/directivesParser.hpp"
 #include "gc/shared/gcVMOperations.hpp"
@@ -38,6 +40,7 @@
 #include "memory/metaspace/metaspaceDCmd.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
+#include "nmt/nmtDCmd.hpp"
 #include "oops/instanceKlass.hpp"
 #include "oops/objArrayOop.inline.hpp"
 #include "oops/oop.inline.hpp"
@@ -57,7 +60,6 @@
 #include "services/diagnosticFramework.hpp"
 #include "services/heapDumper.hpp"
 #include "services/management.hpp"
-#include "services/nmtDCmd.hpp"
 #include "services/writeableFlags.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/events.hpp"
@@ -65,8 +67,8 @@
 #include "utilities/macros.hpp"
 #include "utilities/parseInteger.hpp"
 #ifdef LINUX
-#include "trimCHeapDCmd.hpp"
 #include "mallocInfoDcmd.hpp"
+#include "trimCHeapDCmd.hpp"
 #endif
 
 static void loadAgentModule(TRAPS) {
@@ -122,6 +124,7 @@ void DCmd::register_dcmds(){
 #endif // INCLUDE_JVMTI
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpToFileDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<VThreadSchedulerDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderStatsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
@@ -138,6 +141,7 @@ void DCmd::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesAddDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesRemoveDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilerDirectivesClearDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompilationMemoryStatisticDCmd>(full_export, true, false));
 
   // Enhanced JMX Agent Support
   // These commands won't be exported via the DiagnosticCommandMBean until an
@@ -1098,7 +1102,6 @@ void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const cha
 
   Symbol* sym = vmSymbols::jdk_internal_vm_ThreadDumper();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
-  InstanceKlass* ik = InstanceKlass::cast(k);
   if (HAS_PENDING_EXCEPTION) {
     java_lang_Throwable::print(PENDING_EXCEPTION, output());
     output()->cr();
@@ -1133,4 +1136,58 @@ void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const cha
   typeArrayOop ba = typeArrayOop(res);
   jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
   output()->print_raw((const char*)addr, ba->length());
+}
+
+void VThreadSchedulerDCmd::execute(DCmdSource source, TRAPS) {
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Symbol* sym = vmSymbols::java_lang_VirtualThread();
+  Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // invoke printDefaultScheduler method
+  JavaValue result(T_OBJECT);
+  JavaCallArguments args;
+  JavaCalls::call_static(&result,
+                         k,
+                         vmSymbols::printDefaultScheduler_name(),
+                         vmSymbols::void_byte_array_signature(),
+                         &args,
+                         THREAD);
+  if (HAS_PENDING_EXCEPTION) {
+    java_lang_Throwable::print(PENDING_EXCEPTION, output());
+    output()->cr();
+    CLEAR_PENDING_EXCEPTION;
+    return;
+  }
+
+  // check that result is byte array
+  oop res = cast_to_oop(result.get_jobject());
+  assert(res->is_typeArray(), "just checking");
+  assert(TypeArrayKlass::cast(res->klass())->element_type() == T_BYTE, "just checking");
+
+  // copy the bytes to the output stream
+  typeArrayOop ba = typeArrayOop(res);
+  jbyte* addr = typeArrayOop(res)->byte_at_addr(0);
+  output()->print_raw((const char*)addr, ba->length());
+}
+
+CompilationMemoryStatisticDCmd::CompilationMemoryStatisticDCmd(outputStream* output, bool heap) :
+    DCmdWithParser(output, heap),
+  _human_readable("-H", "Human readable format", "BOOLEAN", false, "false"),
+  _minsize("-s", "Minimum memory size", "MEMORY SIZE", false, "0") {
+  _dcmdparser.add_dcmd_option(&_human_readable);
+  _dcmdparser.add_dcmd_option(&_minsize);
+}
+
+void CompilationMemoryStatisticDCmd::execute(DCmdSource source, TRAPS) {
+  const bool human_readable = _human_readable.value();
+  const size_t minsize = _minsize.has_value() ? _minsize.value()._size : 0;
+  CompilationMemoryStatistic::print_all_by_size(output(), human_readable, minsize);
 }

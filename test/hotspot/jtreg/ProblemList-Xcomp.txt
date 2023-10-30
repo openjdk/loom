@@ -47,6 +47,9 @@ vmTestbase/nsk/jvmti/scenarios/capability/CM03/cm03t001/TestDescription.java 829
 gc/arguments/TestNewSizeFlags.java 8299116 macosx-aarch64
 compiler/interpreter/TestVerifyStackAfterDeopt.java 8316392 macosx-aarch64
 
+gc/cslocker/TestCSLocker.java 8310480 linux-x64
+
+
 ############################################################################
 
 # Loom, fibers branch
@@ -63,3 +66,4 @@ gc/stringdedup/TestStringDeduplicationInterned.java#Serial              8278127 
 gc/stringdedup/TestStringDeduplicationInterned.java#Z                   8278127 generic-all
 
 gc/z/TestGarbageCollectorMXBean.java                                    8278129 generic-all
+

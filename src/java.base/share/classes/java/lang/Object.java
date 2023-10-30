@@ -25,6 +25,7 @@
 
 package java.lang;
 
+import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.misc.Blocker;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 
@@ -370,16 +371,35 @@ public class Object {
      * @see    #wait(long, int)
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
+        if (!Thread.currentThread().isVirtual()) {
+            wait0(timeoutMillis);
+            return;
+        }
+
+        // virtual thread waiting
+        VirtualThreadPinnedEvent event;
+        try {
+            event = new VirtualThreadPinnedEvent();
+            event.begin();
+        } catch (OutOfMemoryError e) {
+            event = null;
+        }
         long comp = Blocker.begin();
         try {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
-            Thread thread = Thread.currentThread();
-            if (thread.isVirtual())
-                thread.getAndClearInterrupt();
+            // virtual thread's interrupt status needs to be cleared
+            Thread.currentThread().getAndClearInterrupt();
             throw e;
         } finally {
             Blocker.end(comp);
+            if (event != null) {
+                try {
+                    event.commit();
+                } catch (OutOfMemoryError e) {
+                    // ignore
+                }
+            }
         }
     }
 

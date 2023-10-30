@@ -30,10 +30,11 @@
  */
 
 /**
- * @test id=system-threads
+ * @test id=poller-modes
  * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
- * @run junit/othervm -Djdk.pollerMode=SYSTEM_THREADS BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=1 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 BlockingSocketOps
  */
 
 /**

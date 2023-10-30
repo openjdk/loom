@@ -43,7 +43,7 @@ class NativeThreadSet {
      * it can efficiently be removed later.
      */
     int add() {
-        long th = NativeThread.currentNativeThread();
+        long th = NativeThread.current();
         // 0 and -1 are treated as placeholders, not real thread handles
         if (th == 0)
             th = -1;
@@ -75,7 +75,7 @@ class NativeThreadSet {
      */
     void remove(int i) {
         synchronized (this) {
-            assert (elts[i] == NativeThread.currentNativeThread()) || (elts[i] == -1);
+            assert (elts[i] == NativeThread.current()) || (elts[i] == -1);
             elts[i] = 0;
             used--;
             if (used == 0 && waitingToEmpty)

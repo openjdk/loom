@@ -46,14 +46,6 @@ public class NativeThread {
     }
 
     /**
-     * Returns the id of the current native thread if the platform can signal
-     * native threads, 0 if the platform can not signal native threads.
-     */
-    static long currentNativeThread() {
-        return 0;
-    }
-
-    /**
      * Signals the given native thread.
      *
      * @throws IllegalArgumentException if tid is not a token to a native thread

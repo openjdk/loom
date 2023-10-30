@@ -30,10 +30,11 @@
  */
 
 /**
- * @test id=system-threads
+ * @test id=poller-modes
  * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
- * @run junit/othervm -Djdk.pollerMode=SYSTEM_THREADS BlockingChannelOps
+ * @run junit/othervm -Djdk.pollerMode=1 BlockingChannelOps
+ * @run junit/othervm -Djdk.pollerMode=2 BlockingChannelOps
  */
 
 /**
@@ -506,7 +507,7 @@ class BlockingChannelOps {
      */
     @Test
     void testDatagramSocketAdaptorReceive2() throws Exception {
-        testDatagramSocketAdaptorReceive(60_1000);
+        testDatagramSocketAdaptorReceive(60_000);
     }
 
     private void testDatagramSocketAdaptorReceive(int timeout) throws Exception {

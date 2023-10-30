@@ -145,6 +145,7 @@ class SerializeClosure;
   template(java_util_Vector,                          "java/util/Vector")                         \
   template(java_util_AbstractList,                    "java/util/AbstractList")                   \
   template(java_util_Hashtable,                       "java/util/Hashtable")                      \
+  template(java_util_DualPivotQuicksort,              "java/util/DualPivotQuicksort")             \
   template(java_lang_Compiler,                        "java/lang/Compiler")                       \
   template(jdk_internal_misc_Signal,                  "jdk/internal/misc/Signal")                 \
   template(jdk_internal_util_Preconditions,           "jdk/internal/util/Preconditions")          \
@@ -794,6 +795,9 @@ class SerializeClosure;
   template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
+                                                                                                                  \
+  /* Thread.vthread_scheduler */                                                                                  \
+  template(printDefaultScheduler_name,             "printDefaultScheduler")                                       \
 
   /*end*/
 

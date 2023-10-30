@@ -25,7 +25,6 @@
  * @test id=default
  * @bug 8284161 8286788
  * @summary Test Thread API with virtual threads
- * @enablePreview
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit ThreadAPI
@@ -33,7 +32,6 @@
 
 /*
  * @test id=no-vmcontinuations
- * @enablePreview
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
@@ -2207,7 +2205,7 @@ class ThreadAPI {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread[] threads = new Thread[100];
             int n = vgroup.enumerate(threads, /*recurse*/false);
-            assertTrue(n == 0);
+            assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
     }
 

@@ -24,6 +24,7 @@
 /**
  * @test
  * @summary Test virtual thread entering (and owning) a lot of monitors
+ * @key randomness
  * @library /test/lib
  * @run junit LotsOfMonitors
  */
@@ -31,7 +32,6 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 
 import jdk.test.lib.thread.VThreadRunner;
@@ -41,12 +41,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LotsOfMonitors {
     static final int MAX_MONITORS = 256;
-
-    static ThreadFactory threadFactory() {
-        return ThreadLocalRandom.current().nextBoolean()
-                ? Thread.ofPlatform().factory()
-                : Thread.ofVirtual().factory();
-    }
 
     /**
      * Test entering lots of monitors with no contention.
@@ -121,7 +115,7 @@ class LotsOfMonitors {
             // start thread to enter monitor for brief period, then enters again when signalled
             var started = new CountDownLatch(1);
             var signal = new CountDownLatch(1);
-            var thread = threadFactory().newThread(() -> {
+            var thread = Thread.ofVirtual().start(() -> {
                 started.countDown();
                 // enter, may be contended
                 synchronized (lock) {
@@ -137,7 +131,6 @@ class LotsOfMonitors {
                     // do nothing
                 }
             });
-            thread.start();
             started.await();
 
             // enter, may be contended

@@ -954,4 +954,41 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class VThreadSchedulerDCmd : public DCmd {
+public:
+  VThreadSchedulerDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
+  static const char* name() {
+    return "Thread.vthread_scheduler";
+  }
+  static const char* description() {
+    return "Print virtual thread scheduler info.";
+  }
+  static const char* impact() { return "Low"; }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
+class CompilationMemoryStatisticDCmd: public DCmdWithParser {
+protected:
+  DCmdArgument<bool> _human_readable;
+  DCmdArgument<MemorySizeArgument> _minsize;
+public:
+  static int num_arguments() { return 2; }
+  CompilationMemoryStatisticDCmd(outputStream* output, bool heap);
+  static const char* name() {
+    return "Compiler.memory";
+  }
+  static const char* description() {
+    return "Print compilation footprint";
+  }
+  static const char* impact() {
+    return "Medium: Pause time depends on number of compiled methods";
+  }
+  static const JavaPermission permission() {
+    JavaPermission p = {"java.lang.management.ManagementPermission",
+                        "monitor", nullptr};
+    return p;
+  }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 #endif // SHARE_SERVICES_DIAGNOSTICCOMMAND_HPP

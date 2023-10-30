@@ -25,14 +25,21 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import java.util.ServiceConfigurationError;
-import sun.security.action.GetPropertyAction;
 
 /**
  * Provider class for Poller implementations.
  */
 abstract class PollerProvider {
+    private static final PollerProvider INSTANCE = new DefaultPollerProvider();
+
     PollerProvider() { }
+
+    /**
+     * Returns the system-wide PollerProvider.
+     */
+    static PollerProvider provider() {
+        return INSTANCE;
+    }
 
     /**
      * Returns the default poller mode.
@@ -43,7 +50,7 @@ abstract class PollerProvider {
     }
 
     /**
-     * Default number of read pollers for the given mode.
+     * Default number of read pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
     int defaultReadPollers(Poller.Mode mode) {
@@ -51,7 +58,7 @@ abstract class PollerProvider {
     }
 
     /**
-     * Default number of write pollers for the given mode.
+     * Default number of write pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
     int defaultWritePollers(Poller.Mode mode) {
@@ -60,28 +67,13 @@ abstract class PollerProvider {
 
     /**
      * Creates a Poller for read ops.
+     * @param subPoller true to create a sub-poller
      */
-    abstract Poller readPoller() throws IOException;
+    abstract Poller readPoller(boolean subPoller) throws IOException;
 
     /**
      * Creates a Poller for write ops.
+     * @param subPoller true to create a sub-poller
      */
-    abstract Poller writePoller() throws IOException;
-
-    /**
-     * Creates the PollerProvider.
-     */
-    static PollerProvider provider() {
-        String cn = GetPropertyAction.privilegedGetProperty("jdk.PollerProvider");
-        if (cn != null) {
-            try {
-                Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-                return (PollerProvider) clazz.getConstructor().newInstance();
-            } catch (Exception e) {
-                throw new ServiceConfigurationError(null, e);
-            }
-        } else {
-            return new DefaultPollerProvider();
-        }
-    }
+    abstract Poller writePoller(boolean subPoller) throws IOException;
 }

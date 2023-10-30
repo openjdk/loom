@@ -55,10 +55,17 @@ class CarrierThreadWaits {
     void testCarrierThreadWaiting() throws Exception {
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             var carrierRef = new AtomicReference<Thread>();
+            var vthreadRef = new AtomicReference<Thread>();
+
             Executor scheduler = task -> {
                 pool.submit(() -> {
                     carrierRef.set(Thread.currentThread());
+
                     task.run();
+
+                    // virtual thread unmounts when it terminates
+                    Thread vthread = vthreadRef.get();
+                    System.err.println(vthread);
                 });
             };
 
@@ -66,27 +73,32 @@ class CarrierThreadWaits {
             var latch = new CountDownLatch(1);
             var done = new AtomicBoolean();
             Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
-            Thread vthread = builder.start(() -> {
+            Thread vthread = builder.unstarted(() -> {
                 latch.countDown();
                 while (!done.get()) {
                     Thread.onSpinWait();
                 }
             });
+            vthreadRef.set(vthread);
+            vthread.start();
 
             // wait for virtual thread to execute
             latch.await();
 
             try {
-                long carrierId = carrierRef.get().threadId();
+                Thread carrier = carrierRef.get();
+                long carrierId = carrier.threadId();
                 long vthreadId = vthread.threadId();
 
                 // carrier thread should be on WAITING on virtual thread
                 ThreadInfo ti = ManagementFactory.getThreadMXBean().getThreadInfo(carrierId);
-                assertEquals(Thread.State.WAITING, ti.getThreadState());
-                assertEquals(vthread.getClass().getName(), ti.getLockInfo().getClassName());
-                assertTrue(ti.getLockInfo().getIdentityHashCode() == System.identityHashCode(vthread));
-                assertTrue(ti.getLockOwnerId() == vthreadId);
-
+                Thread.State state = ti.getThreadState();
+                LockInfo lockInfo = ti.getLockInfo();
+                assertEquals(Thread.State.WAITING, state);
+                assertNotNull(lockInfo);
+                assertEquals(vthread.getClass().getName(), lockInfo.getClassName());
+                assertEquals(System.identityHashCode(vthread), lockInfo.getIdentityHashCode());
+                assertEquals(vthreadId, ti.getLockOwnerId());
             } finally {
                 done.set(true);
             }
