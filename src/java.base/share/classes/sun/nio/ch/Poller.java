@@ -84,7 +84,7 @@ abstract class Poller {
     }
 
     /**
-     * Returns the poller file descriptor, used when the read and write poller threads
+     * Returns the poller's file descriptor, used when the read and write poller threads
      * are virtual threads.
      *
      * @throws UnsupportedOperationException if not supported
