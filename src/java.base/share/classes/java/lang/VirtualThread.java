@@ -203,7 +203,15 @@ final class VirtualThread extends BaseVirtualThread {
         protected void onPinned(Continuation.Pinned reason) {
             if (TRACE_PINNING_MODE > 0) {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
-                PinnedThreadPrinter.printStackTrace(System.out, printAll);
+                VirtualThread vthread = (VirtualThread) Thread.currentThread();
+                int oldState = vthread.state();
+                try {
+                    // avoid printing when in transition states
+                    vthread.setState(RUNNING);
+                    PinnedThreadPrinter.printStackTrace(System.out, printAll);
+                } finally {
+                    vthread.setState(oldState);
+                }
             }
         }
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
@@ -1196,13 +1204,17 @@ final class VirtualThread extends BaseVirtualThread {
             String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
             String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
             if (parallelismValue != null) {
-                parallelism = Integer.parseInt(parallelismValue);
+                parallelism = Integer.max(Integer.parseInt(parallelismValue), 1);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
             if (maxPoolSizeValue != null) {
                 maxPoolSize = Integer.parseInt(maxPoolSizeValue);
-                parallelism = Integer.min(parallelism, maxPoolSize);
+                if (maxPoolSize > 0) {
+                    parallelism = Integer.min(parallelism, maxPoolSize);
+                } else {
+                    maxPoolSize = parallelism;  // no spares
+                }
             } else {
                 maxPoolSize = Integer.max(parallelism, 256);
             }
