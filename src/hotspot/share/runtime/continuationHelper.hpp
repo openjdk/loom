@@ -58,6 +58,7 @@ public:
   class InterpretedFrame;
   class NonInterpretedUnknownFrame;
   class CompiledFrame;
+  class NativeFrame;
   class StubFrame;
 };
 
@@ -127,6 +128,13 @@ public:
 
   template <typename RegisterMapT>
   static int monitors_to_fix(JavaThread* thread, RegisterMapT* map, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
+};
+
+class ContinuationHelper::NativeFrame : public ContinuationHelper::NonInterpretedFrame {
+public:
+  static bool is_instance(const frame& f);
+
+  static int monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
 };
 
 class ContinuationHelper::StubFrame : public ContinuationHelper::NonInterpretedFrame {

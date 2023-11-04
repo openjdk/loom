@@ -181,6 +181,10 @@ inline bool ContinuationHelper::CompiledFrame::is_instance(const frame& f) {
   return f.is_compiled_frame();
 }
 
+inline bool ContinuationHelper::NativeFrame::is_instance(const frame& f) {
+  return f.is_native_frame();
+}
+
 #ifdef ASSERT
 template<typename RegisterMapT>
 int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, RegisterMapT* map, const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
@@ -228,6 +232,40 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
     }
   }
   return monitor_count;
+}
+
+inline int ContinuationHelper::NativeFrame::monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
+  assert(NativeFrame::is_instance(f), "");
+
+  Method* method = f.cb()->as_compiled_method()->method();
+  if (!method->is_synchronized()) {
+    return 0;
+  }
+
+  oop synced_obj = f.get_native_receiver();
+  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
+
+  bool is_first_frame = f.sp() == thread->last_Java_sp();
+  if (!is_first_frame) {
+    assert(ObjectSynchronizer::current_thread_holds_lock(thread, Handle(thread, synced_obj)), "must be owner");
+    assert(monitorenter_oop == nullptr || monitorenter_oop != synced_obj, "owner already, should not be contended");
+
+    markWord mark = synced_obj->mark();
+    if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
+      // already fixed
+      return 0;
+    }
+    bool created;
+    table.put_if_absent(synced_obj, true, &created);
+    if (created) {
+      return 1;
+    }
+  } else {
+    assert(thread->is_on_monitorenter() && monitorenter_oop != nullptr && monitorenter_oop == synced_obj,
+           "should be freeze case due to preempt on monitorenter contention");
+    assert(!ObjectSynchronizer::current_thread_holds_lock(thread, Handle(thread, synced_obj)), "should not be owner");
+  }
+  return 0;
 }
 #endif
 

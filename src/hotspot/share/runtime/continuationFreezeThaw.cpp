@@ -333,6 +333,8 @@ static int monitors_to_fix_on_stack(JavaThread* thread) {
       monitor_count += ContinuationHelper::InterpretedFrame::monitors_to_fix(abs, rhtable, map.stack_chunk()());
     } else if (f.is_compiled_frame()) {
       monitor_count += ContinuationHelper::CompiledFrame::monitors_to_fix(map.thread(), &map, f, rhtable);
+    } else if (f.is_native_frame()) {
+      monitor_count += ContinuationHelper::NativeFrame::monitors_to_fix(map.thread(), f, rhtable);
     }
   }
   return monitor_count;

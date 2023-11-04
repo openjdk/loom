@@ -331,8 +331,8 @@ class frame {
   // Return the monitor owner and BasicLock for compiled synchronized
   // native methods. Used by JVMTI's GetLocalInstance method
   // (via VM_GetReceiver) to retrieve the receiver from a native wrapper frame.
-  BasicLock* get_native_monitor();
-  oop        get_native_receiver();
+  BasicLock* get_native_monitor() const;
+  oop        get_native_receiver() const;
 
   // Find receiver for an invoke when arguments are just pushed on stack (i.e., callee stack-frame is
   // not setup)

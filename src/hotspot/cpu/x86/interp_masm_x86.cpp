@@ -1139,9 +1139,11 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
          "The argument is only for looks. It must be c_rarg1");
 
   if (LockingMode == LM_MONITOR) {
+    push_cont_fastpath();
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
             lock_reg);
+    pop_cont_fastpath();
   } else {
     Label count_locking, done, slow_case;
 

@@ -23,6 +23,11 @@
 
 #include "jni.h"
 
-JNIEXPORT void JNICALL Java_MonitorSyncNativeMethod_nativeMethod(JNIEnv *env, jclass clazz) {
-  // do nothing
+JNIEXPORT void JNICALL Java_MonitorSyncNativeMethod_runFromNative(JNIEnv *env, jclass clazz, jobject runnable) {
+  jmethodID mid = (*env)->GetStaticMethodID(env, clazz, "runUpcall", "(Ljava/lang/Runnable;)V");
+  if (mid == NULL) {
+    (*env)->FatalError(env, "failed to get runUpcall method");
+    return;
+  }
+  (*env)->CallStaticVoidMethod(env, clazz, mid, runnable);
 }

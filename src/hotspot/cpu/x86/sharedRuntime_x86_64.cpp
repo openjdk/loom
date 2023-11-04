@@ -2189,6 +2189,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Save the test result, for recursive case, the result is zero
       __ movptr(Address(lock_reg, mark_word_offset), swap_reg);
       __ jcc(Assembler::notEqual, slow_path_lock);
+      __ jmp (lock_done);
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
       // Load object header
@@ -2310,7 +2311,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Simple recursive lock?
       __ cmpptr(Address(rsp, lock_slot_offset * VMRegImpl::stack_slot_size), NULL_WORD);
       __ jcc(Assembler::notEqual, not_recur);
-      __ dec_held_monitor_count();
       __ jmpb(fast_done);
       __ bind(not_recur);
     }

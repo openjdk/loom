@@ -26,7 +26,7 @@
  * @summary Test synchronization by virtual thread on synchronized native method
  * @library /test/lib
  * @run junit/othervm/native -Xint MonitorSyncNativeMethod
- * @run junit/othervm/native -Xcomp MonitorSyncNativeMethod
+ * @run junit/othervm/native -Xcomp -XX:CompileOnly=MonitorSyncNativeMethod::runFromNative MonitorSyncNativeMethod
  */
 
 import java.util.concurrent.CountDownLatch;
@@ -45,7 +45,11 @@ class MonitorSyncNativeMethod {
     static int VTHREAD_COUNT = Runtime.getRuntime().availableProcessors();
     static AtomicInteger counter = new AtomicInteger(0);
 
-    private static synchronized native void nativeMethod();
+    private static synchronized native void runFromNative(Runnable runnable);
+
+    private static void runUpcall(Runnable runnable) {
+        runnable.run();
+    }
 
     @Test
     void testSyncOnNativeMethod() throws Exception {
@@ -70,7 +74,7 @@ class MonitorSyncNativeMethod {
             var started = new CountDownLatch(1);
             var vthread = Thread.ofVirtual().start(() -> {
                 started.countDown();
-                nativeMethod();
+                runFromNative(() -> LockSupport.parkNanos(1));
                 counter.getAndIncrement();
             });
             // wait for thread to start
@@ -78,6 +82,7 @@ class MonitorSyncNativeMethod {
             await(vthread, Thread.State.BLOCKED);
             vthreads[i] = vthread;
         }
+        runFromNative(() -> LockSupport.parkNanos(1));
     }
 
     private static void await(Thread thread, Thread.State expectedState) {

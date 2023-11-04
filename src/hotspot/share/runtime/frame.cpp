@@ -1098,7 +1098,7 @@ oop frame::retrieve_receiver(RegisterMap* reg_map) {
 }
 
 
-BasicLock* frame::get_native_monitor() {
+BasicLock* frame::get_native_monitor() const {
   nmethod* nm = (nmethod*)_cb;
   assert(_cb != nullptr && _cb->is_nmethod() && nm->method()->is_native(),
          "Should not call this unless it's a native nmethod");
@@ -1107,7 +1107,7 @@ BasicLock* frame::get_native_monitor() {
   return (BasicLock*) &sp()[byte_offset / wordSize];
 }
 
-oop frame::get_native_receiver() {
+oop frame::get_native_receiver() const {
   nmethod* nm = (nmethod*)_cb;
   assert(_cb != nullptr && _cb->is_nmethod() && nm->method()->is_native(),
          "Should not call this unless it's a native nmethod");
