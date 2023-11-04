@@ -243,6 +243,14 @@ public:
 
     return true;
   }
+
+  bool do_lockstack() {
+    BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
+    LockStackOopIterator iterator(_chunk);
+    bs_chunk->encode_gc_mode(_chunk, &iterator);
+
+    return true;
+  }
 };
 
 bool stackChunkOopDesc::try_acquire_relativization() {
@@ -317,6 +325,7 @@ void stackChunkOopDesc::relativize_derived_pointers_concurrently() {
   DerivedPointersSupport::RelativizeClosure derived_cl;
   EncodeGCModeConcurrentFrameClosure<decltype(derived_cl)> frame_cl(this, &derived_cl);
   iterate_stack(&frame_cl);
+  frame_cl.do_lockstack();
 
   release_relativization();
 }
