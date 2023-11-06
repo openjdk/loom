@@ -209,7 +209,8 @@ public class TestSocketChannels extends AbstractChannelsTest {
         throws Exception
     {
         ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
-        sc.connect(ssc.getLocalAddress());
+        // timed-connect using socket adaptor to workaround Windows bug
+        sc.socket().connect(ssc.getLocalAddress(), 10_000);
         return ssc.accept();
     }
 
