@@ -772,7 +772,7 @@ final class VirtualThread extends BaseVirtualThread {
                     submitRunContinuation();
                 }
             } else if ((s == PINNED) || (s == TIMED_PINNED)) {
-                // unpark carrier thread when pinned.
+                // unpark carrier thread when pinned
                 synchronized (carrierThreadAccessLock()) {
                     Thread carrier = carrierThread;
                     if (carrier != null && ((s = state()) == PINNED || s == TIMED_PINNED)) {
