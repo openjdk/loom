@@ -27,7 +27,7 @@
  * @modules java.base/jdk.internal.event
  * @library /test/lib
  * @compile/module=java.base jdk/internal/event/VirtualThreadPinnedEvent.java
- * @run junit VirtualThreadPinnedEventThrows
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED VirtualThreadPinnedEventThrows
  */
 
 import java.lang.ref.Reference;
