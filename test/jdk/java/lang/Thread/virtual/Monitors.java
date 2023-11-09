@@ -27,7 +27,7 @@
  * @key randomness
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit Monitors
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED Monitors
  */
 
 import java.time.Duration;

@@ -60,12 +60,13 @@ class CarrierThreadWaits {
             Executor scheduler = task -> {
                 pool.submit(() -> {
                     carrierRef.set(Thread.currentThread());
+                    Thread vthread = vthreadRef.get();
 
+                    System.err.format("run %s (%s)%n", task, vthread);
                     task.run();
 
                     // virtual thread unmounts when it terminates
-                    Thread vthread = vthreadRef.get();
-                    System.err.println(vthread);
+                    System.err.format("%s done (%s)%n", task, vthread);
                 });
             };
 

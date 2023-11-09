@@ -27,7 +27,7 @@
  * @summary Test Thread API with virtual threads
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit ThreadAPI
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED ThreadAPI
  */
 
 /*
@@ -35,7 +35,8 @@
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations ThreadAPI
+ * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
+ *     --enable-native-access=ALL-UNNAMED ThreadAPI
  */
 
 import java.time.Duration;
