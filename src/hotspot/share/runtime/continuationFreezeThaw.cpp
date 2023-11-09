@@ -2822,7 +2822,6 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
               || (_cont.is_preempted() && f.cb()->as_compiled_method()->is_marked_for_deoptimization())) {
     // The caller of the safepoint stub when the continuation is preempted is not at a call instruction, and so
     // cannot rely on nmethod patching for deopt.
-    assert(_thread->is_interp_only_mode() || stub_caller, "expected a stub-caller");
 
     log_develop_trace(continuations)("Deoptimizing thawed frame");
     DEBUG_ONLY(ContinuationHelper::Frame::patch_pc(f, nullptr));
