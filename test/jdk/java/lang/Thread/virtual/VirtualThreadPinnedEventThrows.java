@@ -32,6 +32,7 @@
 
 import java.lang.ref.Reference;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.VirtualThreadPinnedEvent;
 
@@ -84,24 +85,31 @@ class VirtualThreadPinnedEventThrows {
      * Test parking a virtual thread when pinned.
      */
     private void testParkWhenPinned() throws Exception {
-        var completed = new AtomicBoolean();
+        var exception = new AtomicReference<Throwable>();
+        var done = new AtomicBoolean();
         Thread thread = Thread.startVirtualThread(() -> {
-            VThreadPinner.runPinned(() -> {
-                LockSupport.park();
-            });
-            completed.set(true);
+            try {
+                VThreadPinner.runPinned(() -> {
+                    while (!done.get()) {
+                        LockSupport.park();
+                    }
+                });
+            } catch (Throwable e) {
+                exception.set(e);
+            }
         });
-
-        // wait for thread to park
-        Thread.State state;
-        while ((state = thread.getState()) != Thread.State.WAITING) {
-            assertTrue(state != Thread.State.TERMINATED);
-            Thread.sleep(10);
+        try {
+            // wait for thread to park
+            Thread.State state;
+            while ((state = thread.getState()) != Thread.State.WAITING) {
+                assertTrue(state != Thread.State.TERMINATED);
+                Thread.sleep(10);
+            }
+        } finally {
+            done.set(true);
+            LockSupport.unpark(thread);
+            thread.join();
         }
-
-        // unpark and check that thread completed without exception
-        LockSupport.unpark(thread);
-        thread.join();
-        assertTrue(completed.get());
+        assertNull(exception.get());
     }
 }

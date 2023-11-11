@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
@@ -102,23 +103,39 @@ class JfrEvents {
         Object lock = new Object();
 
         // park with native frame on stack
+        var finish1 = new AtomicBoolean();
         var parkWhenPinned = Arguments.of(
             "LockSupport.park when pinned",
             (ThrowingAction) () -> {
-                VThreadPinner.runPinned(LockSupport::park);
+                VThreadPinner.runPinned(() -> {
+                    while (!finish1.get()) {
+                        LockSupport.park();
+                    }
+                });
             },
             Thread.State.WAITING,
-            (Consumer<Thread>) LockSupport::unpark
+                (Consumer<Thread>) t -> {
+                    finish1.set(true);
+                    LockSupport.unpark(t);
+                }
         );
 
         // timed park with native frame on stack
+        var finish2 = new AtomicBoolean();
         var timedParkWhenPinned = Arguments.of(
             "LockSupport.parkNanos when pinned",
             (ThrowingAction) () -> {
-                VThreadPinner.runPinned(() -> LockSupport.parkNanos(Long.MAX_VALUE));
+                VThreadPinner.runPinned(() -> {
+                    while (!finish2.get()) {
+                        LockSupport.parkNanos(Long.MAX_VALUE);
+                    }
+                });
             },
             Thread.State.TIMED_WAITING,
-            (Consumer<Thread>) LockSupport::unpark
+            (Consumer<Thread>) t -> {
+                finish2.set(true);
+                LockSupport.unpark(t);
+            }
         );
 
         // untimed Object.wait
@@ -199,9 +216,9 @@ class JfrEvents {
             Map<String, Integer> events = sumEvents(recording);
             System.err.println(events);
 
-            // should have a pinned event
+            // should have at least one pinned event
             int pinnedCount = events.getOrDefault("jdk.VirtualThreadPinned", 0);
-            assertEquals(1, pinnedCount);
+            assertTrue(pinnedCount >= 1, "Expected one or more events");
         }
     }
 
