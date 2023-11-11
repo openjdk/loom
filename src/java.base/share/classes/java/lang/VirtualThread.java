@@ -1259,7 +1259,9 @@ final class VirtualThread extends BaseVirtualThread {
         for (int i = 0; i < queueCount; i++) {
             ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
                 Executors.newScheduledThreadPool(1, task -> {
-                    return InnocuousThread.newThread("VirtualThread-unparker", task);
+                    Thread t = InnocuousThread.newThread("VirtualThread-unparker", task);
+                    t.setDaemon(true);
+                    return t;
                 });
             stpe.setRemoveOnCancelPolicy(true);
             schedulers[i] = stpe;
