@@ -62,11 +62,9 @@ class CarrierThreadWaits {
                     carrierRef.set(Thread.currentThread());
                     Thread vthread = vthreadRef.get();
 
-                    System.err.format("run %s (%s)%n", task, vthread);
+                    System.err.println("before task run => " + vthread);
                     task.run();
-
-                    // virtual thread unmounts when it terminates
-                    System.err.format("%s done (%s)%n", task, vthread);
+                    System.err.println(" after task run => " + vthread);
                 });
             };
 

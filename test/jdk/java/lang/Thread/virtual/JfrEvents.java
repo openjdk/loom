@@ -32,7 +32,6 @@
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -94,12 +93,16 @@ class JfrEvents {
 
     /**
      * Arguments for testVirtualThreadPinned to test jdk.VirtualThreadPinned event.
+     *   [0] label/description
+     *   [1] the operation to park/wait
+     *   [2] the Thread.State when parked/waiting
+     *   [3] the action to unpark/notify the thread
      */
-    static Stream<Arguments> pinners() {
+    static Stream<Arguments> pinnedCases() {
         Object lock = new Object();
 
         // park with native frame on stack
-        var pinner1 = Arguments.of(
+        var parkWhenPinned = Arguments.of(
             "LockSupport.park when pinned",
             (ThrowingAction) () -> {
                 VThreadPinner.runPinned(LockSupport::park);
@@ -109,17 +112,17 @@ class JfrEvents {
         );
 
         // timed park with native frame on stack
-        var pinner2 = Arguments.of(
+        var timedParkWhenPinned = Arguments.of(
             "LockSupport.parkNanos when pinned",
             (ThrowingAction) () -> {
-                VThreadPinner.runPinned(() -> LockSupport.parkNanos(Duration.ofDays(1).toNanos()));
+                VThreadPinner.runPinned(() -> LockSupport.parkNanos(Long.MAX_VALUE));
             },
             Thread.State.TIMED_WAITING,
             (Consumer<Thread>) LockSupport::unpark
         );
 
         // untimed Object.wait
-        var pinner3 = Arguments.of(
+        var waitWhenPinned = Arguments.of(
             "Object.wait",
             (ThrowingAction) () -> {
                 synchronized (lock) {
@@ -135,7 +138,7 @@ class JfrEvents {
         );
 
         // timed Object.wait
-        var pinner4 = Arguments.of(
+        var timedWaitWhenPinned = Arguments.of(
             "Object.wait(millis)",
             (ThrowingAction) () -> {
                 synchronized (lock) {
@@ -150,14 +153,14 @@ class JfrEvents {
             }
         );
 
-        return Stream.of(pinner1, pinner2, pinner3, pinner4);
+        return Stream.of(parkWhenPinned, timedParkWhenPinned, waitWhenPinned, timedWaitWhenPinned);
     }
 
     /**
      * Test jdk.VirtualThreadPinned event.
      */
     @ParameterizedTest
-    @MethodSource("pinners")
+    @MethodSource("pinnedCases")
     void testVirtualThreadPinned(String label,
                                  ThrowingAction<Exception> parker,
                                  Thread.State expectedState,
@@ -167,33 +170,28 @@ class JfrEvents {
             recording.enable("jdk.VirtualThreadPinned");
 
             recording.start();
-            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-
-                // execute parking task in a virtual thread
-                var threadRef = new AtomicReference<Thread>();
-                executor.submit(() -> {
-                    threadRef.set(Thread.currentThread());
-                    parker.run();
-                    return null;
+            try {
+                var exception = new AtomicReference<Throwable>();
+                var thread = Thread.ofVirtual().start(() -> {
+                    try {
+                        parker.run();
+                    } catch (Throwable e) {
+                        exception.set(e);
+                    }
                 });
-
-                // wait for the task to start
-                Thread thread;
-                while ((thread = threadRef.get()) == null) {
-                    Thread.sleep(10);
-                }
-
                 try {
                     // wait for thread to park/wait
                     Thread.State state = thread.getState();
                     while (state != expectedState) {
+                        assertTrue(state != Thread.State.TERMINATED, thread.toString());
                         Thread.sleep(10);
                         state = thread.getState();
                     }
                 } finally {
                     unparker.accept(thread);
+                    thread.join();
+                    assertNull(exception.get());
                 }
-
             } finally {
                 recording.stop();
             }

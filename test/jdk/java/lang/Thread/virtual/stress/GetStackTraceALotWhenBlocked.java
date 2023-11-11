@@ -32,7 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class GetStackTraceALotWhenBlocked {
-    static final long DURATION_IN_NANOS = Duration.ofSeconds(5).toNanos();
+    static final long DURATION_IN_NANOS = Duration.ofSeconds(10).toNanos();
 
     public static void main(String[] args) throws Exception {
         var done = new AtomicBoolean();
