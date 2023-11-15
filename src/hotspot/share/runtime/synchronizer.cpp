@@ -691,6 +691,7 @@ void ObjectSynchronizer::jni_exit(oop obj, TRAPS) {
 ObjectLocker::ObjectLocker(Handle obj, JavaThread* thread) {
   _thread = thread;
   _thread->check_for_valid_safepoint_state();
+  DEBUG_ONLY(_thread->inc_obj_locker_count();)
   _obj = obj;
 
   if (_obj() != nullptr) {
@@ -699,6 +700,7 @@ ObjectLocker::ObjectLocker(Handle obj, JavaThread* thread) {
 }
 
 ObjectLocker::~ObjectLocker() {
+  DEBUG_ONLY(_thread->dec_obj_locker_count();)
   if (_obj() != nullptr) {
     ObjectSynchronizer::exit(_obj(), &_lock, _thread);
   }

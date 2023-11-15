@@ -466,6 +466,21 @@ class JavaThread: public Thread {
   bool _preemption_cancelled;
   bool _jvmti_unmount_event_pending;
 
+#ifdef ASSERT
+  intx _obj_locker_count;
+
+ public:
+  intx obj_locker_count() { return _obj_locker_count; }
+  void inc_obj_locker_count() {
+    assert(_obj_locker_count >= 0, "Must always be greater than 0: " INTX_FORMAT, _obj_locker_count);
+    _obj_locker_count++;
+  }
+  void dec_obj_locker_count() {
+    _obj_locker_count--;
+    assert(_obj_locker_count >= 0, "Must always be greater than 0: " INTX_FORMAT, _obj_locker_count);
+  }
+#endif // ASSERT
+
 private:
 
   friend class VMThread;

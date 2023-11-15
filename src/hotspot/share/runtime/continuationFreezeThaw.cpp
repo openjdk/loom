@@ -547,7 +547,11 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
   _monitors_to_fix = thread->held_monitor_count();
   assert(_monitors_to_fix >= 0, "invariant");
   DEBUG_ONLY(int monitors_cnt = monitors_to_fix_on_stack(_thread);)
-  assert(monitors_cnt == _monitors_to_fix, "wrong monitor count. Found %d in the stack but counter is %d", monitors_cnt, _monitors_to_fix);
+  // Ignore assert if inside ObjectLocker since those monitors are not in the
+  // Java stack. We are going to pin due to having native frames on the stack
+  // anyways so no monitor fix attempt will be done. Maybe we should check for
+  // this case early in freeze_internal() along with the other pin conditions.
+  assert(monitors_cnt == _monitors_to_fix || thread->obj_locker_count() > 0, "wrong monitor count. Found %d in the stack but counter is %d", monitors_cnt, _monitors_to_fix);
 
   _monitors_in_lockstack = _monitors_to_fix > 0 && LockingMode == LM_LIGHTWEIGHT ? current->lock_stack().monitor_count() : 0;
   assert(_monitors_in_lockstack >= 0, "_monitors_in_lockstack=%d", _monitors_in_lockstack);
