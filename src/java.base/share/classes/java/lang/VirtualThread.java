@@ -264,8 +264,7 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
-     * otherwise it will be pushed to a submission queue.
-     *
+     * otherwise it will be pushed to an external submission queue.
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
@@ -278,7 +277,21 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler with a lazy submit.
+     * Submits the runContinuation task the scheduler. For the default scheduler, the task
+     * will be pushed to an external submission queue.
+     * @throws RejectedExecutionException
+     */
+    private void externalSubmitRunContinuation() {
+        if (scheduler == DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct) {
+            externalSubmitRunContinuation(ct.getPool());
+        } else {
+            submitRunContinuation();
+        }
+    }
+
+    /**
+     * Submits the runContinuation task to given scheduler with a lazy submit.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
@@ -292,7 +305,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler as an external submit.
+     * Submits the runContinuation task to the given scheduler as an external submit.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
@@ -577,8 +590,8 @@ final class VirtualThread extends BaseVirtualThread {
             // scoped values may be inherited
             inheritScopedValueBindings(container);
 
-            // submit task to run thread
-            submitRunContinuation();
+            // submit task to run thread, using externalSubmit if possible
+            externalSubmitRunContinuation();
             started = true;
         } finally {
             if (!started) {

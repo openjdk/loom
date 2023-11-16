@@ -58,12 +58,13 @@ class CarrierThreadWaits {
 
             Executor scheduler = task -> {
                 pool.submit(() -> {
-                    carrierRef.set(Thread.currentThread());
+                    Thread carrier = Thread.currentThread();
+                    carrierRef.set(carrier);
                     Thread vthread = vthreadRef.get();
 
-                    System.err.println("before task run => " + vthread);
+                    System.err.format("%s run task (%s) ...%n", carrier, vthread);
                     task.run();
-                    System.err.println(" after task run => " + vthread);
+                    System.err.format("%s task done (%s)%n", carrier, vthread);
                 });
             };
 
