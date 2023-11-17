@@ -60,7 +60,6 @@ import sun.net.PlatformSocketImpl;
 import sun.net.ResourceManager;
 import sun.net.ext.ExtendedSocketOptions;
 import sun.net.util.SocketExceptions;
-import sun.security.action.GetPropertyAction;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -77,11 +76,6 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  */
 
 public final class NioSocketImpl extends SocketImpl implements PlatformSocketImpl {
-    static final boolean READ_BEFORE_POLL;
-    static {
-        String s = GetPropertyAction.privilegedGetProperty("jdk.tryReadBeforePoll");
-        READ_BEFORE_POLL = (s == null) || s.isEmpty() || Boolean.parseBoolean(s);
-    }
     private static final NativeDispatcher nd = new SocketDispatcher();
 
     // The maximum number of bytes to read/write per syscall to avoid needing
@@ -276,11 +270,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
     private int timedRead(FileDescriptor fd, byte[] b, int off, int len, long nanos)
         throws IOException
     {
-        assert nanos > 0;
         long startNanos = System.nanoTime();
-        if (!READ_BEFORE_POLL) {
-            park(fd, Net.POLLIN, nanos);
-        }
         int n = tryRead(fd, b, off, len);
         while (n == IOStatus.UNAVAILABLE && isOpen()) {
             long remainingNanos = nanos - (System.nanoTime() - startNanos);
@@ -314,7 +304,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 n = timedRead(fd, b, off, len, MILLISECONDS.toNanos(timeout));
             } else {
                 // read, no timeout
-                n = READ_BEFORE_POLL ? tryRead(fd, b, off, len) : IOStatus.UNAVAILABLE;
+                n = tryRead(fd, b, off, len);
                 while (IOStatus.okayToRetry(n) && isOpen()) {
                     park(fd, Net.POLLIN);
                     n = tryRead(fd, b, off, len);
