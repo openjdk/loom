@@ -46,10 +46,7 @@ class WEPollPoller extends Poller {
 
     @Override
     void implRegister(int fdVal) throws IOException {
-        // re-arm
-        int err = WEPoll.ctl(handle, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
-        if (err == ENOENT)
-            err = WEPoll.ctl(handle, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
+        int err = WEPoll.ctl(handle, EPOLL_CTL_ADD, fdVal, event);
         if (err != 0)
             throw new IOException("epoll_ctl failed: " + err);
     }
@@ -66,6 +63,7 @@ class WEPollPoller extends Poller {
         while (i < n) {
             long event = WEPoll.getEvent(address, i);
             int fdVal = WEPoll.getDescriptor(event);
+            WEPoll.ctl(handle, EPOLL_CTL_DEL, fdVal, 0);
             polled(fdVal);
             i++;
         }
