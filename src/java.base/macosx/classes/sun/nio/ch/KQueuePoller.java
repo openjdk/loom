@@ -56,8 +56,11 @@ class KQueuePoller extends Poller {
     }
 
     @Override
-    void implDeregister(int fdVal) {
-        KQueue.register(kqfd, fdVal, filter, EV_DELETE);
+    void implDeregister(int fdVal, boolean polled) {
+        // event was deleted if already polled
+        if (!polled) {
+            KQueue.register(kqfd, fdVal, filter, EV_DELETE);
+        }
     }
 
     @Override

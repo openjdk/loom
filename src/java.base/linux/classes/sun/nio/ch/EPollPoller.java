@@ -62,8 +62,11 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    void implDeregister(int fdVal) {
-        EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
+    void implDeregister(int fdVal, boolean polled) {
+        // event is disabled if already polled
+        if (!polled) {
+            EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
+        }
     }
 
     @Override
