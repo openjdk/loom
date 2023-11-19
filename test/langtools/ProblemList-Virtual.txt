@@ -21,3 +21,7 @@ tools/javac/launcher/SourceLauncherTest.java 0000000 generic-all
 # unstable when main thread is a virtual thread
 jdk/jshell/ToolMultilineSnippetHistoryTest.java 0000000 generic-all
 jdk/jshell/ToolShiftTabTest.java 0000000 generic-all
+
+# more unstable when main thread is a virtual thread
+jdk/jshell/ToolTabSnippetTest.java 8287078 generic-all
+jdk/jshell/UndefinedClassTest.java 8287078 generic-all
