@@ -67,6 +67,7 @@ public class Blocker {
      */
     public static long begin() {
         if (VM.isBooted()
+                && Thread.currentThread().isVirtual()
                 && currentCarrierThread() instanceof CarrierThread ct && !ct.inBlocking()) {
             ct.beginBlocking();
             boolean completed = false;
