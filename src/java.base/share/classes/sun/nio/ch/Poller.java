@@ -188,7 +188,7 @@ abstract class Poller {
      * is ready for I/O.
      */
     private void register(int fdVal) throws IOException {
-        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        Thread previous = map.put(fdVal, Thread.currentThread());
         assert previous == null;
         implRegister(fdVal);
     }
