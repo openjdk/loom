@@ -114,3 +114,7 @@ runtime/handshake/HandshakeWalkStackTest.java 0000000 generic-all
 runtime/Thread/ThreadCountLimit.java 0000000 generic-all
 
 compiler/interpreter/TestVerifyStackAfterDeopt.java 8316392 macosx-aarch64
+
+compiler/arguments/TestC1Globals.java#id0 8320302 generic-all
+compiler/arguments/TestC1Globals.java#id1 8320302 generic-all
+compiler/arguments/TestC1Globals.java#id2 8320302 generic-all
