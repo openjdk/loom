@@ -36,10 +36,19 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Helper class to support tests running an action in a virtual thread that pins its carrier.
+ * Helper class to allow tests run an action in a virtual thread while pinning its carrier.
+ *
+ * It defines the {@code runPinned} method to run an action with a native frame on the stack.
  */
 public class VThreadPinner {
-    private VThreadPinner() { }
+    private static final Path JAVA_LIBRARY_PATH = Path.of(System.getProperty("java.library.path"));
+    private static final Path LIB_PATH = JAVA_LIBRARY_PATH.resolve(System.mapLibraryName("VThreadPinner"));
+
+    // method handle to call the native function
+    private static final MethodHandle INVOKER = invoker();
+
+    // function pointer to call
+    private static final MemorySegment UPCALL_STUB = upcallStub();
 
     /**
      * Thread local with the action to run.
@@ -49,7 +58,7 @@ public class VThreadPinner {
     /**
      * Runs an action, capturing any exception or error thrown.
      */
-    private static class ActionRunner {
+    private static class ActionRunner implements Runnable {
         private final ThrowingAction<?> action;
         private Throwable throwable;
 
@@ -57,7 +66,8 @@ public class VThreadPinner {
             this.action = action;
         }
 
-        void run() {
+        @Override
+        public void run() {
             try {
                 action.run();
             } catch (Throwable ex) {
@@ -68,6 +78,14 @@ public class VThreadPinner {
         Throwable exception() {
             return throwable;
         }
+    }
+
+    /**
+     * Called by the native function to run the action stashed in the thread local. The
+     * action runs with the native frame on the stack.
+     */
+    private static void callback() {
+        ACTION_RUNNER.get().run();
     }
 
     /**
@@ -85,11 +103,10 @@ public class VThreadPinner {
         if (!Thread.currentThread().isVirtual()) {
             throw new IllegalCallerException("Not a virtual thread");
         }
-
         var runner = new ActionRunner(action);
         ACTION_RUNNER.set(runner);
         try {
-            INVOKER.invoke(CALLBACK);
+            INVOKER.invoke(UPCALL_STUB);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         } finally {
@@ -106,34 +123,31 @@ public class VThreadPinner {
     }
 
     /**
-     * Called by the native function to run the action with the native frame on the stack.
+     * Returns a method handle to the native function void call(void *(*f)(void *)).
      */
-    private static void callback() {
-        ACTION_RUNNER.get().run();
-    }
-
-    // setup
-
-    private static final Path JAVA_LIBRARY_PATH = Path.of(System.getProperty("java.library.path"));
-    private static final Path LIB_PATH = JAVA_LIBRARY_PATH.resolve(System.mapLibraryName("VThreadPinner"));
-
-    private static final MemorySegment CALLBACK;
-    private static final MethodHandle INVOKER;
-
-    static {
+    private static MethodHandle invoker() {
+        Linker abi = Linker.nativeLinker();
         try {
-            Linker abi = Linker.nativeLinker();
-            MethodHandle callback = MethodHandles.lookup()
-                    .findStatic(VThreadPinner.class, "callback", MethodType.methodType(void.class));
-            CALLBACK = abi.upcallStub(callback, FunctionDescriptor.ofVoid(), Arena.global());
-
-            // void call(void *(*f)(void *))
             SymbolLookup lib = SymbolLookup.libraryLookup(LIB_PATH, Arena.global());
             MemorySegment symbol = lib.find("call").orElseThrow();
             FunctionDescriptor desc = FunctionDescriptor.ofVoid(ValueLayout.ADDRESS);
-            INVOKER = abi.downcallHandle(symbol, desc);
+            return abi.downcallHandle(symbol, desc);
         } catch (Throwable e) {
-            throw new ExceptionInInitializerError(e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Returns an upcall stub to use as a function pointer to invoke the callback method.
+     */
+    private static MemorySegment upcallStub() {
+        Linker abi = Linker.nativeLinker();
+        try {
+            MethodHandle callback = MethodHandles.lookup()
+                    .findStatic(VThreadPinner.class, "callback", MethodType.methodType(void.class));
+            return abi.upcallStub(callback, FunctionDescriptor.ofVoid(), Arena.global());
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
         }
     }
 }

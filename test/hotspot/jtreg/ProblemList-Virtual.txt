@@ -84,8 +84,8 @@ vmTestbase/nsk/jdb/repeat/repeat001/repeat001.java  8300707 generic-all
 vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java 8278470 generic-all
 
 ###
-# This test always times out. This is due to the test forcing OOME in the
-# debuggee, which has the side affect of making the Read-Poller thread exit. Because
+# This test times out on Windows and Linux. This is due to the test forcing OOME in
+# the debuggee, which can lead to I/O poller threads exiting. Because
 # of this no vthreads can complete their reads, and the test times out as a result.
 
 vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java 8285417 generic-all
@@ -109,3 +109,12 @@ runtime/ErrorHandling/MachCodeFramesInErrorFile.java 0000000 generic-all
 runtime/Thread/AsyncExceptionOnMonitorEnter.java 0000000 generic-all
 runtime/Thread/StopAtExit.java 0000000 generic-all
 runtime/handshake/HandshakeWalkStackTest.java 0000000 generic-all
+
+# too fragile when main thread is a virtual thread
+runtime/Thread/ThreadCountLimit.java 0000000 generic-all
+
+compiler/interpreter/TestVerifyStackAfterDeopt.java 8316392 macosx-aarch64
+
+compiler/arguments/TestC1Globals.java#id0 8320302 generic-all
+compiler/arguments/TestC1Globals.java#id1 8320302 generic-all
+compiler/arguments/TestC1Globals.java#id2 8320302 generic-all

@@ -67,16 +67,13 @@ public @interface PreviewFeature {
         // not used, but required for interim javac to not warn.
         VIRTUAL_THREADS,
         FOREIGN,
-
-        @JEP(number=430, title="String Templates")
+        @JEP(number=459, title="String Templates", status="Second Preview")
         STRING_TEMPLATES,
-        @JEP(number=443, title="Unnamed Patterns and Variables")
-        UNNAMED,
         @JEP(number=445, title="Unnamed Classes and Instance Main Methods")
         UNNAMED_CLASSES,
         @JEP(number=446, title="Scoped Values", status="Preview")
         SCOPED_VALUES,
-        @JEP(number=453, title="Structured Concurrency", status="Preview")
+        @JEP(number=462, title="Structured Concurrency", status="Second Preview")
         STRUCTURED_CONCURRENCY,
         /**
          * A key for testing.

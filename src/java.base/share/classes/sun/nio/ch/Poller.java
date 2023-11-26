@@ -41,7 +41,7 @@ import sun.security.action.GetPropertyAction;
  * until a given file descriptor is ready for I/O.
  */
 abstract class Poller {
-    private static Pollers POLLERS;
+    private static final Pollers POLLERS;
     static {
         try {
             var pollers = new Pollers();
@@ -94,14 +94,16 @@ abstract class Poller {
     }
 
     /**
-     * Register the file descriptor.
+     * Register the file descriptor. The registration is "one shot", meaning it should
+     * be polled at most once.
      */
     abstract void implRegister(int fdVal) throws IOException;
 
     /**
      * Deregister the file descriptor.
+     * @param polled true if the file descriptor has already been polled
      */
-    abstract void implDeregister(int fdVal);
+    abstract void implDeregister(int fdVal, boolean polled);
 
     /**
      * Poll for events. The {@link #polled(int)} method is invoked for each
@@ -182,23 +184,23 @@ abstract class Poller {
     }
 
     /**
-     * Registers the file descriptor.
+     * Registers the file descriptor to be polled at most once when the file descriptor
+     * is ready for I/O.
      */
     private void register(int fdVal) throws IOException {
-        Thread previous = map.putIfAbsent(fdVal, Thread.currentThread());
+        Thread previous = map.put(fdVal, Thread.currentThread());
         assert previous == null;
         implRegister(fdVal);
     }
 
     /**
-     * Deregister the file descriptor, a no-op if already polled.
+     * Deregister the file descriptor so that the file descriptor is not polled.
      */
     private void deregister(int fdVal) {
         Thread previous = map.remove(fdVal);
-        assert previous == null || previous == Thread.currentThread();
-        if (previous != null) {
-            implDeregister(fdVal);
-        }
+        boolean polled = (previous == null);
+        assert polled || previous == Thread.currentThread();
+        implDeregister(fdVal, polled);
     }
 
     /**
@@ -255,11 +257,11 @@ abstract class Poller {
      * The Pollers used for read and write events.
      */
     private static class Pollers {
+        private final PollerProvider provider;
         private final Poller.Mode pollerMode;
         private final Poller masterPoller;
         private final Poller[] readPollers;
         private final Poller[] writePollers;
-        private final int readMask, writeMask;
 
         // used by start method to executor is kept alive
         private Executor executor;
@@ -302,12 +304,11 @@ abstract class Poller {
                 writePollers[i] = provider.writePoller(mode == Mode.VTHREAD_POLLERS);
             }
 
+            this.provider = provider;
             this.pollerMode = mode;
             this.masterPoller = masterPoller;
             this.readPollers = readPollers;
             this.writePollers = writePollers;
-            this.readMask = readPollers.length - 1;
-            this.writeMask = writePollers.length - 1;
         }
 
         /**
@@ -342,14 +343,16 @@ abstract class Poller {
          * Returns the read poller for the given file descriptor.
          */
         Poller readPoller(int fdVal) {
-            return readPollers[fdVal & readMask];
+            int index = provider.fdValToIndex(fdVal, readPollers.length);
+            return readPollers[index];
         }
 
         /**
          * Returns the write poller for the given file descriptor.
          */
         Poller writePoller(int fdVal) {
-            return writePollers[fdVal & writeMask];
+            int index = provider.fdValToIndex(fdVal, writePollers.length);
+            return writePollers[index];
         }
 
         /**

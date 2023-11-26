@@ -205,7 +205,15 @@ final class VirtualThread extends BaseVirtualThread {
         protected void onPinned(Continuation.Pinned reason) {
             if (TRACE_PINNING_MODE > 0) {
                 boolean printAll = (TRACE_PINNING_MODE == 1);
-                PinnedThreadPrinter.printStackTrace(System.out, printAll);
+                VirtualThread vthread = (VirtualThread) Thread.currentThread();
+                int oldState = vthread.state();
+                try {
+                    // avoid printing when in transition states
+                    vthread.setState(RUNNING);
+                    PinnedThreadPrinter.printStackTrace(System.out, printAll);
+                } finally {
+                    vthread.setState(oldState);
+                }
             }
         }
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
@@ -261,8 +269,7 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
-     * otherwise it will be pushed to a submission queue.
-     *
+     * otherwise it will be pushed to an external submission queue.
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
@@ -275,7 +282,21 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler with a lazy submit.
+     * Submits the runContinuation task the scheduler. For the default scheduler, the task
+     * will be pushed to an external submission queue.
+     * @throws RejectedExecutionException
+     */
+    private void externalSubmitRunContinuation() {
+        if (scheduler == DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct) {
+            externalSubmitRunContinuation(ct.getPool());
+        } else {
+            submitRunContinuation();
+        }
+    }
+
+    /**
+     * Submits the runContinuation task to given scheduler with a lazy submit.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
@@ -289,7 +310,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler as an external submit.
+     * Submits the runContinuation task to the given scheduler as an external submit.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
@@ -576,8 +597,8 @@ final class VirtualThread extends BaseVirtualThread {
             // scoped values may be inherited
             inheritScopedValueBindings(container);
 
-            // submit task to run thread
-            submitRunContinuation();
+            // submit task to run thread, using externalSubmit if possible
+            externalSubmitRunContinuation();
             started = true;
         } finally {
             if (!started) {
@@ -795,7 +816,7 @@ final class VirtualThread extends BaseVirtualThread {
                     submitRunContinuation();
                 }
             } else if ((s == PINNED) || (s == TIMED_PINNED)) {
-                // unpark carrier thread when pinned.
+                // unpark carrier thread when pinned
                 synchronized (carrierThreadAccessLock()) {
                     Thread carrier = carrierThread;
                     if (carrier != null && ((s = state()) == PINNED || s == TIMED_PINNED)) {
@@ -1237,13 +1258,17 @@ final class VirtualThread extends BaseVirtualThread {
             String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
             String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
             if (parallelismValue != null) {
-                parallelism = Integer.parseInt(parallelismValue);
+                parallelism = Integer.max(Integer.parseInt(parallelismValue), 1);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
             if (maxPoolSizeValue != null) {
                 maxPoolSize = Integer.parseInt(maxPoolSizeValue);
-                parallelism = Integer.min(parallelism, maxPoolSize);
+                if (maxPoolSize > 0) {
+                    parallelism = Integer.min(parallelism, maxPoolSize);
+                } else {
+                    maxPoolSize = parallelism;  // no spares
+                }
             } else {
                 maxPoolSize = Integer.max(parallelism, 256);
             }
@@ -1288,7 +1313,9 @@ final class VirtualThread extends BaseVirtualThread {
         for (int i = 0; i < queueCount; i++) {
             ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
                 Executors.newScheduledThreadPool(1, task -> {
-                    return InnocuousThread.newThread("VirtualThread-unparker", task);
+                    Thread t = InnocuousThread.newThread("VirtualThread-unparker", task);
+                    t.setDaemon(true);
+                    return t;
                 });
             stpe.setRemoveOnCancelPolicy(true);
             schedulers[i] = stpe;

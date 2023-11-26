@@ -40,7 +40,6 @@
 import java.lang.management.LockInfo;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,22 +58,22 @@ class CarrierThreadWaits {
 
             Executor scheduler = task -> {
                 pool.submit(() -> {
-                    carrierRef.set(Thread.currentThread());
-
-                    task.run();
-
-                    // virtual thread unmounts when it terminates
+                    Thread carrier = Thread.currentThread();
+                    carrierRef.set(carrier);
                     Thread vthread = vthreadRef.get();
-                    System.err.println(vthread);
+
+                    System.err.format("%s run task (%s) ...%n", carrier, vthread);
+                    task.run();
+                    System.err.format("%s task done (%s)%n", carrier, vthread);
                 });
             };
 
             // start a virtual thread that spins and remains mounted until "done"
-            var latch = new CountDownLatch(1);
+            var started = new AtomicBoolean();
             var done = new AtomicBoolean();
             Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
             Thread vthread = builder.unstarted(() -> {
-                latch.countDown();
+                started.set(true);
                 while (!done.get()) {
                     Thread.onSpinWait();
                 }
@@ -82,11 +81,14 @@ class CarrierThreadWaits {
             vthreadRef.set(vthread);
             vthread.start();
 
-            // wait for virtual thread to execute
-            latch.await();
-
             try {
+                // wait for virtual thread to start
+                while (!started.get()) {
+                    Thread.sleep(10);
+                }
+
                 Thread carrier = carrierRef.get();
+
                 long carrierId = carrier.threadId();
                 long vthreadId = vthread.threadId();
 

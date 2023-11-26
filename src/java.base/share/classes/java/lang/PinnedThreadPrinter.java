@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,6 +34,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import static java.lang.StackWalker.Option.*;
+import jdk.internal.access.JavaIOPrintStreamAccess;
+import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.InternalLock;
 
 /**
  * Helper class to print the virtual thread stack trace when pinned.
@@ -42,7 +45,8 @@ import static java.lang.StackWalker.Option.*;
  * code in that Class. This is used to avoid printing the same stack trace many times.
  */
 class PinnedThreadPrinter {
-    static final StackWalker STACK_WALKER;
+    private static final JavaIOPrintStreamAccess JIOPSA = SharedSecrets.getJavaIOPrintStreamAccess();
+    private static final StackWalker STACK_WALKER;
     static {
         var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
         PrivilegedAction<StackWalker> pa = () ->
@@ -86,7 +90,7 @@ class PinnedThreadPrinter {
     }
 
     /**
-     * Prints the continuation stack trace.
+     * Prints the current thread's stack trace.
      *
      * @param printAll true to print all stack frames, false to only print the
      *        frames that are native or holding a monitor
@@ -98,21 +102,27 @@ class PinnedThreadPrinter {
                     .collect(Collectors.toList())
         );
 
-        // find the closest frame that is causing the thread to be pinned
-        stack.stream()
-            .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
-            .map(LiveStackFrame::getDeclaringClass)
-            .findFirst()
-            .ifPresentOrElse(klass -> {
-                int hash = hash(stack);
-                Hashes hashes = HASHES.get(klass);
-                synchronized (hashes) {
-                    // print the stack trace if not already seen
-                    if (hashes.add(hash)) {
-                        printStackTrace(stack, out, printAll);
-                    }
-                }
-            }, () -> printStackTrace(stack, out, true));  // not found
+        // tryLock to avoid blocking waiting for System.out
+        InternalLock lock = (InternalLock) JIOPSA.lock(out);
+        if (lock != null && lock.tryLock()) {
+            try {
+                // find the closest frame that is causing the thread to be pinned
+                stack.stream()
+                    .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
+                    .map(LiveStackFrame::getDeclaringClass)
+                    .findFirst()
+                    .ifPresentOrElse(klass -> {
+                        int hash = hash(stack);
+                        Hashes hashes = HASHES.get(klass);
+                        // print the stack trace if not already seen
+                        if (hashes.add(hash)) {
+                            printStackTrace(stack, out, printAll);
+                        }
+                    }, () -> printStackTrace(stack, out, true));  // not found
+            } finally {
+                lock.unlock();
+            }
+        }
     }
 
     private static void printStackTrace(List<LiveStackFrame> stack,
