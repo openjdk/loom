@@ -1610,6 +1610,7 @@ void Deoptimization::reassign_fields(frame* fr, RegisterMap* reg_map, GrowableAr
 bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInfo*>* monitors,
                                     JavaThread* deoptee_thread, frame& fr, int exec_mode, bool realloc_failures) {
   bool relocked_objects = false;
+  AMD64_ONLY(int compensate_extra_increment = 0;)
   for (int i = 0; i < monitors->length(); i++) {
     MonitorInfo* mon_info = monitors->at(i);
     if (mon_info->eliminated()) {
@@ -1625,6 +1626,7 @@ bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInf
             markWord dmw = mark.displaced_mark_helper();
             mark.locker()->set_displaced_header(markWord::encode((BasicLock*) nullptr));
             obj->set_mark(dmw);
+            AMD64_ONLY(compensate_extra_increment++;)
           }
           if (mark.has_monitor()) {
             // defer relocking if the deoptee thread is currently waiting for obj
@@ -1653,6 +1655,7 @@ bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInf
       }
     }
   }
+  AMD64_ONLY(deoptee_thread->dec_held_monitor_count(compensate_extra_increment);)
   return relocked_objects;
 }
 #endif // COMPILER2_OR_JVMCI
