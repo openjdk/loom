@@ -1765,7 +1765,7 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count(rec + 1);
+    _thread->dec_held_monitor_count(NOT_AMD64(rec + 1));
   }
 };
 
