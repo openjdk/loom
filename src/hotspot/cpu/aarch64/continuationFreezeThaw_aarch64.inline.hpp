@@ -307,11 +307,6 @@ inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
   return nullptr;
 }
 
-static inline void derelativize_one(intptr_t* const fp, int offset) {
-  intptr_t* addr = fp + offset;
-  *addr = (intptr_t)(fp + *addr);
-}
-
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
   // Make sure that last_sp is kept relativized.
   assert((intptr_t*)f.at_relative(frame::interpreter_frame_last_sp_offset) == f.unextended_sp(), "");
