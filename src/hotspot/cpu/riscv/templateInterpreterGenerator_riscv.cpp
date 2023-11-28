@@ -539,7 +539,7 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(TosState state,
   return entry;
 }
 
-address TemplateInterpreterGenerator::generate_cont_preempt_rerun_adapter() {
+address TemplateInterpreterGenerator::generate_cont_preempt_rerun_interpreter_adapter() {
   return nullptr;
 }
 

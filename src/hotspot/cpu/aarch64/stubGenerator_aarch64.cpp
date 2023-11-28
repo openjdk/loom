@@ -7107,7 +7107,7 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_preempt_rerun_safepointblob_adapter() {
+  address generate_cont_preempt_rerun_compiler_adapter() {
     if (!Continuations::enabled()) return nullptr;
     StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
     address start = __ pc();
@@ -8393,7 +8393,7 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_preempt_rerun_safepointblob_adapter = generate_cont_preempt_rerun_safepointblob_adapter();
+    StubRoutines::_cont_preempt_rerun_compiler_adapter = generate_cont_preempt_rerun_compiler_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)
   }

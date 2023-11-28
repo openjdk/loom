@@ -621,7 +621,7 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
   return entry;
 }
 
-address TemplateInterpreterGenerator::generate_cont_preempt_rerun_adapter() {
+address TemplateInterpreterGenerator::generate_cont_preempt_rerun_interpreter_adapter() {
   if (!Continuations::enabled()) return nullptr;
   address start = __ pc();
 

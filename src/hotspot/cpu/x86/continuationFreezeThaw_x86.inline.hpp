@@ -281,8 +281,8 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
 inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
   intptr_t* sp = top.sp();
   intptr_t* fp = sp - frame::sender_sp_offset;
-  address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_adapter()
-                                    : StubRoutines::cont_preempt_rerun_safepointblob_adapter();
+  address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_interpreter_adapter()
+                                    : StubRoutines::cont_preempt_rerun_compiler_adapter();
 
 #ifdef ASSERT
   RegisterMap map(JavaThread::current(),

@@ -3021,8 +3021,8 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
 
   bool sent_entry_pc = false;
-  if (pc0 == Interpreter::cont_preempt_rerun_adapter() ||
-      pc0 == StubRoutines::cont_preempt_rerun_safepointblob_adapter()) {
+  if (pc0 == Interpreter::cont_preempt_rerun_interpreter_adapter() ||
+      pc0 == StubRoutines::cont_preempt_rerun_compiler_adapter()) {
     sp0 += frame::metadata_words;    // see push_preempt_rerun_adapter
   } else if (pc0 == StubRoutines::cont_preempt_monitorenter_redo()) {
     sp0 += 2 * frame::metadata_words; // see push_preempt_monitorenter_redo
