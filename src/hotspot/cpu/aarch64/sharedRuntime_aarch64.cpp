@@ -2573,6 +2573,10 @@ uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
   return reg_save.r0_offset_in_bytes() >> LogBytesPerWord;
 }
 
+VMReg SharedRuntime::result_register() {
+  return r0->as_VMReg();
+}
+
 uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
   assert(f.is_safepoint_blob_frame(), "");
   RegisterSaver reg_save(f.cb() == polling_page_vectors_safepoint_handler_blob());

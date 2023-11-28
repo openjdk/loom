@@ -23,7 +23,6 @@
  */
 
 #include "precompiled.hpp"
-#include "c1/c1_Runtime1.hpp"
 #include "classfile/javaClasses.inline.hpp"
 #include "classfile/vmSymbols.hpp"
 #include "code/codeCache.inline.hpp"
@@ -1240,17 +1239,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       *return_oop_addr = _thread->return_oop();
       chunk->set_has_oop_on_stub(true);
 
-  #ifdef ASSERT
-      oop returnoop = *return_oop_addr;
+      DEBUG_ONLY(oop returnoop = *return_oop_addr;)
       assert(oopDesc::is_oop(returnoop) && returnoop->klass()->is_klass(), "");
-      assert(stubframe.cb()->is_safepoint_stub(), "must be a safepoint stub");
-      RegisterMap map(_thread,
-                      RegisterMap::UpdateMap::include,
-                      RegisterMap::ProcessFrames::skip,
-                      RegisterMap::WalkContinuation::skip);
-      stubframe.oop_map()->update_register_map(&stubframe, &map);
-      assert(frame::saved_oop_result_address(&map) == return_oop_addr, "");
-  #endif
     }
   }
 
@@ -2155,8 +2145,6 @@ private:
   void recurse_thaw_compiled_frame(const frame& hf, frame& caller, int num_frames, bool stub_caller);
   void recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_frames);
 
-  void patch_thread_register(frame& top);
-
   void push_return_frame(frame& f);
   inline frame new_entry_frame();
   template<typename FKind> frame new_stack_frame(const frame& hf, frame& caller, bool bottom);
@@ -2616,49 +2604,6 @@ void ThawBase::clear_bitmap_bits(intptr_t* start, int range) {
                               chunk->bit_index_for(start+range));
 }
 
-#ifdef ASSERT
-static address get_thread_register_address_in_stub(frame& stub_fr) {
-  CodeBlob* stub_cb = stub_fr.cb();
-  RegisterMap map(JavaThread::current(),
-                  RegisterMap::UpdateMap::include,
-                  RegisterMap::ProcessFrames::skip,
-                  RegisterMap::WalkContinuation::skip);
-  frame caller_fr = stub_fr.sender(&map);
-  const ImmutableOopMap* oopmap = stub_fr.oop_map();
-
-  VMReg rthread = SharedRuntime::thread_register();
-  for (OopMapStream oms(oopmap); !oms.is_done(); oms.next()) {
-    OopMapValue omv = oms.current();
-    if (omv.content_reg() == rthread) {
-      return stub_fr.oopmapreg_to_location(omv.reg(), &map);
-    }
-  }
-  return nullptr;
-}
-#endif
-
-void ThawBase::patch_thread_register(frame& top) {
-  JavaThread** thread_addr;
-  CodeBlob* cb = top.cb();
-
-  if (cb->is_safepoint_stub()) {
-    thread_addr = frame::saved_thread_address(top);
-  } else {
-    assert(cb->is_runtime_stub(), "invariant");
-    if (cb == Runtime1::blob_for(Runtime1::monitorenter_id) ||
-        cb == Runtime1::blob_for(Runtime1::monitorenter_nofpu_id)) {
-      thread_addr = (JavaThread**)(top.sp() + Runtime1::runtime_blob_current_thread_offset(top));
-    } else {
-      // c2 only saves rbp in the stub frame so nothing to do.
-      assert(get_thread_register_address_in_stub(top) == nullptr, "thread register was saved??");
-      return;
-    }
-  }
-  assert(get_thread_register_address_in_stub(top) == (address)thread_addr, "wrong patch address");
-  JavaThread* old_thread = *thread_addr;
-  *thread_addr = _thread;
-}
-
 intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, intptr_t* sp, bool fast_case) {
   frame top(sp);
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
@@ -2704,17 +2649,14 @@ intptr_t* ThawBase::handle_preempted_continuation(stackChunkOop original_chunk, 
   }
 #endif
 
-  if (top_is_interpreted) {
-    sp = push_preempt_rerun_adapter(top, true /* is_interpreted_frame */);
-  } else {
+  if (!top_is_interpreted) {
     assert(ContinuationHelper::Frame::is_stub(top.cb()), "invariant");
-    if (ContinuationHelper::Frame::is_stub(top.cb())) {
-      // The continuation might now run on a different platform thread than the previous time so
-      // we need to adjust the current thread saved in the stub frame before restoring registers.
-      patch_thread_register(top);
-    }
-    sp = push_preempt_rerun_adapter(top, false /* is_interpreted_frame */);
+    // The continuation might now run on a different platform thread than the previous time so
+    // we need to adjust the current thread saved in the stub frame before restoring registers.
+    JavaThread** thread_addr = frame::saved_thread_address(top);
+    if (thread_addr != nullptr) *thread_addr = _thread;
   }
+  sp = push_preempt_rerun_adapter(top, top_is_interpreted /* is_interpreted_frame */);
   return sp;
 }
 

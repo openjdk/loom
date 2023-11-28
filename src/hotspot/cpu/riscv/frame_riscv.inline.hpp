@@ -345,23 +345,6 @@ inline int frame::sender_sp_ret_address_offset() {
   return frame::sender_sp_offset - frame::return_addr_offset;
 }
 
-#ifdef ASSERT
-inline oop* frame::saved_oop_result_address(RegisterMap* map) {
-  Unimplemented();
-  return nullptr;
-}
-#endif
-
-inline oop* frame::saved_oop_result_address(const frame& f) {
-  Unimplemented();
-  return nullptr;
-}
-
-inline JavaThread** frame::saved_thread_address(const frame& f) {
-  Unimplemented();
-  return nullptr;
-}
-
 inline const ImmutableOopMap* frame::get_oop_map() const {
   if (_cb == nullptr) return nullptr;
   if (_cb->oop_maps() != nullptr) {
