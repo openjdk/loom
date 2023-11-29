@@ -172,16 +172,13 @@ inline void stackChunkOopDesc::clear_flags() {
 
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {
-  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_HAS_OOP_ON_STUB | FLAG_PREEMPTED)) == 0, "other flags should not be set");
+  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_PREEMPTED)) == 0, "other flags should not be set");
   set_flag(FLAG_HAS_INTERPRETED_FRAMES, value);
 }
 
 inline bool stackChunkOopDesc::is_preempted() const         { return is_flag(FLAG_PREEMPTED); }
 inline void stackChunkOopDesc::set_is_preempted(bool value) { set_flag(FLAG_PREEMPTED, value); }
 inline bool stackChunkOopDesc::preempted_on_monitorenter() const   { return objectMonitor() != nullptr; }
-
-inline bool stackChunkOopDesc::has_oop_on_stub() const         { return is_flag(FLAG_HAS_OOP_ON_STUB); }
-inline void stackChunkOopDesc::set_has_oop_on_stub(bool value) { set_flag(FLAG_HAS_OOP_ON_STUB, value); }
 
 inline bool stackChunkOopDesc::has_lockStack() const         { return is_flag(FLAG_HAS_LOCKSTACK); }
 inline void stackChunkOopDesc::set_has_lockStack(bool value) { set_flag(FLAG_HAS_LOCKSTACK, value); }
@@ -306,7 +303,7 @@ inline MemRegion stackChunkOopDesc::range() {
 }
 
 inline int stackChunkOopDesc::relativize_usp_offset(const frame& fr, const int usp_offset_in_bytes) const {
-  assert(fr.is_compiled_frame() || fr.cb()->is_runtime_stub() || fr.cb()->is_safepoint_stub(), "");
+  assert(fr.is_compiled_frame() || fr.cb()->is_runtime_stub(), "");
   assert(is_in_chunk(fr.unextended_sp()), "");
 
   intptr_t* base = fr.real_fp(); // equal to the caller's sp

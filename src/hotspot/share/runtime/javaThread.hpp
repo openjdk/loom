@@ -250,7 +250,6 @@ class JavaThread: public Thread {
   SafepointMechanism::ThreadData _poll_data;
   ThreadSafepointState*          _safepoint_state;              // Holds information about a thread during a safepoint
   address                        _saved_exception_pc;           // Saved pc of instruction where last implicit exception happened
-  oop                            _return_oop;                   // Holds return oop when polling on return from nmethod
   NOT_PRODUCT(bool               _requires_cross_modify_fence;) // State used by VerifyCrossModifyFence
 #ifdef ASSERT
   // Debug support for checking if code allows safepoints or not.
@@ -269,9 +268,6 @@ class JavaThread: public Thread {
   // including NoSafepointVerifier.
   void check_for_valid_safepoint_state() NOT_DEBUG_RETURN;
   void check_possible_safepoint()        NOT_DEBUG_RETURN;
-
-  oop  return_oop() const           { return _return_oop; }
-  void set_return_oop(oop o)        { _return_oop = o; }
 
 #ifdef ASSERT
  private:
@@ -655,25 +651,6 @@ private:
   bool is_handshake_safe_for(Thread* th) const {
     return _handshake.active_handshaker() == th || this == th;
   }
-
-#ifdef ASSERT
-  HandshakeOperation* _current_handshake_op;
-
-  HandshakeOperation* current_handshake_op() { return _current_handshake_op; }
-  void set_current_handshake_op(HandshakeOperation* op) {
-    assert((op != nullptr && _current_handshake_op == nullptr) ||
-           (op == nullptr && _current_handshake_op != nullptr), "invariant");
-    _current_handshake_op = op;
-  }
-#endif
-
-  class AllocationInHandshakeMark : public StackObj {
-    JavaThread* _requester;
-    JavaThread* _target;
-   public:
-    inline AllocationInHandshakeMark(JavaThread* target);
-    inline ~AllocationInHandshakeMark();
-  };
 
   // Suspend/resume support for JavaThread
   // higher-level suspension/resume logic called by the public APIs

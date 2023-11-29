@@ -1369,21 +1369,6 @@ uint SharedRuntime::out_preserve_stack_slots() {
   return 0;
 }
 
-uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
-  Unimplemented();
-  return 0;
-}
-
-VMReg SharedRuntime::result_register() {
-  Unimplemented();
-  return nullptr;
-}
-
-uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
-  Unimplemented();
-  return 0;
-}
-
 VMReg SharedRuntime::thread_register() {
   Unimplemented();
   return nullptr;

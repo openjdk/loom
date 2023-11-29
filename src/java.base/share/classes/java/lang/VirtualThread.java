@@ -781,22 +781,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Tries to forcefully preempt this virtual thread.
-     *
-     * @return the result of the preempt attempt.
-     * @throws UnsupportedOperationException if this virtual thread does not support preemption.
-     */
-    @Override
-    public boolean tryPreempt() {
-        Thread carrier = this.carrierThread;
-        if (state() == RUNNING && carrier != null) {
-            Continuation.PreemptStatus res = cont.tryPreempt(carrier);
-            return res == Continuation.PreemptStatus.SUCCESS;
-        }
-        return false;
-    }
-
-    /**
      * Tests whether this virtual thread was unmounted by forceful preemption (a successful tryPreempt)
      * @return whether this virtual thread was unmounted by forceful preemption.
      */

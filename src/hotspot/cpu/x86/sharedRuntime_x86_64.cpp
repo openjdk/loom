@@ -2532,18 +2532,6 @@ uint SharedRuntime::in_preserve_stack_slots() {
   return 4 + 2 * VerifyStackAtCalls;
 }
 
-uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
-  return RegisterSaver::rax_offset_in_bytes() >> LogBytesPerWord;
-}
-
-VMReg SharedRuntime::result_register() {
-  return rax->as_VMReg();
-}
-
-uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
-  return RegisterSaver::r15_offset_in_bytes() >> LogBytesPerWord;
-}
-
 VMReg SharedRuntime::thread_register() {
   return r15_thread->as_VMReg();
 }

@@ -48,20 +48,16 @@ class FrameOopIterator : public OopIterator {
 private:
   const frame& _f;
   const RegisterMapT* _map;
-  const stackChunkOop _chunk;
 
 public:
-  FrameOopIterator(const frame& f, const RegisterMapT* map, const stackChunkOop chunk)
+  FrameOopIterator(const frame& f, const RegisterMapT* map)
     : _f(f),
-      _map(map),
-      _chunk(chunk) {
+      _map(map) {
   }
 
   virtual void oops_do(OopClosure* cl) override {
     if (_f.is_interpreted_frame()) {
       _f.oops_interpreted_do(cl, nullptr);
-    } else if (_f.is_safepoint_blob_frame() && _chunk->has_oop_on_stub()){
-      cl->do_oop(frame::saved_oop_result_address(_f));
     } else {
       OopMapDo<OopClosure, DerivedOopClosure, IncludeAllValues> visitor(cl, nullptr);
       visitor.oops_do(&_f, _map, _f.oop_map());
@@ -238,7 +234,7 @@ public:
 
     BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
     frame fr = f.to_frame();
-    FrameOopIterator<RegisterMapT> iterator(fr, map, _chunk);
+    FrameOopIterator<RegisterMapT> iterator(fr, map);
     bs_chunk->encode_gc_mode(_chunk, &iterator);
 
     return true;
@@ -343,7 +339,7 @@ public:
 
     BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
     frame fr = f.to_frame();
-    FrameOopIterator<RegisterMapT> iterator(fr, map, _chunk);
+    FrameOopIterator<RegisterMapT> iterator(fr, map);
     bs_chunk->encode_gc_mode(_chunk, &iterator);
 
     return true;
@@ -432,7 +428,7 @@ void stackChunkOopDesc::fix_thawed_frame(const frame& f, const RegisterMapT* map
   }
 
   BarrierSetStackChunk* bs_chunk = BarrierSet::barrier_set()->barrier_set_stack_chunk();
-  FrameOopIterator<RegisterMapT> iterator(f, map, this);
+  FrameOopIterator<RegisterMapT> iterator(f, map);
   bs_chunk->decode_gc_mode(this, &iterator);
 
   if (f.is_compiled_frame() && f.oop_map()->has_derived_oops()) {
@@ -620,7 +616,6 @@ bool stackChunkOopDesc::verify(size_t* out_size, int* out_oops, int* out_frames,
   assert((size == 0) == is_empty(), "");
 
   const StackChunkFrameStream<ChunkFrames::Mixed> first(this);
-  const bool has_safepoint_stub_frame = first.is_stub();
 
   VerifyStackChunkFrameClosure closure(this);
   iterate_stack(&closure);

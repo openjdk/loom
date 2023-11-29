@@ -608,15 +608,6 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
   __ call_VM(noreg, runtime_entry);
   __ pop_cont_fastpath(rthread);
   __ membar(Assembler::AnyAny);
-
-  // Check preemption
-  Label ok;
-  __ ldrb(rscratch1, Address(rthread, in_bytes(JavaThread::preempting_offset())));
-  __ cbz(rscratch1, ok);
-  __ lea(rscratch1, RuntimeAddress(StubRoutines::cont_preempt_stub()));
-  __ br(rscratch1);
-  __ bind(ok);
-
   __ dispatch_via(vtos, Interpreter::_normal_table.table_for(vtos));
   return entry;
 }

@@ -418,7 +418,6 @@ class frame {
   oop saved_oop_result(RegisterMap* map) const;
   void set_saved_oop_result(RegisterMap* map, oop obj);
 
-  static oop* saved_oop_result_address(const frame& f);
   static JavaThread** saved_thread_address(const frame& f);
 
   // For debugging

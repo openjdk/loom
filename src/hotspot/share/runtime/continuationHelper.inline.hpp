@@ -53,7 +53,7 @@ inline bool ContinuationHelper::NonInterpretedUnknownFrame::is_instance(const fr
 }
 
 inline bool ContinuationHelper::Frame::is_stub(CodeBlob* cb) {
-  return cb != nullptr && (cb->is_safepoint_stub() || cb->is_runtime_stub());
+  return cb != nullptr && cb->is_runtime_stub();
 }
 
 inline Method* ContinuationHelper::Frame::frame_method(const frame& f) {

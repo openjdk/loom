@@ -83,27 +83,17 @@ static address get_register_address_in_stub(const frame& stub_fr, VMReg reg) {
 }
 #endif
 
-inline oop* frame::saved_oop_result_address(const frame& f) {
-  assert(f.is_safepoint_blob_frame(), "invalid frame");
-  oop* result_adr = (oop *)(f.sp() + SharedRuntime::safepoint_blob_return_value_offset(f));
-  assert(get_register_address_in_stub(f, SharedRuntime::result_register()) == (address)result_adr, "wrong result address");
-  return result_adr;
-}
-
 inline JavaThread** frame::saved_thread_address(const frame& f) {
-  assert(f.is_safepoint_blob_frame() || f.is_runtime_frame(), "invalid frame");
+  CodeBlob* cb = f.cb();
+  assert(cb != nullptr && cb->is_runtime_stub(), "invalid frame");
+
   JavaThread** thread_addr;
-  if (f.is_safepoint_blob_frame()) {
-    thread_addr = (JavaThread**)(f.sp() + SharedRuntime::safepoint_blob_current_thread_offset(f));
+  if (cb == Runtime1::blob_for(Runtime1::monitorenter_id) ||
+      cb == Runtime1::blob_for(Runtime1::monitorenter_nofpu_id)) {
+    thread_addr = (JavaThread**)(f.sp() + Runtime1::runtime_blob_current_thread_offset(f));
   } else {
-    CodeBlob* cb = f.cb();
-    if (cb == Runtime1::blob_for(Runtime1::monitorenter_id) ||
-        cb == Runtime1::blob_for(Runtime1::monitorenter_nofpu_id)) {
-      thread_addr = (JavaThread**)(f.sp() + Runtime1::runtime_blob_current_thread_offset(f));
-    } else {
-      // c2 only saves rbp in the stub frame so nothing to do.
-      thread_addr = nullptr;
-    }
+    // c2 only saves rbp in the stub frame so nothing to do.
+    thread_addr = nullptr;
   }
   assert(get_register_address_in_stub(f, SharedRuntime::thread_register()) == (address)thread_addr, "wrong thread address");
   return thread_addr;

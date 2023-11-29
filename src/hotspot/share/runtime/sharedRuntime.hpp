@@ -466,12 +466,6 @@ class SharedRuntime: AllStatic {
   // On PowerPC it includes the 4 words holding the old TOC & LR glue.
   static uint in_preserve_stack_slots();
 
-  // Offset from safepoint stub's sp() where register with return value is saved.
-  static uint safepoint_blob_return_value_offset(frame f);
-  static VMReg result_register();
-
-  // Offset from safepoint stub's sp() where register with current thread is saved.
-  static uint safepoint_blob_current_thread_offset(frame f);
   static VMReg thread_register();
 
   static void continuation_enter_cleanup(MacroAssembler* masm);

@@ -79,18 +79,6 @@ public class Continuation {
         public Pinned pinned() { return pinned; }
     }
 
-    private static PreemptStatus toPreemptStatus(int status) {
-        return switch (status) {
-            case 0 -> PreemptStatus.SUCCESS;
-            case 2 -> PreemptStatus.TRANSIENT_FAIL_PINNED_CRITICAL_SECTION;
-            case 3 -> PreemptStatus.TRANSIENT_FAIL_PINNED_NATIVE;
-            case 4 -> PreemptStatus.TRANSIENT_FAIL_PINNED_MONITOR;
-            case 6 -> PreemptStatus.PERM_FAIL_NOT_MOUNTED;
-            case 7 -> PreemptStatus.PERM_FAIL_UNSUPPORTED;
-            default -> throw new AssertionError("Unknown status: " + status);
-        };
-    }
-
     private static Pinned pinnedReason(int reason) {
         return switch (reason) {
             case 2 -> Pinned.CRITICAL_SECTION;
@@ -488,14 +476,8 @@ public class Continuation {
      * @throws UnsupportedOperationException if this continuation does not support preemption
      */
     public PreemptStatus tryPreempt(Thread thread) {
-        if (thread == null || thread.isVirtual()) {
-            return PreemptStatus.PERM_FAIL_NOT_MOUNTED;
-        }
-        int res = tryPreempt0(thread);
-        return toPreemptStatus(res);
+        throw new UnsupportedOperationException("Not implemented");
     }
-
-    private native int tryPreempt0(Thread thread);
 
     // native methods
     private static native void registerNatives();

@@ -49,7 +49,7 @@ static inline void patch_return_pc_with_preempt_stub(frame& f) {
   // once it returns to the interpreter and will manually jump to the
   // preempt stub.
   if (!f.is_interpreted_frame()) {
-    assert(f.is_safepoint_blob_frame(), "invariant");
+    assert(f.is_runtime_frame(), "invariant");
     intptr_t* caller_sp = f.sp() + f.cb()->frame_size();
     caller_sp[-1] = (intptr_t)StubRoutines::cont_preempt_stub();
   }

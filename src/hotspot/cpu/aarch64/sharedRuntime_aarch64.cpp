@@ -105,7 +105,6 @@ class RegisterSaver {
 
   int reg_offset_in_bytes(Register r);
   int r0_offset_in_bytes()    { return reg_offset_in_bytes(r0); }
-  int r28_offset_in_bytes()    { return reg_offset_in_bytes(r28); }
   int rscratch1_offset_in_bytes()    { return reg_offset_in_bytes(rscratch1); }
   int v0_offset_in_bytes();
 
@@ -2565,22 +2564,6 @@ uint SharedRuntime::in_preserve_stack_slots() {
 
 uint SharedRuntime::out_preserve_stack_slots() {
   return 0;
-}
-
-uint SharedRuntime::safepoint_blob_return_value_offset(frame f) {
-  assert(f.is_safepoint_blob_frame(), "");
-  RegisterSaver reg_save(f.cb() == polling_page_vectors_safepoint_handler_blob());
-  return reg_save.r0_offset_in_bytes() >> LogBytesPerWord;
-}
-
-VMReg SharedRuntime::result_register() {
-  return r0->as_VMReg();
-}
-
-uint SharedRuntime::safepoint_blob_current_thread_offset(frame f) {
-  assert(f.is_safepoint_blob_frame(), "");
-  RegisterSaver reg_save(f.cb() == polling_page_vectors_safepoint_handler_blob());
-  return reg_save.r28_offset_in_bytes() >> LogBytesPerWord;
 }
 
 VMReg SharedRuntime::thread_register() {

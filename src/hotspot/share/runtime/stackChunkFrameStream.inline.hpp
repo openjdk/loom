@@ -46,7 +46,7 @@ extern "C" bool dbg_is_safe(const void* p, intptr_t errvalue);
 #endif
 
 template <ChunkFrames frame_kind>
-StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) : _chunk(chunk) {
+StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
 
@@ -71,7 +71,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk) : 
 
 template <ChunkFrames frame_kind>
 StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, const frame& f)
-  : _chunk(chunk) {
+  DEBUG_ONLY(: _chunk(chunk)) {
   assert(chunk->is_stackChunk_noinline(), "");
   assert(frame_kind == ChunkFrames::Mixed || !chunk->has_mixed_frames(), "");
   // assert(!is_empty(), ""); -- allowed to be empty
@@ -105,7 +105,7 @@ StackChunkFrameStream<frame_kind>::StackChunkFrameStream(stackChunkOop chunk, co
 
 template <ChunkFrames frame_kind>
 inline bool StackChunkFrameStream<frame_kind>::is_stub() const {
-  return cb() != nullptr && (_cb->is_safepoint_stub() || _cb->is_runtime_stub());
+  return cb() != nullptr && _cb->is_runtime_stub();
 }
 
 template <ChunkFrames frame_kind>
@@ -201,7 +201,7 @@ inline int StackChunkFrameStream<frame_kind>::num_oops() const {
     return oopmap()->num_oops();
   } else {
     assert(is_stub(), "invariant");
-    return _chunk->has_oop_on_stub() ? 1 : 0;
+    return 0;
   }
 }
 
@@ -364,11 +364,6 @@ inline void StackChunkFrameStream<frame_kind>::iterate_oops(OopClosureType* clos
   if (is_interpreted()) {
     frame f = to_frame();
     f.oops_interpreted_do(closure, nullptr, true);
-  } else if (is_stub()){
-    if (_chunk->has_oop_on_stub()) {
-      frame f = to_frame();
-      Devirtualizer::do_oop(closure, frame::saved_oop_result_address(f));
-    }
   } else {
     DEBUG_ONLY(int oops = 0;)
     for (OopMapStream oms(oopmap()); !oms.is_done(); oms.next()) {

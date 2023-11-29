@@ -77,14 +77,12 @@ class HandshakeOperation : public CHeapObj<mtThread> {
     assert(val >= 0, "_pending_threads=%d cannot be negative", val);
     return val == 0;
   }
-  Thread* requester()              { return _requester; }
   void add_target_count(int count) { Atomic::add(&_pending_threads, count); }
   int32_t pending_threads()        { return Atomic::load(&_pending_threads); }
   const char* name()               { return _handshake_cl->name(); }
   bool is_async()                  { return _handshake_cl->is_async(); }
   bool is_suspend()                { return _handshake_cl->is_suspend(); }
   bool is_async_exception()        { return _handshake_cl->is_async_exception(); }
-  bool can_allocate_objects()      { return _handshake_cl->can_allocate_objects(); }
 };
 
 class AsyncHandshakeOperation : public HandshakeOperation {
@@ -440,8 +438,7 @@ void Handshake::execute(AsyncHandshakeClosure* hs_cl, JavaThread* target) {
 
 // Filters
 static bool handshaker_filter(HandshakeOperation* op) {
-  return (!op->is_async() && !op->can_allocate_objects()) ||
-         (op->can_allocate_objects() && (op->requester() == Thread::current()));
+  return !op->is_async();
 }
 static bool no_async_exception_filter(HandshakeOperation* op) {
   return !op->is_async_exception();
@@ -569,12 +566,6 @@ bool HandshakeState::process_by_self(bool allow_suspend, bool check_async_except
                            async ? "asynchronous" : "synchronous", p2i(op), p2i(_handshakee));
       op->prepare(_handshakee, _handshakee);
       if (!async) {
-        if (op->can_allocate_objects()) {
-          // Let the requester execute this operation to avoid recursive calls in
-          // case of allocation. On return we must check for safepoints.
-          wait_for_op(op);
-          return true;
-        }
         HandleMark hm(_handshakee);
         PreserveExceptionMark pem(_handshakee);
         op->do_handshake(_handshakee); // acquire, op removed after
@@ -663,7 +654,6 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
   }
 
   Thread* current_thread = Thread::current();
-  DEBUG_ONLY(JavaThread* cjt = !current_thread->is_VM_thread() ? JavaThread::cast(current_thread) : nullptr;)
 
   HandshakeOperation* op = get_op_for_handshaker();
 
@@ -676,17 +666,11 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
                        current_thread->is_VM_thread() ? "VM Thread" : "JavaThread");
 
   op->prepare(_handshakee, current_thread);
-  bool notify_target = op->can_allocate_objects();
 
-  DEBUG_ONLY(if (cjt) cjt->set_current_handshake_op(op);)
   set_active_handshaker(current_thread);
   op->do_handshake(_handshakee); // acquire, op removed after
   set_active_handshaker(nullptr);
   remove_op(op);
-  DEBUG_ONLY(if (cjt) cjt->set_current_handshake_op(nullptr);)
-
-  // notify in case target is waiting
-  if (notify_target) _lock.notify();
 
   _lock.unlock();
 
@@ -696,21 +680,6 @@ HandshakeState::ProcessResult HandshakeState::try_process(HandshakeOperation* ma
                        op == match_op ? "including" : "excluding", p2i(match_op));
 
   return op == match_op ? HandshakeState::_succeeded : HandshakeState::_processed;
-}
-
-void HandshakeState::wait_for_op(HandshakeOperation* op) {
-  assert(op->can_allocate_objects(), "no notification for this operation");
-  assert(_handshakee->thread_state() == _thread_in_vm, "invalid state");
-  assert(_lock.owned_by_self(), "Lock must be held");
-
-  _handshakee->set_thread_state(_thread_blocked);
-  // When recheckig condition, original op could have been processed and removed but new
-  // one with same address could have been pushed, so check type too.
-  while (operation_pending(op) && op->can_allocate_objects()) {
-    log_trace(handshake)("JavaThread:" INTPTR_FORMAT " waiting for operation " INTPTR_FORMAT, p2i(_handshakee), p2i(op));
-    _lock.wait_without_safepoint_check();
-  }
-  _handshakee->set_thread_state(_thread_in_vm);
 }
 
 void HandshakeState::do_self_suspend() {
@@ -818,22 +787,6 @@ bool HandshakeState::resume() {
   set_suspended(false);
   _lock.notify();
   return true;
-}
-
-void HandshakeState::break_handshake(JavaThread* requester) {
-  assert(requester == active_handshaker(), "invariant");
-  assert(requester->current_handshake_op() != nullptr, "should have ongoing handshake");
-  assert(requester->current_handshake_op()->can_allocate_objects(), "wrong handshake closure");
-  set_active_handshaker(NULL);
-  _lock.unlock();
-}
-
-void HandshakeState::reacquire_handshake(JavaThread* requester) {
-  assert(requester->current_handshake_op() != nullptr, "should have ongoing handshake");
-  assert(requester->current_handshake_op()->can_allocate_objects(), "wrong handshake closure");
-  _lock.lock_without_safepoint_check();
-  assert(active_handshaker() == nullptr, "invariant");
-  set_active_handshaker(requester);
 }
 
 void HandshakeState::handle_unsafe_access_error() {
