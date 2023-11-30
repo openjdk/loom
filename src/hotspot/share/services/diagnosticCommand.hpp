@@ -954,6 +954,19 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
+class VThreadSchedulerDCmd : public DCmd {
+public:
+  VThreadSchedulerDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
+  static const char* name() {
+    return "Thread.vthread_scheduler";
+  }
+  static const char* description() {
+    return "Print virtual thread scheduler info.";
+  }
+  static const char* impact() { return "Low"; }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
 class CompilationMemoryStatisticDCmd: public DCmdWithParser {
 protected:
   DCmdArgument<bool> _human_readable;

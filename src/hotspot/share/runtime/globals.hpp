@@ -1943,7 +1943,7 @@ const int ObjectAlignmentInBytes = 8;
   develop(bool, LoomVerifyAfterThaw, false,                                 \
           "Verify stack after thaw")                                        \
                                                                             \
-  develop(bool, VerifyContinuations, false,                                 \
+  develop(bool, VerifyContinuations, true,                                  \
           "Verify continuation consistency")                                \
                                                                             \
   develop(bool, UseContinuationFastPath, true,                              \

@@ -27,7 +27,7 @@
  * @summary Test Thread API with virtual threads
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit ThreadAPI
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED ThreadAPI
  */
 
 /*
@@ -35,7 +35,8 @@
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations ThreadAPI
+ * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
+ *     --enable-native-access=ALL-UNNAMED ThreadAPI
  */
 
 import java.time.Duration;
@@ -61,6 +62,7 @@ import java.util.stream.Stream;
 import java.nio.channels.Selector;
 
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -755,11 +757,11 @@ class ThreadAPI {
     void testJoin33() throws Exception {
         AtomicBoolean done = new AtomicBoolean();
         Thread thread = Thread.ofVirtual().start(() -> {
-            synchronized (lock) {
+            VThreadPinner.runPinned(() -> {
                 while (!done.get()) {
                     LockSupport.parkNanos(Duration.ofMillis(20).toNanos());
                 }
-            }
+            });
         });
         try {
             assertFalse(thread.join(Duration.ofMillis(100)));
@@ -1179,10 +1181,10 @@ class ThreadAPI {
                     list.add("B");
                 });
                 child.start();
-                synchronized (lock) {
+                VThreadPinner.runPinned(() -> {
                     Thread.yield();   // pinned so will be a no-op
                     list.add("A");
-                }
+                });
                 try { child.join(); } catch (InterruptedException e) { }
             });
             thread.start();
@@ -1378,9 +1380,9 @@ class ThreadAPI {
     void testSleep8() throws Exception {
         VThreadRunner.run(() -> {
             long start = millisTime();
-            synchronized (lock) {
+            VThreadPinner.runPinned(() -> {
                 Thread.sleep(1000);
-            }
+            });
             expectDuration(start, /*min*/900, /*max*/20_000);
         });
     }
@@ -1394,9 +1396,9 @@ class ThreadAPI {
             Thread me = Thread.currentThread();
             me.interrupt();
             try {
-                synchronized (lock) {
+                VThreadPinner.runPinned(() -> {
                     Thread.sleep(2000);
-                }
+                });
                 fail("sleep not interrupted");
             } catch (InterruptedException e) {
                 // expected
@@ -1414,9 +1416,9 @@ class ThreadAPI {
             Thread t = Thread.currentThread();
             scheduleInterrupt(t, 100);
             try {
-                synchronized (lock) {
+                VThreadPinner.runPinned(() -> {
                     Thread.sleep(20 * 1000);
-                }
+                });
                 fail("sleep not interrupted");
             } catch (InterruptedException e) {
                 // interrupt status should be cleared
@@ -1549,8 +1551,7 @@ class ThreadAPI {
     @Test
     void testUncaughtExceptionHandler1() throws Exception {
         class FooException extends RuntimeException { }
-        var exception = new AtomicReference<Throwable>();
-        Thread.UncaughtExceptionHandler handler = (thread, exc) -> exception.set(exc);
+        var handler = new CapturingUHE();
         Thread thread = Thread.ofVirtual().start(() -> {
             Thread me = Thread.currentThread();
             assertTrue(me.getUncaughtExceptionHandler() == me.getThreadGroup());
@@ -1559,7 +1560,8 @@ class ThreadAPI {
             throw new FooException();
         });
         thread.join();
-        assertTrue(exception.get() instanceof FooException);
+        assertInstanceOf(FooException.class, handler.exception());
+        assertEquals(thread, handler.thread());
         assertNull(thread.getUncaughtExceptionHandler());
     }
 
@@ -1569,8 +1571,7 @@ class ThreadAPI {
     @Test
     void testUncaughtExceptionHandler2() throws Exception {
         class FooException extends RuntimeException { }
-        var exception = new AtomicReference<Throwable>();
-        Thread.UncaughtExceptionHandler handler = (thread, exc) -> exception.set(exc);
+        var handler = new CapturingUHE();
         Thread.UncaughtExceptionHandler savedHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(handler);
         Thread thread;
@@ -1581,23 +1582,59 @@ class ThreadAPI {
             });
             thread.join();
         } finally {
-            Thread.setDefaultUncaughtExceptionHandler(savedHandler);
+            Thread.setDefaultUncaughtExceptionHandler(savedHandler);  // restore
         }
-        assertTrue(exception.get() instanceof FooException);
+        assertInstanceOf(FooException.class, handler.exception());
+        assertEquals(thread, handler.thread());
         assertNull(thread.getUncaughtExceptionHandler());
     }
 
     /**
-     * Test no UncaughtExceptionHandler set.
+     * Test Thread and default UncaughtExceptionHandler set.
      */
     @Test
     void testUncaughtExceptionHandler3() throws Exception {
         class FooException extends RuntimeException { }
-        Thread thread = Thread.ofVirtual().start(() -> {
-            throw new FooException();
-        });
-        thread.join();
+        var defaultHandler = new CapturingUHE();
+        var threadHandler = new CapturingUHE();
+        Thread.UncaughtExceptionHandler savedHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(defaultHandler);
+        Thread thread;
+        try {
+            thread = Thread.ofVirtual().start(() -> {
+                Thread me = Thread.currentThread();
+                assertTrue(me.getUncaughtExceptionHandler() == me.getThreadGroup());
+                me.setUncaughtExceptionHandler(threadHandler);
+                assertTrue(me.getUncaughtExceptionHandler() == threadHandler);
+                throw new FooException();
+            });
+            thread.join();
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(savedHandler);  // restore
+        }
+        assertInstanceOf(FooException.class, threadHandler.exception());
+        assertNull(defaultHandler.exception());
+        assertEquals(thread, threadHandler.thread());
         assertNull(thread.getUncaughtExceptionHandler());
+    }
+
+    /**
+     * Test no Thread or default UncaughtExceptionHandler set.
+     */
+    @Test
+    void testUncaughtExceptionHandler4() throws Exception {
+        Thread.UncaughtExceptionHandler savedHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(null);
+        try {
+            class FooException extends RuntimeException { }
+            Thread thread = Thread.ofVirtual().start(() -> {
+                throw new FooException();
+            });
+            thread.join();
+            assertNull(thread.getUncaughtExceptionHandler());
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(savedHandler);
+        }
     }
 
     /**
@@ -2204,7 +2241,7 @@ class ThreadAPI {
             ThreadGroup vgroup = Thread.currentThread().getThreadGroup();
             Thread[] threads = new Thread[100];
             int n = vgroup.enumerate(threads, /*recurse*/false);
-            assertTrue(n == 0);
+            assertFalse(Arrays.stream(threads, 0, n).anyMatch(Thread::isVirtual));
         });
     }
 
@@ -2315,6 +2352,33 @@ class ThreadAPI {
         });
         thread.join();
         assertTrue(thread.toString().contains("fred"));
+    }
+
+    /**
+     * Thread.UncaughtExceptionHandler that captures the first exception thrown.
+     */
+    private static class CapturingUHE implements Thread.UncaughtExceptionHandler {
+        Thread thread;
+        Throwable exception;
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            synchronized (this) {
+                if (thread == null) {
+                    this.thread = t;
+                    this.exception = e;
+                }
+            }
+        }
+        Thread thread() {
+            synchronized (this) {
+                return thread;
+            }
+        }
+        Throwable exception() {
+            synchronized (this) {
+                return exception;
+            }
+        }
     }
 
     /**

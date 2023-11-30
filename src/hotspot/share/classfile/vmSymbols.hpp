@@ -795,6 +795,9 @@ class SerializeClosure;
   template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
+                                                                                                                  \
+  /* Thread.vthread_scheduler */                                                                                  \
+  template(printDefaultScheduler_name,             "printDefaultScheduler")                                       \
 
   /*end*/
 
