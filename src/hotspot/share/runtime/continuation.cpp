@@ -118,8 +118,7 @@ static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread
 
 static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
   if (!java_lang_VirtualThread::is_instance(vthread) ||                               // inside transition
-      java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::RUNNING ||  // inside transition
-      java_lang_VirtualThread::is_preemption_disabled(vthread)) {                     // temp switch to carrier thread or within DisablePreemption context
+      java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::RUNNING) {  // inside transition
     return false;
   }
   return JVMTI_ONLY(is_safe_vthread_to_preempt_for_jvmti(target, vthread)) NOT_JVMTI(true);

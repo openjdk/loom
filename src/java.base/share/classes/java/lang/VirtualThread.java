@@ -160,8 +160,6 @@ final class VirtualThread extends BaseVirtualThread {
     private byte onWaitingList;
     private byte recheckInterval;
 
-    private int preemptionDisabled;
-
     /**
      * Returns the continuation scope used for virtual threads.
      */
@@ -438,7 +436,6 @@ final class VirtualThread extends BaseVirtualThread {
     @JvmtiMountTransition
     private void switchToCarrierThread() {
         notifyJvmtiHideFrames(true);
-        disablePreemption();
         Thread carrier = this.carrierThread;
         assert Thread.currentThread() == this
                 && carrier == Thread.currentCarrierThread();
@@ -454,7 +451,6 @@ final class VirtualThread extends BaseVirtualThread {
         Thread carrier = vthread.carrierThread;
         assert carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(vthread);
-        vthread.enablePreemption();
         notifyJvmtiHideFrames(false);
     }
 
@@ -684,8 +680,8 @@ final class VirtualThread extends BaseVirtualThread {
             long startTime = System.nanoTime();
 
             boolean yielded = false;
-            setState(TIMED_PARKING);
             Future<?> unparker = scheduleUnpark(nanos);  // may throw OOME
+            setState(TIMED_PARKING);
             try {
                 yielded = yieldContinuation();  // may throw
             } finally {
@@ -778,14 +774,6 @@ final class VirtualThread extends BaseVirtualThread {
                 switchToVirtualThread(this);
             }
         }
-    }
-
-    /**
-     * Tests whether this virtual thread was unmounted by forceful preemption (a successful tryPreempt)
-     * @return whether this virtual thread was unmounted by forceful preemption.
-     */
-    public boolean isPreempted() {
-        return cont.isPreempted();
     }
 
     /**
@@ -1215,16 +1203,6 @@ final class VirtualThread extends BaseVirtualThread {
     private void setCarrierThread(Thread carrier) {
         // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
         this.carrierThread = carrier;
-    }
-
-    private void disablePreemption() {
-        assert this.preemptionDisabled >= 0;
-        this.preemptionDisabled++;
-    }
-
-    private void enablePreemption() {
-        this.preemptionDisabled--;
-        assert this.preemptionDisabled >= 0;
     }
 
     // -- JVM TI support --

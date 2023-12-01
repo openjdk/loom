@@ -142,24 +142,6 @@ public:
 #endif
 };
 
-class DisablePreemption : public StackObj {
-  JavaThread* _thread;
-  bool _should_enable;
- public:
-  DisablePreemption(JavaThread* thread) : _thread(thread), _should_enable(false) {
-    oop vthread = thread->vthread();
-    if (java_lang_VirtualThread::is_instance(vthread)) {
-      java_lang_VirtualThread::inc_preemption_disabled(vthread);
-      _should_enable = true;
-    }
-  }
-  ~DisablePreemption() {
-    if (_should_enable) {
-      java_lang_VirtualThread::dec_preemption_disabled(_thread->vthread());
-    }
-  }
-};
-
 void CONT_RegisterNativeMethods(JNIEnv *env, jclass cls);
 
 #endif // SHARE_VM_RUNTIME_CONTINUATION_HPP

@@ -1956,7 +1956,6 @@ int java_lang_VirtualThread::_state_offset;
 int java_lang_VirtualThread::_next_offset;
 int java_lang_VirtualThread::_onWaitingList_offset;
 int java_lang_VirtualThread::_recheckInterval_offset;
-int java_lang_VirtualThread::_preemptionDisabled_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_vthread_scope_offset,       k, "VTHREAD_SCOPE",      continuationscope_signature, true);  \
@@ -1965,8 +1964,7 @@ int java_lang_VirtualThread::_preemptionDisabled_offset;
   macro(_state_offset,                     k, "state",              int_signature,               false); \
   macro(_next_offset,                      k, "next",               vthread_signature,           false); \
   macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
-  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
-  macro(_preemptionDisabled_offset,        k, "preemptionDisabled", int_signature,               false);
+  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false);
 
 
 void java_lang_VirtualThread::compute_offsets() {
@@ -2067,22 +2065,6 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
 bool java_lang_VirtualThread::is_preempted(oop vthread) {
   oop continuation = java_lang_VirtualThread::continuation(vthread);
   return jdk_internal_vm_Continuation::is_preempted(continuation);
-}
-
-bool java_lang_VirtualThread::is_preemption_disabled(oop vthread) {
-  return vthread->int_field(_preemptionDisabled_offset) > 0;
-}
-
-void java_lang_VirtualThread::inc_preemption_disabled(oop vthread) {
-  int val = vthread->int_field(_preemptionDisabled_offset);
-  assert(val >= 0, "must be");
-  vthread->int_field_put(_preemptionDisabled_offset, val + 1);
-}
-
-void java_lang_VirtualThread::dec_preemption_disabled(oop vthread) {
-  int val = vthread->int_field(_preemptionDisabled_offset);
-  assert(val - 1 >= 0, "must be");
-  vthread->int_field_put(_preemptionDisabled_offset, val - 1);
 }
 
 #if INCLUDE_CDS

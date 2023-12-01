@@ -521,7 +521,6 @@ class java_lang_VirtualThread : AllStatic {
   static int _next_offset;
   static int _onWaitingList_offset;
   static int _recheckInterval_offset;
-  static int _preemptionDisabled_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
  public:
   enum {
@@ -564,9 +563,6 @@ class java_lang_VirtualThread : AllStatic {
   static jbyte recheckInterval(oop vthread);
   static void set_recheckInterval(oop vthread, jbyte value);
   static bool is_preempted(oop vthread);
-  static bool is_preemption_disabled(oop vthread);
-  static void inc_preemption_disabled(oop vthread);
-  static void dec_preemption_disabled(oop vthread);
   static JavaThreadStatus map_state_to_thread_status(int state);
 };
 
