@@ -1990,12 +1990,14 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
       status = JavaThreadStatus::NEW;
       break;
     case STARTED :
-    case RUNNABLE :
     case RUNNING :
     case PARKING :
     case TIMED_PARKING:
+    case UNPARKED:
     case YIELDING :
+    case YIELDED:
     case BLOCKING :
+    case UNBLOCKED :
       status = JavaThreadStatus::RUNNABLE;
       break;
     case PARKED :
