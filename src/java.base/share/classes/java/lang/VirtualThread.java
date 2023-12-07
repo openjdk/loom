@@ -97,45 +97,47 @@ final class VirtualThread extends BaseVirtualThread {
      *  RUNNING -> PARKING         // Thread parking with LockSupport.park
      *  PARKING -> PARKED          // cont.yield successful, parked indefinitely
      *  PARKING -> PINNED          // cont.yield failed, parked indefinitely on carrier
-     *   PARKED -> RUNNABLE        // unparked, schedule to continue
+     *   PARKED -> UNPARKED        // unparked, may be scheduled to continue
      *   PINNED -> RUNNING         // unparked, continue execution on same carrier
+     * UNPARKED -> RUNNING         // continue execution after park
      *
      *       RUNNING -> TIMED_PARKING   // Thread parking with LockSupport.parkNanos
      * TIMED_PARKING -> TIMED_PARKED    // cont.yield successful, timed-parked
      * TIMED_PARKING -> TIMED_PINNED    // cont.yield failed, timed-parked on carrier
-     *  TIMED_PARKED -> RUNNABLE        // unparked, schedule to continue
+     *  TIMED_PARKED -> UNPARKED        // unparked, may be scheduled to continue
      *  TIMED_PINNED -> RUNNING         // unparked, continue execution on same carrier
-     *
-     * RUNNABLE -> RUNNING         // continue execution
      *
      *  RUNNABLE -> BLOCKING       // blocking on monitor enter
      *  BLOCKING -> BLOCKED        // blocked on monitor enter
-     *   BLOCKED -> RUNNABLE       // unblocked
+     *   BLOCKED -> UNBLOCKED      // unblocked, may be scheduled to continue
+     * UNBLOCKED -> RUNNING        // continue execution after blocked on monitor enter
      *
      *  RUNNING -> YIELDING        // Thread.yield
-     * YIELDING -> RUNNABLE        // yield successful
-     * YIELDING -> RUNNING         // yield failed
+     * YIELDING -> YIELDED         // cont.yield successful, may be scheduled to continue
+     * YIELDING -> RUNNING         // cont.yield failed
+     *  YIELDED -> RUNNING         // continue execution after Thread.yield
      */
     private static final int NEW      = 0;
     private static final int STARTED  = 1;
-    private static final int RUNNABLE = 2;     // runnable-unmounted
-    private static final int RUNNING  = 3;     // runnable-mounted
+    private static final int RUNNING  = 2;     // runnable-unmounted
 
-    // untimed parking
-    private static final int PARKING  = 4;
-    private static final int PARKED   = 5;     // unmounted
-    private static final int PINNED   = 6;     // mounted
+    // untimed and timed parking
+    private static final int PARKING       = 3;
+    private static final int PARKED        = 4;     // unmounted
+    private static final int PINNED        = 5;     // mounted
+    private static final int TIMED_PARKING = 6;
+    private static final int TIMED_PARKED  = 7;     // unmounted
+    private static final int TIMED_PINNED  = 8;     // mounted
+    private static final int UNPARKED      = 9;     // unmounted but runnable
 
-    // timed parking
-    private static final int TIMED_PARKING = 7;
-    private static final int TIMED_PARKED  = 8;
-    private static final int TIMED_PINNED  = 9;
-
-    private static final int YIELDING   = 10;  // Thread.yield
+    // Thread.yield
+    private static final int YIELDING = 10;
+    private static final int YIELDED  = 11;         // unmounted but runnable
 
     // monitor enter
-    private static final int BLOCKING   = 11;
-    private static final int BLOCKED    = 12;
+    private static final int BLOCKING  = 12;
+    private static final int BLOCKED   = 13;        // unmounted
+    private static final int UNBLOCKED = 14;        // unmounted but runnable
 
     private static final int TERMINATED = 99;  // final state
 
@@ -238,11 +240,16 @@ final class VirtualThread extends BaseVirtualThread {
 
         // set state to RUNNING
         int initialState = state();
-        if (initialState == STARTED && compareAndSetState(STARTED, RUNNING)) {
-            // first run
-        } else if (initialState == RUNNABLE && compareAndSetState(RUNNABLE, RUNNING)) {
-            // consume parking permit
-            setParkPermit(false);
+        if (initialState == STARTED || initialState == UNPARKED
+                || initialState == UNBLOCKED || initialState == YIELDED) {
+            // newly started or continue after parking/blocking/Thread.yield
+            if (!compareAndSetState(initialState, RUNNING)) {
+                return;
+            }
+            // consume parking permit when continuing after parking
+            if (initialState == UNPARKED) {
+                setParkPermit(false);
+            }
         } else {
             // not runnable
             return;
@@ -492,7 +499,7 @@ final class VirtualThread extends BaseVirtualThread {
             setState(newState);
 
             // may have been unparked while parking
-            if (parkPermit && compareAndSetState(newState, RUNNABLE)) {
+            if (parkPermit && compareAndSetState(newState, UNPARKED)) {
                 // lazy submit to continue on the current thread as carrier if possible
                 if (currentThread() instanceof CarrierThread ct) {
                     lazySubmitRunContinuation(ct.getPool());
@@ -506,7 +513,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         // Thread.yield
         if (s == YIELDING) {
-            setState(RUNNABLE);
+            setState(YIELDED);
 
             // external submit if there are no tasks in the local task queue
             if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
@@ -520,7 +527,7 @@ final class VirtualThread extends BaseVirtualThread {
         // blocking on monitorenter
         if (s == BLOCKING) {
             setState(BLOCKED);
-            if (unblocked && compareAndSetState(BLOCKED, RUNNABLE)) {
+            if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
                 unblocked = false;
                 submitRunContinuation();
             }
@@ -773,7 +780,7 @@ final class VirtualThread extends BaseVirtualThread {
         if (!getAndSetParkPermit(true) && currentThread != this) {
             int s = state();
             boolean parked = (s == PARKED) || (s == TIMED_PARKED);
-            if (parked && compareAndSetState(s, RUNNABLE)) {
+            if (parked && compareAndSetState(s, UNPARKED)) {
                 if (currentThread instanceof VirtualThread vthread) {
                     vthread.switchToCarrierThread();
                     try {
@@ -803,7 +810,7 @@ final class VirtualThread extends BaseVirtualThread {
     private void unblock() {
         assert !Thread.currentThread().isVirtual();
         unblocked = true;
-        if (state() == BLOCKED && compareAndSetState(BLOCKED, RUNNABLE)) {
+        if (state() == BLOCKED && compareAndSetState(BLOCKED, UNBLOCKED)) {
             unblocked = false;
             submitRunContinuation();
         }
@@ -961,7 +968,9 @@ final class VirtualThread extends BaseVirtualThread {
                 } else {
                     return Thread.State.RUNNABLE;
                 }
-            case RUNNABLE:
+            case UNPARKED:
+            case UNBLOCKED:
+            case YIELDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
             case RUNNING:
@@ -1024,36 +1033,62 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Returns the stack trace for this virtual thread if it is unmounted.
-     * Returns null if the thread is in another state.
+     * Returns null if the thread is mounted or in transition.
      */
     private StackTraceElement[] tryGetStackTrace() {
         int initialState = state();
-        return switch (initialState) {
-            case RUNNABLE, PARKED, BLOCKED, TIMED_PARKED -> {
-                int suspendedState = initialState | SUSPENDED;
-                if (compareAndSetState(initialState, suspendedState)) {
-                    try {
-                        yield cont.getStackTrace();
-                    } finally {
-                        assert state == suspendedState;
-                        setState(initialState);
-
-                        // re-submit if runnable
-                        // re-submit if unparked or unblocked while suspended
-                        if (initialState == RUNNABLE
-                                || ((parkPermit || unblocked)
-                                    && compareAndSetState(initialState, RUNNABLE))) {
-                            try {
-                                submitRunContinuation();
-                            } catch (RejectedExecutionException ignore) { }
-                        }
-                    }
-                }
-                yield null;
+        switch (initialState) {
+            case NEW, STARTED, TERMINATED -> {
+                return new StackTraceElement[0];  // unmounted, empty stack
             }
-            case NEW, STARTED, TERMINATED ->  new StackTraceElement[0];  // empty stack
-            default -> null;
+            case RUNNING, PINNED -> {
+                return null;   // mounted
+            }
+            case PARKED, TIMED_PARKED, BLOCKED -> {
+                // unmounted, not runnable
+            }
+            case UNPARKED, UNBLOCKED, YIELDED -> {
+                // unmounted, runnable
+            }
+            case PARKING, TIMED_PARKING, BLOCKING, YIELDING -> {
+                return null;  // in transition
+            }
+            default -> throw new InternalError();
+        }
+
+        // thread is unmounted, prevent it from continuing
+        int suspendedState = initialState | SUSPENDED;
+        if (!compareAndSetState(initialState, suspendedState)) {
+            return null;
+        }
+
+        // get stack trace and restore state
+        StackTraceElement[] stack;
+        try {
+            stack = cont.getStackTrace();
+        } finally {
+            assert state == suspendedState;
+            setState(initialState);
+        }
+        boolean resubmit = switch (initialState) {
+            case UNPARKED, UNBLOCKED, YIELDED -> {
+                // resubmit as task may have run while suspended
+                yield true;
+            }
+            case PARKED, TIMED_PARKED -> {
+                // resubmit if unparked while suspended
+                yield parkPermit && compareAndSetState(initialState, UNPARKED);
+            }
+            case BLOCKED -> {
+                // resubmit if unblocked while suspended
+                yield unblocked && compareAndSetState(BLOCKED, UNBLOCKED);
+            }
+            default -> throw new InternalError();
         };
+        if (resubmit) {
+            submitRunContinuation();
+        }
+        return stack;
     }
 
     @Override
