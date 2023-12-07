@@ -1102,36 +1102,40 @@ final class VirtualThread extends BaseVirtualThread {
         }
         sb.append("]/");
 
-        // include the carrier thread state and name when mounted
-        Thread carrier = carrierThread;
+        // add the carrier state and thread name when mounted
+        boolean mounted;
         if (Thread.currentThread() == this) {
-            appendCarrierInfo(sb, carrier);
-        } else if (carrier != null) {
-            if (Thread.currentThread() != this) {
-                synchronized (carrierThreadAccessLock()) {
-                    carrier = carrierThread;  // re-read
-                    appendCarrierInfo(sb, carrier);
-                }
+            mounted = appendCarrierInfo(sb);
+        } else {
+            synchronized (carrierThreadAccessLock()) {
+                mounted = appendCarrierInfo(sb);
             }
         }
 
-        // include virtual thread state when not mounted
-        if (carrier == null) {
+        // add virtual thread state when not mounted
+        if (!mounted) {
             String stateAsString = threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
         }
+
         return sb.toString();
     }
 
     /**
-     * Appends the carrier's state and name to the given string builder when mounted.
+     * Appends the carrier state and thread name to the string buffer if mounted.
+     * @return true if mounted, false if not mounted
      */
-    private void appendCarrierInfo(StringBuilder sb, Thread carrier) {
+    private boolean appendCarrierInfo(StringBuilder sb) {
+        assert Thread.currentThread() == this || Thread.holdsLock(carrierThreadAccessLock());
+        Thread carrier = carrierThread;
         if (carrier != null) {
             String stateAsString = carrier.threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
             sb.append('@');
             sb.append(carrier.getName());
+            return true;
+        } else {
+            return false;
         }
     }
 
