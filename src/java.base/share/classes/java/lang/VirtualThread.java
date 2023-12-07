@@ -989,7 +989,7 @@ final class VirtualThread extends BaseVirtualThread {
             case TIMED_PARKING:
             case YIELDING:
             case BLOCKING:
-                // runnable, not yet waiting/blocked
+                // runnable, in transition
                 return Thread.State.RUNNABLE;
             case PARKED:
             case PINNED:
