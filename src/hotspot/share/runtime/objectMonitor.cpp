@@ -280,24 +280,15 @@ ObjectMonitor::ObjectMonitor(oop object) :
 { }
 
 ObjectMonitor::~ObjectMonitor() {
-  if (!_object.is_null()) {
-    // Release object's oop storage if it hasn't already been done.
-    release_object();
-  }
+  _object.release(_oop_storage);
 }
 
 oop ObjectMonitor::object() const {
   check_object_context();
-  if (_object.is_null()) {
-    return nullptr;
-  }
   return _object.resolve();
 }
 
 oop ObjectMonitor::object_peek() const {
-  if (_object.is_null()) {
-    return nullptr;
-  }
   return _object.peek();
 }
 
@@ -613,9 +604,6 @@ bool ObjectMonitor::deflate_monitor() {
     // Install the old mark word if nobody else has already done it.
     install_displaced_markword_in_object(obj);
   }
-
-  // Release object's oop storage since the ObjectMonitor has been deflated:
-  release_object();
 
   // We leave owner == DEFLATER_MARKER and contentions < 0
   // to force any racing threads to retry.
