@@ -402,7 +402,6 @@ class Monitors {
      * Test that unblocking a virtual thread waiting to enter a monitor does not consume
      * the thread's parking permit.
      */
-    @Disabled
     @Test
     void testParkingPermitNotConsumed() throws Exception {
         var lock = new Object();
