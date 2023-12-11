@@ -151,16 +151,20 @@ final class VirtualThread extends BaseVirtualThread {
     // unblocked
     private volatile boolean unblocked;
 
+    // a positive value if "responsible thread" blocked on monitor enter, accessed by VM
+    private volatile byte recheckInterval;
+
     // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
 
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
 
-    // Next waiting vthread to unpark()
+    // next waiting thread to unblock, set by VM, see processPendingList
     private VirtualThread next;
+
+    // set to 1 when on waiting list to unblock, set by VM, see processPendingList
     private byte onWaitingList;
-    private byte recheckInterval;
 
     /**
      * Returns the continuation scope used for virtual threads.
@@ -534,18 +538,23 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == BLOCKING) {
             setState(BLOCKED);
 
+            // may have been unblocked while blocking
             if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
                 unblocked = false;
                 submitRunContinuation();
-            } else {
-                Future<?> unblocker = null;
-                int recheckInterval = this.recheckInterval;
-                if (recheckInterval > 0 && state() == BLOCKED) {
-                    unblocker = delayedTaskScheduler().schedule(this::unblock, getBlockTime(recheckInterval), MILLISECONDS);
-                    // Check if we were unblocked while scheduling unblock task.
-                    if (state() != BLOCKED) {
-                        unblocker.cancel(false);
-                    }
+                return;
+            }
+
+            // if thread is a "responsible thread" then schedule it to unblock after a delay
+            int recheckInterval = this.recheckInterval;
+            if (recheckInterval > 0 && state() == BLOCKED) {
+                assert recheckInterval >= 1 && recheckInterval <= 6;
+                // 4 ^ (recheckInterval - 1) = 1, 4, 16, ... 1024
+                long delay = 1 << (recheckInterval - 1) << (recheckInterval - 1);
+                Future<?> unblocker = delayedTaskScheduler().schedule(this::unblock, delay, MILLISECONDS);
+                // cancel if unblocked while scheduling the unblock
+                if (state() != BLOCKED) {
+                    unblocker.cancel(false);
                 }
             }
             return;
@@ -974,9 +983,11 @@ final class VirtualThread extends BaseVirtualThread {
 
     @Override
     Thread.State threadState() {
+        // if this thread is a "responsible thread" it is blocked on monitorenter
         if (recheckInterval > 0) {
             return Thread.State.BLOCKED;
         }
+
         int s = state();
         switch (s & ~SUSPENDED) {
             case NEW:
@@ -1211,18 +1222,12 @@ final class VirtualThread extends BaseVirtualThread {
         state = newValue;  // volatile write
     }
 
-    private VirtualThread next() {
-        return next;
-    }
-
-    private void removeFromWaitingList() {
-        next = null;
-        boolean res = U.compareAndSetByte(this, ON_WAITING_LIST, (byte)0x01, (byte)0x00);
-        assert res;
-    }
-
     private boolean compareAndSetState(int expectedValue, int newValue) {
         return U.compareAndSetInt(this, STATE, expectedValue, newValue);
+    }
+
+    private boolean compareAndSetOnWaitingList(byte expectedValue, byte newValue) {
+        return U.compareAndSetByte(this, ON_WAITING_LIST, expectedValue, newValue);
     }
 
     private void setParkPermit(boolean newValue) {
@@ -1367,23 +1372,22 @@ final class VirtualThread extends BaseVirtualThread {
         return 0;
     }
 
-    private static long getBlockTime(int recheckVal) {
-        assert recheckVal >= 1 && recheckVal <= 6;
-        return (long) Math.pow(4, recheckVal - 1);
-    }
-
     /**
      * Unblock virtual threads that are ready to be scheduled again.
      */
     private static void processPendingList() {
         while (true) {
-            VirtualThread currentWaitingVThread = waitForPendingList();
-            VirtualThread nextWaitingVThread = null;
-            while (currentWaitingVThread != null) {
-                nextWaitingVThread = currentWaitingVThread.next();
-                currentWaitingVThread.removeFromWaitingList();
-                currentWaitingVThread.unblock();
-                currentWaitingVThread = nextWaitingVThread;
+            VirtualThread vthread = waitForPendingList();
+            while (vthread != null) {
+                VirtualThread nextThread = vthread.next;
+
+                // remove from list and unblock
+                vthread.next = null;
+                boolean changed = vthread.compareAndSetOnWaitingList((byte) 1, (byte) 0);
+                assert changed;
+                vthread.unblock();
+
+                vthread = nextThread;
             }
         }
     }
