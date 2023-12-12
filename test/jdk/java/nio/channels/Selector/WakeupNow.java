@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,6 +27,7 @@
  */
 
 import java.nio.channels.*;
+import java.util.concurrent.locks.LockSupport;
 
 public class WakeupNow {
 
@@ -46,6 +47,7 @@ public class WakeupNow {
         sel.wakeup();
         // ensure wakeup is consumed by selectNow
         Thread.sleep(2000);
+        clearParkingPermit();
         sel.selectNow();
         long startTime = System.currentTimeMillis();
         int n = sel.select(2000);
@@ -67,6 +69,7 @@ public class WakeupNow {
         sel.wakeup();
         // ensure wakeup is consumed by selectNow
         Thread.sleep(2000);
+        clearParkingPermit();
         sel.selectNow();
         long startTime = System.currentTimeMillis();
         int n = sel.select(2000);
@@ -76,4 +79,9 @@ public class WakeupNow {
             throw new RuntimeException("test failed");
     }
 
+
+   private static void clearParkingPermit() {
+        LockSupport.unpark(Thread.currentThread());
+        LockSupport.park();
+    }
 }
