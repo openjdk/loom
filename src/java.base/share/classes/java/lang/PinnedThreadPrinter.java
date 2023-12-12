@@ -103,8 +103,8 @@ class PinnedThreadPrinter {
         );
 
         // tryLock to avoid blocking waiting for System.out
-        InternalLock lock = (InternalLock) JIOPSA.lock(out);
-        if (lock != null && lock.tryLock()) {
+        Object lockObj = JIOPSA.lock(out);
+        if (lockObj instanceof InternalLock lock && lock.tryLock()) {
             try {
                 // find the closest frame that is causing the thread to be pinned
                 stack.stream()
