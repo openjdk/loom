@@ -1991,7 +1991,7 @@ int java_lang_VirtualThread::state(oop vthread) {
 }
 
 void java_lang_VirtualThread::set_state(oop vthread, int state) {
-  vthread->int_field_put(_state_offset, state);
+  vthread->release_int_field_put(_state_offset, state);
 }
 
 oop java_lang_VirtualThread::next(oop vthread) {
@@ -2024,7 +2024,7 @@ jbyte java_lang_VirtualThread::recheckInterval(oop vthread) {
 }
 
 void java_lang_VirtualThread::set_recheckInterval(oop vthread, jbyte value) {
-  vthread->byte_field_put(_recheckInterval_offset, value);
+  vthread->release_byte_field_put(_recheckInterval_offset, value);
 }
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
