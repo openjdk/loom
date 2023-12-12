@@ -34,9 +34,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import static java.lang.StackWalker.Option.*;
-import jdk.internal.access.JavaIOPrintStreamAccess;
-import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.InternalLock;
 
 /**
  * Helper class to print the virtual thread stack trace when pinned.
@@ -45,7 +42,6 @@ import jdk.internal.misc.InternalLock;
  * code in that Class. This is used to avoid printing the same stack trace many times.
  */
 class PinnedThreadPrinter {
-    private static final JavaIOPrintStreamAccess JIOPSA = SharedSecrets.getJavaIOPrintStreamAccess();
     private static final StackWalker STACK_WALKER;
     static {
         var options = Set.of(SHOW_REFLECT_FRAMES, RETAIN_CLASS_REFERENCE);
@@ -102,27 +98,21 @@ class PinnedThreadPrinter {
                     .collect(Collectors.toList())
         );
 
-        // tryLock to avoid blocking waiting for System.out
-        Object lockObj = JIOPSA.lock(out);
-        if (lockObj instanceof InternalLock lock && lock.tryLock()) {
-            try {
-                // find the closest frame that is causing the thread to be pinned
-                stack.stream()
-                    .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
-                    .map(LiveStackFrame::getDeclaringClass)
-                    .findFirst()
-                    .ifPresentOrElse(klass -> {
-                        int hash = hash(stack);
-                        Hashes hashes = HASHES.get(klass);
-                        // print the stack trace if not already seen
-                        if (hashes.add(hash)) {
-                            printStackTrace(stack, out, printAll);
-                        }
-                    }, () -> printStackTrace(stack, out, true));  // not found
-            } finally {
-                lock.unlock();
-            }
-        }
+        // find the closest frame that is causing the thread to be pinned
+        stack.stream()
+            .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
+            .map(LiveStackFrame::getDeclaringClass)
+            .findFirst()
+            .ifPresentOrElse(klass -> {
+                int hash = hash(stack);
+                Hashes hashes = HASHES.get(klass);
+                synchronized (hashes) {
+                    // print the stack trace if not already seen
+                    if (hashes.add(hash)) {
+                        printStackTrace(stack, out, printAll);
+                    }
+                }
+            }, () -> printStackTrace(stack, out, true));  // not found
     }
 
     private static void printStackTrace(List<LiveStackFrame> stack,
