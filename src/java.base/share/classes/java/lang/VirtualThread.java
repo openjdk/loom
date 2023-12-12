@@ -545,7 +545,8 @@ final class VirtualThread extends BaseVirtualThread {
                 return;
             }
 
-            // if thread is a "responsible thread" then schedule it to unblock after a delay
+            // if thread is the designated responsible thread for a monitor then schedule
+            // it to wakeup so that it can check and recover. See objectMonitor.cpp.
             int recheckInterval = this.recheckInterval;
             if (recheckInterval > 0 && state() == BLOCKED) {
                 assert recheckInterval >= 1 && recheckInterval <= 6;
@@ -983,11 +984,6 @@ final class VirtualThread extends BaseVirtualThread {
 
     @Override
     Thread.State threadState() {
-        // if this thread is a "responsible thread" it is blocked on monitorenter
-        if (recheckInterval > 0) {
-            return Thread.State.BLOCKED;
-        }
-
         int s = state();
         switch (s & ~SUSPENDED) {
             case NEW:
@@ -1000,11 +996,21 @@ final class VirtualThread extends BaseVirtualThread {
                     return Thread.State.RUNNABLE;
                 }
             case UNPARKED:
-            case UNBLOCKED:
             case YIELDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
+            case UNBLOCKED:
+                // if designated responsible thread for monitor then thread is blocked
+                if (isResponsibleForMonitor()) {
+                    return Thread.State.BLOCKED;
+                } else {
+                    return Thread.State.RUNNABLE;
+                }
             case RUNNING:
+                // if designated responsible thread for monitor then thread is blocked
+                if (isResponsibleForMonitor()) {
+                    return Thread.State.BLOCKED;
+                }
                 // if mounted then return state of carrier thread
                 if (Thread.currentThread() != this) {
                     synchronized (carrierThreadAccessLock()) {
@@ -1019,7 +1025,6 @@ final class VirtualThread extends BaseVirtualThread {
             case PARKING:
             case TIMED_PARKING:
             case YIELDING:
-            case BLOCKING:
                 // runnable, in transition
                 return Thread.State.RUNNABLE;
             case PARKED:
@@ -1028,6 +1033,7 @@ final class VirtualThread extends BaseVirtualThread {
             case TIMED_PARKED:
             case TIMED_PINNED:
                 return State.TIMED_WAITING;
+            case BLOCKING:
             case BLOCKED:
                 return State.BLOCKED;
             case TERMINATED:
@@ -1035,6 +1041,14 @@ final class VirtualThread extends BaseVirtualThread {
             default:
                 throw new InternalError();
         }
+    }
+
+    /**
+     * Returns true if thread is the designated responsible thread for a monitor.
+     * See objectMonitor.cpp for details.
+     */
+    private boolean isResponsibleForMonitor() {
+        return (recheckInterval > 0);
     }
 
     @Override
@@ -1148,7 +1162,6 @@ final class VirtualThread extends BaseVirtualThread {
             String stateAsString = threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
         }
-
         return sb.toString();
     }
 
