@@ -36,7 +36,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import jdk.internal.misc.Blocker;
 
 import static sun.nio.ch.EPoll.EPOLLIN;
 import static sun.nio.ch.EPoll.EPOLL_CTL_ADD;
@@ -114,24 +113,28 @@ class EPollSelectorImpl extends SelectorImpl {
         try {
             begin(blocking);
 
-            do {
-                long startTime = timedPoll ? System.nanoTime() : 0;
-                long comp = Blocker.begin(blocking);
-                try {
+            if (Thread.currentThread().isVirtual()) {
+                numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+                if (numEntries == 0 && blocking) {
+                    long nanos = timedPoll ? TimeUnit.MILLISECONDS.toNanos(to) : 0;
+                    Poller.poll(epfd, Net.POLLIN, nanos, this::isOpen);
+                    numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+                }
+            } else {
+                do {
+                    long startTime = timedPoll ? System.nanoTime() : 0;
                     numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, to);
-                } finally {
-                    Blocker.end(comp);
-                }
-                if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
-                    // timed poll interrupted so need to adjust timeout
-                    long adjust = System.nanoTime() - startTime;
-                    to -= (int) TimeUnit.NANOSECONDS.toMillis(adjust);
-                    if (to <= 0) {
-                        // timeout expired so no retry
-                        numEntries = 0;
+                    if (numEntries == IOStatus.INTERRUPTED && timedPoll) {
+                        // timed poll interrupted so need to adjust timeout
+                        long adjust = System.nanoTime() - startTime;
+                        to -= (int) TimeUnit.NANOSECONDS.toMillis(adjust);
+                        if (to <= 0) {
+                            // timeout expired so no retry
+                            numEntries = 0;
+                        }
                     }
-                }
-            } while (numEntries == IOStatus.INTERRUPTED);
+                } while (numEntries == IOStatus.INTERRUPTED);
+            }
             assert IOStatus.check(numEntries);
 
         } finally {
