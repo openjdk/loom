@@ -52,7 +52,7 @@ import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
 import jdk.test.lib.thread.VThreadPinner;
-import jdk.test.lib.thread.VThreadPinner.ThrowingAction;
+import jdk.test.lib.thread.VThreadRunner.ThrowingRunnable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -106,7 +106,7 @@ class JfrEvents {
         var finish1 = new AtomicBoolean();
         var parkWhenPinned = Arguments.of(
             "LockSupport.park when pinned",
-            (ThrowingAction) () -> {
+            (ThrowingRunnable<Exception>) () -> {
                 VThreadPinner.runPinned(() -> {
                     while (!finish1.get()) {
                         LockSupport.park();
@@ -124,7 +124,7 @@ class JfrEvents {
         var finish2 = new AtomicBoolean();
         var timedParkWhenPinned = Arguments.of(
             "LockSupport.parkNanos when pinned",
-            (ThrowingAction) () -> {
+            (ThrowingRunnable<Exception>) () -> {
                 VThreadPinner.runPinned(() -> {
                     while (!finish2.get()) {
                         LockSupport.parkNanos(Long.MAX_VALUE);
@@ -141,7 +141,7 @@ class JfrEvents {
         // untimed Object.wait
         var waitWhenPinned = Arguments.of(
             "Object.wait",
-            (ThrowingAction) () -> {
+            (ThrowingRunnable<Exception>) () -> {
                 synchronized (lock) {
                     lock.wait();
                 }
@@ -157,7 +157,7 @@ class JfrEvents {
         // timed Object.wait
         var timedWaitWhenPinned = Arguments.of(
             "Object.wait(millis)",
-            (ThrowingAction) () -> {
+            (ThrowingRunnable<Exception>) () -> {
                 synchronized (lock) {
                     lock.wait(Long.MAX_VALUE);
                 }
@@ -179,7 +179,7 @@ class JfrEvents {
     @ParameterizedTest
     @MethodSource("pinnedCases")
     void testVirtualThreadPinned(String label,
-                                 ThrowingAction<Exception> parker,
+                                 ThrowingRunnable<Exception> parker,
                                  Thread.State expectedState,
                                  Consumer<Thread> unparker) throws Exception {
 

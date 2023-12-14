@@ -29,16 +29,18 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
-
-import java.lang.invoke.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
+import jdk.test.lib.thread.VThreadRunner.ThrowingRunnable;
 
 /**
- * Helper class to allow tests run an action in a virtual thread while pinning its carrier.
+ * Helper class to allow tests run a task in a virtual thread while pinning its carrier.
  *
- * It defines the {@code runPinned} method to run an action with a native frame on the stack.
+ * It defines the {@code runPinned} method to run a task with a native frame on the stack.
  */
 public class VThreadPinner {
     private static final Path JAVA_LIBRARY_PATH = Path.of(System.getProperty("java.library.path"));
@@ -51,25 +53,25 @@ public class VThreadPinner {
     private static final MemorySegment UPCALL_STUB = upcallStub();
 
     /**
-     * Thread local with the action to run.
+     * Thread local with the task to run.
      */
-    private static final ThreadLocal<ActionRunner> ACTION_RUNNER = new ThreadLocal<>();
+    private static final ThreadLocal<TaskRunner> TASK_RUNNER = new ThreadLocal<>();
 
     /**
-     * Runs an action, capturing any exception or error thrown.
+     * Runs a task, capturing any exception or error thrown.
      */
-    private static class ActionRunner implements Runnable {
-        private final ThrowingAction<?> action;
+    private static class TaskRunner implements Runnable {
+        private final ThrowingRunnable<?> task;
         private Throwable throwable;
 
-        ActionRunner(ThrowingAction<?> action) {
-            this.action = action;
+        TaskRunner(ThrowingRunnable<?> task) {
+            this.task = task;
         }
 
         @Override
         public void run() {
             try {
-                action.run();
+                task.run();
             } catch (Throwable ex) {
                 throwable = ex;
             }
@@ -81,36 +83,30 @@ public class VThreadPinner {
     }
 
     /**
-     * Called by the native function to run the action stashed in the thread local. The
-     * action runs with the native frame on the stack.
+     * Called by the native function to run the task stashed in the thread local. The
+     * task runs with the native frame on the stack.
      */
     private static void callback() {
-        ACTION_RUNNER.get().run();
+        TASK_RUNNER.get().run();
     }
 
     /**
-     * A function to run from a virtual thread pinned to its carrier.
+     * Runs the given task on a virtual thread pinned to its carrier. If called from a
+     * virtual thread then it invokes the task directly.
      */
-    @FunctionalInterface
-    public interface ThrowingAction<X extends Throwable> {
-        void run() throws X;
-    }
-
-    /**
-     * Runs the given action on virtual thread pinned to its carrier.
-     */
-    public static <X extends Throwable> void runPinned(ThrowingAction<X> action) throws X {
+    public static <X extends Throwable> void runPinned(ThrowingRunnable<X> task) throws X {
         if (!Thread.currentThread().isVirtual()) {
-            throw new IllegalCallerException("Not a virtual thread");
+            VThreadRunner.run(() -> runPinned(task));
+            return;
         }
-        var runner = new ActionRunner(action);
-        ACTION_RUNNER.set(runner);
+        var runner = new TaskRunner(task);
+        TASK_RUNNER.set(runner);
         try {
             INVOKER.invoke(UPCALL_STUB);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         } finally {
-            ACTION_RUNNER.remove();
+            TASK_RUNNER.remove();
         }
         Throwable ex = runner.exception();
         if (ex != null) {
