@@ -148,7 +148,7 @@ final class VirtualThread extends BaseVirtualThread {
     // parking permit
     private volatile boolean parkPermit;
 
-    // unblocked
+    // used to mark thread as ready to be unblocked while it is concurrently blocking
     private volatile boolean unblocked;
 
     // a positive value if "responsible thread" blocked on monitor enter, accessed by VM
@@ -160,11 +160,11 @@ final class VirtualThread extends BaseVirtualThread {
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
 
-    // next waiting thread to unblock, set by VM, see processPendingList
-    private VirtualThread next;
+    // has the value 1 when on the list of virtual threads waiting to be unblocked
+    private volatile byte onWaitingList;
 
-    // set to 1 when on waiting list to unblock, set by VM, see processPendingList
-    private byte onWaitingList;
+    // next virtual thread on the list of virtual threads waiting to be unblocked
+    private volatile VirtualThread next;
 
     /**
      * Returns the continuation scope used for virtual threads.
@@ -1386,12 +1386,14 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Unblock virtual threads that are ready to be scheduled again.
+     * Schedule virtual threads that are ready to be scheduled after they blocked on
+     * monitor enter.
      */
-    private static void processPendingList() {
+    private static void unblockVirtualThreads() {
         while (true) {
-            VirtualThread vthread = waitForPendingList();
+            VirtualThread vthread = takeVirtualThreadListToUnblock();
             while (vthread != null) {
+                assert vthread.onWaitingList == 1;
                 VirtualThread nextThread = vthread.next;
 
                 // remove from list and unblock
@@ -1405,11 +1407,13 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
-    private static native VirtualThread waitForPendingList();
+    // takes the list of virtual threads that are waiting to be unblocked, waiting if
+    // necessary until a list becomes available
+    private static native VirtualThread takeVirtualThreadListToUnblock();
 
     static {
         var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",
-                VirtualThread::processPendingList);
+                VirtualThread::unblockVirtualThreads);
         unblocker.setDaemon(true);
         unblocker.start();
     }

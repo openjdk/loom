@@ -4008,7 +4008,7 @@ JVM_ENTRY(void, JVM_VirtualThreadHideFrames(JNIEnv* env, jobject vthread, jboole
 #endif
 JVM_END
 
-JVM_ENTRY(jobject, JVM_VirtualThreadWaitForPendingList(JNIEnv* env))
+JVM_ENTRY(jobject, JVM_TakeVirtualThreadListToUnblock(JNIEnv* env))
   ParkEvent* parkEvent = ObjectMonitor::vthread_unparker_ParkEvent();
   assert(parkEvent != nullptr, "not initialized");
 

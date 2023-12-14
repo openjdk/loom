@@ -1155,7 +1155,7 @@ JNIEXPORT void JNICALL
 JVM_VirtualThreadHideFrames(JNIEnv* env, jobject vthread, jboolean hide);
 
 JNIEXPORT jobject JNICALL
-JVM_VirtualThreadWaitForPendingList(JNIEnv* env);
+JVM_TakeVirtualThreadListToUnblock(JNIEnv* env);
 
 /*
  * Core reflection support.
