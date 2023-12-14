@@ -110,17 +110,14 @@ class EPollSelectorImpl extends SelectorImpl {
         int numEntries;
         processUpdateQueue();
         processDeregisterQueue();
-        try {
-            begin(blocking);
 
-            if (Thread.currentThread().isVirtual()) {
-                numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
-                if (numEntries == 0 && blocking) {
-                    long nanos = timedPoll ? TimeUnit.MILLISECONDS.toNanos(to) : 0;
-                    Poller.poll(epfd, Net.POLLIN, nanos, this::isOpen);
-                    numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
-                }
-            } else {
+        if (Thread.currentThread().isVirtual()) {
+            numEntries = (timedPoll)
+                    ? timedPoll(TimeUnit.MILLISECONDS.toNanos(to))
+                    : untimedPoll(blocking);
+        } else {
+            try {
+                begin(blocking);
                 do {
                     long startTime = timedPoll ? System.nanoTime() : 0;
                     numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, to);
@@ -134,14 +131,48 @@ class EPollSelectorImpl extends SelectorImpl {
                         }
                     }
                 } while (numEntries == IOStatus.INTERRUPTED);
+            } finally {
+                end(blocking);
             }
-            assert IOStatus.check(numEntries);
-
-        } finally {
-            end(blocking);
         }
+        assert IOStatus.check(numEntries);
+
         processDeregisterQueue();
         return processEvents(numEntries, action);
+    }
+
+    /**
+     * If blocking, parks the current virtual thread until a file descriptor is polled
+     * or the thread is interrupted.
+     */
+    private int untimedPoll(boolean block) throws IOException {
+        int numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+        if (block) {
+            while (numEntries == 0 && !Thread.currentThread().isInterrupted()) {
+                Poller.pollSelector(epfd, 0);
+                numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+            }
+        }
+        return numEntries;
+    }
+
+    /**
+     * Parks the current virtual thread until a file descriptor is polled, or the thread
+     * is interrupted, for up to the specified waiting time.
+     */
+    private int timedPoll(long nanos) throws IOException {
+        long startNanos = System.nanoTime();
+        int numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+        while (numEntries == 0 && !Thread.currentThread().isInterrupted()) {
+            long remainingNanos = nanos - (System.nanoTime() - startNanos);
+            if (remainingNanos <= 0) {
+                // timeout
+                break;
+            }
+            Poller.pollSelector(epfd, remainingNanos);
+            numEntries = EPoll.wait(epfd, pollArrayAddress, NUM_EPOLLEVENTS, 0);
+        }
+        return numEntries;
     }
 
     /**
