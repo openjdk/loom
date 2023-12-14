@@ -25,6 +25,7 @@
 package java.lang;
 
 import java.io.PrintStream;
+import java.lang.StackWalker.StackFrame;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.LinkedHashMap;
@@ -75,9 +76,9 @@ class PinnedThreadPrinter {
      * Returns a hash of the given stack trace. The hash is based on the class,
      * method and bytecode index.
      */
-    private static int hash(List<LiveStackFrame> stack) {
+    private static int hash(List<StackFrame> stack) {
         int hash = 0;
-        for (LiveStackFrame frame : stack) {
+        for (StackFrame frame : stack) {
             hash = (31 * hash) + Objects.hash(frame.getDeclaringClass(),
                     frame.getMethodName(),
                     frame.getByteCodeIndex());
@@ -89,10 +90,10 @@ class PinnedThreadPrinter {
      * Prints the current thread's stack trace.
      *
      * @param printAll true to print all stack frames, false to only print the
-     *        frames that are native or holding a monitor
+     *        frames that are native
      */
     static void printStackTrace(PrintStream out, boolean printAll) {
-        List<LiveStackFrame> stack = STACK_WALKER.walk(s ->
+        List<StackFrame> stack = STACK_WALKER.walk(s ->
             s.map(f -> (LiveStackFrame) f)
                     .filter(f -> f.getDeclaringClass() != PinnedThreadPrinter.class)
                     .collect(Collectors.toList())
@@ -100,8 +101,8 @@ class PinnedThreadPrinter {
 
         // find the closest frame that is causing the thread to be pinned
         stack.stream()
-            .filter(f -> (f.isNativeMethod() || f.getMonitors().length > 0))
-            .map(LiveStackFrame::getDeclaringClass)
+            .filter(f -> f.isNativeMethod())
+            .map(StackFrame::getDeclaringClass)
             .findFirst()
             .ifPresentOrElse(klass -> {
                 int hash = hash(stack);
@@ -115,16 +116,13 @@ class PinnedThreadPrinter {
             }, () -> printStackTrace(stack, out, true));  // not found
     }
 
-    private static void printStackTrace(List<LiveStackFrame> stack,
+    private static void printStackTrace(List<StackFrame> stack,
                                         PrintStream out,
                                         boolean printAll) {
         out.println(Thread.currentThread());
-        for (LiveStackFrame frame : stack) {
+        for (StackFrame frame : stack) {
             var ste = frame.toStackTraceElement();
-            int monitorCount = frame.getMonitors().length;
-            if (monitorCount > 0) {
-                out.format("    %s <== monitors:%d%n", ste, monitorCount);
-            } else if (frame.isNativeMethod() || printAll) {
+            if (frame.isNativeMethod() || printAll) {
                 out.format("    %s%n", ste);
             }
         }
