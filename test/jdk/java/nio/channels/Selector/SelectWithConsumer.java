@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -47,7 +47,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.LockSupport;
 import static java.util.concurrent.TimeUnit.*;
 
 import org.testng.annotations.AfterTest;
@@ -75,7 +74,6 @@ public class SelectWithConsumer {
             sel.select();
             while ((key.readyOps() & interestOps) != expectedOps) {
                 Thread.sleep(100);
-                clearParkingPermit();
                 sel.select();
             }
         }
@@ -208,7 +206,6 @@ public class SelectWithConsumer {
             assertTrue(key2.isWritable());
             while (!key1.isReadable()) {
                 Thread.sleep(20);
-                clearParkingPermit();
                 sel.select();
             }
 
@@ -379,7 +376,6 @@ public class SelectWithConsumer {
             assertTrue(sel.isOpen());
         } finally {
             Thread.currentThread().interrupted();  // clear interrupt status
-            clearParkingPermit();
         }
 
         // select(Consumer, timeout)
@@ -394,7 +390,6 @@ public class SelectWithConsumer {
             assertTrue(sel.isOpen());
         } finally {
             Thread.currentThread().interrupted();  // clear interrupt status
-            clearParkingPermit();
         }
     }
 
@@ -411,7 +406,6 @@ public class SelectWithConsumer {
             assertTrue(sel.isOpen());
         } finally {
             Thread.currentThread().interrupted();  // clear interrupt status
-            clearParkingPermit();
         }
 
         // select(Consumer, timeout)
@@ -423,7 +417,6 @@ public class SelectWithConsumer {
             assertTrue(sel.isOpen());
         } finally {
             Thread.currentThread().interrupted();  // clear interrupt status
-            clearParkingPermit();
         }
     }
 
@@ -727,11 +720,6 @@ public class SelectWithConsumer {
     @AfterTest
     void shutdownThreadPool() {
         POOL.shutdown();
-    }
-
-    void clearParkingPermit() {
-        LockSupport.unpark(Thread.currentThread());
-        LockSupport.park();
     }
 
     void scheduleWakeup(Selector sel, long delay, TimeUnit unit) {
