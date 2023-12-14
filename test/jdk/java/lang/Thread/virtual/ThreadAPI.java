@@ -1138,10 +1138,10 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.yield releases thread when not pinned.
+     * Test Thread.yield releases carrier.
      */
     @Test
-    void testYield1() throws Exception {
+    void testYieldReleases() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1166,10 +1166,42 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.yield when thread is pinned.
+     * Test Thread.yield releases carrier when virtual thread holds a monitor.
      */
     @Test
-    void testYield2() throws Exception {
+    void testYieldReleasesWhenHoldingMonitor() throws Exception {
+        // x64 only for now
+        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        var list = new CopyOnWriteArrayList<String>();
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = builder.factory();
+            var lock = new Object();
+            var thread = factory.newThread(() -> {
+                list.add("A");
+                var child = factory.newThread(() -> {
+                    list.add("B");
+                    synchronized (lock) {
+                        Thread.yield();
+                    }
+                    list.add("B");
+                });
+                child.start();
+                Thread.yield();
+                list.add("A");
+                try { child.join(); } catch (InterruptedException e) { }
+            });
+            thread.start();
+            thread.join();
+        }
+        assertEquals(List.of("A", "B", "A", "B"), list);
+    }
+
+    /**
+     * Test Thread.yield when thread is pinned by native frame.
+     */
+    @Test
+    void testYieldWhenPinned() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1193,12 +1225,11 @@ class ThreadAPI {
         assertEquals(List.of("A", "A", "B"), list);
     }
 
-
     /**
-     * Test that Thread.yield does not consume the thread's parking permit.
+     * Test Thread.yield does not consume the thread's parking permit.
      */
     @Test
-    void testYield3() throws Exception {
+    void testYieldDoesNotConsumeParkingPermit() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
             LockSupport.unpark(Thread.currentThread());
             Thread.yield();
@@ -1208,10 +1239,10 @@ class ThreadAPI {
     }
 
     /**
-     * Test that Thread.yield does not make available the thread's parking permit.
+     * Test Thread.yield does not make available the thread's parking permit.
      */
     @Test
-    void testYield4() throws Exception {
+    void testYieldDoesNotGrantParkingPermit() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
             Thread.yield();
             LockSupport.park();  // should park
