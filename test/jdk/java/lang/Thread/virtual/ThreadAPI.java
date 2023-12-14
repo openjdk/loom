@@ -61,6 +61,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import java.nio.channels.Selector;
 
+import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
@@ -1170,7 +1171,7 @@ class ThreadAPI {
      */
     @Test
     void testYieldReleasesWhenHoldingMonitor() throws Exception {
-        // x64 only for now
+        assumeTrue(Platform.isX64(), "x64 only at this time");
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
