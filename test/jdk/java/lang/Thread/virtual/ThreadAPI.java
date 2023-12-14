@@ -1409,11 +1409,9 @@ class ThreadAPI {
      */
     @Test
     void testSleep8() throws Exception {
-        VThreadRunner.run(() -> {
+        VThreadPinner.runPinned(() -> {
             long start = millisTime();
-            VThreadPinner.runPinned(() -> {
-                Thread.sleep(1000);
-            });
+            Thread.sleep(1000);
             expectDuration(start, /*min*/900, /*max*/20_000);
         });
     }

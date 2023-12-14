@@ -25,7 +25,15 @@
  * @test
  * @summary Test virtual threads using Selector
  * @library /test/lib
- * @run junit SelectorOps
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
+ * @test id=no-vmcontinuations
+ * @requires vm.continuations
+ * @library /test/lib
+ * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
+ *     --enable-native-access=ALL-UNNAMED SelectorOps
  */
 
 import java.io.IOException;
@@ -42,6 +50,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -93,6 +102,15 @@ class SelectorOps {
     }
 
     /**
+     * Test that select wakes up when a channel is ready for I/O and thread is pinned.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    public void testSelectWhenPinned(boolean timed) throws Exception {
+        VThreadPinner.runPinned(() -> { testSelect(timed); });
+    }
+
+    /**
      * Test that select wakes up when timeout is reached.
      */
     @Test
@@ -115,6 +133,14 @@ class SelectorOps {
                 closePipe(p);
             }
         });
+    }
+
+    /**
+     * Test that select wakes up when timeout is reached and thread is pinned.
+     */
+    @Test
+    public void testSelectTimeoutWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testSelectTimeout(); });
     }
 
     /**
@@ -185,8 +211,17 @@ class SelectorOps {
     }
 
     /**
+     * Test calling wakeup while a thread is blocked in select.
+     */
+    @Test
+    public void testWakeupDuringSelectWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testWakeupDuringSelect(); });
+    }
+
+    /**
      * Test closing selector while a thread is blocked in select.
      */
+    @Test
     public void testCloseDuringSelect() throws Exception {
         VThreadRunner.run(() -> {
             try (Selector sel = Selector.open()) {
@@ -197,6 +232,14 @@ class SelectorOps {
                 assertFalse(sel.isOpen());
             }
         });
+    }
+
+    /**
+     * Test closing selector while a thread is blocked in select and thread is pinned.
+     */
+    @Test
+    public void testCloseDuringSelectWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testCloseDuringSelect(); });
     }
 
     /**
@@ -231,6 +274,14 @@ class SelectorOps {
                 assertTrue(sel.isOpen());
             }
         });
+    }
+
+    /**
+     * Test interrupting a thread blocked in select and thread is pinned.
+     */
+    @Test
+    public void testInterruptDuringSelectWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testInterruptDuringSelect(); });
     }
 
     /**
