@@ -21,11 +21,19 @@
  * questions.
  */
 
-/**
+/*
  * @test
- * @summary Test virtual threads using Selector
+ * @summary Test virtual threads doing blocking on Selector
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
+ * @test id=poller-modes
+ * @requires (os.family == "linux") | (os.family == "mac")
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=2 --enable-native-access=ALL-UNNAMED SelectorOps
  */
 
 /*
@@ -196,6 +204,14 @@ class SelectorOps {
     }
 
     /**
+     * Test calling wakeup before select and thread is pinned.
+     */
+    @Test
+    public void testWakeupBeforeSelectWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testWakeupBeforeSelect(); });
+    }
+
+    /**
      * Test calling wakeup while a thread is blocked in select.
      */
     @Test
@@ -257,6 +273,14 @@ class SelectorOps {
                 assertTrue(sel.isOpen());
             }
         });
+    }
+
+    /**
+     * Test calling select with interrupt status set and thread is pinned.
+     */
+    @Test
+    public void testInterruptBeforeSelectWhenPinned() throws Exception {
+        VThreadPinner.runPinned(() -> { testInterruptDuringSelect(); });
     }
 
     /**
