@@ -121,6 +121,7 @@ public class VThreadPinner {
     /**
      * Returns a method handle to the native function void call(void *(*f)(void *)).
      */
+    @SuppressWarnings("restricted")
     private static MethodHandle invoker() {
         Linker abi = Linker.nativeLinker();
         try {
@@ -136,6 +137,7 @@ public class VThreadPinner {
     /**
      * Returns an upcall stub to use as a function pointer to invoke the callback method.
      */
+    @SuppressWarnings("restricted")
     private static MemorySegment upcallStub() {
         Linker abi = Linker.nativeLinker();
         try {
