@@ -164,6 +164,14 @@ class SelectorOps {
                 source.configureBlocking(false);
                 SelectionKey key = source.register(sel, SelectionKey.OP_READ);
 
+                // selectNow should return immediately
+                for (int i = 0; i < 3; i++) {
+                    long start = millisTime();
+                    int n = sel.selectNow();
+                    expectDuration(start, -1, /*max*/20_000);
+                    assertEquals(0, n);
+                }
+
                 // write to sink to ensure source is readable
                 ByteBuffer buf = ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8));
                 Callable<Void> writer = () -> { sink.write(buf); return null; };
@@ -172,12 +180,10 @@ class SelectorOps {
                 // call selectNow until key added to selected key set
                 int n = 0;
                 while (n == 0) {
+                    Thread.sleep(10);
                     long start = millisTime();
                     n = sel.selectNow();
                     expectDuration(start, -1, /*max*/20_000);
-                    if (n == 0) {
-                        Thread.sleep(100);
-                    }
                 }
                 assertEquals(1, n);
                 assertTrue(sel.isOpen());

@@ -1135,7 +1135,6 @@ class ThreadAPI {
         assertEquals(List.of("A", "A", "B"), list);
     }
 
-
     /**
      * Test that Thread.yield does not consume the thread's parking permit.
      */
