@@ -23,22 +23,19 @@
 
 #include "jni.h"
 
-JNIEXPORT void JNICALL Java_MonitorsAndJNI_synchronizedInvoke(JNIEnv *env, jobject obj, jobject task) {
+JNIEXPORT void JNICALL Java_NativeSynchronized_synchronizedInvoke(JNIEnv *env, jobject obj, jobject task) {
     jclass clazz = (*env)->GetObjectClass(env, obj);
     jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "(Ljava/lang/Runnable;)V");
-    if (mid == NULL) {
-        return;
+    if (mid != NULL) {
+        (*env)->CallVoidMethod(env, obj, mid, task);
     }
-    (*env)->CallVoidMethod(env, obj, mid, task);
 }
 
-JNIEXPORT void JNICALL Java_MonitorsAndJNI_invoke(JNIEnv *env, jobject obj, jobject lock, jobject task) {
+JNIEXPORT void JNICALL Java_NativeSynchronized_invoke(JNIEnv *env, jobject obj, jobject lock, jobject task) {
 jclass clazz = (*env)->GetObjectClass(env, obj);
     jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "(Ljava/lang/Runnable;)V");
-    if (mid == NULL) {
-        return;
+    if (mid != NULL && (*env)->MonitorEnter(env, lock) == 0) {
+        (*env)->CallVoidMethod(env, obj, mid, task);
+        (*env)->MonitorExit(env, lock);  // can be called with pending exception
     }
-    (*env)->MonitorEnter(env, lock);
-    (*env)->CallVoidMethod(env, obj, mid, task);
-    (*env)->MonitorExit(env, lock);
 }

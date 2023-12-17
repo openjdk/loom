@@ -26,7 +26,7 @@
  * @summary Test virtual threads with native synchronized and native methods that enter
  *     monitors with JNI MonitorEnter
  * @library /test/lib
- * @run junit MonitorsAndJNI
+ * @run junit NativeSynchronized
  */
 
 import java.util.concurrent.CountDownLatch;
@@ -40,11 +40,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-class MonitorsAndJNI {
+class NativeSynchronized {
 
     @BeforeAll
     static void setup() throws Exception {
-        System.loadLibrary("MonitorsAndJNI");
+        System.loadLibrary("NativeSynchronized");
     }
 
     /**
