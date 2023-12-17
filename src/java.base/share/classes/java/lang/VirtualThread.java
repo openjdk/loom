@@ -1162,6 +1162,7 @@ final class VirtualThread extends BaseVirtualThread {
             String stateAsString = threadState().toString();
             sb.append(stateAsString.toLowerCase(Locale.ROOT));
         }
+
         return sb.toString();
     }
 
