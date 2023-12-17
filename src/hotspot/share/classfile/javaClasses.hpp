@@ -533,9 +533,6 @@ class java_lang_VirtualThread : AllStatic {
     UNPARKED      = 9,
     YIELDING      = 10,
     YIELDED       = 11,
-    BLOCKING      = 12,
-    BLOCKED       = 13,
-    UNBLOCKED     = 14,
     TERMINATED    = 99,
 
     // additional state bits

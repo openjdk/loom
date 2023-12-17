@@ -107,11 +107,6 @@ final class VirtualThread extends BaseVirtualThread {
      *  TIMED_PARKED -> UNPARKED        // unparked, may be scheduled to continue
      *  TIMED_PINNED -> RUNNING         // unparked, continue execution on same carrier
      *
-     *  RUNNABLE -> BLOCKING       // blocking on monitor enter
-     *  BLOCKING -> BLOCKED        // blocked on monitor enter
-     *   BLOCKED -> UNBLOCKED      // unblocked, may be scheduled to continue
-     * UNBLOCKED -> RUNNING        // continue execution after blocked on monitor enter
-     *
      *  RUNNING -> YIELDING        // Thread.yield
      * YIELDING -> YIELDED         // cont.yield successful, may be scheduled to continue
      * YIELDING -> RUNNING         // cont.yield failed
@@ -134,11 +129,6 @@ final class VirtualThread extends BaseVirtualThread {
     private static final int YIELDING = 10;
     private static final int YIELDED  = 11;         // unmounted but runnable
 
-    // monitor enter
-    private static final int BLOCKING  = 12;
-    private static final int BLOCKED   = 13;        // unmounted
-    private static final int UNBLOCKED = 14;        // unmounted but runnable
-
     private static final int TERMINATED = 99;  // final state
 
     // can be suspended from scheduling when unmounted
@@ -146,9 +136,6 @@ final class VirtualThread extends BaseVirtualThread {
 
     // parking permit
     private volatile boolean parkPermit;
-
-    // unblocked
-    private volatile boolean unblocked;
 
     // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
@@ -240,8 +227,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         // set state to RUNNING
         int initialState = state();
-        if (initialState == STARTED || initialState == UNPARKED
-                || initialState == UNBLOCKED || initialState == YIELDED) {
+        if (initialState == STARTED || initialState == UNPARKED || initialState == YIELDED) {
             // newly started or continue after parking/blocking/Thread.yield
             if (!compareAndSetState(initialState, RUNNING)) {
                 return;
@@ -524,16 +510,6 @@ final class VirtualThread extends BaseVirtualThread {
             return;
         }
 
-        // blocking on monitorenter
-        if (s == BLOCKING) {
-            setState(BLOCKED);
-            if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
-                unblocked = false;
-                submitRunContinuation();
-            }
-            return;
-        }
-
         assert false;
     }
 
@@ -804,19 +780,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Re-enables this virtual thread for scheduling after blocking on monitor enter.
-     * @throws RejectedExecutionException if the scheduler cannot accept a task
-     */
-    private void unblock() {
-        assert !Thread.currentThread().isVirtual();
-        unblocked = true;
-        if (state() == BLOCKED && compareAndSetState(BLOCKED, UNBLOCKED)) {
-            unblocked = false;
-            submitRunContinuation();
-        }
-    }
-
-    /**
      * Attempts to yield the current virtual thread (Thread.yield).
      */
     void tryYield() {
@@ -911,13 +874,7 @@ final class VirtualThread extends BaseVirtualThread {
                 interrupted = true;
                 Interruptible b = nioBlocker;
                 if (b != null) {
-                    // ensure current thread doesn't unmount while holding interruptLock
-                    Continuation.pin();
-                    try {
-                        b.interrupt(this);
-                    } finally {
-                        Continuation.unpin();
-                    }
+                    b.interrupt(this);
                 }
 
                 // interrupt carrier thread if mounted
@@ -941,15 +898,9 @@ final class VirtualThread extends BaseVirtualThread {
         assert Thread.currentThread() == this;
         boolean oldValue = interrupted;
         if (oldValue) {
-            // ensure current thread doesn't unmount trying to enter interruptLock
-            Continuation.pin();
-            try {
-                synchronized (interruptLock) {
-                    interrupted = false;
-                    carrierThread.clearInterrupt();
-                }
-            } finally {
-                Continuation.unpin();
+            synchronized (interruptLock) {
+                interrupted = false;
+                carrierThread.clearInterrupt();
             }
         }
         return oldValue;
@@ -969,7 +920,6 @@ final class VirtualThread extends BaseVirtualThread {
                     return Thread.State.RUNNABLE;
                 }
             case UNPARKED:
-            case UNBLOCKED:
             case YIELDED:
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
@@ -988,7 +938,6 @@ final class VirtualThread extends BaseVirtualThread {
             case PARKING:
             case TIMED_PARKING:
             case YIELDING:
-            case BLOCKING:
                 // runnable, in transition
                 return Thread.State.RUNNABLE;
             case PARKED:
@@ -997,8 +946,6 @@ final class VirtualThread extends BaseVirtualThread {
             case TIMED_PARKED:
             case TIMED_PINNED:
                 return State.TIMED_WAITING;
-            case BLOCKED:
-                return State.BLOCKED;
             case TERMINATED:
                 return Thread.State.TERMINATED;
             default:
@@ -1044,13 +991,13 @@ final class VirtualThread extends BaseVirtualThread {
             case RUNNING, PINNED -> {
                 return null;   // mounted
             }
-            case PARKED, TIMED_PARKED, BLOCKED -> {
+            case PARKED, TIMED_PARKED -> {
                 // unmounted, not runnable
             }
-            case UNPARKED, UNBLOCKED, YIELDED -> {
+            case UNPARKED, YIELDED -> {
                 // unmounted, runnable
             }
-            case PARKING, TIMED_PARKING, BLOCKING, YIELDING -> {
+            case PARKING, TIMED_PARKING, YIELDING -> {
                 return null;  // in transition
             }
             default -> throw new InternalError();
@@ -1071,17 +1018,13 @@ final class VirtualThread extends BaseVirtualThread {
             setState(initialState);
         }
         boolean resubmit = switch (initialState) {
-            case UNPARKED, UNBLOCKED, YIELDED -> {
+            case UNPARKED, YIELDED -> {
                 // resubmit as task may have run while suspended
                 yield true;
             }
             case PARKED, TIMED_PARKED -> {
                 // resubmit if unparked while suspended
                 yield parkPermit && compareAndSetState(initialState, UNPARKED);
-            }
-            case BLOCKED -> {
-                // resubmit if unblocked while suspended
-                yield unblocked && compareAndSetState(BLOCKED, UNBLOCKED);
             }
             default -> throw new InternalError();
         };
@@ -1335,19 +1278,5 @@ final class VirtualThread extends BaseVirtualThread {
                 return 2;
         }
         return 0;
-    }
-
-    /**
-     * Unblock virtual threads that are ready to be scheduled again.
-     */
-    private static void processPendingList() {
-        // TBD invoke unblock
-    }
-
-    static {
-        var unblocker = InnocuousThread.newThread("VirtualThread-unblocker",
-                VirtualThread::processPendingList);
-        unblocker.setDaemon(true);
-        unblocker.start();
     }
 }
