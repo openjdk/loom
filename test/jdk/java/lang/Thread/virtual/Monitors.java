@@ -80,6 +80,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -306,21 +307,28 @@ class Monitors {
     /**
      * Test that parking while holding a monitor releases the carrier.
      */
-    @Test
+    @ParameterizedTest
     @EnabledIf("platformIsX64")
-    void testReleaseWhenParked() throws Exception {
+    @ValueSource(booleans = { true, false })
+    void testReleaseWhenParked(boolean reenter) throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
             Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
 
             var lock = new Object();
 
-            // thread enters monitor and parks
+            // thread enters (and maybe reenters) a monitor and parks
             var started = new CountDownLatch(1);
             var vthread1 = builder.start(() -> {
                 started.countDown();
                 synchronized (lock) {
-                    LockSupport.park();
+                    if (reenter) {
+                        synchronized (lock) {
+                            LockSupport.park();
+                        }
+                    } else {
+                        LockSupport.park();
+                    }
                 }
             });
 
@@ -344,7 +352,7 @@ class Monitors {
     }
 
     /**
-     * Test that blocked waiting to enter a monitor releases the carrier.
+     * Test that blocking waiting to enter a monitor releases the carrier.
      */
     @Test
     @EnabledIf("platformIsX64")
@@ -619,7 +627,7 @@ class Monitors {
         }
     }
 
-    private boolean platformIsX64() {
+    static boolean platformIsX64() {
         return Platform.isX64();
     }
 }

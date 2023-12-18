@@ -1081,10 +1081,10 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.yield releases carrier.
+     * Test Thread.yield releases carrier thread.
      */
     @Test
-    void testYieldReleases() throws Exception {
+    void testYield1() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1112,7 +1112,7 @@ class ThreadAPI {
      * Test Thread.yield releases carrier when virtual thread holds a monitor.
      */
     @Test
-    void testYieldReleasesWhenHoldingMonitor() throws Exception {
+    void testYield2() throws Exception {
         assumeTrue(Platform.isX64(), "x64 only at this time");
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
@@ -1144,7 +1144,7 @@ class ThreadAPI {
      * Test Thread.yield when thread is pinned by native frame.
      */
     @Test
-    void testYieldWhenPinned() throws Exception {
+    void testYield3() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1172,7 +1172,7 @@ class ThreadAPI {
      * Test Thread.yield does not consume the thread's parking permit.
      */
     @Test
-    void testYieldDoesNotConsumeParkingPermit() throws Exception {
+    void testYield4() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
             LockSupport.unpark(Thread.currentThread());
             Thread.yield();
@@ -1185,7 +1185,7 @@ class ThreadAPI {
      * Test Thread.yield does not make available the thread's parking permit.
      */
     @Test
-    void testYieldDoesNotGrantParkingPermit() throws Exception {
+    void testYield5() throws Exception {
         var thread = Thread.ofVirtual().start(() -> {
             Thread.yield();
             LockSupport.park();  // should park
