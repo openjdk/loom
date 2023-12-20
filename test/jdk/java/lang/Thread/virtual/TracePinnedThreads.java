@@ -36,7 +36,6 @@ import java.io.PrintStream;
 import java.time.Duration;
 import java.util.concurrent.locks.LockSupport;
 
-import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
