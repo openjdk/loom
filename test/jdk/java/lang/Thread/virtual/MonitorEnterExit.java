@@ -26,28 +26,28 @@
  * @summary Test virtual thread with monitor enter/exit
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm --enable-native-access=ALL-UNNAMED Monitors
+ * @run junit/othervm --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=Xint
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -Xint --enable-native-access=ALL-UNNAMED Monitors
+ * @run junit/othervm -Xint --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=TieredStopAtLevel1
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:TieredStopAtLevel=1 --enable-native-access=ALL-UNNAMED Monitors
+ * @run junit/othervm -XX:TieredStopAtLevel=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=noTieredCompilation
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:-TieredCompilation --enable-native-access=ALL-UNNAMED Monitors
+ * @run junit/othervm -XX:-TieredCompilation --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
@@ -56,7 +56,7 @@
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED
- *     -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 Monitors
+ *     -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorEnterExit
  */
 
 import java.time.Duration;
@@ -86,7 +86,7 @@ import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
-class Monitors {
+class MonitorEnterExit {
     static final int MAX_VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
     static final int MAX_ENTER_DEPTH = 256;
 
@@ -140,7 +140,7 @@ class Monitors {
      */
     @Test
     void testEnterWhenHeldByPlatformThread() throws Exception {
-        VThreadRunner.run(this::testEnterWithContention);
+        testEnterWithContention();
     }
 
     /**
@@ -547,7 +547,7 @@ class Monitors {
      */
     @RepeatedTest(20)
     void testUnblockingByPlatformThread() throws Exception {
-        VThreadRunner.run(this::testUnblocking);
+        testUnblocking();
     }
 
     /**
