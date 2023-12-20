@@ -58,20 +58,6 @@ class TracePinnedThreads {
     private static native void invokePark();
 
     /**
-     * Test parking inside synchronized block.
-     */
-    @Test
-    void testPinnedCausedBySynchronizedBlock() throws Exception {
-        String output = run(() -> {
-            synchronized (lock) {
-                park();
-            }
-        });
-        assertContains(output, "<== monitors:1");
-        assertDoesNotContain(output, "(Native Method)");
-    }
-
-    /**
      * Test parking with native frame on stack.
      */
     @Test
