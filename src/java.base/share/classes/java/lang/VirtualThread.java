@@ -220,7 +220,7 @@ final class VirtualThread extends BaseVirtualThread {
                 try {
                     // avoid printing when in transition states
                     vthread.setState(RUNNING);
-                    PinnedThreadPrinter.printStackTrace(System.out, printAll);
+                    PinnedThreadPrinter.printStackTrace(System.out, reason, printAll);
                 } finally {
                     vthread.setState(oldState);
                 }
