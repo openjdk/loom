@@ -26,7 +26,7 @@
  * @summary Test virtual threads using Object.wait/notifyAll
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit WaitNotify
+ * @run junit MonitorWaitNotify
  */
 
 import java.util.concurrent.Semaphore;
@@ -35,7 +35,7 @@ import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class WaitNotify {
+class MonitorWaitNotify {
 
     /**
      * Test virtual thread waits, notified by platform thread.
