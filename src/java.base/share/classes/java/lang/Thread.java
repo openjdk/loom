@@ -345,15 +345,19 @@ public class Thread implements Runnable {
      * operation, if any.  The blocker's interrupt method should be invoked
      * after setting this thread's interrupt status.
      */
-    volatile Interruptible nioBlocker;
+    private volatile Interruptible nioBlocker;
+
+    Interruptible nioBlocker() {
+        return nioBlocker;
+    }
 
     /* Set the blocker field; invoked via jdk.internal.access.SharedSecrets
      * from java.nio code
      */
-    static void blockedOn(Interruptible b) {
-        Thread me = Thread.currentThread();
-        synchronized (me.interruptLock) {
-            me.nioBlocker = b;
+    void blockedOn(Interruptible b) {
+        //assert Thread.currentThread() == this;
+        synchronized (interruptLock) {
+            nioBlocker = b;
         }
     }
 
@@ -1699,14 +1703,18 @@ public class Thread implements Runnable {
             checkAccess();
 
             // thread may be blocked in an I/O operation
+            Interruptible blocker;
             synchronized (interruptLock) {
-                Interruptible b = nioBlocker;
-                if (b != null) {
+                blocker = nioBlocker;
+                if (blocker != null) {
                     interrupted = true;
                     interrupt0();  // inform VM of interrupt
-                    b.interrupt(this);
-                    return;
+                    blocker.interrupt(this);
                 }
+            }
+            if (blocker != null) {
+                blocker.postInterrupt();
+                return;
             }
         }
         interrupted = true;
