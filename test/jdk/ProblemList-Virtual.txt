@@ -82,9 +82,6 @@ jdk/jfr/event/runtime/TestThreadDumpEvent.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
 jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
 
-# Main thread cannot be a virtual thread for some tests
-java/lang/Thread/virtual/Monitors.java 0000000 generic-all
-
 # The problems with permissions
 java/io/FilePermission/MergeName.java 0000000 generic-all
 java/lang/SecurityManager/modules/CustomSecurityManagerTest.java 0000000 generic-all
