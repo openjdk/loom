@@ -820,7 +820,7 @@ final class VirtualThread extends BaseVirtualThread {
                 }
             } else if ((s == PINNED) || (s == TIMED_PINNED)) {
                 // unpark carrier thread when pinned
-                notifyJvmtiDisableSuspend(true);
+                disableSuspendAndPreempt();
                 try {
                     synchronized (carrierThreadAccessLock()) {
                         Thread carrier = carrierThread;
@@ -829,7 +829,7 @@ final class VirtualThread extends BaseVirtualThread {
                         }
                     }
                 } finally {
-                    notifyJvmtiDisableSuspend(false);
+                    enableSuspendAndPreempt();
                 }
             }
         }
@@ -935,21 +935,31 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
+    void blockedOn(Interruptible b) {
+        disableSuspendAndPreempt();
+        try {
+            super.blockedOn(b);
+        } finally {
+            enableSuspendAndPreempt();
+        }
+    }
+
+    @Override
     @SuppressWarnings("removal")
     public void interrupt() {
         if (Thread.currentThread() != this) {
             checkAccess();
 
             // if current thread is a virtual thread then prevent it from being
-            // suspended or unmounted while holding interruptLock
-            notifyJvmtiDisableSuspend(true);
-            Continuation.pin();
+            // suspended or unmounted when entering or holding interruptLock
+            Interruptible blocker;
+            disableSuspendAndPreempt();
             try {
                 synchronized (interruptLock) {
                     interrupted = true;
-                    Interruptible b = nioBlocker;
-                    if (b != null) {
-                        b.interrupt(this);
+                    blocker = nioBlocker();
+                    if (blocker != null) {
+                        blocker.interrupt(this);
                     }
 
                     // interrupt carrier thread if mounted
@@ -957,9 +967,14 @@ final class VirtualThread extends BaseVirtualThread {
                     if (carrier != null) carrier.setInterrupt();
                 }
             } finally {
-                Continuation.unpin();
-                notifyJvmtiDisableSuspend(false);
+                enableSuspendAndPreempt();
             }
+
+            // notify blocker after releasing interruptLock
+            if (blocker != null) {
+                blocker.postInterrupt();
+            }
+
         } else {
             interrupted = true;
             carrierThread.setInterrupt();
@@ -977,18 +992,14 @@ final class VirtualThread extends BaseVirtualThread {
         assert Thread.currentThread() == this;
         boolean oldValue = interrupted;
         if (oldValue) {
-            // if current thread is a virtual thread then prevent it from being
-            // suspended or unmounted while holding interruptLock
-            notifyJvmtiDisableSuspend(true);
-            Continuation.pin();
+            disableSuspendAndPreempt();
             try {
                 synchronized (interruptLock) {
                     interrupted = false;
                     carrierThread.clearInterrupt();
                 }
             } finally {
-                Continuation.unpin();
-                notifyJvmtiDisableSuspend(false);
+                enableSuspendAndPreempt();
             }
         }
         return oldValue;
@@ -1025,7 +1036,7 @@ final class VirtualThread extends BaseVirtualThread {
                 }
                 // if mounted then return state of carrier thread
                 if (Thread.currentThread() != this) {
-                    notifyJvmtiDisableSuspend(true);
+                    disableSuspendAndPreempt();
                     try {
                         synchronized (carrierThreadAccessLock()) {
                             Thread carrierThread = this.carrierThread;
@@ -1034,7 +1045,7 @@ final class VirtualThread extends BaseVirtualThread {
                             }
                         }
                     } finally {
-                        notifyJvmtiDisableSuspend(false);
+                        enableSuspendAndPreempt();
                     }
                 }
                 // runnable, mounted
@@ -1169,13 +1180,13 @@ final class VirtualThread extends BaseVirtualThread {
         if (Thread.currentThread() == this) {
             mounted = appendCarrierInfo(sb);
         } else {
-            notifyJvmtiDisableSuspend(true);
+            disableSuspendAndPreempt();
             try {
                 synchronized (carrierThreadAccessLock()) {
                     mounted = appendCarrierInfo(sb);
                 }
             } finally {
-                notifyJvmtiDisableSuspend(false);
+                enableSuspendAndPreempt();
             }
         }
 
@@ -1246,6 +1257,22 @@ final class VirtualThread extends BaseVirtualThread {
     private Object carrierThreadAccessLock() {
         // return interruptLock as unmount has to coordinate with interrupt
         return interruptLock;
+    }
+
+    /**
+     * Disallow the current thread be suspended or preempted.
+     */
+    private void disableSuspendAndPreempt() {
+        notifyJvmtiDisableSuspend(true);
+        Continuation.pin();
+    }
+
+    /**
+     * Allow the current thread be suspended or preempted.
+     */
+    private void enableSuspendAndPreempt() {
+        Continuation.unpin();
+        notifyJvmtiDisableSuspend(false);
     }
 
     // -- wrappers for get/set of state, parking permit, and carrier thread --
