@@ -1227,17 +1227,13 @@ final class VirtualThread extends BaseVirtualThread {
             String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
             String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
             if (parallelismValue != null) {
-                parallelism = Integer.max(Integer.parseInt(parallelismValue), 1);
+                parallelism = Integer.parseInt(parallelismValue);
             } else {
                 parallelism = Runtime.getRuntime().availableProcessors();
             }
             if (maxPoolSizeValue != null) {
                 maxPoolSize = Integer.parseInt(maxPoolSizeValue);
-                if (maxPoolSize > 0) {
-                    parallelism = Integer.min(parallelism, maxPoolSize);
-                } else {
-                    maxPoolSize = parallelism;  // no spares
-                }
+                parallelism = Integer.min(parallelism, maxPoolSize);
             } else {
                 maxPoolSize = Integer.max(parallelism, 256);
             }
