@@ -64,7 +64,6 @@ java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 ## There is no goal to run all test with virtual test thread factory.
 ## So any test might be added as incompatible, the bug id is not required.
 
-
 # test runs with jdk.virtualThreadScheduler.maxPoolSize=1
 java/lang/Thread/virtual/GetStackTraceWhenRunnable.java 0000000 generic-all
 
@@ -82,9 +81,6 @@ jdk/internal/vm/Continuation/Scoped.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadDumpEvent.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
 jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
-
-# Main thread cannot be a virtual thread for some tests
-java/lang/Thread/virtual/Monitors.java 0000000 generic-all
 
 # The problems with permissions
 java/io/FilePermission/MergeName.java 0000000 generic-all
