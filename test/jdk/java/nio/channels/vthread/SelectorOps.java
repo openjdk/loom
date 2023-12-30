@@ -22,10 +22,26 @@
  */
 
 /*
- * @test
+ * @test id=default
  * @summary Test virtual threads doing selection operations
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
+ * @test id=poller-modes
+ * @requires (os.family == "linux") | (os.family == "mac")
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=2 --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
+ * @test id=no-vmcontinuations
+ * @requires vm.continuations
+ * @library /test/lib
+ * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
+ *     --enable-native-access=ALL-UNNAMED SelectorOps
  */
 
 import java.io.IOException;
