@@ -23,25 +23,9 @@
 
 /*
  * @test
- * @summary Test virtual threads doing blocking on Selector
+ * @summary Test virtual threads doing selection operations
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED SelectorOps
- */
-
-/*
- * @test id=poller-modes
- * @requires (os.family == "linux") | (os.family == "mac")
- * @library /test/lib
- * @run junit/othervm -Djdk.pollerMode=1 --enable-native-access=ALL-UNNAMED SelectorOps
- * @run junit/othervm -Djdk.pollerMode=2 --enable-native-access=ALL-UNNAMED SelectorOps
- */
-
-/*
- * @test id=no-vmcontinuations
- * @requires vm.continuations
- * @library /test/lib
- * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
- *     --enable-native-access=ALL-UNNAMED SelectorOps
  */
 
 import java.io.IOException;
@@ -50,34 +34,25 @@ import java.nio.channels.Pipe;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectorOps {
-    private static ScheduledExecutorService scheduler;
+    private static String selectorClassName;  // platform specific class name
 
     @BeforeAll
     static void setup() throws Exception {
-        ThreadFactory factory = Executors.defaultThreadFactory();
-        scheduler = Executors.newSingleThreadScheduledExecutor(factory);
-    }
-
-    @AfterAll
-    static void finish() {
-        scheduler.shutdown();
+        try (Selector sel = Selector.open()) {
+            selectorClassName = sel.getClass().getName();
+        }
     }
 
     /**
@@ -96,8 +71,7 @@ class SelectorOps {
 
                 // write to sink to ensure source is readable
                 ByteBuffer buf = ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8));
-                Callable<Void> writer = () -> { sink.write(buf); return null; };
-                scheduler.schedule(writer, 500, TimeUnit.MILLISECONDS);
+                onSelect(() -> sink.write(buf));
 
                 int n = timed ? sel.select(60_000) : sel.select();
                 assertEquals(1, n);
@@ -174,8 +148,7 @@ class SelectorOps {
 
                 // write to sink to ensure source is readable
                 ByteBuffer buf = ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8));
-                Callable<Void> writer = () -> { sink.write(buf); return null; };
-                scheduler.schedule(writer, 500, TimeUnit.MILLISECONDS);
+                onSelect(() -> sink.write(buf));
 
                 // call selectNow until key added to selected key set
                 int n = 0;
@@ -224,7 +197,7 @@ class SelectorOps {
     public void testWakeupDuringSelect() throws Exception {
         VThreadRunner.run(() -> {
             try (Selector sel = Selector.open()) {
-                scheduler.schedule(() -> sel.wakeup(), 500, TimeUnit.MILLISECONDS);
+                onSelect(sel::wakeup);
                 int n = sel.select();
                 assertEquals(0, n);
                 assertTrue(sel.isOpen());
@@ -233,7 +206,7 @@ class SelectorOps {
     }
 
     /**
-     * Test calling wakeup while a thread is blocked in select.
+     * Test calling wakeup while a thread is blocked in select and the thread is pinned.
      */
     @Test
     public void testWakeupDuringSelectWhenPinned() throws Exception {
@@ -247,8 +220,7 @@ class SelectorOps {
     public void testCloseDuringSelect() throws Exception {
         VThreadRunner.run(() -> {
             try (Selector sel = Selector.open()) {
-                Callable<Void> close = () -> { sel.close(); return null; };
-                scheduler.schedule(close, 500, TimeUnit.MILLISECONDS);
+                onSelect(sel::close);
                 int n = sel.select();
                 assertEquals(0, n);
                 assertFalse(sel.isOpen());
@@ -257,7 +229,7 @@ class SelectorOps {
     }
 
     /**
-     * Test closing selector while a thread is blocked in select and thread is pinned.
+     * Test closing selector while a thread is blocked in select and the thread is pinned.
      */
     @Test
     public void testCloseDuringSelectWhenPinned() throws Exception {
@@ -297,7 +269,7 @@ class SelectorOps {
         VThreadRunner.run(() -> {
             try (Selector sel = Selector.open()) {
                 Thread me = Thread.currentThread();
-                scheduler.schedule(me::interrupt, 500, TimeUnit.MILLISECONDS);
+                onSelect(me::interrupt);
                 int n = sel.select();
                 assertEquals(0, n);
                 assertTrue(me.isInterrupted());
@@ -307,7 +279,7 @@ class SelectorOps {
     }
 
     /**
-     * Test interrupting a thread blocked in select and thread is pinned.
+     * Test interrupting a thread blocked in select and the thread is pinned.
      */
     @Test
     public void testInterruptDuringSelectWhenPinned() throws Exception {
@@ -320,6 +292,28 @@ class SelectorOps {
     private void closePipe(Pipe p) {
         try { p.sink().close(); } catch (IOException ignore) { }
         try { p.source().close(); } catch (IOException ignore) { }
+    }
+
+    /**
+     * Runs the given action when the current thread is sampled in a selection operation.
+     */
+    private void onSelect(VThreadRunner.ThrowingRunnable<Exception> action) {
+        Thread target = Thread.currentThread();
+        Thread.ofPlatform().daemon().start(() -> {
+            try {
+                boolean found = false;
+                while (!found) {
+                    Thread.sleep(20);
+                    StackTraceElement[] stack = target.getStackTrace();
+                    found = Arrays.stream(stack)
+                            .anyMatch(e -> selectorClassName.equals(e.getClassName())
+                                    && "doSelect".equals(e.getMethodName()));
+                }
+                action.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     /**

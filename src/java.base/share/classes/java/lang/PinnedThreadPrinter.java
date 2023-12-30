@@ -25,7 +25,6 @@
 package java.lang;
 
 import java.io.PrintStream;
-import java.lang.StackWalker.StackFrame;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.LinkedHashMap;
@@ -81,9 +80,9 @@ class PinnedThreadPrinter {
      * Returns a hash of the given stack trace. The hash is based on the class,
      * method and bytecode index.
      */
-    private static int hash(List<StackFrame> stack) {
+    private static int hash(List<LiveStackFrame> stack) {
         int hash = 0;
-        for (StackFrame frame : stack) {
+        for (LiveStackFrame frame : stack) {
             hash = (31 * hash) + Objects.hash(frame.getDeclaringClass(),
                     frame.getMethodName(),
                     frame.getByteCodeIndex());
@@ -92,23 +91,33 @@ class PinnedThreadPrinter {
     }
 
     /**
+     * Returns true if the frame is native, a class initializer, or holds monitors.
+     */
+    private static boolean isInterestingFrame(LiveStackFrame f) {
+        return f.isNativeMethod()
+                || "<clinit>".equals(f.getMethodName())
+                || (f.getMonitors().length > 0);
+    }
+
+    /**
      * Prints the current thread's stack trace.
      *
-     * @param printAll true to print all stack frames, false to only print class
-     *                 initializers or native frames
+     * @param printAll true to print all stack frames, false to only print the
+     *        frames that are native or holding a monitor
      */
     static void printStackTrace(PrintStream out, Continuation.Pinned reason, boolean printAll) {
-        List<StackFrame> stack = STACK_WALKER.walk(s ->
-            s.filter(f -> f.getDeclaringClass() != PinnedThreadPrinter.class)
-             .collect(Collectors.toList())
+        List<LiveStackFrame> stack = STACK_WALKER.walk(s ->
+            s.map(f -> (LiveStackFrame) f)
+                    .filter(f -> f.getDeclaringClass() != PinnedThreadPrinter.class)
+                    .collect(Collectors.toList())
         );
         Object lockObj = JIOPSA.lock(out);
         if (lockObj instanceof InternalLock lock && lock.tryLock()) {
             try {
                 // find the closest frame that is causing the thread to be pinned
                 stack.stream()
-                    .filter(f -> "<clinit>".equals(f.getMethodName()) || f.isNativeMethod())
-                    .map(StackFrame::getDeclaringClass)
+                    .filter(f -> isInterestingFrame(f))
+                    .map(LiveStackFrame::getDeclaringClass)
                     .findFirst()
                     .ifPresentOrElse(klass -> {
                         // print the stack trace if not already seen
@@ -126,16 +135,16 @@ class PinnedThreadPrinter {
 
     private static void printStackTrace(PrintStream out,
                                         Continuation.Pinned reason,
-                                        List<StackFrame> stack,
+                                        List<LiveStackFrame> stack,
                                         boolean printAll) {
         out.format("%s reason:%s%n", Thread.currentThread(), reason);
-
-        for (StackFrame frame : stack) {
+        for (LiveStackFrame frame : stack) {
             var ste = frame.toStackTraceElement();
-            boolean problematicFrame = "<clinit>".equals(ste.getMethodName()) || ste.isNativeMethod();
-            if (printAll || problematicFrame) {
-                String suffix = (printAll && problematicFrame) ? " <===" : "";
-                out.format("    %s%s%n", ste, suffix);
+            int monitorCount = frame.getMonitors().length;
+            if (monitorCount > 0) {
+                out.format("    %s <== monitors:%d%n", ste, monitorCount);
+            } else if (printAll || isInterestingFrame(frame)) {
+                out.format("    %s%n", ste);
             }
         }
     }

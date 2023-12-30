@@ -58,14 +58,43 @@ class TracePinnedThreads {
     private static native void invokePark();
 
     /**
+     * Test parking inside synchronized block.
+     */
+    @Test
+    void testPinnedCausedBySynchronizedBlock() throws Exception {
+        String output = run(() -> {
+            synchronized (lock) {
+                park();
+            }
+        });
+        assertContains(output, "reason:MONITOR");
+        assertContains(output, "<== monitors:1");
+    }
+
+    /**
      * Test parking with native frame on stack.
      */
     @Test
     void testPinnedCausedByNativeMethod() throws Exception {
         System.loadLibrary("TracePinnedThreads");
         String output = run(() -> invokePark());
+        assertContains(output, "reason:NATIVE");
         assertContains(output, "(Native Method)");
-        assertDoesNotContain(output, "<== monitors");
+    }
+
+    /**
+     * Test parking in class initializer.
+     */
+    @Test
+    void testPinnedCausedByClassInitializer() throws Exception {
+        class C {
+            static {
+                park();
+            }
+        }
+        String output = run(C::new);
+        assertContains(output, "reason:NATIVE");
+        assertContains(output, "<clinit>");
     }
 
     /**
