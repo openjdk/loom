@@ -91,19 +91,18 @@ class PinnedThreadPrinter {
     }
 
     /**
-     * Returns true if the frame is native, a class initializer, or holds monitors.
+     * Returns true if the frame is native or a class initializer.
      */
     private static boolean isInterestingFrame(LiveStackFrame f) {
         return f.isNativeMethod()
-                || "<clinit>".equals(f.getMethodName())
-                || (f.getMonitors().length > 0);
+                || "<clinit>".equals(f.getMethodName());
     }
 
     /**
      * Prints the current thread's stack trace.
      *
      * @param printAll true to print all stack frames, false to only print the
-     *        frames that are native or holding a monitor
+     *        frames that are native
      */
     static void printStackTrace(PrintStream out, Continuation.Pinned reason, boolean printAll) {
         List<LiveStackFrame> stack = STACK_WALKER.walk(s ->
@@ -140,10 +139,7 @@ class PinnedThreadPrinter {
         out.format("%s reason:%s%n", Thread.currentThread(), reason);
         for (LiveStackFrame frame : stack) {
             var ste = frame.toStackTraceElement();
-            int monitorCount = frame.getMonitors().length;
-            if (monitorCount > 0) {
-                out.format("    %s <== monitors:%d%n", ste, monitorCount);
-            } else if (printAll || isInterestingFrame(frame)) {
+            if (printAll || isInterestingFrame(frame)) {
                 out.format("    %s%n", ste);
             }
         }
