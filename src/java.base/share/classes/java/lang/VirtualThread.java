@@ -1003,12 +1003,12 @@ final class VirtualThread extends BaseVirtualThread {
      * Returns null if the thread is mounted or in transition.
      */
     private StackTraceElement[] tryGetStackTrace() {
-        int initialState = state();
+        int initialState = state() & ~SUSPENDED;
         switch (initialState) {
             case NEW, STARTED, TERMINATED -> {
                 return new StackTraceElement[0];  // unmounted, empty stack
             }
-            case RUNNING, PINNED -> {
+            case RUNNING, PINNED, TIMED_PINNED -> {
                 return null;   // mounted
             }
             case PARKED, TIMED_PARKED -> {
