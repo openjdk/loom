@@ -164,7 +164,7 @@ class SelectorOps {
 
                 // write to sink to ensure source is readable
                 ByteBuffer buf = ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8));
-                onSelect(() -> sink.write(buf));
+                sink.write(buf);
 
                 // call selectNow until key added to selected key set
                 int n = 0;
