@@ -400,8 +400,6 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     @ReservedStackAccess
     private void unmount() {
-        assert !Thread.holdsLock(interruptLock);
-
         // set Thread.currentThread() to return the platform thread
         Thread carrier = this.carrierThread;
         carrier.setCurrentThread(carrier);
@@ -871,17 +869,31 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
+    void blockedOn(Interruptible b) {
+        notifyJvmtiDisableSuspend(true);
+        try {
+            super.blockedOn(b);
+        } finally {
+            notifyJvmtiDisableSuspend(false);
+        }
+    }
+
+    @Override
     @SuppressWarnings("removal")
     public void interrupt() {
         if (Thread.currentThread() != this) {
             checkAccess();
+
+            // if current thread is a virtual thread then prevent it from being
+            // suspended when entering or holding interruptLock
+            Interruptible blocker;
             notifyJvmtiDisableSuspend(true);
             try {
                 synchronized (interruptLock) {
                     interrupted = true;
-                    Interruptible b = nioBlocker;
-                    if (b != null) {
-                        b.interrupt(this);
+                    blocker = nioBlocker();
+                    if (blocker != null) {
+                        blocker.interrupt(this);
                     }
 
                     // interrupt carrier thread if mounted
@@ -891,6 +903,12 @@ final class VirtualThread extends BaseVirtualThread {
             } finally {
                 notifyJvmtiDisableSuspend(false);
             }
+
+            // notify blocker after releasing interruptLock
+            if (blocker != null) {
+                blocker.postInterrupt();
+            }
+
         } else {
             interrupted = true;
             carrierThread.setInterrupt();
