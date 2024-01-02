@@ -99,7 +99,7 @@ public abstract class AbstractInterruptibleChannel
         this.interruptor = new Interruptible() {
             @Override
             public void interrupt(Thread target) {
-                AbstractInterruptibleChannel.this.setTarget(target);
+                AbstractInterruptibleChannel.this.trySetTarget(target);
             }
             @Override
             public void postInterrupt() {
@@ -160,7 +160,7 @@ public abstract class AbstractInterruptibleChannel
         U.objectFieldOffset(AbstractInterruptibleChannel.class, "interruptedTarget");
     private volatile Object interruptedTarget;  // Thread or placeholder object
 
-    private void setTarget(Thread target) {
+    private void trySetTarget(Thread target) {
         // can't use VarHandle here as CAS may park on first usage
         U.compareAndSetReference(this, INTERRUPTED_TARGET, null, target);
     }
