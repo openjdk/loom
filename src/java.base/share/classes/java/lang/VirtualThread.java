@@ -1038,7 +1038,7 @@ final class VirtualThread extends BaseVirtualThread {
             case PARKING, TIMED_PARKING, YIELDING -> {
                 return null;  // in transition
             }
-            default -> throw new InternalError();
+            default -> throw new InternalError("" + initialState);
         }
 
         // thread is unmounted, prevent it from continuing
