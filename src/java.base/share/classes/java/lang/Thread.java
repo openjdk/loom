@@ -345,7 +345,7 @@ public class Thread implements Runnable {
      * operation, if any.  The blocker's interrupt method should be invoked
      * after setting this thread's interrupt status.
      */
-    private volatile Interruptible nioBlocker;
+    private Interruptible nioBlocker;
 
     Interruptible nioBlocker() {
         return nioBlocker;
