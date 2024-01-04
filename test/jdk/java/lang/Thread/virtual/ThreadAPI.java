@@ -1080,7 +1080,7 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.yield releases thread when not pinned.
+     * Test Thread.yield releases carrier thread.
      */
     @Test
     void testYield1() throws Exception {
@@ -1108,7 +1108,7 @@ class ThreadAPI {
     }
 
     /**
-     * Test Thread.yield when thread is pinned.
+     * Test Thread.yield when thread is pinned by native frame.
      */
     @Test
     void testYield2() throws Exception {
@@ -1136,7 +1136,7 @@ class ThreadAPI {
     }
 
     /**
-     * Test that Thread.yield does not consume the thread's parking permit.
+     * Test Thread.yield does not consume the thread's parking permit.
      */
     @Test
     void testYield3() throws Exception {
@@ -1149,7 +1149,7 @@ class ThreadAPI {
     }
 
     /**
-     * Test that Thread.yield does not make available the thread's parking permit.
+     * Test Thread.yield does not make available the thread's parking permit.
      */
     @Test
     void testYield4() throws Exception {
