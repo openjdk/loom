@@ -1778,11 +1778,11 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
 
     if (post_mount_event && JvmtiExport::should_post_vthread_mount()) {
       JvmtiExport::post_vthread_mount((jthread)vth.raw_value());
-    }
-
-    if (!post_mount_event) {
-      // Cancelled preemption case. Clear the unmount event pending flag.
-      assert(current->jvmti_unmount_event_pending(), "should be set");
+    } else if (!post_mount_event) {
+      // Preemption cancelled case. Clear the unmount event pending flag. The
+      // flag might actually not be set if _VTMS_notify_jvmti_events was enabled
+      // after preemption happened (late binding agents). But since this would
+      // be a rare case we just do it unconditionally.
       current->set_jvmti_unmount_event_pending(false);
     }
 
