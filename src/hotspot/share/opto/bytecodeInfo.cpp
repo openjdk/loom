@@ -515,7 +515,7 @@ bool InlineTree::pass_initial_checks(ciMethod* caller_method, int caller_bci, ci
 #else
       if (call_bc != Bytecodes::_invokedynamic && call_bc != Bytecodes::_monitorenter && call_bc != Bytecodes::_monitorexit) {
 #endif
-      int index = iter.get_index_u2_cpcache();
+      int index = iter.get_index_u2();
       if (!caller_method->is_klass_loaded(index, call_bc, true)) {
         return false;
       }

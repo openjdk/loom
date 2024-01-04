@@ -27,7 +27,9 @@ import com.sun.org.apache.xerces.internal.xni.grammars.XMLGrammarPool;
 import com.sun.org.apache.xerces.internal.xni.parser.XMLParserConfiguration;
 import jdk.xml.internal.JdkConstants;
 import jdk.xml.internal.JdkProperty;
+import jdk.xml.internal.Utils;
 import jdk.xml.internal.XMLSecurityManager;
+import org.xml.sax.SAXException;
 import org.xml.sax.SAXNotRecognizedException;
 import org.xml.sax.SAXNotSupportedException;
 
@@ -39,7 +41,7 @@ import org.xml.sax.SAXNotSupportedException;
  * @author Arnaud  Le Hors, IBM
  * @author Andy Clark, IBM
  *
- * @LastModified: July 2023
+ * @LastModified: Nov 2023
  */
 public class SAXParser
     extends AbstractSAXParser {
@@ -89,20 +91,21 @@ public class SAXParser
      */
     public SAXParser(XMLParserConfiguration config) {
         super(config);
+        initSecurityManager(null, null);
     } // <init>(XMLParserConfiguration)
 
     /**
      * Constructs a SAX parser using the dtd/xml schema parser configuration.
      */
     public SAXParser() {
-        this(null, null);
+        this(null, null, null, null);
     } // <init>()
 
     /**
      * Constructs a SAX parser using the specified symbol table.
      */
     public SAXParser(SymbolTable symbolTable) {
-        this(symbolTable, null);
+        this(symbolTable, null, null, null);
     } // <init>(SymbolTable)
 
     /**
@@ -110,6 +113,11 @@ public class SAXParser
      * grammar pool.
      */
     public SAXParser(SymbolTable symbolTable, XMLGrammarPool grammarPool) {
+        this(symbolTable, grammarPool, null, null);
+    }
+
+    public SAXParser(SymbolTable symbolTable, XMLGrammarPool grammarPool,
+            XMLSecurityPropertyManager securityPropertyMgr, XMLSecurityManager securityManager) {
         super(new XIncludeAwareParserConfiguration());
 
         // set features
@@ -125,6 +133,7 @@ public class SAXParser
             fConfiguration.setProperty(XMLGRAMMAR_POOL, grammarPool);
         }
 
+        initSecurityManager(securityPropertyMgr, securityManager);
     } // <init>(SymbolTable,XMLGrammarPool)
 
     /**
@@ -150,16 +159,6 @@ public class SAXParser
             }
             super.setProperty(JdkConstants.XML_SECURITY_PROPERTY_MANAGER, securityPropertyManager);
             return;
-        }
-
-        if (securityManager == null) {
-            securityManager = new XMLSecurityManager(true);
-            super.setProperty(Constants.SECURITY_MANAGER, securityManager);
-        }
-
-        if (securityPropertyManager == null) {
-            securityPropertyManager = new XMLSecurityPropertyManager();
-            super.setProperty(JdkConstants.XML_SECURITY_PROPERTY_MANAGER, securityPropertyManager);
         }
 
         int index = securityPropertyManager.getIndex(name);

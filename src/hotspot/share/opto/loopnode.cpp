@@ -620,7 +620,7 @@ static bool no_side_effect_since_safepoint(Compile* C, Node* x, Node* mem, Merge
   SafePointNode* safepoint = nullptr;
   for (DUIterator_Fast imax, i = x->fast_outs(imax); i < imax; i++) {
     Node* u = x->fast_out(i);
-    if (u->is_Phi() && u->bottom_type() == Type::MEMORY) {
+    if (u->is_memory_phi()) {
       Node* m = u->in(LoopNode::LoopBackControl);
       if (u->adr_type() == TypePtr::BOTTOM) {
         if (m->is_MergeMem() && mem->is_MergeMem()) {
@@ -855,6 +855,28 @@ bool PhaseIdealLoop::create_loop_nest(IdealLoopTree* loop, Node_List &old_new) {
     // not a loop after all
     return false;
   }
+
+  if (range_checks.size() > 0) {
+    // This transformation requires peeling one iteration. Also, if it has range checks and they are eliminated by Loop
+    // Predication, then 2 Hoisted Check Predicates are added for one range check. Finally, transforming a long range
+    // check requires extra logic to be executed before the loop is entered and for the outer loop. As a result, the
+    // transformations can't pay off for a small number of iterations: roughly, if the loop runs for 3 iterations, it's
+    // going to execute as many range checks once transformed with range checks eliminated (1 peeled iteration with
+    // range checks + 2 predicates per range checks) as it would have not transformed. It also has to pay for the extra
+    // logic on loop entry and for the outer loop.
+    loop->compute_trip_count(this);
+    if (head->is_CountedLoop() && head->as_CountedLoop()->has_exact_trip_count()) {
+      if (head->as_CountedLoop()->trip_count() <= 3) {
+        return false;
+      }
+    } else {
+      loop->compute_profile_trip_cnt(this);
+      if (!head->is_profile_trip_failed() && head->profile_trip_cnt() <= 3) {
+        return false;
+      }
+    }
+  }
+
   julong orig_iters = (julong)hi->hi_as_long() - lo->lo_as_long();
   iters_limit = checked_cast<int>(MIN2((julong)iters_limit, orig_iters));
 
@@ -2639,7 +2661,7 @@ void OuterStripMinedLoopNode::fix_sunk_stores(CountedLoopEndNode* inner_cle, Loo
 #ifdef ASSERT
         for (DUIterator_Fast jmax, j = inner_cl->fast_outs(jmax); j < jmax; j++) {
           Node* uu = inner_cl->fast_out(j);
-          if (uu->is_Phi() && uu->bottom_type() == Type::MEMORY) {
+          if (uu->is_memory_phi()) {
             if (uu->adr_type() == igvn->C->get_adr_type(igvn->C->get_alias_index(u->adr_type()))) {
               assert(phi == uu, "what's that phi?");
             } else if (uu->adr_type() == TypePtr::BOTTOM) {
@@ -4459,6 +4481,7 @@ void PhaseIdealLoop::build_and_optimize() {
   NOT_PRODUCT( C->verify_graph_edges(); )
   worklist.push(C->top());
   build_loop_late( visited, worklist, nstack );
+  if (C->failing()) { return; }
 
   if (_verify_only) {
     C->restore_major_progress(old_progress);
@@ -4640,7 +4663,7 @@ void PhaseIdealLoop::build_and_optimize() {
   }
 
   // Convert scalar to superword operations at the end of all loop opts.
-  if (UseSuperWord && C->has_loops() && !C->major_progress()) {
+  if (C->do_superword() && C->has_loops() && !C->major_progress()) {
     // SuperWord transform
     SuperWord sw(this);
     for (LoopTreeIterator iter(_ltree_root); !iter.done(); iter.next()) {
@@ -4692,6 +4715,7 @@ void PhaseIdealLoop::verify() const {
   bool success = true;
 
   PhaseIdealLoop phase_verify(_igvn, this);
+  if (C->failing()) return;
 
   // Verify ctrl and idom of every node.
   success &= verify_idom_and_nodes(C->root(), &phase_verify);
@@ -5359,11 +5383,12 @@ int PhaseIdealLoop::build_loop_tree_impl( Node *n, int pre_order ) {
         if( !n->is_CallStaticJava() || !n->as_CallStaticJava()->_name ) {
           Node *iff = n->in(0)->in(0);
           // No any calls for vectorized loops.
-          if( UseSuperWord || !iff->is_If() ||
-              (n->in(0)->Opcode() == Op_IfFalse &&
-               (1.0 - iff->as_If()->_prob) >= 0.01) ||
-              (iff->as_If()->_prob >= 0.01) )
+          if (C->do_superword() ||
+              !iff->is_If() ||
+              (n->in(0)->Opcode() == Op_IfFalse && (1.0 - iff->as_If()->_prob) >= 0.01) ||
+              iff->as_If()->_prob >= 0.01) {
             innermost->_has_call = 1;
+          }
         }
       } else if( n->is_Allocate() && n->as_Allocate()->_is_scalar_replaceable ) {
         // Disable loop optimizations if the loop has a scalar replaceable
@@ -5715,6 +5740,51 @@ Node* CountedLoopNode::is_canonical_loop_entry() {
   return res ? cmpzm->in(input) : nullptr;
 }
 
+// Find pre loop end from main loop. Returns nullptr if none.
+CountedLoopEndNode* CountedLoopNode::find_pre_loop_end() {
+  assert(is_main_loop(), "Can only find pre-loop from main-loop");
+  // The loop cannot be optimized if the graph shape at the loop entry is
+  // inappropriate.
+  if (is_canonical_loop_entry() == nullptr) {
+    return nullptr;
+  }
+
+  Node* p_f = skip_assertion_predicates_with_halt()->in(0)->in(0);
+  if (!p_f->is_IfFalse() || !p_f->in(0)->is_CountedLoopEnd()) {
+    return nullptr;
+  }
+  CountedLoopEndNode* pre_end = p_f->in(0)->as_CountedLoopEnd();
+  CountedLoopNode* loop_node = pre_end->loopnode();
+  if (loop_node == nullptr || !loop_node->is_pre_loop()) {
+    return nullptr;
+  }
+  return pre_end;
+}
+
+  CountedLoopNode* CountedLoopNode::pre_loop_head() const {
+    assert(is_main_loop(), "Only main loop has pre loop");
+    assert(_pre_loop_end != nullptr && _pre_loop_end->loopnode() != nullptr,
+           "should find head from pre loop end");
+    return _pre_loop_end->loopnode();
+  }
+
+  CountedLoopEndNode* CountedLoopNode::pre_loop_end() {
+#ifdef ASSERT
+    assert(is_main_loop(), "Only main loop has pre loop");
+    assert(_pre_loop_end != nullptr, "should be set when fetched");
+    Node* found_pre_end = find_pre_loop_end();
+    assert(_pre_loop_end == found_pre_end && _pre_loop_end == pre_loop_head()->loopexit(),
+           "should find the pre loop end and must be the same result");
+#endif
+    return _pre_loop_end;
+  }
+
+  void CountedLoopNode::set_pre_loop_end(CountedLoopEndNode* pre_loop_end) {
+    assert(is_main_loop(), "Only main loop has pre loop");
+    assert(pre_loop_end, "must be valid");
+    _pre_loop_end = pre_loop_end;
+  }
+
 //------------------------------get_late_ctrl----------------------------------
 // Compute latest legal control.
 Node *PhaseIdealLoop::get_late_ctrl( Node *n, Node *early ) {
@@ -5944,6 +6014,7 @@ void PhaseIdealLoop::build_loop_late( VectorSet &visited, Node_List &worklist, N
       } else {
         // All of n's children have been processed, complete post-processing.
         build_loop_late_post(n);
+        if (C->failing()) { return; }
         if (nstack.is_empty()) {
           // Finished all nodes on stack.
           // Process next node on the worklist.
@@ -6090,13 +6161,15 @@ void PhaseIdealLoop::build_loop_late_post_work(Node *n, bool pinned) {
   Node *legal = LCA;            // Walk 'legal' up the IDOM chain
   Node *least = legal;          // Best legal position so far
   while( early != legal ) {     // While not at earliest legal
-#ifdef ASSERT
     if (legal->is_Start() && !early->is_Root()) {
+#ifdef ASSERT
       // Bad graph. Print idom path and fail.
       dump_bad_graph("Bad graph detected in build_loop_late", n, early, LCA);
       assert(false, "Bad graph detected in build_loop_late");
-    }
 #endif
+      C->record_method_not_compilable("Bad graph detected in build_loop_late");
+      return;
+    }
     // Find least loop nesting depth
     legal = idom(legal);        // Bump up the IDOM tree
     // Check for lower nesting depth

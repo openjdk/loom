@@ -25,19 +25,15 @@
  * @test
  * @bug 8029800
  * @summary String.toLowerCase()/toUpperCase is generally dangerous, check it is not used in langtools
- * @modules java.base/jdk.internal.classfile
- *          java.base/jdk.internal.classfile.attribute
- *          java.base/jdk.internal.classfile.constantpool
- *          java.base/jdk.internal.classfile.instruction
- *          java.base/jdk.internal.classfile.components
- *          java.base/jdk.internal.classfile.impl
+ * @enablePreview
+ * @modules java.base/jdk.internal.classfile.impl
  */
 
 import java.io.*;
 import java.util.*;
 import javax.tools.*;
-import jdk.internal.classfile.*;
-import jdk.internal.classfile.constantpool.*;
+import java.lang.classfile.*;
+import java.lang.classfile.constantpool.*;
 
 public class NoStringToLower {
     public static void main(String... args) throws Exception {
@@ -108,10 +104,9 @@ public class NoStringToLower {
      */
     void scan(JavaFileObject fo) throws IOException {
         try (InputStream in = fo.openInputStream()) {
-            ClassModel cf = Classfile.of().parse(in.readAllBytes());
-            ConstantPool cp = cf.constantPool();
-            for (int i = 1; i < cp.entryCount(); i += cp.entryByIndex(i).width()) {
-                if (cp.entryByIndex(i) instanceof MethodRefEntry ref) {
+            ClassModel cf = ClassFile.of().parse(in.readAllBytes());
+            for (PoolEntry pe : cf.constantPool()) {
+                if (pe instanceof MethodRefEntry ref) {
                     String methodDesc = ref.owner().name().stringValue() + "." + ref.name().stringValue() + ":" + ref.type().stringValue();
 
                     if ("java/lang/String.toLowerCase:()Ljava/lang/String;".equals(methodDesc)) {

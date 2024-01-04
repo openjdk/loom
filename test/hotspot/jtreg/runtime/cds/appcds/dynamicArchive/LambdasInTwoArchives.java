@@ -33,7 +33,7 @@
  * @requires vm.cds
  * @library /test/lib /test/hotspot/jtreg/runtime/cds/appcds
  *          /test/hotspot/jtreg/runtime/cds/appcds/dynamicArchive/test-classes
- * @build LambdasWithSameKey
+ * @build LambdasWithSameKey jdk.test.whitebox.WhiteBox
  * @run driver jdk.test.lib.helpers.ClassFileInstaller -jar lambdas_same_key.jar LambdasWithSameKey
  * @run driver jdk.test.lib.helpers.ClassFileInstaller -jar WhiteBox.jar jdk.test.whitebox.WhiteBox
  * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
@@ -93,7 +93,7 @@ public class LambdasInTwoArchives extends DynamicArchiveTestBase {
                 "-Xlog:cds",
                 "-Xlog:cds+lambda",
                 "-cp", appJar, mainClass};
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(launchArgs);
+        ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(launchArgs);
         OutputAnalyzer oa = TestCommon.executeAndLog(pb, "lambda-classes");
         oa.shouldHaveExitValue(0);
 

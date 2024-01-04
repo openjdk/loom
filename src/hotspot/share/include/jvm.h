@@ -301,11 +301,11 @@ JVM_ExpandStackFrameInfo(JNIEnv *env, jobject obj);
 JNIEXPORT jobject JNICALL
 JVM_CallStackWalk(JNIEnv *env, jobject stackStream, jint mode,
                   jint skip_frames, jobject contScope, jobject cont,
-                  jint frame_count, jint start_index, jobjectArray frames);
+                  jint buffer_size, jint start_index, jobjectArray frames);
 
 JNIEXPORT jint JNICALL
 JVM_MoreStackWalk(JNIEnv *env, jobject stackStream, jint mode, jlong anchor,
-                  jint frame_count, jint start_index,
+                  jint last_batch_count, jint buffer_size, jint start_index,
                   jobjectArray frames);
 
 JNIEXPORT void JNICALL
@@ -828,12 +828,6 @@ JNIEXPORT jobject JNICALL
 JVM_AssertionStatusDirectives(JNIEnv *env, jclass unused);
 
 /*
- * java.util.concurrent.atomic.AtomicLong
- */
-JNIEXPORT jboolean JNICALL
-JVM_SupportsCX8(void);
-
-/*
  * java.lang.ref.Finalizer
  */
 JNIEXPORT void JNICALL
@@ -1205,6 +1199,9 @@ JVM_VirtualThreadUnmount(JNIEnv* env, jobject vthread, jboolean hide);
 
 JNIEXPORT void JNICALL
 JVM_VirtualThreadHideFrames(JNIEnv* env, jobject vthread, jboolean hide);
+
+JNIEXPORT void JNICALL
+JVM_VirtualThreadDisableSuspend(JNIEnv* env, jobject vthread, jboolean enter);
 
 /*
  * Core reflection support.
