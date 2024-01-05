@@ -2,85 +2,105 @@ Test: hotspot/jtreg :tier1_runtime
 
 Source info:
 
-commit 1f73bed74f65f430971789ce6c4cf2c8ee547594 (HEAD -> jom-master)
+commit d7df161bf1132c32e11bfec370efef363da82066
+Merge: 0335f542439 05745e3f1d5
 Author: David Holmes <david.holmes@oracle.com>
-Date:   Wed Sep 13 22:42:23 2023 -0400
+Date:   Thu Jan 4 00:44:28 2024 -0500
 
-Apply fixes needed in JOM for interpreter_frame_last_sp relativisation changes
+Test results: passed: 639; failed: 16; error: 3
 
-Test results: passed: 625; failed: 16; error: 2
+(previous logged run: Test results: passed: 625; failed: 16; error: 2)
 
-(previous logged run: passed: 617; failed: 18; error: 2)
+1.runtime/ErrorHandling/StackWalkNativeToJava.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.RuntimeException: Reached statement after synchronized' found in stderr
 
-1. runtime/logging/MonitorInflationTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'inflate(has_locker):' missing from stdout/stderr
+Relies of fatal error synchronizing on a valude-based class, which JOM does not implement yet.
+
+2. runtime/logging/MonitorInflationTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'inflate(has_locker):' missing from stdout/stderr
 
 Test not applicable to JOM: No native monitor inflation so logging is not present
 
-2. runtime/Thread/AsyncExceptionOnMonitorEnter.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected: java.lang.InterruptedException: sleep interrupted
-  or
-runtime/Thread/AsyncExceptionOnMonitorEnter.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed ou
-
-3. runtime/Thread/StopAtExit.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected: java.lang.InterruptedException
-
-These may not be JOM specific. There is some strangeness happening with failure to deliver an async exception and instead we respond to the interrupt that is part of the StopThread action.
-
-4. runtime/Unsafe/InternalErrorTest.java: Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation
-
-Also appears to be an issue with async exception delivery. The InternalError gets thrown outside the test code.
-
-5. runtime/Thread/TestThreadDumpClassInitMonitor.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected initial stack line: "TestThread" #12 prio=5 os_prio=0 cpu=1.03ms elapsed=0.89s tid=0x00007feee8027e80 nid=2094 runnable [0x00007fef303ba000]
-
-Intermittent. Stack has changed with JOM, so test may need adjusting. Now we se BasicObjectLock again this may be resolved.
-
-6. runtime/BootClassAppendProp/BootClassPathAppend.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.Object' missing from stdout/stderr
-
-Won't work in interpreted mode
-
-7. runtime/ClassInitErrors/TestStackOverflowDuringInit.java: Failed. Unexpected exit from test [exit code: 134]
-
-Test triggers stackoverflow then tries to recover, but it hits in the monitorEnter code and so we abort.
-
-8.  runtime/handshake/HandshakeDirectTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
-
-Intermittent
-
-9. runtime/HiddenClasses/GCHiddenClass.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out
-
-Intermittent. May not be suitable for interpreter mode
-
-10. runtime/HiddenClasses/TestHiddenClassUnloading.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Background compilation enabled
-
-Won't work in interpreted mode
-
-11. runtime/logging/loadLibraryTest/LoadLibraryTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out (timeout set to 1800000ms, elapsed time including timeout handling was 1800688ms).
-
-Intermittent. Unknown failure mode.
-
-12.  runtime/memory/LargePages/TestLargePagesFlags.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
-
-Intermittent. Seems stuck at safepoint.
-
-13 - 16. runtime/Monitor/DeflationIntervalsTest.java#guaranteed_threshold_noSafepoint: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Async deflation needed: monitors used are above the threshold' missing from stdout/stder
-17. runtime/Monitor/MonitorUsedDeflationThresholdTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Did not find too_many string in output.
+3 - 6. runtime/Monitor/DeflationIntervalsTest.java#guaranteed_threshold_noSafepoint: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'Async deflation needed: monitors used are above the threshold' missing from stdout/stder
+7. runtime/Monitor/MonitorUsedDeflationThresholdTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Did not find too_many string in output.
 
 Not applicable for JOM: no deflation
 
-18. runtime/Monitor/SyncOnValueBasedClassTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Synchronizing on object' missing from stdout/stderr
+8. runtime/Monitor/SyncOnValueBasedClassTest.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'fatal error: Synchronizing on object' missing from stdout/stderr
 
 This check is missing in the JOM prototype.
 
-19. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
-20. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+9. runtime/Thread/AsyncExceptionOnMonitorEnter.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected: java.lang.InterruptedException: sleep interrupted
+  or
+runtime/Thread/AsyncExceptionOnMonitorEnter.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed ou
+
+10. runtime/Thread/StopAtExit.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected: java.lang.InterruptedException
+
+These may not be JOM specific. There is some strangeness happening with failure to deliver an async exception and instead we respond to the interrupt that is part of the StopThread action.
+
+11. runtime/Unsafe/InternalErrorTest.java: Failed. Execution failed: `main' threw exception: java.lang.InternalError: a fault occurred in an unsafe memory access operation
+
+Also appears to be an issue with async exception delivery. The InternalError gets thrown outside the test code.
+
+12. runtime/BootClassAppendProp/BootClassPathAppend.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.Object' missing from stdout/stderr
+
+Won't work in interpreted mode
+
+13. runtime/ClassInitErrors/TestStackOverflowDuringInit.java: Failed. Unexpected exit from test [exit code: 134]
+
+Test triggers stackoverflow then tries to recover, but it hits in the monitorEnter code and so we abort.
+
+14. runtime/HiddenClasses/TestHiddenClassUnloading.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Background compilation enabled
+
+Won't work in interpreted mode
+
+15. runtime/lockStack/TestStackWalk.java: Failed. Unexpected exit from test [exit code: 134]
+
+SEGV in javaVFrame::print_lock_info_on
+
+Not investigated yet.
+
+
+16. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+17. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
 
 Won't work in interpreted mode.
 
-21. runtime/reflect/ReflectOutOfMemoryError.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
+18. runtime/reflect/ReflectStackOverflow.java: Failed. Unexpected exit from test [exit code: 134]
+
+Test triggers stackoverflow then tries to recover, but it hits in the monitorEnter code and so we abort.
+
+19. runtime/whitebox/TestWBDeflateIdleMonitors.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0]
+
+Not applicable for JOM: no deflation
+
+---
+
+Other intermittent failures seen previously
+
+- runtime/Thread/TestThreadDumpClassInitMonitor.java: Failed. Execution failed: `main' threw exception: java.lang.Error: Unexpected initial stack line: "TestThread" #12 prio=5 os_prio=0 cpu=1.03ms elapsed=0.89s tid=0x00007feee8027e80 nid=2094 runnable [0x00007fef303ba000]
+
+Intermittent. Stack has changed with JOM, so test may need adjusting. Now we se BasicObjectLock again this may be resolved.
+
+- runtime/handshake/HandshakeDirectTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
+
+Intermittent
+
+- runtime/HiddenClasses/GCHiddenClass.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out
+
+Intermittent. May not be suitable for interpreter mode
+
+- runtime/logging/loadLibraryTest/LoadLibraryTest.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-jom-master-merge/images/jdk/bin/java' timed out (timeout set to 1800000ms, elapsed time including timeout handling was 1800688ms).
+
+Intermittent. Unknown failure mode.
+
+- runtime/memory/LargePages/TestLargePagesFlags.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
+
+Intermittent. Seems stuck at safepoint.
+
+
+- runtime/reflect/ReflectOutOfMemoryError.java: Error. Program `/scratch/users/daholme/loom-jom/build/linux-x64-debug-vthread-fix/images/jdk/bin/java' timed out
 
 Intermittent. Appears to be stuck at safepoint
 
-22. runtime/whitebox/TestWBDeflateIdleMonitors.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0]
-
-Not applicable for JOM: no deflation
 
 
 ----------------------------------------------------------
