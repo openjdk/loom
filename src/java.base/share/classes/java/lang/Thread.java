@@ -2401,11 +2401,33 @@ public class Thread implements Runnable {
         // synchronized code and we get infinite recursion.
         if (lockStackPos <= 0 || lockStackPos >= lockStack.length)
             MonitorSupport.abort("pop() ArrayIndexOutOfBoundsException: " + lockStackPos);
-        Object o = lockStack[--lockStackPos];
+        Object o = lockStack[lockStackPos];
         if (o != lockee) {
-            MonitorSupport.abort("mismatched lockStack: expected " + lockee + " but found " + o);
+            // Out-of-order unlocking can happen from direct bytecode and is
+            // permitted.
+            if (!remove(lockee)) {
+                MonitorSupport.abort("Trying to pop non-existent object: " + lockee);
+            }
+        } else {
+            lockStack[--lockStackPos] = null;
         }
-        lockStack[lockStackPos] = null;
+    }
+
+    // Remove the most recent occurrence of the given Object from the lock-stack.
+    // Return true if the Objectwas found and removed, and false if not present.
+    boolean remove(Object lockee) {
+        for (int i = lockStackPos - 1; i >= 0; i--) {
+            Object o = lockStack[i];
+            if (o == lockee) {
+                // Need to compact the list
+                for (int j = i; j < lockStackPos - 1; j++) {
+                    lockStack[j] = lockStack[j + 1];
+                }
+                lockStack[--lockStackPos] = null;
+                return true;
+            }
+        }
+        return false;
     }
 
     Object peek() {
