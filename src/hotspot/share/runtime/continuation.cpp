@@ -130,7 +130,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, bool set_sta
   assert(target->is_on_monitorenter(), "must be");
   assert(target->has_last_Java_frame(), "must be");
   assert(!target->preempting(), "must be");
-  assert(!target->is_suspended(), "must be");
+  assert(!target->is_suspended() || target->is_disable_suspend(), "must be");
   assert(!target->has_pending_exception(), "must be");
   assert(target->last_continuation() != nullptr, "must be");
   assert(target->last_continuation()->cont_oop(target) == continuation, "must be");
