@@ -395,7 +395,6 @@ private:
   void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node, oop vthread = nullptr);
   ObjectWaiter* LookupWaiter(int64_t threadid);
   int       TryLock(JavaThread* current);
-  int       NotRunnable(JavaThread* current, JavaThread* Owner);
   int       TrySpin(JavaThread* current);
   void      ExitEpilog(JavaThread* current, ObjectWaiter* Wakee);
 
