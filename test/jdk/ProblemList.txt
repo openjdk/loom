@@ -770,6 +770,9 @@ jdk/jfr/api/consumer/recordingstream/TestOnEvent.java           8255404 linux-x6
 
 # jdk_foreign
 
+java/foreign/TestStubAllocFailure.java 8322324 generic-all
+
+
 ############################################################################
 # Client manual tests
 
