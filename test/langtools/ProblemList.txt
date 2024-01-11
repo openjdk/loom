@@ -67,7 +67,7 @@ tools/javac/annotations/typeAnnotations/referenceinfos/NestedTypes.java         
 tools/javac/warnings/suppress/TypeAnnotations.java                              8057683    generic-all    improve ordering of errors with type annotations
 tools/javac/modules/SourceInSymlinkTest.java                                    8180263    windows-all    fails when run on a subst drive
 
-test/langtools/tools/javac/switchnull/SwitchNull.java                           8322726    generic-all    fais with -XX:+VerifyOops
+tools/javac/switchnull/SwitchNull.java                                          8322726    generic-all    fais with -XX:+VerifyOops
 
 ###########################################################################
 #
