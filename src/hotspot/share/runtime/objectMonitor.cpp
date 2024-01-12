@@ -1173,7 +1173,7 @@ void ObjectMonitor::VThreadEpilog(JavaThread* current) {
 
 void ObjectMonitor::UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* currentNode, oop vthread) {
   assert(owner_raw() == current, "invariant");
-  assert(currentNode->_thread == current || currentNode->_thread == nullptr && currentNode->vthread() == vthread, "invariant");
+  assert((currentNode->_thread == current) || (currentNode->_thread == nullptr && currentNode->vthread() == vthread), "invariant");
 
   if (currentNode->TState == ObjectWaiter::TS_ENTER) {
     // Normal case: remove current from the DLL EntryList .
