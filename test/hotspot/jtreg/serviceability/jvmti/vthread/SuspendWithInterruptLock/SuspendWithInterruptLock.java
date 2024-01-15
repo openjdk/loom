@@ -36,7 +36,7 @@
  * @bug 8311218
  * @requires vm.continuations
  * @library /testlibrary
- * @run main/othervm -Xint SuspendWithInterruptLock
+ * @run main/othervm -Xint -XX:-VerifyContinuations SuspendWithInterruptLock
  */
 
 import jvmti.JVMTIUtils;
