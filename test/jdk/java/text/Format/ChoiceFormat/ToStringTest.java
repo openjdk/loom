@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,28 +19,37 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_GC_SERIAL_DEFNEWGENERATION_INLINE_HPP
-#define SHARE_GC_SERIAL_DEFNEWGENERATION_INLINE_HPP
+/*
+ * @test
+ * @bug 8321545
+ * @summary Ensure value returned by overridden toString method is as expected
+ * @run junit ToStringTest
+ */
 
-#include "gc/serial/defNewGeneration.hpp"
+import java.text.ChoiceFormat;
 
-#include "gc/serial/cardTableRS.hpp"
-#include "gc/shared/space.inline.hpp"
-#include "oops/access.inline.hpp"
-#include "utilities/devirtualizer.inline.hpp"
+import org.junit.jupiter.api.Test;
 
-// Methods of protected closure types
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-template <typename OopClosureType>
-void DefNewGeneration::oop_since_save_marks_iterate(OopClosureType* cl) {
-  // No allocation in eden and from spaces, so no iteration required.
-  assert(eden()->saved_mark_at_top(), "inv");
-  assert(from()->saved_mark_at_top(), "inv");
+public class ToStringTest {
 
-  to()->oop_since_save_marks_iterate(cl);
+    // Check a normal expected value. There is no null locale test as
+    // ChoiceFormat is not localized.
+    @Test
+    public void normalValueTest() {
+        String expectedStr = "ChoiceFormat [pattern: \"1.0#foo\"]\n";
+        var c = new ChoiceFormat("1.0#foo");
+        assertEquals(expectedStr, c.toString());
+    }
+
+    // Ensure toString throws no exception when ChoiceFormat is created
+    // with empty arrays
+    @Test
+    public void oddValueTest() {
+        var c2 = new ChoiceFormat(new double[]{}, new String[]{});
+        System.out.println(c2);
+    }
 }
-
-#endif // SHARE_GC_SERIAL_DEFNEWGENERATION_INLINE_HPP
