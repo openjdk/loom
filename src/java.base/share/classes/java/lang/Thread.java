@@ -162,7 +162,16 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * }
  *
  * <h2><a id="inheritance">Inheritance when creating threads</a></h2>
- * A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
+ * A {@code Thread} created with one of the public constructors inherits the daemon
+ * status and thread priority from the parent thread at the time that the child {@code
+ * Thread} is created. The {@linkplain ThreadGroup thread group} is also inherited when
+ * not provided to the constructor (and not selected by the security manager).
+ * When using a {@code Thread.Builder} to create a platform thread, the daemon status,
+ * thread priority, and thread group (when not selected by the security manager) are
+ * inherited when not set on the builder. As with the constructors, inheriting from the
+ * parent thread is done when the child {@code Thread} is created.
+ *
+ * <p> A {@code Thread} inherits its initial values of {@linkplain InheritableThreadLocal
  * inheritable-thread-local} variables (including the context class loader) from
  * the parent thread values at the time that the child {@code Thread} is created.
  * The 5-param {@linkplain Thread#Thread(ThreadGroup, Runnable, String, long, boolean)
@@ -170,9 +179,6 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * values from the constructing thread. When using a {@code Thread.Builder}, the
  * {@link Builder#inheritInheritableThreadLocals(boolean) inheritInheritableThreadLocals}
  * method can be used to select if the initial values are inherited.
- *
- * <p> Platform threads inherit the daemon status, thread priority, and when not
- * provided (or not selected by a security manager), the thread group.
  *
  * <p> Creating a platform thread {@linkplain AccessController#getContext() captures} the
  * {@linkplain AccessControlContext caller context} to limit the {@linkplain Permission
