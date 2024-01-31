@@ -3966,11 +3966,21 @@ void TemplateTable::monitorenter()
 
   // store object
   __ str(r0, Address(c_rarg1, BasicObjectLock::obj_offset()));
+  __ set_last_Java_frame(sp, rfp, rscratch1, rscratch2);
   __ lock_object(c_rarg1);
+  __ reset_last_Java_frame(true);
 
   // check to make sure this monitor doesn't cause stack overflow after locking
   __ save_bcp();  // in case of exception
   __ generate_stack_overflow_check(0);
+
+  // Check preemption
+  Label ok;
+  __ ldrb(rscratch1, Address(rthread, in_bytes(JavaThread::preempting_offset())));
+  __ cbz(rscratch1, ok);
+  __ lea(rscratch1, RuntimeAddress(StubRoutines::cont_preempt_stub()));
+  __ br(rscratch1);
+  __ bind(ok);
 
   // The bcp has already been incremented. Just need to dispatch to
   // next instruction.
@@ -4020,6 +4030,8 @@ void TemplateTable::monitorexit()
   }
 
   // error handling. Unlocking was not block-structured
+  __ adr(rscratch1, __ pc());
+  __ set_last_Java_frame(sp, rfp, rscratch1, rscratch2);
   __ call_VM(noreg, CAST_FROM_FN_PTR(address,
                    InterpreterRuntime::throw_illegal_monitor_state_exception));
   __ should_not_reach_here();

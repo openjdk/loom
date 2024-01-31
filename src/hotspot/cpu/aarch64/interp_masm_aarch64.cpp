@@ -753,10 +753,17 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 
       // Save the test result, for recursive case, the result is zero
       str(swap_reg, Address(lock_reg, mark_offset));
-      br(Assembler::EQ, count);
+      br(Assembler::NE, slow_case);
+      b(done);
     }
+
+    bind(count);
+    inc_held_monitor_count();
+    b(done);
+
     bind(slow_case);
 
+    //    push_cont_fastpath();
     // Call the runtime routine for slow case
     if (LockingMode == LM_LIGHTWEIGHT) {
       call_VM(noreg,
@@ -767,11 +774,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
               lock_reg);
     }
-    b(done);
-
-    bind(count);
-    increment(Address(rthread, JavaThread::held_monitor_count_offset()));
-
+    //    pop_cont_fastpath();
     bind(done);
   }
 }
@@ -816,9 +819,9 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg)
     // Free entry
     str(zr, Address(lock_reg, BasicObjectLock::obj_offset()));
 
-    if (LockingMode == LM_LIGHTWEIGHT) {
-      Label slow_case;
+    Label slow_case;
 
+    if (LockingMode == LM_LIGHTWEIGHT) {
       // Check for non-symmetric locking. This is allowed by the spec and the interpreter
       // must handle it.
       Register tmp = rscratch1;
@@ -836,26 +839,26 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg)
       tbnz(header_reg, exact_log2(markWord::monitor_value), slow_case);
       lightweight_unlock(obj_reg, header_reg, swap_reg, tmp_reg, slow_case);
       b(count);
-      bind(slow_case);
     } else if (LockingMode == LM_LEGACY) {
       // Load the old header from BasicLock structure
       ldr(header_reg, Address(swap_reg,
                               BasicLock::displaced_header_offset_in_bytes()));
 
       // Test for recursion
-      cbz(header_reg, count);
+      cbz(header_reg, done);
 
       // Atomic swap back the old header
-      cmpxchg_obj_header(swap_reg, header_reg, obj_reg, rscratch1, count, /*fallthrough*/nullptr);
+      cmpxchg_obj_header(swap_reg, header_reg, obj_reg, rscratch1, count, &slow_case);
     }
+
+    bind(count);
+    dec_held_monitor_count();
+    b(done);
+
+    bind(slow_case);
     // Call the runtime routine for slow case.
     str(obj_reg, Address(lock_reg, BasicObjectLock::obj_offset())); // restore obj
     call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
-    b(done);
-
-    bind(count);
-    decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
-
     bind(done);
     restore_bcp();
   }

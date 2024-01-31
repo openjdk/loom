@@ -65,6 +65,7 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   const int hdr_offset = oopDesc::mark_offset_in_bytes();
   assert_different_registers(hdr, obj, disp_hdr, temp, rscratch2);
   int null_check_offset = -1;
+  Label count_locking, done;
 
   verify_oop(obj);
 
@@ -85,7 +86,6 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   if (LockingMode == LM_LIGHTWEIGHT) {
     lightweight_lock(obj, hdr, temp, rscratch2, slow_case);
   } else if (LockingMode == LM_LEGACY) {
-    Label done;
     // and mark it as unlocked
     orr(hdr, hdr, markWord::unlocked_value);
     // save unlocked object header into the displaced header location on the stack
@@ -94,7 +94,8 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // displaced header address in the object header - if it is not the same, get the
     // object header instead
     lea(rscratch2, Address(obj, hdr_offset));
-    cmpxchgptr(hdr, disp_hdr, rscratch2, rscratch1, done, /*fallthough*/nullptr);
+    // if the object header was the same, we're done
+    cmpxchgptr(hdr, disp_hdr, rscratch2, rscratch1, count_locking, /*fallthough*/nullptr);
     // if the object header was the same, we're done
     // if the object header was not the same, it is now in the hdr register
     // => test if it is a stack pointer into the same stack (recursive locking), i.e.:
@@ -118,9 +119,11 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // otherwise we don't care about the result and handle locking via runtime call
     cbnz(hdr, slow_case);
     // done
-    bind(done);
+    b(done);
   }
-  increment(Address(rthread, JavaThread::held_monitor_count_offset()));
+  bind(count_locking);
+  inc_held_monitor_count();
+  bind(done);
   return null_check_offset;
 }
 
@@ -129,7 +132,7 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
   const int aligned_mask = BytesPerWord -1;
   const int hdr_offset = oopDesc::mark_offset_in_bytes();
   assert_different_registers(hdr, obj, disp_hdr, temp, rscratch2);
-  Label done;
+  Label count_locking, done;
 
   if (LockingMode != LM_LIGHTWEIGHT) {
     // load displaced header
@@ -158,14 +161,15 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
     // we do unlocking via runtime call
     if (hdr_offset) {
       lea(rscratch1, Address(obj, hdr_offset));
-      cmpxchgptr(disp_hdr, hdr, rscratch1, rscratch2, done, &slow_case);
+      cmpxchgptr(disp_hdr, hdr, rscratch1, rscratch2, count_locking, &slow_case);
     } else {
-      cmpxchgptr(disp_hdr, hdr, obj, rscratch2, done, &slow_case);
+      cmpxchgptr(disp_hdr, hdr, obj, rscratch2, count_locking, &slow_case);
     }
     // done
-    bind(done);
+    bind(count_locking);
   }
-  decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
+  dec_held_monitor_count();
+  bind(done);
 }
 
 

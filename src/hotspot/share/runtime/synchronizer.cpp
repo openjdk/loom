@@ -419,7 +419,9 @@ bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
 
     if (owner == current) {
       m->_recursions++;
-      NOT_AMD64(current->inc_held_monitor_count();)
+#ifndef LOOM_MONITOR_SUPPORT
+      current->inc_held_monitor_count();
+#endif
       return true;
     }
 
@@ -558,7 +560,7 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
         assert(lock != mark.locker(), "must not re-lock the same lock");
         assert(lock != (BasicLock*) obj->mark().value(), "don't relock with same BasicLock");
         lock->set_displaced_header(markWord::from_pointer(nullptr));
-        AMD64_ONLY(current->dec_held_monitor_count();)
+        LOOM_MONITOR_SUPPORT_ONLY(current->dec_held_monitor_count();)
         return;
       }
 
@@ -638,7 +640,7 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
           }
         }
 #endif
-        AMD64_ONLY(current->inc_held_monitor_count();)
+        LOOM_MONITOR_SUPPORT_ONLY(current->inc_held_monitor_count();)
         return;
       }
 
@@ -1799,7 +1801,11 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count(NOT_AMD64(rec + 1));
+    _thread->dec_held_monitor_count(
+#ifndef LOOM_MONITOR_SUPPORT
+                                    (rec + 1)
+#endif
+                                    );
   }
 };
 

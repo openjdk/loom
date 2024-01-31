@@ -7008,7 +7008,9 @@ class StubGenerator: public StubCodeGenerator {
     // If we want, we can templatize thaw by kind, and have three different entries
     __ movw(c_rarg1, (uint32_t)kind);
 
+    __ set_last_Java_frame(sp, rfp, rscratch1, rscratch2);
     __ call_VM_leaf(Continuation::thaw_entry(), rthread, c_rarg1);
+    __ reset_last_Java_frame(true);
     __ mov(rscratch2, r0); // r0 is the sp of the yielding frame
 
     if (return_barrier) {
@@ -7093,16 +7095,29 @@ class StubGenerator: public StubCodeGenerator {
     __ reset_last_Java_frame(true);
 
     // reset the flag
-    __ mov(rscratch2, zr);
-    __ strb(rscratch2, Address(rthread, JavaThread::preempting_offset()));
+    __ strb(zr, Address(rthread, JavaThread::preempting_offset()));
 
     // Set sp to enterSpecial frame and then remove it from the stack
     __ ldr(rscratch2, Address(rthread, JavaThread::cont_entry_offset()));
     __ mov(sp, rscratch2);
-    SharedRuntime::continuation_enter_cleanup(_masm);
 
+    Label preemption_cancelled;
+    // FIXME: Whose responsibility is it to clear this flag?
+    __ ldrb(rscratch1, Address(rthread, JavaThread::preemption_cancelled_offset()));
+    __ cbnz(rscratch1, preemption_cancelled);
+
+    //__ trace("Remove enterSpecial frame from the stack and return to Continuation.run()");
+    // Remove enterSpecial frame from the stack and return to Continuation.run()
+    SharedRuntime::continuation_enter_cleanup(_masm);
     __ leave();
     __ ret(lr);
+
+    __ bind(preemption_cancelled);
+    //__ trace("preemption_cancelled");
+    __ lea(rfp, Address(sp, checked_cast<int32_t>(ContinuationEntry::size())));
+    __ lea(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
+    __ ldr(rscratch1, Address(rscratch1));
+    __ br(rscratch1);
 
     return start;
   }
@@ -7119,6 +7134,51 @@ class StubGenerator: public StubCodeGenerator {
     // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
     __ movptr(r20, NULL_WORD);
 
+    __ leave();
+    __ ret(lr);
+
+    return start;
+  }
+
+  address generate_cont_preempt_monitorenter_redo() {
+    if (!Continuations::enabled()) return nullptr;
+    StubCodeMark mark(this, "StubRoutines","Continuation monitorenter redo stub");
+    address start = __ pc();
+
+    const Register mon_reg = c_rarg1;
+    __ ldr(mon_reg, __ post(sp, 2 * wordSize));
+
+#ifdef ASSERT
+    { Label L;
+      __ cbnz(mon_reg, L);
+      __ stop("ObjectMonitor to use is null");
+      __ bind(L);
+    }
+#endif // ASSERT
+
+    __ set_last_Java_frame(sp, rfp, lr, rscratch1);
+    __ mov(c_rarg0, rthread);
+    __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter));
+    __ reset_last_Java_frame(true);
+
+    Label failAcquire;
+    __ ldrb(rscratch1, Address(rthread, JavaThread::preempting_offset()));
+    __ cbnz(rscratch1, failAcquire);
+    // We have the lock now, just return to caller (we will actually hit the
+    // return barrier to thaw more frames)
+
+    // ThawBase::push_preempt_monitorenter_redo set things up so that
+    // SP now points to {fp, lr}.
+    __ ldp(rfp, lr, Address(__ post(sp, 2 * wordSize)));
+    __ ret(lr);
+
+    __ bind(failAcquire);
+    __ strb(/*false*/zr, Address(rthread, JavaThread::preempting_offset()));
+    // Set sp to enterSpecial frame
+    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
+    __ mov(sp, rscratch1);
+    // Remove enterSpecial frame from the stack and return to Continuation.run()
+    SharedRuntime::continuation_enter_cleanup(_masm);
     __ leave();
     __ ret(lr);
 
@@ -8393,6 +8453,7 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
+    StubRoutines::_cont_preempt_monitorenter_redo = generate_cont_preempt_monitorenter_redo();
     StubRoutines::_cont_preempt_rerun_compiler_adapter = generate_cont_preempt_rerun_compiler_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)

@@ -1149,6 +1149,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   __ bind(call_thaw);
 
+  ContinuationEntry::_thaw_call_pc_offset = __ pc() - start;
   __ rt_call(CAST_FROM_FN_PTR(address, StubRoutines::cont_thaw()));
   oop_maps->add_gc_map(__ pc() - start, map->deep_copy());
   ContinuationEntry::_return_pc_offset = __ pc() - start;
@@ -1816,13 +1817,14 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Save the test result, for recursive case, the result is zero
       __ str(swap_reg, Address(lock_reg, mark_word_offset));
       __ br(Assembler::NE, slow_path_lock);
+      __ b(lock_done);
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
       __ ldr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
       __ lightweight_lock(obj_reg, swap_reg, tmp, lock_tmp, slow_path_lock);
     }
     __ bind(count);
-    __ increment(Address(rthread, JavaThread::held_monitor_count_offset()));
+    __ inc_held_monitor_count();
 
     // Slow path will re-enter here
     __ bind(lock_done);
@@ -1935,7 +1937,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Simple recursive lock?
       __ ldr(rscratch1, Address(sp, lock_slot_offset * VMRegImpl::stack_slot_size));
       __ cbnz(rscratch1, not_recursive);
-      __ decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
       __ b(done);
     }
 
@@ -1958,13 +1959,13 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       Label count;
       __ cmpxchg_obj_header(r0, old_hdr, obj_reg, rscratch1, count, &slow_path_unlock);
       __ bind(count);
-      __ decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
+      __ dec_held_monitor_count();
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "");
       __ ldr(old_hdr, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
       __ tbnz(old_hdr, exact_log2(markWord::monitor_value), slow_path_unlock);
       __ lightweight_unlock(obj_reg, old_hdr, swap_reg, lock_tmp, slow_path_unlock);
-      __ decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
+      __ dec_held_monitor_count();
     }
 
     // slow path re-enters here

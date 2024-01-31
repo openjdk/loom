@@ -289,6 +289,22 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
 
 inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
   intptr_t* sp = top.sp();
+  CodeBlob* cb = top.cb();
+  if (!is_interpreted_frame && cb->frame_size() == 2) {
+    // C2 runtime stub case. For aarch64 the real size of the c2 runtime stub is 2 words bigger
+    // than what we think, i.e. size is 4. This is because the _last_Java_sp is not set to the
+    // sp right before making the call to the VM, but rather it is artificially set 2 words above
+    // this real sp so that we can store the return address at last_Java_sp[-1], and keep this
+    // property where we can retrieve the last_Java_pc from the last_Java_sp. But that means that
+    // once we return to the runtime stub, the code will adjust sp according to this real size.
+    // So we must adjust the frame size back here. We just copy lr/rfp again. These 2 top words
+    // will be the ones popped in generate_cont_preempt_rerun_compiler_adapter(). The other 2 words
+    // will just be discarded once back in the runtime stub (add sp, sp, #0x10).
+    sp -= 2;
+    sp[-2] = sp[0];
+    sp[-1] = sp[1];
+  }
+
   intptr_t* fp = sp - frame::sender_sp_offset;
   address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_interpreter_adapter()
                                     : StubRoutines::cont_preempt_rerun_compiler_adapter();
@@ -303,8 +319,26 @@ inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpr
 }
 
 inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
-  Unimplemented();
-  return nullptr;
+
+  // fprintf(stderr, "push_preempt_monitorenter_redo\n");
+  frame enterSpecial = new_entry_frame();
+  intptr_t* sp = enterSpecial.sp();
+
+  // First push the return barrier frame
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)StubRoutines::cont_returnBarrier();
+  sp[0] = (intptr_t)enterSpecial.fp();
+
+  // Now push the ObjectMonitor*
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)chunk->objectMonitor(); // alignment
+  sp[0] = (intptr_t)chunk->objectMonitor();
+
+  // Finally arrange to return to the monitorenter_redo stub
+  sp[-1] = (intptr_t)StubRoutines::cont_preempt_monitorenter_redo();
+  sp[-2] = (intptr_t)enterSpecial.fp();
+  log_develop_trace(continuations, preempt)("push_preempt_monitorenter_redo initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
+  return sp;
 }
 
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {

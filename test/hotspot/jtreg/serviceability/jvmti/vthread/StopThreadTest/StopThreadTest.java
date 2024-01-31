@@ -125,8 +125,9 @@ public class StopThreadTest {
             log("\nMain #A.2: suspended");
             suspendThread(testTaskThread);
             retCode = stopThread(testTaskThread);
-            int expectedRetCode = (is_virtual && !isBoundVThread && Platform.isX64()) ? JVMTI_ERROR_OPAQUE_FRAME : JVMTI_ERROR_NONE;
-            String expectedRetCodeName = (is_virtual && !isBoundVThread && Platform.isX64()) ? "JVMTI_ERROR_OPAQUE_FRAME" : "JVMTI_ERROR_NONE";
+            int expectedRetCode = (is_virtual && !isBoundVThread && (Platform.isX64() || Platform.isAArch64())) ? JVMTI_ERROR_OPAQUE_FRAME : JVMTI_ERROR_NONE;
+            String expectedRetCodeName = (is_virtual && !isBoundVThread && (Platform.isX64() || Platform.isAArch64())) ?
+                "JVMTI_ERROR_OPAQUE_FRAME" : "JVMTI_ERROR_NONE";
             if (retCode != expectedRetCode) {
                 throwFailed("Main #A.2: expected " + expectedRetCodeName + " instead of: " + retCode);
             } else {
@@ -212,7 +213,10 @@ public class StopThreadTest {
                 seenExceptionFromA = true;
             }
             Thread.interrupted();
-            if (!seenExceptionFromA && !(is_virtual && !isBoundVThread && Platform.isX64())) {
+            if (!seenExceptionFromA
+                && !(is_virtual
+                     && !isBoundVThread
+                     && (Platform.isX64() || (Platform.isAArch64())) )) {
                 StopThreadTest.setFailed("TestTask.run: expected AssertionError from method A()");
             }
             sleep(1); // to cause yield

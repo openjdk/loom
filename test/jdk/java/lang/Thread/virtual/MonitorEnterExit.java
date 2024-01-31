@@ -40,14 +40,14 @@
  * @test id=TieredStopAtLevel1
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:TieredStopAtLevel=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=noTieredCompilation
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -XX:-TieredCompilation --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
@@ -177,7 +177,7 @@ class MonitorEnterExit {
      * Test monitor reenter when there are other threads blocked trying to enter.
      */
     @Test
-    @EnabledIf("platformIsX64")
+    // @EnabledIf("platformIsX64")
     void testReenterWithContention() throws Exception {
         var lock = new Object();
         VThreadRunner.run(() -> {
@@ -308,7 +308,7 @@ class MonitorEnterExit {
      * Test that parking while holding a monitor releases the carrier.
      */
     @ParameterizedTest
-    @EnabledIf("platformIsX64")
+    // @EnabledIf("platformIsX64")
     @ValueSource(booleans = { true, false })
     void testReleaseWhenParked(boolean reenter) throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
@@ -355,7 +355,7 @@ class MonitorEnterExit {
      * Test that blocking waiting to enter a monitor releases the carrier.
      */
     @Test
-    @EnabledIf("platformIsX64")
+    // @EnabledIf("platformIsX64")
     void testReleaseWhenBlocked() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -398,7 +398,7 @@ class MonitorEnterExit {
      * carriers aren't released.
      */
     @Test
-    @EnabledIf("platformIsX64")
+    // @EnabledIf("platformIsX64")
     void testManyParkedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var done = new AtomicBoolean();
@@ -434,7 +434,7 @@ class MonitorEnterExit {
      * carriers aren't released.
      */
     @Test
-    @EnabledIf("platformIsX64")
+    // @EnabledIf("platformIsX64")
     void testManyBlockedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var lock = new Object();
@@ -490,10 +490,14 @@ class MonitorEnterExit {
         var threads = new Thread[nThreads];
         int index = 0;
         for (int i = 0; i < nPlatformThreads; i++) {
-            threads[index++] = Thread.ofPlatform().unstarted(counter::increment);
+            threads[index] = Thread.ofPlatform().unstarted(counter::increment);
+            threads[index].setName("platform-" + index);
+            index++;
         }
         for (int i = 0; i < nVirtualThreads; i++) {
-            threads[index++] = Thread.ofVirtual().unstarted(counter::increment);
+            threads[index] = Thread.ofVirtual().unstarted(counter::increment);
+            threads[index].setName("virtual-" + index);
+            index++;
         }
         // start all threads
         for (Thread thread : threads) {

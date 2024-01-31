@@ -462,6 +462,8 @@ class JavaThread: public Thread {
   bool _preempting;
   bool _preemption_cancelled;
   bool _jvmti_unmount_event_pending;
+  address _preempt_alternate_return; // used when preempting a thread
+  address _preempt_alternate_return_sp;
 
 #ifdef ASSERT
   intx _obj_locker_count;
@@ -639,6 +641,8 @@ private:
   bool jvmti_unmount_event_pending() { return _jvmti_unmount_event_pending; }
   void set_jvmti_unmount_event_pending(bool val) { _jvmti_unmount_event_pending = val; }
 
+  void set_preempt_alternate_return(address val) { _preempt_alternate_return = val; }
+  void set_preempt_alternate_return_sp(address val) { _preempt_alternate_return_sp = val; }
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -846,6 +850,9 @@ private:
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
   static ByteSize preempting_offset()         { return byte_offset_of(JavaThread, _preempting); }
   static ByteSize preemption_cancelled_offset()  { return byte_offset_of(JavaThread, _preemption_cancelled); }
+  static ByteSize preempt_alternate_return_offset() {
+    return byte_offset_of(JavaThread, _preempt_alternate_return);
+  }
 
 #if INCLUDE_JVMTI
   static ByteSize is_in_VTMS_transition_offset()     { return byte_offset_of(JavaThread, _is_in_VTMS_transition); }

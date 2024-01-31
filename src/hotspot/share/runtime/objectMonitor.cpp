@@ -330,7 +330,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
     // TODO-FIXME: check for integer overflow!  BUGID 6557169.
     _recursions++;
     // Compensate for the already executed increment.
-    AMD64_ONLY(current->dec_held_monitor_count();)
+    LOOM_MONITOR_SUPPORT_ONLY(current->dec_held_monitor_count();)
     return true;
   }
 
@@ -339,7 +339,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
     _recursions = 1;
     set_owner_from_BasicLock(cur, current);  // Convert from BasicLock* to Thread*.
     // Compensate for the already executed increment.
-    AMD64_ONLY(current->dec_held_monitor_count();)
+    LOOM_MONITOR_SUPPORT_ONLY(current->dec_held_monitor_count();)
     return true;
   }
 
@@ -412,7 +412,7 @@ bool ObjectMonitor::enter(JavaThread* current) {
       // ParkEvent associated with this ObjectMonitor.
     }
 
-#if defined(X86)
+#ifdef LOOM_MONITOR_SUPPORT
     ContinuationEntry* ce = current->last_continuation();
     if (ce != nullptr && ce->is_virtual_thread() && current->is_on_monitorenter()) {
       // Try to avoid pinning and preempt vthread. Compensate for already
@@ -1332,7 +1332,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
   if (_recursions != 0) {
     _recursions--;        // this is simple recursive enter
     // Compensate for the already executed decrement.
-    AMD64_ONLY(current->inc_held_monitor_count();)
+    LOOM_MONITOR_SUPPORT_ONLY(current->inc_held_monitor_count();)
     return;
   }
 
@@ -1820,8 +1820,10 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   int relock_count = JvmtiDeferredUpdates::get_and_reset_relock_count_after_wait(current);
   _recursions =   save          // restore the old recursion count
                 + relock_count; //  increased by the deferred relock count
-  NOT_AMD64(current->inc_held_monitor_count(relock_count);) // Deopt never entered these counts.
-  _waiters--;             // decrement the number of waiters
+#ifndef LOOM_MONITOR_SUPPORT
+  current->inc_held_monitor_count(relock_count); // Deopt never entered these counts.
+#endif
+    _waiters--;             // decrement the number of waiters
 
   // Verify a few postconditions
   assert(owner_raw() == current, "invariant");

@@ -24,17 +24,16 @@
 /**
  * @test id=default
  * @summary Test virtual threads using synchronized
- * @requires os.arch=="amd64" | os.arch=="x86_64"
  * @library /test/lib
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xint MonitorsTest
- * @run junit/othervm -Xcomp MonitorsTest
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
  * @run junit/othervm MonitorsTest
  */
 
 /**
  * @test id=gc
- * @requires os.arch=="amd64" | os.arch=="x86_64"
  * @requires vm.debug
  * @library /test/lib
  * @modules java.base/java.lang:+open

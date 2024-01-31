@@ -1419,7 +1419,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   } else if (is_entry_frame()) {
     // For now just label the frame
     values.describe(-1, info_address, err_msg("#%d entry frame", frame_no), 2);
-  } else if (cb()->is_compiled()) {
+  } else if (cb() && cb()->is_compiled()) {
     // For now just label the frame
     CompiledMethod* cm = cb()->as_compiled_method();
     values.describe(-1, info_address,

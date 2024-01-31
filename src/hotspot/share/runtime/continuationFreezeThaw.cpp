@@ -1876,7 +1876,14 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
   // assert(monitors_on_stack(current) == ((current->held_monitor_count() - current->jni_monitor_count()) > 0),
   //       "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)current->held_monitor_count(), (int64_t)current->jni_monitor_count());
 
-  if (entry->is_pinned() || (current->held_monitor_count() > 0 X86_ONLY(&& (current->jni_monitor_count() > 0 || !entry->is_virtual_thread())))) {
+  const bool block_platform_thread =
+#ifdef LOOM_MONITOR_SUPPORT
+    (current->jni_monitor_count() > 0 || !entry->is_virtual_thread())
+#else
+    true
+#endif
+    ;
+  if (entry->is_pinned() || (current->held_monitor_count() > 0 && block_platform_thread)) {
     log_develop_debug(continuations)("PINNED due to critical section/hold monitor");
     verify_continuation(cont.continuation());
     freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
@@ -1890,6 +1897,9 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
     freeze.set_last_frame();  // remember last frame
     frame last_frame = freeze.last_frame();
 #ifdef AARCH64
+    JvmtiSampledObjectAllocEventCollector jsoaec(false);
+    freeze.set_jvmti_event_collector(&jsoaec);
+
     // Force aarch64 to slow path always for now. It needs extra instructions to correctly set
     // the last pc we copy into the stackChunk, since it will not necessarily be at sp[-1]).
     freeze_result res = freeze.freeze_slow();
@@ -2926,6 +2936,16 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   if (pc0 == Interpreter::cont_preempt_rerun_interpreter_adapter() ||
       pc0 == StubRoutines::cont_preempt_rerun_compiler_adapter()) {
     sp0 += frame::metadata_words;    // see push_preempt_rerun_adapter
+#ifdef AARCH64
+    if (pc0 == StubRoutines::cont_preempt_rerun_compiler_adapter()) {
+      address pc1 = *(address*)(sp0 - frame::sender_sp_ret_address_offset());
+      CodeBlob* cb = CodeCache::find_blob(pc1);
+      assert(cb != nullptr, "should be either c1 or c2 runtime stub");
+      if (cb->frame_size() == 2) {
+        sp0 += frame::metadata_words;
+      }
+    }
+#endif
   } else if (pc0 == StubRoutines::cont_preempt_monitorenter_redo()) {
     sp0 += 2 * frame::metadata_words; // see push_preempt_monitorenter_redo
     sent_entry_pc = true;
