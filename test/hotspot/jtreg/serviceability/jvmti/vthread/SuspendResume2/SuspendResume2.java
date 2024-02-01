@@ -148,7 +148,7 @@ class TestedThread extends Thread {
         while (!shouldFinish) {
             if (n <= 0) {
                 n = 1000;
-                SuspendResume2.sleep(1);
+                SuspendResume2.sleep(10);
             }
             if (i > n) {
                 i = 0;
@@ -162,7 +162,7 @@ class TestedThread extends Thread {
     public void ensureReady() {
         try {
             while (!threadReady) {
-                sleep(1);
+                sleep(10);
             }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interruption while preparing tested thread: \n\t" + e);
