@@ -33,30 +33,24 @@
  * @test id=Xint
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -Xint --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xint -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xint -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=TieredStopAtLevel1
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
  * @test id=noTieredCompilation
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm -Xcomp -XX:-TieredCompilation --enable-native-access=ALL-UNNAMED MonitorEnterExit
- */
-
-/*
- * @test id=FullGCALot
- * @requires vm.debug
- * @modules java.base/java.lang:+open
- * @library /test/lib
- * @run junit/othervm --enable-native-access=ALL-UNNAMED
- *     -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 import java.time.Duration;
