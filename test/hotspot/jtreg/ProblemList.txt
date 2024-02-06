@@ -78,6 +78,9 @@ compiler/floatingpoint/TestSubnormalDouble.java 8317810 generic-i586
 
 compiler/c2/irTests/TestPrunedExHandler.java 8323651 generic-all
 
+compiler/intrinsics/float16/TestConstFloat16ToFloat.java 8325264 macosx-aarch64
+compiler/intrinsics/float16/Binary16Conversion.java 8325264 macosx-aarch64
+
 #############################################################################
 
 # :hotspot_gc
