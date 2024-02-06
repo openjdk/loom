@@ -2193,13 +2193,14 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Save the test result, for recursive case, the result is zero
       __ movptr(Address(lock_reg, mark_word_offset), swap_reg);
       __ jcc(Assembler::notEqual, slow_path_lock);
-      __ jmp (lock_done);
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
       // Load object header
       __ movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
       __ lightweight_lock(obj_reg, swap_reg, r15_thread, rscratch1, slow_path_lock);
     }
+    __ jmp (lock_done);
+
     __ bind(count_mon);
     __ inc_held_monitor_count();
 
@@ -2342,7 +2343,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       __ movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
       __ andptr(swap_reg, ~(int32_t)markWord::lock_mask_in_place);
       __ lightweight_unlock(obj_reg, swap_reg, lock_reg, slow_path_unlock);
-      __ dec_held_monitor_count();
     }
 
     // slow path re-enters here

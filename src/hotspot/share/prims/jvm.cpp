@@ -3114,6 +3114,12 @@ JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
                                      jobject theThread))
   oop threadObj = JNIHandles::resolve(theThread);
   thread->set_vthread(threadObj);
+
+  // Set lock id of new current Thread
+  int64_t tid = java_lang_Thread::thread_id(threadObj);
+  assert(tid != 0 && tid < ThreadIdentifier::current(), "invalid tid");
+  thread->set_lock_id(tid);
+
   JFR_ONLY(Jfr::on_set_current_thread(thread, threadObj);)
 JVM_END
 

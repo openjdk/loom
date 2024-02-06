@@ -157,12 +157,20 @@ class JavaThread: public Thread {
   // One-element thread local free list
   JNIHandleBlock* _free_handle_block;
 
+  // ID used as owner for inflated monitors. Same as the tid field of the current
+  // _vthread object, except during creation of the primordial and JNI attached
+  // thread cases where this field can have a temporal value.
+  int64_t _lock_id;
+
  public:
   volatile intptr_t _Stalled;
   bool _on_monitorenter;
 
   bool is_on_monitorenter() { return _on_monitorenter; }
   void set_on_monitorenter(bool val) { _on_monitorenter = val; }
+
+  void set_lock_id(int64_t tid) { assert(tid != 0, "must be set"); _lock_id = tid; }
+  int64_t lock_id() const { return _lock_id; }
 
   // For tracking the heavyweight monitor the thread is pending on.
   ObjectMonitor* current_pending_monitor() {
@@ -845,6 +853,8 @@ private:
   }
   static ByteSize doing_unsafe_access_offset() { return byte_offset_of(JavaThread, _doing_unsafe_access); }
   NOT_PRODUCT(static ByteSize requires_cross_modify_fence_offset()  { return byte_offset_of(JavaThread, _requires_cross_modify_fence); })
+
+  static ByteSize lock_id_offset()            { return byte_offset_of(JavaThread, _lock_id); }
 
   static ByteSize cont_entry_offset()         { return byte_offset_of(JavaThread, _cont_entry); }
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }

@@ -2265,10 +2265,12 @@ void MacroAssembler::compiler_fast_lock_object(ConditionRegister flag, Register 
 
   // Try to CAS m->owner from null to current thread.
   addi(temp, displaced_header, in_bytes(ObjectMonitor::owner_offset()) - markWord::monitor_value);
+  Register thread_id = displaced_header;
+  ld(thread_id, in_bytes(JavaThread::lock_id_offset()), R16_thread);
   cmpxchgd(/*flag=*/flag,
            /*current_value=*/current_header,
            /*compare_value=*/(intptr_t)0,
-           /*exchange_value=*/R16_thread,
+           /*exchange_value=*/thread_id,
            /*where=*/temp,
            MacroAssembler::MemBarRel | MacroAssembler::MemBarAcq,
            MacroAssembler::cmpxchgx_hint_acquire_lock());
@@ -2280,7 +2282,7 @@ void MacroAssembler::compiler_fast_lock_object(ConditionRegister flag, Register 
   beq(flag, success);
 
   // Check for recursive locking.
-  cmpd(flag, current_header, R16_thread);
+  cmpd(flag, current_header, thread_id);
   bne(flag, failure);
 
   // Current thread already owns the lock. Just increment recursions.
@@ -2350,7 +2352,9 @@ void MacroAssembler::compiler_fast_unlock_object(ConditionRegister flag, Registe
 
   // In case of LM_LIGHTWEIGHT, we may reach here with (temp & ObjectMonitor::ANONYMOUS_OWNER) != 0.
   // This is handled like owner thread mismatches: We take the slow path.
-  cmpd(flag, temp, R16_thread);
+  Register thread_id = displaced_header;
+  ld(thread_id, in_bytes(JavaThread::lock_id_offset()), R16_thread);
+  cmpd(flag, temp, thread_id);
   bne(flag, failure);
 
   ld(displaced_header, in_bytes(ObjectMonitor::recursions_offset()), current_header);

@@ -36,6 +36,7 @@
 
 class ObjectMonitor;
 class ParkEvent;
+class BasicLock;
 
 // ObjectWaiter serves as a "proxy" or surrogate thread.
 // TODO-FIXME: Eliminate ObjectWaiter and use the thread-specific
@@ -138,6 +139,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   friend class ObjectSynchronizer;
   friend class ObjectWaiter;
   friend class VMStructs;
+  friend class MonitorList;
   JVMCI_ONLY(friend class JVMCIVMStructs;)
 
   static OopStorage* _oop_storage;
@@ -167,20 +169,18 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 public:
   // NOTE: Typed as uintptr_t so that we can pick it up in SA, via vmStructs.
   static const uintptr_t ANONYMOUS_OWNER = 1;
-  static const uintptr_t VTHREAD_OWNER = 4;
 
 private:
   static void* anon_owner_ptr() { return reinterpret_cast<void*>(ANONYMOUS_OWNER); }
-  static void* vthread_owner_ptr() { return reinterpret_cast<void*>(VTHREAD_OWNER); }
 
   void* volatile _owner;            // pointer to owning thread OR BasicLock
-  OopHandle      _vthread;          // vthread owner when _owner == VTHREAD_OWNER (set on continuation freeze only)
+  BasicLock* volatile _stack_locker;      // can this share a cache line with owner? they're used together
   volatile uint64_t _previous_owner_tid;  // thread id of the previous owner of the monitor
   // Separate _owner and _next_om on different cache lines since
   // both can have busy multi-threaded access. _previous_owner_tid is only
   // changed by ObjectMonitor::exit() so it is a good choice to share the
   // cache line with _owner.
-  DEFINE_PAD_MINUS_SIZE(1, OM_CACHE_LINE_SIZE, sizeof(void* volatile) +
+  DEFINE_PAD_MINUS_SIZE(1, OM_CACHE_LINE_SIZE, 2 * sizeof(void* volatile) +
                         sizeof(volatile uint64_t));
   ObjectMonitor* _next_om;          // Next ObjectMonitor* linkage
   volatile intx _recursions;        // recursion count, 0 for first entry
@@ -204,7 +204,6 @@ private:
   volatile int  _waiters;           // number of waiting threads
  private:
   volatile int _WaitSetLock;        // protects Wait Queue - simple spinlock
-  bool _was_fixed_on_freeze;
 
  public:
 
@@ -241,7 +240,7 @@ private:
   static ByteSize cxq_offset()         { return byte_offset_of(ObjectMonitor, _cxq); }
   static ByteSize succ_offset()        { return byte_offset_of(ObjectMonitor, _succ); }
   static ByteSize EntryList_offset()   { return byte_offset_of(ObjectMonitor, _EntryList); }
-  static ByteSize was_fixed_on_freeze_offset()   { return byte_offset_of(ObjectMonitor, _was_fixed_on_freeze); }
+  static ByteSize stack_locker_offset(){ return byte_offset_of(ObjectMonitor, _stack_locker); }
 
   // ObjectMonitor references can be ORed with markWord::monitor_value
   // as part of the ObjectMonitor tagging mechanism. When we combine an
@@ -276,65 +275,57 @@ private:
   const char* is_busy_to_string(stringStream* ss);
 
   bool is_entered(JavaThread* current) const;
+  int contentions() const;
 
   // Returns true if this OM has an owner, false otherwise.
-  bool      has_owner() const;
-  void*     owner() const;  // Returns null if DEFLATER_MARKER is observed.
+  bool   has_owner() const;
+  void*  owner() const;  // Returns null if DEFLATER_MARKER is observed.
+  bool   is_owner(JavaThread* thread) const { return owner() == owner_for(thread); }
+  bool   is_owner_anonymous() const { return owner_raw() == anon_owner_ptr(); }
+  bool   is_stack_locker(JavaThread* current);
+  BasicLock* stack_locker() const;
+
+ private:
   void*     owner_raw() const;
+  void*     owner_for(JavaThread* thread) const;
   // Returns true if owner field == DEFLATER_MARKER and false otherwise.
   bool      owner_is_DEFLATER_MARKER() const;
   // Returns true if 'this' is being async deflated and false otherwise.
   bool      is_being_async_deflated();
   // Clear _owner field; current value must match old_value.
-  void      release_clear_owner(void* old_value);
+  void      release_clear_owner(JavaThread* old_value);
   // Simply set _owner field to new_value; current value must match old_value.
-  void      set_owner_from(void* old_value, void* new_value);
+  void      set_owner_from_raw(void* old_value, void* new_value);
+  void      set_owner_from(void* old_value, JavaThread* current);
   // Simply set _owner field to current; current value must match basic_lock_p.
-  void      set_owner_from_BasicLock(void* basic_lock_p, JavaThread* current);
+  void      set_owner_from_BasicLock(JavaThread* current);
   // Try to set _owner field to new_value if the current value matches
   // old_value, using Atomic::cmpxchg(). Otherwise, does not change the
   // _owner field. Returns the prior value of the _owner field.
-  void*     try_set_owner_from(void* old_value, void* new_value);
+  void*     try_set_owner_from_raw(void* old_value, void* new_value);
+  void*     try_set_owner_from(void* old_value, JavaThread* current);
+
+  void set_stack_locker(BasicLock* locker);
 
   void set_owner_anonymous() {
-    set_owner_from(nullptr, anon_owner_ptr());
+    set_owner_from_raw(nullptr, anon_owner_ptr());
   }
 
-  bool is_owner_anonymous() const {
-    return owner_raw() == anon_owner_ptr();
-  }
-
-  void set_owner_from_anonymous(Thread* owner) {
+  void set_owner_from_anonymous(JavaThread* owner) {
     set_owner_from(anon_owner_ptr(), owner);
   }
-
-  bool has_vthread_owner() const { return owner_raw() == vthread_owner_ptr(); }
-  oop  vthread_owner() const { return _vthread.resolve(); }
-  void set_vthread_owner(void* owner, oop vthread) {
-    _vthread = OopHandle(JavaThread::thread_oop_storage(), vthread);
-    set_owner_from(owner, vthread_owner_ptr());
-  }
-  void clear_vthread_owner(JavaThread* thread) {
-    set_owner_from(vthread_owner_ptr(), thread);
-    _vthread.release(JavaThread::thread_oop_storage());
-    _vthread = OopHandle();
-  }
-
-  bool was_fixed_on_freeze()             { return _was_fixed_on_freeze; }
-  void set_was_fixed_on_freeze(bool val) { _was_fixed_on_freeze = val; }
 
   // Simply get _next_om field.
   ObjectMonitor* next_om() const;
   // Simply set _next_om field to new_value.
   void set_next_om(ObjectMonitor* new_value);
 
-  int       waiters() const;
-
-  int       contentions() const;
   void      add_to_contentions(int value);
   intx      recursions() const                                         { return _recursions; }
 
+ public:
   // JVM/TI GetObjectMonitorUsage() needs this:
+  int waiters() const;
   ObjectWaiter* first_waiter()                                         { return _WaitSet; }
   ObjectWaiter* next_waiter(ObjectWaiter* o)                           { return o->_next; }
   JavaThread* thread_of_waiter(ObjectWaiter* o)                        { return o->_thread; }

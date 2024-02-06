@@ -100,7 +100,7 @@ public:
   static int size(const frame& f);
   static inline int expression_stack_size(const frame &f, InterpreterOopMap* mask);
 
-  static int monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) NOT_DEBUG_RETURN0;
+  static int monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) NOT_DEBUG_RETURN0;
 
   static bool is_instance(const frame& f);
 

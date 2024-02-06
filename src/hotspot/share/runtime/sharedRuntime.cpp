@@ -2265,10 +2265,10 @@ JRT_END
 
 JRT_LEAF(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
   assert(current == JavaThread::current(), "invariant");
+  assert(!monitor->is_owner(current), "invariant");
 
-  ThreadOnMonitorEnter tme(current);
   monitor->redo_enter(current);
-  assert(monitor->owner_raw() == current || current->preempting(), "invariant");
+  assert(monitor->is_owner(current) || current->preempting(), "invariant");
 JRT_END
 
 void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {

@@ -727,10 +727,11 @@ public class Thread implements Runnable {
         }
 
         if (attached && VM.initLevel() < 1) {
-            this.tid = 1;  // primordial thread
+            this.tid = 3;  // primordial thread
         } else {
             this.tid = ThreadIdentifiers.next();
         }
+
         this.name = (name != null) ? name : genThreadName();
 
         if (acc != null) {

@@ -105,8 +105,8 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // otherwise we don't care about the result and handle locking via runtime call
     jcc(Assembler::notZero, slow_case);
     // done
-    jmp(done);
   }
+  jmp(done);
 
   bind(count_locking);
   inc_held_monitor_count();
@@ -148,9 +148,9 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
     // if the object header was not pointing to the displaced header,
     // we do unlocking via runtime call
     jcc(Assembler::notEqual, slow_case);
+    dec_held_monitor_count();
     // done
   }
-  dec_held_monitor_count();
   bind(done);
 }
 

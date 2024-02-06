@@ -470,7 +470,7 @@ public class Fuzz implements Runnable {
     }
 
     boolean shouldPin() {
-        return traceHas(Op.PIN::contains);
+        return traceHas(Op.PIN::contains) && !(Platform.isX64() || Platform.isAArch64());
     }
 
     void verifyPin(boolean yieldResult) {

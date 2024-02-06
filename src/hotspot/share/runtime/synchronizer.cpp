@@ -349,7 +349,7 @@ bool ObjectSynchronizer::quick_notify(oopDesc* obj, JavaThread* current, bool al
   if (mark.has_monitor()) {
     ObjectMonitor* const mon = mark.monitor();
     assert(mon->object() == oop(obj), "invariant");
-    if (mon->owner() != current) return false;  // slow-path for IMS exception
+    if (!mon->is_owner(current)) return false;  // slow-path for IMS exception
 
     if (mon->first_waiter() != nullptr) {
       // We have one or more waiters. Since this is an inflated monitor
@@ -402,26 +402,14 @@ bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
       return false;
     }
 
-    if (m->has_vthread_owner() && current->is_vthread_mounted()) {
-      if (m->vthread_owner() == current->vthread()) {
-        assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
-        m->_recursions++;
-        return true;
-      }
-    }
-
-    JavaThread* const owner = static_cast<JavaThread*>(m->owner_raw());
-
     // Lock contention and Transactional Lock Elision (TLE) diagnostics
     // and observability
     // Case: light contention possibly amenable to TLE
     // Case: TLE inimical operations such as nested/recursive synchronization
 
-    if (owner == current) {
+    if (m->is_owner(current)) {
       m->_recursions++;
-#ifndef LOOM_MONITOR_SUPPORT
-      current->inc_held_monitor_count();
-#endif
+      NOT_LOOM_MONITOR_SUPPORT(current->inc_held_monitor_count();)
       return true;
     }
 
@@ -438,9 +426,9 @@ bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
       lock->set_displaced_header(markWord::unused_mark());
     }
 
-    if (owner == nullptr && m->try_set_owner_from(nullptr, current) == nullptr) {
+    if (!m->has_owner() && m->try_set_owner_from(nullptr, current) == nullptr) {
       assert(m->_recursions == 0, "invariant");
-      current->inc_held_monitor_count();
+      NOT_LOOM_MONITOR_SUPPORT(current->inc_held_monitor_count();)
       return true;
     }
   }
@@ -522,7 +510,7 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
     handle_sync_on_value_based_class(obj, current);
   }
 
-  current->inc_held_monitor_count();
+  NOT_LOOM_MONITOR_SUPPORT(current->inc_held_monitor_count();)
 
   if (!useHeavyMonitors()) {
     if (LockingMode == LM_LIGHTWEIGHT) {
@@ -552,6 +540,7 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
         // be visible <= the ST performed by the CAS.
         lock->set_displaced_header(mark);
         if (mark == obj()->cas_set_mark(markWord::from_pointer(lock), mark)) {
+          LOOM_MONITOR_SUPPORT_ONLY(current->inc_held_monitor_count();)
           return;
         }
         // Fall through to inflate() ...
@@ -560,7 +549,6 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
         assert(lock != mark.locker(), "must not re-lock the same lock");
         assert(lock != (BasicLock*) obj->mark().value(), "don't relock with same BasicLock");
         lock->set_displaced_header(markWord::from_pointer(nullptr));
-        LOOM_MONITOR_SUPPORT_ONLY(current->dec_held_monitor_count();)
         return;
       }
 
@@ -579,16 +567,6 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
   // we have lost the race to async deflation and we simply try again.
   while (true) {
     ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_monitor_enter);
-    if (monitor->has_vthread_owner() && current->is_vthread_mounted()) {
-      if (monitor->vthread_owner() == current->vthread()) {
-        assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
-        // Recursive case
-        monitor->_recursions++;
-        // Compensate for the already executed increment.
-        current->dec_held_monitor_count();
-        return;
-      }
-    }
     if (monitor->enter(current)) {
       return;
     }
@@ -596,7 +574,7 @@ void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current)
 }
 
 void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) {
-  current->dec_held_monitor_count();
+  NOT_LOOM_MONITOR_SUPPORT(current->dec_held_monitor_count();)
 
   if (!useHeavyMonitors()) {
     markWord mark = object->mark();
@@ -640,7 +618,6 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
           }
         }
 #endif
-        LOOM_MONITOR_SUPPORT_ONLY(current->inc_held_monitor_count();)
         return;
       }
 
@@ -649,6 +626,7 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
         // swing the displaced header from the BasicLock back to the mark.
         assert(dhw.is_neutral(), "invariant");
         if (object->cas_set_mark(dhw, mark) == mark) {
+          LOOM_MONITOR_SUPPORT_ONLY(current->dec_held_monitor_count();)
           return;
         }
       }
@@ -661,22 +639,7 @@ void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) 
   // The ObjectMonitor* can't be async deflated until ownership is
   // dropped inside exit() and the ObjectMonitor* must be !is_busy().
   ObjectMonitor* monitor = inflate(current, object, inflate_cause_vm_internal);
-  if (monitor->was_fixed_on_freeze()) {
-    assert(monitor->has_vthread_owner() && monitor->vthread_owner() == current->vthread(), "invariant");
-    assert(java_lang_VirtualThread::is_instance(current->vthread()), "wrong identity");
-    // Compensate for the already executed decrement.
-    current->inc_held_monitor_count();
-    if (monitor->recursions() == 0) {
-      // Last unlock, revert owner to JavaThread*
-      monitor->clear_vthread_owner(current);
-      monitor->set_was_fixed_on_freeze(false);
-      // Falthough to exit() ...
-    } else {
-      // Recursive case
-      monitor->_recursions--;
-      return;
-    }
-  }
+  assert(!monitor->is_owner_anonymous(), "must not be");
   monitor->exit(current);
 }
 
@@ -941,6 +904,10 @@ static inline intptr_t get_next_hash(Thread* current, oop obj) {
   assert(value != markWord::no_hash, "invariant");
   return value;
 }
+static bool is_lock_owned(Thread* thread, address adr) {
+  assert(LockingMode == LM_LEGACY, "only call this with new lightweight locking enabled");
+  return thread->is_Java_thread() ? JavaThread::cast(thread)->is_lock_owned(adr) : false;
+}
 
 intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
 
@@ -1094,7 +1061,7 @@ JavaThread* ObjectSynchronizer::get_lock_owner(ThreadsList * t_list, Handle h_ob
   if (LockingMode == LM_LEGACY && mark.has_locker()) {
     // stack-locked so header points into owner's stack.
     // owning_thread_from_monitor_owner() may also return null here:
-    return Threads::owning_thread_from_monitor_owner(t_list, (address) mark.locker());
+    return Threads::owning_thread_from_stacklock(t_list, (address) mark.locker());
   }
 
   if (LockingMode == LM_LIGHTWEIGHT && mark.is_fast_locked()) {
@@ -1144,7 +1111,7 @@ void ObjectSynchronizer::owned_monitors_iterate_filtered(MonitorClosure* closure
     // only interested in an owned ObjectMonitor and ownership
     // cannot be dropped under the calling contexts so the
     // ObjectMonitor cannot be async deflated.
-    if (monitor->has_owner() && filter(monitor->owner_raw())) {
+    if (monitor->has_owner() && filter(monitor)) {
       assert(!monitor->is_being_async_deflated(), "Owned monitors should not be deflating");
 
       closure->do_monitor(monitor);
@@ -1155,13 +1122,13 @@ void ObjectSynchronizer::owned_monitors_iterate_filtered(MonitorClosure* closure
 // Iterate ObjectMonitors where the owner == thread; this does NOT include
 // ObjectMonitors where owner is set to a stack-lock address in thread.
 void ObjectSynchronizer::owned_monitors_iterate(MonitorClosure* closure, JavaThread* thread) {
-  auto thread_filter = [&](void* owner) { return owner == thread; };
+  auto thread_filter = [&](ObjectMonitor* monitor) { return monitor->is_owner(thread); };
   return owned_monitors_iterate_filtered(closure, thread_filter);
 }
 
 // Iterate ObjectMonitors owned by any thread.
 void ObjectSynchronizer::owned_monitors_iterate(MonitorClosure* closure) {
-  auto all_filter = [&](void* owner) { return true; };
+  auto all_filter = [&](ObjectMonitor* monitor) { return true; };
   return owned_monitors_iterate_filtered(closure, all_filter);
 }
 
@@ -1361,9 +1328,22 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
       ObjectMonitor* inf = mark.monitor();
       markWord dmw = inf->header();
       assert(dmw.is_neutral(), "invariant: header=" INTPTR_FORMAT, dmw.value());
-      if (LockingMode == LM_LIGHTWEIGHT && inf->is_owner_anonymous() && is_lock_owned(current, object)) {
-        inf->set_owner_from_anonymous(current);
-        JavaThread::cast(current)->lock_stack().remove(object);
+      if (inf->is_owner_anonymous()) {
+        if (LockingMode == LM_LIGHTWEIGHT) {
+          if (is_lock_owned(current, object)) {
+            JavaThread* jt = JavaThread::cast(current);
+            inf->set_owner_from_anonymous(jt);
+            jt->lock_stack().remove(object);
+          }
+        } else {
+          assert(LockingMode == LM_LEGACY, "invariant");
+          if (is_lock_owned(current, (address)inf->stack_locker())) {
+            JavaThread* jt = JavaThread::cast(current);
+            inf->set_owner_from_BasicLock(jt);
+            // Decrement monitor count now since this monitor is okay for freezing
+            LOOM_MONITOR_SUPPORT_ONLY(jt->dec_held_monitor_count();)
+          }
+        }
       }
       return inf;
     }
@@ -1399,7 +1379,7 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
       bool own = is_lock_owned(current, object);
       if (own) {
         // Owned by us.
-        monitor->set_owner_from(nullptr, current);
+        monitor->set_owner_from(nullptr, JavaThread::cast(current));
       } else {
         // Owned by somebody else.
         monitor->set_owner_anonymous();
@@ -1496,12 +1476,20 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
       // Setup monitor fields to proper values -- prepare the monitor
       m->set_header(dmw);
 
-      // Optimization: if the mark.locker stack address is associated
-      // with this thread we could simply set m->_owner = current.
       // Note that a thread can inflate an object
       // that it has stack-locked -- as might happen in wait() -- directly
       // with CAS.  That is, we can avoid the xchg-nullptr .... ST idiom.
-      m->set_owner_from(nullptr, mark.locker());
+      if (is_lock_owned(current, (address)mark.locker())) {
+        JavaThread* jt = JavaThread::cast(current);
+        m->set_owner_from(nullptr, jt);
+        // Decrement monitor count now since this monitor is okay for freezing
+        LOOM_MONITOR_SUPPORT_ONLY(jt->dec_held_monitor_count();)
+      } else {
+        // Use ANONYMOUS_OWNER to indicate that the owner is the BasicLock on the stack,
+        // and set the stack locker field in the monitor.
+        m->set_stack_locker(mark.locker());
+        m->set_owner_anonymous();  // second
+      }
       // TODO-FIXME: assert BasicLock->dhw != 0.
 
       // Must preserve store ordering. The monitor state must
@@ -1801,11 +1789,7 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count(
-#ifndef LOOM_MONITOR_SUPPORT
-                                    (rec + 1)
-#endif
-                                    );
+    _thread->dec_held_monitor_count(NOT_LOOM_MONITOR_SUPPORT((rec + 1)));
   }
 };
 

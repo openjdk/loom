@@ -284,6 +284,7 @@ GrowableArray<MonitorInfo*>* compiledVFrame::monitors() const {
 
   // Replace the original values with any stores that have been
   // performed through compiledVFrame::update_monitors.
+  if (thread() == nullptr) return result; // Unmounted continuations have no thread so nothing to do.
   GrowableArrayView<jvmtiDeferredLocalVariableSet*>* list = JvmtiDeferredUpdates::deferred_locals(thread());
   if (list != nullptr ) {
     // In real life this never happens or is typically a single element search

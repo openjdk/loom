@@ -1249,8 +1249,8 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
       // Save the test result, for recursive case, the result is zero
       movptr(Address(lock_reg, mark_offset), swap_reg);
       jcc(Assembler::notZero, slow_case);
-      jmp(done);
     }
+    jmp(done);
 
     bind(count_locking);
     inc_held_monitor_count();
@@ -1347,8 +1347,8 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
 
       // zero for simple unlock of a stack-lock case
       jcc(Assembler::notZero, slow_case);
+      dec_held_monitor_count();
     }
-    dec_held_monitor_count();
     jmp(done);
 
     bind(slow_case);

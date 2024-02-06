@@ -109,18 +109,18 @@ inline int ContinuationHelper::InterpretedFrame::expression_stack_size(const fra
 }
 
 #ifdef ASSERT
-inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) {
+inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) {
   BasicObjectLock* first_mon = f.interpreter_frame_monitor_begin();
   BasicObjectLock* last_mon = f.interpreter_frame_monitor_end();
   assert(last_mon <= first_mon, "must be");
 
   if (first_mon == last_mon) {
+    // No monitors in this frame
     return 0;
   }
 
   int monitor_count = 0;
-  JavaThread* self = JavaThread::current();
-  oop monitorenter_oop = self->is_on_monitorenter() ? ((ObjectMonitor*)(self->_Stalled))->object() : nullptr;
+  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
 
   for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(first_mon);
        current >= last_mon; current = f.previous_monitor_in_interpreter_frame(current)) {
@@ -138,10 +138,13 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(const frame& f,
 
     if (obj != nullptr && obj != monitorenter_oop) {
       markWord mark = obj->mark();
-      if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
-        // already fixed
+      if (mark.has_monitor() && !mark.monitor()->is_owner_anonymous()) {
+        // Nothing to do
+        assert(mark.monitor()->is_owner(thread), "invariant");
         continue;
       }
+      assert(!f.is_heap_frame() || LockingMode == LM_LIGHTWEIGHT,
+             "monitors found on heap frame that need to be fixed should only be those saved in the LockStack");
       bool created;
       table.put_if_absent(obj, true, &created);
       if (created) {
@@ -196,12 +199,12 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
   assert(!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
 
   if (!cm->has_monitors()) {
+    // No monitors in this frame
     return 0;
   }
 
   int monitor_count = 0;
-  JavaThread* self = JavaThread::current();
-  oop monitorenter_oop = self->is_on_monitorenter() ? ((ObjectMonitor*)(self->_Stalled))->object() : nullptr;
+  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
 
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
@@ -212,18 +215,21 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
     for (int index = (mons->length()-1); index >= 0; index--) { // see compiledVFrame::monitors()
       MonitorValue* mon = mons->at(index);
       if (mon->eliminated()) {
-        continue; // we ignore scalar-replaced monitors
+        continue; // we ignore eliminated monitors
       }
+
       ScopeValue* ov = mon->owner();
       StackValue* owner_sv = StackValue::create_stack_value(&f, map, ov); // it is an oop
       oop owner = owner_sv->get_obj()();
       if (owner != nullptr && owner != monitorenter_oop) {
         markWord mark = owner->mark();
-        mark.has_monitor();
-        if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
-          // already fixed
+        if (mark.has_monitor() && !mark.monitor()->is_owner_anonymous()) {
+          // Nothing to do
+          assert(mark.monitor()->is_owner(thread), "invariant");
           continue;
         }
+        assert(!f.is_heap_frame() || LockingMode == LM_LIGHTWEIGHT,
+             "monitors found on heap frame that need to be fixed should only be those saved in the LockStack");
         bool created;
         table.put_if_absent(owner, true, &created);
         if (created) {
@@ -252,10 +258,12 @@ inline int ContinuationHelper::NativeFrame::monitors_to_fix(JavaThread* thread, 
     assert(monitorenter_oop == nullptr || monitorenter_oop != synced_obj, "owner already, should not be contended");
 
     markWord mark = synced_obj->mark();
-    if (mark.has_monitor() && mark.monitor()->has_vthread_owner()) {
-      // already fixed
+    if (mark.has_monitor() && !mark.monitor()->is_owner_anonymous()) {
+      // Nothing to do
+      assert(mark.monitor()->is_owner(thread), "invariant");
       return 0;
     }
+    assert(!f.is_heap_frame(), "native frame on the heap???");
     bool created;
     table.put_if_absent(synced_obj, true, &created);
     if (created) {
