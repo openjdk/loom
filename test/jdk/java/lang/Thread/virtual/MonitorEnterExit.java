@@ -24,32 +24,72 @@
 /*
  * @test id=default
  * @summary Test virtual thread with monitor enter/exit
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
- * @test id=Xint
+ * @test id=default-LM_LEGACY
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run junit/othervm -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=default-LM_LIGHTWEIGHT
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run junit/othervm -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=Xint-LM_LEGACY
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xint -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=Xint-LM_LIGHTWEIGHT
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -Xint -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
- * @test id=TieredStopAtLevel1
+ * @test id=Xcomp-TieredStopAtLevel1-LM_LEGACY
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=Xcomp-TieredStopAtLevel1-LM_LIGHTWEIGHT
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
 /*
- * @test id=noTieredCompilation
+ * @test id=Xcomp-noTieredCompilation-LM_LEGACY
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=Xcomp-noTieredCompilation-LM_LIGHTWEIGHT
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
  */
 
@@ -66,7 +106,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import jdk.test.lib.Platform;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 
@@ -96,6 +135,22 @@ class MonitorEnterExit {
             }
             assertFalse(Thread.holdsLock(lock));
         });
+    }
+
+    /**
+     * Test monitor enter with contention, monitor is held by platform thread.
+     */
+    @Test
+    void testEnterWhenHeldByPlatformThread() throws Exception {
+        testEnterWithContention();
+    }
+
+    /**
+     * Test monitor enter with contention, monitor is held by virtual thread.
+     */
+    @Test
+    void testEnterWhenHeldByVirtualThread() throws Exception {
+        VThreadRunner.run(this::testEnterWithContention);
     }
 
     /**
@@ -130,22 +185,6 @@ class MonitorEnterExit {
     }
 
     /**
-     * Test monitor enter with contention, monitor is held by platform thread.
-     */
-    @Test
-    void testEnterWhenHeldByPlatformThread() throws Exception {
-        testEnterWithContention();
-    }
-
-    /**
-     * Test monitor enter with contention, monitor is held by virtual thread.
-     */
-    @Test
-    void testEnterWhenHeldByVirtualThread() throws Exception {
-        VThreadRunner.run(this::testEnterWithContention);
-    }
-
-    /**
      * Test monitor reenter.
      */
     @Test
@@ -171,7 +210,6 @@ class MonitorEnterExit {
      * Test monitor reenter when there are other threads blocked trying to enter.
      */
     @Test
-    // @EnabledIf("platformIsX64")
     void testReenterWithContention() throws Exception {
         var lock = new Object();
         VThreadRunner.run(() -> {
@@ -249,6 +287,28 @@ class MonitorEnterExit {
     }
 
     /**
+     * Test contended monitor enter when pinned. Monitor is held by platform thread.
+     */
+    @Test
+    void testContendedEnterWhenPinnedHeldByPlatformThread() throws Exception {
+        testEnterWithContentionWhenPinned();
+    }
+
+    /**
+     * Test contended monitor enter when pinned. Monitor is held by virtual thread.
+     */
+    @Test
+    void testContendedEnterWhenPinnedHeldByVirtualThread() throws Exception {
+        // need at least two carrier threads
+        int previousParallelism = VThreadRunner.ensureParallelism(2);
+        try {
+            VThreadRunner.run(this::testEnterWithContentionWhenPinned);
+        } finally {
+            VThreadRunner.setParallelism(previousParallelism);
+        }
+    }
+
+    /**
      * Test contended monitor enter when pinned, monitor will be held by caller thread.
      */
     private void testEnterWithContentionWhenPinned() throws Exception {
@@ -277,32 +337,9 @@ class MonitorEnterExit {
     }
 
     /**
-     * Test contended monitor enter when pinned. Monitor is held by platform thread.
-     */
-    @Test
-    void testContendedEnterWhenPinnedHeldByPlatformThread() throws Exception {
-        testEnterWithContentionWhenPinned();
-    }
-
-    /**
-     * Test contended monitor enter when pinned. Monitor is held by virtual thread.
-     */
-    @Test
-    void testContendedEnterWhenPinnedHeldByVirtualThread() throws Exception {
-        // need at least two carrier threads
-        int previousParallelism = VThreadRunner.ensureParallelism(2);
-        try {
-            VThreadRunner.run(this::testEnterWithContentionWhenPinned);
-        } finally {
-            VThreadRunner.setParallelism(previousParallelism);
-        }
-    }
-
-    /**
      * Test that parking while holding a monitor releases the carrier.
      */
     @ParameterizedTest
-    // @EnabledIf("platformIsX64")
     @ValueSource(booleans = { true, false })
     void testReleaseWhenParked(boolean reenter) throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
@@ -349,7 +386,6 @@ class MonitorEnterExit {
      * Test that blocking waiting to enter a monitor releases the carrier.
      */
     @Test
-    // @EnabledIf("platformIsX64")
     void testReleaseWhenBlocked() throws Exception {
         assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -389,10 +425,9 @@ class MonitorEnterExit {
     /**
      * Test lots of virtual threads parked while holding a monitor. If the number of
      * virtual threads exceeds the number of carrier threads then this test will hang if
-     * carriers aren't released.
+     * parking doesn't release the carrier.
      */
     @Test
-    // @EnabledIf("platformIsX64")
     void testManyParkedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var done = new AtomicBoolean();
@@ -428,7 +463,6 @@ class MonitorEnterExit {
      * carriers aren't released.
      */
     @Test
-    // @EnabledIf("platformIsX64")
     void testManyBlockedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var lock = new Object();
@@ -484,13 +518,15 @@ class MonitorEnterExit {
         var threads = new Thread[nThreads];
         int index = 0;
         for (int i = 0; i < nPlatformThreads; i++) {
-            threads[index] = Thread.ofPlatform().unstarted(counter::increment);
-            threads[index].setName("platform-" + index);
+            threads[index] = Thread.ofPlatform()
+                    .name("platform-" + index)
+                    .unstarted(counter::increment);
             index++;
         }
         for (int i = 0; i < nVirtualThreads; i++) {
-            threads[index] = Thread.ofVirtual().unstarted(counter::increment);
-            threads[index].setName("virtual-" + index);
+            threads[index] = Thread.ofVirtual()
+                    .name("virtual-" + index)
+                    .unstarted(counter::increment);
             index++;
         }
         // start all threads
@@ -502,6 +538,23 @@ class MonitorEnterExit {
             thread.join();
         }
         assertEquals(nThreads, counter.count);
+    }
+
+    /**
+     * Test unblocking a virtual thread waiting to enter a monitor held by a platform thread.
+     */
+    @RepeatedTest(20)
+    void testUnblockingByPlatformThread() throws Exception {
+        testUnblocking();
+    }
+
+    /**
+     * Test unblocking a virtual thread waiting to enter a monitor held by another
+     * virtual thread.
+     */
+    @RepeatedTest(20)
+    void testUnblockingByVirtualThread() throws Exception {
+        VThreadRunner.run(this::testUnblocking);
     }
 
     /**
@@ -538,23 +591,6 @@ class MonitorEnterExit {
             vthread.join();
         }
         assertTrue(entered.get());
-    }
-
-    /**
-     * Test unblocking a virtual thread waiting to enter a monitor held by a platform thread.
-     */
-    @RepeatedTest(20)
-    void testUnblockingByPlatformThread() throws Exception {
-        testUnblocking();
-    }
-
-    /**
-     * Test unblocking a virtual thread waiting to enter a monitor held by another
-     * virtual thread.
-     */
-    @RepeatedTest(20)
-    void testUnblockingByVirtualThread() throws Exception {
-        VThreadRunner.run(this::testUnblocking);
     }
 
     /**
@@ -623,9 +659,5 @@ class MonitorEnterExit {
             Thread.sleep(10);
             state = thread.getState();
         }
-    }
-
-    static boolean platformIsX64() {
-        return Platform.isX64();
     }
 }
