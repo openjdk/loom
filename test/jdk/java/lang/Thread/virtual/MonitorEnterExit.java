@@ -31,7 +31,7 @@
  */
 
 /*
- * @test id=default-LM_LEGACY
+ * @test id=LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
@@ -39,7 +39,7 @@
  */
 
 /*
- * @test id=default-LM_LIGHTWEIGHT
+ * @test id=LM_LIGHTWEIGHT
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open
  * @library /test/lib
