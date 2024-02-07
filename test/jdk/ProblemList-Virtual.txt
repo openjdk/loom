@@ -59,6 +59,8 @@ java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
 # Underlying implementation is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
+sun/security/ssl/SSLSessionImpl/ResumptionUpdateBoundValues.java 8325384 generic-all
+
 ##########
 ## Tests incompatible with virtual test thread factory.
 ## There is no goal to run all test with virtual test thread factory.
