@@ -458,8 +458,8 @@ public class FileOutputStream extends OutputStream
             synchronized (this) {
                 fc = this.channel;
                 if (fc == null) {
-                    this.channel = fc = FileChannelImpl.open(fd, path, false,
-                        true, false, this);
+                    fc = FileChannelImpl.open(fd, path, false, true, false, false, this);
+                    this.channel = fc;
                     if (closed) {
                         try {
                             // possible race with close(), benign since
