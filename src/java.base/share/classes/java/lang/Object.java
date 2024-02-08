@@ -384,7 +384,7 @@ public class Object {
         } catch (OutOfMemoryError e) {
             event = null;
         }
-        long comp = Blocker.begin();
+        boolean attempted = Blocker.beginCompenstate();
         try {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
@@ -392,7 +392,7 @@ public class Object {
             Thread.currentThread().getAndClearInterrupt();
             throw e;
         } finally {
-            Blocker.end(comp);
+            Blocker.endCompenstate(attempted);
             if (event != null) {
                 try {
                     event.commit();

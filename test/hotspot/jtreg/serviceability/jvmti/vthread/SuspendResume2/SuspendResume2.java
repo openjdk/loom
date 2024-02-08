@@ -30,6 +30,7 @@
  * @run main/othervm/native
  *      -Djdk.virtualThreadScheduler.maxPoolSize=1
  *      -agentlib:SuspendResume2
+ *      -XX:-VerifyContinuations
  *      SuspendResume2
  */
 
@@ -162,7 +163,7 @@ class TestedThread extends Thread {
     public void ensureReady() {
         try {
             while (!threadReady) {
-                sleep(10);
+                sleep(100);
             }
         } catch (InterruptedException e) {
             throw new RuntimeException("Interruption while preparing tested thread: \n\t" + e);

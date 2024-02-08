@@ -78,6 +78,7 @@ public class FileChannelImpl
     // File access mode (immutable)
     private final boolean writable;
     private final boolean readable;
+    private final boolean sync;  // O_SYNC or O_DSYNC
 
     // Required to prevent finalization of creating stream (immutable)
     private final Closeable parent;
@@ -122,12 +123,14 @@ public class FileChannelImpl
     }
 
     private FileChannelImpl(FileDescriptor fd, String path, boolean readable,
-                            boolean writable, boolean direct, Closeable parent)
+                            boolean writable, boolean sync, boolean direct,
+                            Closeable parent)
     {
         this.fd = fd;
         this.path = path;
         this.readable = readable;
         this.writable = writable;
+        this.sync = sync;
         this.direct = direct;
         this.parent = parent;
         if (direct) {
@@ -150,9 +153,9 @@ public class FileChannelImpl
     // and RandomAccessFile::getChannel
     public static FileChannel open(FileDescriptor fd, String path,
                                    boolean readable, boolean writable,
-                                   boolean direct, Closeable parent)
+                                   boolean sync, boolean direct, Closeable parent)
     {
-        return new FileChannelImpl(fd, path, readable, writable, direct, parent);
+        return new FileChannelImpl(fd, path, readable, writable, sync, direct, parent);
     }
 
     private void ensureOpen() throws IOException {
@@ -230,11 +233,11 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    long comp = Blocker.begin();
+                    boolean attempted = Blocker.beginCompenstate(direct);
                     try {
                         n = IOUtil.read(fd, dst, -1, direct, alignment, nd);
                     } finally {
-                        Blocker.end(comp);
+                        Blocker.endCompenstate(attempted);
                     }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
@@ -265,11 +268,11 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    long comp = Blocker.begin();
+                    boolean attempted = Blocker.beginCompenstate(direct);
                     try {
                         n = IOUtil.read(fd, dsts, offset, length, direct, alignment, nd);
                     } finally {
-                        Blocker.end(comp);
+                        Blocker.endCompenstate(attempted);
                     }
 
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
@@ -298,11 +301,11 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    long comp = Blocker.begin();
+                    boolean attempted = Blocker.beginCompenstate(sync | direct);
                     try {
                         n = IOUtil.write(fd, src, -1, direct, alignment, nd);
                     } finally {
-                        Blocker.end(comp);
+                        Blocker.endCompenstate(attempted);
                     }
 
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
@@ -334,11 +337,11 @@ public class FileChannelImpl
                 if (!isOpen())
                     return 0;
                 do {
-                    long comp = Blocker.begin();
+                    boolean attempted = Blocker.beginCompenstate(sync | direct);
                     try {
                         n = IOUtil.write(fd, srcs, offset, length, direct, alignment, nd);
                     } finally {
-                        Blocker.end(comp);
+                        Blocker.endCompenstate(attempted);
                     }
                 } while ((n == IOStatus.INTERRUPTED) && isOpen());
                 return IOStatus.normalize(n);
@@ -529,11 +532,11 @@ public class FileChannelImpl
             if (!isOpen())
                 return;
             do {
-                long comp = Blocker.begin();
+                boolean attempted = Blocker.beginCompenstate();
                 try {
                     rv = nd.force(fd, metaData);
                 } finally {
-                    Blocker.end(comp);
+                    Blocker.endCompenstate(attempted);
                 }
             } while ((rv == IOStatus.INTERRUPTED) && isOpen());
         } finally {
@@ -1090,11 +1093,11 @@ public class FileChannelImpl
             if (!isOpen())
                 return -1;
             do {
-                long comp = Blocker.begin();
+                boolean attempted = Blocker.beginCompenstate(direct);
                 try {
                     n = IOUtil.read(fd, dst, position, direct, alignment, nd);
                 } finally {
-                    Blocker.end(comp);
+                    Blocker.endCompenstate(attempted);
                 }
             } while ((n == IOStatus.INTERRUPTED) && isOpen());
             return IOStatus.normalize(n);
@@ -1135,11 +1138,11 @@ public class FileChannelImpl
             if (!isOpen())
                 return -1;
             do {
-                long comp = Blocker.begin();
+                boolean attempted = Blocker.beginCompenstate(sync | direct);
                 try {
                     n = IOUtil.write(fd, src, position, direct, alignment, nd);
                 } finally {
-                    Blocker.end(comp);
+                    Blocker.endCompenstate(attempted);
                 }
             } while ((n == IOStatus.INTERRUPTED) && isOpen());
             return IOStatus.normalize(n);
@@ -1577,11 +1580,11 @@ public class FileChannelImpl
                 return null;
             int n;
             do {
-                long comp = Blocker.begin();
+                boolean attempted = Blocker.beginCompenstate();
                 try {
                     n = nd.lock(fd, true, position, size, shared);
                 } finally {
-                    Blocker.end(comp);
+                    Blocker.endCompenstate(attempted);
                 }
             } while ((n == FileDispatcher.INTERRUPTED) && isOpen());
             if (isOpen()) {

@@ -71,6 +71,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
     private final FileDescriptor fd;
 
     private final boolean rw;
+    private final boolean sync;  // O_SYNC or O_DSYNC
 
     /**
      * The path of the referenced file
@@ -229,21 +230,25 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
         int imode = -1;
 
         boolean rw = false;
+        boolean sync = false;
         if (mode.equals("r"))
             imode = O_RDONLY;
         else if (mode.startsWith("rw")) {
             imode = O_RDWR;
             rw = true;
             if (mode.length() > 2) {
-                if (mode.equals("rws"))
+                if (mode.equals("rws")) {
                     imode |= O_SYNC;
-                else if (mode.equals("rwd"))
+                    sync = true;
+                } else if (mode.equals("rwd")) {
                     imode |= O_DSYNC;
-                else
+                    sync = true;
+                } else
                     imode = -1;
             }
         }
         this.rw = rw;
+        this.sync = sync;
 
         if (openAndDelete)
             imode |= O_TEMPORARY;
@@ -308,8 +313,8 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
             synchronized (this) {
                 fc = this.channel;
                 if (fc == null) {
-                    this.channel = fc = FileChannelImpl.open(fd, path, true,
-                        rw, false, this);
+                    fc = FileChannelImpl.open(fd, path, true, rw, sync, false, this);
+                    this.channel = fc;
                     if (closed) {
                         try {
                             fc.close();
@@ -547,11 +552,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        long comp = Blocker.begin();
+        boolean attempted = Blocker.beginCompenstate(sync);
         try {
             write0(b);
         } finally {
-            Blocker.end(comp);
+            Blocker.endCompenstate(attempted);
         }
     }
 
@@ -566,11 +571,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws    IOException If an I/O error has occurred.
      */
     private void writeBytes(byte[] b, int off, int len) throws IOException {
-        long comp = Blocker.begin();
+        boolean attempted = Blocker.beginCompenstate(sync);
         try {
             writeBytes0(b, off, len);
         } finally {
-            Blocker.end(comp);
+            Blocker.endCompenstate(attempted);
         }
     }
 

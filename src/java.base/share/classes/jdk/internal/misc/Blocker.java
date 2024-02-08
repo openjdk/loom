@@ -32,11 +32,11 @@ import jdk.internal.access.SharedSecrets;
  * Defines static methods to mark the beginning and end of a possibly blocking
  * operation. The methods are intended to be used with try-finally as follows:
  * {@snippet lang=java :
- *     long comp = Blocker.begin();
+ *     boolean attempted = Blocker.beginCompenstate();
  *     try {
  *         // blocking operation
  *     } finally {
- *         Blocker.end(comp);
+ *         Blocker.endCompenstate(attempted);
  *     }
  * }
  * If invoked from a virtual thread and the underlying carrier thread is a
@@ -60,39 +60,45 @@ public class Blocker {
     }
 
     /**
-     * Marks the beginning of a possibly blocking operation.
-     * @apiNote This method returns a long to preserve the existing usages in the JDK,
-     * it will eventually be replaced with a boolean.
-     * @return 1 if attempted to compensate or 0 if not attempted
+     * Marks the beginning of a blocking operation.
+     * @return true if tryCompensate attempted
      */
-    public static long begin() {
+    public static boolean beginCompenstate() {
         if (VM.isBooted()
                 && Thread.currentThread().isVirtual()
                 && currentCarrierThread() instanceof CarrierThread ct) {
             ct.beginBlocking();
-            return 1;
+            return true;
         }
-        return 0;
+        return false;
     }
 
     /**
      * Marks the beginning of a possibly blocking operation.
      * @param blocking true if the operation may block, otherwise false
-     * @return 1 if attempted to compensate or 0 if not attempted
+     * @return true if tryCompensate attempted
      */
-    public static long begin(boolean blocking) {
-        return (blocking) ? begin() : 0;
+    public static boolean beginCompenstate(boolean blocking) {
+        return (blocking) ? beginCompenstate() : false;
     }
 
     /**
      * Marks the end of an operation that may have blocked.
-     * @param attempted the value returned by the begin method
+     * @param attempted if tryCompensate attempted
      */
-    public static void end(long attempted) {
-        assert attempted == 0 || attempted == 1;
-        if (attempted == 1) {
+    public static void endCompenstate(boolean attempted) {
+        if (attempted) {
             CarrierThread ct = (CarrierThread) currentCarrierThread();
             ct.endBlocking();
         }
+    }
+
+    // The following methods are retained to avoid changing dozens of usages in JDK at this time.
+
+    public static long begin() {
+        return 0;
+    }
+
+    public static void end(long attempted) {
     }
 }
