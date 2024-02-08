@@ -57,6 +57,7 @@ public class CarrierThread extends ForkJoinWorkerThread {
     private int compensating;
     private long compensateValue;   // FJP value to adjust release counts
 
+    @SuppressWarnings("this-escape")
     public CarrierThread(ForkJoinPool pool) {
         super(CARRIER_THREADGROUP, pool, true);
         U.putReference(this, CONTEXTCLASSLOADER, ClassLoader.getSystemClassLoader());
