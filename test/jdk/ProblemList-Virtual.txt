@@ -105,6 +105,8 @@ jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
 sun/security/util/Resources/early/EarlyResources.java 0000000 generic-all
 tools/jimage/JImageToolTest.java 0000000 generic-all
 
+com/sun/management/DiagnosticCommandMBean/DcmdMBeanPermissionsTest.java 0000000 generic-all
+
 # Not supported on virtual threads
 com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java#G1 0000000 generic-all
 com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java#Serial 0000000 generic-all
