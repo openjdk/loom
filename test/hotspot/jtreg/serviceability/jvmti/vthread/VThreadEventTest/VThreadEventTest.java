@@ -54,12 +54,12 @@ class CountDownLatch {
 
     public synchronized void countDown() {
         count--;
-        notify();
+        notifyAll();
     }
 
     public synchronized void await() throws InterruptedException {
         while (count > 0) {
-            wait(1);
+            wait(10);
         }
     }
 }
