@@ -24,6 +24,19 @@
 /*
  * @test id=default
  * @summary Test SuspendAllVirtualThreads/ResumeAllVirtualThreads
+ * @requires vm.debug != true
+ * @library /test/lib
+ * @compile SuspendResume2.java
+ * @run driver jdk.test.lib.FileInstaller . .
+ * @run main/othervm/native
+ *      -Djdk.virtualThreadScheduler.maxPoolSize=1
+ *      -agentlib:SuspendResume2
+ *      SuspendResume2
+ */
+
+/*
+ * @test id=debug
+ * @requires vm.debug == true
  * @library /test/lib
  * @compile SuspendResume2.java
  * @run driver jdk.test.lib.FileInstaller . .

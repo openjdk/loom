@@ -32,8 +32,15 @@
 
 /**
  * @test id=xint
- * @summary Do not suspend virtual threads in a critical section.
- * @bug 8311218
+ * @requires vm.debug != true
+ * @requires vm.continuations
+ * @library /testlibrary
+ * @run main/othervm -Xint SuspendWithInterruptLock
+ */
+
+/**
+ * @test id=xint-debug
+ * @requires vm.debug == true
  * @requires vm.continuations
  * @library /testlibrary
  * @run main/othervm -Xint -XX:-VerifyContinuations SuspendWithInterruptLock

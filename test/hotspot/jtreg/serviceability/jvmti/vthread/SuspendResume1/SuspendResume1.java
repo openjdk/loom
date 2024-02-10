@@ -25,6 +25,19 @@
  * @test id=default
  * @summary Test SuspendThread/ResumeThread, SuspendThreadList/ResumeThreadList
  *          for virtual threads.
+ * @requires vm.debug != true
+ * @library /test/lib
+ * @compile SuspendResume1.java
+ * @run driver jdk.test.lib.FileInstaller . .
+ * @run main/othervm/native/timeout=600
+ *      -Djdk.virtualThreadScheduler.maxPoolSize=1
+ *      -agentlib:SuspendResume1
+ *      SuspendResume1
+ */
+
+/*
+ * @test id=debug
+ * @requires vm.debug == true
  * @library /test/lib
  * @compile SuspendResume1.java
  * @run driver jdk.test.lib.FileInstaller . .
