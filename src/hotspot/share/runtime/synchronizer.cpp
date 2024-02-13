@@ -401,7 +401,7 @@ bool ObjectSynchronizer::quick_enter(oop obj, JavaThread* current,
     }
     if (lock_stack.try_recursive_enter(obj)) {
       // Recursive lock successful.
-      current->inc_held_monitor_count();
+      NOT_LOOM_MONITOR_SUPPORT(current->inc_held_monitor_count();)
       return true;
     }
   }
