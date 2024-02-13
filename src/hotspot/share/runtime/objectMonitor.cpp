@@ -473,6 +473,12 @@ bool ObjectMonitor::enter(JavaThread* current) {
                (!acquired && !current->preemption_cancelled() && state == java_lang_VirtualThread::BLOCKING), "invariant");
         return true;
       }
+      if (result == freeze_pinned_native || result == freeze_pinned_cs) {
+        EventVirtualThreadPinned e;
+        if (e.should_commit()) {
+          e.commit();
+        }
+      }
     }
 #endif
 
@@ -1649,6 +1655,14 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   assert(InitDone, "Unexpectedly not initialized");
 
   CHECK_OWNER();  // Throws IMSE if not owner.
+
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce != nullptr && ce->is_virtual_thread()) {
+    EventVirtualThreadPinned e;
+    if (e.should_commit()) {
+      e.commit();
+    }
+  }
 
   EventJavaMonitorWait event;
 

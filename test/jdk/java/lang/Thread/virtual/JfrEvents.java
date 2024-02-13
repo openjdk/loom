@@ -138,6 +138,33 @@ class JfrEvents {
             }
         );
 
+        // block on monitorenter with native frame on stack
+        var blockWhenPinned = Arguments.of(
+            "Contended monitorenter when pinned",
+            (ThrowingRunnable<Exception>) () -> {
+                var readyToEnter = new AtomicBoolean();
+                var thread = Thread.ofVirtual().unstarted(() -> {
+                    VThreadPinner.runPinned(() -> {
+                        readyToEnter.set(true);
+                        synchronized (lock) { }
+                    });
+                });
+                try {
+                    synchronized (lock) {
+                        thread.start();
+                        while (!readyToEnter.get()) {
+                            Thread.sleep(10);
+                        }
+                        await(thread, Thread.State.BLOCKED);
+                    }
+                } finally {
+                    thread.join();
+                }
+            },
+            Thread.State.TERMINATED,
+            (Consumer<Thread>) t -> { }
+        );
+
         // untimed Object.wait
         var waitWhenPinned = Arguments.of(
             "Object.wait",
@@ -170,7 +197,11 @@ class JfrEvents {
             }
         );
 
-        return Stream.of(parkWhenPinned, timedParkWhenPinned, waitWhenPinned, timedWaitWhenPinned);
+        return Stream.of(parkWhenPinned,
+                timedParkWhenPinned,
+                blockWhenPinned,
+                waitWhenPinned,
+                timedWaitWhenPinned);
     }
 
     /**
@@ -198,12 +229,7 @@ class JfrEvents {
                 });
                 try {
                     // wait for thread to park/wait
-                    Thread.State state = thread.getState();
-                    while (state != expectedState) {
-                        assertTrue(state != Thread.State.TERMINATED, thread.toString());
-                        Thread.sleep(10);
-                        state = thread.getState();
-                    }
+                    await(thread, expectedState);
                 } finally {
                     unparker.accept(thread);
                     thread.join();
@@ -242,9 +268,7 @@ class JfrEvents {
                 thread.start();
 
                 // wait for thread to park
-                while (thread.getState() != Thread.State.WAITING) {
-                    Thread.sleep(10);
-                }
+                await(thread, Thread.State.WAITING);
 
                 // shutdown scheduler
                 pool.shutdown();
@@ -295,5 +319,16 @@ class JfrEvents {
             recording.dump(recordingFile);
         }
         return recordingFile;
+    }
+
+    /**
+     * Waits for the given thread to reach a given state.
+     */
+    private static void await(Thread thread, Thread.State expectedState) throws InterruptedException {
+        Thread.State state = thread.getState();
+        while (state != expectedState) {
+            Thread.sleep(10);
+            state = thread.getState();
+        }
     }
 }

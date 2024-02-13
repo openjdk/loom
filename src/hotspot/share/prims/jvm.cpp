@@ -4018,6 +4018,12 @@ JVM_ENTRY(void, JVM_VirtualThreadDisableSuspend(JNIEnv* env, jclass clazz, jbool
 #endif
 JVM_END
 
+JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEvent())
+  EventVirtualThreadPinned event;
+  if (event.should_commit()) {
+    event.commit();
+  }
+JVM_END
 
 JVM_ENTRY(jobject, JVM_TakeVirtualThreadListToUnblock(JNIEnv* env, jclass ignored))
   ParkEvent* parkEvent = ObjectMonitor::vthread_unparker_ParkEvent();

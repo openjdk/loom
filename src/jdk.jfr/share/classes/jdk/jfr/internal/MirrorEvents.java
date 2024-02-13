@@ -41,7 +41,6 @@ import jdk.jfr.events.SocketWriteEvent;
 import jdk.jfr.events.TLSHandshakeEvent;
 import jdk.jfr.events.ThreadSleepEvent;
 import jdk.jfr.events.VirtualThreadEndEvent;
-import jdk.jfr.events.VirtualThreadPinnedEvent;
 import jdk.jfr.events.VirtualThreadStartEvent;
 import jdk.jfr.events.VirtualThreadSubmitFailedEvent;
 import jdk.jfr.events.X509CertificateEvent;
@@ -60,7 +59,6 @@ public final class MirrorEvents {
         TLSHandshakeEvent.class,
         VirtualThreadStartEvent.class,
         VirtualThreadEndEvent.class,
-        VirtualThreadPinnedEvent.class,
         VirtualThreadSubmitFailedEvent.class,
         X509CertificateEvent.class,
         X509ValidationEvent.class,
