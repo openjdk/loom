@@ -25,7 +25,6 @@
 
 package java.lang;
 
-import jdk.internal.event.VirtualThreadPinnedEvent;
 import jdk.internal.misc.Blocker;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 
@@ -377,13 +376,6 @@ public class Object {
         }
 
         // virtual thread waiting
-        VirtualThreadPinnedEvent event;
-        try {
-            event = new VirtualThreadPinnedEvent();
-            event.begin();
-        } catch (OutOfMemoryError e) {
-            event = null;
-        }
         boolean attempted = Blocker.beginCompenstate();
         try {
             wait0(timeoutMillis);
@@ -393,17 +385,10 @@ public class Object {
             throw e;
         } finally {
             Blocker.endCompenstate(attempted);
-            if (event != null) {
-                try {
-                    event.commit();
-                } catch (OutOfMemoryError e) {
-                    // ignore
-                }
-            }
         }
     }
 
-    // final modifier so method not in vtable
+    // final modifier as method not in vtable
     private final native void wait0(long timeoutMillis) throws InterruptedException;
 
     /**
