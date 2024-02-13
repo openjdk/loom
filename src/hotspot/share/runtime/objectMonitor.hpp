@@ -322,6 +322,7 @@ private:
 
   void      add_to_contentions(int value);
   intx      recursions() const                                         { return _recursions; }
+  void      set_recursions(size_t recursions);
 
  public:
   // JVM/TI GetObjectMonitorUsage() needs this:
