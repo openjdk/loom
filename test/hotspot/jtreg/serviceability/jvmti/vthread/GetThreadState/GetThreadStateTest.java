@@ -279,7 +279,7 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread parked with LockSupport.park while holding a monitor.
+     * Test state of thread parked with LockSupport.park while pinned.
      */
     @Test
     void testParkWhenPinned() throws Exception {
@@ -311,7 +311,7 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread parked with LockSupport.parkNanos while holding a monitor.
+     * Test state of thread parked with LockSupport.parkNanos while pinned.
      */
     @Test
     void testParkNanosWhenPinned() throws Exception {
