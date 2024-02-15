@@ -23,7 +23,8 @@
 
 #include "jni.h"
 
-JNIEXPORT void JNICALL Java_NativeSynchronized_synchronizedInvoke(JNIEnv *env, jobject obj, jobject task) {
+JNIEXPORT void JNICALL
+Java_SynchronizedNative_runWithSynchronizedNative(JNIEnv *env, jobject obj, jobject task) {
     jclass clazz = (*env)->GetObjectClass(env, obj);
     jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "(Ljava/lang/Runnable;)V");
     if (mid != NULL) {
@@ -31,8 +32,9 @@ JNIEXPORT void JNICALL Java_NativeSynchronized_synchronizedInvoke(JNIEnv *env, j
     }
 }
 
-JNIEXPORT void JNICALL Java_NativeSynchronized_invoke(JNIEnv *env, jobject obj, jobject lock, jobject task) {
-jclass clazz = (*env)->GetObjectClass(env, obj);
+JNIEXPORT void JNICALL
+Java_SynchronizedNative_runWithMonitorEnteredInNative(JNIEnv *env, jobject obj, jobject lock, jobject task) {
+    jclass clazz = (*env)->GetObjectClass(env, obj);
     jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "(Ljava/lang/Runnable;)V");
     if (mid != NULL && (*env)->MonitorEnter(env, lock) == 0) {
         (*env)->CallVoidMethod(env, obj, mid, task);
