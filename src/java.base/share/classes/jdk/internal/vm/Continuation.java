@@ -56,9 +56,18 @@ public class Continuation {
 
     /** Reason for pinning */
     public enum Pinned {
-        /** Native frame on stack */ NATIVE,
-        /** Monitor held */          MONITOR,
-        /** In critical section */   CRITICAL_SECTION }
+        /** Native frame on stack */ NATIVE(2),
+        /** Monitor held */          MONITOR(3),
+        /** In critical section */   CRITICAL_SECTION(4);
+
+        private final int value;
+        Pinned(int value) {
+            this.value = value;
+        }
+        public int value() {
+            return value;
+        }
+    }
 
     /** Preemption attempt result */
     public enum PreemptStatus {

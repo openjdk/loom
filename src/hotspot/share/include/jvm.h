@@ -1158,7 +1158,7 @@ JNIEXPORT void JNICALL
 JVM_VirtualThreadDisableSuspend(JNIEnv* env, jclass clazz, jboolean enter);
 
 JNIEXPORT void JNICALL
-JVM_VirtualThreadPinnedEvent();
+JVM_VirtualThreadPinnedEvent(jint reason);
     
 JNIEXPORT jobject JNICALL
 JVM_TakeVirtualThreadListToUnblock(JNIEnv* env, jclass ignored);

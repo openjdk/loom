@@ -211,6 +211,8 @@ final class VirtualThread extends BaseVirtualThread {
         }
         @Override
         protected void onPinned(Continuation.Pinned reason) {
+            // emit JFR event
+            virtualThreadPinnedEvent(reason.value());
         }
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
             return new Runnable() {
@@ -719,9 +721,6 @@ final class VirtualThread extends BaseVirtualThread {
     private void parkOnCarrierThread(boolean timed, long nanos) {
         assert state() == RUNNING;
 
-        // emit JFR event
-        virtualThreadPinnedEvent();
-
         setState(timed ? TIMED_PINNED : PINNED);
         try {
             if (!parkPermit) {
@@ -740,11 +739,11 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM
-     * to emit event to having a JFR in Java with the same name (but different ID) to
-     * events emitted by the VM.
+     * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM to
+     * emit event to avoid having a JFR in Java with the same name (but different ID)
+     * to events emitted by the VM.
      */
-    private static native void virtualThreadPinnedEvent();
+    private static native void virtualThreadPinnedEvent(int reason);
 
     /**
      * Schedule this virtual thread to be unparked after a given delay.
