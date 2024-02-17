@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -489,9 +489,9 @@ class MonitorEnterExit {
 
     /**
      * Returns a stream of elements that are ordered pairs of platform and virtual thread
-     * counts (0,2,4,..16 platform threads, 2,4,6,..32 virtual threads).
+     * counts. 0,2,4,..16 platform threads. 2,4,6,..32 virtual threads.
      */
-    static Stream<Arguments> threadMix() {
+    static Stream<Arguments> threadCounts() {
         return IntStream.range(0, 17)
                 .filter(i -> i % 2 == 0)
                 .mapToObj(i -> i)
@@ -504,7 +504,7 @@ class MonitorEnterExit {
      * Test mutual exclusion of monitors with platform and virtual threads
      */
     @ParameterizedTest
-    @MethodSource("threadMix")
+    @MethodSource("threadCounts")
     void testMutualExclusion(int nPlatformThreads, int nVirtualThreads) throws Exception {
         class Counter {
             int count;

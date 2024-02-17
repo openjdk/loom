@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,15 +25,15 @@
  * @test id=default
  * @summary Test virtual threads with a synchronized native method and a native method
  *      that enter/exits a monitor with JNI MonitorEnter/MonitorExit
- * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit SynchronizedNative
+ * @run junit/othervm SynchronizedNative
  */
 
 /*
  * @test id=Xint
- * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xint SynchronizedNative
@@ -41,7 +41,7 @@
 
 /*
  * @test id=Xcomp-TieredStopAtLevel1
- * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 SynchronizedNative
@@ -49,7 +49,7 @@
 
 /*
  * @test id=Xcomp-noTieredCompilation
- * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:-TieredCompilation SynchronizedNative
@@ -59,6 +59,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
@@ -67,7 +69,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SynchronizedNative {
@@ -175,40 +178,57 @@ class SynchronizedNative {
     }
 
     /**
-     * Test entering a monitor with a synchronized native method from many virtual
-     * threads at the same time.
+     * Returns a stream of elements that are ordered pairs of platform and virtual thread
+     * counts. 0,2,4 platform threads. 2,4,6,8 virtual threads.
      */
-    @ParameterizedTest
-    @ValueSource(ints = { 2, 4, 8, 16 })
-    void testEnterWithManyThreads(int nthreads) throws Exception {
-        int parallism = nthreads;
+    static Stream<Arguments> threadCounts() {
+        return IntStream.range(0, 5)
+                .filter(i -> i % 2 == 0)
+                .mapToObj(i -> i)
+                .flatMap(np -> IntStream.range(2, 9)
+                        .filter(i -> i % 2 == 0)
+                        .mapToObj(vp -> Arguments.of(np, vp)));
+    }
+
+    /**
+     * Execute a task concurrently from both platform and virtual threads.
+     */
+    private void executeConcurrently(int nPlatformThreads,
+                                     int nVirtualThreads,
+                                     Runnable task) throws Exception {
+        int parallism = nVirtualThreads;
         if (Thread.currentThread().isVirtual()) {
             parallism++;
         }
         int previousParallelism = VThreadRunner.ensureParallelism(parallism);
         try {
-            Object lock = this;
+            int nthreads = nPlatformThreads + nVirtualThreads;
             var phaser = new Phaser(nthreads + 1);
 
             // start all threads
             var threads = new Thread[nthreads];
-            for (int i = 0; i < nthreads; i++) {
-                threads[i] = Thread.startVirtualThread(() -> {
+            int index = 0;
+            for (int i = 0; i < nPlatformThreads; i++) {
+                threads[index++] = Thread.ofPlatform().start(() -> {
                     phaser.arriveAndAwaitAdvance();
-                    runWithSynchronizedNative(() -> {
-                        LockSupport.parkNanos(100_000_000);  // 100ms
-                    });
+                    task.run();
+                });
+            }
+            for (int i = 0; i < nVirtualThreads; i++) {
+                threads[index++] = Thread.ofVirtual().start(() -> {
+                    phaser.arriveAndAwaitAdvance();
+                    task.run();
                 });
             }
 
             // wait for all threads to start
             phaser.arriveAndAwaitAdvance();
-            System.err.printf("%d threads started%n", nthreads);
+            System.err.printf("  %d threads started%n", nthreads);
 
             // wait for all threads to terminate
             for (Thread thread : threads) {
                 if (thread != null) {
-                    System.err.printf("join %s ...%n", thread);
+                    System.err.printf("  join %s ...%n", thread);
                     thread.join();
                 }
             }
@@ -216,6 +236,28 @@ class SynchronizedNative {
             // reset parallelism
             VThreadRunner.setParallelism(previousParallelism);
         }
+    }
+
+
+    /**
+     * Test entering a monitor with a synchronized native method from many threads
+     * at the same time.
+     */
+    @ParameterizedTest
+    @MethodSource("threadCounts")
+    void testEnterConcurrently(int nPlatformThreads, int nVirtualThreads) throws Exception {
+        var counter = new Object() {
+            int value;
+            int value() { return value; }
+            void increment() { value++; }
+        };
+        executeConcurrently(nPlatformThreads, nVirtualThreads, () -> {
+            runWithSynchronizedNative(() -> {
+                counter.increment();
+                LockSupport.parkNanos(100_000_000);  // 100ms
+            });
+        });
+        assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
     }
 
     /**
@@ -250,7 +292,7 @@ class SynchronizedNative {
             assertFalse(Thread.holdsLock(lock));
 
             // enter with JNI MonitorEnter, renter with synchronized statement
-            runWithMonitorEnteredInNative(lock,() -> {
+            runWithMonitorEnteredInNative(lock, () -> {
                 assertTrue(Thread.holdsLock(lock));
                 synchronized (lock) {
                     assertTrue(Thread.holdsLock(lock));
@@ -260,9 +302,9 @@ class SynchronizedNative {
             assertFalse(Thread.holdsLock(lock));
 
             // enter with JNI MonitorEnter, renter with JNI MonitorEnter
-            runWithMonitorEnteredInNative(lock,() -> {
+            runWithMonitorEnteredInNative(lock, () -> {
                 assertTrue(Thread.holdsLock(lock));
-                runWithMonitorEnteredInNative(lock,() -> {
+                runWithMonitorEnteredInNative(lock, () -> {
                     assertTrue(Thread.holdsLock(lock));
                 });
                 assertTrue(Thread.holdsLock(lock));
@@ -281,7 +323,7 @@ class SynchronizedNative {
         var entered = new AtomicBoolean();
         var vthread = Thread.ofVirtual().unstarted(() -> {
             started.countDown();
-            runWithMonitorEnteredInNative(lock,() -> {
+            runWithMonitorEnteredInNative(lock, () -> {
                 assertTrue(Thread.holdsLock(lock));
                 entered.set(true);
             });
@@ -300,6 +342,26 @@ class SynchronizedNative {
             vthread.join();
         }
         assertTrue(entered.get());
+    }
+
+    /**
+     * Test entering a monitor with JNI MonitorEnter from many threads at the same time.
+     */
+    @ParameterizedTest
+    @MethodSource("threadCounts")
+    void testEnterInNativeConcurrently(int nPlatformThreads, int nVirtualThreads) throws Exception {
+        var counter = new Object() {
+            int value;
+            int value() { return value; }
+            void increment() { value++; }
+        };
+        executeConcurrently(nPlatformThreads, nVirtualThreads, () -> {
+            runWithMonitorEnteredInNative(counter, () -> {
+                counter.increment();
+                LockSupport.parkNanos(100_000_000);  // 100ms
+            });
+        });
+        assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
     }
 
     /**
