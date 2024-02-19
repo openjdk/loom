@@ -251,13 +251,17 @@ class SynchronizedNative {
             int value() { return value; }
             void increment() { value++; }
         };
+        var lock = this;
         executeConcurrently(nPlatformThreads, nVirtualThreads, () -> {
             runWithSynchronizedNative(() -> {
+                assertTrue(Thread.holdsLock(lock));
                 counter.increment();
                 LockSupport.parkNanos(100_000_000);  // 100ms
             });
         });
-        assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
+        synchronized (lock) {
+            assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
+        }
     }
 
     /**
@@ -355,13 +359,17 @@ class SynchronizedNative {
             int value() { return value; }
             void increment() { value++; }
         };
+        var lock = counter;
         executeConcurrently(nPlatformThreads, nVirtualThreads, () -> {
-            runWithMonitorEnteredInNative(counter, () -> {
+            runWithMonitorEnteredInNative(lock, () -> {
+                assertTrue(Thread.holdsLock(lock));
                 counter.increment();
                 LockSupport.parkNanos(100_000_000);  // 100ms
             });
         });
-        assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
+        synchronized (lock) {
+            assertEquals(nPlatformThreads + nVirtualThreads, counter.value());
+        }
     }
 
     /**
@@ -446,7 +454,7 @@ class SynchronizedNative {
     private native void runWithMonitorEnteredInNative(Object lock, Runnable task);
 
     /**
-     * Calls from native methods to run the given task.
+     * Called from native methods to run the given task.
      */
     private void run(Runnable task) {
         task.run();
