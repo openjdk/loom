@@ -863,6 +863,12 @@ void ObjectMonitor::EnterI(JavaThread* current) {
 
   int nWakeups = 0;
   int recheckInterval = 1;
+  bool do_timed_parked = false;
+
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce != nullptr && ce->is_virtual_thread()) {
+    do_timed_parked = true;
+  }
 
   for (;;) {
 
@@ -870,7 +876,7 @@ void ObjectMonitor::EnterI(JavaThread* current) {
     assert(owner_raw() != owner_for(current), "invariant");
 
     // park self
-    if (_Responsible == current) {
+    if (_Responsible == current || do_timed_parked) {
       current->_ParkEvent->park((jlong) recheckInterval);
       // Increase the recheckInterval, but clamp the value.
       recheckInterval *= 8;
