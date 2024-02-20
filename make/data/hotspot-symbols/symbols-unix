@@ -225,6 +225,7 @@ JVM_VirtualThreadUnmount
 JVM_VirtualThreadHideFrames
 JVM_VirtualThreadDisableSuspend
 JVM_VirtualThreadPinnedEvent
+JVM_SetLockId
 JVM_TakeVirtualThreadListToUnblock
 
 # Scoped values

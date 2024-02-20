@@ -3116,9 +3116,7 @@ JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
   thread->set_vthread(threadObj);
 
   // Set lock id of new current Thread
-  int64_t tid = java_lang_Thread::thread_id(threadObj);
-  assert(tid != 0 && tid < ThreadIdentifier::current(), "invalid tid");
-  thread->set_lock_id(tid);
+  thread->set_lock_id(java_lang_Thread::thread_id(threadObj));
 
   JFR_ONLY(Jfr::on_set_current_thread(thread, threadObj);)
 JVM_END
@@ -4023,6 +4021,10 @@ JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEvent(jint reason))
   if (event.should_commit()) {
     event.commit();
   }
+JVM_END
+
+JVM_ENTRY_NO_ENV(void, JVM_SetLockId(JNIEnv* env, jclass clazz, jlong tid))
+  thread->set_lock_id(tid);
 JVM_END
 
 JVM_ENTRY(jobject, JVM_TakeVirtualThreadListToUnblock(JNIEnv* env, jclass ignored))

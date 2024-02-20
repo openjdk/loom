@@ -439,6 +439,7 @@ final class VirtualThread extends BaseVirtualThread {
         assert Thread.currentThread() == this
                 && carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(carrier);
+        setLockId(this.threadId()); // keep lockid of vthread
     }
 
     /**
@@ -1295,6 +1296,9 @@ final class VirtualThread extends BaseVirtualThread {
         // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
         this.carrierThread = carrier;
     }
+
+    @IntrinsicCandidate
+    private static native void setLockId(long tid);
 
     // -- JVM TI support --
 
