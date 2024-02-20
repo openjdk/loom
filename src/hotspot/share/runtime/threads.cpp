@@ -167,8 +167,7 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
                           string,
                           CHECK);
 
-  // Update the lock_id with the tid value.
-  thread->set_lock_id(java_lang_Thread::thread_id(thread_oop()));
+  assert(thread->lock_id() == ThreadIdentifier::initial(), "invariant");
 
   // Set thread status to running since main thread has
   // been started and running.
@@ -535,8 +534,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   main_thread->set_active_handles(JNIHandleBlock::allocate_block());
   MACOS_AARCH64_ONLY(main_thread->init_wx());
 
-  // Set the lock_id to the next thread_id temporarily while initialization runs.
+  // Set the lock_id now since we will run Java code before the Thread instance
+  // is even created. The same value will be assigned to the Thread instance on init.
   main_thread->set_lock_id(ThreadIdentifier::next());
+  assert(main_thread->lock_id() == ThreadIdentifier::initial(), "invariant");
 
   if (!main_thread->set_as_starting_thread()) {
     vm_shutdown_during_initialization(

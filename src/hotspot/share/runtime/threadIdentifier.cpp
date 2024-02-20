@@ -26,8 +26,15 @@
 #include "runtime/atomic.hpp"
 #include "runtime/threadIdentifier.hpp"
 
-// starting at 4, excluding reserved values defined in ObjectMonitor.hpp + primordial thread id
-static volatile int64_t next_thread_id = 4;
+// starting at 3, excluding reserved values defined in ObjectMonitor.hpp
+static const int64_t INITIAL_TID = 3;
+static volatile int64_t next_thread_id = INITIAL_TID;
+
+#ifdef ASSERT
+int64_t ThreadIdentifier::initial() {
+  return INITIAL_TID;
+}
+#endif
 
 int64_t ThreadIdentifier::unsafe_offset() {
   return reinterpret_cast<int64_t>(&next_thread_id);

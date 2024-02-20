@@ -41,6 +41,7 @@
 #include "runtime/stackOverflow.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadHeapSampler.hpp"
+#include "runtime/threadIdentifier.hpp"
 #include "runtime/threadStatisticalInfo.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -169,7 +170,10 @@ class JavaThread: public Thread {
   bool is_on_monitorenter() { return _on_monitorenter; }
   void set_on_monitorenter(bool val) { _on_monitorenter = val; }
 
-  void set_lock_id(int64_t tid) { assert(tid != 0, "must be set"); _lock_id = tid; }
+  void set_lock_id(int64_t tid) {
+    assert(tid >= ThreadIdentifier::initial() && tid < ThreadIdentifier::current(), "invalid tid");
+    _lock_id = tid;
+  }
   int64_t lock_id() const { return _lock_id; }
 
   // For tracking the heavyweight monitor the thread is pending on.
