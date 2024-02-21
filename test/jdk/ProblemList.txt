@@ -496,6 +496,7 @@ java/lang/invoke/RicochetTest.java                              8251969 generic-
 
 java/lang/Thread/virtual/stress/GetStackTraceALotWhenPinned.java#id0 8322962 generic-all
 java/lang/Thread/virtual/stress/GetStackTraceALotWhenPinned.java#id1 8322962 generic-all
+java/lang/Thread/virtual/BusyMonitorEnterWhenPinned.java	         8322962 generic-all
 
 ############################################################################
 
