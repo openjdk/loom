@@ -564,11 +564,11 @@ final class ProcessImpl extends Process {
     private static native int getExitCodeProcess(long handle);
 
     public int waitFor() throws InterruptedException {
-        boolean attempted = Blocker.beginCompenstate();
+        boolean attempted = Blocker.begin();
         try {
             waitForInterruptibly(handle);
         } finally {
-            Blocker.endCompenstate(attempted);
+            Blocker.end(attempted);
         }
         if (Thread.interrupted())
             throw new InterruptedException();
@@ -593,11 +593,11 @@ final class ProcessImpl extends Process {
                 // if wraps around then wait a long while
                 msTimeout = Integer.MAX_VALUE;
             }
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 waitForTimeoutInterruptibly(handle, msTimeout);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
             if (Thread.interrupted())
                 throw new InterruptedException();

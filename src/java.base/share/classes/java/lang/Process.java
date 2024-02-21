@@ -843,31 +843,31 @@ public abstract class Process {
 
         @Override
         public int read() throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 return super.read();
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
 
         @Override
         public int read(byte[] b) throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 return super.read(b);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 return super.read(b, off, len);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
     }
@@ -882,31 +882,31 @@ public abstract class Process {
 
         @Override
         public void write(int b) throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
-                write(b);
+                super.write(b);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
 
         @Override
         public void write(byte[] b) throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 super.write(b);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
 
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 super.write(b, off, len);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
     }

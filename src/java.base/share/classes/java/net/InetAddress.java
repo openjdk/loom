@@ -1216,11 +1216,11 @@ public sealed class InetAddress implements Serializable permits Inet4Address, In
             Objects.requireNonNull(policy);
             validate(host);
             InetAddress[] addrs;
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 addrs = impl.lookupAllHostAddr(host, policy);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
             return Arrays.stream(addrs);
         }
@@ -1230,11 +1230,11 @@ public sealed class InetAddress implements Serializable permits Inet4Address, In
             if (addr.length != Inet4Address.INADDRSZ && addr.length != Inet6Address.INADDRSZ) {
                 throw new IllegalArgumentException("Invalid address length");
             }
-            boolean attempted = Blocker.beginCompenstate();
+            boolean attempted = Blocker.begin();
             try {
                 return impl.getHostByAddr(addr);
             } finally {
-                Blocker.endCompenstate(attempted);
+                Blocker.end(attempted);
             }
         }
     }

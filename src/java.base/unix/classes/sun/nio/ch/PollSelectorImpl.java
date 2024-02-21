@@ -111,11 +111,11 @@ class PollSelectorImpl extends SelectorImpl {
             int numPolled;
             do {
                 long startTime = timedPoll ? System.nanoTime() : 0;
-                boolean attempted = Blocker.beginCompenstate(blocking);
+                boolean attempted = Blocker.begin(blocking);
                 try {
                     numPolled = poll(pollArray.address(), pollArraySize, to);
                 } finally {
-                    Blocker.endCompenstate(attempted);
+                    Blocker.end(attempted);
                 }
                 if (numPolled == IOStatus.INTERRUPTED && timedPoll) {
                     // timed poll interrupted so need to adjust timeout

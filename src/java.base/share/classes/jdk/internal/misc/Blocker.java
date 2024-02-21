@@ -32,11 +32,11 @@ import jdk.internal.access.SharedSecrets;
  * Defines static methods to mark the beginning and end of a possibly blocking
  * operation. The methods are intended to be used with try-finally as follows:
  * {@snippet lang=java :
- *     boolean attempted = Blocker.beginCompenstate();
+ *     boolean attempted = Blocker.begin();
  *     try {
  *         // blocking operation
  *     } finally {
- *         Blocker.endCompenstate(attempted);
+ *         Blocker.end(attempted);
  *     }
  * }
  * If invoked from a virtual thread and the underlying carrier thread is a
@@ -63,7 +63,7 @@ public class Blocker {
      * Marks the beginning of a blocking operation.
      * @return true if tryCompensate attempted
      */
-    public static boolean beginCompenstate() {
+    public static boolean begin() {
         if (VM.isBooted()
                 && Thread.currentThread().isVirtual()
                 && currentCarrierThread() instanceof CarrierThread ct) {
@@ -78,27 +78,18 @@ public class Blocker {
      * @param blocking true if the operation may block, otherwise false
      * @return true if tryCompensate attempted
      */
-    public static boolean beginCompenstate(boolean blocking) {
-        return (blocking) ? beginCompenstate() : false;
+    public static boolean begin(boolean blocking) {
+        return (blocking) ? begin() : false;
     }
 
     /**
      * Marks the end of an operation that may have blocked.
      * @param attempted if tryCompensate attempted
      */
-    public static void endCompenstate(boolean attempted) {
+    public static void end(boolean attempted) {
         if (attempted) {
             CarrierThread ct = (CarrierThread) currentCarrierThread();
             ct.endBlocking();
         }
-    }
-
-    // The following methods are retained to avoid changing dozens of usages in JDK at this time.
-
-    public static long begin() {
-        return 0;
-    }
-
-    public static void end(long attempted) {
     }
 }

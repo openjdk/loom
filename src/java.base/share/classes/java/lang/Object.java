@@ -376,7 +376,7 @@ public class Object {
         }
 
         // virtual thread waiting
-        boolean attempted = Blocker.beginCompenstate();
+        boolean attempted = Blocker.begin();
         try {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
@@ -384,7 +384,7 @@ public class Object {
             Thread.currentThread().getAndClearInterrupt();
             throw e;
         } finally {
-            Blocker.endCompenstate(attempted);
+            Blocker.end(attempted);
         }
     }
 

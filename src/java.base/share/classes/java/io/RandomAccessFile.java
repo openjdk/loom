@@ -355,12 +355,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *             defined above
      */
     private void open(String name, int mode) throws FileNotFoundException {
-        long comp = Blocker.begin();
-        try {
-            open0(name, mode);
-        } finally {
-            Blocker.end(comp);
-        }
+        open0(name, mode);
     }
 
     // 'Read' primitives
@@ -381,12 +376,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      *                          end-of-file has been reached.
      */
     public int read() throws IOException {
-        long comp = Blocker.begin();
-        try {
-            return read0();
-        } finally {
-            Blocker.end(comp);
-        }
+        return read0();
     }
 
     private native int read0() throws IOException;
@@ -399,12 +389,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws    IOException If an I/O error has occurred.
      */
     private int readBytes(byte[] b, int off, int len) throws IOException {
-        long comp = Blocker.begin();
-        try {
-            return readBytes0(b, off, len);
-        } finally {
-            Blocker.end(comp);
-        }
+        return readBytes0(b, off, len);
     }
 
     private native int readBytes0(byte[] b, int off, int len) throws IOException;
@@ -552,11 +537,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        boolean attempted = Blocker.beginCompenstate(sync);
+        boolean attempted = Blocker.begin(sync);
         try {
             write0(b);
         } finally {
-            Blocker.endCompenstate(attempted);
+            Blocker.end(attempted);
         }
     }
 
@@ -571,11 +556,11 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws    IOException If an I/O error has occurred.
      */
     private void writeBytes(byte[] b, int off, int len) throws IOException {
-        boolean attempted = Blocker.beginCompenstate(sync);
+        boolean attempted = Blocker.begin(sync);
         try {
             writeBytes0(b, off, len);
         } finally {
-            Blocker.endCompenstate(attempted);
+            Blocker.end(attempted);
         }
     }
 
@@ -635,12 +620,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
         if (pos < 0) {
             throw new IOException("Negative seek offset");
         }
-        long comp = Blocker.begin();
-        try {
-            seek0(pos);
-        } finally {
-            Blocker.end(comp);
-        }
+        seek0(pos);
     }
 
     private native void seek0(long pos) throws IOException;
@@ -652,12 +632,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @throws     IOException  if an I/O error occurs.
      */
     public long length() throws IOException {
-        long comp = Blocker.begin();
-        try {
-            return length0();
-        } finally {
-            Blocker.end(comp);
-        }
+        return length0();
     }
 
     private native long length0() throws IOException;
@@ -689,12 +664,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
      * @since      1.2
      */
     public void setLength(long newLength) throws IOException {
-        long comp = Blocker.begin();
-        try {
-            setLength0(newLength);
-        } finally {
-            Blocker.end(comp);
-        }
+        setLength0(newLength);
     }
 
     private native void setLength0(long newLength) throws IOException;
