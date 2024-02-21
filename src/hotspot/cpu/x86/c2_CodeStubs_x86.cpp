@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -100,5 +100,75 @@ void C2HandleAnonOMOwnerStub::emit(C2_MacroAssembler& masm) {
   __ jmp(continuation());
 }
 #endif
+
+int C2FastUnlockLightweightStub::max_size() const {
+  return 128;
+}
+
+void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
+  assert(_t1 == rax, "must be");
+
+  Label slow_path;
+
+  { // Restore lock-stack and handle the unlock in runtime.
+
+    __ bind(_push_and_slow_path);
+#ifdef ASSERT
+    // The obj was only cleared in debug.
+    __ movl(_t1, Address(_thread, JavaThread::lock_stack_top_offset()));
+    __ movptr(Address(_thread, _t1), _obj);
+#endif
+    __ addl(Address(_thread, JavaThread::lock_stack_top_offset()), oopSize);
+  }
+
+  { // Handle the unlock in runtime
+
+    __ bind(slow_path);
+    // set ZF=0 to indicate failure
+    __ orl(_t1, 1);
+    __ jmp(slow_path_continuation());
+  }
+
+  { // Handle monitor medium path.
+
+    __ bind(_check_successor);
+
+    Label fix_zf_and_unlocked;
+    const Register monitor = _mark;
+
+#ifndef _LP64
+    __ jmpb(slow_path);
+#else // _LP64
+    // successor null check.
+    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    __ jccb(Assembler::equal, slow_path);
+
+    // Release lock.
+    __ movptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), NULL_WORD);
+
+    // Fence.
+    // Instead of MFENCE we use a dummy locked add of 0 to the top-of-stack.
+    __ lock(); __ addl(Address(rsp, 0), 0);
+
+    // Recheck successor.
+    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    // Observed a successor after the release -> fence we have handed off the monitor
+    __ jccb(Assembler::notEqual, fix_zf_and_unlocked);
+
+    // Try to relock, if it fails the monitor has been handed over
+    // TODO: Caveat, this may fail due to deflation, which does
+    //       not handle the monitor handoff. Currently only works
+    //       due to the responsible thread.
+    __ xorptr(rax, rax);
+    __ movptr(_t2, Address(_thread, JavaThread::lock_id_offset()));
+    __ lock(); __ cmpxchgptr(_t2, Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
+    __ jccb  (Assembler::equal, slow_path);
+#endif
+
+    __ bind(fix_zf_and_unlocked);
+    __ xorl(rax, rax);
+    __ jmp(unlocked_continuation());
+  }
+}
 
 #undef __

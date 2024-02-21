@@ -117,6 +117,7 @@ public:
   inline int monitor_count() const;
   inline void move_to_address(oop* start);
   inline void move_from_address(oop* start, int count);
+  inline int unique_count() const NOT_DEBUG_RETURN0;
 
   // GC support
   inline void oops_do(OopClosure* cl);

@@ -236,6 +236,22 @@ inline void LockStack::move_from_address(oop* start, int count) {
   }
 }
 
+#ifdef ASSERT
+inline int LockStack::unique_count() const {
+  int end = to_index(_top);
+  oop previous = nullptr;
+  int count = 0;
+  for (int i = 0; i < end; i++) {
+    assert(_base[i] != nullptr, "invariant");
+    if (_base[i] != previous) {
+      previous = _base[i];
+      count++;
+    }
+  }
+  return count;
+}
+#endif
+
 inline void LockStack::oops_do(OopClosure* cl) {
   verify("pre-oops-do");
   int end = to_index(_top);

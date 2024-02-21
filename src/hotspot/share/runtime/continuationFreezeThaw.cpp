@@ -552,7 +552,8 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
     assert(thread->held_monitor_count() == 0, "should be set only for LM_LEGACY");
   }
   DEBUG_ONLY(int verified_cnt = monitors_to_fix_on_stack(_thread);)
-  assert(verified_cnt == _monitors_to_fix || thread->obj_locker_count() > 0,
+  assert(verified_cnt == _monitors_to_fix || thread->obj_locker_count() > 0 ||
+         (LockingMode == LM_LIGHTWEIGHT && verified_cnt == _thread->lock_stack().unique_count()),
          "wrong monitor count. Found %d in the stack but counter is %d", verified_cnt, _monitors_to_fix);
 }
 
