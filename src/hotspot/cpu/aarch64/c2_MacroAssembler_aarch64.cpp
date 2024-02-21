@@ -238,7 +238,7 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
 void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register t1,
                                               Register t2, Register t3, Register t4) {
   assert(LockingMode == LM_LIGHTWEIGHT, "must be");
-  assert_different_registers(obj, t1, t2, t3);
+  assert_different_registers(obj, t1, t2, t3, t4);
 
   // Handle inflated monitor.
   Label inflated;
@@ -461,8 +461,9 @@ void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register t1, Regis
 
     // The owner may be anonymous and we removed the last obj entry in
     // the lock-stack. This loses the information about the owner.
-    // Write the thread to the owner field so the runtime knows the owner.
-    str(rthread, Address(t2_owner_addr));
+    // Write the thread id to the owner field so the runtime knows the owner.
+    ldr(t3_t, Address(rthread, JavaThread::lock_id_offset()));
+    str(t3_t, Address(t2_owner_addr));
     b(slow_path);
 
     bind(release);
