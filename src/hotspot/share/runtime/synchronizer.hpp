@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@
 #include "oops/markWord.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/handles.hpp"
+#include "runtime/javaObjectMonitor.hpp"
 #include "utilities/resourceHash.hpp"
 
 template <typename T> class GrowableArray;
@@ -66,39 +67,6 @@ public:
   ObjectMonitor* next();
 };
 
-class ObjectMonitorMode : AllStatic {
-  enum class Mode {
-    LEGACY = -1,
-    NATIVE =  0,
-    HEAVY  =  1,
-    FAST   =  2
-  };
-  static Mode _mode;
-public:
-  static bool initialize();
-  static bool legacy() { return _mode == Mode::LEGACY; };
-
-  static bool java()   { return _mode != Mode::LEGACY; };
-
-  static bool native() { return _mode == Mode::NATIVE; };
-
-  static bool java_only()   { return heavy() || fast(); };
-
-  static bool heavy()  { return _mode == Mode::HEAVY; };
-  static bool fast()   { return _mode == Mode::FAST; };
-
-  static int  as_int()    { return (int)_mode; };
-  static const char* as_string() {
-    switch(_mode) {
-    case Mode::LEGACY: return "legacy";
-    case Mode::NATIVE: return "native";
-    case Mode::HEAVY:  return "heavy";
-    case Mode::FAST:   return "fast";
-    }
-    return "error: invalid mode";
-  };
-};
-
 class ObjectSynchronizer : AllStatic {
   friend class VMStructs;
   friend class ObjectMonitorDeflationLogging;
@@ -128,7 +96,18 @@ class ObjectSynchronizer : AllStatic {
   // This is the "slow path" version of monitor enter and exit.
   static void enter(Handle obj, BasicLock* lock, JavaThread* current);
   static void exit(oop obj, BasicLock* lock, JavaThread* current);
+  // Used to enter a monitor for another thread. This requires that the
+  // locking_thread is suspended, and that entering on a potential
+  // inflated monitor may only contend with deflation. That is the obj being
+  // locked on is either already locked by the locking_thread or cannot
+  // escape the locking_thread.
+  static void enter_for(Handle obj, BasicLock* lock, JavaThread* locking_thread);
+private:
+  // Shared implementation for enter and enter_for. Performs all but
+  // inflated monitor enter.
+  static bool enter_fast_impl(Handle obj, BasicLock* lock, JavaThread* locking_thread);
 
+public:
   // Used only to handle jni locks or other unmatched monitor enter/exit
   // Internally they will use heavy weight monitor.
   static void jni_enter(Handle obj, JavaThread* current);
@@ -155,6 +134,14 @@ class ObjectSynchronizer : AllStatic {
 
   // Inflate light weight monitor to heavy weight monitor
   static ObjectMonitor* inflate(Thread* current, oop obj, const InflateCause cause);
+  // Used to inflate a monitor as if it was done from the thread JavaThread.
+  static ObjectMonitor* inflate_for(JavaThread* thread, oop obj, const InflateCause cause);
+
+private:
+  // Shared implementation between the different LockingMode.
+  static ObjectMonitor* inflate_impl(JavaThread* thread, oop obj, const InflateCause cause);
+
+public:
   // This version is only for internal use
   static void inflate_helper(oop obj);
   static const char* inflate_cause_name(const InflateCause cause);
@@ -232,7 +219,7 @@ class ObjectSynchronizer : AllStatic {
   static size_t get_gvars_size();
   static u_char* get_gvars_stw_random_addr();
 
-  static void handle_sync_on_value_based_class(Handle obj, JavaThread* current);
+  static void handle_sync_on_value_based_class(Handle obj, JavaThread* locking_thread);
 };
 
 // ObjectLocker enforces balanced locking and can never throw an

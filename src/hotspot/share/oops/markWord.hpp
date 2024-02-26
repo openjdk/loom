@@ -28,6 +28,7 @@
 #include "metaprogramming/primitiveConversions.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "runtime/globals.hpp"
+#include "runtime/javaObjectMonitor.hpp"
 
 #include <type_traits>
 
@@ -181,7 +182,7 @@ class markWord {
   }
 
   bool is_fast_locked() const {
-    assert(LockingMode == LM_LIGHTWEIGHT, "should only be called with new lightweight locking");
+    assert(ObjectMonitorMode::legacy() && LockingMode == LM_LIGHTWEIGHT, "should only be called with new lightweight locking");
     return (value() & lock_mask_in_place) == locked_value;
   }
   markWord set_fast_locked() const {

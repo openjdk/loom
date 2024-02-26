@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -554,7 +554,12 @@ JRT_ENTRY(address, InterpreterRuntime::exception_handler_for_exception(JavaThrea
 #if INCLUDE_JVMCI
   if (EnableJVMCI && h_method->method_data() != nullptr) {
     ResourceMark rm(current);
-    ProfileData* pdata = h_method->method_data()->allocate_bci_to_data(current_bci, nullptr);
+    MethodData* mdo = h_method->method_data();
+
+    // Lock to read ProfileData, and ensure lock is not broken by a safepoint
+    MutexLocker ml(mdo->extra_data_lock(), Mutex::_no_safepoint_check_flag);
+
+    ProfileData* pdata = mdo->allocate_bci_to_data(current_bci, nullptr);
     if (pdata != nullptr && pdata->is_BitData()) {
       BitData* bit_data = (BitData*) pdata;
       bit_data->set_exception_seen();
@@ -737,6 +742,7 @@ void InterpreterRuntime::resolve_get_put(JavaThread* current, Bytecodes::Code by
 
 //%note monitor_1
 JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter(JavaThread* current, BasicObjectLock* elem))
+  assert(ObjectMonitorMode::legacy(), "must be");
   assert(LockingMode != LM_LIGHTWEIGHT, "Should call monitorenter_obj() when using the new lightweight locking");
 #ifdef ASSERT
   current->last_frame().interpreter_frame_verify_monitor(elem);
@@ -761,6 +767,7 @@ JRT_END
 // As soon as legacy stack-locking goes away we could remove the other monitorenter() entry
 // point, and only use oop-accepting entries (same for monitorexit() below).
 JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter_obj(JavaThread* current, oopDesc* obj))
+  assert(ObjectMonitorMode::legacy(), "must be");
   assert(LockingMode == LM_LIGHTWEIGHT, "Should call monitorenter() when not using the new lightweight locking");
   Handle h_obj(current, cast_to_oop(obj));
   assert(Universe::heap()->is_in_or_null(h_obj()),
@@ -770,6 +777,7 @@ JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter_obj(JavaThread* curren
 JRT_END
 
 JRT_LEAF(void, InterpreterRuntime::monitorexit(BasicObjectLock* elem))
+  assert(ObjectMonitorMode::legacy(), "must be");
   oop obj = elem->obj();
   assert(Universe::heap()->is_in(obj), "must be an object");
   // The object could become unlocked through a JNI call, which we have no other checks for.

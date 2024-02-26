@@ -136,7 +136,7 @@ bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
   if (obj->mark().value() != 0) {
     return true;
   }
-  return LockingMode == LM_LIGHTWEIGHT || !SafepointSynchronize::is_at_safepoint();
+  return (ObjectMonitorMode::legacy() && LockingMode == LM_LIGHTWEIGHT) || !SafepointSynchronize::is_at_safepoint();
 }
 
 // used only for asserts and guarantees

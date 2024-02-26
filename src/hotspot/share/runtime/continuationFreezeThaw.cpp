@@ -1498,23 +1498,23 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
 #endif // INCLUDE_JVMTI
 
 #ifdef ASSERT
-// static bool monitors_on_stack(JavaThread* thread) {
-//  assert(ObjectMonitorMode::legacy(), "monitors_on_stack can't work for Java Object Monitors");
-
-//   ContinuationEntry* ce = thread->last_continuation();
-//   RegisterMap map(thread,
-//                   RegisterMap::UpdateMap::include,
-//                   RegisterMap::ProcessFrames::include,
-//                   RegisterMap::WalkContinuation::skip);
-//   map.set_include_argument_oops(false);
-//   for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
-//     if ((f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f)) ||
-//         (f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f))) {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
+#if 0
+static bool monitors_on_stack(JavaThread* thread) {
+  ContinuationEntry* ce = thread->last_continuation();
+  RegisterMap map(thread,
+                  RegisterMap::UpdateMap::include,
+                  RegisterMap::ProcessFrames::include,
+                  RegisterMap::WalkContinuation::skip);
+  map.set_include_argument_oops(false);
+  for (frame f = thread->last_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
+    if ((f.is_interpreted_frame() && ContinuationHelper::InterpretedFrame::is_owning_locks(f)) ||
+        (f.is_compiled_frame() && ContinuationHelper::CompiledFrame::is_owning_locks(map.thread(), &map, f))) {
+      return true;
+    }
+  }
+  return false;
+}
+#endif
 
 bool FreezeBase::interpreted_native_or_deoptimized_on_stack() {
   ContinuationEntry* ce = _thread->last_continuation();
@@ -2192,7 +2192,7 @@ void ThawBase::clear_bitmap_bits(address start, address end) {
   log_develop_trace(continuations)("clearing bitmap for " INTPTR_FORMAT " - " INTPTR_FORMAT, p2i(start), p2i(effective_end));
   stackChunkOop chunk = _cont.tail();
   chunk->bitmap().clear_range(chunk->bit_index_for(start), chunk->bit_index_for(effective_end));
-  assert(chunk->bitmap().count_one_bits(chunk->bit_index_for(effective_end), chunk->bit_index_for(end)) == 0, "bits should not be set");
+  assert(effective_end == end || !chunk->bitmap().at(chunk->bit_index_for(effective_end)), "bit should not be set");
 }
 
 NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& caller, int num_frames) {
