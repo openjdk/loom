@@ -1766,8 +1766,9 @@ bool FreezeBase::check_valid_fast_path() {
                   RegisterMap::ProcessFrames::skip,
                   RegisterMap::WalkContinuation::skip);
   map.set_include_argument_oops(false);
-  for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map)) {
-    if (!f.is_compiled_frame() || f.is_deoptimized_frame()) {
+  int i = 0;
+  for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map), i++) {
+    if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (i == 0 && f.is_runtime_frame()))) {
       return false;
     }
   }
