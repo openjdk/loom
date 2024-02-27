@@ -2,14 +2,13 @@ Test: hotspot/jtreg :tier1_runtime
 
 Source info:
 
-commit d7df161bf1132c32e11bfec370efef363da82066
-Merge: 0335f542439 05745e3f1d5
+commit 7b708d5ad3abf8367126fef523dfd747d9d04680
+Merge: a5fbb5b47fd cc1e216eb9e
 Author: David Holmes <david.holmes@oracle.com>
-Date:   Thu Jan 4 00:44:28 2024 -0500
+Date:   Mon Feb 26 00:20:22 2024 -0500
 
-Test results: passed: 639; failed: 16; error: 3
-
-(previous logged run: Test results: passed: 625; failed: 16; error: 2)
+Test results: passed: 641; failed: 17; error: 3
+(previous Test results: passed: 639; failed: 16; error: 3)
 
 1.runtime/ErrorHandling/StackWalkNativeToJava.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: 'java.lang.RuntimeException: Reached statement after synchronized' found in stderr
 
@@ -52,23 +51,28 @@ Test triggers stackoverflow then tries to recover, but it hits in the monitorEnt
 
 Won't work in interpreted mode
 
-15. runtime/lockStack/TestStackWalk.java: Failed. Unexpected exit from test [exit code: 134]
+15. runtime/lockStack/TestLockStackCapacity.java: Failed. Unexpected exit from test [exit code: 1]
+
+
+Can'r run in JOM mode.
+
+16. runtime/lockStack/TestStackWalk.java: Failed. Unexpected exit from test [exit code: 134]
 
 SEGV in javaVFrame::print_lock_info_on
 
 Not investigated yet.
 
 
-16. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
-17. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+17. runtime/NMT/MallocLimitTest.java#compiler-limit-fatal: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
+18. runtime/NMT/MallocLimitTest.java#compiler-limit-oom: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Unexpected to get exit value of [0]
 
 Won't work in interpreted mode.
 
-18. runtime/reflect/ReflectStackOverflow.java: Failed. Unexpected exit from test [exit code: 134]
+19. runtime/reflect/ReflectStackOverflow.java: Failed. Unexpected exit from test [exit code: 134]
 
 Test triggers stackoverflow then tries to recover, but it hits in the monitorEnter code and so we abort.
 
-19. runtime/whitebox/TestWBDeflateIdleMonitors.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0]
+20. runtime/whitebox/TestWBDeflateIdleMonitors.java: Failed. Execution failed: `main' threw exception: java.lang.RuntimeException: Expected to get exit value of [0]
 
 Not applicable for JOM: no deflation
 
