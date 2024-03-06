@@ -88,6 +88,7 @@ jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
 jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
 
 # The problems with permissions
+java/io/File/GetXSpace.java 0000000 generic-all
 java/io/FilePermission/MergeName.java 0000000 generic-all
 java/lang/SecurityManager/modules/CustomSecurityManagerTest.java 0000000 generic-all
 java/net/httpclient/security/Security.java 0000000 generic-all
