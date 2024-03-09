@@ -130,7 +130,7 @@ runtime/Thread/StopAtExit.java 0000000 generic-all
 runtime/handshake/HandshakeWalkStackTest.java 0000000 generic-all
 
 # too fragile when main thread is a virtual thread
-runtime/Thread/ThreadCountLimit.java 0000000 generic-all
+runtime/Thread/ThreadCountLimit.java#id0 0000000 generic-all
 
 compiler/interpreter/TestVerifyStackAfterDeopt.java 8316392 macosx-aarch64
 
