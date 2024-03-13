@@ -60,6 +60,7 @@
 #include "oops/symbol.hpp"
 #include "prims/jvm_misc.hpp"
 #include "prims/jvmtiAgentList.hpp"
+#include "prims/jvmtiEnvBase.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/flags/jvmFlagLimit.hpp"
@@ -1190,10 +1191,12 @@ void Threads::metadata_handles_do(void f(Metadata*)) {
   threads_do(&handles_closure);
 }
 
-// Get count Java threads that are waiting to enter the specified monitor.
+#if INCLUDE_JVMTI
+// Get count of Java threads that are waiting to enter or re-enter the specified monitor.
 GrowableArray<JavaThread*>* Threads::get_pending_threads(ThreadsList * t_list,
                                                          int count,
                                                          address monitor) {
+  assert(Thread::current()->is_VM_thread(), "Must be the VM thread");
   GrowableArray<JavaThread*>* result = new GrowableArray<JavaThread*>(count);
 
   int i = 0;
@@ -1203,7 +1206,14 @@ GrowableArray<JavaThread*>* Threads::get_pending_threads(ThreadsList * t_list,
     // The first stage of async deflation does not affect any field
     // used by this comparison so the ObjectMonitor* is usable here.
     address pending = (address)p->current_pending_monitor();
-    if (pending == monitor) {             // found a match
+    address waiting = (address)p->current_waiting_monitor();
+    oop thread_oop = JvmtiEnvBase::get_vthread_or_thread_oop(p);
+    bool is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+    jint state = is_virtual ? JvmtiEnvBase::get_vthread_state(thread_oop, p)
+                            : JvmtiEnvBase::get_thread_state(thread_oop, p);
+    if (pending == monitor || (waiting == monitor &&
+        (state & JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER))
+    ) { // found a match
       if (i < count) result->append(p);   // save the first count matches
       i++;
     }
@@ -1211,7 +1221,7 @@ GrowableArray<JavaThread*>* Threads::get_pending_threads(ThreadsList * t_list,
 
   return result;
 }
-
+#endif // INCLUDE_JVMTI
 
 JavaThread *Threads::owning_thread_from_stacklock(ThreadsList * t_list, address basicLock) {
   assert(LockingMode == LM_LEGACY, "Not with new lightweight locking");
