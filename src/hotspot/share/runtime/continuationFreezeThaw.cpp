@@ -1836,9 +1836,6 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   assert(entry->is_virtual_thread() == (entry->scope(current) == java_lang_VirtualThread::vthread_scope()), "");
 
-  // assert(monitors_on_stack(current) == ((current->held_monitor_count() - current->jni_monitor_count()) > 0),
-  //       "Held monitor count and locks on stack invariant: " INT64_FORMAT " JNI: " INT64_FORMAT, (int64_t)current->held_monitor_count(), (int64_t)current->jni_monitor_count());
-
   const bool pinned_monitor = NOT_LOOM_MONITOR_SUPPORT(current->held_monitor_count() > 0) LOOM_MONITOR_SUPPORT_ONLY(current->jni_monitor_count() > 0);
   if (entry->is_pinned() || pinned_monitor) {
     log_develop_debug(continuations)("PINNED due to critical section/hold monitor");
@@ -1852,7 +1849,6 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
 
   if (preempt) {
     freeze.set_last_frame();  // remember last frame
-    frame last_frame = freeze.last_frame();
 #ifdef AARCH64
     JvmtiSampledObjectAllocEventCollector jsoaec(false);
     freeze.set_jvmti_event_collector(&jsoaec);
