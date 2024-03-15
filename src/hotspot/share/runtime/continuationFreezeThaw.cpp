@@ -663,7 +663,7 @@ void FreezeBase::fix_monitors_in_fast_path() {
     DEBUG_ONLY(_monitors_to_fix -= _monitors_in_lockstack;)
   } else {
     assert(LockingMode == LM_LEGACY, "invariant");
-    _monitorenter_obj = _thread->is_on_monitorenter() ? ((ObjectMonitor*)(_thread->_Stalled))->object() : nullptr;
+    _monitorenter_obj = _thread->is_on_monitorenter() ? _thread->current_pending_monitor()->object() : nullptr;
 
     ResourceMark rm(_thread);
     RegisterMap map(JavaThread::current(),
@@ -1217,7 +1217,7 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
       _monitors_to_fix -= _monitors_in_lockstack;
       assert(_monitors_to_fix == 0, "invariant");
     }
-    _monitorenter_obj = _thread->is_on_monitorenter() ? ((ObjectMonitor*)(_thread->_Stalled))->object() : nullptr;
+    _monitorenter_obj = _thread->is_on_monitorenter() ? _thread->current_pending_monitor()->object() : nullptr;
   }
 
   // The topmost existing frame in the chunk; or an empty frame if the chunk is empty
@@ -1807,7 +1807,7 @@ static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& o
   cont.tail()->set_is_preempted(true);
 
   if (cont.thread()->is_on_monitorenter()) {
-    cont.tail()->set_objectMonitor((ObjectMonitor*)cont.thread()->_Stalled);
+    cont.tail()->set_objectMonitor(cont.thread()->current_pending_monitor());
   }
 
   return freeze_epilog(cont);
