@@ -236,9 +236,9 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
 }
 
 void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register t1,
-                                              Register t2, Register t3, Register t4) {
+                                              Register t2, Register t3) {
   assert(LockingMode == LM_LIGHTWEIGHT, "must be");
-  assert_different_registers(obj, t1, t2, t3, t4);
+  assert_different_registers(obj, t1, t2, t3);
 
   // Handle inflated monitor.
   Label inflated;
@@ -310,13 +310,13 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register t1,
     lea(t2_owner_addr, Address(t1_tagged_monitor, (in_bytes(ObjectMonitor::owner_offset()) - monitor_tag)));
 
     // CAS owner (null => current thread id).
-    ldr(t4, Address(rthread, JavaThread::lock_id_offset()));
-    cmpxchg(t2_owner_addr, zr, t4, Assembler::xword, /*acquire*/ true,
+    ldr(rscratch2, Address(rthread, JavaThread::lock_id_offset()));
+    cmpxchg(t2_owner_addr, zr, rscratch2, Assembler::xword, /*acquire*/ true,
             /*release*/ false, /*weak*/ false, t3_owner);
     br(Assembler::EQ, locked);
 
     // Check if recursive.
-    cmp(t3_owner, t4);
+    cmp(t3_owner, rscratch2);
     br(Assembler::NE, slow_path);
 
     // Recursive.
