@@ -164,7 +164,6 @@ class JavaThread: public Thread {
   int64_t _lock_id;
 
  public:
-  volatile intptr_t _Stalled;
   bool _on_monitorenter;
 
   bool is_on_monitorenter() { return _on_monitorenter; }

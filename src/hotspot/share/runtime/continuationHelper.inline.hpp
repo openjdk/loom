@@ -120,7 +120,7 @@ inline int ContinuationHelper::InterpretedFrame::monitors_to_fix(JavaThread* thr
   }
 
   int monitor_count = 0;
-  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
+  oop monitorenter_oop = thread->is_on_monitorenter() ? thread->current_pending_monitor()->object() : nullptr;
 
   for (BasicObjectLock* current = f.previous_monitor_in_interpreter_frame(first_mon);
        current >= last_mon; current = f.previous_monitor_in_interpreter_frame(current)) {
@@ -204,7 +204,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
   }
 
   int monitor_count = 0;
-  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
+  oop monitorenter_oop = thread->is_on_monitorenter() ? thread->current_pending_monitor()->object() : nullptr;
 
   for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
@@ -250,7 +250,7 @@ inline int ContinuationHelper::NativeFrame::monitors_to_fix(JavaThread* thread, 
   }
 
   oop synced_obj = f.get_native_receiver();
-  oop monitorenter_oop = thread->is_on_monitorenter() ? ((ObjectMonitor*)(thread->_Stalled))->object() : nullptr;
+  oop monitorenter_oop = thread->is_on_monitorenter() ? thread->current_pending_monitor()->object() : nullptr;
 
   bool is_first_frame = f.sp() == thread->last_Java_sp();
   if (!is_first_frame) {
