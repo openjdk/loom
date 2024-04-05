@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,7 +58,7 @@ inline bool ContinuationHelper::Frame::is_stub(CodeBlob* cb) {
 }
 
 inline Method* ContinuationHelper::Frame::frame_method(const frame& f) {
-  return f.is_interpreted_frame() ? f.interpreter_frame_method() : f.cb()->as_compiled_method()->method();
+  return f.is_interpreted_frame() ? f.interpreter_frame_method() : f.cb()->as_nmethod()->method();
 }
 
 inline address ContinuationHelper::Frame::return_pc(const frame& f) {
@@ -80,8 +80,8 @@ inline intptr_t* ContinuationHelper::Frame::frame_top(const frame &f) {
 inline bool ContinuationHelper::Frame::is_deopt_return(address pc, const frame& sender) {
   if (sender.is_interpreted_frame()) return false;
 
-  CompiledMethod* cm = sender.cb()->as_compiled_method();
-  return cm->is_deopt_pc(pc);
+  nmethod* nm = sender.cb()->as_nmethod();
+  return nm->is_deopt_pc(pc);
 }
 
 #endif
@@ -195,10 +195,10 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
   assert(!f.is_interpreted_frame(), "");
   assert(CompiledFrame::is_instance(f), "");
 
-  CompiledMethod* cm = f.cb()->as_compiled_method();
-  assert(!cm->is_compiled() || !cm->as_compiled_method()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
+  nmethod* nm = f.cb()->as_nmethod();
+  assert(!nm->is_nmethod() || !nm->as_nmethod()->is_native_method(), ""); // See compiledVFrame::compiledVFrame(...) in vframe_hp.cpp
 
-  if (!cm->has_monitors()) {
+  if (!nm->has_monitors()) {
     // No monitors in this frame
     return 0;
   }
@@ -206,7 +206,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
   int monitor_count = 0;
   oop monitorenter_oop = thread->is_on_monitorenter() ? thread->current_pending_monitor()->object() : nullptr;
 
-  for (ScopeDesc* scope = cm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
+  for (ScopeDesc* scope = nm->scope_desc_at(f.pc()); scope != nullptr; scope = scope->sender()) {
     GrowableArray<MonitorValue*>* mons = scope->monitors();
     if (mons == nullptr || mons->is_empty()) {
       continue;
@@ -244,7 +244,7 @@ int ContinuationHelper::CompiledFrame::monitors_to_fix(JavaThread* thread, Regis
 inline int ContinuationHelper::NativeFrame::monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table) {
   assert(NativeFrame::is_instance(f), "");
 
-  Method* method = f.cb()->as_compiled_method()->method();
+  Method* method = f.cb()->as_nmethod()->method();
   if (!method->is_synchronized()) {
     return 0;
   }

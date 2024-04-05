@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -32,8 +32,8 @@
 
 #include CPU_HEADER(continuationEntry)
 
-class CompiledMethod;
 class JavaThread;
+class nmethod;
 class OopMap;
 class RegisterMap;
 
@@ -58,12 +58,12 @@ public:
   static int _return_pc_offset; // friend gen_continuation_enter
   static int _thaw_call_pc_offset;
   static address _thaw_call_pc;
-  static void set_enter_code(CompiledMethod* cm, int interpreted_entry_offset);
+  static void set_enter_code(nmethod* nm, int interpreted_entry_offset);
   static bool is_interpreted_call(address call_address);
 
 private:
   static address _return_pc;
-  static CompiledMethod* _enter_special;
+  static nmethod* _enter_special;
   static int _interpreted_entry_offset;
 
 private:
