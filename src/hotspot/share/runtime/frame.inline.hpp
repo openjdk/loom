@@ -72,6 +72,16 @@ inline bool frame::is_compiled_frame() const {
   return false;
 }
 
+inline address frame::get_deopt_original_pc() const {
+  if (_cb == nullptr)  return nullptr;
+
+  nmethod* nm = _cb->as_nmethod_or_null();
+  if (nm != nullptr && nm->is_deopt_pc(_pc)) {
+    return nm->get_original_pc(this);
+  }
+  return nullptr;
+}
+
 #ifdef ASSERT
 static address get_register_address_in_stub(const frame& stub_fr, VMReg reg) {
   RegisterMap map(nullptr,
