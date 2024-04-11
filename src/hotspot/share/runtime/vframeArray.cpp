@@ -188,16 +188,65 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   address pc;
   bool use_next_mdp = false; // true if we should use the mdp associated with the next bci
                              // rather than the one associated with bcp
-  if (raw_bci() == SynchronizationEntryBCI) {
-    // We are deoptimizing while hanging in prologue code for synchronized method
-    bcp = method()->bcp_from(0); // first byte code
-    pc  = Interpreter::deopt_entry(vtos, 0); // step = 0 since we don't skip current bytecode
+  int bci = raw_bci();
+  if (bci < 0) {
+    if (bci == SynchronizationEntryBCI) {
+      // We are deoptimizing while hanging in prologue code for synchronized method
+      bcp = method()->bcp_from(0); // first byte code
+      pc  = Interpreter::deopt_entry(vtos, 0); // step = 0 since we don't skip current bytecode
+    } else if (bci == AfterBci) {
+      // XXX already did unlock, so need to return as if unsynchronized, or use caller context
+      assert(method()->is_synchronized(), "");
+      int locks = monitors() == nullptr ? 0 : monitors()->number_of_monitors();
+      assert(locks == 0, "");
+      assert(!thread->do_not_unlock_if_synchronized(), "recursive unlock?");
+      thread->set_do_not_unlock_if_synchronized(true);
+      // The fake bytecode arrays below mostly work, except they don't belong to the method,
+      // some we can hit asserts with TraceBytecodes enabled, for example.
+      switch (method()->result_type()) {
+        case T_BOOLEAN:
+        case T_CHAR:
+        case T_BYTE:
+        case T_SHORT:
+        case T_INT:
+          static u_char ireturn[] = {(u_char)Bytecodes::_ireturn, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = ireturn;
+          break;
+        case T_LONG:
+          static u_char lreturn[] = {(u_char)Bytecodes::_lreturn, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = lreturn;
+          break;
+        case T_FLOAT:
+          static u_char freturn[] = {(u_char)Bytecodes::_freturn, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = freturn;
+          break;
+        case T_DOUBLE:
+          static u_char dreturn[] = {(u_char)Bytecodes::_dreturn, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = dreturn;
+          break;
+        case T_OBJECT:
+          static u_char areturn[] = {(u_char)Bytecodes::_areturn, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = areturn;
+          break;
+        case T_VOID:
+          static u_char _return[] = {(u_char)Bytecodes::_return, (u_char)Bytecodes::_shouldnotreachhere};
+          bcp = _return;
+          break;
+        default:
+          ShouldNotReachHere();
+      }
+      pc  = Interpreter::deopt_entry(vtos, 0);
+    } else {
+      bcp = nullptr;
+      pc = nullptr;
+      assert(false, "unrecognized bci %d", bci);
+    }
   } else if (should_reexecute()) { //reexecute this bytecode
     assert(is_top_frame, "reexecute allowed only for the top frame");
-    bcp = method()->bcp_from(bci());
+    bcp = method()->bcp_from(bci);
     pc  = Interpreter::deopt_reexecute_entry(method(), bcp);
   } else {
-    bcp = method()->bcp_from(bci());
+    bcp = method()->bcp_from(bci);
     pc  = Interpreter::deopt_continue_after_entry(method(), bcp, callee_parameters, is_top_frame);
     use_next_mdp = true;
   }
@@ -301,7 +350,7 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
 
   _frame.patch_pc(thread, pc);
 
-  assert (!method()->is_synchronized() || locks > 0 || _removed_monitors || raw_bci() == SynchronizationEntryBCI, "synchronized methods must have monitors");
+  assert (!method()->is_synchronized() || locks > 0 || _removed_monitors || raw_bci() < 0, "synchronized methods must have monitors");
 
   BasicObjectLock* top = iframe()->interpreter_frame_monitor_begin();
   for (int index = 0; index < locks; index++) {
@@ -316,6 +365,10 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
   iframe()->interpreter_frame_set_bcp(bcp);
   if (ProfileInterpreter) {
     MethodData* mdo = method()->method_data();
+    if (raw_bci() < 0) {
+      mdo = nullptr;
+      iframe()->interpreter_frame_set_mdp(nullptr);
+    }
     if (mdo != nullptr) {
       int bci = iframe()->interpreter_frame_bci();
       if (use_next_mdp) ++bci;

@@ -682,8 +682,8 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
   }
 
   // Compute whether the root vframe returns a float or double value.
-  BasicType return_type;
-  {
+  BasicType return_type = T_ILLEGAL;
+  if (array->element(0)->bci() >= 0) {
     methodHandle method(current, array->element(0)->method());
     Bytecode_invoke invoke = Bytecode_invoke_check(method, array->element(0)->bci());
     return_type = invoke.is_valid() ? invoke.result_type() : T_ILLEGAL;
@@ -724,12 +724,10 @@ Deoptimization::UnrollBlock* Deoptimization::fetch_unroll_info_helper(JavaThread
 
   assert(CodeCache::find_blob(frame_pcs[0]) != nullptr, "bad pc");
 
-#if INCLUDE_JVMCI
   if (exceptionObject() != nullptr) {
     current->set_exception_oop(exceptionObject());
     exec_mode = Unpack_exception;
   }
-#endif
 
   if (current->frames_to_pop_failed_realloc() > 0 && exec_mode != Unpack_uncommon_trap) {
     assert(current->has_pending_exception(), "should have thrown OOME");

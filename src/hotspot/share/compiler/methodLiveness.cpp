@@ -360,7 +360,7 @@ MethodLiveness::BasicBlock *MethodLiveness::work_list_get() {
 MethodLivenessResult MethodLiveness::get_liveness_at(int entry_bci) {
   int bci = entry_bci;
   bool is_entry = false;
-  if (entry_bci == InvocationEntryBci) {
+  if (entry_bci < 0) {
     is_entry = true;
     bci = 0;
   }

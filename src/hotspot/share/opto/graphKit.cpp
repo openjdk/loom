@@ -852,9 +852,9 @@ bool GraphKit::dead_locals_are_killed() {
 
 // Helper function for enforcing certain bytecodes to reexecute if deoptimization happens.
 static bool should_reexecute_implied_by_bytecode(JVMState *jvms, bool is_anewarray) {
-  ciMethod* cur_method = jvms->method();
   int       cur_bci   = jvms->bci();
-  if (cur_method != nullptr && cur_bci != InvocationEntryBci) {
+  if (jvms->has_method() && cur_bci >= 0) {
+    ciMethod* cur_method = jvms->method();
     Bytecodes::Code code = cur_method->java_code_at_bci(cur_bci);
     return Interpreter::bytecode_should_reexecute(code) ||
            (is_anewarray && code == Bytecodes::_multianewarray);
@@ -3534,6 +3534,11 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
     return;
   }
 
+  if (UseNewCode) {
+    // Kill monitor from debug info
+    map()->pop_monitor( );
+  }
+
   // Memory barrier to avoid floating things down past the locked region
   insert_mem_bar(Op_MemBarReleaseLock);
 
@@ -3551,6 +3556,13 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
 
   unlock->init_req(TypeFunc::Parms + 0, obj);
   unlock->init_req(TypeFunc::Parms + 1, box);
+  if (UseNewCode) {
+    // Clear out dead values from the debug info.
+    kill_dead_locals();
+
+    add_safepoint_edges(unlock);
+  }
+
   unlock = _gvn.transform(unlock)->as_Unlock();
 
   Node* mem = reset_memory();
@@ -3558,8 +3570,10 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   // unlock has no side-effects, sets few values
   set_predefined_output_for_runtime_call(unlock, mem, TypeRawPtr::BOTTOM);
 
-  // Kill monitor from debug info
-  map()->pop_monitor( );
+  if (!UseNewCode) {
+    // Kill monitor from debug info
+    map()->pop_monitor( );
+  }
 }
 
 //-------------------------------get_layout_helper-----------------------------

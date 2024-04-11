@@ -206,6 +206,7 @@ private:
   uint              _sp;        // Java Expression Stack Pointer for this state
   int               _bci;       // Byte Code Index of this JVM point
   ReexecuteState    _reexecute; // Whether this bytecode need to be re-executed
+  bool              _rethrow;   // Need to rethrow exception on stack?
   ciMethod*         _method;    // Method Pointer
   SafePointNode*    _map;       // Map node associated with this scope
 public:
@@ -247,6 +248,7 @@ public:
   int                      bci() const { return _bci; }
   bool        should_reexecute() const { return _reexecute==Reexecute_True; }
   bool  is_reexecute_undefined() const { return _reexecute==Reexecute_Undefined; }
+  bool       rethrow_exception() const { return _rethrow; }
   bool              has_method() const { return _method != nullptr; }
   ciMethod*             method() const { assert(has_method(), ""); return _method; }
   JVMState*             caller() const { return _caller; }
@@ -294,6 +296,7 @@ public:
                     // _reexecute is initialized to "undefined" for a new bci
   void              set_bci(int bci) {if(_bci != bci)_reexecute=Reexecute_Undefined; _bci = bci; }
   void              set_should_reexecute(bool reexec) {_reexecute = reexec ? Reexecute_True : Reexecute_False;}
+  void              set_rethrow_exception() { _rethrow = true; }
 
   // Miscellaneous utility functions
   JVMState* clone_deep(Compile* C) const;    // recursively clones caller chain

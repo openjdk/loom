@@ -267,6 +267,7 @@ JVMState::JVMState(ciMethod* method, JVMState* caller) :
   assert(method != nullptr, "must be valid call site");
   _bci = InvocationEntryBci;
   _reexecute = Reexecute_Undefined;
+  _rethrow = false;
   debug_only(_bci = -99);  // random garbage value
   debug_only(_map = (SafePointNode*)-1);
   _caller = caller;
@@ -282,6 +283,7 @@ JVMState::JVMState(int stack_size) :
   _method(nullptr) {
   _bci = InvocationEntryBci;
   _reexecute = Reexecute_Undefined;
+  _rethrow = false;
   debug_only(_map = (SafePointNode*)-1);
   _caller = nullptr;
   _depth  = 1;
@@ -659,6 +661,9 @@ void JVMState::adapt_position(int delta) {
 // How much stack space would we need at this point in the program in
 // case of deoptimization?
 int JVMState::interpreter_frame_size() const {
+  if (!has_method()) {
+    return 0;
+  }
   const JVMState* jvms = this;
   int size = 0;
   int callee_parameters = 0;

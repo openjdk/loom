@@ -2041,9 +2041,7 @@ void PhaseMacroExpand::mark_eliminated_locking_nodes(AbstractLockNode *alock) {
        assert(alock->box_node()->as_BoxLock()->is_eliminated(), "sanity");
        return;
     } else if (!alock->is_non_esc_obj()) { // Not eliminated or coarsened
-      // Only Lock node has JVMState needed here.
-      // Not that preceding claim is documented anywhere else.
-      if (alock->jvms() != nullptr) {
+      if (alock->is_Lock()) {
         if (alock->as_Lock()->is_nested_lock_region()) {
           // Mark eliminated related nested locks and unlocks.
           Node* obj = alock->obj_node();
@@ -2268,8 +2266,10 @@ void PhaseMacroExpand::expand_unlock_node(UnlockNode *unlock) {
   Node *thread = transform_later(new ThreadLocalNode());
 
   CallNode *call = make_slow_call((CallNode *) unlock, OptoRuntime::complete_monitor_exit_Type(),
+                                  UseNewCode ?
+                                  CAST_FROM_FN_PTR(address, OptoRuntime::complete_monitor_unlocking_Java()) :
                                   CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_unlocking_C),
-                                  "complete_monitor_unlocking_C", slow_path, obj, box, thread);
+                                  UseNewCode ? nullptr : "complete_monitor_unlocking_C", slow_path, obj, box, thread);
 
   call->extract_projections(&_callprojs, false /*separate_io_proj*/, false /*do_asserts*/);
   assert(_callprojs.fallthrough_ioproj == nullptr && _callprojs.catchall_ioproj == nullptr &&

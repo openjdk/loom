@@ -2292,6 +2292,11 @@ JRT_LEAF(void, SharedRuntime::complete_monitor_unlocking_C(oopDesc* obj, BasicLo
   SharedRuntime::monitor_exit_helper(obj, lock, current);
 JRT_END
 
+JRT_ENTRY_NO_ASYNC(void, SharedRuntime::complete_monitor_unlocking_C_nonleaf(oopDesc* obj, BasicLock* lock, JavaThread* current))
+  assert(current == JavaThread::current(), "pre-condition");
+  SharedRuntime::monitor_exit_helper(obj, lock, current);
+JRT_END
+
 #ifndef PRODUCT
 
 void SharedRuntime::print_statistics() {
