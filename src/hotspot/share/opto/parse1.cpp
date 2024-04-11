@@ -822,6 +822,10 @@ void Parse::build_exits() {
 JVMState* Compile::build_start_state(StartNode* start, const TypeFunc* tf) {
   int        arg_size = tf->domain()->cnt();
   int        max_size = MAX2(arg_size, (int)tf->range()->cnt());
+  if (UseNewCode && method()->is_synchronized()) {
+    // Deoptimization trick in do_exits(): allow enough room for exception object
+    max_size = MAX2(max_size, TypeFunc::Parms + 1);
+  }
   JVMState*  jvms     = new (this) JVMState(max_size - TypeFunc::Parms);
   SafePointNode* map  = new SafePointNode(max_size, jvms);
   record_for_igvn(map);
