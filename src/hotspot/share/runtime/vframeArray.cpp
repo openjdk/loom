@@ -208,30 +208,36 @@ void vframeArrayElement::unpack_on_stack(int caller_actual_parameters,
         case T_CHAR:
         case T_BYTE:
         case T_SHORT:
-        case T_INT:
+        case T_INT: {
           static u_char ireturn[] = {(u_char)Bytecodes::_ireturn, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = ireturn;
           break;
-        case T_LONG:
+        }
+        case T_LONG: {
           static u_char lreturn[] = {(u_char)Bytecodes::_lreturn, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = lreturn;
           break;
-        case T_FLOAT:
+        }
+        case T_FLOAT: {
           static u_char freturn[] = {(u_char)Bytecodes::_freturn, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = freturn;
           break;
-        case T_DOUBLE:
+        }
+        case T_DOUBLE: {
           static u_char dreturn[] = {(u_char)Bytecodes::_dreturn, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = dreturn;
           break;
-        case T_OBJECT:
+        }
+        case T_OBJECT: {
           static u_char areturn[] = {(u_char)Bytecodes::_areturn, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = areturn;
           break;
-        case T_VOID:
+        }
+        case T_VOID: {
           static u_char _return[] = {(u_char)Bytecodes::_return, (u_char)Bytecodes::_shouldnotreachhere};
           bcp = _return;
           break;
+        }
         default:
           ShouldNotReachHere();
       }
