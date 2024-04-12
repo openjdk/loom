@@ -4332,7 +4332,6 @@ void Compile::verify_bidirectional_edges(Unique_Node_List &visited) {
       } else if (in == nullptr) {
         assert(i == 0 || i >= n->req() ||
                n->is_Region() || n->is_Phi() || n->is_ArrayCopy() ||
-               (n->is_Unlock() && i == (n->req() - 1)) ||
                (n->is_MemBar() && i == 5), // the precedence edge to a membar can be removed during macro node expansion
               "only region, phi, arraycopy, unlock or membar nodes have null data edges");
       } else {

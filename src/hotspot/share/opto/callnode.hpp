@@ -1221,6 +1221,21 @@ private:
   JVMState* const _dbg_jvms;      // Pointer to list of JVM State objects
 #endif
 public:
+  static const TypeFunc *lock_type() {
+    // create input type (domain)
+    const Type **fields = TypeTuple::fields(2);
+    fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL;  // Object to be Locked
+    fields[TypeFunc::Parms+1] = TypeRawPtr::BOTTOM;    // Address of stack location for lock
+    const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+2,fields);
+
+    // create result type (range)
+    fields = TypeTuple::fields(0);
+
+    const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0,fields);
+
+    return TypeFunc::make(domain,range);
+  }
+
   virtual int Opcode() const;
   virtual uint size_of() const; // Size is bigger
   UnlockNode(Compile* C, const TypeFunc *tf) : AbstractLockNode( tf )

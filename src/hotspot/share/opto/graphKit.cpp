@@ -3542,7 +3542,7 @@ void GraphKit::shared_unlock(Node* box, Node* obj) {
   // Memory barrier to avoid floating things down past the locked region
   insert_mem_bar(Op_MemBarReleaseLock);
 
-  const TypeFunc *tf = OptoRuntime::complete_monitor_exit_Type();
+  const TypeFunc *tf = UnlockNode::lock_type();
   UnlockNode *unlock = new UnlockNode(C, tf);
 #ifdef ASSERT
   unlock->set_dbg_jvms(sync_jvms());
