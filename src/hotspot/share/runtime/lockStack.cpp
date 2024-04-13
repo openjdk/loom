@@ -148,7 +148,7 @@ void LockStack::verify_consistent_lock_order(GrowableArray<oop>& lock_order, boo
       top_index--;
     } else {
       assert(!mark.is_fast_locked(), "must be inflated");
-      assert(mark.monitor()->owner_raw() == get_thread() ||
+      assert(mark.monitor()->is_owner(get_thread()) ||
              (!leaf_frame && get_thread()->current_waiting_monitor() == mark.monitor()),
              "must be owned by (or waited on by) thread");
       assert(!contains(obj), "must not be on lock_stack");
