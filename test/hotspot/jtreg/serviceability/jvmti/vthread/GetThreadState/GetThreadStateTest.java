@@ -25,24 +25,29 @@
  * @test id=default
  * @bug 8312498
  * @summary Basic test for JVMTI GetThreadState with virtual threads
+ * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm/native GetThreadStateTest
+ * @run junit/othervm/native --enable-native-access=ALL-UNNAMED GetThreadStateTest
  */
 
 /*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
+ * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run junit/othervm/native -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations GetThreadStateTest
+ * @run junit/othervm/native -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations --enable-native-access=ALL-UNNAMED GetThreadStateTest
  */
 
 import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
+import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GetThreadStateTest {
@@ -51,6 +56,11 @@ class GetThreadStateTest {
     static void setup() {
         System.loadLibrary("GetThreadStateTest");
         init();
+
+        // need >=2 carriers for testing pinning when main thread is a virtual thread
+        if (Thread.currentThread().isVirtual()) {
+            VThreadRunner.ensureParallelism(2);
+        }
     }
 
     /**
@@ -105,15 +115,22 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread waiting to enter a monitor.
+     * Test state of thread waiting to enter a monitor when pinned and not pinned.
      */
-    @Test
-    void testMonitorEnter() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testMonitorEnter(boolean pinned) throws Exception {
         var started = new AtomicBoolean();
         Object lock = new Object();
         var thread = Thread.ofVirtual().unstarted(() -> {
             started.set(true);
-            synchronized (lock) { }
+            if (pinned) {
+                VThreadPinner.runPinned(() -> {
+                    synchronized (lock) { }
+                });
+            } else {
+                synchronized (lock) { }
+            }
         });
         try {
             synchronized (lock) {
@@ -219,79 +236,26 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread parked with LockSupport.park.
+     * Test state of thread parked with LockSupport.park when pinned and not pinned.
      */
-    @Test
-    void testPark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testPark(boolean pinned) throws Exception {
         var started = new AtomicBoolean();
         var done = new AtomicBoolean();
         var thread = Thread.ofVirtual().start(() -> {
             started.set(true);
-            while (!done.get()) {
-                LockSupport.park();
-            }
-        });
-        try {
-            // wait for thread to start execution
-            awaitTrue(started);
-
-            // thread should park
-            int expected = JVMTI_THREAD_STATE_ALIVE |
-                    JVMTI_THREAD_STATE_WAITING |
-                    JVMTI_THREAD_STATE_WAITING_INDEFINITELY |
-                    JVMTI_THREAD_STATE_PARKED;
-            await(thread, expected);
-        } finally {
-            done.set(true);
-            LockSupport.unpark(thread);
-            thread.join();
-        }
-    }
-
-    /**
-     * Test state of thread parked with LockSupport.parkNanos.
-     */
-    @Test
-    void testParkNanos() throws Exception {
-        var started = new AtomicBoolean();
-        var done = new AtomicBoolean();
-        var thread = Thread.ofVirtual().start(() -> {
-            started.set(true);
-            while (!done.get()) {
-                LockSupport.parkNanos(Long.MAX_VALUE);
-            }
-        });
-        try {
-            // wait for thread to start execution
-            awaitTrue(started);
-
-            // thread should park
-            int expected = JVMTI_THREAD_STATE_ALIVE |
-                    JVMTI_THREAD_STATE_WAITING |
-                    JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT |
-                    JVMTI_THREAD_STATE_PARKED;
-            await(thread, expected);
-        } finally {
-            done.set(true);
-            LockSupport.unpark(thread);
-            thread.join();
-        }
-    }
-
-    /**
-     * Test state of thread parked with LockSupport.park while pinned.
-     */
-    @Test
-    void testParkWhenPinned() throws Exception {
-        var started = new AtomicBoolean();
-        var done = new AtomicBoolean();
-        var thread = Thread.ofVirtual().start(() -> {
-            VThreadPinner.runPinned(() -> {
-                started.set(true);
+            if (pinned) {
+                VThreadPinner.runPinned(() -> {
+                    while (!done.get()) {
+                        LockSupport.park();
+                    }
+                });
+            } else {
                 while (!done.get()) {
                     LockSupport.park();
                 }
-            });
+            }
         });
         try {
             // wait for thread to start execution
@@ -311,19 +275,26 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread parked with LockSupport.parkNanos while pinned.
+     * Test state of thread parked with LockSupport.parkNanos when pinned and not pinned.
      */
-    @Test
-    void testParkNanosWhenPinned() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testParkNanos(boolean pinned) throws Exception {
         var started = new AtomicBoolean();
         var done = new AtomicBoolean();
         var thread = Thread.ofVirtual().start(() -> {
-            VThreadPinner.runPinned(() -> {
-                started.set(true);
+            started.set(true);
+            if (pinned) {
+                VThreadPinner.runPinned(() -> {
+                    while (!done.get()) {
+                        LockSupport.parkNanos(Long.MAX_VALUE);
+                    }
+                });
+            } else {
                 while (!done.get()) {
                     LockSupport.parkNanos(Long.MAX_VALUE);
                 }
-            });
+            }
         });
         try {
             // wait for thread to start execution
