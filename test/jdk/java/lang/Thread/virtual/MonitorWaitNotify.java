@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,10 @@
  * @run junit MonitorWaitNotify
  */
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 
 import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Test;
@@ -152,6 +155,205 @@ class MonitorWaitNotify {
                 }
             }
         });
+    }
+
+    /**
+     * Testing invoking Object.wait with interrupt status set.
+     */
+    @Test
+    void testWaitWithInterruptSet() throws Exception {
+        VThreadRunner.run(() -> {
+            Object obj = new Object();
+            synchronized (obj) {
+                Thread.currentThread().interrupt();
+                assertThrows(InterruptedException.class, obj::wait);
+                assertFalse(Thread.currentThread().isInterrupted());
+            }
+        });
+    }
+
+    /**
+     * Test interrupting a virtual thread waiting in Object.wait.
+     */
+    @Test
+    void testInterruptWait() throws Exception {
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+        var interruptedException = new AtomicBoolean();
+        var vthread = Thread.ofVirtual().start(() -> {
+            started.countDown();
+            synchronized (lock) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    interruptedException.set(true);
+                }
+            }
+        });
+
+        // wait for thread to start and wait
+        started.await();
+        await(vthread, Thread.State.WAITING);
+
+        // interrupt thread, it should throw InterruptedException and terminate
+        vthread.interrupt();
+        vthread.join();
+        assertTrue(interruptedException.get());
+    }
+
+    /**
+     * Test interrupting a virtual thread blocked waiting to reenter after waiting.
+     */
+    @Test
+    void testInterruptReenter() throws Exception {
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+        var interruptedException = new AtomicBoolean();
+        var vthread = Thread.ofVirtual().start(() -> {
+            started.countDown();
+            synchronized (lock) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    interruptedException.set(true);
+                }
+            }
+        });
+
+        // wait for thread to start and wait
+        started.await();
+        await(vthread, Thread.State.WAITING);
+
+        // notify, thread should block waiting to reenter
+        synchronized (lock) {
+            lock.notifyAll();
+            await(vthread, Thread.State.BLOCKED);
+            vthread.interrupt();
+        }
+
+        vthread.join();
+        assertFalse(interruptedException.get());
+        assertTrue(vthread.isInterrupted());
+    }
+
+    /**
+     * Test that Object.wait does not consume the thread's parking permit.
+     */
+    @Test
+    void testParkingPermitNotConsumed() throws Exception {
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+        var completed = new AtomicBoolean();
+        var vthread = Thread.ofVirtual().start(() -> {
+            started.countDown();
+            LockSupport.unpark(Thread.currentThread());
+            synchronized (lock) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    fail("wait interrupted");
+                }
+            }
+            LockSupport.park();      // should not park
+            completed.set(true);
+        });
+
+        // wait for thread to start and wait
+        started.await();
+        await(vthread, Thread.State.WAITING);
+
+        // wakeup thread
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+
+        // thread should terminate
+        vthread.join();
+        assertTrue(completed.get());
+    }
+
+    /**
+     * Test that Object.wait does not make available the thread's parking permit.
+     */
+    @Test
+    void testParkingPermitNotOffered() throws Exception {
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+        var readyToPark = new CountDownLatch(1);
+        var completed = new AtomicBoolean();
+        var vthread = Thread.ofVirtual().start(() -> {
+            started.countDown();
+            synchronized (lock) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    fail("wait interrupted");
+                }
+            }
+            readyToPark.countDown();
+            LockSupport.park();      // should park
+            completed.set(true);
+        });
+
+        // wait for thread to start and wait
+        started.await();
+        await(vthread, Thread.State.WAITING);
+
+        // wakeup thread
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+
+        // thread should park
+        readyToPark.await();
+        await(vthread, Thread.State.WAITING);
+
+        LockSupport.unpark(vthread);
+
+        // thread should terminate
+        vthread.join();
+        assertTrue(completed.get());
+    }
+
+    /**
+     * Test that wait(long) throws IAE when timeout is negative.
+     */
+    @Test
+    void testIllegalArgumentException() throws Exception {
+        VThreadRunner.run(() -> {
+            Object obj = new Object();
+            synchronized (obj) {
+                assertThrows(IllegalArgumentException.class, () -> obj.wait(-1L));
+                assertThrows(IllegalArgumentException.class, () -> obj.wait(-1000L));
+                assertThrows(IllegalArgumentException.class, () -> obj.wait(Long.MIN_VALUE));
+            }
+        });
+    }
+
+    /**
+     * Test that wait throws IMSE when not owner.
+     */
+    @Test
+    void testIllegalMonitorStateException() throws Exception {
+        VThreadRunner.run(() -> {
+            Object obj = new Object();
+            assertThrows(IllegalMonitorStateException.class, () -> obj.wait());
+            assertThrows(IllegalMonitorStateException.class, () -> obj.wait(0));
+            assertThrows(IllegalMonitorStateException.class, () -> obj.wait(1000));
+            assertThrows(IllegalMonitorStateException.class, () -> obj.wait(Long.MAX_VALUE));
+        });
+    }
+
+    /**
+     * Waits for the given thread to reach a given state.
+     */
+    private void await(Thread thread, Thread.State expectedState) throws InterruptedException {
+        Thread.State state = thread.getState();
+        while (state != expectedState) {
+            assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
+            Thread.sleep(10);
+            state = thread.getState();
+        }
     }
 
     /**
