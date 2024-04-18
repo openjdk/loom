@@ -128,7 +128,7 @@ public class ScopedValues {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int CreateBindThenGetThenRemove_ScopedValue() throws Exception {
-        return ScopedValue.where(sl1, THE_ANSWER).call(sl1::get);
+        return ScopedValue.callWhere(sl1, THE_ANSWER, sl1::get);
     }
 
 
@@ -137,7 +137,7 @@ public class ScopedValues {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int bindThenGetThenRemove_ScopedValue() throws Exception {
-        return HOLD_42.call(sl1::get);
+        return ScopedValue.callWhere(HOLD_42, sl1::get);
     }
 
     @Benchmark
@@ -164,7 +164,7 @@ public class ScopedValues {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bind_ScopedValue() throws Exception {
-        return HOLD_42.call(aCallable);
+        return ScopedValue.callWhere(HOLD_42, aCallable);
     }
     private static final Callable<Class<?>> aCallable = () -> ScopedValues.class;
 
@@ -173,7 +173,7 @@ public class ScopedValues {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public Object bindViaGet_ScopedValue() {
-        return HOLD_42.get(aSupplier);
+        return ScopedValue.getWhere(HOLD_42, aSupplier);
     }
     private static final Supplier<Class<?>> aSupplier = () -> ScopedValues.class;
 

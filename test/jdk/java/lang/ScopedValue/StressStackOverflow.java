@@ -96,16 +96,16 @@ public class StressStackOverflow {
                 var nextRandomFloat = ThreadLocalRandom.current().nextFloat();
                 try {
                     switch (behaviour) {
-                        case CALL -> ScopedValue.where(el, el.get() + 1).call(() -> fibonacci_pad(20, this));
-                        case GET -> ScopedValue.where(el, el.get() + 1).get(() -> fibonacci_pad(20, this));
-                        case RUN -> ScopedValue.where(el, el.get() + 1).run(() -> fibonacci_pad(20, this));
+                        case CALL -> ScopedValue.callWhere(el, el.get() + 1, () -> fibonacci_pad(20, this));
+                        case GET -> ScopedValue.getWhere(el, el.get() + 1, () -> fibonacci_pad(20, this));
+                        case RUN -> ScopedValue.runWhere(el, el.get() + 1, () -> fibonacci_pad(20, this));
                     }
                     if (!last.equals(el.get())) {
                         throw testFailureException;
                     }
                 } catch (StackOverflowError e) {
                     if (nextRandomFloat <= 0.1) {
-                        ScopedValue.where(el, el.get() + 1).run(this);
+                        ScopedValue.runWhere(el, el.get() + 1, this);
                     }
                 } catch (TestFailureException e) {
                     throw e;
@@ -186,7 +186,8 @@ public class StressStackOverflow {
 
     public void run() {
         try {
-            ScopedValue.where(inheritedValue, 42).where(el, 0).run(() -> {
+            var carrier = ScopedValue.where(inheritedValue, 42).where(el, 0);
+            ScopedValue.runWhere(carrier, () -> {
                 try (var scope = new StructuredTaskScope<>()) {
                     try {
                         if (ThreadLocalRandom.current().nextBoolean()) {
