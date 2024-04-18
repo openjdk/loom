@@ -831,6 +831,10 @@ void Parse::build_exits() {
 JVMState* Compile::build_start_state(StartNode* start, const TypeFunc* tf) {
   int        arg_size = tf->domain()->cnt();
   int        max_size = MAX2(arg_size, (int)tf->range()->cnt());
+  if (UseNewCode && method()->is_synchronized()) {
+    // Deoptimization trick in do_exits(): allow enough room for exception object
+    max_size = MAX2(max_size, TypeFunc::Parms + 1);
+  }
   JVMState*  jvms     = new (this) JVMState(max_size - TypeFunc::Parms);
   SafePointNode* map  = new SafePointNode(max_size, jvms);
   record_for_igvn(map);
@@ -1101,13 +1105,29 @@ void Parse::do_exits() {
       JVMState* caller = kit.jvms();
       JVMState* ex_jvms = caller->clone_shallow(C);
       ex_jvms->bind_map(kit.clone_map());
-      ex_jvms->set_bci(   InvocationEntryBci);
+      if (UseNewCode && do_synch) {
+        if (depth() > 1) {
+          assert(ex_jvms->bci() == _caller->bci(), "");
+          ex_jvms->set_rethrow_exception();
+        } else {
+          // !has_method(), no deoptimization allowed
+          ex_jvms->set_bci(AfterExceptionBci);
+        }
+      } else {
+        ex_jvms->set_bci(   InvocationEntryBci);
+      }
       kit.set_jvms(ex_jvms);
       if (do_synch) {
+        if (UseNewCode) {
+          kit.push(ex_oop);
+        }
         // Add on the synchronized-method box/object combo
         kit.map()->push_monitor(_synch_lock);
         // Unlock!
         kit.shared_unlock(_synch_lock->box_node(), _synch_lock->obj_node());
+        if (UseNewCode) {
+          kit.pop();
+        }
       }
       if (C->env()->dtrace_method_probes()) {
         kit.make_dtrace_method_exit(method());
@@ -2247,7 +2267,14 @@ void Parse::return_current(Node* value) {
   // Do not set_parse_bci, so that return goo is credited to the return insn.
   set_bci(InvocationEntryBci);
   if (method()->is_synchronized() && GenerateSynchronizationCode) {
+    if (UseNewCode && value != nullptr) {
+      push(value);
+    }
+    set_bci(AfterBci);
     shared_unlock(_synch_lock->box_node(), _synch_lock->obj_node());
+    if (UseNewCode && value != nullptr) {
+      pop();
+    }
   }
   if (C->env()->dtrace_method_probes()) {
     make_dtrace_method_exit(method());

@@ -48,7 +48,8 @@ enum MethodCompilation {
   UnwindBci            = -3,
   AfterExceptionBci    = -4,
   UnknownBci           = -5,
-  InvalidFrameStateBci = -6
+  InvalidFrameStateBci = -6,
+  MinBci               = InvalidFrameStateBci,      // minimum value allowed by debugInfo
 };
 
 // Enumeration to distinguish tiers of compilation

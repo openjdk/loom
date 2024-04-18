@@ -327,9 +327,7 @@ bool frame::should_be_deoptimized() const {
   if( !nm->is_marked_for_deoptimization() )
     return false;
 
-  // If at the return point, then the frame has already been popped, and
-  // only the return needs to be executed. Don't deoptimize here.
-  return !nm->is_at_poll_return(pc());
+  return can_be_deoptimized();
 }
 
 bool frame::can_be_deoptimized() const {
@@ -339,7 +337,22 @@ bool frame::can_be_deoptimized() const {
   if(!nm->can_be_deoptimized())
     return false;
 
-  return !nm->is_at_poll_return(pc());
+  // If at the return point, then the frame has already been popped, and
+  // only the return needs to be executed. Don't deoptimize here.
+  if (nm->is_at_poll_return(pc())) {
+    return false;
+  }
+
+  ResourceMark rm;
+  ScopeDesc* sd = nm->scope_desc_at(pc());
+  if (sd->bci() == AfterExceptionBci) {
+    return false;
+  }
+  if (sd->is_top() && sd->bci() == AfterBci) {
+    return false;
+  }
+
+  return true;
 }
 
 void frame::deoptimize(JavaThread* thread) {
@@ -892,6 +905,18 @@ void frame::oops_interpreted_do(OopClosure* f, const RegisterMap* map, bool quer
   assert(is_interpreted_frame(), "Not an interpreted frame");
   Thread *thread = Thread::current();
   methodHandle m (thread, interpreter_frame_method());
+
+  if (UseNewCode && !m->is_native() && m->result_type() == T_OBJECT) {
+    address bcp = interpreter_frame_bcp();
+    // Check for pseudo-bci or shared bytecodes array
+    if (!m->contains(bcp)) {
+      assert(interpreter_frame_expression_stack_size() == 1, "");
+      assert(interpreter_frame_tos_address() == interpreter_frame_expression_stack_at(0), "");
+      f->do_oop((oop*)interpreter_frame_expression_stack_at(0));
+      return;
+    }
+  }
+
   jint      bci = interpreter_frame_bci();
 
   assert(!Universe::heap()->is_in(m()),
