@@ -349,6 +349,9 @@ class SharedRuntime: AllStatic {
 
   static void monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current);
 
+  // Issue UL warning for unlocked JNI monitor on virtual thread termination
+  static void log_jni_monitor_still_held();
+
  private:
   static Handle find_callee_info(Bytecodes::Code& bc, CallInfo& callinfo, TRAPS);
   static Handle find_callee_info_helper(vframeStream& vfst, Bytecodes::Code& bc, CallInfo& callinfo, TRAPS);
@@ -501,6 +504,7 @@ class SharedRuntime: AllStatic {
   static void redo_monitorenter(JavaThread* current, ObjectMonitor* monitor);
 
   // Resolving of calls
+  static address get_resolved_entry        (JavaThread* current, methodHandle callee_method);
   static address resolve_static_call_C     (JavaThread* current);
   static address resolve_virtual_call_C    (JavaThread* current);
   static address resolve_opt_virtual_call_C(JavaThread* current);

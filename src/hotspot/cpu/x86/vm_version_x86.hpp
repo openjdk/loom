@@ -790,6 +790,11 @@ public:
 
   static bool supports_cont_preemption() { return true; }
 
+  // x86_64 supports secondary supers table
+  constexpr static bool supports_secondary_supers_table() {
+    return LP64_ONLY(true) NOT_LP64(false); // not implemented on x86_32
+  }
+
   constexpr static bool supports_stack_watermark_barrier() {
     return true;
   }
