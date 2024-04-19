@@ -219,12 +219,16 @@ public class JNIMonitor {
         }
 
         static void runTest(int nThreads, boolean skipUnlock, boolean throwOnExit) throws Throwable {
-            final Object monitor = new Object();
+            final Object[] monitors = new Object[nThreads];
+            for (int i = 0; i < nThreads; i++) {
+                monitors[i] = new Object();
+            }
             final AtomicReference<Throwable> exception = new AtomicReference();
             // Ensure all our VT's operate of the same carrier, sequentially.
             ExecutorService scheduler = Executors.newSingleThreadExecutor();
             ThreadFactory factory = virtualThreadBuilder(scheduler).factory();
             for (int i = 0 ; i < nThreads; i++) {
+                Object monitor = skipUnlock ? monitors[i] : monitors[0];
                 Thread th = factory.newThread(() -> {
                         try {
                             int res = monitorEnter(monitor);
