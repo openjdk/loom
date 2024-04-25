@@ -388,7 +388,7 @@ public class Object {
         }
     }
 
-    // final modifier as method not in vtable
+    // final modifier so method not in vtable
     private final native void wait0(long timeoutMillis) throws InterruptedException;
 
     /**
