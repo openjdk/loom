@@ -212,7 +212,7 @@ final class VirtualThread extends BaseVirtualThread {
         @Override
         protected void onPinned(Continuation.Pinned reason) {
             // emit JFR event
-            virtualThreadPinnedEvent(reason.value());
+            virtualThreadPinnedEvent(reason.reasonCode(), reason.reasonString());
         }
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
             return new Runnable() {
@@ -741,10 +741,10 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM to
-     * emit event to avoid having a JFR in Java with the same name (but different ID)
+     * emit event to avoid having a JFR event in Java with the same name (but different ID)
      * to events emitted by the VM.
      */
-    private static native void virtualThreadPinnedEvent(int reason);
+    private static native void virtualThreadPinnedEvent(int reason, String reasonString);
 
     /**
      * Schedule this virtual thread to be unparked after a given delay.

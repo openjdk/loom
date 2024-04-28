@@ -116,6 +116,15 @@ OopStorage* ObjectMonitor::_oop_storage = nullptr;
 OopHandle ObjectMonitor::_vthread_cxq_head;
 ParkEvent* ObjectMonitor::_vthread_unparker_ParkEvent = nullptr;
 
+static void post_virtual_thread_pinned_event(JavaThread* current, const char* reason) {
+  EventVirtualThreadPinned e;
+  if (e.should_commit()) {
+    e.set_pinnedReason(reason);
+    e.set_carrierThread(JFR_JVM_THREAD_ID(current));
+    e.commit();
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Theory of operations -- Monitors lists, thread residency, etc:
 //
@@ -455,11 +464,8 @@ bool ObjectMonitor::enter(JavaThread* current) {
                (!acquired && !current->preemption_cancelled() && state == java_lang_VirtualThread::BLOCKING), "invariant");
         return true;
       }
-      if (result == freeze_pinned_native || result == freeze_pinned_cs) {
-        EventVirtualThreadPinned e;
-        if (e.should_commit()) {
-          e.commit();
-        }
+      if (result == freeze_pinned_native) {
+        post_virtual_thread_pinned_event(current, "Native frame or <clinit> on stack");
       }
     }
 #endif
@@ -1651,14 +1657,6 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
   CHECK_OWNER();  // Throws IMSE if not owner.
 
-  ContinuationEntry* ce = current->last_continuation();
-  if (ce != nullptr && ce->is_virtual_thread()) {
-    EventVirtualThreadPinned e;
-    if (e.should_commit()) {
-      e.commit();
-    }
-  }
-
   EventJavaMonitorWait event;
 
   // check for a pending interrupt
@@ -1682,6 +1680,17 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     }
     THROW(vmSymbols::java_lang_InterruptedException());
     return;
+  }
+
+  ContinuationEntry* ce = current->last_continuation();
+  if (ce != nullptr && ce->is_virtual_thread()) {
+    const Klass* monitor_klass = object()->klass();
+    if (!is_excluded(monitor_klass)) {
+      ResourceMark rm;
+      char reason[256];
+      jio_snprintf(reason, sizeof reason, "Object.wait on object of klass %s", monitor_klass->external_name());
+      post_virtual_thread_pinned_event(current, reason);
+    }
   }
 
   current->set_current_waiting_monitor(this);

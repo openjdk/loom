@@ -48,7 +48,8 @@ Java_java_lang_VirtualThread_registerNatives(JNIEnv *env, jclass clazz) {
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_VirtualThread_virtualThreadPinnedEvent(JNIEnv *env, jclass ignored, jint reason)
+Java_java_lang_VirtualThread_virtualThreadPinnedEvent(JNIEnv *env, jclass ignored,
+                                                      jint reasonCode, jstring reasonString)
 {
-    JVM_VirtualThreadPinnedEvent(reason);
+    JVM_VirtualThreadPinnedEvent(reasonCode, reasonString);
 }

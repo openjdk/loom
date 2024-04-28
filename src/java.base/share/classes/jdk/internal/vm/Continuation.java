@@ -56,16 +56,21 @@ public class Continuation {
 
     /** Reason for pinning */
     public enum Pinned {
-        /** Native frame on stack */ NATIVE(2),
-        /** Monitor held */          MONITOR(3),
-        /** In critical section */   CRITICAL_SECTION(4);
+        NATIVE(2, "Native frame or <clinit> on stack"),
+        MONITOR(3, "Monitor held"),
+        CRITICAL_SECTION(4, "In critical section");
 
-        private final int value;
-        Pinned(int value) {
-            this.value = value;
+        private final int reasonCode;
+        private final String reasonString;
+        Pinned(int reasonCode, String reasonString) {
+            this.reasonCode = reasonCode;
+            this.reasonString = reasonString;
         }
-        public int value() {
-            return value;
+        public int reasonCode() {
+            return reasonCode;
+        }
+        public String reasonString() {
+            return reasonString;
         }
     }
 

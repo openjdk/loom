@@ -40,9 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,11 +50,9 @@ import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
 import jdk.test.lib.thread.VThreadPinner;
-import jdk.test.lib.thread.VThreadRunner.ThrowingRunnable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JfrEvents {
@@ -93,158 +89,259 @@ class JfrEvents {
     }
 
     /**
-     * Arguments for testVirtualThreadPinned to test jdk.VirtualThreadPinned event.
-     *   [0] label/description
-     *   [1] the operation to park/wait
-     *   [2] the Thread.State when parked/waiting
-     *   [3] the action to unpark/notify the thread
-     */
-    static Stream<Arguments> pinnedCases() {
-        Object lock = new Object();
-
-        // park with native frame on stack
-        var finish1 = new AtomicBoolean();
-        var parkWhenPinned = Arguments.of(
-            "LockSupport.park when pinned",
-            (ThrowingRunnable<Exception>) () -> {
-                VThreadPinner.runPinned(() -> {
-                    while (!finish1.get()) {
-                        LockSupport.park();
-                    }
-                });
-            },
-            Thread.State.WAITING,
-                (Consumer<Thread>) t -> {
-                    finish1.set(true);
-                    LockSupport.unpark(t);
-                }
-        );
-
-        // timed park with native frame on stack
-        var finish2 = new AtomicBoolean();
-        var timedParkWhenPinned = Arguments.of(
-            "LockSupport.parkNanos when pinned",
-            (ThrowingRunnable<Exception>) () -> {
-                VThreadPinner.runPinned(() -> {
-                    while (!finish2.get()) {
-                        LockSupport.parkNanos(Long.MAX_VALUE);
-                    }
-                });
-            },
-            Thread.State.TIMED_WAITING,
-            (Consumer<Thread>) t -> {
-                finish2.set(true);
-                LockSupport.unpark(t);
-            }
-        );
-
-        // block on monitorenter with native frame on stack
-        var blockWhenPinned = Arguments.of(
-            "Contended monitorenter when pinned",
-            (ThrowingRunnable<Exception>) () -> {
-                var readyToEnter = new AtomicBoolean();
-                var thread = Thread.ofVirtual().unstarted(() -> {
-                    VThreadPinner.runPinned(() -> {
-                        readyToEnter.set(true);
-                        synchronized (lock) { }
-                    });
-                });
-                try {
-                    synchronized (lock) {
-                        thread.start();
-                        while (!readyToEnter.get()) {
-                            Thread.sleep(10);
-                        }
-                        await(thread, Thread.State.BLOCKED);
-                    }
-                } finally {
-                    thread.join();
-                }
-            },
-            Thread.State.TERMINATED,
-            (Consumer<Thread>) t -> { }
-        );
-
-        // untimed Object.wait
-        var waitWhenPinned = Arguments.of(
-            "Object.wait",
-            (ThrowingRunnable<Exception>) () -> {
-                synchronized (lock) {
-                    lock.wait();
-                }
-            },
-            Thread.State.WAITING,
-            (Consumer<Thread>) t -> {
-                synchronized (lock) {
-                    lock.notifyAll();
-                }
-            }
-        );
-
-        // timed Object.wait
-        var timedWaitWhenPinned = Arguments.of(
-            "Object.wait(millis)",
-            (ThrowingRunnable<Exception>) () -> {
-                synchronized (lock) {
-                    lock.wait(Long.MAX_VALUE);
-                }
-            },
-            Thread.State.TIMED_WAITING,
-            (Consumer<Thread>) t -> {
-                synchronized (lock) {
-                    lock.notifyAll();
-                }
-            }
-        );
-
-        return Stream.of(parkWhenPinned,
-                timedParkWhenPinned,
-                blockWhenPinned,
-                waitWhenPinned,
-                timedWaitWhenPinned);
-    }
-
-    /**
-     * Test jdk.VirtualThreadPinned event.
+     * Test jdk.VirtualThreadPinned event when parking while pinned.
      */
     @ParameterizedTest
-    @MethodSource("pinnedCases")
-    void testVirtualThreadPinned(String label,
-                                 ThrowingRunnable<Exception> parker,
-                                 Thread.State expectedState,
-                                 Consumer<Thread> unparker) throws Exception {
-
+    @ValueSource(booleans = { true, false })
+    void testParkWhenPinned(boolean timed) throws Exception {
         try (Recording recording = new Recording()) {
             recording.enable("jdk.VirtualThreadPinned");
-
             recording.start();
-            try {
-                var exception = new AtomicReference<Throwable>();
-                var thread = Thread.ofVirtual().start(() -> {
-                    try {
-                        parker.run();
-                    } catch (Throwable e) {
-                        exception.set(e);
+
+            var started = new AtomicBoolean();
+            var done = new AtomicBoolean();
+            var vthread = Thread.startVirtualThread(() -> {
+                VThreadPinner.runPinned(() -> {
+                    started.set(true);
+                    while (!done.get()) {
+                        if (timed) {
+                            LockSupport.parkNanos(Long.MAX_VALUE);
+                        } else {
+                            LockSupport.park();
+                        }
                     }
                 });
-                try {
-                    // wait for thread to park/wait
-                    await(thread, expectedState);
-                } finally {
-                    unparker.accept(thread);
-                    thread.join();
-                    assertNull(exception.get());
-                }
+            });
+
+            try {
+                // wait for thread to start and park
+                awaitTrue(started);
+                await(vthread, timed ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
             } finally {
+                done.set(true);
+                LockSupport.unpark(vthread);
+                vthread.join();
                 recording.stop();
             }
 
-            Map<String, Integer> events = sumEvents(recording);
-            System.err.println(events);
+            assertContainsPinnedEvent(recording, vthread);
+        }
+    }
 
-            // should have at least one pinned event
-            int pinnedCount = events.getOrDefault("jdk.VirtualThreadPinned", 0);
-            assertTrue(pinnedCount >= 1, "Expected one or more events");
+    /**
+     * Test jdk.VirtualThreadPinned event when blocking on monitor while pinned.
+     */
+    @Test
+    void testBlockWhenPinned() throws Exception {
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.VirtualThreadPinned");
+            recording.start();
+
+            Object lock = new Object();
+
+            var started = new AtomicBoolean();
+            var vthread = Thread.ofVirtual().unstarted(() -> {
+                VThreadPinner.runPinned(() -> {
+                    started.set(true);
+                    synchronized (lock) { }
+                });
+            });
+
+            try {
+                synchronized (lock) {
+                    vthread.start();
+                    // wait for thread to start and block
+                    awaitTrue(started);
+                    await(vthread, Thread.State.BLOCKED);
+                }
+            } finally {
+                vthread.join();
+                recording.stop();
+            }
+
+            assertContainsPinnedEvent(recording, vthread);
+        }
+    }
+
+    /**
+     * Test jdk.VirtualThreadPinned event when waiting with Object.wait.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testObjectWait(boolean timed) throws Exception {
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.VirtualThreadPinned");
+            recording.start();
+
+            Object lock = new Object();
+
+            var started = new AtomicBoolean();
+            var vthread = Thread.startVirtualThread(() -> {
+                VThreadPinner.runPinned(() -> {
+                    started.set(true);
+                    synchronized (lock) {
+                        try {
+                            if (timed) {
+                                lock.wait(Long.MAX_VALUE);
+                            } else {
+                                lock.wait();
+                            }
+                        } catch (InterruptedException e) {
+                            fail();
+                        }
+                    }
+                });
+            });
+
+            try {
+                // wait for thread to start and wait
+                awaitTrue(started);
+                await(vthread, timed ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
+            } finally {
+                synchronized (lock) {
+                    lock.notifyAll();
+                }
+                vthread.join();
+                recording.stop();
+            }
+
+            assertContainsPinnedEvent(recording, vthread);
+        }
+    }
+
+    /**
+     * Test jdk.VirtualThreadPinned event when parking in a class initializer.
+     */
+    @Test
+    void testParkInClassInitializer() throws Exception {
+        class TestClass {
+            static {
+                LockSupport.park();
+            }
+            static void m() {
+                // do nothing
+            }
+        }
+
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.VirtualThreadPinned");
+            recording.start();
+
+            var started = new AtomicBoolean();
+            Thread vthread = Thread.startVirtualThread(() -> {
+                started.set(true);
+                TestClass.m();
+            });
+
+            try {
+                // wait for it to start and park
+                awaitTrue(started);
+                await(vthread, Thread.State.WAITING);
+            } finally {
+                LockSupport.unpark(vthread);
+                vthread.join();
+                recording.stop();
+            }
+
+            assertContainsPinnedEvent(recording, vthread);
+        }
+    }
+
+    /**
+     * Test jdk.VirtualThreadPinned event when blocking on monitor in a class initializer.
+     */
+    @Test
+    void testBlockInClassInitializer() throws Exception {
+        class LockHolder {
+            static final Object lock = new Object();
+        }
+        class TestClass {
+            static {
+                synchronized (LockHolder.lock) { }
+            }
+            static void m() {
+                // no nothing
+            }
+        }
+
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.VirtualThreadPinned");
+            recording.start();
+
+            var started = new AtomicBoolean();
+            Thread vthread = Thread.ofVirtual().unstarted(() -> {
+                started.set(true);
+                TestClass.m();
+            });
+
+            try {
+                synchronized (LockHolder.lock) {
+                    vthread.start();
+                    // wait for thread to start and block
+                    awaitTrue(started);
+                    await(vthread, Thread.State.BLOCKED);
+                }
+            } finally {
+                vthread.join();
+                recording.stop();
+            }
+
+            assertContainsPinnedEvent(recording, vthread);
+        }
+    }
+
+    /**
+     * Test jdk.VirtualThreadPinned event when waiting for a class initializer.
+     */
+    @Test
+    void testWaitingForClassInitializer() throws Exception {
+        class TestClass {
+            static {
+                LockSupport.park();
+            }
+            static void m() {
+                // do nothing
+            }
+        }
+
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.VirtualThreadPinned");
+            recording.start();
+
+            var started1 = new AtomicBoolean();
+            var started2 = new AtomicBoolean();
+
+            Thread vthread1 =  Thread.ofVirtual().unstarted(() -> {
+                started1.set(true);
+                TestClass.m();
+            });
+            Thread vthread2 = Thread.ofVirtual().unstarted(() -> {
+                started2.set(true);
+                TestClass.m();
+            });
+
+            try {
+                // start first virtual thread and wait for it to start + park
+                vthread1.start();
+                awaitTrue(started1);
+                await(vthread1, Thread.State.WAITING);
+
+                // start second virtual thread and wait for it to start
+                vthread2.start();
+                awaitTrue(started2);
+
+                // give time for second virtual thread to wait on the MutexLocker
+                Thread.sleep(3000);
+
+            } finally {
+                LockSupport.unpark(vthread1);
+                vthread1.join();
+                vthread2.join();
+                recording.stop();
+            }
+
+            // the recording should have a pinned event for vthread2
+            assertContainsPinnedEvent(recording, vthread2);
         }
     }
 
@@ -288,12 +385,21 @@ class JfrEvents {
                 recording.stop();
             }
 
-            Map<String, Integer> events = sumEvents(recording);
-            System.err.println(events);
-
-            int count = events.getOrDefault("jdk.VirtualThreadSubmitFailed", 0);
-            assertEquals(2, count);
+            List<RecordedEvent> submitFailedEvents = find(recording, "jdk.VirtualThreadSubmitFailed");
+            System.err.println(submitFailedEvents);
+            assertTrue(submitFailedEvents.size() == 2, "Expected two events");
         }
+    }
+
+    /**
+     * Returns the list of events in the given recording with the given name.
+     */
+    private static List<RecordedEvent> find(Recording recording, String name) throws IOException {
+        Path recordingFile = recordingFile(recording);
+        return RecordingFile.readAllEvents(recordingFile)
+                .stream()
+                .filter(e -> e.getEventType().getName().equals(name))
+                .toList();
     }
 
     /**
@@ -319,6 +425,29 @@ class JfrEvents {
             recording.dump(recordingFile);
         }
         return recordingFile;
+    }
+
+    /**
+     * Assert that a recording contains a jdk.VirtualThreadPinned event on the given thread.
+     */
+    private void assertContainsPinnedEvent(Recording recording, Thread thread) throws IOException {
+        List<RecordedEvent> pinnedEvents = find(recording, "jdk.VirtualThreadPinned");
+        assertTrue(pinnedEvents.size() > 0, "No jdk.VirtualThreadPinned events in recording");
+        System.err.println(pinnedEvents);
+
+        long tid = thread.threadId();
+        assertTrue(pinnedEvents.stream()
+                        .anyMatch(e -> e.getThread().getJavaThreadId() == tid),
+                "jdk.VirtualThreadPinned for javaThreadId = " + tid + " not found");
+    }
+
+    /**
+     * Waits for the given boolean to be set to true.
+     */
+    private void awaitTrue(AtomicBoolean b) throws InterruptedException {
+        while (!b.get()) {
+            Thread.sleep(10);
+        }
     }
 
     /**
