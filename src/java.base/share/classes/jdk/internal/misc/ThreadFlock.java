@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -275,15 +275,8 @@ public class ThreadFlock implements AutoCloseable {
      * Shutdown this flock so that no new threads can be started, existing threads
      * in the flock will continue to run. This method is a no-op if the flock is
      * already shutdown or closed.
-     *
-     * <p> This method may only be invoked by the flock owner or threads {@linkplain
-     * #containsThread(Thread) contained} in the flock.
-     *
-     * @throws WrongThreadException if the current thread is not the owner or a thread
-     * contained in the flock
      */
     public void shutdown() {
-        ensureOwnerOrContainsThread();
         if (!shutdown) {
             shutdown = true;
         }

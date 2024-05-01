@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -931,59 +931,6 @@ class ThreadFlockTest {
             assertTrue(Thread.interrupted());  // clear interrupt
         }
         assertNull(exception.get());
-    }
-
-    /**
-     * Test shutdown is confined to threads in the flock.
-     */
-    @ParameterizedTest
-    @MethodSource("factories")
-    void testShutdownConfined(ThreadFactory factory) throws Exception {
-        try (var flock = ThreadFlock.open(null)) {
-            // thread in flock
-            testShutdownConfined(flock, task -> {
-                Thread thread = factory.newThread(task);
-                return flock.start(thread);
-            });
-
-            // thread in flock
-            try (var flock2 = ThreadFlock.open(null)) {
-                testShutdownConfined(flock, task -> {
-                    Thread thread = factory.newThread(task);
-                    return flock2.start(thread);
-                });
-            }
-
-            // thread not contained in flock
-            testShutdownConfined(flock, task -> {
-                Thread thread = factory.newThread(task);
-                thread.start();
-                return thread;
-            });
-        }
-    }
-
-    /**
-     * Test that a thread created with the given factory cannot shut down the
-     * given flock.
-     */
-    private void testShutdownConfined(ThreadFlock flock,
-                                      Function<Runnable, Thread> factory) throws Exception {
-        var exception = new AtomicReference<Exception>();
-        Thread thread = factory.apply(() -> {
-            try {
-                flock.shutdown();
-            } catch (Exception e) {
-                exception.set(e);
-            }
-        });
-        thread.join();
-        Throwable cause = exception.get();
-        if (flock.containsThread(thread)) {
-            assertNull(cause);
-        } else {
-            assertTrue(cause instanceof WrongThreadException);
-        }
     }
 
     /**
