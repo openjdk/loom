@@ -66,7 +66,8 @@ public class CallAsWithScopedValue {
 
         // Observable in structured concurrency in SV mode, but not in ACC mode
         Subject.callAs(subject, () -> {
-            try (var scope = new StructuredTaskScope<>()) {
+            var policy = StructuredTaskScope.Policy.ignoreFailures();
+            try (var scope = StructuredTaskScope.open(policy)) {
                 scope.fork(() -> check(3, Subject.current(), usv ? "Duke" : null));
                 scope.join();
             }
