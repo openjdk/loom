@@ -496,8 +496,6 @@ public final class ScopedValue<T> {
     /**
      * An operation that returns a result and may throw an exception.
      *
-     * @apiNote Naming TBD. Not proposing to move this to j.u.function.
-     *
      * @param <T> result type of the operation
      * @param <X> type of the exception thrown by the operation
      * @since 23

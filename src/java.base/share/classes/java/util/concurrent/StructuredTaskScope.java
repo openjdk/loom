@@ -711,7 +711,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * The other components are the same as this object.
          * @param timeout the timeout
          *
-         * @apiNote Applications using deadlines, expressed as a {@link java.time.Instant},
+         * @apiNote Applications using deadlines, expressed as an {@link java.time.Instant},
          * can use {@link Duration#between Duration.between(Instant.now(), deadline)} to
          * compute the timeout for this method.
          *
@@ -1024,7 +1024,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * #fork(Callable) started} in this task scope to finish execution. It stops waiting
      * when all threads finish, the {@code Policy}'s {@link Policy#onFork(Subtask) onFork}
      * or {@link Policy#onComplete(Subtask) onComplete} returns {@code true} to cancel
-     * execution, the timeout (if set) expires, or current thread is {@linkplain
+     * execution, the timeout (if set) expires, or the current thread is {@linkplain
      * Thread#interrupt() interrupted}.
      *
      * <p> This method may only be invoked by the task scope owner.
