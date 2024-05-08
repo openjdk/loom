@@ -99,33 +99,6 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that fork creates a new thread for each task.
-     */
-    @ParameterizedTest
-    @MethodSource("factories")
-    void testForkCreatesThread(ThreadFactory factory) throws Exception {
-        Set<Long> tids = ConcurrentHashMap.newKeySet();
-        try (var scope = StructuredTaskScope.open(Policy.ignoreFailures(),
-                cf -> cf.withThreadFactory(factory))) {
-
-            for (int i = 0; i < 50; i++) {
-                // runnable
-                scope.fork(() -> {
-                    tids.add(Thread.currentThread().threadId());
-                });
-
-                // callable
-                scope.fork(() -> {
-                    tids.add(Thread.currentThread().threadId());
-                    return null;
-                });
-            }
-            scope.join();
-        }
-        assertEquals(100, tids.size());
-    }
-
-    /**
      * Test that fork creates virtual threads when no ThreadFactory is configured.
      */
     @Test
@@ -156,20 +129,44 @@ class StructuredTaskScopeTest {
     @ParameterizedTest
     @MethodSource("factories")
     void testForkUsesThreadFactory(ThreadFactory factory) throws Exception {
-        var countingThreadFactory = new CountingThreadFactory(factory);
+        // TheadFactory that keeps reference to all threads it creates
+        class RecordingThreadFactory implements ThreadFactory {
+            final ThreadFactory delegate;
+            final Set<Thread> threads = ConcurrentHashMap.newKeySet();
+            RecordingThreadFactory(ThreadFactory delegate) {
+                this.delegate = delegate;
+            }
+            @Override
+            public Thread newThread(Runnable task) {
+                Thread thread = delegate.newThread(task);
+                threads.add(thread);
+                return thread;
+            }
+            Set<Thread> threads() {
+                return threads;
+            }
+        }
+        var recordingThreadFactory = new RecordingThreadFactory(factory);
+        Set<Thread> threads = ConcurrentHashMap.newKeySet();
         try (var scope = StructuredTaskScope.open(Policy.ignoreFailures(),
-                cf -> cf.withThreadFactory(countingThreadFactory))) {
+                cf -> cf.withThreadFactory(recordingThreadFactory))) {
 
             for (int i = 0; i < 50; i++) {
                 // runnable
-                scope.fork(() -> { });
+                scope.fork(() -> {
+                    threads.add(Thread.currentThread());
+                });
 
                 // callable
-                scope.fork(() -> null);
+                scope.fork(() -> {
+                    threads.add(Thread.currentThread());
+                    return null;
+                });
             }
             scope.join();
         }
-        assertEquals(100, countingThreadFactory.threadCount());
+        assertEquals(100, threads.size());
+        assertEquals(recordingThreadFactory.threads(), threads);
     }
 
     /**
@@ -586,11 +583,11 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that cancel interrupts unfinished subtasks.
+     * Test that cancelling exceutions interrupts unfinished threads.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testCancelInterruptsThreads1(ThreadFactory factory) throws Exception {
+    void testCancelInterruptsThreads(ThreadFactory factory) throws Exception {
         var testPolicy = new CancelAfterOnePolicy<String>();
 
         try (var scope = StructuredTaskScope.open(testPolicy,
@@ -622,6 +619,47 @@ class StructuredTaskScopeTest {
 
             assertEquals(Subtask.State.UNAVAILABLE, subtask1.state());
             assertEquals("bar", subtask2.get());
+        }
+    }
+
+    /**
+     * Test that timeout interrupts unfinished threads.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testTimeoutInterruptsThreads(ThreadFactory factory) throws Exception {
+        try (var scope = StructuredTaskScope.open(Policy.ignoreFailures(),
+                cf -> cf.withThreadFactory(factory)
+                        .withTimeout(Duration.ofSeconds(2)))) {
+
+            var started = new AtomicBoolean();
+            var interrupted = new CountDownLatch(1);
+            Subtask<Void> subtask = scope.fork(() -> {
+                started.set(true);
+                try {
+                    Thread.sleep(Duration.ofDays(1));
+                } catch (InterruptedException e) {
+                    interrupted.countDown();
+                }
+                return null;
+            });
+
+            while (!scope.isCancelled()) {
+                Thread.sleep(50);
+            }
+
+            // if subtask started then it should be interrupted
+            if (started.get()) {
+                interrupted.await();
+            }
+
+            try {
+                scope.join();
+                fail();
+            } catch (ExecutionException e) {
+                assertTrue(e.getCause() instanceof TimeoutException);
+            }
+            assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
         }
     }
 
@@ -931,7 +969,13 @@ class StructuredTaskScopeTest {
     void testSubtaskWhenSuccess(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>ignoreFailures(),
                 cf -> cf.withThreadFactory(factory))) {
+
             Subtask<String> subtask = scope.fork(() -> "foo");
+
+            // before join
+            assertThrows(IllegalStateException.class, subtask::get);
+            assertThrows(IllegalStateException.class, subtask::exception);
+
             scope.join();
 
             // after join
@@ -949,7 +993,13 @@ class StructuredTaskScopeTest {
     void testSubtaskWhenFailed(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>ignoreFailures(),
                 cf -> cf.withThreadFactory(factory))) {
+
             Subtask<String> subtask = scope.fork(() -> { throw new FooException(); });
+
+            // before join
+            assertThrows(IllegalStateException.class, subtask::get);
+            assertThrows(IllegalStateException.class, subtask::exception);
+
             scope.join();
 
             // after join
