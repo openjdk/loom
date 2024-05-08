@@ -353,7 +353,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test repated calls to join.
+     * Test repeated calls to join.
      */
     @Test
     void testJoinAfterJoin() throws Exception {
