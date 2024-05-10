@@ -929,7 +929,9 @@ class JvmtiClassFileLoadHookPoster : public StackObj {
     _cached_class_file_ptr = cache_ptr;
     _has_been_modified = false;
 
-    assert(!_thread->is_in_any_VTMS_transition(), "CFLH events are not allowed in any VTMS transition");
+    if (_thread->is_in_any_VTMS_transition()) {
+      return; // no events should be posted if thread is in any VTMS transition
+    }
     _state = JvmtiExport::get_jvmti_thread_state(_thread);
     if (_state != nullptr) {
       _class_being_redefined = _state->get_class_being_redefined();
@@ -1367,7 +1369,7 @@ void JvmtiExport::post_class_load(JavaThread *thread, Klass* klass) {
     return;
   }
   if (thread->is_in_any_VTMS_transition()) {
-    return; // skip ClassLoad events in VTMS transition
+    return; // no events should be posted if thread is in any VTMS transition
   }
 
   EVT_TRIG_TRACE(JVMTI_EVENT_CLASS_LOAD, ("[%s] Trg Class Load triggered",
@@ -1404,7 +1406,7 @@ void JvmtiExport::post_class_prepare(JavaThread *thread, Klass* klass) {
     return;
   }
   if (thread->is_in_any_VTMS_transition()) {
-    return; // skip ClassPrepare events in VTMS transition
+    return; // no events should be posted if thread is in any VTMS transition
   }
 
   EVT_TRIG_TRACE(JVMTI_EVENT_CLASS_PREPARE, ("[%s] Trg Class Prepare triggered",
