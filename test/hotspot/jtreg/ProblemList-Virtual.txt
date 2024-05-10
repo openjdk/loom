@@ -128,8 +128,7 @@ runtime/handshake/HandshakeWalkStackTest.java 0000000 generic-all
 # too fragile when main thread is a virtual thread
 runtime/Thread/ThreadCountLimit.java#id0 0000000 generic-all
 
-compiler/interpreter/TestVerifyStackAfterDeopt.java 8316392 macosx-aarch64
-
-compiler/arguments/TestC1Globals.java#id0 8320302 generic-all
-compiler/arguments/TestC1Globals.java#id1 8320302 generic-all
-compiler/arguments/TestC1Globals.java#id2 8320302 generic-all
+# Invalid code heap sizes
+compiler/arguments/TestC1Globals.java#id0 0000000 generic-all
+compiler/arguments/TestC1Globals.java#id1 0000000 generic-all
+compiler/arguments/TestC1Globals.java#id2 0000000 generic-all

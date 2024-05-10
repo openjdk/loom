@@ -124,9 +124,3 @@ sun/management/jmxremote/startstop/JMXStatusTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStartStopTest.java 0000000 generic-all
 
-# Regression due to JDK-8329331
-java/foreign/TestSegments.java 			8331033 linux-x64,windows-x64
-java/foreign/TestSegmentAllocators.java		8331033 linux-x64,windows-x64
-java/foreign/TestSlices.java			8331033 linux-x64,windows-x64
-java/foreign/TestSegmentCopy.java		8331033 linux-x64,windows-x64
-java/foreign/TestStringEncoding.java		8331033 linux-x64,windows-x64
