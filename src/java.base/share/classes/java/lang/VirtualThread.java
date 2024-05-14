@@ -199,7 +199,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        this.runContinuation = this::runContinuation;
+        this.runContinuation = (Runnable) ForkJoinTask.adapt(this::runContinuation);
     }
 
     /**

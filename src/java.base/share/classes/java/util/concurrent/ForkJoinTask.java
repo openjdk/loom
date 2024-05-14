@@ -1405,6 +1405,9 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
      * @return the task
      */
     public static ForkJoinTask<?> adapt(Runnable runnable) {
+        if (runnable instanceof ForkJoinTask<?>) {
+            return (ForkJoinTask<?>)runnable;
+        }
         return new AdaptedRunnableAction(runnable);
     }
 
