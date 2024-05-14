@@ -97,15 +97,15 @@ public class StressStackOverflow {
                 var nextRandomFloat = ThreadLocalRandom.current().nextFloat();
                 try {
                     switch (behaviour) {
-                        case CALL -> ScopedValue.callWhere(el, el.get() + 1, () -> fibonacci_pad(20, this));
-                        case RUN -> ScopedValue.runWhere(el, el.get() + 1, () -> fibonacci_pad(20, this));
+                        case CALL -> ScopedValue.where(el, el.get() + 1).call(() -> fibonacci_pad(20, this));
+                        case RUN -> ScopedValue.where(el, el.get() + 1).run(() -> fibonacci_pad(20, this));
                     }
                     if (!last.equals(el.get())) {
                         throw testFailureException;
                     }
                 } catch (StackOverflowError e) {
                     if (nextRandomFloat <= 0.1) {
-                        ScopedValue.runWhere(el, el.get() + 1, this);
+                        ScopedValue.where(el, el.get() + 1).run(this);
                     }
                 } catch (TestFailureException e) {
                     throw e;
@@ -187,8 +187,7 @@ public class StressStackOverflow {
 
     public void run() {
         try {
-            var carrier = ScopedValue.where(inheritedValue, 42).where(el, 0);
-            ScopedValue.runWhere(carrier, () -> {
+            ScopedValue.where(inheritedValue, 42).where(el, 0).run(() -> {
                 try (var scope = StructuredTaskScope.open(Policy.ignoreFailures())) {
                     try {
                         if (ThreadLocalRandom.current().nextBoolean()) {
