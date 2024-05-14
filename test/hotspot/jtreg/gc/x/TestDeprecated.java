@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,37 +19,32 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_NMT_ALLOCATIONSITE_HPP
-#define SHARE_NMT_ALLOCATIONSITE_HPP
+package gc.x;
 
-#include "nmt/memflags.hpp"
-#include "utilities/nativeCallStack.hpp"
+/*
+ * @test TestDeprecated
+ * @requires vm.gc.ZSinglegen
+ * @summary Test ZGenerational Deprecated
+ * @library /test/lib
+ * @run driver gc.x.TestDeprecated
+ */
 
-// Allocation site represents a code path that makes a memory
-// allocation
-class AllocationSite {
- private:
-  const NativeCallStack  _call_stack;
-  const MEMFLAGS         _flag;
- public:
-  AllocationSite(const NativeCallStack& stack, MEMFLAGS flag) : _call_stack(stack), _flag(flag) { }
+import java.util.LinkedList;
+import jdk.test.lib.process.ProcessTools;
 
-  bool equals(const NativeCallStack& stack) const {
-    return _call_stack.equals(stack);
-  }
-
-  bool equals(const AllocationSite& other) const {
-    return other.equals(_call_stack);
-  }
-
-  const NativeCallStack* call_stack() const {
-    return &_call_stack;
-  }
-
-  MEMFLAGS flag() const { return _flag; }
-};
-
-#endif // SHARE_NMT_ALLOCATIONSITE_HPP
+public class TestDeprecated {
+    static class Test {
+        public static void main(String[] args) throws Exception {}
+    }
+    public static void main(String[] args) throws Exception {
+        ProcessTools.executeLimitedTestJava("-XX:+UseZGC",
+                                            "-XX:-ZGenerational",
+                                            "-Xlog:gc+init",
+                                            Test.class.getName())
+                    .shouldContain("Option ZGenerational was deprecated")
+                    .shouldContain("Using deprecated non-generational mode")
+                    .shouldHaveExitValue(0);
+    }
+}
