@@ -463,7 +463,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * where the results from the {@link StructuredTaskScope#join() join} method are
      * processed. It should be clear what the {@code Policy} does vs. the application
      * code at the use-site. In general, the {@code Policy} implementation is not the
-     * place to code "business logic". A {@code Policy} should as designed to be as
+     * place to code "business logic". A {@code Policy} should be designed to be as
      * general purpose as possible.
      *
      * @param <T> the result type of tasks executed in the task scope
@@ -616,7 +616,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         /**
          * {@return a new policy object that yields a stream of all forked subtasks,
          * cancelling execution when evaluating a completed subtask with the given
-         * predicate returns true}.
+         * predicate returns true}
          *
          * <p> The policy's {@link Policy#onComplete(Subtask)} method invokes the
          * predicate's {@link Predicate#test(Object) test} method with the subtask that
