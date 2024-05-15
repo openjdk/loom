@@ -54,7 +54,7 @@ class StructuredThreadDumpTest {
      */
     @Test
     void testTree() throws Exception {
-        try (var scope = StructuredTaskScope.open(Policy.ignoreFailures(), cf -> cf.withName("scope"))) {
+        try (var scope = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withName("scope"))) {
             Thread thread1 = fork(scope, "child-scope-A");
             Thread thread2 = fork(scope, "child-scope-B");
             try {
@@ -96,10 +96,10 @@ class StructuredThreadDumpTest {
      */
     @Test
     void testNested() throws Exception {
-        try (var scope1 = StructuredTaskScope.open(Policy.ignoreFailures(), cf -> cf.withName("scope-A"))) {
+        try (var scope1 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withName("scope-A"))) {
             Thread thread1 = fork(scope1);
 
-            try (var scope2 = StructuredTaskScope.open(Policy.ignoreFailures(), cf -> cf.withName("scope-B"))) {
+            try (var scope2 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withName("scope-B"))) {
                 Thread thread2 = fork(scope2);
                 try {
                     ThreadDump threadDump = threadDump();
@@ -183,7 +183,7 @@ class StructuredThreadDumpTest {
                                String childScopeName) throws Exception {
         var ref = new AtomicReference<Thread>();
         scope.fork(() -> {
-            try (var childScope = StructuredTaskScope.open(Policy.ignoreFailures(),
+            try (var childScope = StructuredTaskScope.open(Policy.ignoreAll(),
                     cf -> cf.withName(childScopeName))) {
                 ref.set(Thread.currentThread());
                 LockSupport.park();

@@ -84,13 +84,13 @@ import jdk.internal.misc.ThreadFlock;
  * successfully, one subtask may succeed and the other may fail, or both subtasks may
  * fail. In this example, the code in the main task is interested in the result from the
  * first subtask to complete successfully. The example uses {@link
- * Policy#anySuccessfulOrThrow() Policy.anySuccessfulOrThrow()} to create a {@code Policy}
- * that makes available the result of the first subtask to complete successfully. The type
- * parameter in the example is "{@code String}" so that only subtasks that return a
- * {@code String} can be forked.
+ * Policy#anySuccessfulResultOrThrow() Policy.anySuccessfulResultOrThrow()} to create a
+ * {@code Policy} that makes available the result of the first subtask to complete
+ * successfully. The type parameter in the example is "{@code String}" so that only subtasks
+ * that return a {@code String} can be forked.
  * {@snippet lang=java :
  *    // @link substring="open" target="#open(Policy)" :
- *    try (var scope = StructuredTaskScope.open(Policy.<String>anySuccessfulOrThrow())) {
+ *    try (var scope = StructuredTaskScope.open(Policy.<String>anySuccessfulResultOrThrow())) {
  *
  *        scope.fork(() -> query(left));  // @link substring="fork" target="#fork(Callable)"
  *        scope.fork(() -> query(right));
@@ -114,11 +114,11 @@ import jdk.internal.misc.ThreadFlock;
  * <p> Now consider another example that also splits into two subtasks to concurrently
  * fetch resources. One of the subtasks returns a {@code String} when it succeeds, the
  * other returns an {@code Integer}. The main task in this example is interested in the
- * successful result from both subtasks. It uses {@link Policy#throwIfFailed()
- * Policy.throwIfFailed()} to create a {@code Policy} that cancels execution and causes
- * {@code join} to throw if any subtask fails.
+ * successful result from both subtasks. It uses {@link Policy#ignoreSuccessfulOrThrow()
+ * Policy.ignoreSuccessfulOrThrow()} to create a {@code Policy} that cancels execution and
+ * causes {@code join} to throw if any subtask fails.
  * {@snippet lang=java :
- *    try (var scope = StructuredTaskScope.open(Policy.throwIfFailed())) {
+ *    try (var scope = StructuredTaskScope.open(Policy.ignoreSuccessfulOrThrow())) {
  *
  *        // @link substring="Subtask" target="Subtask" :
  *        Subtask<String> subtask1 = scope.fork(() -> query(left));
@@ -147,8 +147,8 @@ import jdk.internal.misc.ThreadFlock;
  * the {@code Policy} and usage. Some {@code Policy} implementations are suited to subtasks
  * that return results of the same type and where the {@code join} method returns a result
  * for the main task to use. Code that forks subtasks that return results of different
- * types, and uses a {@code Policy} such as {@code Policy.throwIfFailed()} that does not
- * return a result, will use {@link Subtask#get() Subtask.get()} after joining.
+ * types, and uses a {@code Policy} such as {@code Policy.ignoreSuccessfulOrThrow()} that
+ * does not return a result, will use {@link Subtask#get() Subtask.get()} after joining.
  *
  * <h2>Configuration</h2>
  *
@@ -204,9 +204,9 @@ import jdk.internal.misc.ThreadFlock;
  *        scope.fork(() -> query(left));
  *        scope.fork(() -> query(right));
  *
- *        String result = scope.join()
- *                             .map(Subtask.get())
- *                             .toList();
+ *        List<String> result = scope.join()
+ *                                   .map(Subtask::get)
+ *                                   .toList();
  *
  *   }
  * }
@@ -255,7 +255,7 @@ import jdk.internal.misc.ThreadFlock;
  *     // @link substring="callWhere" target="ScopedValue#callWhere" :
  *     Result result = ScopedValue.callWhere(USERNAME, "duke", () -> {
  *
- *         try (var scope = StructuredTaskScope.open(Policy.throwIfFailed())) {
+ *         try (var scope = StructuredTaskScope.open(Policy.ignoreSuccessfulOrThrow())) {
  *
  *             Subtask<String> subtask1 = scope.fork( .. );    // inherits binding
  *             Subtask<Integer> subtask2 = scope.fork( .. );   // inherits binding
@@ -418,22 +418,23 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * <p> Policy defines static methods to create {@code Policy} objects for common cases:
      * <ul>
-     *   <li> {@link #throwIfFailed() throwIfFailed()} creates a {@code Policy} that cancels
-     *   execution and causes {@code join} to throw if any subtask fails.
+     *   <li> {@link #ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow()} creates a {@code
+     *   Policy} that ignores all successful subtasks. It cancels execution and causes
+     *   {@code join} to throw if any subtask fails.
      *   <li> {@link #allSuccessfulOrThrow() allSuccessfulOrThrow()} creates a {@code Policy}
      *   that yields a stream of the completed subtasks for {@code join} to return when
      *   all subtasks complete successfully. It cancels execution and causes {@code join}
      *   to throw if any subtask fails.
-     *   <li> {@link #anySuccessfulOrThrow() anySuccessfulOrThrow()} creates a {@code Policy}
-     *   that yields the result of the first subtask to succeed. It cancels execution and
-     *   causes {@code join} to throw if all subtasks fail.
-     *   <li> {@link #ignoreFailures() ignoreFailures()} creates a {@code Policy} that does
-     *   not cancel execution, even when subtasks fail. The {@code join} method returns
-     *   {@code null} when all subtasks finish.
+     *   <li> {@link #anySuccessfulResultOrThrow() anySuccessfulResultOrThrow()} creates a
+     *   {@code Policy} that yields the result of the first subtask to succeed. It cancels
+     *   execution and causes {@code join} to throw if all subtasks fail.
+     *   <li> {@link #ignoreAll() ignoreAll()} creates a {@code Policy} that ignores all
+     *   completed subtasks, even subtasks that fail. The {@code join} method returns null
+     *   when all subtasks finish.
      * </ul>
      *
      * <p> In addition to the methods to create {@code Policy} objects for common cases,
-     * the {@link #allForked(Predicate) allForked(Predicate)} method is defined to create
+     * the {@link #all(Predicate) all(Predicate)} method is defined to create
      * a {@code Policy} that yields a stream of all forked subtasks. It is created with a
      * {@link Predicate Predicate} that determines if execution should continue or be
      * cancelled. This policy can be built upon to create custom policies that cancel
@@ -535,9 +536,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         R result() throws Throwable;
 
         /**
-         * {@return a new policy object that cancels execution if a subtask fails}
-         * The policy's {@link Policy#result() result} method returns {@code null} or
-         * throws the exception from the first subtask to fail.
+         * {@return a new policy object that ignores all successful subtasks. It
+         * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> if
+         * any subtask fails}
+         *
+         * The policy's {@link Policy#result() result} method returns {@code null} if
+         * all subtasks complete successfully, or throws the exception from the first
+         * subtask to fail.
          *
          * @apiNote This policy is intended for cases where the results for all subtasks
          * are required ("invoke all"), and where the code {@linkplain #fork(Callable) forking}
@@ -546,7 +551,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @param <T> the result type of subtasks
          */
-        static <T> Policy<T, Void> throwIfFailed() {
+        static <T> Policy<T, Void> ignoreSuccessfulOrThrow() {
             return new ThrowIfFailed<>();
         }
 
@@ -588,13 +593,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @param <T> the result type of subtasks
          */
-        static <T> Policy<T, T> anySuccessfulOrThrow() {
+        static <T> Policy<T, T> anySuccessfulResultOrThrow() {
             return new AnySuccessful<>();
         }
 
         /**
-         * {@return a new policy object that does not cancel execution, even when subtasks
-         * fail}  The policy's {@link Policy#result() result} method returns {@code null}.
+         * {@return a new policy object that ignores all completed subtasks, even subtasks
+         * that fail} The policy's {@link Policy#result() result} method returns {@code null}.
          *
          * @apiNote This policy is intended for cases where subtasks make use of
          * <em>side-effects</em> rather than return results or fail with exceptions.
@@ -603,7 +608,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @param <T> the result type of subtasks
          */
-        static <T> Policy<T, Void> ignoreFailures() {
+        static <T> Policy<T, Void> ignoreAll() {
             // ensure that new Policy object is returned
             return new Policy<T, Void>() {
                 @Override
@@ -631,7 +636,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * state) or subtasks in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state
          * if execution was cancelled before all subtasks were forked or completed.
          *
-         * <p> The following example uses {@code allForked} to create a {@code Policy} that
+         * <p> The following example uses {@code all} to create a {@code Policy} that
          * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> when
          * two or more subtasks fail.
          * {@snippet lang=java :
@@ -644,13 +649,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *         }
          *     }
          *
-         *     var policy = Policy.allForked(new AtMostTwoFailures<String>());
+         *     var policy = Policy.all(new AtMostTwoFailures<String>());
          * }
          *
          * @param isDone the predicate to evaluate completed subtasks
          * @param <T> the result type of subtasks
          */
-        static <T> Policy<T, Stream<Subtask<T>>> allForked(Predicate<Subtask<? extends T>> isDone) {
+        static <T> Policy<T, Stream<Subtask<T>>> all(Predicate<Subtask<? extends T>> isDone) {
             return new AllForked<>(isDone);
         }
     }
