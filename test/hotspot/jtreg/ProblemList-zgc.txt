@@ -48,3 +48,21 @@ serviceability/sa/TestHeapDumpForInvokeDynamic.java           8315646   generic-
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java        8289582   windows-x64
 
 vmTestbase/nsk/sysdict/vm/stress/chain/chain007/chain007.java 8298991 linux-x64
+
+serviceability/sa/ClhsdbAttachDifferentJVMs.java		0000000 generic-all
+serviceability/sa/ClhsdbCDSJstackPrintAll.java			0000000 generic-all
+serviceability/sa/ClhsdbCDSCore.java				0000000 generic-all
+serviceability/sa/ClhsdbDumpheap.java				0000000 generic-all
+serviceability/sa/ClhsdbFindPC.java#no-xcomp-core		0000000 generic-all
+serviceability/sa/ClhsdbInspect.java			 	0000000 generic-all
+serviceability/sa/ClhsdbJstack.java#id0				0000000 generic-all
+serviceability/sa/ClhsdbJstack.java#id1				0000000 generic-all
+serviceability/sa/ClhsdbJstackXcompStress.java			0000000 generic-all
+serviceability/sa/ClhsdbSource.java				0000000 generic-all
+serviceability/sa/ClhsdbThreadContext.java			0000000 generic-all
+serviceability/sa/ClhsdbWhere.java				0000000 generic-all
+serviceability/sa/DeadlockDetectionTest.java			0000000 generic-all
+serviceability/sa/JhsdbThreadInfoTest.java			0000000 generic-all
+serviceability/sa/TestObjectMonitorIterate.java			0000000 generic-all
+serviceability/sa/sadebugd/DebugdConnectTest.java		0000000 generic-all
+serviceability/sa/sadebugd/DisableRegistryTest.java	 	0000000 generic-all
