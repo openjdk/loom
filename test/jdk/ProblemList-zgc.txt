@@ -29,5 +29,3 @@
 
 sun/tools/jhsdb/JShellHeapDumpTest.java            8276539 generic-all
 sun/tools/jhsdb/HeapDumpTestWithActiveProcess.java 8276539 generic-all
-
-com/sun/jdi/ThreadMemoryLeakTest.java		   8307402 generic-all
