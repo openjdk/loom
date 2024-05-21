@@ -418,9 +418,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * <p> Policy defines static methods to create {@code Policy} objects for common cases:
      * <ul>
-     *   <li> {@link #ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow()} creates a {@code
-     *   Policy} that ignores all successful subtasks. It cancels execution and causes
-     *   {@code join} to throw if any subtask fails.
      *   <li> {@link #allSuccessfulOrThrow() allSuccessfulOrThrow()} creates a {@code Policy}
      *   that yields a stream of the completed subtasks for {@code join} to return when
      *   all subtasks complete successfully. It cancels execution and causes {@code join}
@@ -428,6 +425,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *   <li> {@link #anySuccessfulResultOrThrow() anySuccessfulResultOrThrow()} creates a
      *   {@code Policy} that yields the result of the first subtask to succeed. It cancels
      *   execution and causes {@code join} to throw if all subtasks fail.
+     *   <li> {@link #ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow()} creates a {@code
+     *   Policy} that ignores all successful subtasks. It cancels execution and causes
+     *   {@code join} to throw if any subtask fails.
      *   <li> {@link #ignoreAll() ignoreAll()} creates a {@code Policy} that ignores all
      *   completed subtasks, even subtasks that fail. The {@code join} method returns null
      *   when all subtasks finish.
@@ -536,26 +536,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         R result() throws Throwable;
 
         /**
-         * {@return a new policy object that ignores all successful subtasks. It
-         * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> if
-         * any subtask fails}
-         *
-         * The policy's {@link Policy#result() result} method returns {@code null} if
-         * all subtasks complete successfully, or throws the exception from the first
-         * subtask to fail.
-         *
-         * @apiNote This policy is intended for cases where the results for all subtasks
-         * are required ("invoke all"), and where the code {@linkplain #fork(Callable) forking}
-         * subtasks keeps a reference to the {@linkplain Subtask Subtask} objects. A
-         * typical usage will be when subtasks return results of different types.
-         *
-         * @param <T> the result type of subtasks
-         */
-        static <T> Policy<T, Void> ignoreSuccessfulOrThrow() {
-            return new ThrowIfFailed<>();
-        }
-
-        /**
          * {@return a new policy object that yields a stream of all forked subtasks
          * when all subtasks complete successfully, or throws if any subtask fails}
          * If any subtask fails then execution is cancelled.
@@ -598,6 +578,26 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
+         * {@return a new policy object that ignores all successful subtasks. It
+         * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> if
+         * any subtask fails}
+         *
+         * The policy's {@link Policy#result() result} method returns {@code null} if
+         * all subtasks complete successfully, or throws the exception from the first
+         * subtask to fail.
+         *
+         * @apiNote This policy is intended for cases where the results for all subtasks
+         * are required ("invoke all"), and where the code {@linkplain #fork(Callable) forking}
+         * subtasks keeps a reference to the {@linkplain Subtask Subtask} objects. A
+         * typical usage will be when subtasks return results of different types.
+         *
+         * @param <T> the result type of subtasks
+         */
+        static <T> Policy<T, Void> ignoreSuccessfulOrThrow() {
+            return new IgnoreSuccessful<>();
+        }
+
+        /**
          * {@return a new policy object that ignores all completed subtasks, even subtasks
          * that fail} The policy's {@link Policy#result() result} method returns {@code null}.
          *
@@ -636,7 +636,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * state) or subtasks in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state
          * if execution was cancelled before all subtasks were forked or completed.
          *
-         * <p> The following example uses {@code all} to create a {@code Policy} that
+         * <p> The following example uses this method to create a  {@code Policy} that
          * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> when
          * two or more subtasks fail.
          * {@snippet lang=java :
@@ -1259,39 +1259,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A policy that cancels execution if a subtask fails.
-     */
-    private static final class ThrowIfFailed<T> implements Policy<T, Void> {
-        private static final VarHandle FIRST_EXCEPTION;
-        static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_EXCEPTION = l.findVarHandle(ThrowIfFailed.class, "firstException", Throwable.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-        private volatile Throwable firstException;
-
-        @Override
-        public boolean onComplete(Subtask<? extends T> subtask) {
-            return (subtask.state() == Subtask.State.FAILED)
-                    && (firstException == null)
-                    && FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
-        }
-
-        @Override
-        public Void result() throws Throwable {
-            Throwable ex = firstException;
-            if (ex != null) {
-                throw ex;
-            } else {
-                return null;
-            }
-        }
-    }
-
-    /**
      * A policy that returns a stream of all forked subtasks when all subtasks
      * complete successfully. If any subtask fails then execution is cancelled.
      */
@@ -1383,6 +1350,40 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
                 throw firstException;
             } else {
                 throw new NoSuchElementException("No subtasks completed");
+            }
+        }
+    }
+
+    /**
+     * A policy that that ignores all successful subtasks. If any subtask fails the
+     * execution is cancelled.
+     */
+    private static final class IgnoreSuccessful<T> implements Policy<T, Void> {
+        private static final VarHandle FIRST_EXCEPTION;
+        static {
+            try {
+                MethodHandles.Lookup l = MethodHandles.lookup();
+                FIRST_EXCEPTION = l.findVarHandle(IgnoreSuccessful.class, "firstException", Throwable.class);
+            } catch (Exception e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+        private volatile Throwable firstException;
+
+        @Override
+        public boolean onComplete(Subtask<? extends T> subtask) {
+            return (subtask.state() == Subtask.State.FAILED)
+                    && (firstException == null)
+                    && FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
+        }
+
+        @Override
+        public Void result() throws Throwable {
+            Throwable ex = firstException;
+            if (ex != null) {
+                throw ex;
+            } else {
+                return null;
             }
         }
     }
