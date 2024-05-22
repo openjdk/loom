@@ -59,6 +59,10 @@ public class VThreadEventTest {
     }
 
     public static void main(String[] args) throws Exception {
+        if (Thread.currentThread().isVirtual()) {
+            System.out.println("Skipping test as current thread is a virtual thread");
+            return;
+        }
         VThreadRunner.ensureParallelism(SPINNING_THREAD_COUNT+1);
 
         // start threads that park (unmount)
@@ -126,7 +130,6 @@ public class VThreadEventTest {
         log("VirtualThreadEnd events: " + threadEndCnt + ", expected: " + threadCount);
         log("VirtualThreadMount events: " + threadMountCnt + ", expected: " + PARKED_THREAD_COUNT);
         log("VirtualThreadUnmount events: " + threadUnmountCnt + ", expected: " + threadCount);
-
 
         boolean failed = false;
         if (threadEndCnt != threadCount) {
