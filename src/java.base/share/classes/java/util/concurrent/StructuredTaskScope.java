@@ -434,11 +434,11 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * </ul>
      *
      * <p> In addition to the methods to create {@code Policy} objects for common cases,
-     * the {@link #all(Predicate) all(Predicate)} method is defined to create
-     * a {@code Policy} that yields a stream of all forked subtasks. It is created with a
-     * {@link Predicate Predicate} that determines if execution should continue or be
-     * cancelled. This policy can be built upon to create custom policies that cancel
-     * execution based on some condition.
+     * the {@link #all(Predicate) all(Predicate)} method is defined to create a {@code
+     * Policy} that yields a stream of all subtasks. It is created with a {@link Predicate
+     * Predicate} that determines if execution should continue or be cancelled. This policy
+     * can be built upon to create custom policies that cancel execution based on some
+     * condition.
      *
      * <p> More advanced policies can be developed by implementing the {@code Policy}
      * interface. The {@link #onFork(Subtask)} method is invoked when subtasks are forked.
@@ -486,6 +486,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * subtask is {@code null}. It throws {@code IllegalArgumentException} if the
          * subtask is not in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state, it
          * otherwise returns {@code false}.
+         *
+         * @apiNote This method is invoked by the {@code fork} methods. It should not be
+         * invoked directly.
          * 
          * @param subtask the subtask
          * @return {@code true} to cancel execution
@@ -506,7 +509,10 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * subtask is {@code null}. It throws {@code IllegalArgumentException} if the
          * subtask is not in the {@link Subtask.State#SUCCESS SUCCESS} or {@link
          * Subtask.State#FAILED FAILED} state, it otherwise returns {@code false}.
-         * 
+         *
+         * @apiNote This method is invoked by subtasks when they complete. It should not
+         * be invoked directly.
+         *
          * @param subtask the subtask
          * @return {@code true} to cancel execution
          */
@@ -530,18 +536,21 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * implementation should return an equal result (or throw the same exception) on
          * second or subsequent calls to produce the outcome.
          *
+         * @apiNote This method is invoked by the {@code join} method. It should not be
+         * invoked directly.
+         *
          * @return the result
          * @throws Throwable the exception
          */
         R result() throws Throwable;
 
         /**
-         * {@return a new policy object that yields a stream of all forked subtasks
-         * when all subtasks complete successfully, or throws if any subtask fails}
+         * {@return a new policy object that yields a stream of all subtasks when all
+         * subtasks complete successfully, or throws if any subtask fails}
          * If any subtask fails then execution is cancelled.
          *
          * <p> If all subtasks complete successfully, the policy's {@link Policy#result()}
-         * method returns a stream of all forked subtasks in the order that they were forked.
+         * method returns a stream of all subtasks in the order that they were forked.
          * If any subtask failed then the {@code result} method throws the exception from
          * the first subtask to fail.
          *
@@ -619,9 +628,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new policy object that yields a stream of all forked subtasks,
-         * cancelling execution when evaluating a completed subtask with the given
-         * predicate returns true}
+         * {@return a new policy object that yields a stream of all subtasks, cancelling
+         * execution when evaluating a completed subtask with the given predicate returns
+         * {@code true}}
          *
          * <p> The policy's {@link Policy#onComplete(Subtask)} method invokes the
          * predicate's {@link Predicate#test(Object) test} method with the subtask that
@@ -630,17 +639,17 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * execution is cancelled</a>. The {@code test} method must be thread safe as it
          * may be invoked concurrently from several threads.
          *
-         * <p> The policy's {@link #result()} method returns the stream of all forked
-         * subtasks, in fork order. The stream may contain subtasks that have completed
+         * <p> The policy's {@link #result()} method returns the stream of all subtasks,
+         * in fork order. The stream may contain subtasks that have completed
          * (in {@link Subtask.State#SUCCESS SUCCESS} or {@link Subtask.State#FAILED FAILED}
          * state) or subtasks in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state
          * if execution was cancelled before all subtasks were forked or completed.
          *
-         * <p> The following example uses this method to create a  {@code Policy} that
+         * <p> The following example uses this method to create a {@code Policy} that
          * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> when
          * two or more subtasks fail.
          * {@snippet lang=java :
-         *    class AtMostTwoFailures<T> implements Predicate<Subtask<? extends T>> {
+         *    class CancelAfterTwoFailures<T> implements Predicate<Subtask<? extends T>> {
          *         private final AtomicInteger failedCount = new AtomicInteger();
          *         @Override
          *         public boolean test(Subtask<? extends T> subtask) {
@@ -649,14 +658,14 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *         }
          *     }
          *
-         *     var policy = Policy.all(new AtMostTwoFailures<String>());
+         *     var policy = Policy.all(new CancelAfterTwoFailures<String>());
          * }
          *
          * @param isDone the predicate to evaluate completed subtasks
          * @param <T> the result type of subtasks
          */
         static <T> Policy<T, Stream<Subtask<T>>> all(Predicate<Subtask<? extends T>> isDone) {
-            return new AllForked<>(isDone);
+            return new AllSubtasks<>(isDone);
         }
     }
 
@@ -1259,8 +1268,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A policy that returns a stream of all forked subtasks when all subtasks
-     * complete successfully. If any subtask fails then execution is cancelled.
+     * A policy that returns a stream of all subtasks when all subtasks complete
+     * successfully. If any subtask fails then execution is cancelled.
      */
     private static final class AllSuccessful<T> implements Policy<T, Stream<Subtask<T>>> {
         private static final VarHandle FIRST_EXCEPTION;
@@ -1389,14 +1398,14 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A policy that returns a stream of all forked subtasks.
+     * A policy that returns a stream of all subtasks.
      */
-    private static class AllForked<T> implements Policy<T, Stream<Subtask<T>>> {
+    private static class AllSubtasks<T> implements Policy<T, Stream<Subtask<T>>> {
         private final Predicate<Subtask<? extends T>> isDone;
         // list of forked subtasks, only accessed by owner thread
         private final List<Subtask<T>> subtasks = new ArrayList<>();
 
-        AllForked(Predicate<Subtask<? extends T>> isDone) {
+        AllSubtasks(Predicate<Subtask<? extends T>> isDone) {
             this.isDone = Objects.requireNonNull(isDone);
         }
 
