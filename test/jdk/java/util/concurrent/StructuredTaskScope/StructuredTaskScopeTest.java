@@ -333,11 +333,11 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test join with a running subtask.
+     * Test join with a remaining subtask.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testJoinWithSubtasks(ThreadFactory factory) throws Exception {
+    void testJoinWithRemainingSubtasks(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.ignoreAll(),
                 cf -> cf.withThreadFactory(factory))) {
             Subtask<String> subtask = scope.fork(() -> {
@@ -587,7 +587,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testCancelInterruptsThreads(ThreadFactory factory) throws Exception {
+    void testCancellationInterruptsThreads(ThreadFactory factory) throws Exception {
         var testPolicy = new CancelAfterOnePolicy<String>();
 
         try (var scope = StructuredTaskScope.open(testPolicy,
@@ -674,7 +674,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test close without join, unfinished subtasks.
+     * Test close without join, subtasks forked.
      */
     @ParameterizedTest
     @MethodSource("factories")
@@ -1091,57 +1091,10 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Policy.ignoreSuccessfulOrThrow() with no subtasks.
-     */
-    @Test
-    void testThrowIfFailed1() throws Throwable {
-        try (var scope = StructuredTaskScope.open(Policy.ignoreSuccessfulOrThrow())) {
-            var result = scope.join();
-            assertNull(result);
-        }
-    }
-
-    /**
-     * Test Policy.ignoreSuccessfulOrThrow() with subtasks that complete successfully.
-     */
-    @ParameterizedTest
-    @MethodSource("factories")
-    void testThrowIfFailed2(ThreadFactory factory) throws Throwable {
-        try (var scope = StructuredTaskScope.open(Policy.<String>ignoreSuccessfulOrThrow(),
-                cf -> cf.withThreadFactory(factory))) {
-            var subtask1 = scope.fork(() -> "foo");
-            var subtask2 = scope.fork(() -> "bar");
-            var result = scope.join();
-            assertNull(result);
-            assertEquals("foo", subtask1.get());
-            assertEquals("bar", subtask2.get());
-        }
-    }
-
-    /**
-     * Test Policy.ignoreSuccessfulOrThrow() with a subtask that complete successfully and
-     * a subtask that fails.
-     */
-    @ParameterizedTest
-    @MethodSource("factories")
-    void testThrowIfFailed3(ThreadFactory factory) throws Throwable {
-        try (var scope = StructuredTaskScope.open(Policy.<String>ignoreSuccessfulOrThrow(),
-                cf -> cf.withThreadFactory(factory))) {
-            scope.fork(() -> "foo");
-            scope.fork(() -> { throw new FooException(); });
-            try {
-                scope.join();
-            } catch (ExecutionException e) {
-                assertTrue(e.getCause() instanceof FooException);
-            }
-        }
-    }
-
-    /**
      * Test Policy.allSuccessfulOrThrow() with no subtasks.
      */
     @Test
-    void testAllSuccessful1() throws Throwable {
+    void testAllSuccessfulOrThrow1() throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.allSuccessfulOrThrow())) {
             var subtasks = scope.join().toList();
             assertTrue(subtasks.isEmpty());
@@ -1153,7 +1106,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAllSuccessful2(ThreadFactory factory) throws Throwable {
+    void testAllSuccessfulOrThrow2(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.<String>allSuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
@@ -1171,7 +1124,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAllSuccessful3(ThreadFactory factory) throws Throwable {
+    void testAllSuccessfulOrThrow3(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.<String>allSuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1188,7 +1141,7 @@ class StructuredTaskScopeTest {
      * Test Policy.anySuccessfulResultOrThrow() with no subtasks.
      */
     @Test
-    void testAnySuccessful1() throws Exception {
+    void testAnySuccessfulResultOrThrow1() throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.anySuccessfulResultOrThrow())) {
             try {
                 scope.join();
@@ -1203,7 +1156,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAnySuccessful2(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulResultOrThrow2(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>anySuccessfulResultOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1218,7 +1171,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAnySuccessful3(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulResultOrThrow3(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>anySuccessfulResultOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> null);
@@ -1228,12 +1181,12 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Policy.anySuccessfulResultOrThrow() with a subtask that complete succcessfully and
-     * a subtask that fails.
+     * Test Policy.anySuccessfulResultOrThrow() with a subtask that complete succcessfully
+     * and a subtask that fails.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAnySuccessful4(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulResultOrThrow4(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>anySuccessfulResultOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1248,7 +1201,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAnySuccessful5(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulResultOrThrow5(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.anySuccessfulResultOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> { throw new FooException(); });
@@ -1258,10 +1211,57 @@ class StructuredTaskScopeTest {
     }
 
     /**
+     * Test Policy.ignoreSuccessfulOrThrow() with no subtasks.
+     */
+    @Test
+    void testIgnoreSuccessfulOrThrow1() throws Throwable {
+        try (var scope = StructuredTaskScope.open(Policy.ignoreSuccessfulOrThrow())) {
+            var result = scope.join();
+            assertNull(result);
+        }
+    }
+
+    /**
+     * Test Policy.ignoreSuccessfulOrThrow() with subtasks that complete successfully.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testIgnoreSuccessfulOrThrow2(ThreadFactory factory) throws Throwable {
+        try (var scope = StructuredTaskScope.open(Policy.<String>ignoreSuccessfulOrThrow(),
+                cf -> cf.withThreadFactory(factory))) {
+            var subtask1 = scope.fork(() -> "foo");
+            var subtask2 = scope.fork(() -> "bar");
+            var result = scope.join();
+            assertNull(result);
+            assertEquals("foo", subtask1.get());
+            assertEquals("bar", subtask2.get());
+        }
+    }
+
+    /**
+     * Test Policy.ignoreSuccessfulOrThrow() with a subtask that complete successfully and
+     * a subtask that fails.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testIgnoreSuccessfulOrThrow3(ThreadFactory factory) throws Throwable {
+        try (var scope = StructuredTaskScope.open(Policy.<String>ignoreSuccessfulOrThrow(),
+                cf -> cf.withThreadFactory(factory))) {
+            scope.fork(() -> "foo");
+            scope.fork(() -> { throw new FooException(); });
+            try {
+                scope.join();
+            } catch (ExecutionException e) {
+                assertTrue(e.getCause() instanceof FooException);
+            }
+        }
+    }
+
+    /**
      * Test Policy.ignoreAll() with no subtasks.
      */
     @Test
-    void testIgnoreFailures1() throws Throwable {
+    void testIgnoreAll1() throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.ignoreAll())) {
             var result = scope.join();
             assertNull(result);
@@ -1273,7 +1273,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreFailures2(ThreadFactory factory) throws Throwable {
+    void testIgnoreAll2(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.<String>ignoreAll(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
@@ -1286,12 +1286,12 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Policy.ignoreAll() with a subtask that complete successfully and
-     * a subtask that fails.
+     * Test Policy.ignoreAll() with a subtask that complete successfully and a subtask
+     * that fails.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreFailures3(ThreadFactory factory) throws Throwable {
+    void testIgnoreAll3(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.<String>ignoreAll(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
@@ -1307,7 +1307,7 @@ class StructuredTaskScopeTest {
      * Test Policy.all(Predicate) with no subtasks.
      */
     @Test
-    void testAllForked1() throws Throwable {
+    void testAllWithPredicate1() throws Throwable {
         try (var scope = StructuredTaskScope.open(Policy.all(s -> false))) {
             var subtasks = scope.join();
             assertEquals(0, subtasks.count());
@@ -1319,7 +1319,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAllForked2(ThreadFactory factory) throws Exception {
+    void testAllWithPredicate2(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>all(s -> false),
                 cf -> cf.withThreadFactory(factory))) {
 
@@ -1341,7 +1341,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAllForked3(ThreadFactory factory) throws Exception {
+    void testAllWithPredicate3(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Policy.<String>all(s -> true),
                 cf -> cf.withThreadFactory(factory))) {
 
@@ -1362,14 +1362,14 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Policy.all(Predicate) with cancellation after serveral subtasks completes.
+     * Test Policy.all(Predicate) with cancellation after serveral subtasks complete.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testAllForked4(ThreadFactory factory) throws Exception {
+    void testAllWithPredicate4(ThreadFactory factory) throws Exception {
 
-        // cancel execution if 2 or more failures
-        class AtMostTwoFailures<T> implements Predicate<Subtask<? extends T>> {
+        // cancel execution after two or more failures
+        class CancelAfterTwoFailures<T> implements Predicate<Subtask<? extends T>> {
             final AtomicInteger failedCount = new AtomicInteger();
             @Override
             public boolean test(Subtask<? extends T> subtask) {
@@ -1377,7 +1377,7 @@ class StructuredTaskScopeTest {
                         && failedCount.incrementAndGet() >= 2;
             }
         }
-        var policy = Policy.all(new AtMostTwoFailures<String>());
+        var policy = Policy.all(new CancelAfterTwoFailures<String>());
 
         try (var scope = StructuredTaskScope.open(policy)) {
             int forkCount = 0;

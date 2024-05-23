@@ -330,6 +330,127 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     private volatile boolean timeoutExpired;
 
     /**
+     * Throws IllegalStateException if the task scope is closed.
+     */
+    private void ensureOpen() {
+        assert Thread.currentThread() == flock.owner();
+        if (closed) {
+            throw new IllegalStateException("Task scope is closed");
+        }
+    }
+
+    /**
+     * Throws WrongThreadException if the current thread is not the owner thread.
+     */
+    private void ensureOwner() {
+        if (Thread.currentThread() != flock.owner()) {
+            throw new WrongThreadException("Current thread not owner");
+        }
+    }
+
+    /**
+     * Throws IllegalStateException if invoked by the owner thread and the owner thread
+     * has not joined.
+     */
+    private void ensureJoinedIfOwner() {
+        if (Thread.currentThread() == flock.owner() && !joined) {
+            String msg = needToJoin ? "Owner did not join" : "join did not complete";
+            throw new IllegalStateException(msg);
+        }
+    }
+
+    /**
+     * Interrupts all threads in this task scope, except the current thread.
+     */
+    private void implInterruptAll() {
+        flock.threads()
+                .filter(t -> t != Thread.currentThread())
+                .forEach(t -> {
+                    try {
+                        t.interrupt();
+                    } catch (Throwable ignore) { }
+                });
+    }
+
+    @SuppressWarnings("removal")
+    private void interruptAll() {
+        if (System.getSecurityManager() == null) {
+            implInterruptAll();
+        } else {
+            PrivilegedAction<Void> pa = () -> {
+                implInterruptAll();
+                return null;
+            };
+            AccessController.doPrivileged(pa);
+        }
+    }
+
+    /**
+     * Cancel exception if not already cancelled.
+     */
+    private void cancelExecution() {
+        if (!cancelled && CANCELLED.compareAndSet(this, false, true)) {
+            // prevent new threads from starting
+            flock.shutdown();
+
+            // interrupt all unfinished threads
+            interruptAll();
+
+            // wakeup join
+            flock.wakeup();
+        }
+    }
+
+    /**
+     * Schedules a task to cancel execution on timeout.
+     */
+    private void scheduleTimeout(Duration timeout) {
+        assert Thread.currentThread() == flock.owner() && timerTask == null;
+        timerTask = TimerSupport.schedule(timeout, () -> {
+            if (!cancelled) {
+                timeoutExpired = true;
+                cancelExecution();
+            }
+        });
+    }
+
+    /**
+     * Cancels the timer task if set.
+     */
+    private void cancelTimeout() {
+        assert Thread.currentThread() == flock.owner();
+        if (timerTask != null) {
+            timerTask.cancel(false);
+        }
+    }
+
+    /**
+     * Invoked by the thread for a subtask when the subtask completes before execution
+     * was cancelled.
+     */
+    private void onComplete(SubtaskImpl<? extends T> subtask) {
+        assert subtask.state() != Subtask.State.UNAVAILABLE;
+        if (policy.onComplete(subtask)) {
+            cancelExecution();
+        }
+    }
+
+    /**
+     * Initialize a new StructuredTaskScope.
+     */
+    @SuppressWarnings("this-escape")
+    private StructuredTaskScope(Policy<? super T, ? extends R> policy,
+                                ThreadFactory threadFactory,
+                                String name) {
+        this.policy = policy;
+        this.threadFactory = threadFactory;
+
+        if (name == null)
+            name = Objects.toIdentityString(this);
+        this.flock = ThreadFlock.open(name);
+    }
+
+    /**
      * Represents a subtask forked with {@link #fork(Callable)} or {@link #fork(Runnable)}.
      * @param <T> the result type
      * @since 21
@@ -735,21 +856,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Initialize a new StructuredTaskScope.
-     */
-    @SuppressWarnings("this-escape")
-    private StructuredTaskScope(Policy<? super T, ? extends R> policy,
-                                ThreadFactory threadFactory,
-                                String name) {
-        this.policy = policy;
-        this.threadFactory = threadFactory;
-
-        if (name == null)
-            name = Objects.toIdentityString(this);
-        this.flock = ThreadFlock.open(name);
-    }
-
-    /**
      * Opens a new structured task scope to use the given policy object plus configuration
      * that is the result of applying the given function to the
      * <a href="#DefaultConfiguration">default configuration</a>.
@@ -825,100 +931,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      */
     public static <T, R> StructuredTaskScope<T, R> open(Policy<? super T, ? extends R> policy) {
         return open(policy, Function.identity());
-    }
-
-    private void ensureOwner() {
-        if (Thread.currentThread() != flock.owner()) {
-            throw new WrongThreadException("Current thread not owner");
-        }
-    }
-
-    private void ensureOpen() {
-        if (closed) {
-            throw new IllegalStateException("Task scope is closed");
-        }
-    }
-
-    private void ensureJoinedIfOwner() {
-        if (Thread.currentThread() == flock.owner() && !joined) {
-            String msg = needToJoin ? "Owner did not join" : "join did not complete";
-            throw new IllegalStateException(msg);
-        }
-    }
-
-    /**
-     * Interrupts all threads in this task scope, except the current thread.
-     */
-    private void implInterruptAll() {
-        flock.threads()
-                .filter(t -> t != Thread.currentThread())
-                .forEach(t -> {
-                    try {
-                        t.interrupt();
-                    } catch (Throwable ignore) { }
-                });
-    }
-
-    @SuppressWarnings("removal")
-    private void interruptAll() {
-        if (System.getSecurityManager() == null) {
-            implInterruptAll();
-        } else {
-            PrivilegedAction<Void> pa = () -> {
-                implInterruptAll();
-                return null;
-            };
-            AccessController.doPrivileged(pa);
-        }
-    }
-
-    /**
-     * Cancel exception.
-     */
-    private void cancelExecution() {
-        if (!cancelled && CANCELLED.compareAndSet(this, false, true)) {
-            // prevent new threads from starting
-            flock.shutdown();
-
-            // interrupt all unfinished threads
-            interruptAll();
-
-            // wakeup join
-            flock.wakeup();
-        }
-    }
-
-    /**
-     * Schedules a task to cancel execution on timeout.
-     */
-    private void scheduleTimeout(Duration timeout) {
-        assert Thread.currentThread() == flock.owner() && timerTask == null;
-        timerTask = TimerSupport.schedule(timeout, () -> {
-            if (!cancelled) {
-                timeoutExpired = true;
-                cancelExecution();
-            }
-        });
-    }
-
-    /**
-     * Cancels the timer task if set.
-     */
-    private void cancelTimeout() {
-        assert Thread.currentThread() == flock.owner();
-        if (timerTask != null) {
-            timerTask.cancel(false);
-        }
-    }
-
-    /**
-     * Invoked when the given subtask completes before execution was cancelled.
-     */
-    private void onComplete(SubtaskImpl<? extends T> subtask) {
-        assert subtask.state() != Subtask.State.UNAVAILABLE;
-        if (policy.onComplete(subtask)) {
-            cancelExecution();
-        }
     }
 
     /**
@@ -1332,19 +1344,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
         @Override
         public boolean onComplete(Subtask<? extends T> subtask) {
-            if (firstSuccess != null) {
-                // already captured a successful subtask
-                return false;
+            if (firstSuccess == null) {
+                if (subtask.state() == Subtask.State.SUCCESS) {
+                    // capture the first subtask that completes successfully
+                    return FIRST_SUCCESS.compareAndSet(this, null, subtask);
+                } else if (firstException == null) {
+                    // capture the exception thrown by the first task to fail
+                    FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
+                }
             }
-
-            if (subtask.state() == Subtask.State.SUCCESS) {
-                // task completed with a result
-                return FIRST_SUCCESS.compareAndSet(this, null, subtask);
-            } else if (firstException == null) {
-                // capture the exception thrown by the first task that failed
-                FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
-            }
-
             return false;
         }
 
