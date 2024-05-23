@@ -376,15 +376,12 @@ public class Object {
         }
 
         // virtual thread waiting
-        boolean attempted = Blocker.begin();
         try {
             wait0(timeoutMillis);
         } catch (InterruptedException e) {
             // virtual thread's interrupt status needs to be cleared
             Thread.currentThread().getAndClearInterrupt();
             throw e;
-        } finally {
-            Blocker.end(attempted);
         }
     }
 

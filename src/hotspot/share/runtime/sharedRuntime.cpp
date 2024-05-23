@@ -92,6 +92,7 @@ RuntimeStub*        SharedRuntime::_resolve_opt_virtual_call_blob;
 RuntimeStub*        SharedRuntime::_resolve_virtual_call_blob;
 RuntimeStub*        SharedRuntime::_resolve_static_call_blob;
 address             SharedRuntime::_resolve_static_call_entry;
+address             SharedRuntime::_native_frame_resume_entry = nullptr;
 
 DeoptimizationBlob* SharedRuntime::_deopt_blob;
 SafepointBlob*      SharedRuntime::_polling_page_vectors_safepoint_handler_blob;
@@ -1910,11 +1911,12 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_C(oopDesc* obj, Ba
   SharedRuntime::monitor_enter_helper(obj, lock, current);
 JRT_END
 
-JRT_LEAF(void, SharedRuntime::redo_monitorenter(JavaThread* current, ObjectMonitor* monitor))
+JRT_BLOCK_ENTRY(void, SharedRuntime::resume_monitor_operation(JavaThread* current, ObjectWaiter* node))
   assert(current == JavaThread::current(), "invariant");
+  ObjectMonitor* monitor = node->monitor();
   assert(!monitor->is_owner(current), "invariant");
 
-  monitor->redo_enter(current);
+  monitor->resume_operation(current, node);
   assert(monitor->is_owner(current) || current->preempting(), "invariant");
 JRT_END
 

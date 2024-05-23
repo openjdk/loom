@@ -91,12 +91,12 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   Unimplemented();
 }
 
-inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+inline intptr_t* ThawBase::push_resume_adapter(frame top, bool is_interpreted_frame) {
   Unimplemented();
   return nullptr;
 }
 
-inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
   Unimplemented();
   return nullptr;
 }

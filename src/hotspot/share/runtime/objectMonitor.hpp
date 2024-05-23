@@ -28,7 +28,7 @@
 #include "memory/allocation.hpp"
 #include "memory/padded.hpp"
 #include "oops/markWord.hpp"
-#include "oops/oopHandle.inline.hpp"
+#include "oops/oopHandle.hpp"
 #include "oops/weakHandle.hpp"
 #include "runtime/javaThread.hpp"
 #include "runtime/perfDataTypes.hpp"
@@ -46,27 +46,33 @@ class BasicLock;
 
 class ObjectWaiter : public CHeapObj<mtThread> {
  public:
-  enum TStates { TS_UNDEF, TS_READY, TS_RUN, TS_WAIT, TS_ENTER, TS_CXQ };
+  enum TStates : uint8_t { TS_UNDEF, TS_READY, TS_RUN, TS_WAIT, TS_ENTER, TS_CXQ };
   ObjectWaiter* volatile _next;
   ObjectWaiter* volatile _prev;
-  JavaThread*   _thread;
-  OopHandle _vthread;
-  uint64_t      _notifier_tid;
-  ParkEvent *   _event;
-  volatile int  _notified;
+  JavaThread*     _thread;
+  OopHandle      _vthread;
+  ObjectMonitor* _monitor;
+  uint64_t  _notifier_tid;
+  int         _recursions;
   volatile TStates TState;
-  bool          _active;           // Contention monitoring is enabled
+  volatile bool _notified;
+  bool           _is_wait;
+  bool        _at_reenter;
+  bool       _interrupted;
+  bool            _active;    // Contention monitoring is enabled
  public:
   ObjectWaiter(JavaThread* current);
-  ObjectWaiter(oop vthread);
-  ~ObjectWaiter() {
-    if (is_vthread()) {
-      assert(_vthread.resolve() != nullptr, "invariant");
-      _vthread.release(JavaThread::thread_oop_storage());
-    }
-  }
-  oop vthread() { return _vthread.resolve(); }
-  bool is_vthread() { return _thread == nullptr; }
+  ObjectWaiter(oop vthread, ObjectMonitor* mon);
+  ~ObjectWaiter();
+  JavaThread* thread() { return _thread; }
+  bool is_vthread()    { return _thread == nullptr; }
+  uint8_t state()      { return TState; }
+  ObjectMonitor* monitor() { return _monitor; }
+  bool is_monitorenter()   { return !_is_wait; }
+  bool is_wait()           { return _is_wait; }
+  bool notified()          { return _notified; }
+  bool at_reenter()        { return _at_reenter; }
+  oop vthread();
   void wait_reenter_begin(ObjectMonitor *mon);
   void wait_reenter_end(ObjectMonitor *mon);
 };
@@ -360,9 +366,9 @@ private:
  public:
   bool      enter_for(JavaThread* locking_thread);
   bool      enter(JavaThread* current);
-  void      redo_enter(JavaThread* current);
+  void      resume_operation(JavaThread* current, ObjectWaiter* node);
   void      exit(JavaThread* current, bool not_suspended = true);
-  void      wait(jlong millis, bool interruptible, TRAPS);
+  void      wait(jlong millis, TRAPS);
   void      notify(TRAPS);
   void      notifyAll(TRAPS);
 
@@ -380,13 +386,14 @@ private:
   void      INotify(JavaThread* current);
   ObjectWaiter* DequeueWaiter();
   void      DequeueSpecificWaiter(ObjectWaiter* waiter);
+  void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node);
   void      EnterI(JavaThread* current);
   void      ReenterI(JavaThread* current, ObjectWaiter* current_node);
-  bool      HandlePreemptedVThread(JavaThread* current);
-  void      VThreadEpilog(JavaThread* current);
-  void      UnlinkAfterAcquire(JavaThread* current, ObjectWaiter* current_node, oop vthread = nullptr);
-  ObjectWaiter* LookupWaiter(int64_t threadid);
 
+  bool      VThreadMonitorEnter(JavaThread* current, ObjectWaiter* node = nullptr);
+  void      VThreadWait(JavaThread* current, jlong millis);
+  bool      VThreadWaitReenter(JavaThread* current, ObjectWaiter* node);
+  void      VThreadEpilog(JavaThread* current, ObjectWaiter* node);
 
   enum class TryLockResult { Interference = -1, HasOwner = 0, Success = 1 };
 

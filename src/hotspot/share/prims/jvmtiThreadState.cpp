@@ -672,10 +672,10 @@ JvmtiVTMSTransitionDisabler::VTMS_unmount_end(jobject vthread) {
   assert(!thread->is_in_tmp_VTMS_transition(), "sanity check");
   finish_VTMS_transition(vthread, /* is_mount */ false);
 
-  if (JvmtiExport::should_post_vthread_unmount() && thread->jvmti_unmount_event_pending()) {
+  if (thread->pending_jvmti_unmount_event()) {
     assert(java_lang_VirtualThread::is_preempted(JNIHandles::resolve(vthread)), "should be marked preempted");
     JvmtiExport::post_vthread_unmount(vthread);
-    thread->set_jvmti_unmount_event_pending(false);
+    thread->set_pending_jvmti_unmount_event(false);
   }
 }
 

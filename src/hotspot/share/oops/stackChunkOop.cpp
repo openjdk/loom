@@ -72,7 +72,7 @@ public:
   LockStackOopIterator(const stackChunkOop chunk) : _chunk(chunk) {}
 
   virtual void oops_do(OopClosure* cl) override {
-    int cnt = _chunk->lockStackSize();
+    int cnt = _chunk->lockstack_size();
     oop* lockstack_start = (oop*)_chunk->start_address();
     for (int i = 0; i < cnt; i++) {
       cl->do_oop(&lockstack_start[i]);
@@ -442,7 +442,7 @@ template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const Register
 template void stackChunkOopDesc::fix_thawed_frame(const frame& f, const SmallRegisterMap* map);
 
 void stackChunkOopDesc::copy_lockstack(oop* dst) {
-  int cnt = lockStackSize();
+  int cnt = lockstack_size();
 
   if (!(is_gc_mode() || requires_barriers())) {
     oop* lockstack_start = (oop*)start_address();

@@ -187,8 +187,8 @@ address StubRoutines::_cont_thaw          = nullptr;
 address StubRoutines::_cont_returnBarrier = nullptr;
 address StubRoutines::_cont_returnBarrierExc = nullptr;
 address StubRoutines::_cont_preempt_stub = nullptr;
-address StubRoutines::_cont_preempt_monitorenter_redo = nullptr;
-address StubRoutines::_cont_preempt_rerun_compiler_adapter = nullptr;
+address StubRoutines::_cont_resume_monitor_operation = nullptr;
+address StubRoutines::_cont_resume_compiler_adapter = nullptr;
 
 JFR_ONLY(RuntimeStub* StubRoutines::_jfr_write_checkpoint_stub = nullptr;)
 JFR_ONLY(address StubRoutines::_jfr_write_checkpoint = nullptr;)

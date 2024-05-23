@@ -1314,7 +1314,7 @@ nmethod::nmethod(
     _comp_level              = CompLevel_none;
     _compiler_type           = type;
     _orig_pc_offset          = 0;
-    _num_stack_arg_slots     = _method->constMethod()->num_stack_arg_slots();
+    _num_stack_arg_slots     = 0;
 
     if (offsets->value(CodeOffsets::Exceptions) != -1) {
       // Continuation enter intrinsic

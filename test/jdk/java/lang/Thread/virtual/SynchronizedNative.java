@@ -56,6 +56,8 @@
  */
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
@@ -440,6 +442,49 @@ class SynchronizedNative {
             vthread.join();
         }
         assertTrue(entered2.get());
+    }
+
+    /**
+     * Test that blocking on synchronized native method releases the carrier.
+     */
+    //@Test
+    void testReleaseWhenBlocked() throws Exception {
+        assertTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+
+            var lock = this;
+            var started = new CountDownLatch(1);
+            var entered = new AtomicBoolean();   // set to true when vthread enters lock
+
+            var vthread1 = builder.unstarted(() -> {
+                started.countDown();
+                runWithSynchronizedNative(() -> {
+                    assertTrue(Thread.holdsLock(lock));
+                    entered.set(true);
+                });
+                assertFalse(Thread.holdsLock(lock));
+            });
+
+            try {
+                synchronized (this) {
+                    // start thread and wait for it to block
+                    vthread1.start();
+                    started.await();
+                    await(vthread1, Thread.State.BLOCKED);
+
+                    // carrier should be released, use it for another thread
+                    var executed = new AtomicBoolean();
+                    var vthread2 = builder.start(() -> {
+                        executed.set(true);
+                    });
+                    vthread2.join();
+                    assertTrue(executed.get());
+                }
+            } finally {
+                vthread1.join();
+            }
+        }
     }
 
     /**

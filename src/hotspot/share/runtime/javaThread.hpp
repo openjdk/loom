@@ -332,6 +332,8 @@ class JavaThread: public Thread {
   bool                  _is_in_tmp_VTMS_transition;      // thread is in temporary virtual thread mount state transition
   bool                  _is_disable_suspend;             // JVMTI suspend is temporarily disabled; used on current thread only
   bool                  _VTMS_transition_mark;           // used for sync between VTMS transitions and disablers
+  bool                  _pending_jvmti_unmount_event;    // When preempting we post unmount event at unmount end rather than start
+  ObjectMonitor*        _contended_entered_monitor;      // Monitor por pending monitor_contended_entered callback
 #ifdef ASSERT
   bool                  _is_VTMS_transition_disabler;    // thread currently disabled VTMS transitions
 #endif
@@ -482,9 +484,8 @@ class JavaThread: public Thread {
   intx _jni_monitor_count;
   bool _preempting;
   bool _preemption_cancelled;
-  bool _jvmti_unmount_event_pending;
+  bool _pending_interrupted_exception;
   address _preempt_alternate_return; // used when preempting a thread
-  address _preempt_alternate_return_sp;
 
 #ifdef ASSERT
   intx _obj_locker_count;
@@ -655,14 +656,14 @@ private:
   bool preempting()           { return _preempting; }
   void set_preempting(bool b) { _preempting = b; }
 
-  bool preemption_cancelled() { return _preemption_cancelled; }
-  void set_preemption_cancelled(bool val) { _preemption_cancelled = val; }
+  bool preemption_cancelled()           { return _preemption_cancelled; }
+  void set_preemption_cancelled(bool b) { _preemption_cancelled = b; }
 
-  bool jvmti_unmount_event_pending() { return _jvmti_unmount_event_pending; }
-  void set_jvmti_unmount_event_pending(bool val) { _jvmti_unmount_event_pending = val; }
+  bool pending_interrupted_exception()           { return _pending_interrupted_exception; }
+  void set_pending_interrupted_exception(bool b) { _pending_interrupted_exception = b; }
 
   void set_preempt_alternate_return(address val) { _preempt_alternate_return = val; }
-  void set_preempt_alternate_return_sp(address val) { _preempt_alternate_return_sp = val; }
+
  private:
   DEBUG_ONLY(void verify_frame_info();)
 
@@ -711,11 +712,18 @@ private:
   bool VTMS_transition_mark() const              { return Atomic::load(&_VTMS_transition_mark); }
   void set_VTMS_transition_mark(bool val)        { Atomic::store(&_VTMS_transition_mark, val); }
 
+  bool pending_jvmti_unmount_event()             { return _pending_jvmti_unmount_event; }
+  void set_pending_jvmti_unmount_event(bool val) { _pending_jvmti_unmount_event = val; }
+
+  bool pending_contended_entered_event()         { return _contended_entered_monitor != nullptr; }
+  ObjectMonitor* contended_entered_monitor()     { return _contended_entered_monitor; }
 #ifdef ASSERT
   bool is_VTMS_transition_disabler() const       { return _is_VTMS_transition_disabler; }
   void set_is_VTMS_transition_disabler(bool val);
 #endif
 #endif
+
+  void set_contended_entered_monitor(ObjectMonitor* val) NOT_JVMTI_RETURN JVMTI_ONLY({ _contended_entered_monitor = val; })
 
   // Support for object deoptimization and JFR suspension
   void handle_special_runtime_exit_condition();

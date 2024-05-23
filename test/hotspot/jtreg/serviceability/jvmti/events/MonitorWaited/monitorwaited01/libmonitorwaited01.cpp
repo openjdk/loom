@@ -30,6 +30,8 @@
 
 extern "C" {
 
+const int MAX_COUNT = 50;
+
 /* scaffold objects */
 static JNIEnv *jni = nullptr;
 static jvmtiEnv *jvmti = nullptr;
@@ -39,6 +41,8 @@ static jlong timeout = 0;
 static jthread expected_thread = nullptr;
 static jobject expected_object = nullptr;
 static volatile int eventsCount = 0;
+
+static void check_stack_trace(jthread thr);
 
 void JNICALL
 MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jboolean timed_out) {
@@ -65,9 +69,48 @@ MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jboolean t
       set_agent_fail_status();
     }
   }
+
+  if (jni->IsVirtualThread(thr)) {
+    check_stack_trace(thr);
+  }
 }
 
 /* ========================================================================== */
+
+static void check_stack_trace(jthread thr) {
+  jvmtiError err;
+  jint count = 0;
+  jint skipped = 0;
+
+  print_stack_trace(jvmti, jni, nullptr);
+
+  jvmtiFrameInfo frameInfo[MAX_COUNT];
+
+  err = jvmti->GetStackTrace(thr, 0, MAX_COUNT, frameInfo, &count);
+  check_jvmti_status(jni, err, "event handler: error in JVMTI GetStackTrace call");
+
+  const int expected_count = 8;
+  const char* expected_methods[expected_count] = {"wait0", "wait", "run", "runWith", "run", "run", "enter0", "enter"};
+
+  if (count != expected_count) {
+    LOG("Expected 8 methods in the stack but found %d", count);
+    jni->FatalError("Unexpected method count");
+  }
+
+  for (int idx = 0; idx < count; idx++) {
+    jclass declaringClass = nullptr;
+    char *clasSignature = nullptr;
+    char *methodName = nullptr;
+
+    err = jvmti->GetMethodName(frameInfo[idx].method, &methodName, nullptr, nullptr);
+    check_jvmti_status(jni, err, "event handler: error in JVMTI GetMethodName call");
+
+    if (strcmp(methodName, expected_methods[idx]) != 0) {
+      LOG("Expected method %s but found %s", expected_methods[idx], methodName);
+      jni->FatalError("Unexpected method found");
+    }
+  }
+}
 
 static int prepare() {
   /* enable MonitorWait event */

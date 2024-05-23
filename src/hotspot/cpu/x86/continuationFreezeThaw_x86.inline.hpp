@@ -142,7 +142,9 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
   assert((intptr_t*)hf.at_relative(frame::interpreter_frame_last_sp_offset) == hf.unextended_sp(), "");
 
   // Make sure that locals is already relativized.
-  assert((*hf.addr_at(frame::interpreter_frame_locals_offset) == frame::sender_sp_offset + f.interpreter_frame_method()->max_locals() - 1), "");
+  DEBUG_ONLY(Method* m = f.interpreter_frame_method();)
+  DEBUG_ONLY(int max_locals = !m->is_native() ? m->max_locals() : m->size_of_parameters() + 2;)
+  assert((*hf.addr_at(frame::interpreter_frame_locals_offset) == frame::sender_sp_offset + max_locals - 1), "");
 
   // Make sure that monitor_block_top is already relativized.
   assert(hf.at_absolute(frame::interpreter_frame_monitor_block_top_offset) <= frame::interpreter_frame_initial_sp_offset, "");
@@ -213,7 +215,6 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     // If caller is interpreted it already made room for the callee arguments
     int overlap = caller.is_interpreted_frame() ? ContinuationHelper::InterpretedFrame::stack_argsize(hf) : 0;
     const int fsize = (int)(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp() - overlap);
-    const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* frame_sp = caller.unextended_sp() - fsize;
     intptr_t* fp = frame_sp + (hf.fp() - heap_sp);
     DEBUG_ONLY(intptr_t* unextended_sp = fp + *hf.addr_at(frame::interpreter_frame_last_sp_offset);)
@@ -223,7 +224,9 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     // we need to set the locals so that the caller of new_stack_frame() can call
     // ContinuationHelper::InterpretedFrame::frame_bottom
     intptr_t locals_offset = *hf.addr_at(frame::interpreter_frame_locals_offset);
-    assert((int)locals_offset == frame::sender_sp_offset + locals - 1, "");
+    DEBUG_ONLY(Method* m = hf.interpreter_frame_method();)
+    DEBUG_ONLY(const int max_locals = !m->is_native() ? m->max_locals() : m->size_of_parameters() + 2;)
+    assert((int)locals_offset == frame::sender_sp_offset + max_locals - 1, "");
     // copy relativized locals from the heap frame
     *f.addr_at(frame::interpreter_frame_locals_offset) = locals_offset;
     return f;
@@ -248,7 +251,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
       // we need to recreate a "real" frame pointer, pointing into the stack
       fp = frame_sp + FKind::size(hf) - frame::sender_sp_offset;
     } else {
-      fp = FKind::stub
+      fp = FKind::stub || FKind::native
         ? frame_sp + fsize - frame::sender_sp_offset // fp always points to the address below the pushed return pc. We need correct address.
         : *(intptr_t**)(hf.sp() - frame::sender_sp_offset); // we need to re-read fp because it may be an oop and we might have fixed the frame.
     }
@@ -278,11 +281,16 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   patch_callee_link(f, fp);
 }
 
-inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+inline void ThawBase::fix_native_return_pc_pd(frame& top) {
+  bool from_interpreted = top.is_interpreted_frame();
+  address resume_address = from_interpreted ? Interpreter::native_frame_resume_entry() : SharedRuntime::native_frame_resume_entry();
+  DEBUG_ONLY(Method* method = from_interpreted ? top.interpreter_frame_method() : CodeCache::find_blob(resume_address)->as_nmethod()->method();)
+  assert(method->is_object_wait0(), "");
+  ContinuationHelper::Frame::patch_pc(top, resume_address);
+}
+
+inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
   intptr_t* sp = top.sp();
-  intptr_t* fp = sp - frame::sender_sp_offset;
-  address pc = is_interpreted_frame ? Interpreter::cont_preempt_rerun_interpreter_adapter()
-                                    : StubRoutines::cont_preempt_rerun_compiler_adapter();
 
 #ifdef ASSERT
   RegisterMap map(JavaThread::current(),
@@ -294,16 +302,20 @@ inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpr
   assert(sp[-2] == link_addr, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr);
 #endif
 
+  intptr_t* fp = sp - frame::sender_sp_offset;
+  address pc = top.is_interpreted_frame() ? Interpreter::cont_resume_interpreter_adapter()
+                                          : StubRoutines::cont_resume_compiler_adapter();
+
   sp -= frame::metadata_words;
   *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
   *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
 
-  log_develop_trace(continuations, preempt)("push_preempt_rerun_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    is_interpreted_frame ? "interpreter" : "safepointblob", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+  log_develop_trace(continuations, preempt)("push_resume_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
+    top.is_interpreted_frame() ? "interpreter" : "compiler", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
   return sp;
 }
 
-inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
   frame enterSpecial = new_entry_frame();
   intptr_t* sp = enterSpecial.sp();
 
@@ -312,16 +324,16 @@ inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
   sp[1] = (intptr_t)StubRoutines::cont_returnBarrier();
   sp[0] = (intptr_t)enterSpecial.fp();
 
-  // Now push the ObjectMonitor*
+  // Now push the ObjectWaiter*
   sp -= frame::metadata_words;
-  sp[1] = (intptr_t)chunk->objectMonitor(); // alignment
-  sp[0] = (intptr_t)chunk->objectMonitor();
+  sp[1] = (intptr_t)chunk->object_waiter(); // alignment
+  sp[0] = (intptr_t)chunk->object_waiter();
 
-  // Finally arrange to return to the monitorenter_redo stub
-  sp[-1] = (intptr_t)StubRoutines::cont_preempt_monitorenter_redo();
+  // Finally arrange to return to the resume_monitor_operation stub
+  sp[-1] = (intptr_t)StubRoutines::cont_resume_monitor_operation();
   sp[-2] = (intptr_t)enterSpecial.fp();
 
-  log_develop_trace(continuations, preempt)("push_preempt_monitorenter_redo initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
+  log_develop_trace(continuations, preempt)("push_resume_monitor_operation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
 }
 

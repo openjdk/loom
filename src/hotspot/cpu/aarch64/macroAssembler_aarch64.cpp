@@ -1965,13 +1965,8 @@ void MacroAssembler::call_VM_leaf_base(address entry_point,
   if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) || 
       entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
     ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-    ldr(rscratch2, Address(rthread, in_bytes(JavaThread::preempt_alternate_return_offset()) + wordSize));
     cbz(rscratch1, not_preempted);
-    mov(r4, sp); // r4 is clobbered by VM calls, so free here
-    cmp(rscratch2, r4);
-    br(LT, not_preempted);
     str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-    str(zr, Address(rthread, in_bytes(JavaThread::preempt_alternate_return_offset()) + wordSize));
     br(rscratch1);
   }
 

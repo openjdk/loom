@@ -523,7 +523,9 @@ class java_lang_VirtualThread : AllStatic {
   static int _state_offset;
   static int _next_offset;
   static int _onWaitingList_offset;
+  static int _notified_offset;
   static int _recheckInterval_offset;
+  static int _millisOnTimedWait_offset;
   JFR_ONLY(static int _jfr_epoch_offset;)
  public:
   enum {
@@ -542,6 +544,10 @@ class java_lang_VirtualThread : AllStatic {
     BLOCKING      = 12,
     BLOCKED       = 13,
     UNBLOCKED     = 14,
+    WAITING       = 15,
+    TIMED_WAITING = 16,
+    WAITED        = 17,
+    TIMED_WAITED  = 18,
     TERMINATED    = 99,
 
     // additional state bits
@@ -562,11 +568,15 @@ class java_lang_VirtualThread : AllStatic {
   static oop continuation(oop vthread);
   static int state(oop vthread);
   static void set_state(oop vthread, int state);
+  static int cmpxchg_state(oop vthread, int old_state, int new_state);
   static oop next(oop vthread);
   static void set_next(oop vthread, oop next_vthread);
   static bool set_onWaitingList(oop vthread, OopHandle& list_head);
   static jbyte recheckInterval(oop vthread);
   static void set_recheckInterval(oop vthread, jbyte value);
+  static jlong millisOnTimedWait(oop vthread);
+  static void set_millisOnTimedWait(oop vthread, jlong value);
+  static void set_notified(oop vthread, jboolean value);
   static bool is_preempted(oop vthread);
   static JavaThreadStatus map_state_to_thread_status(int state);
 };

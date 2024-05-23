@@ -1960,7 +1960,9 @@ int java_lang_VirtualThread::_continuation_offset;
 int java_lang_VirtualThread::_state_offset;
 int java_lang_VirtualThread::_next_offset;
 int java_lang_VirtualThread::_onWaitingList_offset;
+int java_lang_VirtualThread::_notified_offset;
 int java_lang_VirtualThread::_recheckInterval_offset;
+int java_lang_VirtualThread::_millisOnTimedWait_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_vthread_scope_offset,       k, "VTHREAD_SCOPE",      continuationscope_signature, true);  \
@@ -1969,7 +1971,9 @@ int java_lang_VirtualThread::_recheckInterval_offset;
   macro(_state_offset,                     k, "state",              int_signature,               false); \
   macro(_next_offset,                      k, "next",               vthread_signature,           false); \
   macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
-  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false);
+  macro(_notified_offset,                  k, "notified",           bool_signature,              false); \
+  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
+  macro(_millisOnTimedWait_offset,         k, "millisOnTimedWait",  long_signature,              false);
 
 
 void java_lang_VirtualThread::compute_offsets() {
@@ -1999,6 +2003,12 @@ void java_lang_VirtualThread::set_state(oop vthread, int state) {
   vthread->release_int_field_put(_state_offset, state);
 }
 
+int java_lang_VirtualThread::cmpxchg_state(oop vthread, int old_state, int new_state) {
+  jint* addr = vthread->field_addr<jint>(_state_offset);
+  int res = Atomic::cmpxchg(addr, old_state, new_state);
+  return res;
+}
+
 oop java_lang_VirtualThread::next(oop vthread) {
   return vthread->obj_field(_next_offset);
 }
@@ -2024,12 +2034,24 @@ bool java_lang_VirtualThread::set_onWaitingList(oop vthread, OopHandle& list_hea
   return false; // already on waiting list
 }
 
+void java_lang_VirtualThread::set_notified(oop vthread, jboolean value) {
+  vthread->bool_field_put_volatile(_notified_offset, value);
+}
+
 jbyte java_lang_VirtualThread::recheckInterval(oop vthread) {
   return vthread->byte_field(_recheckInterval_offset);
 }
 
 void java_lang_VirtualThread::set_recheckInterval(oop vthread, jbyte value) {
   vthread->release_byte_field_put(_recheckInterval_offset, value);
+}
+
+jlong java_lang_VirtualThread::millisOnTimedWait(oop vthread) {
+  return vthread->long_field(_millisOnTimedWait_offset);
+}
+
+void java_lang_VirtualThread::set_millisOnTimedWait(oop vthread, jlong value) {
+  vthread->long_field_put(_millisOnTimedWait_offset, value);
 }
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
@@ -2047,6 +2069,8 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
     case YIELDED:
     case BLOCKING:
     case UNBLOCKED:
+    case WAITING:
+    case TIMED_WAITING:
       status = JavaThreadStatus::RUNNABLE;
       break;
     case PARKED:
@@ -2059,6 +2083,12 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
       break;
     case BLOCKED:
       status = JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER;
+      break;
+    case WAITED:
+      status = JavaThreadStatus::IN_OBJECT_WAIT;
+      break;
+    case TIMED_WAITED:
+      status = JavaThreadStatus::IN_OBJECT_WAIT_TIMED;
       break;
     case TERMINATED:
       status = JavaThreadStatus::TERMINATED;

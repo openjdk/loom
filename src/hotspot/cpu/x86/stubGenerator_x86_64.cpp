@@ -3830,6 +3830,7 @@ address StubGenerator::generate_cont_preempt_stub() {
   __ ret(0);
 
   __ bind(preemption_cancelled);
+  __ movbool(Address(r15_thread, JavaThread::preemption_cancelled_offset()), false);
   __ lea(rbp, Address(rsp, checked_cast<int32_t>(ContinuationEntry::size())));
   __ movptr(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
   __ jmp(rscratch1);
@@ -3837,9 +3838,9 @@ address StubGenerator::generate_cont_preempt_stub() {
   return start;
 }
 
-address StubGenerator::generate_cont_preempt_monitorenter_redo() {
+address StubGenerator::generate_cont_resume_monitor_operation() {
   if (!Continuations::enabled()) return nullptr;
-  StubCodeMark mark(this, "StubRoutines","Continuation monitorenter redo stub");
+  StubCodeMark mark(this, "StubRoutines","Continuation resume monitor operation");
   address start = __ pc();
 
 #ifdef ASSERT
@@ -3854,13 +3855,13 @@ address StubGenerator::generate_cont_preempt_monitorenter_redo() {
   __ pop(rax);
 #endif
 
-  const Register mon_reg = c_rarg1;
-  __ pop(mon_reg);
-  __ pop(mon_reg);
+  const Register waiter_reg = c_rarg1;
+  __ pop(waiter_reg);
+  __ pop(waiter_reg);
 
 #ifdef ASSERT
   { Label L;
-    __ testptr(mon_reg, mon_reg);
+    __ testptr(waiter_reg, waiter_reg);
     __ jcc(Assembler::notEqual, L);
     __ stop("ObjectMonitor to use is null");
     __ bind(L);
@@ -3869,7 +3870,7 @@ address StubGenerator::generate_cont_preempt_monitorenter_redo() {
 
   __ mov(c_rarg0, r15_thread);
   __ subptr(rsp, frame::arg_reg_save_area_bytes);
-  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter)));
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::resume_monitor_operation)));
   __ addptr(rsp, frame::arg_reg_save_area_bytes);
 
   Label failAcquire;
@@ -3893,9 +3894,9 @@ address StubGenerator::generate_cont_preempt_monitorenter_redo() {
   return start;
 }
 
-address StubGenerator::generate_cont_preempt_rerun_compiler_adapter() {
+address StubGenerator::generate_cont_resume_compiler_adapter() {
   if (!Continuations::enabled()) return nullptr;
-  StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
+  StubCodeMark mark(this, "StubRoutines", "Continuation resume compiler adapter");
   address start = __ pc();
 
   // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
@@ -4265,8 +4266,8 @@ void StubGenerator::generate_continuation_stubs() {
   StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
   StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
   StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-  StubRoutines::_cont_preempt_monitorenter_redo = generate_cont_preempt_monitorenter_redo();
-  StubRoutines::_cont_preempt_rerun_compiler_adapter = generate_cont_preempt_rerun_compiler_adapter();
+  StubRoutines::_cont_resume_monitor_operation = generate_cont_resume_monitor_operation();
+  StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
 
   JFR_ONLY(generate_jfr_stubs();)
 }

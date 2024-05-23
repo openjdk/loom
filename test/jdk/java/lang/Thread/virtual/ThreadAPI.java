@@ -2052,6 +2052,8 @@ class ThreadAPI {
             // check virtual thread's stack trace
             assertFalse(contains(vthreadStackTrace, "java.util.concurrent.ForkJoinPool.runWorker"));
             assertTrue(contains(vthreadStackTrace, "java.lang.Object.wait"));
+
+            vthread.join();
         }
     }
 
@@ -2208,6 +2210,7 @@ class ThreadAPI {
 
             // there should be no stack trace for the virtual thread
             assertNull(map.get(vthread));
+            vthread.join();
         }
     }
 

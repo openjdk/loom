@@ -7158,18 +7158,16 @@ class StubGenerator: public StubCodeGenerator {
     __ mov(sp, rscratch2);
 
     Label preemption_cancelled;
-    // FIXME: Whose responsibility is it to clear this flag?
     __ ldrb(rscratch1, Address(rthread, JavaThread::preemption_cancelled_offset()));
     __ cbnz(rscratch1, preemption_cancelled);
 
-    //__ trace("Remove enterSpecial frame from the stack and return to Continuation.run()");
     // Remove enterSpecial frame from the stack and return to Continuation.run()
     SharedRuntime::continuation_enter_cleanup(_masm);
     __ leave();
     __ ret(lr);
 
     __ bind(preemption_cancelled);
-    //__ trace("preemption_cancelled");
+    __ strb(zr, Address(rthread, JavaThread::preemption_cancelled_offset()));
     __ lea(rfp, Address(sp, checked_cast<int32_t>(ContinuationEntry::size())));
     __ lea(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
     __ ldr(rscratch1, Address(rscratch1));
@@ -7178,9 +7176,9 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_preempt_rerun_compiler_adapter() {
+  address generate_cont_resume_compiler_adapter() {
     if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines", "Continuation preempt safepoint blob adapter");
+    StubCodeMark mark(this, "StubRoutines", "Continuation resume compiler adapter");
     address start = __ pc();
 
     // The safepoint blob handler expects that r20, being a callee saved register, will be preserved
@@ -7196,17 +7194,17 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_preempt_monitorenter_redo() {
+  address generate_cont_resume_monitor_operation() {
     if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines","Continuation monitorenter redo stub");
+    StubCodeMark mark(this, "StubRoutines","Continuation resume monitor operation");
     address start = __ pc();
 
-    const Register mon_reg = c_rarg1;
-    __ ldr(mon_reg, __ post(sp, 2 * wordSize));
+    const Register waiter_reg = c_rarg1;
+    __ ldr(waiter_reg, __ post(sp, 2 * wordSize));
 
 #ifdef ASSERT
     { Label L;
-      __ cbnz(mon_reg, L);
+      __ cbnz(waiter_reg, L);
       __ stop("ObjectMonitor to use is null");
       __ bind(L);
     }
@@ -7214,7 +7212,7 @@ class StubGenerator: public StubCodeGenerator {
 
     __ set_last_Java_frame(sp, rfp, lr, rscratch1);
     __ mov(c_rarg0, rthread);
-    __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::redo_monitorenter));
+    __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::resume_monitor_operation));
     __ reset_last_Java_frame(true);
 
     Label failAcquire;
@@ -8510,8 +8508,8 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_preempt_monitorenter_redo = generate_cont_preempt_monitorenter_redo();
-    StubRoutines::_cont_preempt_rerun_compiler_adapter = generate_cont_preempt_rerun_compiler_adapter();
+    StubRoutines::_cont_resume_monitor_operation = generate_cont_resume_monitor_operation();
+    StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
 
     JFR_ONLY(generate_jfr_stubs();)
   }

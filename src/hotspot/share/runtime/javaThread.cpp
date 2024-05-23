@@ -457,6 +457,8 @@ JavaThread::JavaThread() :
   _is_in_tmp_VTMS_transition(false),
   _is_disable_suspend(false),
   _VTMS_transition_mark(false),
+  _pending_jvmti_unmount_event(false),
+  _contended_entered_monitor(nullptr),
 #ifdef ASSERT
   _is_VTMS_transition_disabler(false),
 #endif
@@ -497,7 +499,8 @@ JavaThread::JavaThread() :
   _jni_monitor_count(0),
   _preempting(false),
   _preemption_cancelled(false),
-  _jvmti_unmount_event_pending(false),
+  _pending_interrupted_exception(false),
+  _preempt_alternate_return(nullptr),
   DEBUG_ONLY(_obj_locker_count(0) COMMA)
 
   _handshake(this),

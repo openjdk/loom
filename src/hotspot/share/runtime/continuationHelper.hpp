@@ -66,6 +66,7 @@ class ContinuationHelper::Frame : public AllStatic {
 public:
   static const bool interpreted = false;
   static const bool stub = false;
+  static const bool native = false;
 
   static inline intptr_t** callee_link_address(const frame& f);
   static Method* frame_method(const frame& f);
@@ -132,9 +133,12 @@ public:
 
 class ContinuationHelper::NativeFrame : public ContinuationHelper::NonInterpretedFrame {
 public:
+  static const bool native = true;
+
   static bool is_instance(const frame& f);
 
   static int monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
+  static int stack_argsize(const frame& f) { return 0; }
 };
 
 class ContinuationHelper::StubFrame : public ContinuationHelper::NonInterpretedFrame {

@@ -581,8 +581,8 @@ class StubGenerator: public StubCodeGenerator {
   address generate_cont_returnBarrier_exception();
 
   address generate_cont_preempt_stub();
-  address generate_cont_preempt_monitorenter_redo();
-  address generate_cont_preempt_rerun_compiler_adapter();
+  address generate_cont_resume_monitor_operation();
+  address generate_cont_resume_compiler_adapter();
 
 #if INCLUDE_JFR
   void generate_jfr_stubs();

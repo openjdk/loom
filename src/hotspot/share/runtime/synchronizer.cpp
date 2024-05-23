@@ -817,7 +817,7 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
   ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_wait);
 
   DTRACE_MONITOR_WAIT_PROBE(monitor, obj(), current, millis);
-  monitor->wait(millis, true, THREAD); // Not CHECK as we need following code
+  monitor->wait(millis, THREAD); // Not CHECK as we need following code
 
   // This dummy call is in place to get around dtrace bug 6254741.  Once
   // that's fixed we can uncomment the following line, remove the call

@@ -440,6 +440,7 @@ class SerializeClosure;
   template(maxSize_name,                              "maxSize")                                  \
   template(reset_name,                                "reset")                                    \
   template(done_name,                                 "done")                                     \
+  template(preempted_name,                            "preempted")                                \
   template(mounted_name,                              "mounted")                                  \
   template(numInterpretedFrames_name,                 "numInterpretedFrames")                     \
   template(jfrTraceId_name,                           "jfrTraceId")                               \
@@ -546,7 +547,7 @@ class SerializeClosure;
   template(jfr_epoch_name,                            "jfr_epoch")                                \
   template(maxThawingSize_name,                       "maxThawingSize")                           \
   template(lockStackSize_name,                        "lockStackSize")                            \
-  template(objectMonitor_name,                        "objectMonitor")                            \
+  template(objectWaiter_name,                         "objectWaiter")                             \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \

@@ -1416,7 +1416,7 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
   } else if (is_entry_frame()) {
     // For now just label the frame
     values.describe(-1, info_address, err_msg("#%d entry frame", frame_no), 2);
-  } else if (cb() && cb()->is_nmethod()) {
+  } else if (is_compiled_frame()) {
     // For now just label the frame
     nmethod* nm = cb()->as_nmethod();
     values.describe(-1, info_address,
@@ -1519,17 +1519,16 @@ void frame::describe(FrameValues& values, int frame_no, const RegisterMap* reg_m
         oop_map()->all_type_do(this, OopMapValue::callee_saved_value, &valuesFn);
       }
     }
-
-    if (nm->method()->is_continuation_enter_intrinsic()) {
-      ContinuationEntry* ce = Continuation::get_continuation_entry_for_entry_frame(reg_map->thread(), *this); // (ContinuationEntry*)unextended_sp();
-      ce->describe(values, frame_no);
-    }
   } else if (is_native_frame()) {
     // For now just label the frame
     nmethod* nm = cb()->as_nmethod_or_null();
     values.describe(-1, info_address,
                     FormatBuffer<1024>("#%d nmethod " INTPTR_FORMAT " for native method %s", frame_no,
                                        p2i(nm), nm->method()->name_and_sig_as_C_string()), 2);
+    if (nm->method()->is_continuation_enter_intrinsic()) {
+      ContinuationEntry* ce = Continuation::get_continuation_entry_for_entry_frame(reg_map->thread(), *this); // (ContinuationEntry*)unextended_sp();
+      ce->describe(values, frame_no);
+    }
   } else {
     // provide default info if not handled before
     char *info = (char *) "special frame";

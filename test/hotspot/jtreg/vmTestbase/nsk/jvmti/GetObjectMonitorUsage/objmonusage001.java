@@ -56,10 +56,11 @@ public class objmonusage001 {
         Thread mainThread = Thread.currentThread();
         Object syncObject[] = new Object[NUMBER_OF_THREADS];
         objmonusage001a runn[] = new objmonusage001a[NUMBER_OF_THREADS];
+        boolean isMainVirtual = Thread.currentThread().isVirtual();
 
         for (int i = 0; i < NUMBER_OF_THREADS; i++) {
             syncObject[i] = new Object();
-            runn[i] = new objmonusage001a(mainThread, i, syncObject[i]);
+            runn[i] = new objmonusage001a(mainThread, i, syncObject[i], isMainVirtual);
         }
 
         for (int i = 0; i < NUMBER_OF_THREADS; i++) {
@@ -139,11 +140,13 @@ class objmonusage001a extends Thread {
     Thread mainThread;
     Object syncObject;
     int index;
+    boolean isMainVirtual;
 
-    public objmonusage001a(Thread mt, int i, Object s) {
+    public objmonusage001a(Thread mt, int i, Object s, boolean v) {
         mainThread = mt;
         index = i;
         syncObject = s;
+        isMainVirtual = v;
     }
 
     public void run() {
@@ -167,7 +170,7 @@ class objmonusage001a extends Thread {
             // and is not notified and this worker thread is doing the verification.
             //
             objmonusage001.check(index, syncObject, this, 1,
-                                 null, 0, mainThread, 1);
+                                 null, 0, isMainVirtual ? null : mainThread, isMainVirtual ? 0 : 1);
             syncObject.notify();
 
             try {

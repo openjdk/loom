@@ -547,12 +547,12 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, c
   // Keep top_frame_sp relativized.
 }
 
-inline intptr_t* ThawBase::push_preempt_rerun_adapter(frame top, bool is_interpreted_frame) {
+inline intptr_t* ThawBase::push_resume_adapter(frame& top, bool is_interpreted_frame) {
   Unimplemented();
   return nullptr;
 }
 
-inline intptr_t* ThawBase::push_preempt_monitorenter_redo(stackChunkOop chunk) {
+inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
   Unimplemented();
   return nullptr;
 }

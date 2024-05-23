@@ -64,13 +64,11 @@ public class GetStackTrace {
 
                 System.out.println();
 
-                // top-most frame of carrier thread should be Continuation.run
                 // bottom-most frame of carrier thread should be Thread.run
                 var carrier = scheduler.thread();
                 System.out.println(carrier);
                 StackTraceElement[] carrierStack = carrier.getStackTrace();
                 Stream.of(carrierStack).forEach(System.out::println);
-                assertEquals("run", carrierStack[0].getMethodName());
                 assertEquals("run", carrierStack[carrierStack.length - 1].getMethodName());
             } finally {
                 vthread.interrupt();

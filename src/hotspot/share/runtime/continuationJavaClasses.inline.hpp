@@ -193,12 +193,12 @@ inline void jdk_internal_vm_StackChunk::set_lockStackSize(oop chunk, uint8_t val
   Atomic::store(chunk->field_addr<uint8_t>(_lockStackSize_offset), value);
 }
 
-inline address jdk_internal_vm_StackChunk::objectMonitor(oop chunk) {
-  return chunk->address_field(_objectMonitor_offset);
+inline address jdk_internal_vm_StackChunk::objectWaiter(oop chunk) {
+  return chunk->address_field(_objectWaiter_offset);
 }
 
-inline void jdk_internal_vm_StackChunk::set_objectMonitor(oop chunk, address value) {
-  chunk->address_field_put(_objectMonitor_offset, value);
+inline void jdk_internal_vm_StackChunk::set_objectWaiter(oop chunk, address value) {
+  chunk->address_field_put(_objectWaiter_offset, value);
 }
 
 #endif // SHARE_RUNTIME_CONTINUATIONJAVACLASSES_INLINE_HPP

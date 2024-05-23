@@ -612,7 +612,7 @@ address TemplateInterpreterGenerator::generate_safept_entry_for(
   return entry;
 }
 
-address TemplateInterpreterGenerator::generate_cont_preempt_rerun_interpreter_adapter() {
+address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter() {
   if (!Continuations::enabled()) return nullptr;
   address start = __ pc();
 
@@ -1354,6 +1354,8 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // result handler is in r0
   // set result handler
   __ mov(result_handler, r0);
+  __ str(r0, Address(rfp, frame::interpreter_frame_result_handler_offset * wordSize));
+
   // pass mirror handle if static call
   {
     Label L;
@@ -1392,8 +1394,8 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // Set the last Java PC in the frame anchor to be the return address from
   // the call to the native method: this will allow the debugger to
   // generate an accurate stack trace.
-  Label native_return;
-  __ set_last_Java_frame(esp, rfp, native_return, rscratch1);
+  Label resume_pc;
+  __ set_last_Java_frame(esp, rfp, resume_pc, rscratch1);
 
   // change thread state
 #ifdef ASSERT
@@ -1414,7 +1416,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   // Call the native method.
   __ blr(r10);
-  __ bind(native_return);
+
   __ get_method(rmethod);
   // result potentially in r0 or v0
 
@@ -1479,6 +1481,18 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   __ lea(rscratch2, Address(rthread, JavaThread::thread_state_offset()));
   __ stlrw(rscratch1, rscratch2);
 
+  // Check preemption for Object.wait()
+  Label not_preempted;
+  __ ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
+  __ cbz(rscratch1, not_preempted);
+  __ str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
+  __ br(rscratch1);
+  __ bind(resume_pc);
+  // On resume we need to set up stack as expected
+  __ push(dtos);
+  __ push(ltos);
+  __ bind(not_preempted);
+
   // reset_last_Java_frame
   __ reset_last_Java_frame(true);
 
@@ -1497,6 +1511,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   {
     Label no_oop;
     __ adr(t, ExternalAddress(AbstractInterpreter::result_handler(T_OBJECT)));
+    __ ldr(result_handler, Address(rfp, frame::interpreter_frame_result_handler_offset*wordSize));
     __ cmp(t, result_handler);
     __ br(Assembler::NE, no_oop);
     // Unbox oop result, e.g. JNIHandles::resolve result.

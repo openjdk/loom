@@ -60,6 +60,12 @@ enum freeze_result {
   unsupported = 7
 };
 
+enum freeze_kind {
+  freeze_self_from_java  = 0,
+  freeze_on_monitorenter = 1,
+  freeze_on_wait         = 2
+};
+
 class Continuation : AllStatic {
 public:
 
@@ -86,7 +92,7 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
 
-  static int try_preempt(JavaThread* target, oop continuation, bool set_state_yielding = false);
+  static int try_preempt(JavaThread* target, oop continuation, int preempt_kind);
 
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);

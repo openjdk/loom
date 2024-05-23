@@ -176,7 +176,7 @@ void TemplateInterpreterGenerator::generate_all() {
   }
 
   { CodeletMark cm(_masm, "preemption rerun adapter");
-    Interpreter::_cont_preempt_rerun_interpreter_adapter = generate_cont_preempt_rerun_interpreter_adapter();
+    Interpreter::_cont_resume_interpreter_adapter = generate_cont_resume_interpreter_adapter();
   }
 
 #define method_entry(kind)                                                                          \

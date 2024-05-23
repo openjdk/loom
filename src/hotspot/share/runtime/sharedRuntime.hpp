@@ -35,6 +35,7 @@
 class AdapterHandlerEntry;
 class AdapterFingerPrint;
 class vframeStream;
+class ObjectWaiter;
 
 // Runtime is the base class for various runtime interfaces
 // (InterpreterRuntime, CompilerRuntime, etc.). It provides
@@ -57,6 +58,7 @@ class SharedRuntime: AllStatic {
   static RuntimeStub*        _resolve_virtual_call_blob;
   static RuntimeStub*        _resolve_static_call_blob;
   static address             _resolve_static_call_entry;
+  static address             _native_frame_resume_entry;
 
   static DeoptimizationBlob* _deopt_blob;
 
@@ -199,6 +201,12 @@ class SharedRuntime: AllStatic {
   static address continuation_for_implicit_exception(JavaThread* current,
                                                      address faulting_pc,
                                                      ImplicitExceptionKind exception_kind);
+
+  static address native_frame_resume_entry() { return _native_frame_resume_entry; }
+  static void set_native_frame_resume_entry(address val) {
+    assert(_native_frame_resume_entry == nullptr, "");
+    _native_frame_resume_entry = val;
+  }
 
   // Post-slow-path-allocation, pre-initializing-stores step for
   // implementing e.g. ReduceInitialCardMarks
@@ -501,7 +509,7 @@ class SharedRuntime: AllStatic {
   // Slow-path Locking and Unlocking
   static void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
   static void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
-  static void redo_monitorenter(JavaThread* current, ObjectMonitor* monitor);
+  static void resume_monitor_operation(JavaThread* current, ObjectWaiter* node);
 
   // Resolving of calls
   static address get_resolved_entry        (JavaThread* current, methodHandle callee_method);

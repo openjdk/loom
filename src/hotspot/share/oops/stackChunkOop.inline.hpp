@@ -39,6 +39,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/objectMonitor.hpp"
 #include "runtime/registerMap.hpp"
 #include "runtime/smallRegisterMap.inline.hpp"
 #include "utilities/macros.hpp"
@@ -88,11 +89,11 @@ inline void stackChunkOopDesc::set_max_thawing_size(int value)  {
   jdk_internal_vm_StackChunk::set_maxThawingSize(this, (jint)value);
 }
 
-inline uint8_t stackChunkOopDesc::lockStackSize() const         { return jdk_internal_vm_StackChunk::lockStackSize(as_oop()); }
-inline void stackChunkOopDesc::set_lockStackSize(uint8_t value) { jdk_internal_vm_StackChunk::set_lockStackSize(this, value); }
+inline uint8_t stackChunkOopDesc::lockstack_size() const         { return jdk_internal_vm_StackChunk::lockStackSize(as_oop()); }
+inline void stackChunkOopDesc::set_lockstack_size(uint8_t value) { jdk_internal_vm_StackChunk::set_lockStackSize(this, value); }
 
-inline ObjectMonitor* stackChunkOopDesc::objectMonitor() const       { return (ObjectMonitor*)jdk_internal_vm_StackChunk::objectMonitor(as_oop()); }
-inline void stackChunkOopDesc::set_objectMonitor(ObjectMonitor* mon) { jdk_internal_vm_StackChunk::set_objectMonitor(this, (address)mon); }
+inline ObjectWaiter* stackChunkOopDesc::object_waiter() const       { return (ObjectWaiter*)jdk_internal_vm_StackChunk::objectWaiter(as_oop()); }
+inline void stackChunkOopDesc::set_object_waiter(ObjectWaiter* obj) { jdk_internal_vm_StackChunk::set_objectWaiter(this, (address)obj); }
 
 inline oop stackChunkOopDesc::cont() const                {
   if (UseZGC && !ZGenerational) {
@@ -167,22 +168,50 @@ inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
   uint32_t flags = this->flags();
   set_flags((uint8_t)(value ? flags |= flag : flags &= ~flag));
 }
+inline void stackChunkOopDesc::clear_flags(uint8_t flag) {
+  uint32_t flags = this->flags();
+  set_flags((uint8_t)(flags &= ~flag));
+}
 inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
 
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {
-  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_PREEMPTED)) == 0, "other flags should not be set");
+  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAGS_PREEMPTED)) == 0, "other flags should not be set");
   set_flag(FLAG_HAS_INTERPRETED_FRAMES, value);
 }
 
-inline bool stackChunkOopDesc::is_preempted() const         { return is_flag(FLAG_PREEMPTED); }
-inline void stackChunkOopDesc::set_is_preempted(bool value) { set_flag(FLAG_PREEMPTED, value); }
-inline bool stackChunkOopDesc::preempted_on_monitorenter() const   { return objectMonitor() != nullptr; }
+inline void stackChunkOopDesc::set_preempt_kind(int freeze_kind) {
+  assert((flags() & FLAGS_PREEMPTED) == 0, "");
+  assert(freeze_kind == freeze_on_monitorenter || freeze_kind == freeze_on_wait, "");
+  uint8_t flag = freeze_kind == freeze_on_monitorenter ? FLAG_PREEMPTED_MONITORENTER : FLAG_PREEMPTED_WAIT;
+  set_flag(flag, true);
+}
 
-inline bool stackChunkOopDesc::has_lockStack() const         { return is_flag(FLAG_HAS_LOCKSTACK); }
-inline void stackChunkOopDesc::set_has_lockStack(bool value) { set_flag(FLAG_HAS_LOCKSTACK, value); }
+inline int stackChunkOopDesc::get_and_clear_preempt_kind() {
+  assert((is_flag(FLAG_PREEMPTED_MONITORENTER) && !is_flag(FLAG_PREEMPTED_WAIT))
+         || (is_flag(FLAG_PREEMPTED_WAIT) && !is_flag(FLAG_PREEMPTED_MONITORENTER)), "");
+  int kind = is_flag(FLAG_PREEMPTED_MONITORENTER) ? freeze_on_monitorenter : freeze_on_wait;
+  clear_flags(FLAGS_PREEMPTED);
+  return kind;
+}
+
+inline ObjectMonitor* stackChunkOopDesc::current_pending_monitor() const {
+  ObjectWaiter* waiter = object_waiter();
+  if (waiter != nullptr && (waiter->is_monitorenter() || (waiter->is_wait() && (waiter->at_reenter() || waiter->notified())))) {
+    return waiter->monitor();
+  }
+  return nullptr;
+}
+
+inline ObjectMonitor* stackChunkOopDesc::current_waiting_monitor() const {
+  ObjectWaiter* waiter = object_waiter();
+  return waiter != nullptr && waiter->is_wait() ? waiter->monitor() : nullptr;
+}
+
+inline bool stackChunkOopDesc::has_lockstack() const         { return is_flag(FLAG_HAS_LOCKSTACK); }
+inline void stackChunkOopDesc::set_has_lockstack(bool value) { set_flag(FLAG_HAS_LOCKSTACK, value); }
 
 inline bool stackChunkOopDesc::is_gc_mode() const                  { return is_flag(FLAG_GC_MODE); }
 inline bool stackChunkOopDesc::is_gc_mode_acquire() const          { return is_flag_acquire(FLAG_GC_MODE); }
@@ -211,7 +240,7 @@ inline void stackChunkOopDesc::iterate_lockstack(StackChunkLockStackClosureType*
   if (LockingMode != LM_LIGHTWEIGHT) {
     return;
   }
-  int cnt = lockStackSize();
+  int cnt = lockstack_size();
   intptr_t* lockstart_addr = start_address();
   for (int i = 0; i < cnt; i++) {
     closure->do_oop((OopT*)&lockstart_addr[i]);

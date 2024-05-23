@@ -2309,6 +2309,18 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_Java);
   __ bind(after_transition);
 
+  // Check preemption for Object.wait()
+  if (method->is_object_wait0()) {
+    Label not_preempted;
+    __ movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
+    __ cmpptr(rscratch1, NULL_WORD);
+    __ jccb(Assembler::equal, not_preempted);
+    __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
+    __ jmp(rscratch1);
+    __ bind(not_preempted);
+  }
+  int resume_wait_offset = ((intptr_t)__ pc()) - start;
+
   Label reguard;
   Label reguard_done;
   __ cmpl(Address(r15_thread, JavaThread::stack_guard_state_offset()), StackOverflow::stack_guard_yellow_reserved_disabled);
@@ -2526,6 +2538,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                             (is_static ? in_ByteSize(klass_offset) : in_ByteSize(receiver_offset)),
                                             in_ByteSize(lock_slot_offset*VMRegImpl::stack_slot_size),
                                             oop_maps);
+
+  if (nm != nullptr && method->is_object_wait0()) {
+    SharedRuntime::set_native_frame_resume_entry(nm->code_begin() + resume_wait_offset);
+  }
 
   return nm;
 }

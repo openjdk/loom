@@ -1090,7 +1090,7 @@ JvmtiEnvBase::get_locked_objects_in_frame(JavaThread* calling_thread, JavaThread
       assert(oopCont != nullptr, "vthread with no continuation");
       stackChunkOop chunk = jdk_internal_vm_Continuation::tail(oopCont);
       assert(chunk != nullptr, "unmounted vthread should have a chunk");
-      ObjectMonitor *mon = chunk->objectMonitor();
+      ObjectMonitor *mon = chunk->current_pending_monitor();
       if (mon != nullptr) pending_obj = mon->object();
     }
   }
@@ -1537,10 +1537,12 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
     // the monitor threads after being notified. Here we are correcting the actual
     // number of the waiting threads by excluding those re-entering the monitor.
     nWait = 0;
+    bool is_head = true;
     for (ObjectWaiter* waiter = mon->first_waiter();
-         waiter != nullptr && (nWait == 0 || waiter != mon->first_waiter());
+         waiter != nullptr && (is_head || waiter != mon->first_waiter());
          waiter = mon->next_waiter(waiter)) {
-      nWait++;
+      is_head = false;
+      if (mon->thread_of_waiter(waiter) != nullptr) nWait++;  // skip vthreads
     }
   }
   ret.waiter_count = nWant;
@@ -1581,11 +1583,12 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       ObjectWaiter *waiter = mon->first_waiter();
       for (int i = 0; i < nWait; i++) {
         JavaThread *w = mon->thread_of_waiter(waiter);
-        assert(w != nullptr, "sanity check");
-        // If the thread was found on the ObjectWaiter list, then
-        // it has not been notified.
-        Handle th(current_thread, get_vthread_or_thread_oop(w));
-        ret.notify_waiters[i] = (jthread)jni_reference(calling_thread, th);
+        if (w != nullptr) {
+          // If the thread was found on the ObjectWaiter list, then
+          // it has not been notified.
+          Handle th(current_thread, get_vthread_or_thread_oop(w));
+          ret.notify_waiters[i] = (jthread)jni_reference(calling_thread, th);
+        }
         waiter = mon->next_waiter(waiter);
       }
     }
@@ -2535,8 +2538,8 @@ GetCurrentContendedMonitorClosure::do_vthread(Handle target_h) {
     assert(cont != nullptr, "vthread with no continuation");
     stackChunkOop chunk = jdk_internal_vm_Continuation::tail(cont);
     assert(chunk != nullptr, "unmounted vthread should have a chunk");
-    if (chunk->objectMonitor() != nullptr) {
-      *_owned_monitor_ptr = JNIHandles::make_local(_calling_thread, chunk->objectMonitor()->object());
+    if (chunk->current_pending_monitor() != nullptr) {
+      *_owned_monitor_ptr = JNIHandles::make_local(_calling_thread, chunk->current_pending_monitor()->object());
     }
     _result = JVMTI_ERROR_NONE; // target virtual thread is unmounted
     return;
