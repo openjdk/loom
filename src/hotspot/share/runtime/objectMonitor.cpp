@@ -1212,7 +1212,7 @@ void ObjectMonitor::resume_operation(JavaThread* current, ObjectWaiter* node) {
     java_lang_VirtualThread::set_recheckInterval(vthread, 0);
   }
 
-  // The JT will read this variable on return to the monitorenter_redo stub
+  // The JT will read this variable on return to the resume_monitor_operation stub
   // and will unmount (enterSpecial frame removed and return to Continuation.run()).
   current->set_preempting(true);
   java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::BLOCKING);
@@ -2143,7 +2143,7 @@ bool ObjectMonitor::VThreadWaitReenter(JavaThread* current, ObjectWaiter* node) 
       stackChunkOop chunk  = jdk_internal_vm_Continuation::tail(cont);
       chunk->set_object_waiter(nullptr);
     } else {
-      // The JT will read this variable on return to the monitorenter_redo stub
+      // The JT will read this variable on return to the resume_monitor_operation stub
       // and will unmount (enterSpecial frame removed and return to Continuation.run()).
       current->set_preempting(true);
     }
