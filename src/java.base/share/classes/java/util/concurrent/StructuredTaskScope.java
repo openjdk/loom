@@ -63,9 +63,9 @@ import jdk.internal.misc.ThreadFlock;
  * if the owner did not invoke the {@code join} method.
  *
  * <p> A {@code StructuredTaskScope} is opened with a {@link Policy} that handles subtask
- * completion and produces the result returned by the {@link #join() join} method. The
- * {@code Policy} interface defines static methods to create a {@code Policy} for common
- * cases.
+ * completion and produces the outcome (the result or an exception) for the {@link #join()
+ * join} method. The {@code Policy} interface defines static methods to create a {@code
+ * Policy} for common cases.
  *
  * <p> A {@code Policy} may <a id="CancelExecution"><em>cancel execution</em></a>
  * (sometimes called "short-circuiting") when some condition is reached that does not
@@ -149,6 +149,30 @@ import jdk.internal.misc.ThreadFlock;
  * for the main task to use. Code that forks subtasks that return results of different
  * types, and uses a {@code Policy} such as {@code Policy.ignoreSuccessfulOrThrow()} that
  * does not return a result, will use {@link Subtask#get() Subtask.get()} after joining.
+ *
+ * <h2>Exception handling</h2>
+ *
+ * <p> A {@code StructuredTaskScope} is opened with a {@link Policy Policy} that handles
+ * subtask completion and produces the outcome for the {@link #join() join} method. In
+ * some cases, the outcome will be a result, in other cases it will be an exception.
+ * If the outcome is an exception then the {@code join} method throws {@link
+ * ExecutionException} with the exception as the {@linkplain Throwable#getCause()
+ * cause}. For many {@code Policy} implementations, the exception will be an exception
+ * thrown by a subtask that failed. In the case of {@link Policy#allSuccessfulOrThrow()
+ * allSuccessfulOrThrow} and {@link Policy#ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow}
+ * for example, the exception is from the first subtask to fail.
+ *
+ * <p> Many of the details for how exceptions are handled will depend on usage. In some
+ * cases, the {@code join} method will be called in a {@code try-catch} block to catch
+ * {@code ExecutionException} and handle the cause. The exception handling may use
+ * {@code instanceof} with pattern matching to handle specific causes. In some cases it
+ * may not be useful to catch {@code ExecutionException} but instead leave it to propagate
+ * to the configured {@linkplain Thread.UncaughtExceptionHandler uncaught exception handler}
+ * for logging purposes.
+ *
+ * <p> For cases where a specific exception triggers the use of a default result then it
+ * may be more appropriate to handle this in the subtask itself rather than the subtask
+ * failing and code in the main task handling the exception.
  *
  * <h2>Configuration</h2>
  *
