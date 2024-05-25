@@ -370,18 +370,16 @@ public class Object {
      * @see    #wait(long, int)
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        if (!Thread.currentThread().isVirtual()) {
+        if (Thread.currentThread().isVirtual()) {
+            try {
+                wait0(timeoutMillis);
+            } catch (InterruptedException e) {
+                // virtual thread's interrupt status needs to be cleared
+                Thread.currentThread().getAndClearInterrupt();
+                throw e;
+            }
+        } else {
             wait0(timeoutMillis);
-            return;
-        }
-
-        // virtual thread waiting
-        try {
-            wait0(timeoutMillis);
-        } catch (InterruptedException e) {
-            // virtual thread's interrupt status needs to be cleared
-            Thread.currentThread().getAndClearInterrupt();
-            throw e;
         }
     }
 

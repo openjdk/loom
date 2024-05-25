@@ -93,47 +93,63 @@
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Stream;
-import java.util.stream.Collectors;
-
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MonitorWaitNotify {
 
+    @BeforeAll
+    static void setup() {
+        // need >=2 carriers for testing pinning when main thread is a virtual thread
+        if (Thread.currentThread().isVirtual()) {
+            VThreadRunner.ensureParallelism(2);
+        }
+    }
+
     /**
      * Test virtual thread waits, notified by platform thread.
      */
-    @Test
-    void testWaitNotify1() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testWaitNotify1(boolean pinned) throws Exception {
         var lock = new Object();
-        var ready = new Semaphore(0);
+        var ready = new AtomicBoolean();
         var thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
-                ready.release();
                 try {
-                    lock.wait();
+                    if (pinned) {
+                        VThreadPinner.runPinned(() -> {
+                            ready.set(true);
+                            lock.wait();
+                        });
+                    } else {
+                        ready.set(true);
+                        lock.wait();
+                    }
                 } catch (InterruptedException e) { }
             }
         });
-        // thread invokes notify
-        ready.acquire();
+        awaitTrue(ready);
+
+        // notify, thread should block waiting to reenter
         synchronized (lock) {
             lock.notifyAll();
+            await(thread, Thread.State.BLOCKED);
         }
         thread.join();
     }
@@ -144,15 +160,13 @@ class MonitorWaitNotify {
     @Test
     void testWaitNotify2() throws Exception {
         var lock = new Object();
-        var ready = new Semaphore(0);
-        var thread = Thread.ofVirtual().start(() -> {
-            ready.acquireUninterruptibly();
+        var thread = Thread.ofVirtual().unstarted(() -> {
             synchronized (lock) {
                 lock.notifyAll();
             }
         });
         synchronized (lock) {
-            ready.release();
+            thread.start();
             lock.wait();
         }
         thread.join();
@@ -161,89 +175,60 @@ class MonitorWaitNotify {
     /**
      * Test virtual thread waits, notified by another virtual thread.
      */
-    @Test
-    void testWaitNotify3() throws Exception {
-        // need at least two carrier threads due to pinning
-        int previousParallelism = VThreadRunner.ensureParallelism(2);
-        try {
-            var lock = new Object();
-            var ready = new Semaphore(0);
-            var thread1 = Thread.ofVirtual().start(() -> {
-                synchronized (lock) {
-                    ready.release();
-                    try {
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testWaitNotify3(boolean pinned) throws Exception {
+        var lock = new Object();
+        var ready = new AtomicBoolean();
+        var thread1 = Thread.ofVirtual().start(() -> {
+            synchronized (lock) {
+                try {
+                    if (pinned) {
+                        VThreadPinner.runPinned(() -> {
+                            ready.set(true);
+                            lock.wait();
+                        });
+                    } else {
+                        ready.set(true);
                         lock.wait();
-                    } catch (InterruptedException e) { }
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-            });
-            var thread2 = Thread.ofVirtual().start(() -> {
-                ready.acquireUninterruptibly();
+            }
+        });
+        var thread2 = Thread.ofVirtual().start(() -> {
+            try {
+                awaitTrue(ready);
+
+                // notify, thread should block waiting to reenter
                 synchronized (lock) {
                     lock.notifyAll();
+                    await(thread1, Thread.State.BLOCKED);
                 }
-            });
-            thread1.join();
-            thread2.join();
-        } finally {
-            // restore
-            VThreadRunner.setParallelism(previousParallelism);
-        }
-    }
-
-    /**
-     * Test interrupt status set when calling Object.wait.
-     */
-    @Test
-    void testWaitNotify4() throws Exception {
-        VThreadRunner.run(() -> {
-            Thread t = Thread.currentThread();
-            t.interrupt();
-            Object lock = new Object();
-            synchronized (lock) {
-                try {
-                    lock.wait();
-                    fail();
-                } catch (InterruptedException e) {
-                    // interrupt status should be cleared
-                    assertFalse(t.isInterrupted());
-                    validateStackTrace(e.getStackTrace());
-                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         });
-    }
-
-    /**
-     * Test interrupt when blocked in Object.wait.
-     */
-    @Test
-    void testWaitNotify5() throws Exception {
-        VThreadRunner.run(() -> {
-            Thread t = Thread.currentThread();
-            scheduleInterrupt(t, 1000);
-            Object lock = new Object();
-            synchronized (lock) {
-                try {
-                    lock.wait();
-                    fail();
-                } catch (InterruptedException e) {
-                    // interrupt status should be cleared
-                    assertFalse(t.isInterrupted());
-                    validateStackTrace(e.getStackTrace());
-                }
-            }
-        });
+        thread1.join();
+        thread2.join();
     }
 
     /**
      * Testing invoking Object.wait with interrupt status set.
      */
-    @Test
-    void testWaitWithInterruptSet() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testWaitWithInterruptSet(int timeout) throws Exception {
         VThreadRunner.run(() -> {
-            Object obj = new Object();
-            synchronized (obj) {
+            Object lock = new Object();
+            synchronized (lock) {
                 Thread.currentThread().interrupt();
-                assertThrows(InterruptedException.class, obj::wait);
+                if (timeout > 0) {
+                    assertThrows(InterruptedException.class, () -> lock.wait(timeout));
+                } else {
+                    assertThrows(InterruptedException.class, lock::wait);
+                }
                 assertFalse(Thread.currentThread().isInterrupted());
             }
         });
@@ -252,26 +237,31 @@ class MonitorWaitNotify {
     /**
      * Test interrupting a virtual thread waiting in Object.wait.
      */
-    @Test
-    void testInterruptWait() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testInterruptWait(int timeout) throws Exception {
         var lock = new Object();
-        var started = new CountDownLatch(1);
+        var ready = new AtomicBoolean();
         var interruptedException = new AtomicBoolean();
         var vthread = Thread.ofVirtual().start(() -> {
-            started.countDown();
             synchronized (lock) {
                 try {
-                    lock.wait();
+                    ready.set(true);
+                    if (timeout > 0) {
+                        lock.wait(timeout);
+                    } else {
+                        lock.wait();
+                    }
                 } catch (InterruptedException e) {
+                    checkInterruptedException(e);
                     interruptedException.set(true);
-                    validateStackTrace(e.getStackTrace());
                 }
             }
         });
 
         // wait for thread to start and wait
-        started.await();
-        await(vthread, Thread.State.WAITING);
+        awaitTrue(ready);
+        await(vthread, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
 
         // interrupt thread, it should throw InterruptedException and terminate
         vthread.interrupt();
@@ -282,25 +272,31 @@ class MonitorWaitNotify {
     /**
      * Test interrupting a virtual thread blocked waiting to reenter after waiting.
      */
-    @Test
-    void testInterruptReenter() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testInterruptReenter(int timeout) throws Exception {
         var lock = new Object();
-        var started = new CountDownLatch(1);
+        var ready = new AtomicBoolean();
         var interruptedException = new AtomicBoolean();
         var vthread = Thread.ofVirtual().start(() -> {
-            started.countDown();
             synchronized (lock) {
                 try {
-                    lock.wait();
+                    ready.set(true);
+                    if (timeout > 0) {
+                        lock.wait(timeout);
+                    } else {
+                        lock.wait();
+                    }
                 } catch (InterruptedException e) {
+                    checkInterruptedException(e);
                     interruptedException.set(true);
                 }
             }
         });
 
         // wait for thread to start and wait
-        started.await();
-        await(vthread, Thread.State.WAITING);
+        awaitTrue(ready);
+        await(vthread, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
 
         // notify, thread should block waiting to reenter
         synchronized (lock) {
@@ -317,27 +313,31 @@ class MonitorWaitNotify {
     /**
      * Test Object.wait with recursive locking.
      */
-    @Test
-    void testRecursive() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testRecursive(int timeout) throws Exception {
         var lock = new Object();
-        var started = new CountDownLatch(1);
+        var ready = new AtomicBoolean();
         var vthread = Thread.ofVirtual().start(() -> {
-            started.countDown();
             synchronized (lock) {
                 synchronized (lock) {
                     synchronized (lock) {
                         try {
-                            lock.wait();
-                        } catch (InterruptedException e) {
-                        }
+                            ready.set(true);
+                            if (timeout > 0) {
+                                lock.wait(timeout);
+                            } else {
+                                lock.wait();
+                            }
+                        } catch (InterruptedException e) { }
                     }
                 }
             }
         });
 
         // wait for thread to start and wait
-        started.await();
-        await(vthread, Thread.State.WAITING);
+        awaitTrue(ready);
+        await(vthread, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
 
         // notify, thread should block waiting to reenter
         synchronized (lock) {
@@ -429,21 +429,26 @@ class MonitorWaitNotify {
     /**
      * Test that Object.wait releases the carrier.
      */
-    @Test
-    void testReleaseOnWait() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testReleaseWhenWaiting1(int timeout) throws Exception {
         assertTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
             Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
 
             var lock = new Object();
-            var started = new CountDownLatch(1);
+            var ready = new AtomicBoolean();
             var completed = new AtomicBoolean();
 
             var vthread1 = builder.start(() -> {
-                started.countDown();
                 synchronized (lock) {
                     try {
-                        lock.wait();
+                        ready.set(true);
+                        if (timeout > 0) {
+                            lock.wait(timeout);
+                        } else {
+                            lock.wait();
+                        }
                     } catch (InterruptedException e) {
                         fail("wait interrupted");
                     }
@@ -452,8 +457,8 @@ class MonitorWaitNotify {
             });
 
             // wait for vthread1 to start and wait
-            started.await();
-            await(vthread1, Thread.State.WAITING);
+            awaitTrue(ready);
+            await(vthread1, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
 
             // carrier should be released, use it for another thread
             var executed = new AtomicBoolean();
@@ -474,105 +479,29 @@ class MonitorWaitNotify {
     }
 
     /**
-     * Test that Object.wait releases the carrier with multiple threads
-     */
-    @Test
-    void testMultipleReleaseOnWait() throws Exception {
-        int VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
-        CountDownLatch latch = new CountDownLatch(VTHREAD_COUNT);
-        Object object = new Object();
-        AtomicInteger counter = new AtomicInteger(0);
-
-        for (int i = 0; i < VTHREAD_COUNT; i++) {
-            int vthreadIndex = i;
-            Thread.ofVirtual().name("Vthread-" + i).start(() -> {
-                synchronized (object) {
-                    if (counter.incrementAndGet() == VTHREAD_COUNT) {
-                      object.notifyAll();
-                    } else {
-                      try {
-                        object.wait();
-                      } catch (InterruptedException e) {}
-                    }
-                }
-                latch.countDown();
-            });
-        }
-        latch.await();
-    }
-
-    /**
-     * Test that Object.wait releases the carrier.
-     */
-    @Test
-    void testReleaseOnTimedWait() throws Exception {
-        assertTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
-        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
-
-            var lock = new Object();
-            var started = new CountDownLatch(1);
-            var completed = new AtomicBoolean();
-
-            var vthread1 = builder.start(() -> {
-                started.countDown();
-                synchronized (lock) {
-                    try {
-                        lock.wait(5000);
-                    } catch (InterruptedException e) {
-                        fail("wait interrupted");
-                    }
-                }
-                completed.set(true);
-            });
-
-            // wait for vthread1 to start and wait
-            started.await();
-            await(vthread1, Thread.State.TIMED_WAITING);
-
-            // carrier should be released, use it for another thread
-            var executed = new AtomicBoolean();
-            var vthread2 = builder.start(() -> {
-                executed.set(true);
-            });
-            vthread2.join();
-            assertTrue(executed.get());
-
-            // wakeup vthread1
-            synchronized (lock) {
-                lock.notifyAll();
-            }
-
-            vthread1.join();
-            assertTrue(completed.get());
-        }
-    }
-
-    static Stream<Arguments> waitingTimes() {
-        return Stream.of(1, 10, 100, 250, 500, 1000).map(t -> Arguments.of(t));
-    }
-
-    /**
-     * Test that Object.wait releases the carrier with multiple threads
+     * Test that Object.wait releases the carrier with multiple virtual threads waiting.
      */
     @ParameterizedTest
-    @MethodSource("waitingTimes")
-    void testMultipleReleaseOnTimedWait(long waitingTime) throws Exception {
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testReleaseWhenWaiting2(int timeout) throws Exception {
         int VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
         CountDownLatch latch = new CountDownLatch(VTHREAD_COUNT);
-        Object object = new Object();
+        Object lock = new Object();
         AtomicInteger counter = new AtomicInteger(0);
 
         for (int i = 0; i < VTHREAD_COUNT; i++) {
-            int vthreadIndex = i;
-            Thread.ofVirtual().name("Vthread-" + i).start(() -> {
-                synchronized (object) {
+            Thread.ofVirtual().name("vthread-" + i).start(() -> {
+                synchronized (lock) {
                     if (counter.incrementAndGet() == VTHREAD_COUNT) {
-                      object.notifyAll();
+                        lock.notifyAll();
                     } else {
-                      try {
-                        object.wait(waitingTime);
-                      } catch (InterruptedException e) {}
+                        try {
+                            if (timeout > 0) {
+                                lock.wait(timeout);
+                            } else {
+                                lock.wait();
+                            }
+                        } catch (InterruptedException e) {}
                     }
                 }
                 latch.countDown();
@@ -611,6 +540,15 @@ class MonitorWaitNotify {
     }
 
     /**
+     * Waits for the boolean value to become true.
+     */
+    private static void awaitTrue(AtomicBoolean ref) throws InterruptedException {
+        while (!ref.get()) {
+            Thread.sleep(20);
+        }
+    }
+
+    /**
      * Waits for the given thread to reach a given state.
      */
     private void await(Thread thread, Thread.State expectedState) throws InterruptedException {
@@ -623,23 +561,14 @@ class MonitorWaitNotify {
     }
 
     /**
-     * Schedule a thread to be interrupted after a delay.
+     * Test that an InterruptedException thrown by Object.wait has the expected methods in
+     * the stack trace.
      */
-    private static void scheduleInterrupt(Thread thread, long delay) {
-        Runnable interruptTask = () -> {
-            try {
-                Thread.sleep(delay);
-                thread.interrupt();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        };
-        new Thread(interruptTask).start();
-    }
-
-    private static void validateStackTrace(StackTraceElement[] stackTrace) {
-        List<String> expected = Arrays.asList("wait0", "wait", "run");
-        List<String> actual = Stream.of(stackTrace).map(f -> f.getMethodName()).collect(Collectors.toList());
-        expected.stream().forEach(m -> assertTrue(actual.contains(m), "Method " + m + " not in stack trace"));
+    private static void checkInterruptedException(InterruptedException e) {
+        Set<String> expected = Set.of("wait0", "wait", "run");
+        Set<String> methods = Stream.of(e.getStackTrace())
+                .map(StackTraceElement::getMethodName)
+                .collect(Collectors.toSet());
+        assertTrue(methods.containsAll(expected));
     }
 }
