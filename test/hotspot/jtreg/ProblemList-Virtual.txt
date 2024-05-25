@@ -87,9 +87,9 @@ vmTestbase/nsk/jdi/ExceptionEvent/catchLocation/location002/TestDescription.java
 vmTestbase/nsk/jdi/VMOutOfMemoryException/VMOutOfMemoryException001/VMOutOfMemoryException001.java 8285417 generic-all
 
 ###
-# Uses GetObjectMonitorUsage to get the list of threads waiting to enter the monitor but we only
-# support getting the waiting platform threads, not unmounted vthreads.
+# GetObjectMonitorUsage only supports platform threads
 
+vmTestbase/nsk/jvmti/GetObjectMonitorUsage/objmonusage001/TestDescription.java 0000000 generic-all
 vmTestbase/nsk/jdi/ObjectReference/waitingThreads/waitingthreads002/TestDescription.java 0000000 generic-all
 
 ###

@@ -56,14 +56,21 @@ public class objmonusage001 {
         Thread mainThread = Thread.currentThread();
         Object syncObject[] = new Object[NUMBER_OF_THREADS];
         objmonusage001a runn[] = new objmonusage001a[NUMBER_OF_THREADS];
-        boolean isMainVirtual = Thread.currentThread().isVirtual();
 
         for (int i = 0; i < NUMBER_OF_THREADS; i++) {
             syncObject[i] = new Object();
-            runn[i] = new objmonusage001a(mainThread, i, syncObject[i], isMainVirtual);
+            runn[i] = new objmonusage001a(mainThread, i, syncObject[i]);
         }
+        // Virtual threads are not supported by GetObjectMonitorUsage.
+        // Correct the expected values if the test is executed with
+        // JTREG_TEST_THREAD_FACTORY=Virtual.
+        Thread expOwner = mainThread.isVirtual() ? null : mainThread;
+        int expEntryCount = mainThread.isVirtual() ? 0 : 1;
 
         for (int i = 0; i < NUMBER_OF_THREADS; i++) {
+            Thread expNotifyWaiter = runn[i].isVirtual() ? null : runn[i];
+            int expNotifyWaitingCount = runn[i].isVirtual() ? 0 : 1;
+
             synchronized (syncObject[i]) {
                 runn[i].start();
                 try {
@@ -93,8 +100,8 @@ public class objmonusage001 {
                 // This is a stable verification point because the worker thread is in wait()
                 // and is not notified and the main thread is doing the verification.
                 //
-                check(NUMBER_OF_THREADS + i, syncObject[i], mainThread, 1,
-                      null, 0, runn[i], 1);
+                check(NUMBER_OF_THREADS + i, syncObject[i], expOwner, expEntryCount,
+                      null, 0, expNotifyWaiter, expNotifyWaitingCount);
             }
 
             // Check #3:
@@ -118,7 +125,7 @@ public class objmonusage001 {
             // and is not notified and the main thread is doing the verification.
             //
             check((NUMBER_OF_THREADS * 2) + i, syncObject[i], null, 0,
-                  null, 0, runn[i], 1);
+                  null, 0, expNotifyWaiter, expNotifyWaitingCount);
         }
 
         for (int i = 0; i < NUMBER_OF_THREADS; i++) {
@@ -140,16 +147,22 @@ class objmonusage001a extends Thread {
     Thread mainThread;
     Object syncObject;
     int index;
-    boolean isMainVirtual;
 
-    public objmonusage001a(Thread mt, int i, Object s, boolean v) {
+    public objmonusage001a(Thread mt, int i, Object s) {
         mainThread = mt;
         index = i;
         syncObject = s;
-        isMainVirtual = v;
     }
 
     public void run() {
+        // Virtual threads are not supported by GetObjectMonitorUsage.
+        // Correct the expected values if the test is executed with
+        // JTREG_TEST_THREAD_FACTORY=Virtual.
+        Thread expOwner = this.isVirtual() ? null : this;
+        Thread expNotifyWaiter = mainThread.isVirtual() ? null : mainThread;
+        int expEntryCount = this.isVirtual() ? 0 : 1;
+        int expNotifyWaitingCount = mainThread.isVirtual() ? 0 : 1;
+
         synchronized (syncObject) {
             // Check #1:
             // - owner == this_thread:
@@ -169,8 +182,8 @@ class objmonusage001a extends Thread {
             // This is a stable verification point because the main thread is in wait()
             // and is not notified and this worker thread is doing the verification.
             //
-            objmonusage001.check(index, syncObject, this, 1,
-                                 null, 0, isMainVirtual ? null : mainThread, isMainVirtual ? 0 : 1);
+            objmonusage001.check(index, syncObject, expOwner, expEntryCount,
+                                 null, 0, expNotifyWaiter, expNotifyWaitingCount);
             syncObject.notify();
 
             try {
