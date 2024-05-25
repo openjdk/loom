@@ -1750,13 +1750,10 @@ void ObjectMonitor::wait(jlong millis, TRAPS) {
       current->set_current_waiting_monitor(nullptr);
       return;
     }
-    if (result == freeze_pinned_native || result == freeze_pinned_cs) {
+    if (result == freeze_pinned_native) {
       const Klass* monitor_klass = object()->klass();
       if (!is_excluded(monitor_klass)) {
-        ResourceMark rm;
-        char reason[256];
-        jio_snprintf(reason, sizeof reason, "Object.wait on object of klass %s", monitor_klass->external_name());
-        post_virtual_thread_pinned_event(current, reason);
+        post_virtual_thread_pinned_event(current, "Native frame or <clinit> on stack");
       }
     }
   }
