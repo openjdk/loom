@@ -120,15 +120,16 @@ class GetThreadStateTest {
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
     void testMonitorEnter(boolean pinned) throws Exception {
-        var started = new AtomicBoolean();
+        var ready = new AtomicBoolean();
         Object lock = new Object();
         var thread = Thread.ofVirtual().unstarted(() -> {
-            started.set(true);
             if (pinned) {
                 VThreadPinner.runPinned(() -> {
+                    ready.set(true);
                     synchronized (lock) { }
                 });
             } else {
+                ready.set(true);
                 synchronized (lock) { }
             }
         });
@@ -136,7 +137,7 @@ class GetThreadStateTest {
             synchronized (lock) {
                 // start thread and wait for it to start execution
                 thread.start();
-                awaitTrue(started);
+                awaitTrue(ready);
 
                 // thread should block on monitor enter
                 int expected = JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;
@@ -152,23 +153,31 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread waiting in Object.wait().
+     * Test state of thread waiting in Object.wait() when pinned and not pinned.
      */
-    @Test
-    void testObjectWait() throws Exception {
-        var started = new AtomicBoolean();
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testObjectWait(boolean pinned) throws Exception {
+        var ready = new AtomicBoolean();
         Object lock = new Object();
         var thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
-                started.set(true);
                 try {
-                    lock.wait();
+                    if (pinned) {
+                        VThreadPinner.runPinned(() -> {
+                            ready.set(true);
+                            lock.wait();
+                        });
+                    } else {
+                        ready.set(true);
+                        lock.wait();
+                    }
                 } catch (InterruptedException e) { }
             }
         });
         try {
             // wait for thread to start execution
-            awaitTrue(started);
+            awaitTrue(ready);
 
             // thread should wait
             int expected = JVMTI_THREAD_STATE_ALIVE |
@@ -196,21 +205,31 @@ class GetThreadStateTest {
     /**
      * Test state of thread waiting in Object.wait(millis).
      */
-    @Test
-    void testObjectWaitMillis() throws Exception {
-        var started = new AtomicBoolean();
+    @ParameterizedTest
+    @ValueSource(booleans = { true, false })
+    void testObjectWaitMillis(boolean pinned) throws Exception {
+        var ready = new AtomicBoolean();
         Object lock = new Object();
         var thread = Thread.ofVirtual().start(() -> {
             synchronized (lock) {
-                started.set(true);
-                try {
-                    lock.wait(Long.MAX_VALUE);
-                } catch (InterruptedException e) { }
+                synchronized (lock) {
+                    try {
+                        if (pinned) {
+                            VThreadPinner.runPinned(() -> {
+                                ready.set(true);
+                                lock.wait(Long.MAX_VALUE);
+                            });
+                        } else {
+                            ready.set(true);
+                            lock.wait(Long.MAX_VALUE);
+                        }
+                    } catch (InterruptedException e) { }
+                }
             }
         });
         try {
             // wait for thread to start execution
-            awaitTrue(started);
+            awaitTrue(ready);
 
             // thread should wait
             int expected = JVMTI_THREAD_STATE_ALIVE |
@@ -241,17 +260,18 @@ class GetThreadStateTest {
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
     void testPark(boolean pinned) throws Exception {
-        var started = new AtomicBoolean();
+        var ready = new AtomicBoolean();
         var done = new AtomicBoolean();
         var thread = Thread.ofVirtual().start(() -> {
-            started.set(true);
             if (pinned) {
                 VThreadPinner.runPinned(() -> {
+                    ready.set(true);
                     while (!done.get()) {
                         LockSupport.park();
                     }
                 });
             } else {
+                ready.set(true);
                 while (!done.get()) {
                     LockSupport.park();
                 }
@@ -259,7 +279,7 @@ class GetThreadStateTest {
         });
         try {
             // wait for thread to start execution
-            awaitTrue(started);
+            awaitTrue(ready);
 
             // thread should park
             int expected = JVMTI_THREAD_STATE_ALIVE |
@@ -280,17 +300,18 @@ class GetThreadStateTest {
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
     void testParkNanos(boolean pinned) throws Exception {
-        var started = new AtomicBoolean();
+        var ready = new AtomicBoolean();
         var done = new AtomicBoolean();
         var thread = Thread.ofVirtual().start(() -> {
-            started.set(true);
             if (pinned) {
                 VThreadPinner.runPinned(() -> {
+                    ready.set(true);
                     while (!done.get()) {
                         LockSupport.parkNanos(Long.MAX_VALUE);
                     }
                 });
             } else {
+                ready.set(true);
                 while (!done.get()) {
                     LockSupport.parkNanos(Long.MAX_VALUE);
                 }
@@ -298,7 +319,7 @@ class GetThreadStateTest {
         });
         try {
             // wait for thread to start execution
-            awaitTrue(started);
+            awaitTrue(ready);
 
             // thread should park
             int expected = JVMTI_THREAD_STATE_ALIVE |
