@@ -132,3 +132,6 @@ runtime/Thread/ThreadCountLimit.java#id0 0000000 generic-all
 compiler/arguments/TestC1Globals.java#id0 0000000 generic-all
 compiler/arguments/TestC1Globals.java#id1 0000000 generic-all
 compiler/arguments/TestC1Globals.java#id2 0000000 generic-all
+
+# OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "main"
+compiler/codecache/CodeCacheFullCountTest.java 8332926 generic-all
