@@ -93,6 +93,8 @@
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -100,6 +102,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -107,7 +110,9 @@ import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -212,6 +217,174 @@ class MonitorWaitNotify {
         });
         thread1.join();
         thread2.join();
+    }
+
+    /**
+     * Test notifyAll when there are no threads waiting.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    void testNotifyBeforeWait(int timeout) throws Exception {
+        var lock = new Object();
+
+        // no threads waiting
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+
+        var ready = new AtomicBoolean();
+        var thread = Thread.ofVirtual().start(() -> {
+            try {
+                synchronized (lock) {
+                    ready.set(true);
+
+                    // thread should wait
+                    if (timeout > 0) {
+                        lock.wait(timeout);
+                    } else {
+                        lock.wait();
+                    }
+                }
+            } catch (InterruptedException e) { }
+        });
+
+        try {
+            // wait for thread to start and wait
+            awaitTrue(ready);
+            Thread.State expectedState = timeout > 0
+                    ? Thread.State.TIMED_WAITING
+                    : Thread.State.WAITING;
+            await(thread, expectedState);
+
+            // poll thread state again, it should still be waiting
+            Thread.sleep(10);
+            assertEquals(thread.getState(), expectedState);
+        } finally {
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+            thread.join();
+        }
+    }
+
+    /**
+     * Returns a stream of elements that are ordered pairs of platform and virtual thread
+     * counts. 0,2,4,..8 platform threads. 2,4,6,..16 virtual threads.
+     */
+    static Stream<Arguments> threadCounts() {
+        return IntStream.range(0, 9)
+                .filter(i -> i % 2 == 0)
+                .mapToObj(i -> i)
+                .flatMap(np -> IntStream.range(2, 17)
+                        .filter(i -> i % 2 == 0)
+                        .mapToObj(vp -> Arguments.of(np, vp)));
+    }
+
+    /**
+     * Test notify wakes only one thread when platform and virtual threads are waiting.
+     */
+    @ParameterizedTest
+    @MethodSource("threadCounts")
+    void testNotifyOneThread(int nPlatformThreads, int nVirtualThreads) throws Exception {
+        int nThreads = nPlatformThreads + nVirtualThreads;
+
+        var lock = new Object();
+        var ready = new CountDownLatch(nThreads);
+        var notified = new AtomicInteger();
+
+        Runnable waitTask = () -> {
+            synchronized (lock) {
+                try {
+                    ready.countDown();
+                    lock.wait();
+                    notified.incrementAndGet();
+                } catch (InterruptedException e) { }
+            }
+        };
+
+        var threads = new ArrayList<Thread>();
+        try {
+            for (int i = 0; i < nPlatformThreads; i++) {
+                threads.add(Thread.ofPlatform().start(waitTask));
+            }
+            for (int i = 0; i < nVirtualThreads; i++) {
+                threads.add(Thread.ofVirtual().start(waitTask));
+            }
+
+            // wait for all threads to wait
+            ready.await();
+
+            // wake threads, one by one
+            for (int i = 0; i < threads.size(); i++) {
+
+                // wake one thread
+                synchronized (lock) {
+                    lock.notify();
+                }
+
+                // one thread should have awoken
+                int expectedWakeups = i + 1;
+                while (notified.get() < expectedWakeups) {
+                    Thread.sleep(10);
+                }
+                assertEquals(expectedWakeups, notified.get());
+            }
+        } finally {
+            for (Thread t : threads) {
+                t.interrupt();
+                t.join();
+            }
+        }
+    }
+
+    /**
+     * Test notifyAll wakes all threads.
+     */
+    @ParameterizedTest
+    @MethodSource("threadCounts")
+    void testNotifyAllThreads(int nPlatformThreads, int nVirtualThreads) throws Exception {
+        int nThreads = nPlatformThreads + nVirtualThreads;
+
+        var lock = new Object();
+        var ready = new CountDownLatch(nThreads);
+        var notified = new CountDownLatch(nThreads);
+
+        Runnable waitTask = () -> {
+            synchronized (lock) {
+                try {
+                    ready.countDown();
+                    lock.wait();
+                    notified.countDown();
+                } catch (InterruptedException e) { }
+            }
+        };
+
+        var threads = new ArrayList<Thread>();
+        try {
+            for (int i = 0; i < nPlatformThreads; i++) {
+                threads.add(Thread.ofPlatform().start(waitTask));
+            }
+            for (int i = 0; i < nVirtualThreads; i++) {
+                threads.add(Thread.ofVirtual().start(waitTask));
+            }
+
+            // wait for all threads to wait
+            ready.await();
+
+            // wakeup all threads
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+
+            // wait for all threads to have awoken
+            notified.await();
+
+        } finally {
+            for (Thread t : threads) {
+                t.interrupt();
+                t.join();
+            }
+        }
     }
 
     /**
