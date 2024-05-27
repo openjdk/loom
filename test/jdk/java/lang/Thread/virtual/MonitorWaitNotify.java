@@ -424,12 +424,14 @@ class MonitorWaitNotify {
         var lock = new Object();
 
         var ready = new AtomicBoolean();
+        var waited = new AtomicBoolean();
         var durationRef = new AtomicReference<Long>();
         var thread = Thread.ofVirtual().start(() -> {
             try {
                 synchronized (lock) {
                     ready.set(true);
-                    lock.wait(100);
+                    lock.wait(200);
+                    waited.set(true);
 
                     long start = millisTime();
                     lock.wait(2000);
@@ -440,7 +442,10 @@ class MonitorWaitNotify {
 
         awaitTrue(ready);
         synchronized (lock) {
-            lock.notifyAll();
+            // wake thread if waiting in first wait
+            if (!waited.get()) {
+                lock.notifyAll();
+            }
         }
 
         thread.join();
