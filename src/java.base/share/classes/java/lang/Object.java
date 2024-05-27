@@ -25,7 +25,6 @@
 
 package java.lang;
 
-import jdk.internal.misc.Blocker;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 
 /**
