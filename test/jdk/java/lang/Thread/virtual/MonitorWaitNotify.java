@@ -99,13 +99,16 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
@@ -385,6 +388,65 @@ class MonitorWaitNotify {
                 t.join();
             }
         }
+    }
+
+    /**
+     * Test duration of timed Object.wait.
+     */
+    @Test
+    void testTimedWaitDuration1() throws Exception {
+        var lock = new Object();
+
+        var durationRef = new AtomicReference<Long>();
+        var thread = Thread.ofVirtual().start(() -> {
+            try {
+                synchronized (lock) {
+                    long start = millisTime();
+                    lock.wait(2000);
+                    durationRef.set(millisTime() - start);
+                }
+            } catch (InterruptedException e) { }
+        });
+
+        thread.join();
+
+        long duration = durationRef.get();
+        checkDuration(duration, 1900, 20_000);
+    }
+
+    /**
+     * Test duration of timed Object.wait. This test invokes wait twice, first with a short
+     * timeout, the second with a longer timeout. The thread scenario ensures that the
+     * timeout from the first wait doesn't interfere with the second wait.
+     */
+    @Test
+    void testTimedWaitDuration2() throws Exception {
+        var lock = new Object();
+
+        var ready = new AtomicBoolean();
+        var durationRef = new AtomicReference<Long>();
+        var thread = Thread.ofVirtual().start(() -> {
+            try {
+                synchronized (lock) {
+                    ready.set(true);
+                    lock.wait(100);
+
+                    long start = millisTime();
+                    lock.wait(2000);
+                    durationRef.set(millisTime() - start);
+                }
+            } catch (InterruptedException e) { }
+        });
+
+        awaitTrue(ready);
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+
+        thread.join();
+
+        long duration = durationRef.get();
+        checkDuration(duration, 1900, 20_000);
     }
 
     /**
@@ -734,6 +796,28 @@ class MonitorWaitNotify {
             Thread.sleep(10);
             state = thread.getState();
         }
+    }
+
+    /**
+     * Returns the current time in milliseconds.
+     */
+    private static long millisTime() {
+        long now = System.nanoTime();
+        return TimeUnit.MILLISECONDS.convert(now, TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Check a duration is within expected bounds.
+     * @param duration, in milliseconds
+     * @param min minimum expected duration, in milliseconds
+     * @param max maximum expected duration, in milliseconds
+     * @return the duration (now - start), in milliseconds
+     */
+    private static void checkDuration(long duration, long min, long max) {
+        assertTrue(duration >= min,
+                "Duration " + duration + "ms, expected >= " + min + "ms");
+        assertTrue(duration <= max,
+                "Duration " + duration + "ms, expected <= " + max + "ms");
     }
 
     /**
