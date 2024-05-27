@@ -370,13 +370,21 @@ public class Object {
      * @see    #wait(long, int)
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        if (Thread.currentThread().isVirtual()) {
+        if (timeoutMillis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+
+        if (Thread.currentThread() instanceof VirtualThread vthread) {
             try {
                 wait0(timeoutMillis);
             } catch (InterruptedException e) {
                 // virtual thread's interrupt status needs to be cleared
-                Thread.currentThread().getAndClearInterrupt();
+                vthread.getAndClearInterrupt();
                 throw e;
+            } finally {
+                if (timeoutMillis > 0) {
+                    vthread.cancelWaitTimeout();
+                }
             }
         } else {
             wait0(timeoutMillis);

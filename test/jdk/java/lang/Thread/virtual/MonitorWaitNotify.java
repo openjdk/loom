@@ -436,8 +436,11 @@ class MonitorWaitNotify {
         awaitTrue(ready);
         await(vthread, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
 
-        // interrupt thread, it should throw InterruptedException and terminate
-        vthread.interrupt();
+        // interrupt thread, should block, then throw InterruptedException
+        synchronized (lock) {
+            vthread.interrupt();
+            await(vthread, Thread.State.BLOCKED);
+        }
         vthread.join();
         assertTrue(interruptedException.get());
     }

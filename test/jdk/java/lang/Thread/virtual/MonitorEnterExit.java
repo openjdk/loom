@@ -108,8 +108,8 @@ import java.util.stream.Stream;
 
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
-
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -122,6 +122,14 @@ import static org.junit.jupiter.api.Assumptions.*;
 class MonitorEnterExit {
     static final int MAX_VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
     static final int MAX_ENTER_DEPTH = 256;
+
+    @BeforeAll
+    static void setup() {
+        // need >=2 carriers for testing pinning when main thread is a virtual thread
+        if (Thread.currentThread().isVirtual()) {
+            VThreadRunner.ensureParallelism(2);
+        }
+    }
 
     /**
      * Test monitor enter with no contention.
@@ -501,7 +509,7 @@ class MonitorEnterExit {
     }
 
     /**
-     * Test mutual exclusion of monitors with platform and virtual threads
+     * Test mutual exclusion of monitors with platform and virtual threads.
      */
     @ParameterizedTest
     @MethodSource("threadCounts")

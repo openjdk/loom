@@ -1695,7 +1695,7 @@ static void vthread_monitor_waited_event(JavaThread *current, ObjectWaiter* node
 
   JRT_BLOCK
     if (event->should_commit()) {
-      long timeout = java_lang_VirtualThread::millisOnTimedWait(current->vthread());
+      long timeout = java_lang_VirtualThread::waitTimeout(current->vthread());
       post_monitor_wait_event(event, node->_monitor, node->_notifier_tid, timeout, timed_out);
     }
     if (JvmtiExport::should_post_monitor_waited()) {
@@ -1966,8 +1966,8 @@ void ObjectMonitor::INotify(JavaThread* current) {
       // will set the state to BLOCKED at the end of the unmount transition.
       // In the other cases the target would have been already unblocked so
       // there is nothing to do.
-      if (old_state == java_lang_VirtualThread::WAITED ||
-          old_state == java_lang_VirtualThread::TIMED_WAITED) {
+      if (old_state == java_lang_VirtualThread::WAIT ||
+          old_state == java_lang_VirtualThread::TIMED_WAIT) {
         java_lang_VirtualThread::cmpxchg_state(vthread, old_state, java_lang_VirtualThread::BLOCKED);
       }
     }
@@ -2087,9 +2087,9 @@ void ObjectMonitor::VThreadWait(JavaThread* current, jlong millis) {
 
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
   java_lang_VirtualThread::set_state(vthread, millis == 0 ? java_lang_VirtualThread::WAITING : java_lang_VirtualThread::TIMED_WAITING);
-  java_lang_VirtualThread::set_millisOnTimedWait(vthread, millis);
+  java_lang_VirtualThread::set_waitTimeout(vthread, millis);
 
-  // Save the ObjectWaiter* in the chunk since we will need it
+  // Save the ObjectWaiter* in the chunk since we will need it
   // when resuming execution.
   oop cont = java_lang_VirtualThread::continuation(vthread);
   stackChunkOop chunk  = jdk_internal_vm_Continuation::tail(cont);

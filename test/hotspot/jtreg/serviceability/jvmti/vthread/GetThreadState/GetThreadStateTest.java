@@ -203,7 +203,7 @@ class GetThreadStateTest {
     }
 
     /**
-     * Test state of thread waiting in Object.wait(millis).
+     * Test state of thread waiting in Object.wait(millis) when pinned and not pinned.
      */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })

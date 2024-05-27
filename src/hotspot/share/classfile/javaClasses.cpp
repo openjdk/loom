@@ -1962,7 +1962,7 @@ int java_lang_VirtualThread::_next_offset;
 int java_lang_VirtualThread::_onWaitingList_offset;
 int java_lang_VirtualThread::_notified_offset;
 int java_lang_VirtualThread::_recheckInterval_offset;
-int java_lang_VirtualThread::_millisOnTimedWait_offset;
+int java_lang_VirtualThread::_waitTimeout_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
   macro(static_vthread_scope_offset,       k, "VTHREAD_SCOPE",      continuationscope_signature, true);  \
@@ -1973,7 +1973,7 @@ int java_lang_VirtualThread::_millisOnTimedWait_offset;
   macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
   macro(_notified_offset,                  k, "notified",           bool_signature,              false); \
   macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
-  macro(_millisOnTimedWait_offset,         k, "millisOnTimedWait",  long_signature,              false);
+  macro(_waitTimeout_offset,               k, "waitTimeout",        long_signature,              false);
 
 
 void java_lang_VirtualThread::compute_offsets() {
@@ -2046,12 +2046,12 @@ void java_lang_VirtualThread::set_recheckInterval(oop vthread, jbyte value) {
   vthread->release_byte_field_put(_recheckInterval_offset, value);
 }
 
-jlong java_lang_VirtualThread::millisOnTimedWait(oop vthread) {
-  return vthread->long_field(_millisOnTimedWait_offset);
+jlong java_lang_VirtualThread::waitTimeout(oop vthread) {
+  return vthread->long_field(_waitTimeout_offset);
 }
 
-void java_lang_VirtualThread::set_millisOnTimedWait(oop vthread, jlong value) {
-  vthread->long_field_put(_millisOnTimedWait_offset, value);
+void java_lang_VirtualThread::set_waitTimeout(oop vthread, jlong value) {
+  vthread->long_field_put(_waitTimeout_offset, value);
 }
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
@@ -2084,10 +2084,10 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
     case BLOCKED:
       status = JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER;
       break;
-    case WAITED:
+    case WAIT:
       status = JavaThreadStatus::IN_OBJECT_WAIT;
       break;
-    case TIMED_WAITED:
+    case TIMED_WAIT:
       status = JavaThreadStatus::IN_OBJECT_WAIT_TIMED;
       break;
     case TERMINATED:
