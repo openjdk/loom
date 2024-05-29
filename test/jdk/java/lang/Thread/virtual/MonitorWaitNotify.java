@@ -118,15 +118,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.*;
 
 class MonitorWaitNotify {
 
     @BeforeAll
     static void setup() {
-        // need >=2 carriers for testing pinning when main thread is a virtual thread
-        if (Thread.currentThread().isVirtual()) {
-            VThreadRunner.ensureParallelism(2);
-        }
+        // need >=2 carriers for testing pinning
+        VThreadRunner.ensureParallelism(2);
     }
 
     /**
@@ -416,7 +415,7 @@ class MonitorWaitNotify {
 
     /**
      * Test duration of timed Object.wait. This test invokes wait twice, first with a short
-     * timeout, the second with a longer timeout. The thread scenario ensures that the
+     * timeout, the second with a longer timeout. The test scenario ensures that the
      * timeout from the first wait doesn't interfere with the second wait.
      */
     @Test
@@ -675,7 +674,7 @@ class MonitorWaitNotify {
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
     void testReleaseWhenWaiting1(int timeout) throws Exception {
-        assertTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
             Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
 

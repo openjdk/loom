@@ -25,21 +25,29 @@
  * @test
  * @summary Stress test Thread.getStackTrace on virtual threads that are blocking or
  *     blocked on monitorenter
- * @run main GetStackTraceALotWhenBlocked 500000
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run main/othervm GetStackTraceALotWhenBlocked 500000
  */
 
 /*
  * @test
  * @requires vm.debug == true & vm.continuations
- * @run main/timeout=300 GetStackTraceALotWhenBlocked 50000
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run main/othervm/timeout=300 GetStackTraceALotWhenBlocked 50000
  */
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import jdk.test.lib.thread.VThreadRunner;
 
 public class GetStackTraceALotWhenBlocked {
 
     public static void main(String[] args) throws Exception {
+        // need at least two carriers
+        VThreadRunner.ensureParallelism(2);
+
         int iterations = args.length > 0 ? Integer.parseInt(args[0]) : 100_000;
 
         var done = new AtomicBoolean();

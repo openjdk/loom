@@ -83,10 +83,8 @@ class ThreadAPI {
         ThreadFactory factory = Executors.defaultThreadFactory();
         scheduler = Executors.newSingleThreadScheduledExecutor(factory);
 
-        // need >=2 carriers for testing pinning when main thread is a virtual thread
-        if (Thread.currentThread().isVirtual()) {
-            VThreadRunner.ensureParallelism(2);
-        }
+        // need >=2 carriers for testing pinning
+        VThreadRunner.ensureParallelism(2);
     }
 
     @AfterAll

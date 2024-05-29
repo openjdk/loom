@@ -49,13 +49,24 @@ import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
+import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JfrEvents {
+
+    @BeforeAll
+    static void setup() {
+        int minParallelism = 2;
+        if (Thread.currentThread().isVirtual()) {
+            minParallelism++;
+        }
+        VThreadRunner.ensureParallelism(minParallelism);
+    }
 
     /**
      * Test jdk.VirtualThreadStart and jdk.VirtualThreadEnd events.
@@ -168,7 +179,7 @@ class JfrEvents {
      */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    void testObjectWait(boolean timed) throws Exception {
+    void testObjectWaitWhenPinned(boolean timed) throws Exception {
         try (Recording recording = new Recording()) {
             recording.enable("jdk.VirtualThreadPinned");
             recording.start();
