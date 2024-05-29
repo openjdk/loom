@@ -178,8 +178,7 @@ class StructuredThreadDumpTest {
      * Forks a subtask in the given scope. The subtask creates a new child scope with
      * the given name, then parks. This method returns Thread that executes the subtask.
      */
-    private static Thread fork(StructuredTaskScope<Object,
-            Void> scope,
+    private static Thread fork(StructuredTaskScope<Object, Void> scope,
                                String childScopeName) throws Exception {
         var ref = new AtomicReference<Thread>();
         scope.fork(() -> {
