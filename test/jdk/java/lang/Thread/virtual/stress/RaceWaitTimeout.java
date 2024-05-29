@@ -35,7 +35,7 @@
 
 /*
  * @test id=notify-interrupt
- * @run main/othervm RaceWaitTimeout 200 true true
+ * @run main/othervm RaceWaitTimeout 100 true true
  */
 
 import java.time.Instant;

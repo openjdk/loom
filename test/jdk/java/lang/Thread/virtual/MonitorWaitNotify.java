@@ -724,7 +724,7 @@ class MonitorWaitNotify {
      * Test that Object.wait releases the carrier with multiple virtual threads waiting.
      */
     @ParameterizedTest
-    @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    @ValueSource(ints = { 0, 10, 20, 100, 500, 30000, Integer.MAX_VALUE })
     void testReleaseWhenWaiting2(int timeout) throws Exception {
         int VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
         CountDownLatch latch = new CountDownLatch(VTHREAD_COUNT);
