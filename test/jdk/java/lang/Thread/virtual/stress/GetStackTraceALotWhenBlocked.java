@@ -38,6 +38,7 @@
  * @run main/othervm/timeout=300 GetStackTraceALotWhenBlocked 50000
  */
 
+import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import jdk.test.lib.thread.VThreadRunner;
@@ -61,13 +62,17 @@ public class GetStackTraceALotWhenBlocked {
                 }
                 count++;
             }
-            System.out.format("%s => %d%n", Thread.currentThread(), count);
+            System.out.format("%s %s => %d loops%n", Instant.now(), Thread.currentThread(), count);
         };
 
         var thread1 = Thread.ofVirtual().start(task);
         var thread2 = Thread.ofVirtual().start(task);
         try {
             for (int i = 0; i < iterations; i++) {
+                if ((i % 10_000) == 0) {
+                    System.out.format("%s iteration %d of %d%n", Instant.now(), i, iterations);
+                }
+
                 thread1.getStackTrace();
                 pause();
                 thread2.getStackTrace();
