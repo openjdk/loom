@@ -1960,7 +1960,7 @@ void ObjectMonitor::INotify(JavaThread* current) {
       oop vthread = iterator->vthread();
       java_lang_VirtualThread::set_notified(vthread, true);
       int old_state = java_lang_VirtualThread::state(vthread);
-      // If state is not WAITED/TIMED_WAITED then target could still be on
+      // If state is not WAIT/TIMED_WAIT then target could still be on
       // unmount transition, or wait could have already timed-out or target
       // could have been interrupted. In the first case, the target itself
       // will set the state to BLOCKED at the end of the unmount transition.
