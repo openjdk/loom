@@ -329,7 +329,7 @@ public class ObjectMonitorUsage {
 
         test(false); // test platform threads
 
-        //test(true);  // test virtual threads
+        test(true);  // test virtual threads
 
         check(lockCheck, null, 0, 0, 0);
         if (getRes() > 0) {
