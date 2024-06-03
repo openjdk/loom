@@ -22,38 +22,26 @@
  */
 
 /*
- * @test id=skynet-1M
+ * @test
  * @summary Stress test virtual threads with a variation of the Skynet 1M benchmark that uses
- *   a channel implementation based on object monitors
+ *   a channel implementation based on object monitors. This variant uses a reduced number of
+ *   100k virtual threads at the final level.
  * @requires vm.debug != true & vm.continuations
- * @run main/othervm/timeout=300 -Xmx1500m SkynetWithMonitors 2 skynet-1M
+ * @run main/othervm/timeout=300 Skynet100kWithMonitors 50
  */
 
 /*
- * @test id=skynet-100K
+ * @test
  * @requires vm.debug == true & vm.continuations
- * @run main/othervm/timeout=300 SkynetWithMonitors 10 skynet-100K
+ * @run main/othervm/timeout=300 Skynet100kWithMonitors 10
  */
 
-public class SkynetWithMonitors {
+public class Skynet100kWithMonitors {
 
     public static void main(String[] args) {
         int iterations = (args.length) > 0 ? Integer.parseInt(args[0]) : 10;
-
-        int num;
-        long expected;
-        if (args.length < 2 || args[1].equalsIgnoreCase("skynet-1M")) {
-            num = 1_000_000;
-            expected = 499999500000L;
-        } else if (args[1].equalsIgnoreCase("skynet-100k")) {
-            num = 100_000;
-            expected = 4999950000L;
-        } else {
-            throw new RuntimeException(args[1] + " not recognzied");
-        }
-
         for (int i = 0; i < iterations; i++) {
-            skynet(num, expected);
+            skynet(100_000, 4999950000L);
         }
     }
 
