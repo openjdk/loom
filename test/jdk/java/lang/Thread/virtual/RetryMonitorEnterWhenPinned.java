@@ -29,7 +29,7 @@
  *   can't continue because there are no carriers available.
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run main/othervm --enable-native-access=ALL-UNNAMED BusyMonitorEnterWhenPinned
+ * @run main/othervm --enable-native-access=ALL-UNNAMED RetryMonitorEnterWhenPinned
  */
 
 import java.time.Duration;
@@ -39,7 +39,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import jdk.test.lib.thread.VThreadPinner;
 
-public class BusyMonitorEnterWhenPinned {
+public class RetryMonitorEnterWhenPinned {
     public static void main(String[] args) throws Exception {
         int iterations = (args.length > 0) ? Integer.parseInt(args[0]) : 10;
         for (int i = 1; i <= iterations; i++) {

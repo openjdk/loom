@@ -22,20 +22,30 @@
  */
 
 /*
- * @test id=notify
- * @summary Stress test Object.wait(millis) where the timeout expires at around the same
- *   time that the thread is awakened with Object.notify and/or Thread.interrupt
- * @run main/othervm RaceWaitTimeout 200 true false
+ * @test id=timeout
+ * @summary Stress test timed-Object.wait
+ * @run main/othervm TimedWaitALot 200
  */
 
 /*
- * @test id=interrupt
- * @run main/othervm RaceWaitTimeout 200 false true
+ * @test id=timeout-notify
+ * @summary Test timed-Object.wait where the waiting thread is awakened with Object.notify
+ *     at around the same time that the timeout expires.
+ * @run main/othervm TimedWaitALot 200 true false
  */
 
 /*
- * @test id=notify-interrupt
- * @run main/othervm RaceWaitTimeout 100 true true
+ * @test id=timeout-interrupt
+ * @summary Test timed-Object.wait where the waiting thread is awakened with Thread.interrupt
+ *     at around the same time that the timeout expires.
+ * @run main/othervm TimedWaitALot 200 false true
+ */
+
+/*
+ * @test id=timeout-notify-interrupt
+ * @summary Test timed-Object.wait where the waiting thread is awakened with Object.notify
+ *     and Thread.interrupt at around the same time that the timeout expires.
+ * @run main/othervm TimedWaitALot 100 true true
  */
 
 import java.time.Instant;
@@ -43,11 +53,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class RaceWaitTimeout {
+public class TimedWaitALot {
     public static void main(String[] args) throws Exception {
         int iterations = Integer.parseInt(args[0]);
-        boolean notify = "true".equals(args[1]);
-        boolean interrupt = "true".equals(args[2]);
+        boolean notify = args.length >= 2 && "true".equals(args[1]);
+        boolean interrupt = args.length >=3 && "true".equals(args[2]);
 
         // test all timeouts concurrently
         int[] timeouts = { 10, 20, 50, 100 };
