@@ -1493,7 +1493,7 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
   owning_thread = ObjectSynchronizer::get_lock_owner(tlh.list(), hobj);
   if (owning_thread != nullptr) {
     oop thread_oop = get_vthread_or_thread_oop(owning_thread);
-    bool is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+    bool is_virtual = thread_oop->is_a(vmClasses::BaseVirtualThread_klass());
     if (is_virtual) {
       thread_oop = nullptr;
     }
@@ -1541,6 +1541,11 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       JavaThread *w = mon->thread_of_waiter(waiter);
       if (w == nullptr) {
         skipped++;
+      } else {
+        oop thread_oop = get_vthread_or_thread_oop(w);
+        if (thread_oop->is_a(vmClasses::BaseVirtualThread_klass())) {
+          skipped++;
+        }
       }
       nWait++;
     }
@@ -1588,7 +1593,14 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
       jint skipped = 0;
       for (int i = 0; i < nWait; i++) {
         JavaThread *w = mon->thread_of_waiter(waiter);
+        bool is_virtual;
         if (w == nullptr) {
+          is_virtual = true;
+        } else {
+          oop thread_oop = get_vthread_or_thread_oop(w);
+          is_virtual = thread_oop->is_a(vmClasses::BaseVirtualThread_klass());
+        }
+        if (is_virtual) {
           skipped++;
         } else {
           // If the thread was found on the ObjectWaiter list, then
