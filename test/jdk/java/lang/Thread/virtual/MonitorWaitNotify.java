@@ -492,7 +492,13 @@ class MonitorWaitNotify {
                         lock.wait();
                     }
                 } catch (InterruptedException e) {
-                    checkInterruptedException(e);
+                    // check stack trace has the expected frames
+                    Set<String> expected = Set.of("wait0", "wait", "run");
+                    Set<String> methods = Stream.of(e.getStackTrace())
+                            .map(StackTraceElement::getMethodName)
+                            .collect(Collectors.toSet());
+                    assertTrue(methods.containsAll(expected));
+
                     interruptedException.set(true);
                 }
             }
@@ -516,7 +522,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
-    void testInterruptReenter(int timeout) throws Exception {
+    void testInterruptReenterAfterWait(int timeout) throws Exception {
         var lock = new Object();
         var ready = new AtomicBoolean();
         var interruptedException = new AtomicBoolean();
@@ -530,7 +536,6 @@ class MonitorWaitNotify {
                         lock.wait();
                     }
                 } catch (InterruptedException e) {
-                    checkInterruptedException(e);
                     interruptedException.set(true);
                 }
             }
@@ -544,6 +549,8 @@ class MonitorWaitNotify {
         synchronized (lock) {
             lock.notifyAll();
             await(vthread, Thread.State.BLOCKED);
+
+            // interrupt when blocked
             vthread.interrupt();
         }
 
@@ -553,11 +560,11 @@ class MonitorWaitNotify {
     }
 
     /**
-     * Test Object.wait with recursive locking.
+     * Test Object.wait when the monitor entry count > 1.
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
-    void testRecursive(int timeout) throws Exception {
+    void testWaitWhenEnteredManyTimes(int timeout) throws Exception {
         var lock = new Object();
         var ready = new AtomicBoolean();
         var vthread = Thread.ofVirtual().start(() -> {
@@ -669,7 +676,8 @@ class MonitorWaitNotify {
     }
 
     /**
-     * Test that Object.wait releases the carrier.
+     * Test that Object.wait releases the carrier. This test uses a custom scheduler
+     * with one carrier thread.
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
@@ -721,7 +729,9 @@ class MonitorWaitNotify {
     }
 
     /**
-     * Test that Object.wait releases the carrier with multiple virtual threads waiting.
+     * Test that Object.wait releases the carrier. This test arranges for 4*ncores - 1
+     * virtual threads to wait. For long timeout and no timeout cases, all virtual threads
+     * will wait until they are notified.
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 10, 20, 100, 500, 30000, Integer.MAX_VALUE })
@@ -822,17 +832,5 @@ class MonitorWaitNotify {
                 "Duration " + duration + "ms, expected >= " + min + "ms");
         assertTrue(duration <= max,
                 "Duration " + duration + "ms, expected <= " + max + "ms");
-    }
-
-    /**
-     * Test that an InterruptedException thrown by Object.wait has the expected methods in
-     * the stack trace.
-     */
-    private static void checkInterruptedException(InterruptedException e) {
-        Set<String> expected = Set.of("wait0", "wait", "run");
-        Set<String> methods = Stream.of(e.getStackTrace())
-                .map(StackTraceElement::getMethodName)
-                .collect(Collectors.toSet());
-        assertTrue(methods.containsAll(expected));
     }
 }
