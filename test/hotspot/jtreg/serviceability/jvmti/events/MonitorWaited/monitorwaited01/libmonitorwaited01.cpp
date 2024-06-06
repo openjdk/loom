@@ -33,7 +33,6 @@ extern "C" {
 const int MAX_COUNT = 50;
 
 /* scaffold objects */
-static JNIEnv *jni = nullptr;
 static jvmtiEnv *jvmti = nullptr;
 static jlong timeout = 0;
 
@@ -42,7 +41,7 @@ static jthread expected_thread = nullptr;
 static jobject expected_object = nullptr;
 static volatile int eventsCount = 0;
 
-static void check_stack_trace(jthread thr);
+static void check_stack_trace(JNIEnv* env, jthread thr);
 
 void JNICALL
 MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jboolean timed_out) {
@@ -71,13 +70,13 @@ MonitorWaited(jvmtiEnv *jvmti, JNIEnv *jni, jthread thr, jobject obj, jboolean t
   }
 
   if (jni->IsVirtualThread(thr)) {
-    check_stack_trace(thr);
+    check_stack_trace(jni, thr);
   }
 }
 
 /* ========================================================================== */
 
-static void check_stack_trace(jthread thr) {
+static void check_stack_trace(JNIEnv* jni, jthread thr) {
   jvmtiError err;
   jint count = 0;
   jint skipped = 0;
@@ -133,7 +132,6 @@ static int clean() {
 
 static void JNICALL
 agentProc(jvmtiEnv *jvmti, JNIEnv *agentJNI, void *arg) {
-  jni = agentJNI;
 
   /* wait for initial sync */
   if (!agent_wait_for_sync(timeout))
