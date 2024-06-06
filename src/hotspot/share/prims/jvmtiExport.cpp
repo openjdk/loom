@@ -2872,7 +2872,7 @@ void JvmtiExport::vthread_post_monitor_waited(JavaThread *current, ObjectMonitor
     MutexLocker mu(JvmtiThreadState_lock);
     JvmtiThreadState* state = current->jvmti_thread_state();
     if (state != NULL && state->is_pending_interp_only_mode()) {
-      JvmtiEventController::enter_interp_only_mode();
+      JvmtiEventController::enter_interp_only_mode(state);
     }
   }
   assert(current->is_in_VTMS_transition(), "sanity check");
