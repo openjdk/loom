@@ -204,7 +204,12 @@ abstract class Poller {
     private void register(int fdVal) throws IOException {
         Thread previous = map.put(fdVal, Thread.currentThread());
         assert previous == null;
-        implRegister(fdVal);
+        try {
+            implRegister(fdVal);
+        } catch (IOException ioe) {
+            map.remove(fdVal);
+            throw ioe;
+        }
     }
 
     /**

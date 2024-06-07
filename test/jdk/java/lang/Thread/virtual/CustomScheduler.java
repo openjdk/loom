@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
@@ -216,6 +217,49 @@ class CustomScheduler {
     }
 
     /**
+     * Test custom scheduler throwing OOME when starting a thread.
+     */
+    @Test
+    void testThreadStartOOME() throws Exception {
+        Executor scheduler = task -> {
+            System.err.println("OutOfMemoryError");
+            throw new OutOfMemoryError();
+        };
+        Thread thread = ThreadBuilders.virtualThreadBuilder(scheduler).unstarted(() -> { });
+        assertThrows(OutOfMemoryError.class, thread::start);
+    }
+
+    /**
+     * Test custom scheduler throwing OOME when unparking a thread.
+     */
+    @Test
+    void testThreadUnparkOOME() throws Exception {
+        try (ExecutorService executor = Executors.newFixedThreadPool(1)) {
+            AtomicInteger counter = new AtomicInteger();
+            Executor scheduler = task -> {
+                switch (counter.getAndIncrement()) {
+                    case 0 -> executor.execute(task);             // Thread.start
+                    case 1, 2 -> {                                // unpark attempt 1+2
+                        System.err.println("OutOfMemoryError");
+                        throw new OutOfMemoryError();
+                    }
+                    default -> executor.execute(task);
+                }
+                executor.execute(task);
+            };
+
+            // start thread and wait for it to park
+            var thread = ThreadBuilders.virtualThreadBuilder(scheduler).start(LockSupport::park);
+            await(thread, Thread.State.WAITING);
+
+            // unpark thread, this should retry until OOME is not thrown
+            LockSupport.unpark(thread);
+            thread.join();
+        }
+
+    }
+
+    /**
      * Returns the scheduler for the given virtual thread.
      */
     private static Executor scheduler(Thread thread) {
@@ -228,6 +272,18 @@ class CustomScheduler {
             return (Executor) scheduler.get(thread);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Waits for the given thread to reach a given state.
+     */
+    private void await(Thread thread, Thread.State expectedState) throws InterruptedException {
+        Thread.State state = thread.getState();
+        while (state != expectedState) {
+            assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
+            Thread.sleep(10);
+            state = thread.getState();
         }
     }
 }
