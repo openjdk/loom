@@ -53,8 +53,6 @@ java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
 # Underlying implementation is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
-sun/security/ssl/SSLSessionImpl/ResumptionUpdateBoundValues.java 8325384 generic-all
-
 jdk/jfr/event/compiler/TestCompilerCompile.java 8325392 generic-all
 
 
