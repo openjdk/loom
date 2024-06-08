@@ -295,28 +295,21 @@ final class VirtualThread extends BaseVirtualThread {
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
      * otherwise it will be pushed to an external submission queue.
+     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        try {
-            scheduler.execute(runContinuation);
-        } catch (RejectedExecutionException ree) {
-            submitFailed(ree);
-            throw ree;
-        }
-    }
-
-    /**
-     * Submits the runContinuation task the scheduler. For the default scheduler, the task
-     * will be pushed to an external submission queue.
-     * @throws RejectedExecutionException
-     */
-    private void externalSubmitRunContinuation() {
-        if (scheduler == DEFAULT_SCHEDULER
-                && currentCarrierThread() instanceof CarrierThread ct) {
-            externalSubmitRunContinuation(ct.getPool());
-        } else {
-            submitRunContinuation();
+        boolean done = false;
+        while (!done) {
+            try {
+                scheduler.execute(runContinuation);
+                done = true;
+            } catch (RejectedExecutionException ree) {
+                submitFailed(ree);
+                throw ree;
+            } catch (OutOfMemoryError e) {
+                U.park(false, 100_000_000); // 100ms
+            }
         }
     }
 
@@ -331,6 +324,8 @@ final class VirtualThread extends BaseVirtualThread {
         } catch (RejectedExecutionException ree) {
             submitFailed(ree);
             throw ree;
+        } catch (OutOfMemoryError e) {
+            submitRunContinuation();
         }
     }
 
@@ -342,6 +337,29 @@ final class VirtualThread extends BaseVirtualThread {
     private void externalSubmitRunContinuation(ForkJoinPool pool) {
         try {
             pool.externalSubmit(ForkJoinTask.adapt(runContinuation));
+        } catch (RejectedExecutionException ree) {
+            submitFailed(ree);
+            throw ree;
+        } catch (OutOfMemoryError e) {
+            submitRunContinuation();
+        }
+    }
+
+    /**
+     * Submits the runContinuation task the scheduler. For the default scheduler, and
+     * calling it a virtual thread that uses the default scheduler, the task will be
+     * pushed to an external submission queue. This method may throw OutOfMemoryError.
+     * @throws RejectedExecutionException
+     * @throws OutOfMemoryError
+     */
+    private void externalSubmitRunContinuationOrThrow() {
+        try {
+            if (scheduler == DEFAULT_SCHEDULER
+                    && currentCarrierThread() instanceof CarrierThread ct) {
+                ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
+            } else {
+                scheduler.execute(runContinuation);
+            }
         } catch (RejectedExecutionException ree) {
             submitFailed(ree);
             throw ree;
@@ -535,7 +553,6 @@ final class VirtualThread extends BaseVirtualThread {
                 } else {
                     submitRunContinuation();
                 }
-
             }
             return;
         }
@@ -683,7 +700,7 @@ final class VirtualThread extends BaseVirtualThread {
             inheritScopedValueBindings(container);
 
             // submit task to run thread, using externalSubmit if possible
-            externalSubmitRunContinuation();
+            externalSubmitRunContinuationOrThrow();
             started = true;
         } finally {
             if (!started) {

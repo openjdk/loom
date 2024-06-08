@@ -1962,7 +1962,7 @@ void MacroAssembler::call_VM_leaf_base(address entry_point,
   if (retaddr)
     bind(*retaddr);
 
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) || 
+  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
       entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
     ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
     cbz(rscratch1, not_preempted);

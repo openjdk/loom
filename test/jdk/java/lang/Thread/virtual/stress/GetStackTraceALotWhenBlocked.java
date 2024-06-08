@@ -68,9 +68,9 @@ public class GetStackTraceALotWhenBlocked {
         var thread1 = Thread.ofVirtual().start(task);
         var thread2 = Thread.ofVirtual().start(task);
         try {
-            for (int i = 0; i < iterations; i++) {
+            for (int i = 1; i <= iterations; i++) {
                 if ((i % 10_000) == 0) {
-                    System.out.format("%s iteration %d of %d%n", Instant.now(), i, iterations);
+                    System.out.format("%s => %d of %d%n", Instant.now(), i, iterations);
                 }
 
                 thread1.getStackTrace();

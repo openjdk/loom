@@ -33,6 +33,8 @@
  * @requires vm.debug == true
  * @run main/othervm GetStackTraceALotWithTimedWait 50000
  */
+
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
@@ -57,7 +59,7 @@ public class GetStackTraceALotWithTimedWait {
                     ref.set(Thread.currentThread());
                     while (!done.get()) {
                         synchronized (lock) {
-                            int delay = 1 + ThreadLocalRandom.current().nextInt(19);
+                            int delay = 1 + ThreadLocalRandom.current().nextInt(20);
                             lock.wait(delay);
                         }
                     }
@@ -72,7 +74,10 @@ public class GetStackTraceALotWithTimedWait {
 
             // hammer on Thread.getStackTrace
             try {
-                for (int i = 0; i < iterations; i++) {
+                for (int i = 1; i <= iterations; i++) {
+                    if ((i % 1000) == 0) {
+                        System.out.println(Instant.now() + " => " + i + " of " + iterations);
+                    }
                     for (Thread thread : threads) {
                         thread.getStackTrace();
                     }

@@ -25,6 +25,7 @@
  * @test id=default
  * @summary Test virtual threads using synchronized
  * @library /test/lib
+ * @requires vm.continuations
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xint MonitorsTest
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
@@ -34,7 +35,7 @@
 
 /**
  * @test id=gc
- * @requires vm.debug
+ * @requires vm.debug == true & vm.continuations
  * @library /test/lib
  * @modules java.base/java.lang:+open
  * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest

@@ -55,7 +55,7 @@ public class Skynet100kWithMonitors {
         long end = System.currentTimeMillis();
         System.out.format("Result: %d in %s ms%n", sum, (end-start));
         if (sum != expected)
-            throw new AssertionError("unexpected result!");
+            throw new RuntimeException("Expected " + expected);
     }
 
     static void skynet(Channel<Long> result, int num, int size, int div) {
