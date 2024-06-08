@@ -634,7 +634,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @apiNote This method is invoked by the {@code fork} methods. It should not be
          * invoked directly.
-         * 
+         *
          * @param subtask the subtask
          * @return {@code true} to cancel execution
          */
@@ -1320,7 +1320,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         // list of forked subtasks, only accessed by owner thread
         private final List<Subtask<T>> subtasks = new ArrayList<>();
         private volatile Throwable firstException;
-        
+
         @Override
         public boolean onFork(Subtask<? extends T> subtask) {
             @SuppressWarnings("unchecked")
