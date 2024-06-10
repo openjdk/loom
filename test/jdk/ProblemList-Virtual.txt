@@ -108,6 +108,7 @@ com/sun/management/ThreadMXBean/ThreadAllocatedMemory.java#Serial 0000000 generi
 java/lang/management/ManagementFactory/ProxyTypeMapping.java 0000000 generic-all
 java/lang/management/ManagementFactory/ValidateOpenTypes.java 0000000 generic-all
 java/lang/management/ThreadMXBean/Locks.java 0000000 generic-all
+java/lang/management/ThreadMXBean/LockedMonitorInNative.java generic-all
 java/lang/management/ThreadMXBean/ThreadCpuTime.java 0000000 generic-all
 java/lang/management/ThreadMXBean/ThreadUserTime.java 0000000 generic-all
 
