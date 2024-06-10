@@ -27,7 +27,7 @@
  *     blocked on monitorenter
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run main/othervm GetStackTraceALotWhenBlocked 500000
+ * @run main/othervm GetStackTraceALotWhenBlocking 500000
  */
 
 /*
@@ -35,7 +35,7 @@
  * @requires vm.debug == true & vm.continuations
  * @modules java.base/java.lang:+open
  * @library /test/lib
- * @run main/othervm/timeout=300 GetStackTraceALotWhenBlocked 50000
+ * @run main/othervm/timeout=300 GetStackTraceALotWhenBlocking 50000
  */
 
 import java.time.Instant;
@@ -43,7 +43,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import jdk.test.lib.thread.VThreadRunner;
 
-public class GetStackTraceALotWhenBlocked {
+public class GetStackTraceALotWhenBlocking {
 
     public static void main(String[] args) throws Exception {
         // need at least two carriers

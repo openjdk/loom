@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,19 +23,19 @@
 
 /**
  * @test
- * @summary Stress test asynchronous Thread.getStackTrace
+ * @summary Stress test asynchronous Thread.getStackTrace when parking
  * @requires vm.debug != true & vm.continuations
  * @modules java.base/java.lang:+open
- * @compile GetStackTraceALot.java ../ThreadBuilders.java
- * @run main GetStackTraceALot
+ * @compile GetStackTraceALotWhenParking.java ../ThreadBuilders.java
+ * @run main GetStackTraceALotWhenParking
  */
 
 /**
  * @test
  * @requires vm.debug == true & vm.continuations
  * @modules java.base/java.lang:+open
- * @compile GetStackTraceALot.java ../ThreadBuilders.java
- * @run main/timeout=300 GetStackTraceALot 1000
+ * @compile GetStackTraceALotWhenParking.java ../ThreadBuilders.java
+ * @run main/timeout=300 GetStackTraceALotWhenParking 1000
  */
 
 import java.time.Duration;
@@ -46,7 +46,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
-public class GetStackTraceALot {
+public class GetStackTraceALotWhenParking {
     static class RoundRobinExecutor implements Executor, AutoCloseable {
         private final ExecutorService[] executors;
         private int next;
