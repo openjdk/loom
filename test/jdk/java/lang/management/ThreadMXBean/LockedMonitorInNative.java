@@ -60,7 +60,6 @@ public class LockedMonitorInNative {
      * Test ThreadMXBean.getLockedMonitors returns information about an object
      * monitor lock entered with JNI MonitorEnter.
      */
-    @org.junit.jupiter.api.Disabled
     @Test
     void testMonitorEnteredInNative() {
         var lock = new Object();
