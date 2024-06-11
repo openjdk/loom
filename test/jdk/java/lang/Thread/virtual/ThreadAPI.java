@@ -66,6 +66,7 @@ import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -1999,6 +2000,37 @@ class ThreadAPI {
                 assertTrue(Thread.holdsLock(lock));
             }
         });
+    }
+
+    /**
+     * Test Thread.holdsLock when lock held by carrier thread.
+     */
+    @Disabled
+    @Test
+    void testHoldsLock3() throws Exception {
+        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+
+        Object lock = new Object();
+
+        // carrier thread runs all tasks while holding the lock
+        ThreadFactory factory = task -> Thread.ofPlatform().unstarted(() -> {
+            synchronized (lock) {
+                task.run();
+            }
+        });
+        try (ExecutorService pool = Executors.newSingleThreadExecutor(factory)) {
+            Executor scheduler = task -> pool.submit(task::run);
+            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+
+            // start virtual that tests if it holds the lock
+            var result = new AtomicReference<Boolean>();
+            Thread vthread = builder.start(() -> {
+                result.set(Thread.holdsLock(lock));
+            });
+            vthread.join();
+            boolean holdsLock = result.get();
+            assertFalse(holdsLock, "Thread.holdsLock should return false");
+        }
     }
 
     /**
