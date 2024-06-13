@@ -135,3 +135,6 @@ compiler/arguments/TestC1Globals.java#id2 0000000 generic-all
 
 # OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "main"
 compiler/codecache/CodeCacheFullCountTest.java 8332926 generic-all
+
+# doesn't handle threads in transition
+serviceability/dcmd/thread/PrintMountedVirtualThread.java 8334215 generic-all
