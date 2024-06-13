@@ -181,3 +181,7 @@ vmTestbase/nsk/monitoring/ThreadMXBean/findMonitorDeadlockedThreads/find006/Test
 
 serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java  8029528 generic-all
 serviceability/jvmti/vthread/GetSetLocalTest/GetSetLocalTest.java    0000000 generic-all
+
+# redefine j.l.Object
+serviceability/jvmti/RedefineClasses/RedefineObject.java 0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java 0000000 generic-all
