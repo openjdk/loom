@@ -59,11 +59,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 
@@ -449,15 +451,15 @@ class SynchronizedNative {
      */
     //@Test
     void testReleaseWhenBlocked() throws Exception {
-        assertTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        assertTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
 
             var lock = this;
             var started = new CountDownLatch(1);
             var entered = new AtomicBoolean();   // set to true when vthread enters lock
 
-            var vthread1 = builder.unstarted(() -> {
+            var vthread1 = factory.newThread(() -> {
                 started.countDown();
                 runWithSynchronizedNative(() -> {
                     assertTrue(Thread.holdsLock(lock));
@@ -466,6 +468,7 @@ class SynchronizedNative {
                 assertFalse(Thread.holdsLock(lock));
             });
 
+            vthread1.start();
             try {
                 synchronized (this) {
                     // start thread and wait for it to block
@@ -475,9 +478,10 @@ class SynchronizedNative {
 
                     // carrier should be released, use it for another thread
                     var executed = new AtomicBoolean();
-                    var vthread2 = builder.start(() -> {
+                    var vthread2 = factory.newThread(() -> {
                         executed.set(true);
                     });
+                    vthread2.start();
                     vthread2.join();
                     assertTrue(executed.get());
                 }

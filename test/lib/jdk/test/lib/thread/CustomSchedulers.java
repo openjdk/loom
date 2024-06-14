@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,38 +21,33 @@
  * questions.
  */
 
+package jdk.test.lib.thread;
+
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
- * Helper class for creating Thread buidlers.
+ * Helper class to allow tests run virtual threads with a custom scheduler.
  *
  * Tests using this class need to open java.base/java.lang.
  */
-class ThreadBuilders {
-    private ThreadBuilders() { }
-
-    private static final Constructor<?> VTBUILDER_CTOR;
-    static {
-        try {
-            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
-            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
-            ctor.setAccessible(true);
-            VTBUILDER_CTOR = ctor;
-        } catch (Exception e) {
-            throw new InternalError(e);
-        }
-    }
+public class CustomSchedulers {
+    private CustomSchedulers() { }
 
     /**
      * Returns a builder to create virtual threads that use the given scheduler.
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
-    static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+    public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
         try {
-            return (Thread.Builder.OfVirtual) VTBUILDER_CTOR.newInstance(scheduler);
+            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
+            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
+            ctor.setAccessible(true);
+            return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException re) {
@@ -65,9 +60,33 @@ class ThreadBuilders {
     }
 
     /**
+     * Returns a ThreadFactory to create virtual threads that use the given scheduler.
+     * @throws UnsupportedOperationException if custom schedulers are not supported
+     */
+    public static ThreadFactory virtualThreadFactory(Executor scheduler) {
+        return virtualThreadBuilder(scheduler).factory();
+    }
+
+    /**
+     * Returns the scheduler for the given virtual thread.
+     */
+    public static Executor scheduler(Thread thread) {
+        if (!thread.isVirtual())
+            throw new IllegalArgumentException("Not a virtual thread");
+        try {
+            Field scheduler = Class.forName("java.lang.VirtualThread")
+                    .getDeclaredField("scheduler");
+            scheduler.setAccessible(true);
+            return (Executor) scheduler.get(thread);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Return true if custom schedulers are supported.
      */
-    static boolean supportsCustomScheduler() {
+    public static boolean supportsCustomScheduler() {
         try (var pool = Executors.newCachedThreadPool()) {
             try {
                 virtualThreadBuilder(pool);

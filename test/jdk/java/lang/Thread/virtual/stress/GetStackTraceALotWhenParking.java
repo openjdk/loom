@@ -26,7 +26,7 @@
  * @summary Stress test asynchronous Thread.getStackTrace when parking
  * @requires vm.debug != true & vm.continuations
  * @modules java.base/java.lang:+open
- * @compile GetStackTraceALotWhenParking.java ../ThreadBuilders.java
+ * @library /test/lib
  * @run main GetStackTraceALotWhenParking
  */
 
@@ -34,7 +34,7 @@
  * @test
  * @requires vm.debug == true & vm.continuations
  * @modules java.base/java.lang:+open
- * @compile GetStackTraceALotWhenParking.java ../ThreadBuilders.java
+ * @library /test/lib
  * @run main/timeout=300 GetStackTraceALotWhenParking 1000
  */
 
@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
+import jdk.test.lib.thread.CustomSchedulers;
 
 public class GetStackTraceALotWhenParking {
     static class RoundRobinExecutor implements Executor, AutoCloseable {
@@ -83,7 +84,9 @@ public class GetStackTraceALotWhenParking {
         AtomicInteger count = new AtomicInteger();
 
         try (RoundRobinExecutor executor = new RoundRobinExecutor()) {
-            Thread thread = ThreadBuilders.virtualThreadBuilder(executor).start(() -> {
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(executor);
+
+            Thread thread = factory.newThread(() -> {
                 while (count.incrementAndGet() < ITERATIONS) {
                     long start = System.nanoTime();
                     while ((System.nanoTime() - start) < SPIN_NANOS) {
@@ -92,6 +95,7 @@ public class GetStackTraceALotWhenParking {
                     LockSupport.parkNanos(500_000);
                 }
             });
+            thread.start();
 
             long start = System.nanoTime();
             while (thread.isAlive()) {

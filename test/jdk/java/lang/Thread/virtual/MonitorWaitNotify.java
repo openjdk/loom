@@ -99,6 +99,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -108,6 +109,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
@@ -682,15 +684,15 @@ class MonitorWaitNotify {
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
     void testReleaseWhenWaiting1(int timeout) throws Exception {
-        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
 
             var lock = new Object();
             var ready = new AtomicBoolean();
             var completed = new AtomicBoolean();
 
-            var vthread1 = builder.start(() -> {
+            var vthread1 = factory.newThread(() -> {
                 synchronized (lock) {
                     try {
                         ready.set(true);
@@ -705,6 +707,7 @@ class MonitorWaitNotify {
                 }
                 completed.set(true);
             });
+            vthread1.start();
 
             // wait for vthread1 to start and wait
             awaitTrue(ready);
@@ -712,9 +715,10 @@ class MonitorWaitNotify {
 
             // carrier should be released, use it for another thread
             var executed = new AtomicBoolean();
-            var vthread2 = builder.start(() -> {
+            var vthread2 = factory.newThread(() -> {
                 executed.set(true);
             });
+            vthread2.start();
             vthread2.join();
             assertTrue(executed.get());
 

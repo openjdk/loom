@@ -49,6 +49,7 @@ import jdk.jfr.Recording;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
@@ -369,7 +370,7 @@ class JfrEvents {
                 Executor scheduler = task -> pool.execute(task);
 
                 // create virtual thread that uses custom scheduler
-                ThreadFactory factory = ThreadBuilders.virtualThreadBuilder(scheduler).factory();
+                ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
 
                 // start a thread
                 Thread thread = factory.newThread(LockSupport::park);

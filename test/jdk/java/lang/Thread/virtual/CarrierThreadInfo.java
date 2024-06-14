@@ -27,6 +27,7 @@
  * @summary Test java.lang.management.ThreadInfo contains expected information for carrier threads
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit CarrierThreadInfo
  */
 
@@ -34,6 +35,7 @@
  * @test id=LM_LIGHTWEIGHT
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -XX:LockingMode=2 CarrierThreadInfo
  */
 
@@ -41,6 +43,7 @@
  * @test id=LM_LEGACY
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -XX:LockingMode=1 CarrierThreadInfo
  */
 
@@ -48,6 +51,7 @@
  * @test id=LM_MONITOR
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run junit/othervm -XX:LockingMode=0 CarrierThreadInfo
  */
 
@@ -63,6 +67,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -215,8 +220,10 @@ class CarrierThreadInfo {
          * Starts a virtual thread to execute the give task.
          */
         Thread forkVirtualThread(Runnable task) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
-            return builder.start(task);
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            Thread thread = factory.newThread(task);
+            thread.start();
+            return thread;
         }
 
         @Override

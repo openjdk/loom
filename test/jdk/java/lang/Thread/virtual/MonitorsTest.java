@@ -44,6 +44,7 @@
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.*;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -86,7 +87,7 @@ class MonitorsTest {
         // Create first batch of VT threads.
         Thread firstBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            firstBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
+            firstBatch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
         }
 
         // Give time for all threads to reach Thread.yield
@@ -95,7 +96,7 @@ class MonitorsTest {
         // Create second batch of VT threads.
         Thread secondBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR);
+            secondBatch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR);
         }
 
         while(counter != VT_COUNT) {}
@@ -143,7 +144,7 @@ class MonitorsTest {
         // Create first batch of VT threads.
         Thread firstBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            firstBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
+            firstBatch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("FirstBatchVT-" + i).start(FOO);
         }
 
         // Give time for all threads to reach Thread.yield
@@ -152,7 +153,7 @@ class MonitorsTest {
         // Create second batch of VT threads.
         Thread secondBatch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            secondBatch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR2);
+            secondBatch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("SecondBatchVT-" + i).start(BAR2);
         }
 
         while(counter != 2*VT_COUNT) {}
@@ -188,7 +189,7 @@ class MonitorsTest {
         // Create batch of VT threads.
         Thread batch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO3);
+            batch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO3);
         }
 
         // Give time for all threads to reach synchronized(globalLock)
@@ -257,7 +258,7 @@ class MonitorsTest {
 
         Thread batch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO4);
+            batch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO4);
         }
 
         Thread.sleep(10000);
@@ -335,7 +336,7 @@ class MonitorsTest {
         Thread batch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
             //Thread.ofVirtual().name("FirstBatchVT-" + i).start(FOO);
-            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO5);
+            batch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO5);
         }
 
         Thread.sleep(10000);
@@ -398,7 +399,7 @@ class MonitorsTest {
         // Create batch of VT threads.
         Thread batch[] = new Thread[VT_COUNT];
         for (int i = 0; i < VT_COUNT; i++) {
-            batch[i] = ThreadBuilders.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO6);
+            batch[i] = CustomSchedulers.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO6);
         }
 
         Thread.sleep(10000);

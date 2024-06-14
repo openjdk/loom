@@ -106,6 +106,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import jdk.test.lib.thread.CustomSchedulers;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
@@ -350,15 +351,15 @@ class MonitorEnterExit {
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
     void testReleaseWhenParked(boolean reenter) throws Exception {
-        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
 
             var lock = new Object();
 
             // thread enters (and maybe reenters) a monitor and parks
             var started = new CountDownLatch(1);
-            var vthread1 = builder.start(() -> {
+            var vthread1 = factory.newThread(() -> {
                 started.countDown();
                 synchronized (lock) {
                     if (reenter) {
@@ -371,6 +372,7 @@ class MonitorEnterExit {
                 }
             });
 
+            vthread1.start();
             try {
                 // wait for thread to start and park
                 started.await();
@@ -378,9 +380,10 @@ class MonitorEnterExit {
 
                 // carrier should be released, use it for another thread
                 var executed = new AtomicBoolean();
-                var vthread2 = builder.start(() -> {
+                var vthread2 = factory.newThread(() -> {
                     executed.set(true);
                 });
+                vthread2.start();
                 vthread2.join();
                 assertTrue(executed.get());
             } finally {
@@ -395,15 +398,15 @@ class MonitorEnterExit {
      */
     @Test
     void testReleaseWhenBlocked() throws Exception {
-        assumeTrue(ThreadBuilders.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            Thread.Builder builder = ThreadBuilders.virtualThreadBuilder(scheduler);
+            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
 
             var lock = new Object();
 
             // thread enters monitor
             var started = new CountDownLatch(1);
-            var vthread1 = builder.unstarted(() -> {
+            var vthread1 = factory.newThread(() -> {
                 started.countDown();
                 synchronized (lock) {
                 }
@@ -418,9 +421,10 @@ class MonitorEnterExit {
 
                     // carrier should be released, use it for another thread
                     var executed = new AtomicBoolean();
-                    var vthread2 = builder.start(() -> {
+                    var vthread2 = factory.newThread(() -> {
                         executed.set(true);
                     });
+                    vthread2.start();
                     vthread2.join();
                     assertTrue(executed.get());
                 }
