@@ -52,9 +52,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 
-import jdk.test.lib.thread.CustomSchedulers;
-import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
+import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -196,7 +196,7 @@ public class VirtualThreads {
      */
     @Test
     void testGetThreadInfoCarrierThread() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService pool = Executors.newFixedThreadPool(1)) {
             var carrierRef = new AtomicReference<Thread>();
             Executor scheduler = (task) -> {
@@ -205,7 +205,7 @@ public class VirtualThreads {
                     task.run();
                 });
             };
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             // start virtual thread so carrier Thread can be captured
             Thread thread = factory.newThread(() -> { });

@@ -33,7 +33,7 @@
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.concurrent.locks.LockSupport;
-import jdk.test.lib.thread.CustomSchedulers;
+import jdk.test.lib.thread.VThreadScheduler;
 
 public class ParkWithFixedThreadPool {
     public static void main(String[] args) throws Exception {
@@ -60,7 +60,7 @@ public class ParkWithFixedThreadPool {
                 }
             };
 
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             for (int i = 0; i < vthreadCount; i++) {
                 vthreads[i] = factory.newThread(target);

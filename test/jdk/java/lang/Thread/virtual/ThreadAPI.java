@@ -61,9 +61,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import java.nio.channels.Selector;
 
-import jdk.test.lib.thread.CustomSchedulers;
-import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
+import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -1083,10 +1083,10 @@ class ThreadAPI {
      */
     @Test
     void testYield1() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1110,10 +1110,10 @@ class ThreadAPI {
      */
     @Test
     void testYield2() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             var lock = new Object();
             var thread = factory.newThread(() -> {
                 list.add("A");
@@ -1140,10 +1140,10 @@ class ThreadAPI {
      */
     @Test
     void testYield3() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             var thread = factory.newThread(() -> {
                 list.add("A");
                 var child = factory.newThread(() -> {
@@ -1735,10 +1735,10 @@ class ThreadAPI {
      */
     @Test
     void testGetState4() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         AtomicBoolean completed = new AtomicBoolean();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             Thread thread1 = factory.newThread(() -> {
                 Thread thread2 = factory.newThread(LockSupport::park);
                 assertEquals(Thread.State.NEW, thread2.getState());
@@ -2007,7 +2007,7 @@ class ThreadAPI {
     @Disabled
     @Test
     void testHoldsLock3() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
 
         Object lock = new Object();
 
@@ -2019,7 +2019,7 @@ class ThreadAPI {
         });
         try (ExecutorService pool = Executors.newSingleThreadExecutor(carrierThreadFactory)) {
             Executor scheduler = task -> pool.submit(task::run);
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             // start virtual that tests if it holds the lock
             var result = new AtomicReference<Boolean>();
@@ -2048,9 +2048,9 @@ class ThreadAPI {
      */
     @Test
     void testGetStackTraceStarted() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         Executor scheduler = task -> { };
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
         Thread thread = factory.newThread(() -> { });
         thread.start();
         StackTraceElement[] stack = thread.getStackTrace();
@@ -2091,11 +2091,11 @@ class ThreadAPI {
      */
     @Test
     void testGetStackTraceRunnableUnmounted() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
 
         // custom scheduler with one carrier thread
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             // start thread1 to park
             Thread thread1 = factory.newThread(LockSupport::park);
@@ -2338,7 +2338,7 @@ class ThreadAPI {
      */
     @Test
     void testGetAllStackTraces2() throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ForkJoinPool pool = new ForkJoinPool(1)) {
             AtomicReference<Thread> ref = new AtomicReference<>();
             Executor scheduler = task -> {
@@ -2348,7 +2348,7 @@ class ThreadAPI {
                 });
             };
 
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             Thread vthread = factory.newThread(() -> {
                 synchronized (lock) {
                     try {
