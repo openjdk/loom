@@ -24,6 +24,7 @@
  */
 package java.lang;
 
+import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -69,7 +70,7 @@ import static java.util.concurrent.TimeUnit.*;
 final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
-    private static final ForkJoinPool DEFAULT_SCHEDULER = createDefaultScheduler();
+    private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
     private static final ScheduledExecutorService[] DELAYED_TASK_SCHEDULERS = createDelayedTaskSchedulers();
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
@@ -254,7 +255,7 @@ final class VirtualThread extends BaseVirtualThread {
      * on the current thread before the task runs or continues. It unmounts when the
      * task completes or yields.
      */
-    @ChangesCurrentThread
+    @ChangesCurrentThread // allow mount/unmount to be inlined
     private void runContinuation() {
         // the carrier must be a platform thread
         if (Thread.currentThread().isVirtual()) {
@@ -296,29 +297,46 @@ final class VirtualThread extends BaseVirtualThread {
      * and calling it on a worker thread, the task will be pushed to the local queue,
      * otherwise it will be pushed to an external submission queue.
      * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
+     * @param retryOnOOME to retry indefinitely if OutOfMemoryError is thrown
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation() {
+    @ChangesCurrentThread
+    private void submitRunContinuation(boolean retryOnOOME) {
         boolean done = false;
         while (!done) {
             try {
-                scheduler.execute(runContinuation);
+                if (currentThread() instanceof VirtualThread vthread) {
+                    vthread.switchToCarrierThread();
+                    try {
+                        scheduler.execute(runContinuation);
+                    } finally {
+                        switchToVirtualThread(vthread);
+                    }
+                } else {
+                    scheduler.execute(runContinuation);
+                }
                 done = true;
             } catch (RejectedExecutionException ree) {
                 submitFailed(ree);
                 throw ree;
             } catch (OutOfMemoryError e) {
-                U.park(false, 100_000_000); // 100ms
+                if (retryOnOOME) {
+                    U.park(false, 100_000_000); // 100ms
+                } else {
+                    throw e;
+                }
             }
         }
     }
 
     /**
      * Submits the runContinuation task to given scheduler with a lazy submit.
+     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
     private void lazySubmitRunContinuation(ForkJoinPool pool) {
+        assert Thread.currentThread() instanceof CarrierThread;
         try {
             pool.lazySubmit(ForkJoinTask.adapt(runContinuation));
         } catch (RejectedExecutionException ree) {
@@ -331,10 +349,12 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Submits the runContinuation task to the given scheduler as an external submit.
+     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
     private void externalSubmitRunContinuation(ForkJoinPool pool) {
+        assert Thread.currentThread() instanceof CarrierThread;
         try {
             pool.externalSubmit(ForkJoinTask.adapt(runContinuation));
         } catch (RejectedExecutionException ree) {
@@ -346,6 +366,17 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Submits the runContinuation task to the scheduler. For the default scheduler,
+     * and calling it on a worker thread, the task will be pushed to the local queue,
+     * otherwise it will be pushed to an external submission queue.
+     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
+     * @throws RejectedExecutionException
+     */
+    private void submitRunContinuation() {
+        submitRunContinuation(true);
+    }
+
+    /**
      * Submits the runContinuation task the scheduler. For the default scheduler, and
      * calling it a virtual thread that uses the default scheduler, the task will be
      * pushed to an external submission queue. This method may throw OutOfMemoryError.
@@ -353,16 +384,16 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws OutOfMemoryError
      */
     private void externalSubmitRunContinuationOrThrow() {
-        try {
-            if (scheduler == DEFAULT_SCHEDULER
-                    && currentCarrierThread() instanceof CarrierThread ct) {
+        if (scheduler == DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct) {
+            try {
                 ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
-            } else {
-                scheduler.execute(runContinuation);
+            } catch (RejectedExecutionException ree) {
+                submitFailed(ree);
+                throw ree;
             }
-        } catch (RejectedExecutionException ree) {
-            submitFailed(ree);
-            throw ree;
+        } else {
+            submitRunContinuation(false);
         }
     }
 
@@ -490,7 +521,7 @@ final class VirtualThread extends BaseVirtualThread {
      */
     @ChangesCurrentThread
     @JvmtiMountTransition
-    private void switchToVirtualThread(VirtualThread vthread) {
+    private static void switchToVirtualThread(VirtualThread vthread) {
         Thread carrier = vthread.carrierThread;
         assert carrier == Thread.currentCarrierThread();
         carrier.setCurrentThread(vthread);
@@ -866,24 +897,13 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     @Override
-    @ChangesCurrentThread
     void unpark() {
-        Thread currentThread = Thread.currentThread();
-        if (!getAndSetParkPermit(true) && currentThread != this) {
+        if (!getAndSetParkPermit(true) && currentThread() != this) {
             int s = state();
 
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
-                if (currentThread instanceof VirtualThread vthread) {
-                    vthread.switchToCarrierThread();
-                    try {
-                        submitRunContinuation();
-                    } finally {
-                        switchToVirtualThread(vthread);
-                    }
-                } else {
-                    submitRunContinuation();
-                }
+                submitRunContinuation();
                 return;
             }
 
@@ -1477,9 +1497,35 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Creates the default scheduler.
+     * If the system property {@code jdk.virtualThreadScheduler.implClass} is set then
+     * its value is name of a class that implements java.util.concurrent.Executor.
+     * The class is public in an exported package, has a public no-arg constructor,
+     * and is visible to the system class loader.
+     * If the system property is not set then the default scheduler will be a
+     * ForkJoinPool instance.
+     */
+    private static Executor createDefaultScheduler() {
+        String propName = "jdk.virtualThreadScheduler.implClass";
+        String propValue = GetPropertyAction.privilegedGetProperty(propName);
+        if (propValue != null) {
+            try {
+                Class<?> clazz = Class.forName(propValue, true,
+                        ClassLoader.getSystemClassLoader());
+                Constructor<?> ctor = clazz.getConstructor();
+                return (Executor) ctor.newInstance();
+            } catch (Exception ex) {
+                throw new Error(ex);
+            }
+        } else {
+            return createDefaultForkJoinPoolScheduler();
+        }
+    }
+
+    /**
+     * Creates the default ForkJoinPool scheduler.
      */
     @SuppressWarnings("removal")
-    private static ForkJoinPool createDefaultScheduler() {
+    private static ForkJoinPool createDefaultForkJoinPoolScheduler() {
         ForkJoinWorkerThreadFactory factory = pool -> {
             PrivilegedAction<ForkJoinWorkerThread> pa = () -> new CarrierThread(pool);
             return AccessController.doPrivileged(pa);
