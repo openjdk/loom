@@ -109,7 +109,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
-import jdk.test.lib.thread.CustomSchedulers;
+import jdk.test.lib.thread.VThreadScheduler;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
@@ -684,9 +684,9 @@ class MonitorWaitNotify {
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
     void testReleaseWhenWaiting1(int timeout) throws Exception {
-        assumeTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             var lock = new Object();
             var ready = new AtomicBoolean();

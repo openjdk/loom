@@ -35,37 +35,8 @@ import java.util.concurrent.ThreadFactory;
  *
  * Tests using this class need to open java.base/java.lang.
  */
-public class CustomSchedulers {
-    private CustomSchedulers() { }
-
-    /**
-     * Returns a builder to create virtual threads that use the given scheduler.
-     * @throws UnsupportedOperationException if custom schedulers are not supported
-     */
-    public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
-        try {
-            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
-            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
-            ctor.setAccessible(true);
-            return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
-        } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(e);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Returns a ThreadFactory to create virtual threads that use the given scheduler.
-     * @throws UnsupportedOperationException if custom schedulers are not supported
-     */
-    public static ThreadFactory virtualThreadFactory(Executor scheduler) {
-        return virtualThreadBuilder(scheduler).factory();
-    }
+public class VThreadScheduler {
+    private VThreadScheduler() { }
 
     /**
      * Returns the scheduler for the given virtual thread.
@@ -95,5 +66,34 @@ public class CustomSchedulers {
                 return false;
             }
         }
+    }
+
+    /**
+     * Returns a builder to create virtual threads that use the given scheduler.
+     * @throws UnsupportedOperationException if custom schedulers are not supported
+     */
+    public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+        try {
+            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
+            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
+            ctor.setAccessible(true);
+            return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(e);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Returns a ThreadFactory to create virtual threads that use the given scheduler.
+     * @throws UnsupportedOperationException if custom schedulers are not supported
+     */
+    public static ThreadFactory virtualThreadFactory(Executor scheduler) {
+        return virtualThreadBuilder(scheduler).factory();
     }
 }

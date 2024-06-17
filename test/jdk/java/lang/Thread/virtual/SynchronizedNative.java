@@ -65,9 +65,9 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import jdk.test.lib.thread.CustomSchedulers;
-import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadPinner;
+import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterAll;
@@ -451,9 +451,9 @@ class SynchronizedNative {
      */
     //@Test
     void testReleaseWhenBlocked() throws Exception {
-        assertTrue(CustomSchedulers.supportsCustomScheduler(), "No support for custom schedulers");
+        assertTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             var lock = this;
             var started = new CountDownLatch(1);

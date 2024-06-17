@@ -45,7 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
-import jdk.test.lib.thread.CustomSchedulers;
+import jdk.test.lib.thread.VThreadScheduler;
 
 public class GetStackTraceALotWhenParking {
     static class RoundRobinExecutor implements Executor, AutoCloseable {
@@ -84,7 +84,7 @@ public class GetStackTraceALotWhenParking {
         AtomicInteger count = new AtomicInteger();
 
         try (RoundRobinExecutor executor = new RoundRobinExecutor()) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(executor);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(executor);
 
             Thread thread = factory.newThread(() -> {
                 while (count.incrementAndGet() < ITERATIONS) {

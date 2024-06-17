@@ -44,8 +44,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import static java.lang.StackWalker.Option.*;
 
-import jdk.test.lib.thread.CustomSchedulers;
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,7 +95,7 @@ class StackFrames {
                     task.run();
                 });
             };
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
 
             var ready = new AtomicBoolean();
             var done = new AtomicBoolean();

@@ -67,7 +67,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import jdk.test.lib.thread.CustomSchedulers;
+import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -220,7 +220,7 @@ class CarrierThreadInfo {
          * Starts a virtual thread to execute the give task.
          */
         Thread forkVirtualThread(Runnable task) {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             Thread thread = factory.newThread(task);
             thread.start();
             return thread;

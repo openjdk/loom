@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-import jdk.test.lib.thread.CustomSchedulers;
+import jdk.test.lib.thread.VThreadScheduler;
 import jdk.test.lib.thread.VThreadRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -70,9 +70,9 @@ class CustomScheduler {
     @Test
     void testCustomScheduler1() throws Exception {
         var ref = new AtomicReference<Executor>();
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler1);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler1);
         Thread thread = factory.newThread(() -> {
-            ref.set(CustomSchedulers.scheduler(Thread.currentThread()));
+            ref.set(VThreadScheduler.scheduler(Thread.currentThread()));
         });
         thread.start();
         thread.join();
@@ -94,11 +94,11 @@ class CustomScheduler {
     @Test
     void testCustomScheduler3() throws Exception {
         var ref = new AtomicReference<Executor>();
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler1);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler1);
         Thread thread = factory.newThread(() -> {
             try {
                 Thread.ofVirtual().start(() -> {
-                    ref.set(CustomSchedulers.scheduler(Thread.currentThread()));
+                    ref.set(VThreadScheduler.scheduler(Thread.currentThread()));
                 }).join();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -116,12 +116,12 @@ class CustomScheduler {
     @Test
     void testCustomScheduler4() throws Exception {
         var ref = new AtomicReference<Executor>();
-        ThreadFactory factory1 = CustomSchedulers.virtualThreadFactory(scheduler1);
-        ThreadFactory factory2 = CustomSchedulers.virtualThreadFactory(scheduler2);
+        ThreadFactory factory1 = VThreadScheduler.virtualThreadFactory(scheduler1);
+        ThreadFactory factory2 = VThreadScheduler.virtualThreadFactory(scheduler2);
         Thread thread1 = factory1.newThread(() -> {
             try {
                 Thread thread2 = factory2.newThread(() -> {
-                    ref.set(CustomSchedulers.scheduler(Thread.currentThread()));
+                    ref.set(VThreadScheduler.scheduler(Thread.currentThread()));
                 });
                 thread2.start();
                 thread2.join();
@@ -155,7 +155,7 @@ class CustomScheduler {
             }
             assertTrue(exc.get() instanceof WrongThreadException);
         };
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
         Thread thread = factory.newThread(LockSupport::park);
         thread.start();
     }
@@ -169,7 +169,7 @@ class CustomScheduler {
         Thread carrier = Thread.currentThread();
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(Runnable::run);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(Runnable::run);
             Thread vthread = factory.newThread(() -> {
                 Thread.currentThread().interrupt();
                 Thread.yield();
@@ -191,7 +191,7 @@ class CustomScheduler {
         Thread carrier = Thread.currentThread();
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(Runnable::run);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(Runnable::run);
             Thread vthread = factory.newThread(() -> {
                 Thread.currentThread().interrupt();
             });
@@ -213,7 +213,7 @@ class CustomScheduler {
             Thread.currentThread().interrupt();
             task.run();
         };
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
         try {
             AtomicBoolean interrupted = new AtomicBoolean();
             Thread vthread = factory.newThread(() -> {
@@ -235,7 +235,7 @@ class CustomScheduler {
             System.err.println("OutOfMemoryError");
             throw new OutOfMemoryError();
         };
-        ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
         Thread thread = factory.newThread(() -> { });
         assertThrows(OutOfMemoryError.class, thread::start);
     }
@@ -260,7 +260,7 @@ class CustomScheduler {
             };
 
             // start thread and wait for it to park
-            ThreadFactory factory = CustomSchedulers.virtualThreadFactory(scheduler);
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
             var thread = factory.newThread(LockSupport::park);
             thread.start();
             await(thread, Thread.State.WAITING);
