@@ -30,7 +30,7 @@
 
 import java.time.Duration;
 import java.util.concurrent.StructuredTaskScope;
-import java.util.concurrent.StructuredTaskScope.Policy;
+import java.util.concurrent.StructuredTaskScope.JoinPolicy;
 import java.util.concurrent.StructuredTaskScope.Subtask;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.IntStream;
@@ -65,7 +65,7 @@ class StressCancellation {
     @ParameterizedTest
     @MethodSource("testCases")
     void test(ThreadFactory factory, int beforeCancel, int afterCancel) throws Exception {
-        var policy = new Policy<Boolean, Void>() {
+        var policy = new JoinPolicy<Boolean, Void>() {
             @Override
             public boolean onComplete(Subtask<? extends Boolean> subtask) {
                 boolean cancel = subtask.get();

@@ -130,6 +130,9 @@ serviceability/sa/ClhsdbPstack.java#core 8267433 macosx-x64
 serviceability/sa/TestJmapCore.java 8267433 macosx-x64
 serviceability/sa/TestJmapCoreMetaspace.java 8267433 macosx-x64
 
+serviceability/sa/ClhsdbFindPC.java#xcomp-core 8284045 macosx-aarch64
+serviceability/sa/ClhsdbCDSCore.java 8284045 macosx-aarch64
+
 serviceability/attach/ConcAttachTest.java 8290043 linux-all
 
 serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java 8315980 linux-all,windows-x64
@@ -184,3 +187,6 @@ serviceability/jvmti/vthread/GetSetLocalTest/GetSetLocalTest.java    0000000 gen
 # redefine j.l.Object
 serviceability/jvmti/RedefineClasses/RedefineObject.java 0000000 generic-all
 vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java 0000000 generic-all
+
+# changed in loom repo to only print thread ID of mounted thread
+serviceability/dcmd/thread/PrintMountedVirtualThread.java 0000000 generic-all

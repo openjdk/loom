@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,7 +31,7 @@
 
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Subtask;
-import java.util.concurrent.StructuredTaskScope.Policy;
+import java.util.concurrent.StructuredTaskScope.JoinPolicy;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -56,7 +56,8 @@ class WithScopedValue {
     void testForkInheritsScopedValue1(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withThreadFactory(factory))) {
+            try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll(),
+                                                      cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask = scope.fork(() -> {
                     return name.get(); // child should read "x"
                 });
@@ -75,9 +76,11 @@ class WithScopedValue {
     void testForkInheritsScopedValue2(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope1 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withThreadFactory(factory))) {
+            try (var scope1 = StructuredTaskScope.open(JoinPolicy.ignoreAll(),
+                                                       cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask1 = scope1.fork(() -> {
-                    try (var scope2 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withThreadFactory(factory))) {
+                    try (var scope2 = StructuredTaskScope.open(JoinPolicy.ignoreAll(),
+                                                               cf -> cf.withThreadFactory(factory))) {
                         Subtask<String> subtask2 = scope2.fork(() -> {
                             return name.get(); // grandchild should read "x"
                         });
@@ -100,13 +103,15 @@ class WithScopedValue {
     void testForkInheritsScopedValue3(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope1 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withThreadFactory(factory))) {
+            try (var scope1 = StructuredTaskScope.open(JoinPolicy.ignoreAll(),
+                                                       cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask1 = scope1.fork(() -> {
                     assertEquals(name.get(), "x");  // child should read "x"
 
                     // rebind name to "y"
                     String grandchildValue = ScopedValue.callWhere(name, "y", () -> {
-                        try (var scope2 = StructuredTaskScope.open(Policy.ignoreAll(), cf -> cf.withThreadFactory(factory))) {
+                        try (var scope2 = StructuredTaskScope.open(JoinPolicy.ignoreAll(),
+                                                                   cf -> cf.withThreadFactory(factory))) {
                             Subtask<String> subtask2 = scope2.fork(() -> {
                                 return name.get(); // grandchild should read "y"
                             });
@@ -138,7 +143,7 @@ class WithScopedValue {
         try {
             try {
                 ScopedValue.runWhere(name, "x", () -> {
-                    box.scope = StructuredTaskScope.open(Policy.ignoreAll());
+                    box.scope = StructuredTaskScope.open(JoinPolicy.ignoreAll());
                 });
                 fail();
             } catch (StructureViolationException expected) { }
@@ -167,7 +172,7 @@ class WithScopedValue {
     @Test
     void testStructureViolation2() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
-        try (var scope = StructuredTaskScope.open(Policy.ignoreAll())) {
+        try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll())) {
             ScopedValue.runWhere(name, "x", () -> {
                 assertThrows(StructureViolationException.class, scope::close);
             });
@@ -180,7 +185,7 @@ class WithScopedValue {
     @Test
     void testStructureViolation3() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
-        try (var scope = StructuredTaskScope.open(Policy.ignoreAll())) {
+        try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll())) {
             ScopedValue.runWhere(name, "x", () -> {
                 assertThrows(StructureViolationException.class,
                         () -> scope.fork(() -> "foo"));
@@ -198,7 +203,7 @@ class WithScopedValue {
 
         // rebind
         ScopedValue.runWhere(name1, "x", () -> {
-            try (var scope = StructuredTaskScope.open(Policy.ignoreAll())) {
+            try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll())) {
                 ScopedValue.runWhere(name1, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
@@ -208,7 +213,7 @@ class WithScopedValue {
 
         // new binding
         ScopedValue.runWhere(name1, "x", () -> {
-            try (var scope = StructuredTaskScope.open(Policy.ignoreAll())) {
+            try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll())) {
                 ScopedValue.runWhere(name2, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));

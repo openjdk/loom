@@ -305,6 +305,12 @@ final class VirtualThread extends BaseVirtualThread {
         boolean done = false;
         while (!done) {
             try {
+                // The scheduler's execute method is invoked in the context of the
+                // carrier thread. For the default scheduler this ensures that the
+                // current thread is a ForkJoinWorkerThread so the task will be pushed
+                // to the local queue. For other schedulers, it avoids deadlock that
+                // would arise due to platform and virtual threads contenting for a
+                // lock on the scheduler's submission queue.
                 if (currentThread() instanceof VirtualThread vthread) {
                     vthread.switchToCarrierThread();
                     try {
@@ -615,15 +621,11 @@ final class VirtualThread extends BaseVirtualThread {
             // if thread is the designated responsible thread for a monitor then schedule
             // it to wakeup so that it can check and recover. See objectMonitor.cpp.
             int recheckInterval = this.recheckInterval;
-            if (recheckInterval > 0 && state() == BLOCKED) {
+            if (recheckInterval > 0) {
                 assert recheckInterval >= 1 && recheckInterval <= 6;
                 // 4 ^ (recheckInterval - 1) = 1, 4, 16, ... 1024
                 long delay = 1 << (recheckInterval - 1) << (recheckInterval - 1);
-                Future<?> unblocker = schedule(this::unblock, delay, MILLISECONDS);
-                // cancel if unblocked while scheduling the unblock
-                if (state() != BLOCKED) {
-                    unblocker.cancel(false);
-                }
+                schedule(this::unblock, delay, MILLISECONDS);
             }
             return;
         }
