@@ -2748,6 +2748,10 @@ public final class System {
                 }
             }
 
+            public void appendVirtualThreadSchedulerInfo(StringBuilder sb) {
+                VirtualThread.appendSchedulerInfo(sb);
+            }
+
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
                                                       ContinuationScope contScope,
                                                       Continuation continuation) {
