@@ -187,6 +187,3 @@ serviceability/jvmti/vthread/GetSetLocalTest/GetSetLocalTest.java    0000000 gen
 # redefine j.l.Object
 serviceability/jvmti/RedefineClasses/RedefineObject.java 0000000 generic-all
 vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java 0000000 generic-all
-
-# changed in loom repo to only print thread ID of mounted thread
-serviceability/dcmd/thread/PrintMountedVirtualThread.java 0000000 generic-all
