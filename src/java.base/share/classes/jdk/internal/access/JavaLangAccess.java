@@ -584,6 +584,11 @@ public interface JavaLangAccess {
     void unparkVirtualThread(Thread thread);
 
     /**
+     * Append virtual thread scheduler information to given string buffer.
+     */
+    void appendVirtualThreadSchedulerInfo(StringBuilder sb);
+
+    /**
      * Creates a new StackWalker
      */
     StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,

@@ -957,14 +957,14 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class VThreadSchedulerDCmd : public DCmd {
+class VThreadInfoDCmd : public DCmd {
 public:
-  VThreadSchedulerDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
+  VThreadInfoDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
   static const char* name() {
-    return "Thread.vthread_scheduler";
+    return "Thread.vthread_info";
   }
   static const char* description() {
-    return "Print virtual thread scheduler info.";
+    return "Print virtual thread scheduler and other information";
   }
   static const char* impact() { return "Low"; }
   virtual void execute(DCmdSource source, TRAPS);

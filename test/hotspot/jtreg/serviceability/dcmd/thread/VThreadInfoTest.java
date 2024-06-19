@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,17 +23,20 @@
 
 /*
  * @test
- * @summary Basic test for jcmd Thread.vthread_scheduler
+ * @summary Basic test for jcmd Thread.vthread_info
  * @library /test/lib
- * @run main/othervm VThreadSchedulerTest
+ * @run main/othervm VThreadInfoTest
  */
 
 import jdk.test.lib.dcmd.PidJcmdExecutor;
 import jdk.test.lib.process.OutputAnalyzer;
 
-public class VThreadSchedulerTest {
+public class VThreadInfoTest {
     public static void main(String[] args) throws Exception {
-        OutputAnalyzer output = new PidJcmdExecutor().execute("Thread.vthread_scheduler");
-        output.shouldContain("parallelism");
+        OutputAnalyzer output = new PidJcmdExecutor().execute("Thread.vthread_info");
+        output.shouldContain("Virtual thread scheduler:")
+                .shouldContain("java.util.concurrent.ForkJoinPool")
+                .shouldContain("Timeout schedulers:")
+                .shouldContain("[0] java.util.concurrent.ScheduledThreadPoolExecutor");
     }
 }

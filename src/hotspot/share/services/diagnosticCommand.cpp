@@ -129,7 +129,7 @@ void DCmd::register_dcmds(){
 #endif // INCLUDE_JVMTI
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ThreadDumpToFileDCmd>(full_export, true, false));
-  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<VThreadSchedulerDCmd>(full_export, true, false));
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<VThreadInfoDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderStatsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<ClassLoaderHierarchyDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
@@ -1164,11 +1164,11 @@ void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const cha
   output()->print_raw((const char*)addr, ba->length());
 }
 
-void VThreadSchedulerDCmd::execute(DCmdSource source, TRAPS) {
+void VThreadInfoDCmd::execute(DCmdSource source, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
-  Symbol* sym = vmSymbols::java_lang_VirtualThread();
+  Symbol* sym = vmSymbols::jdk_internal_vm_VMSupport();
   Klass* k = SystemDictionary::resolve_or_fail(sym, true, CHECK);
   if (HAS_PENDING_EXCEPTION) {
     java_lang_Throwable::print(PENDING_EXCEPTION, output());
@@ -1177,12 +1177,12 @@ void VThreadSchedulerDCmd::execute(DCmdSource source, TRAPS) {
     return;
   }
 
-  // invoke printDefaultScheduler method
+  // invoke VMSupport.printVThreadInfo method
   JavaValue result(T_OBJECT);
   JavaCallArguments args;
   JavaCalls::call_static(&result,
                          k,
-                         vmSymbols::printDefaultScheduler_name(),
+                         vmSymbols::printVThreadInfo_name(),
                          vmSymbols::void_byte_array_signature(),
                          &args,
                          THREAD);

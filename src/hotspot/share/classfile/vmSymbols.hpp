@@ -743,13 +743,13 @@ class SerializeClosure;
   template(toFileURL_signature,                             "(Ljava/lang/String;)Ljava/net/URL;")                 \
   template(url_array_classloader_void_signature,            "([Ljava/net/URL;Ljava/lang/ClassLoader;)V")          \
                                                                                                                   \
-  /* Thread.dump_to_file jcmd */                                                                                  \
+  /* jcmd Thread.dump_to_file */                                                                                  \
   template(jdk_internal_vm_ThreadDumper,           "jdk/internal/vm/ThreadDumper")                                \
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
                                                                                                                   \
-  /* Thread.vthread_scheduler */                                                                                  \
-  template(printDefaultScheduler_name,             "printDefaultScheduler")                                       \
+  /* jcmd Thread.vthread_info */                                                                                       \
+  template(printVThreadInfo_name,                  "printVThreadInfo")                                            \
 
   /*end*/
 

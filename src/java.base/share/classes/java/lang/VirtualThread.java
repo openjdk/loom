@@ -25,7 +25,6 @@
 package java.lang;
 
 import java.lang.reflect.Constructor;
-import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Locale;
@@ -64,8 +63,7 @@ import sun.security.action.GetPropertyAction;
 import static java.util.concurrent.TimeUnit.*;
 
 /**
- * A thread that is scheduled by the Java virtual machine rather than the operating
- * system.
+ * A thread that is scheduled by the Java virtual machine rather than the operating system.
  */
 final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
@@ -1498,6 +1496,25 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Append virtual thread scheduler information to given string buffer.
+     */
+    static void appendSchedulerInfo(StringBuilder sb) {
+        sb.append("Default virtual thread scheduler:");
+        sb.append(System.lineSeparator());
+        sb.append(DEFAULT_SCHEDULER);
+        sb.append(System.lineSeparator());
+
+        sb.append(System.lineSeparator());
+        sb.append("Timeout schedulers:");
+        sb.append(System.lineSeparator());
+        for (int i = 0; i < DELAYED_TASK_SCHEDULERS.length; i++) {
+            sb.append('[').append(i).append("] ");
+            sb.append(DELAYED_TASK_SCHEDULERS[i]);
+            sb.append(System.lineSeparator());
+        }
+    }
+
+    /**
      * Creates the default scheduler.
      * If the system property {@code jdk.virtualThreadScheduler.implClass} is set then
      * its value is name of a class that implements java.util.concurrent.Executor.
@@ -1559,14 +1576,6 @@ final class VirtualThread extends BaseVirtualThread {
                          0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         };
         return AccessController.doPrivileged(pa);
-    }
-
-    /**
-     * Invoked by the VM for the Thread.vthread_scheduler diagnostic command.
-     */
-    private static byte[] printDefaultScheduler() {
-        return String.format("%s%n", DEFAULT_SCHEDULER.toString())
-                .getBytes(StandardCharsets.UTF_8);
     }
 
     /**
