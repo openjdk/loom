@@ -1323,7 +1323,6 @@ void Threads::print_on(outputStream* st, bool print_stacks,
         p->trace_stack();
       } else {
         p->print_stack_on(st);
-        const oop thread_oop = p->threadObj();
         if (p->is_vthread_mounted()) {
           // _lock_id is the thread ID of the mounted virtual thread
           st->print_cr("   Mounted virtual thread #" INT64_FORMAT, p->lock_id());
