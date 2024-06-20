@@ -34,7 +34,7 @@ import jdk.test.lib.process.OutputAnalyzer;
 public class VThreadInfoTest {
     public static void main(String[] args) throws Exception {
         OutputAnalyzer output = new PidJcmdExecutor().execute("Thread.vthread_info");
-        output.shouldContain("Virtual thread scheduler:")
+        output.shouldContain("Default virtual thread scheduler:")
                 .shouldContain("java.util.concurrent.ForkJoinPool")
                 .shouldContain("Timeout schedulers:")
                 .shouldContain("[0] java.util.concurrent.ScheduledThreadPoolExecutor");
