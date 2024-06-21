@@ -27,6 +27,7 @@ package java.lang;
 import java.lang.reflect.Constructor;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -42,6 +43,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
@@ -187,6 +189,20 @@ final class VirtualThread extends BaseVirtualThread {
 
     // next virtual thread on the list of virtual threads waiting to be unblocked
     private volatile VirtualThread next;
+
+    /**
+     * Returns the default scheduler.
+     */
+    static Executor defaultScheduler() {
+        return DEFAULT_SCHEDULER;
+    }
+
+    /**
+     * Returns a stream of the delayed task schedulers used to support timed operations.
+     */
+    static Stream<ScheduledExecutorService> delayedTaskSchedulers() {
+        return Arrays.stream(DELAYED_TASK_SCHEDULERS);
+    }
 
     /**
      * Returns the continuation scope used for virtual threads.
@@ -1493,25 +1509,6 @@ final class VirtualThread extends BaseVirtualThread {
     private static native void registerNatives();
     static {
         registerNatives();
-    }
-
-    /**
-     * Append virtual thread scheduler information to given string buffer.
-     */
-    static void appendSchedulerInfo(StringBuilder sb) {
-        sb.append("Default virtual thread scheduler:");
-        sb.append(System.lineSeparator());
-        sb.append(DEFAULT_SCHEDULER);
-        sb.append(System.lineSeparator());
-
-        sb.append(System.lineSeparator());
-        sb.append("Timeout schedulers:");
-        sb.append(System.lineSeparator());
-        for (int i = 0; i < DELAYED_TASK_SCHEDULERS.length; i++) {
-            sb.append('[').append(i).append("] ");
-            sb.append(DELAYED_TASK_SCHEDULERS[i]);
-            sb.append(System.lineSeparator());
-        }
     }
 
     /**

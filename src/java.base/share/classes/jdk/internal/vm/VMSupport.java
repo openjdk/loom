@@ -25,10 +25,10 @@
 package jdk.internal.vm;
 
 import jdk.internal.misc.Unsafe;
+import jdk.internal.misc.VM;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.reflect.ConstantPool;
-import sun.nio.ch.PollerInfo;
 import sun.reflect.annotation.AnnotationParser;
 import sun.reflect.annotation.AnnotationSupport;
 import sun.reflect.annotation.AnnotationType;
@@ -578,17 +578,4 @@ public class VMSupport {
         }
         return length;
     }
-
-    /**
-     * This method is invoked by the VM for the Thread.vthread_info diagnostic command.
-     * @return the UTF-8 encoded information to print
-     */
-    private static byte[] printVThreadInfo() {
-        StringBuilder sb = new StringBuilder();
-        SharedSecrets.getJavaLangAccess().appendVirtualThreadSchedulerInfo(sb);
-        sb.append(System.lineSeparator());
-        PollerInfo.appendPollerInfo(sb);
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
 }

@@ -36,13 +36,14 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import jdk.internal.misc.InnocuousThread;
+import jdk.internal.vm.VThreadSummary;
 import sun.security.action.GetPropertyAction;
 
 /**
  * Polls file descriptors. Virtual threads invoke the poll method to park
  * until a given file descriptor is ready for I/O.
  */
-abstract class Poller {
+public abstract class Poller {
     private static final Pollers POLLERS;
     static {
         try {
@@ -52,7 +53,9 @@ abstract class Poller {
         } catch (IOException ioe) {
             throw new ExceptionInInitializerError(ioe);
         }
-        PollerInfo.start();
+
+        // notify serviceability support that the poller I/O mechanism has started
+        VThreadSummary.pollerInitialized();
     }
 
     // maps file descriptors to parked Thread
@@ -277,7 +280,7 @@ abstract class Poller {
 
     @Override
     public String toString() {
-        return Objects.toIdentityString(this) + "[registered = " + map.size() + "]";
+        return Objects.toIdentityString(this) + " [registered = " + map.size() + "]";
     }
 
     /**
@@ -438,21 +441,24 @@ abstract class Poller {
         }
     }
 
-    static Poller masterPoller() {
+    /**
+     * Return the master poller or null if there is no master poller.
+     */
+    public static Poller masterPoller() {
         return POLLERS.masterPoller();
     }
 
     /**
      * Return the list of read pollers.
      */
-    static List<Poller> readPollers() {
+    public static List<Poller> readPollers() {
         return POLLERS.readPollers();
     }
 
     /**
      * Return the list of write pollers.
      */
-    static List<Poller> writePollers() {
+    public static List<Poller> writePollers() {
         return POLLERS.writePollers();
     }
 }
