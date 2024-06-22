@@ -131,4 +131,4 @@ compiler/arguments/TestC1Globals.java#id2 0000000 generic-all
 compiler/codecache/CodeCacheFullCountTest.java 8332926 generic-all
 
 # no regions should be selected expected: true but was: false
-gc//g1/TestMixedGCLiveThreshold.java#25percent 0000000 windows-all
+gc/g1/TestMixedGCLiveThreshold.java#25percent 8334759 windows-all
