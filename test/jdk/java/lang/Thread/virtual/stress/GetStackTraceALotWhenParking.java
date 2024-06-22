@@ -39,6 +39,7 @@
  */
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -103,7 +104,7 @@ public class GetStackTraceALotWhenParking {
                 // printStackTrace(stackTrace);
                 Thread.sleep(5);
                 if ((System.nanoTime() - start) > 500_000_000) {
-                    System.out.println(count.get());
+                    System.out.format("%s => %d of %d%n", Instant.now(), count.get(), ITERATIONS);
                     start = System.nanoTime();
                 }
             }

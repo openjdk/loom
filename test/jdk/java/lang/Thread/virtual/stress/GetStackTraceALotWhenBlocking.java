@@ -25,6 +25,7 @@
  * @test
  * @summary Stress test Thread.getStackTrace on virtual threads that are blocking or
  *     blocked on monitorenter
+ * @requires vm.debug != true
  * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run main/othervm GetStackTraceALotWhenBlocking 500000
