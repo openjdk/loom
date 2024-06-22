@@ -1509,12 +1509,15 @@ final class VirtualThread extends BaseVirtualThread {
     private static native void registerNatives();
     static {
         registerNatives();
+
+        // ensure VTHREAD_GROUP is created, may be accessed by JVMTI
+        var group = Thread.virtualThreadGroup();
     }
 
     /**
      * Creates the default scheduler.
      * If the system property {@code jdk.virtualThreadScheduler.implClass} is set then
-     * its value is name of a class that implements java.util.concurrent.Executor.
+     * its value is the name of a class that implements java.util.concurrent.Executor.
      * The class is public in an exported package, has a public no-arg constructor,
      * and is visible to the system class loader.
      * If the system property is not set then the default scheduler will be a
