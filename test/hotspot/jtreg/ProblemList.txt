@@ -144,6 +144,10 @@ serviceability/attach/ConcAttachTest.java 8290043 linux-all
 
 serviceability/jvmti/stress/StackTrace/NotSuspended/GetStackTraceNotSuspendedStressTest.java 8315980 linux-all,windows-x64
 
+# redefine java.lang.Object returns JVMTI_ERROR_UNMODIFIABLE_CLASS
+serviceability/jvmti/RedefineClasses/RedefineObject.java 0000000 generic-all
+vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java 0000000 generic-all
+
 #############################################################################
 
 # :hotspot_misc
@@ -183,14 +187,3 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 vmTestbase/nsk/monitoring/ThreadMXBean/ThreadInfo/Multi/Multi005/TestDescription.java 8076494 windows-x64
 
 vmTestbase/nsk/monitoring/ThreadMXBean/findMonitorDeadlockedThreads/find006/TestDescription.java 8310144 macosx-aarch64
-
-#############################################################################
-
-# Loom, fibers branch
-
-serviceability/jvmti/vthread/ContinuationTest/ContinuationTest.java  8029528 generic-all
-serviceability/jvmti/vthread/GetSetLocalTest/GetSetLocalTest.java    0000000 generic-all
-
-# redefine j.l.Object
-serviceability/jvmti/RedefineClasses/RedefineObject.java 0000000 generic-all
-vmTestbase/nsk/jvmti/scenarios/bcinstr/BI04/bi04t002/TestDescription.java 0000000 generic-all

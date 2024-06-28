@@ -97,7 +97,10 @@ jdk/jfr/api/consumer/TestRecordedEventGetThread.java 0000000 generic-all
 jdk/jfr/api/consumer/TestRecordedObject.java 0000000 generic-all
 jdk/jfr/startupargs/TestDumpOnExit.java 0000000 generic-all
 
+# AccessControlException: access denied ("java.lang.reflect.ReflectPermission" "suppressAccessChecks")
 sun/security/util/Resources/early/EarlyResources.java 0000000 generic-all
+
+# ProcessTools fails with InaccessibleObjectException
 tools/jimage/JImageToolTest.java 0000000 generic-all
 
 com/sun/management/DiagnosticCommandMBean/DcmdMBeanPermissionsTest.java 0000000 generic-all
