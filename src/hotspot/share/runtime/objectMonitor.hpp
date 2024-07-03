@@ -368,7 +368,7 @@ private:
   bool      enter(JavaThread* current);
   void      resume_operation(JavaThread* current, ObjectWaiter* node);
   void      exit(JavaThread* current, bool not_suspended = true);
-  void      wait(jlong millis, TRAPS);
+  void      wait(jlong millis, bool interruptible, TRAPS);
   void      notify(TRAPS);
   void      notifyAll(TRAPS);
 

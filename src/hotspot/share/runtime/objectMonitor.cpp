@@ -1710,7 +1710,7 @@ static void vthread_monitor_waited_event(JavaThread *current, ObjectWaiter* node
 //
 // Note: a subset of changes to ObjectMonitor::wait()
 // will need to be replicated in complete_exit
-void ObjectMonitor::wait(jlong millis, TRAPS) {
+void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   JavaThread* current = THREAD;
 
   assert(InitDone, "Unexpectedly not initialized");
@@ -1720,7 +1720,7 @@ void ObjectMonitor::wait(jlong millis, TRAPS) {
   EventJavaMonitorWait event;
 
   // check for a pending interrupt
-  if (current->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
+  if (interruptible && current->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
     // post monitor waited event.  Note that this is past-tense, we are done waiting.
     if (JvmtiExport::should_post_monitor_waited()) {
       // Note: 'false' parameter is passed here because the
@@ -1746,7 +1746,7 @@ void ObjectMonitor::wait(jlong millis, TRAPS) {
 
 #ifdef LOOM_MONITOR_SUPPORT
   ContinuationEntry* ce = current->last_continuation();
-  if (ce != nullptr && ce->is_virtual_thread()) {
+  if (interruptible && ce != nullptr && ce->is_virtual_thread()) {
     int result = Continuation::try_preempt(current, ce->cont_oop(current), freeze_on_wait);
     if (result == freeze_ok) {
       VThreadWait(current, millis);
@@ -1800,7 +1800,7 @@ void ObjectMonitor::wait(jlong millis, TRAPS) {
   int WasNotified = 0;
 
   // Need to check interrupt state whilst still _thread_in_vm
-  bool interrupted = current->is_interrupted(false);
+  bool interrupted = interruptible && current->is_interrupted(false);
 
   { // State transition wrappers
     OSThread* osthread = current->osthread();
@@ -1930,7 +1930,7 @@ void ObjectMonitor::wait(jlong millis, TRAPS) {
   if (!WasNotified) {
     // no, it could be timeout or Thread.interrupt() or both
     // check for interrupt event, otherwise it is timeout
-    if (current->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
+    if (interruptible && current->is_interrupted(true) && !HAS_PENDING_EXCEPTION) {
       THROW(vmSymbols::java_lang_InterruptedException());
     }
   }

@@ -817,7 +817,7 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
   ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_wait);
 
   DTRACE_MONITOR_WAIT_PROBE(monitor, obj(), current, millis);
-  monitor->wait(millis, THREAD); // Not CHECK as we need following code
+  monitor->wait(millis, true, THREAD); // Not CHECK as we need following code
 
   // This dummy call is in place to get around dtrace bug 6254741.  Once
   // that's fixed we can uncomment the following line, remove the call
@@ -826,6 +826,16 @@ int ObjectSynchronizer::wait(Handle obj, jlong millis, TRAPS) {
   int ret_code = dtrace_waited_probe(monitor, obj, THREAD);
   return ret_code;
 }
+
+void ObjectSynchronizer::waitUninterruptibly(Handle obj, jlong millis, TRAPS) {
+  if (millis < 0) {
+    THROW_MSG(vmSymbols::java_lang_IllegalArgumentException(), "timeout value is negative");
+  }
+  ObjectSynchronizer::inflate(THREAD,
+                              obj(),
+                              inflate_cause_wait)->wait(millis, false, THREAD);
+}
+
 
 void ObjectSynchronizer::notify(Handle obj, TRAPS) {
   JavaThread* current = THREAD;
