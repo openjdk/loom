@@ -103,6 +103,8 @@ vmTestbase/nsk/jdb/kill/kill001/kill001.java 0000000 generic-all
 # Unknown reasons, should be investigated
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
 
+# Fails on Windows because of additional memory allocation.
+gc/g1/TestMixedGCLiveThreshold.java#25percent 8334759 windows-x64
 
 ##########
 ## Tests incompatible with  with virtual test thread factory.
@@ -129,6 +131,3 @@ compiler/arguments/TestC1Globals.java#id2 0000000 generic-all
 
 # OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "main"
 compiler/codecache/CodeCacheFullCountTest.java 8332926 generic-all
-
-# no regions should be selected expected: true but was: false
-gc/g1/TestMixedGCLiveThreshold.java#25percent 8334759 windows-all
