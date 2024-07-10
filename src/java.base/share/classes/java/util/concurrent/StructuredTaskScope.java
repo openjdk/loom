@@ -48,7 +48,7 @@ import jdk.internal.misc.ThreadFlock;
  * ensure that the lifetime of a concurrent operation is confined by a <em>syntax block</em>,
  * just like that of a sequential operation in structured programming.
  *
- * <p> {@code StructuredTaskScope} defines the static method {@link #open(JoinPolicy) open}
+ * <p> {@code StructuredTaskScope} defines the static method {@link #open(Joiner) open}
  * to open a new {@code StructuredTaskScope} and the {@link #close() close} method to close
  * it. The API is designed to be used with the {@code try-with-resources} statement where
  * the {@code StructuredTaskScope} is opened as a resource and then closed automatically.
@@ -62,12 +62,12 @@ import jdk.internal.misc.ThreadFlock;
  * StructuredTaskScope}), and the {@code close} method throws an exception after closing
  * if the owner did not invoke the {@code join} method.
  *
- * <p> A {@code StructuredTaskScope} is opened with a {@link JoinPolicy} that handles subtask
+ * <p> A {@code StructuredTaskScope} is opened with a {@link Joiner} that handles subtask
  * completion and produces the outcome (the result or an exception) for the {@link #join()
- * join} method. The {@code JoinPolicy} interface defines static methods to create a
- * {@code JoinPolicy} for common cases.
+ * join} method. The {@code Joiner} interface defines static methods to create a
+ * {@code Joiner} for common cases.
  *
- * <p> A {@code JoinPolicy} may <a id="CancelExecution"><em>cancel execution</em></a>
+ * <p> A {@code Joiner} may <a id="CancelExecution"><em>cancel execution</em></a>
  * (sometimes called "short-circuiting") when some condition is reached that does not
  * require the result of subtasks that are still executing. Cancelling execution prevents
  * new threads from being started to execute further subtasks, {@linkplain Thread#interrupt()
@@ -84,13 +84,13 @@ import jdk.internal.misc.ThreadFlock;
  * successfully, one subtask may succeed and the other may fail, or both subtasks may
  * fail. In this example, the code in the main task is interested in the result from the
  * first subtask to complete successfully. The example uses {@link
- * JoinPolicy#anySuccessfulResultOrThrow() JoinPolicy.anySuccessfulResultOrThrow()} to
- * create a {@code JoinPolicy} that makes available the result of the first subtask to
+ * Joiner#anySuccessfulResultOrThrow() Joiner.anySuccessfulResultOrThrow()} to
+ * create a {@code Joiner} that makes available the result of the first subtask to
  * complete successfully. The type parameter in the example is "{@code String}" so that
  * only subtasks that return a {@code String} can be forked.
  * {@snippet lang=java :
  *    // @link substring="open" target="#open(Policy)" :
- *    try (var scope = StructuredTaskScope.open(JoinPolicy.<String>anySuccessfulResultOrThrow())) {
+ *    try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulResultOrThrow())) {
  *
  *        scope.fork(() -> query(left));  // @link substring="fork" target="#fork(Callable)"
  *        scope.fork(() -> query(right));
@@ -114,11 +114,11 @@ import jdk.internal.misc.ThreadFlock;
  * <p> Now consider another example that also splits into two subtasks to concurrently
  * fetch resources. One of the subtasks returns a {@code String} when it succeeds, the
  * other returns an {@code Integer}. The main task in this example is interested in the
- * successful result from both subtasks. It uses {@link JoinPolicy#ignoreSuccessfulOrThrow()
- * JoinPolicy.ignoreSuccessfulOrThrow()} to create a {@code JoinPolicy} that cancels
+ * successful result from both subtasks. It uses {@link Joiner#awaitAllSuccessfulOrThrow()
+ * Joiner.awaitAllSuccessfulOrThrow()} to create a {@code Joiner} that cancels
  * execution and causes {@code join} to throw if any subtask fails.
  * {@snippet lang=java :
- *    try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreSuccessfulOrThrow())) {
+ *    try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
  *
  *        // @link substring="Subtask" target="Subtask" :
  *        Subtask<String> subtask1 = scope.fork(() -> query(left));
@@ -144,22 +144,22 @@ import jdk.internal.misc.ThreadFlock;
  * Throwable#getCause() cause}.
  *
  * <p> Whether code uses the {@code Subtask} returned from {@code fork} will depend on
- * the {@code JoinPolicy} and usage. Some {@code JoinPolicy} implementations are suited to subtasks
+ * the {@code Joiner} and usage. Some {@code Joiner} implementations are suited to subtasks
  * that return results of the same type and where the {@code join} method returns a result
  * for the main task to use. Code that forks subtasks that return results of different
- * types, and uses a {@code JoinPolicy} such as {@code JoinPolicy.ignoreSuccessfulOrThrow()} that
+ * types, and uses a {@code Joiner} such as {@code Joiner.awaitAllSuccessfulOrThrow()} that
  * does not return a result, will use {@link Subtask#get() Subtask.get()} after joining.
  *
  * <h2>Exception handling</h2>
  *
- * <p> A {@code StructuredTaskScope} is opened with a {@link JoinPolicy JoinPolicy} that
+ * <p> A {@code StructuredTaskScope} is opened with a {@link Joiner Joiner} that
  * handles subtask completion and produces the outcome for the {@link #join() join} method.
  * In some cases, the outcome will be a result, in other cases it will be an exception.
  * If the outcome is an exception then the {@code join} method throws {@link
  * ExecutionException} with the exception as the {@linkplain Throwable#getCause()
- * cause}. For many {@code JoinPolicy} implementations, the exception will be an exception
- * thrown by a subtask that failed. In the case of {@link JoinPolicy#allSuccessfulOrThrow()
- * allSuccessfulOrThrow} and {@link JoinPolicy#ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow}
+ * cause}. For many {@code Joiner} implementations, the exception will be an exception
+ * thrown by a subtask that failed. In the case of {@link Joiner#allSuccessfulOrThrow()
+ * allSuccessfulOrThrow} and {@link Joiner#awaitAllSuccessfulOrThrow() awaitAllSuccessfulOrThrow}
  * for example, the exception is from the first subtask to fail.
  *
  * <p> Many of the details for how exceptions are handled will depend on usage. In some
@@ -180,16 +180,16 @@ import jdk.internal.misc.ThreadFlock;
  * consists of a {@link ThreadFactory} to create threads, an optional name for monitoring
  * and management purposes, and an optional timeout.
  *
- * <p> The 1-arg {@link #open(JoinPolicy) open} method creates a {@code StructuredTaskScope}
+ * <p> The 1-arg {@link #open(Joiner) open} method creates a {@code StructuredTaskScope}
  * with the <a id="DefaultConfiguration"> <em>default configuration</em></a>. The default
  * configuration has a {@code ThreadFactory} that creates unnamed
  * <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">virtual threads</a>,
  * is unnamed for monitoring and management purposes, and has no timeout.
  *
- * <p> The 2-arg {@link #open(JoinPolicy, Function) open} method can be used to create a
+ * <p> The 2-arg {@link #open(Joiner, Function) open} method can be used to create a
  * {@code StructuredTaskScope} that uses a different {@code ThreadFactory}, has a name for
  * the purposes of monitoring and management, or has a timeout that cancels execution if
- * the timeout expires before or while waiting for subtasks to finish. The {@code open}
+ * the timeout expires before or while waiting for subtasks to complete. The {@code open}
  * method is called with a {@linkplain Function function} that is applied to the default
  * configuration and returns a {@link Config Config} for the {@code StructuredTaskScope}
  * under construction.
@@ -197,12 +197,12 @@ import jdk.internal.misc.ThreadFlock;
  * <p> The following example opens a new {@code StructuredTaskScope} with a {@code
  * ThreadFactory} that creates virtual threads {@linkplain Thread#setName(String) named}
  * "duke-0", "duke-1" ...
- * {@snippet lang=java :
+ * {@snippet lang = java:
  *    // @link substring="name" target="Thread.Builder#name(String, long)" :
  *    ThreadFactory factory = Thread.ofVirtual().name("duke-", 0).factory();
  *
  *    // @link substring="withThreadFactory" target="Config#withThreadFactory(ThreadFactory)" :
- *    try (var scope = StructuredTaskScope.open(policy, cf -> cf.withThreadFactory(factory))) {
+ *    try (var scope = StructuredTaskScope.open(joiner, cf -> cf.withThreadFactory(factory))) {
  *
  *        scope.fork( .. );   // runs in a virtual thread with name "duke-0"
  *        scope.fork( .. );   // runs in a virtual thread with name "duke-1"
@@ -210,7 +210,7 @@ import jdk.internal.misc.ThreadFlock;
  *        scope.join();
  *
  *     }
- * }
+ *}
  *
  * <p> A second example sets a timeout, represented by a {@link Duration}. The timeout
  * starts when the new task scope is opened. If the timeout expires before the {@code join}
@@ -220,8 +220,8 @@ import jdk.internal.misc.ThreadFlock;
  * {@snippet lang=java :
  *    Duration timeout = Duration.ofSeconds(10);
  *
- *    // @link substring="allSuccessfulOrThrow" target="JoinPolicy#allSuccessfulOrThrow()" :
- *    try (var scope = StructuredTaskScope.open(JoinPolicy.<String>allSuccessfulOrThrow(),
+ *    // @link substring="allSuccessfulOrThrow" target="Joiner#allSuccessfulOrThrow()" :
+ *    try (var scope = StructuredTaskScope.open(Joiner.<String>allSuccessfulOrThrow(),
  *    // @link substring="withTimeout" target="Config#withTimeout(Duration)" :
  *                                              cf -> cf.withTimeout(timeout))) {
  *
@@ -279,7 +279,7 @@ import jdk.internal.misc.ThreadFlock;
  *     // @link substring="callWhere" target="ScopedValue#callWhere" :
  *     Result result = ScopedValue.callWhere(USERNAME, "duke", () -> {
  *
- *         try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreSuccessfulOrThrow())) {
+ *         try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
  *
  *             Subtask<String> subtask1 = scope.fork( .. );    // inherits binding
  *             Subtask<Integer> subtask2 = scope.fork( .. );   // inherits binding
@@ -337,7 +337,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
     }
 
-    private final JoinPolicy<? super T, ? extends R> policy;
+    private final Joiner<? super T, ? extends R> joiner;
     private final ThreadFactory threadFactory;
     private final ThreadFlock flock;
 
@@ -454,7 +454,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      */
     private void onComplete(SubtaskImpl<? extends T> subtask) {
         assert subtask.state() != Subtask.State.UNAVAILABLE;
-        if (policy.onComplete(subtask)) {
+        if (joiner.onComplete(subtask)) {
             cancelExecution();
         }
     }
@@ -463,10 +463,10 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * Initialize a new StructuredTaskScope.
      */
     @SuppressWarnings("this-escape")
-    private StructuredTaskScope(JoinPolicy<? super T, ? extends R> policy,
+    private StructuredTaskScope(Joiner<? super T, ? extends R> joiner,
                                 ThreadFactory threadFactory,
                                 String name) {
-        this.policy = policy;
+        this.joiner = joiner;
         this.threadFactory = threadFactory;
 
         if (name == null)
@@ -523,7 +523,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * <p> Code executing in the scope owner thread can use this method to get the
          * result of a successful subtask only after it has {@linkplain #join() joined}.
          *
-         * <p> Code executing in the {@code JoinPolicy} {@link JoinPolicy#onComplete(Subtask)
+         * <p> Code executing in the {@code Joiner} {@link Joiner#onComplete(Subtask)
          * onComplete} method should test that the {@linkplain #state() subtask state} is
          * {@link State#SUCCESS SUCCESS} before using this method to get the result.
          *
@@ -545,7 +545,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * <p> Code executing in the scope owner thread can use this method to get the
          * exception thrown by a failed subtask only after it has {@linkplain #join() joined}.
          *
-         * <p> Code executing in a {@code JoinPolicy} {@link JoinPolicy#onComplete(Subtask)
+         * <p> Code executing in a {@code Joiner} {@link Joiner#onComplete(Subtask)
          * onComplete} method should test that the {@linkplain #state() subtask state} is
          * {@link State#FAILED FAILED} before using this method to get the exception.
          *
@@ -561,32 +561,30 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * and produce the result for a main task waiting in the {@link #join() join} method
      * for subtasks to complete.
      *
-     * <p> JoinPolicy defines static methods to create {@code JoinPolicy} objects for
-     * common cases:
+     * <p> Joiner defines static methods to create {@code Joiner} objects for common cases:
      * <ul>
-     *   <li> {@link #allSuccessfulOrThrow() allSuccessfulOrThrow()} creates a {@code JoinPolicy}
+     *   <li> {@link #allSuccessfulOrThrow() allSuccessfulOrThrow()} creates a {@code Joiner}
      *   that yields a stream of the completed subtasks for {@code join} to return when
      *   all subtasks complete successfully. It cancels execution and causes {@code join}
      *   to throw if any subtask fails.
      *   <li> {@link #anySuccessfulResultOrThrow() anySuccessfulResultOrThrow()} creates a
-     *   {@code JoinPolicy} that yields the result of the first subtask to succeed. It cancels
+     *   {@code Joiner} that yields the result of the first subtask to succeed. It cancels
      *   execution and causes {@code join} to throw if all subtasks fail.
-     *   <li> {@link #ignoreSuccessfulOrThrow() ignoreSuccessfulOrThrow()} creates a {@code
-     *   JoinPolicy} that ignores all successful subtasks. It cancels execution and causes
-     *   {@code join} to throw if any subtask fails.
-     *   <li> {@link #ignoreAll() ignoreAll()} creates a {@code JoinPolicy} that ignores all
-     *   completed subtasks, even subtasks that fail. The {@code join} method returns null
-     *   when all subtasks finish.
+     *   <li> {@link #awaitAllSuccessfulOrThrow() awaitAllSuccessfulOrThrow()} creates a
+     *   {@code Joiner} that waits for all successful subtasks. It cancels execution and
+     *   causes {@code join} to throw if any subtask fails.
+     *   <li> {@link #awaitAll() awaitAll()} creates a {@code Joiner} that waits for all
+     *   subtasks. If does not cancel execution.
      * </ul>
      *
-     * <p> In addition to the methods to create {@code JoinPolicy} objects for common cases,
+     * <p> In addition to the methods to create {@code Joiner} objects for common cases,
      * the {@link #all(Predicate) all(Predicate)} method is defined to create a {@code
-     * JoinPolicy} that yields a stream of all subtasks. It is created with a {@link
+     * Joiner} that yields a stream of all subtasks. It is created with a {@link
      * Predicate Predicate} that determines if execution should continue or be cancelled.
-     * This {@code JoinPolicy} can be built upon to create custom policies that cancel
+     * This {@code Joiner} can be built upon to create custom policies that cancel
      * execution based on some condition.
      *
-     * <p> More advanced policies can be developed by implementing the {@code JoinPolicy}
+     * <p> More advanced policies can be developed by implementing the {@code Joiner}
      * interface. The {@link #onFork(Subtask)} method is invoked when subtasks are forked.
      * The {@link #onComplete(Subtask)} method is invoked when subtasks complete with a
      * result or exception. These methods return a {@code boolean} to indicate if execution
@@ -602,25 +600,25 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * #onComplete(Subtask)} method defined by this interface may be invoked by several
      * threads concurrently.
      *
-     * @apiNote It is very important that a new {@code JoinPolicy} object is created for each
-     * {@code StructuredTaskScope}. {@code JoinPolicy} objects should never be shared with
+     * @apiNote It is very important that a new {@code Joiner} object is created for each
+     * {@code StructuredTaskScope}. {@code Joiner} objects should never be shared with
      * different task scopes or re-used after a task is closed.
      *
-     * <p> Designing a {@code JoinPolicy} should take into account the code at the use-site
+     * <p> Designing a {@code Joiner} should take into account the code at the use-site
      * where the results from the {@link StructuredTaskScope#join() join} method are
-     * processed. It should be clear what the {@code JoinPolicy} does vs. the application
-     * code at the use-site. In general, the {@code JoinPolicy} implementation is not the
-     * place to code "business logic". A {@code JoinPolicy} should be designed to be as
+     * processed. It should be clear what the {@code Joiner} does vs. the application
+     * code at the use-site. In general, the {@code Joiner} implementation is not the
+     * place to code "business logic". A {@code Joiner} should be designed to be as
      * general purpose as possible.
      *
      * @param <T> the result type of tasks executed in the task scope
      * @param <R> the type of results returned by the join method
      * @since 24
-     * @see #open(JoinPolicy)
+     * @see #open(Joiner)
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     @FunctionalInterface
-    public interface JoinPolicy<T, R> {
+    public interface Joiner<T, R> {
 
         /**
          * Invoked by {@link #fork(Callable) fork(Callable)} and {@link #fork(Runnable)
@@ -691,16 +689,16 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         R result() throws Throwable;
 
         /**
-         * {@return a new JoinPolicy object that yields a stream of all subtasks when all
+         * {@return a new Joiner object that yields a stream of all subtasks when all
          * subtasks complete successfully, or throws if any subtask fails}
          * If any subtask fails then execution is cancelled.
          *
-         * <p> If all subtasks complete successfully, the policy's {@link JoinPolicy#result()}
+         * <p> If all subtasks complete successfully, the joiner's {@link Joiner#result()}
          * method returns a stream of all subtasks in the order that they were forked.
          * If any subtask failed then the {@code result} method throws the exception from
          * the first subtask to fail.
          *
-         * @apiNote This policy is intended for cases where the results for all subtasks
+         * @apiNote This joiner is intended for cases where the results for all subtasks
          * are required ("invoke all"); if any subtask fails then the results of other
          * unfinished subtasks are no longer needed. A typical usage will be when the
          * subtasks return results of the same type, the returned stream of forked
@@ -708,66 +706,65 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @param <T> the result type of subtasks
          */
-        static <T> JoinPolicy<T, Stream<Subtask<T>>> allSuccessfulOrThrow() {
+        static <T> Joiner<T, Stream<Subtask<T>>> allSuccessfulOrThrow() {
             return new AllSuccessful<>();
         }
 
         /**
-         * {@return a new JoinPolicy object that yields the result of a subtask that completed
+         * {@return a new Joiner object that yields the result of a subtask that completed
          * successfully, or throws if all subtasks fail} If any subtask completes
          * successfully then execution is cancelled.
          *
-         * <p> The policy's {@link JoinPolicy#result()} method returns the result of a subtask
+         * <p> The joiner's {@link Joiner#result()} method returns the result of a subtask
          * that completed successfully. If all subtasks fail then the {@code result} method
          * throws the exception from one of the failed subtasks. The {@code result} method
          * throws {@code NoSuchElementException} if no subtasks were forked.
          *
-         * @apiNote This policy is intended for cases where the result of any subtask will
+         * @apiNote This joiner is intended for cases where the result of any subtask will
          * do ("invoke any") and where the results of other unfinished subtasks are no
          * longer needed.
          *
          * @param <T> the result type of subtasks
          */
-        static <T> JoinPolicy<T, T> anySuccessfulResultOrThrow() {
+        static <T> Joiner<T, T> anySuccessfulResultOrThrow() {
             return new AnySuccessful<>();
         }
 
         /**
-         * {@return a new JoinPolicy object that ignores all successful subtasks. It
+         * {@return a new Joiner object that waits for all successful subtasks. It
          * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> if
          * any subtask fails}
          *
-         * <p> The policy's {@link JoinPolicy#result() result} method returns {@code null}
+         * <p> The joiner's {@link Joiner#result() result} method returns {@code null}
          * if all subtasks complete successfully, or throws the exception from the first
          * subtask to fail.
          *
-         * @apiNote This policy is intended for cases where the results for all subtasks
-         * are required ("invoke all"), and where the code {@linkplain #fork(Callable) forking}
-         * subtasks keeps a reference to the {@linkplain Subtask Subtask} objects. A
-         * typical usage will be when subtasks return results of different types.
+         * @apiNote This joiner is intended for cases where the results for all subtasks
+         * are required ("invoke all"), and where the code {@linkplain #fork(Callable)
+         * forking} subtasks keeps a reference to the {@linkplain Subtask Subtask} objects.
+         * A typical usage will be when subtasks return results of different types.
          *
          * @param <T> the result type of subtasks
          */
-        static <T> JoinPolicy<T, Void> ignoreSuccessfulOrThrow() {
-            return new IgnoreSuccessful<>();
+        static <T> Joiner<T, Void> awaitAllSuccessfulOrThrow() {
+            return new AwaitSuccessful<>();
         }
 
         /**
-         * {@return a new JoinPolicy object that ignores the outcome of all completed
-         * subtasks, even subtasks that fail}
+         * {@return a new Joiner object that waits for all subtasks}
          *
-         * <p> The policy's {@link JoinPolicy#result() result} method returns {@code null}.
+         * <p> The joiner's {@link Joiner#result() result} method returns {@code null}.
          *
-         * @apiNote This policy is intended for cases where subtasks make use of
+         * @apiNote This joiner is intended for cases where subtasks make use of
          * <em>side-effects</em> rather than return results or fail with exceptions.
          * The {@link #fork(Runnable) fork(Runnable)} method can be used to fork subtasks
          * that do not return a result.
          *
          * @param <T> the result type of subtasks
          */
-        static <T> JoinPolicy<T, Void> ignoreAll() {
-            // ensure that new JoinPolicy object is returned
-            return new JoinPolicy<T, Void>() {
+        static <T> Joiner<T, Void> awaitAll() {
+            // ensure that new Joiner object is returned
+            return new Joiner<T, Void>() {
                 @Override
                 public Void result() {
                     return null;
@@ -776,24 +773,24 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new JoinPolicy object that yields a stream of all subtasks, cancelling
+         * {@return a new Joiner object that yields a stream of all subtasks, cancelling
          * execution when evaluating a completed subtask with the given predicate returns
          * {@code true}}
          *
-         * <p> The policy's {@link JoinPolicy#onComplete(Subtask)} method invokes the
+         * <p> The joiner's {@link Joiner#onComplete(Subtask)} method invokes the
          * predicate's {@link Predicate#test(Object) test} method with the subtask that
          * completed successfully or failed with an exception. If the {@code test} method
          * returns {@code true} then <a href="StructuredTaskScope.html#CancelExecution">
          * execution is cancelled</a>. The {@code test} method must be thread safe as it
          * may be invoked concurrently from several threads.
          *
-         * <p> The policy's {@link #result()} method returns the stream of all subtasks,
+         * <p> The joiner's {@link #result()} method returns the stream of all subtasks,
          * in fork order. The stream may contain subtasks that have completed
          * (in {@link Subtask.State#SUCCESS SUCCESS} or {@link Subtask.State#FAILED FAILED}
          * state) or subtasks in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state
          * if execution was cancelled before all subtasks were forked or completed.
          *
-         * <p> The following example uses this method to create a {@code JoinPolicy} that
+         * <p> The following example uses this method to create a {@code Joiner} that
          * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> when
          * two or more subtasks fail.
          * {@snippet lang=java :
@@ -806,13 +803,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *         }
          *     }
          *
-         *     var joinPolicy = JoinPolicy.all(new CancelAfterTwoFailures<String>());
+         *     var joinPolicy = Joiner.all(new CancelAfterTwoFailures<String>());
          * }
          *
          * @param isDone the predicate to evaluate completed subtasks
          * @param <T> the result type of subtasks
          */
-        static <T> JoinPolicy<T, Stream<Subtask<T>>> all(Predicate<Subtask<? extends T>> isDone) {
+        static <T> Joiner<T, Stream<Subtask<T>>> all(Predicate<Subtask<? extends T>> isDone) {
             return new AllSubtasks<>(isDone);
         }
     }
@@ -824,13 +821,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * ThreadFactory} to create threads, an optional name for the purposes of monitoring
      * and management, and an optional timeout.
      *
-     * <p> Creating a {@code StructuredTaskScope} with its 1-arg {@link #open(JoinPolicy) open}
+     * <p> Creating a {@code StructuredTaskScope} with its 1-arg {@link #open(Joiner) open}
      * method uses the <a href="StructuredTaskScope.html#DefaultConfiguration">default
      * configuration</a>. The default configuration consists of a thread factory that
      * creates unnamed <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">
      * virtual threads</a>, no name for monitoring and management purposes, and no timeout.
      *
-     * <p> Creating a {@code StructuredTaskScope} with its 2-arg {@link #open(JoinPolicy, Function)
+     * <p> Creating a {@code StructuredTaskScope} with its 2-arg {@link #open(Joiner, Function)
      * open} method allows a different configuration to be used. The function specified
      * to the {@code open} method is applied to the default configuration and returns the
      * configuration for the {@code StructuredTaskScope} under construction. The function
@@ -883,7 +880,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Opens a new structured task scope to use the given {@code JoinPolicy} object plus
+     * Opens a new structured task scope to use the given {@code Joiner} object and with
      * configuration that is the result of applying the given function to the
      * <a href="#DefaultConfiguration">default configuration</a>.
      *
@@ -908,19 +905,19 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * <p> Construction captures the current thread's {@linkplain ScopedValue scoped
      * value} bindings for inheritance by threads started in the task scope.
      *
-     * @param policy the policy
+     * @param joiner the joiner
      * @param configFunction a function to produce the configuration
      * @return a new task scope
      * @param <T> the result type of tasks executed in the task scope
      * @param <R> the type of the result returned by the join method
      * @since 24
      */
-    public static <T, R> StructuredTaskScope<T, R> open(JoinPolicy<? super T, ? extends R> policy,
+    public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner,
                                                         Function<Config, Config> configFunction) {
-        Objects.requireNonNull(policy);
+        Objects.requireNonNull(joiner);
 
         var config = (ConfigImpl) configFunction.apply(ConfigImpl.defaultConfig());
-        var scope = new StructuredTaskScope<T, R>(policy, config.threadFactory(), config.name());
+        var scope = new StructuredTaskScope<T, R>(joiner, config.threadFactory(), config.name());
 
         // schedule timeout
         Duration timeout = config.timeout();
@@ -940,7 +937,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Opens a new structured task scope to use the given {@code JoinPolicy} object. The
+     * Opens a new structured task scope to use the given {@code Joiner} object. The
      * task scope is created with the <a href="#DefaultConfiguration">default configuration</a>.
      * The default configuration has a {@code ThreadFactory} that creates unnamed
      * <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">virtual threads</a>,
@@ -948,16 +945,16 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * @implSpec
      * This factory method is equivalent to invoking the 2-arg open method with the given
-     * policy and the {@linkplain Function#identity() identity function}.
+     * joiner and the {@linkplain Function#identity() identity function}.
      *
-     * @param policy the policy
+     * @param joiner the joiner
      * @return a new task scope
      * @param <T> the result type of tasks executed in the task scope
      * @param <R> the type of the result returned by the join method
      * @since 24
      */
-    public static <T, R> StructuredTaskScope<T, R> open(JoinPolicy<? super T, ? extends R> policy) {
-        return open(policy, Function.identity());
+    public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
+        return open(joiner, Function.identity());
     }
 
     /**
@@ -967,7 +964,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * method.
      *
      * <p> This method first creates a {@link Subtask Subtask} to represent the <em>forked
-     * subtask</em>. It invokes the policy's {@link JoinPolicy#onFork(Subtask) onFork} method
+     * subtask</em>. It invokes the joiner's {@link Joiner#onFork(Subtask) onFork} method
      * with the {@code Subtask} object. If the {@code onFork} completes with an exception
      * or error then it is propagated by the {@code fork} method. If execution is
      * {@linkplain #isCancelled() cancelled}, or {@code onFork} returns {@code true} to
@@ -978,15 +975,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * started. Forking a subtask inherits the current thread's {@linkplain ScopedValue
      * scoped value} bindings. The bindings must match the bindings captured when the
      * task scope was opened. If the subtask completes (successfully or with an exception)
-     * before execution is cancelled, then the thread invokes the policy's
-     * {@link JoinPolicy#onComplete(Subtask) onComplete} method with subtask in the
+     * before execution is cancelled, then the thread invokes the joiner's
+     * {@link Joiner#onComplete(Subtask) onComplete} method with subtask in the
      * {@link Subtask.State#SUCCESS SUCCESS} or {@link Subtask.State#FAILED FAILED} state.
      *
      * <p> This method returns the {@link Subtask Subtask} object. In some usages, this
      * object may be used to get its result. In other cases it may be used for correlation
      * or just discarded. To ensure correct usage, the {@link Subtask#get() Subtask.get()}
      * method may only be called by the task scope owner to get the result after it has
-     * waited for all threads to finish with the {@link #join() join} method and the subtask
+     * waited for subtasks to complete with the {@link #join() join} method and the subtask
      * completed successfully. Similarly, the {@link Subtask#exception() Subtask.exception()}
      * method may only be called by the task scope owner after it has joined and the subtask
      * failed. If execution was cancelled before the subtask was forked, or before it
@@ -1015,8 +1012,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
         var subtask = new SubtaskImpl<U>(this, task);
 
-        // notify policy, even if cancelled
-        if (policy.onFork(subtask)) {
+        // notify joiner, even if cancelled
+        if (joiner.onFork(subtask)) {
             cancelExecution();
         }
 
@@ -1065,27 +1062,27 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Waits for all subtasks started in this task scope to finish or execution to be
+     * Waits for all subtasks started in this task scope to complete or execution to be
      * cancelled. If a {@linkplain  Config#withTimeout(Duration) timeout} has been set
      * then execution will be cancelled if the timeout expires before or while waiting.
-     * Once finished waiting, the {@code JoinPolicy}'s {@link JoinPolicy#result() result}
+     * Once finished waiting, the {@code Joiner}'s {@link Joiner#result() result}
      * method is invoked to get the result or throw an exception. If the {@code result}
      * method throws then this method throws {@code ExecutionException} with the
      * exception thrown by the {@code result()} method as the cause.
      *
      * <p> This method waits for all subtasks by waiting for all threads {@linkplain
      * #fork(Callable) started} in this task scope to finish execution. It stops waiting
-     * when all threads finish, the {@code JoinPolicy}'s {@link JoinPolicy#onFork(Subtask)
-     * onFork} or {@link JoinPolicy#onComplete(Subtask) onComplete} returns {@code true}
+     * when all threads finish, the {@code Joiner}'s {@link Joiner#onFork(Subtask)
+     * onFork} or {@link Joiner#onComplete(Subtask) onComplete} returns {@code true}
      * to cancel execution, the timeout (if set) expires, or the current thread is
      * {@linkplain Thread#interrupt() interrupted}.
      *
      * <p> This method may only be invoked by the task scope owner.
      *
-     * @return the {@link JoinPolicy#result() result}
+     * @return the {@link Joiner#result() result}
      * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the task scope owner
-     * @throws ExecutionException if the policy's {@code result} method throws, or with
+     * @throws ExecutionException if the joiner's {@code result} method throws, or with
      * cause {@link TimeoutException} if a timeout is set and the timeout expires
      * @throws InterruptedException if interrupted while waiting
      * @since 24
@@ -1111,9 +1108,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             joined = true;
         }
 
-        // invoke policy to get result
+        // invoke joiner to get result
         try {
-            return policy.result();
+            return joiner.result();
         } catch (Throwable e) {
             throw new ExecutionException(e);
         }
@@ -1185,7 +1182,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             cancelTimeout();
         }
 
-        // wait for stragglers to finish
+        // wait for stragglers
         try {
             flock.close();
         } finally {
@@ -1307,10 +1304,10 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A join policy that returns a stream of all subtasks when all subtasks complete
+     * A joiner that returns a stream of all subtasks when all subtasks complete
      * successfully. If any subtask fails then execution is cancelled.
      */
-    private static final class AllSuccessful<T> implements JoinPolicy<T, Stream<Subtask<T>>> {
+    private static final class AllSuccessful<T> implements Joiner<T, Stream<Subtask<T>>> {
         private static final VarHandle FIRST_EXCEPTION;
         static {
             try {
@@ -1351,10 +1348,10 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A join policy that returns the result of the first subtask to complete successfully.
+     * A joiner that returns the result of the first subtask to complete successfully.
      * If any subtask completes successfully then execution is cancelled.
      */
-    private static final class AnySuccessful<T> implements JoinPolicy<T, T> {
+    private static final class AnySuccessful<T> implements Joiner<T, T> {
         private static final VarHandle FIRST_SUCCESS;
         private static final VarHandle FIRST_EXCEPTION;
         static {
@@ -1399,15 +1396,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A join policy that that ignores all successful subtasks. If any subtask fails the
+     * A joiner that that waits for all successful subtasks. If any subtask fails the
      * execution is cancelled.
      */
-    private static final class IgnoreSuccessful<T> implements JoinPolicy<T, Void> {
+    private static final class AwaitSuccessful<T> implements Joiner<T, Void> {
         private static final VarHandle FIRST_EXCEPTION;
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_EXCEPTION = l.findVarHandle(IgnoreSuccessful.class, "firstException", Throwable.class);
+                FIRST_EXCEPTION = l.findVarHandle(AwaitSuccessful.class, "firstException", Throwable.class);
             } catch (Exception e) {
                 throw new ExceptionInInitializerError(e);
             }
@@ -1433,9 +1430,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A join policy that returns a stream of all subtasks.
+     * A joiner that returns a stream of all subtasks.
      */
-    private static class AllSubtasks<T> implements JoinPolicy<T, Stream<Subtask<T>>> {
+    private static class AllSubtasks<T> implements Joiner<T, Stream<Subtask<T>>> {
         private final Predicate<Subtask<? extends T>> isDone;
         // list of forked subtasks, only accessed by owner thread
         private final List<Subtask<T>> subtasks = new ArrayList<>();

@@ -52,7 +52,7 @@ import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.StructuredTaskScope;
-import java.util.concurrent.StructuredTaskScope.JoinPolicy;
+import java.util.concurrent.StructuredTaskScope.Joiner;
 import java.util.function.Supplier;
 
 public class StressStackOverflow {
@@ -170,7 +170,7 @@ public class StressStackOverflow {
     void runInNewThread(Runnable op) {
         var threadFactory
                 = (ThreadLocalRandom.current().nextBoolean() ? Thread.ofPlatform() : Thread.ofVirtual()).factory();
-        try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll(), cf -> cf.withThreadFactory(threadFactory))) {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll(), cf -> cf.withThreadFactory(threadFactory))) {
             var handle = scope.fork(() -> {
                 op.run();
                 return null;
@@ -187,7 +187,7 @@ public class StressStackOverflow {
     public void run() {
         try {
             ScopedValue.where(inheritedValue, 42).where(el, 0).run(() -> {
-                try (var scope = StructuredTaskScope.open(JoinPolicy.ignoreAll())) {
+                try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
                     try {
                         if (ThreadLocalRandom.current().nextBoolean()) {
                             // Repeatedly test Scoped Values set by ScopedValue::call(), get(), and run()
