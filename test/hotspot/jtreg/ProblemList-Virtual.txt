@@ -104,6 +104,7 @@ vmTestbase/nsk/jdb/kill/kill001/kill001.java 0000000 generic-all
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
 
 # Fails on Windows because of additional memory allocation.
+
 gc/g1/TestMixedGCLiveThreshold.java#25percent 8334759 windows-x64
 
 ##########
