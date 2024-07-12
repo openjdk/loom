@@ -310,12 +310,12 @@ final class VirtualThread extends BaseVirtualThread {
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
      * otherwise it will be pushed to an external submission queue.
-     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
-     * @param retryOnOOME to retry indefinitely if OutOfMemoryError is thrown
+     * @param scheduler the scheduler
+     * @param retryOnOOME true to retry indefinitely if OutOfMemoryError is thrown
      * @throws RejectedExecutionException
      */
     @ChangesCurrentThread
-    private void submitRunContinuation(boolean retryOnOOME) {
+    private void submitRunContinuation(Executor scheduler, boolean retryOnOOME) {
         boolean done = false;
         while (!done) {
             try {
@@ -363,7 +363,7 @@ final class VirtualThread extends BaseVirtualThread {
             submitFailed(ree);
             throw ree;
         } catch (OutOfMemoryError e) {
-            submitRunContinuation();
+            submitRunContinuation(pool, true);
         }
     }
 
@@ -381,7 +381,7 @@ final class VirtualThread extends BaseVirtualThread {
             submitFailed(ree);
             throw ree;
         } catch (OutOfMemoryError e) {
-            submitRunContinuation();
+            submitRunContinuation(pool, true);
         }
     }
 
@@ -393,19 +393,18 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        submitRunContinuation(true);
+        submitRunContinuation(scheduler, true);
     }
 
     /**
-     * Submits the runContinuation task the scheduler. For the default scheduler, and
+     * Submits the runContinuation task to the scheduler. For the default scheduler, and
      * calling it a virtual thread that uses the default scheduler, the task will be
      * pushed to an external submission queue. This method may throw OutOfMemoryError.
      * @throws RejectedExecutionException
      * @throws OutOfMemoryError
      */
     private void externalSubmitRunContinuationOrThrow() {
-        if (scheduler == DEFAULT_SCHEDULER
-                && currentCarrierThread() instanceof CarrierThread ct) {
+        if (scheduler == DEFAULT_SCHEDULER && currentCarrierThread() instanceof CarrierThread ct) {
             try {
                 ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
@@ -413,7 +412,7 @@ final class VirtualThread extends BaseVirtualThread {
                 throw ree;
             }
         } else {
-            submitRunContinuation(false);
+            submitRunContinuation(scheduler, false);
         }
     }
 
@@ -598,8 +597,8 @@ final class VirtualThread extends BaseVirtualThread {
 
             // may have been unparked while parking
             if (parkPermit && compareAndSetState(newState, UNPARKED)) {
-                // lazy submit to continue on the current thread as carrier if possible
-                if (currentThread() instanceof CarrierThread ct) {
+                // lazy submit to continue on the current carrier if possible
+                if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
                     lazySubmitRunContinuation(ct.getPool());
                 } else {
                     submitRunContinuation();
@@ -767,7 +766,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Parks unless unparked or interrupted. If already unparked then the parking
+     * Parks until unparked or interrupted. If already unparked then the parking
      * permit is consumed and this method completes immediately (meaning it doesn't
      * yield). It also completes immediately if the interrupt status is set.
      */
