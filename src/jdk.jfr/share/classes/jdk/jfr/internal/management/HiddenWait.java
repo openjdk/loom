@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,11 +22,21 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.internal.classfile.impl;
+package jdk.jfr.internal.management;
 
-import java.lang.classfile.CodeBuilder;
+/**
+ * The HiddenWait class is used to exclude jdk.JavaMonitorWait events
+ * from being generated when Object.wait() is called on an object of this type.
+ */
+public final class HiddenWait {
 
-public sealed interface TerminalCodeBuilder extends CodeBuilder, LabelContext
-        permits DirectCodeBuilder, BufferedCodeBuilder {
-    int curTopLocal();
+    public synchronized boolean takeNap(long timeoutMillis) {
+        try {
+            this.wait(timeoutMillis);
+            return true;
+        } catch (InterruptedException e) {
+            // Ok, ignore
+            return false;
+        }
+    }
 }
