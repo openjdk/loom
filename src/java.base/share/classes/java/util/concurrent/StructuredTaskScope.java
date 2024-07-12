@@ -342,8 +342,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     private final ThreadFlock flock;
 
     // fields that are only accessed by owner thread
-    private boolean needToJoin;     // join attempted
-    private boolean joined;         // join completed
+    private boolean needToJoin;     // set by fork to indicate that owner must join
+    private boolean joined;         // set to true when owner joins
     private boolean closed;
     private Future<?> timerTask;
 
@@ -1189,7 +1189,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             closed = true;
         }
 
-        // throw ISE if the owner didn't attempt to join after forking
+        // throw ISE if the owner didn't join after forking
         if (needToJoin) {
             needToJoin = false;
             throw new IllegalStateException("Owner did not join");
@@ -1467,7 +1467,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
                               String name,
                               Duration timeout) implements Config {
         static Config defaultConfig() {
-            return new ConfigImpl(Thread.ofVirtual().factory(),null,  null);
+            return new ConfigImpl(Thread.ofVirtual().factory(), null, null);
         }
 
         @Override
