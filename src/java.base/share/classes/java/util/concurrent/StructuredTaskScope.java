@@ -115,8 +115,8 @@ import jdk.internal.misc.ThreadFlock;
  * fetch resources. One of the subtasks returns a {@code String} when it succeeds, the
  * other returns an {@code Integer}. The main task in this example is interested in the
  * successful result from both subtasks. It uses {@link Joiner#awaitAllSuccessfulOrThrow()
- * Joiner.awaitAllSuccessfulOrThrow()} to create a {@code Joiner} that cancels
- * execution and causes {@code join} to throw if any subtask fails.
+ * Joiner.awaitAllSuccessfulOrThrow()} to create a {@code Joiner} that waits for both
+ * subtasks to complete successfully or for either subtask to fail.
  * {@snippet lang=java :
  *    try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
  *
