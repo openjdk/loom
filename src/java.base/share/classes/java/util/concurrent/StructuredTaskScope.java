@@ -476,6 +476,12 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
     /**
      * Represents a subtask forked with {@link #fork(Callable)} or {@link #fork(Runnable)}.
+     *
+     * <p> Code that forks subtasks can use the {@link #get() get()} method after {@linkplain
+     * #join() joining} to obtain the result of a subtask that completed successfully. It
+     * can use the {@link #exception()} method to obtain the exception thrown by a subtask
+     * that failed.
+     *
      * @param <T> the result type
      * @since 21
      */
