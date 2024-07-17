@@ -1123,6 +1123,49 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
+     * Cancels execution. This method allows the task scope owner to explicitly
+     * <a href="#CancelExecution">cancel execution</a>. If not already cancelled, this
+     * method {@linkplain Thread#interrupt() interrupts} the threads executing subtasks
+     * that have not completed, and prevents new threads from being started in the task
+     * scope.
+     *
+     * @apiNote This method is intended for cases where a task scope is created with a
+     * {@link Joiner Joiner} that doesn't cancel execution or where the code in the main
+     * task needs to cancel execution due to some exception or other condition in the main
+     * task. The following example accepts network connections indefinitely, forking a
+     * subtask to handle each connection. If the {@code accept()} method in the example
+     * throws then the main task cancels execution before joining and closing the scope.
+     * The {@link #close() close} method waits for the interrupted threads to finish.
+     *
+     * {@snippet lang=java :
+     *    // @link substring="awaitAll" target="Joiner#awaitAll()" :
+     *    try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
+     *
+     *        try {
+     *            while (true) {
+     *                Socket peer = listener.accept();
+     *                // @link substring="fork" target="#fork(Runnable)" :
+     *                scope.fork(() -> handle(peer));
+     *            }
+     *        } finally {
+     *            scope.cancel();
+     *            scope.join();    // completes immediately
+     *        }
+     *
+     *   }
+     * }
+     *
+     * @throws IllegalStateException if this task scope is closed
+     * @throws WrongThreadException if the current thread is not the task scope owner
+     * @since 24
+     */
+    public void cancel() {
+        ensureOwner();
+        ensureOpen();
+        cancelExecution();
+    }
+
+    /**
      * {@return {@code true} if <a href="#CancelExecution">execution is cancelled</a>,
      * or in the process of being cancelled, otherwise {@code false}}
      *

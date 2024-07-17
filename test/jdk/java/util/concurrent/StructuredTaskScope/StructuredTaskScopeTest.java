@@ -172,23 +172,13 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test fork is owner confined.
+     * Test fork method is owner confined.
      */
     @ParameterizedTest
     @MethodSource("factories")
     void testForkConfined(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<Boolean>awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
-
-            // thread in scope cannot fork
-            Subtask<Boolean> subtask = scope.fork(() -> {
-                assertThrows(WrongThreadException.class, () -> {
-                    scope.fork(() -> null);
-                });
-                return true;
-            });
-            scope.join();
-            assertTrue(subtask.get());
 
             // random thread cannot fork
             try (var pool = Executors.newSingleThreadExecutor()) {
@@ -200,6 +190,16 @@ class StructuredTaskScopeTest {
                 });
                 future.get();
             }
+
+            // subtask cannot fork
+            Subtask<Boolean> subtask = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, () -> {
+                    scope.fork(() -> null);
+                });
+                return true;
+            });
+            scope.join();
+            assertTrue(subtask.get());
         }
     }
 
@@ -260,15 +260,49 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test fork after task scope is cancelled.
+     * Test fork after task scope is cancelled. This test uses the cancel method to
+     * cancel execution explicitly.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testForkAfterCancel(ThreadFactory factory) throws Exception {
+    void testForkAfterCancel1(ThreadFactory factory) throws Exception {
         var countingThreadFactory = new CountingThreadFactory(factory);
-        var testPolicy = new CancelAfterOnePolicy<String>();
+        var testJoiner = new CountingJoiner<String>();
 
-        try (var scope = StructuredTaskScope.open(testPolicy,
+        try (var scope = StructuredTaskScope.open(testJoiner,
+                cf -> cf.withThreadFactory(countingThreadFactory))) {
+
+            scope.cancel();
+
+            // fork subtask
+            var subtask = scope.fork(() -> "foo");
+            
+            assertEquals(0, countingThreadFactory.threadCount());
+            assertEquals(1, testJoiner.onForkCount());
+            assertEquals(0, testJoiner.onCompleteCount());
+
+            scope.join();
+
+            assertEquals(0, countingThreadFactory.threadCount());
+            assertEquals(1, testJoiner.onForkCount());
+            assertEquals(0, testJoiner.onCompleteCount());
+
+            assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
+        }
+    }
+    
+
+    /**
+     * Test fork after task scope is cancelled. This test uses a custom Joiner to
+     * cancel execution.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testForkAfterCancel2(ThreadFactory factory) throws Exception {
+        var countingThreadFactory = new CountingThreadFactory(factory);
+        var testJoiner = new CancelAfterOneJoiner<String>();
+
+        try (var scope = StructuredTaskScope.open(testJoiner,
                 cf -> cf.withThreadFactory(countingThreadFactory))) {
 
             // fork subtask, the scope should be cancelled when the subtask completes
@@ -278,22 +312,22 @@ class StructuredTaskScopeTest {
             }
 
             assertEquals(1, countingThreadFactory.threadCount());
-            assertEquals(1, testPolicy.onForkCount());
-            assertEquals(1, testPolicy.onCompleteCount());
+            assertEquals(1, testJoiner.onForkCount());
+            assertEquals(1, testJoiner.onCompleteCount());
 
             // fork second subtask, it should not run
             var subtask2 = scope.fork(() -> "bar");
 
             // onFork should be invoked, newThread and onComplete should not be invoked
             assertEquals(1, countingThreadFactory.threadCount());
-            assertEquals(2, testPolicy.onForkCount());
-            assertEquals(1, testPolicy.onCompleteCount());
+            assertEquals(2, testJoiner.onForkCount());
+            assertEquals(1, testJoiner.onCompleteCount());
 
             scope.join();
 
             assertEquals(1, countingThreadFactory.threadCount());
-            assertEquals(2, testPolicy.onForkCount());
-            assertEquals(1, testPolicy.onCompleteCount());
+            assertEquals(2, testJoiner.onForkCount());
+            assertEquals(1, testJoiner.onCompleteCount());
             assertEquals("foo", subtask1.get());
             assertEquals(Subtask.State.UNAVAILABLE, subtask2.state());
         }
@@ -302,11 +336,9 @@ class StructuredTaskScopeTest {
     /**
      * Test fork after task scope is closed.
      */
-    @ParameterizedTest
-    @MethodSource("factories")
-    void testForkAfterClose(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.open(Joiner.awaitAll(),
-                cf -> cf.withThreadFactory(factory))) {
+    @Test
+    void testForkAfterClose() {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
             scope.close();
             assertThrows(IllegalStateException.class, () -> scope.fork(() -> null));
         }
@@ -316,7 +348,7 @@ class StructuredTaskScopeTest {
      * Test fork when the ThreadFactory rejects creating a thread.
      */
     @Test
-    void testForkRejectedExecutionException() throws Exception {
+    void testForkRejectedExecutionException() {
         ThreadFactory factory = task -> null;
         try (var scope = StructuredTaskScope.open(Joiner.awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
@@ -361,7 +393,7 @@ class StructuredTaskScopeTest {
         try (var scope = StructuredTaskScope.open(joiner)) {
             scope.fork(() -> "foo");
 
-            // each call to join should invoke Policy::result
+            // each call to join should invoke Joiner::result
             assertEquals("foo", scope.join());
             assertEquals("bar", scope.join());
             assertEquals("baz", scope.join());
@@ -369,23 +401,13 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test join is owner confined.
+     * Test join method is owner confined.
      */
     @ParameterizedTest
     @MethodSource("factories")
     void testJoinConfined(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<Boolean>awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
-
-            // thread in scope cannot join
-            Subtask<Boolean> subtask = scope.fork(() -> {
-                assertThrows(WrongThreadException.class, () -> { scope.join(); });
-                return true;
-            });
-
-            scope.join();
-
-            assertTrue(subtask.get());
 
             // random thread cannot join
             try (var pool = Executors.newSingleThreadExecutor()) {
@@ -395,6 +417,14 @@ class StructuredTaskScopeTest {
                 });
                 future.get();
             }
+
+            // subtask cannot join
+            Subtask<Boolean> subtask = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, () -> { scope.join(); });
+                return true;
+            });
+            scope.join();
+            assertTrue(subtask.get());
         }
     }
 
@@ -472,9 +502,9 @@ class StructuredTaskScopeTest {
     @MethodSource("factories")
     void testJoinWhenCancelled(ThreadFactory factory) throws Exception {
         var countingThreadFactory = new CountingThreadFactory(factory);
-        var testPolicy = new CancelAfterOnePolicy<String>();
+        var testJoiner = new CancelAfterOneJoiner<String>();
 
-        try (var scope = StructuredTaskScope.open(testPolicy,
+        try (var scope = StructuredTaskScope.open(testJoiner,
                     cf -> cf.withThreadFactory(countingThreadFactory))) {
 
             // fork subtask, the scope should be cancelled when the subtask completes
@@ -585,14 +615,48 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test that cancelling exceutions interrupts unfinished threads.
+     * Test that cancelling execution interrupts unfinished threads. This test uses the
+     * cancel method to cancel execution explicitly.
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testCancellationInterruptsThreads(ThreadFactory factory) throws Exception {
-        var testPolicy = new CancelAfterOnePolicy<String>();
+    void testCancelInterruptsThreads1(ThreadFactory factory) throws Exception {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll(),
+                cf -> cf.withThreadFactory(factory))) {
 
-        try (var scope = StructuredTaskScope.open(testPolicy,
+            // fork subtask that runs for a long time
+            var started = new CountDownLatch(1);
+            var interrupted = new CountDownLatch(1);
+            var subtask = scope.fork(() -> {
+                started.countDown();
+                try {
+                    Thread.sleep(Duration.ofDays(1));
+                } catch (InterruptedException e) {
+                    interrupted.countDown();
+                }
+            });
+            started.await();
+
+            scope.cancel();
+
+            // subtask should be interrupted
+            interrupted.await();
+
+            scope.join();
+            assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
+        }
+    }
+
+    /**
+     * Test that cancelling execution interrupts unfinished threads. This test uses
+     * a custom Joiner to cancel execution.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testCancelInterruptsThreads2(ThreadFactory factory) throws Exception {
+        var testJoiner = new CancelAfterOneJoiner<String>();
+
+        try (var scope = StructuredTaskScope.open(testJoiner,
                 cf -> cf.withThreadFactory(factory))) {
 
             // fork subtask1 that runs for a long time
@@ -618,7 +682,6 @@ class StructuredTaskScopeTest {
             interrupted.await();
 
             scope.join();
-
             assertEquals(Subtask.State.UNAVAILABLE, subtask1.state());
             assertEquals("bar", subtask2.get());
         }
@@ -718,22 +781,13 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test close is owner confined.
+     * Test close method is owner confined.
      */
     @ParameterizedTest
     @MethodSource("factories")
     void testCloseConfined(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<Boolean>awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
-
-            // attempt to close from thread in scope
-            Subtask<Boolean> subtask = scope.fork(() -> {
-                assertThrows(WrongThreadException.class, scope::close);
-                return true;
-            });
-
-            scope.join();
-            assertTrue(subtask.get());
 
             // random thread cannot close scope
             try (var pool = Executors.newCachedThreadPool(factory)) {
@@ -743,6 +797,14 @@ class StructuredTaskScopeTest {
                 });
                 future.get();
             }
+
+            // subtask cannot close
+            Subtask<Boolean> subtask = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, scope::close);
+                return true;
+            });
+            scope.join();
+            assertTrue(subtask.get());
         }
     }
 
@@ -752,8 +814,8 @@ class StructuredTaskScopeTest {
     @ParameterizedTest
     @MethodSource("factories")
     void testInterruptClose1(ThreadFactory factory) throws Exception {
-        var testPolicy = new CancelAfterOnePolicy<String>();
-        try (var scope = StructuredTaskScope.open(testPolicy,
+        var testJoiner = new CancelAfterOneJoiner<String>();
+        try (var scope = StructuredTaskScope.open(testJoiner,
                 cf -> cf.withThreadFactory(factory))) {
 
             // fork first subtask, a straggler as it continues after being interrupted
@@ -797,8 +859,8 @@ class StructuredTaskScopeTest {
     @ParameterizedTest
     @MethodSource("factories")
     void testInterruptClose2(ThreadFactory factory) throws Exception {
-        var testPolicy = new CancelAfterOnePolicy<String>();
-        try (var scope = StructuredTaskScope.open(testPolicy,
+        var testJoiner = new CancelAfterOneJoiner<String>();
+        try (var scope = StructuredTaskScope.open(testJoiner,
                 cf -> cf.withThreadFactory(factory))) {
 
             Thread mainThread = Thread.currentThread();
@@ -863,6 +925,59 @@ class StructuredTaskScopeTest {
                 assertFalse(executed.get());
                 assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
             }
+        }
+    }
+
+
+    /**
+     * Test cancel after task scope is cancelled.
+     */
+    @Test
+    void testCancelAfterCancel() {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
+            scope.cancel();
+        }
+    }
+
+    /**
+     * Test cancel after task scope is closed.
+     */
+    @Test
+    void testCancelAfterClose() {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
+            assertFalse(scope.isCancelled());
+            scope.cancel();
+            assertTrue(scope.isCancelled());
+            scope.cancel();
+            assertTrue(scope.isCancelled());
+        }
+    }
+
+    /**
+     * Test cancel method is owner confined.
+     */
+    @ParameterizedTest
+    @MethodSource("factories")
+    void testCancelConfined(ThreadFactory factory) throws Exception {
+        try (var scope = StructuredTaskScope.open(Joiner.<Boolean>awaitAll(),
+                cf -> cf.withThreadFactory(factory))) {
+
+            // random thread cannot cancel scope
+            try (var pool = Executors.newCachedThreadPool(factory)) {
+                Future<Boolean> future = pool.submit(() -> {
+                    assertThrows(WrongThreadException.class, scope::cancel);
+                    return null;
+                });
+                future.get();
+            }
+
+            // subtask cannot cancel
+            Subtask<Boolean> subtask = scope.fork(() -> {
+                assertThrows(WrongThreadException.class, scope::cancel);
+                return true;
+            });
+            scope.join();
+            assertTrue(subtask.get());
         }
     }
 
@@ -1046,7 +1161,7 @@ class StructuredTaskScopeTest {
     @ParameterizedTest
     @MethodSource("factories")
     void testSubtaskWhenCancelled(ThreadFactory factory) throws Exception {
-        try (var scope = StructuredTaskScope.open(new CancelAfterOnePolicy<String>())) {
+        try (var scope = StructuredTaskScope.open(new CancelAfterOneJoiner<String>())) {
             scope.fork(() -> "foo");
             while (!scope.isCancelled()) {
                 Thread.sleep(20);
@@ -1438,11 +1553,11 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Policy's default methods.
+     * Test Joiner default methods.
      */
     @Test
-    void testPolicyDefaultMethods() throws Exception {
-        try (var scope = StructuredTaskScope.open(new CancelAfterOnePolicy<String>())) {
+    void testJoinerDefaultMethods() throws Exception {
+        try (var scope = StructuredTaskScope.open(new CancelAfterOneJoiner<String>())) {
 
             // need subtasks to test default methods
             var subtask1 = scope.fork(() -> "foo");
@@ -1455,7 +1570,7 @@ class StructuredTaskScopeTest {
             assertEquals(Subtask.State.SUCCESS, subtask1.state());
             assertEquals(Subtask.State.UNAVAILABLE, subtask2.state());
 
-            // Policy that does not override default methods
+            // Joiner that does not override default methods
             Joiner<Object, Void> joiner = () -> null;
             assertThrows(NullPointerException.class, () -> joiner.onFork(null));
             assertThrows(NullPointerException.class, () -> joiner.onComplete(null));
@@ -1517,9 +1632,39 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Policy that cancels execution when a subtask completes.
+     * A joiner that counts that counts the number of subtasks that are forked and the
+     * number of subtasks that complete.
      */
-    private static class CancelAfterOnePolicy<T> implements Joiner<T, Void> {
+    private static class CountingJoiner<T> implements Joiner<T, Void> {
+        final AtomicInteger onForkCount = new AtomicInteger();
+        final AtomicInteger onCompleteCount = new AtomicInteger();
+        @Override
+        public boolean onFork(Subtask<? extends T> subtask) {
+            onForkCount.incrementAndGet();
+            return false;
+        }
+        @Override
+        public boolean onComplete(Subtask<? extends T> subtask) {
+            onCompleteCount.incrementAndGet();
+            return false;
+        }
+        @Override
+        public Void result() {
+            return null;
+        }
+        int onForkCount() {
+            return onForkCount.get();
+        }
+        int onCompleteCount() {
+            return onCompleteCount.get();
+        }
+    }
+
+    /**
+     * A joiner that cancels execution when a subtask completes. It also keeps a count
+     * of the number of subtasks that are forked and the number of subtasks that complete.
+     */
+    private static class CancelAfterOneJoiner<T> implements Joiner<T, Void> {
         final AtomicInteger onForkCount = new AtomicInteger();
         final AtomicInteger onCompleteCount = new AtomicInteger();
         @Override
@@ -1542,7 +1687,7 @@ class StructuredTaskScopeTest {
         int onCompleteCount() {
             return onCompleteCount.get();
         }
-    };
+    }
 
     /**
      * A runtime exception for tests.
