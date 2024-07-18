@@ -1869,7 +1869,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int f
     freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
     log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
     // Avoid Thread.yield() loops without safepoint polls.
-    if (SafepointMechanism::should_process(current)) {
+    if (SafepointMechanism::should_process(current) && !preempt) {
       cont.done(); // allow safepoint
       ThreadInVMfromJava tivmfj(current);
     }
