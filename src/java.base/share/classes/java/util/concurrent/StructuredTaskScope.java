@@ -82,50 +82,19 @@ import jdk.internal.misc.ThreadFlock;
  * <p> Consider the example of a main task that splits into two subtasks to concurrently
  * fetch resources from two URL locations "left" and "right". Both subtasks may complete
  * successfully, one subtask may succeed and the other may fail, or both subtasks may
- * fail. In this example, the code in the main task is interested in the result from the
- * first subtask to complete successfully. The example uses {@link
- * Joiner#anySuccessfulResultOrThrow() Joiner.anySuccessfulResultOrThrow()} to
- * create a {@code Joiner} that makes available the result of the first subtask to
- * complete successfully. The type parameter in the example is "{@code String}" so that
- * only subtasks that return a {@code String} can be forked.
- * {@snippet lang=java :
- *    // @link substring="open" target="#open(Policy)" :
- *    try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulResultOrThrow())) {
- *
- *        scope.fork(() -> query(left));  // @link substring="fork" target="#fork(Callable)"
- *        scope.fork(() -> query(right));
- *
- *        // throws if both subtasks fail
- *        String firstResult = scope.join();   // @link substring="join" target="#join()"
- *
- *    // @link substring="close" target="#close()" :
- *    } // close
- * }
- *
- * <p> In the example, the main task forks the two subtasks, then waits in the {@code
- * join} method for either subtask to complete successfully or for both subtasks to fail.
- * If one of the subtasks completes successfully then the other subtask is cancelled (by
- * way of interrupting the thread executing the subtask), and the {@code join} method
- * returns the result from the first subtask. Cancelling the other subtask avoids the
- * main task waiting for a result that it doesn't care about. If both subtasks fail then
- * the {@code join} method throws {@link ExecutionException} with the exception from one
- * of the subtasks as the {@linkplain Throwable#getCause() cause}.
- *
- * <p> Now consider another example that also splits into two subtasks to concurrently
- * fetch resources. One of the subtasks returns a {@code String} when it succeeds, the
- * other returns an {@code Integer}. The main task in this example is interested in the
- * successful result from both subtasks. It uses {@link Joiner#awaitAllSuccessfulOrThrow()
+ * fail. The main task in this example is interested in the successful result from both
+ * subtasks. It uses {@link Joiner#awaitAllSuccessfulOrThrow()
  * Joiner.awaitAllSuccessfulOrThrow()} to create a {@code Joiner} that waits for both
  * subtasks to complete successfully or for either subtask to fail.
  * {@snippet lang=java :
  *    try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
  *
- *        // @link substring="Subtask" target="Subtask" :
+ *        // @link substring="fork" target="#fork(Callable)" :
  *        Subtask<String> subtask1 = scope.fork(() -> query(left));
  *        Subtask<Integer> subtask2 = scope.fork(() -> query(right));
  *
  *        // throws if either subtask fails
- *        scope.join();
+ *        scope.join();  // @link substring="join" target="#join()"
  *
  *        // both subtasks completed successfully
  *        return new MyResult(subtask1.get(), subtask2.get()); // @link substring="get" target="Subtask#get()"
@@ -138,10 +107,40 @@ import jdk.internal.misc.ThreadFlock;
  * waits in the {@code join} method for both subtasks to complete successfully or for either
  * subtask to fail. If both subtasks complete successfully then the {@code join} method
  * completes and the main task uses the {@link Subtask#get() Subtask.get()} method to get
- * the result of each subtask. If either subtask fails then the other is cancelled (by way
- * of interrupting the thread executing the subtask) and the {@code join} throws {@link
- * ExecutionException} with the exception from the failed subtask as the {@linkplain
- * Throwable#getCause() cause}.
+ * the result of each subtask. If either subtask fails then the {@code Joiner} causes the
+ * other subtask to be cancelled (this will interrupt the thread executing the subtask)
+ * and the {@code join} method throws {@link ExecutionException} with the exception from
+ * the failed subtask as the {@linkplain Throwable#getCause() cause}.
+ *
+ * <p> Now consider another example that also splits into two subtasks to concurrently
+ * fetch resources. In this example, the code in the main task is only interested in the
+ * result from the first subtask to complete successfully. The example uses {@link
+ * Joiner#anySuccessfulResultOrThrow() Joiner.anySuccessfulResultOrThrow()} to
+ * create a {@code Joiner} that makes available the result of the first subtask to
+ * complete successfully. The type parameter in the example is "{@code String}" so that
+ * only subtasks that return a {@code String} can be forked.
+ * {@snippet lang=java :
+ *    // @link substring="open" target="#open(Policy)" :
+ *    try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulResultOrThrow())) {
+ *
+ *        scope.fork(() -> query(left));  // @link substring="fork" target="#fork(Callable)"
+ *        scope.fork(() -> query(right));
+ *
+ *        // throws if both subtasks fail
+ *        String firstResult = scope.join();
+ *
+ *    // @link substring="close" target="#close()" :
+ *    } // close
+ * }
+ *
+ * <p> In the example, the main task forks the two subtasks, then waits in the {@code
+ * join} method for either subtask to complete successfully or for both subtasks to fail.
+ * If one of the subtasks completes successfully then the {@code Joiner} causes the other
+ * subtask to be cancelled (this will interrupt the thread executing the subtask), and
+ * the {@code join} method returns the result from the first subtask. Cancelling the other
+ * subtask avoids the main task waiting for a result that it doesn't care about. If both
+ * subtasks fail then the {@code join} method throws {@link ExecutionException} with the
+ * exception from one of the subtasks as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> Whether code uses the {@code Subtask} returned from {@code fork} will depend on
  * the {@code Joiner} and usage. Some {@code Joiner} implementations are suited to subtasks
