@@ -63,6 +63,22 @@
  */
 
 /*
+ * @test id=Xcomp-LM_LEGACY
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run junit/othervm -Xcomp -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
+ * @test id=Xcomp-LM_LIGHTWEIGHT
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @modules java.base/java.lang:+open
+ * @library /test/lib
+ * @run junit/othervm -Xcomp -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorEnterExit
+ */
+
+/*
  * @test id=Xcomp-TieredStopAtLevel1-LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
  * @modules java.base/java.lang:+open

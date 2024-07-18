@@ -1073,10 +1073,14 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   __ movl(Address(thread, JavaThread::thread_state_offset()),
           _thread_in_native);
 
+  __ push_cont_fastpath();
+
   // Call the native method.
   __ call(rax);
   // 32: result potentially in rdx:rax or ST0
   // 64: result potentially in rax or xmm0
+
+  __ pop_cont_fastpath();
 
   // Verify or restore cpu control state after JNI call
   __ restore_cpu_control_state_after_jni(rscratch1);

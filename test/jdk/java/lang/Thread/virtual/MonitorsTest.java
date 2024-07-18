@@ -414,4 +414,42 @@ class MonitorsTest {
             throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
         }
     }
+
+    @Test
+    void waitNotifyTest() throws Exception {
+        int threadCount = 1000;
+        int waitTime = 50;
+        long start = System.currentTimeMillis();
+        Thread[] vthread = new Thread[threadCount];
+        while (System.currentTimeMillis() - start < 5000) {
+            CountDownLatch latchStart = new CountDownLatch(threadCount);
+            CountDownLatch latchFinish = new CountDownLatch(threadCount);
+            Object object = new Object();
+            for (int i = 0; i < threadCount; i++) {
+                vthread[i] = Thread.ofVirtual().start(() -> {
+                    synchronized (object) {
+                        try {
+                            latchStart.countDown();
+                            object.wait(waitTime);
+                        } catch (InterruptedException e) {
+                            //do nothing;
+                        }
+                    }
+                    latchFinish.countDown();
+                });
+            }
+            try {
+                latchStart.await();
+                synchronized (object) {
+                    object.notifyAll();
+                }
+                latchFinish.await();
+                for (int i = 0; i < threadCount; i++) {
+                    vthread[i].join();
+                }
+            } catch (InterruptedException e) {
+                //do nothing;
+            }
+        }
+    }
 }

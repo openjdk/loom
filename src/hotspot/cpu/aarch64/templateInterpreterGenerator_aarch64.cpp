@@ -1414,8 +1414,12 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   __ lea(rscratch2, Address(rthread, JavaThread::thread_state_offset()));
   __ stlrw(rscratch1, rscratch2);
 
+  __ push_cont_fastpath();
+
   // Call the native method.
   __ blr(r10);
+
+  __ pop_cont_fastpath();
 
   __ get_method(rmethod);
   // result potentially in r0 or v0

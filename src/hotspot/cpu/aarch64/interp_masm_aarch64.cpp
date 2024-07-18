@@ -666,9 +666,11 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 {
   assert(lock_reg == c_rarg1, "The argument is only for looks. It must be c_rarg1");
   if (LockingMode == LM_MONITOR) {
+    push_cont_fastpath();
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
             lock_reg);
+    pop_cont_fastpath();
   } else {
     Label count, done;
 
@@ -757,8 +759,8 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 
     bind(slow_case);
 
-    //    push_cont_fastpath();
     // Call the runtime routine for slow case
+    push_cont_fastpath();
     if (LockingMode == LM_LIGHTWEIGHT) {
       call_VM(noreg,
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj),
@@ -768,7 +770,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
               lock_reg);
     }
-    //    pop_cont_fastpath();
+    pop_cont_fastpath();
     bind(done);
   }
 }
