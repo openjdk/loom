@@ -21,19 +21,41 @@
  * questions.
  */
 
-/**
+/*
  * @test id=default
  * @summary Test virtual threads using synchronized
  * @library /test/lib
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xint MonitorsTest
- * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
- * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
  * @run junit/othervm MonitorsTest
  */
 
-/**
+/*
+ * @test id=Xint
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xint MonitorsTest
+ */
+
+/*
+ * @test id=Xcomp-TieredStopAtLevel3
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
+ */
+
+/*
+ * @test id=Xcomp-noTieredCompilation
+ * @summary Test virtual threads using synchronized
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
+ */
+
+/*
  * @test id=gc
  * @requires vm.debug == true & vm.continuations
  * @library /test/lib
@@ -67,14 +89,14 @@ class MonitorsTest {
                 Thread.yield();
             }
         }
-        System.out.println("Exiting FOO from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO from thread " + Thread.currentThread().getName());
     };
 
     static final Runnable BAR = () -> {
         synchronized(globalLock) {
             counter++;
         }
-        System.out.println("Exiting BAR from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting BAR from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -116,7 +138,7 @@ class MonitorsTest {
             counter++;
         }
         recursive2(10);
-        System.out.println("Exiting BAR2 from thread " + Thread.currentThread().getName() + "with counter=" + counter);
+        System.err.println("Exiting BAR2 from thread " + Thread.currentThread().getName() + "with counter=" + counter);
     };
 
     static void recursive2(int count) {
@@ -174,7 +196,7 @@ class MonitorsTest {
                 Thread.yield();
             }
         }
-        System.out.println("Exiting FOO3 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO3 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -239,7 +261,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO4 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO4 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -315,7 +337,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -378,7 +400,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
     };
 
     /**
