@@ -21,19 +21,41 @@
  * questions.
  */
 
-/**
+/*
  * @test id=default
  * @summary Test virtual threads using synchronized
  * @library /test/lib
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xint MonitorsTest
- * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
- * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
  * @run junit/othervm MonitorsTest
  */
 
-/**
+/*
+ * @test id=Xint
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xint MonitorsTest
+ */
+
+/*
+ * @test id=Xcomp-TieredStopAtLevel3
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
+ */
+
+/*
+ * @test id=Xcomp-noTieredCompilation
+ * @summary Test virtual threads using synchronized
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
+ */
+
+/*
  * @test id=gc
  * @requires vm.debug == true & vm.continuations
  * @library /test/lib
@@ -67,14 +89,14 @@ class MonitorsTest {
                 Thread.yield();
             }
         }
-        System.out.println("Exiting FOO from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO from thread " + Thread.currentThread().getName());
     };
 
     static final Runnable BAR = () -> {
         synchronized(globalLock) {
             counter++;
         }
-        System.out.println("Exiting BAR from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting BAR from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -116,7 +138,7 @@ class MonitorsTest {
             counter++;
         }
         recursive2(10);
-        System.out.println("Exiting BAR2 from thread " + Thread.currentThread().getName() + "with counter=" + counter);
+        System.err.println("Exiting BAR2 from thread " + Thread.currentThread().getName() + "with counter=" + counter);
     };
 
     static void recursive2(int count) {
@@ -174,7 +196,7 @@ class MonitorsTest {
                 Thread.yield();
             }
         }
-        System.out.println("Exiting FOO3 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO3 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -239,7 +261,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO4 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO4 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -315,7 +337,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -378,7 +400,7 @@ class MonitorsTest {
             }
         }
         workerCount.getAndIncrement();
-        System.out.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
+        System.err.println("Exiting FOO5 from thread " + Thread.currentThread().getName());
     };
 
     /**
@@ -412,6 +434,44 @@ class MonitorsTest {
 
         if (workerCount.get() != VT_COUNT) {
             throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
+        }
+    }
+
+    @Test
+    void waitNotifyTest() throws Exception {
+        int threadCount = 1000;
+        int waitTime = 50;
+        long start = System.currentTimeMillis();
+        Thread[] vthread = new Thread[threadCount];
+        while (System.currentTimeMillis() - start < 5000) {
+            CountDownLatch latchStart = new CountDownLatch(threadCount);
+            CountDownLatch latchFinish = new CountDownLatch(threadCount);
+            Object object = new Object();
+            for (int i = 0; i < threadCount; i++) {
+                vthread[i] = Thread.ofVirtual().start(() -> {
+                    synchronized (object) {
+                        try {
+                            latchStart.countDown();
+                            object.wait(waitTime);
+                        } catch (InterruptedException e) {
+                            //do nothing;
+                        }
+                    }
+                    latchFinish.countDown();
+                });
+            }
+            try {
+                latchStart.await();
+                synchronized (object) {
+                    object.notifyAll();
+                }
+                latchFinish.await();
+                for (int i = 0; i < threadCount; i++) {
+                    vthread[i].join();
+                }
+            } catch (InterruptedException e) {
+                //do nothing;
+            }
         }
     }
 }

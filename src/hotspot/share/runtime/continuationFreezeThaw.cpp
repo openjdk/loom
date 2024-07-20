@@ -415,7 +415,6 @@ public:
   inline int size_if_fast_freeze_available();
 
   inline frame& last_frame() { return _last_frame; }
-  inline void set_last_frame() { _last_frame = _thread->last_frame(); }
 
 #ifdef ASSERT
   bool check_valid_fast_path();
@@ -524,6 +523,10 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
 #endif
   // With preemption doYield() might not have been resolved yet
   assert(_preempt || SharedRuntime::cont_doYield_stub()->frame_size() == doYield_stub_frame_size, "");
+
+  if (preempt) {
+    _last_frame = _thread->last_frame();
+  }
 
   // properties of the continuation on the stack; all sizes are in words
   _cont_stack_top    = frame_sp + (!preempt ? doYield_stub_frame_size : 0); // we don't freeze the doYield stub frame
@@ -887,9 +890,20 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
 
   // We're always writing to a young chunk, so the GC can't see it until the next safepoint.
   chunk->set_sp(chunk_new_sp);
+
   // set chunk->pc to the return address of the topmost frame in the chunk
-  chunk->set_pc(ContinuationHelper::return_address_at(
+  if (_preempt) {
+    // On aarch64, the return pc of the top frame won't necessarily be at sp[-1].
+    // Also, on x64, if the top frame is the native wrapper frame, sp[-1] will not
+    // be the pc we used when creating the oopmap. Get the top's frame last pc from
+    // the anchor instead.
+    address last_pc = _last_frame.pc();
+    ContinuationHelper::patch_return_address_at(chunk_top - frame::sender_sp_ret_address_offset(), last_pc);
+    chunk->set_pc(last_pc);
+  } else {
+    chunk->set_pc(ContinuationHelper::return_address_at(
                   _cont_stack_top - frame::sender_sp_ret_address_offset()));
+  }
 
   // Fix monitors after unwinding frames to make sure oops are valid.
   if (_monitors_to_fix > 0) {
@@ -1798,7 +1812,7 @@ bool FreezeBase::check_valid_fast_path() {
   map.set_include_argument_oops(false);
   int i = 0;
   for (frame f = freeze_start_frame(); Continuation::is_frame_in_continuation(ce, f); f = f.sender(&map), i++) {
-    if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (i == 0 && f.is_runtime_frame()))) {
+    if (!((f.is_compiled_frame() && !f.is_deoptimized_frame()) || (i == 0 && (f.is_runtime_frame() || f.is_native_frame())))) {
       return false;
     }
   }
@@ -1869,7 +1883,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int f
     freeze_result res = entry->is_pinned() ? freeze_pinned_cs : freeze_pinned_monitor;
     log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
     // Avoid Thread.yield() loops without safepoint polls.
-    if (SafepointMechanism::should_process(current)) {
+    if (SafepointMechanism::should_process(current) && !preempt) {
       cont.done(); // allow safepoint
       ThreadInVMfromJava tivmfj(current);
     }
@@ -1877,16 +1891,6 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int f
   }
 
   Freeze<ConfigT> freeze(current, cont, sp, preempt);
-
-  if (preempt) {
-    freeze.set_last_frame();  // remember last frame
-    if (freeze_kind == freeze_on_wait AARCH64_ONLY(|| true)) {
-      // Force freeze slow path on wait to avoid dealing with native wrapper frames on the fast
-      // path. For aarch64 force slow path always for now. It needs extra instructions to correctly
-      // set the last pc we copy into the stackChunk, since it will not necessarily be at sp[-1]).
-      current->push_cont_fastpath(current->last_Java_sp());
-    }
-  }
 
   assert(!current->cont_fastpath() || freeze.check_valid_fast_path(), "");
   bool fast = UseContinuationFastPath && current->cont_fastpath();
@@ -2072,7 +2076,7 @@ protected:
   intptr_t* handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case);
   inline intptr_t* push_resume_adapter(frame& top);
   inline intptr_t* push_resume_monitor_operation(stackChunkOop chunk);
-  inline void fix_native_return_pc_pd(frame& top);
+  inline void fix_native_wrapper_return_pc_pd(frame& top);
   void throw_interrupted_exception(JavaThread* current, frame& top);
 
   void recurse_thaw(const frame& heap_frame, frame& caller, int num_frames, bool top_on_preempt_case);
@@ -2332,6 +2336,7 @@ inline bool ThawBase::seen_by_gc() {
 
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::thaw_kind kind) {
+  int preempt_kind;
   bool retry_fast_path = false;
 
   bool preempted_case = _cont.is_preempted();
@@ -2341,6 +2346,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       return push_resume_monitor_operation(chunk);
     }
     retry_fast_path = true;
+    preempt_kind = chunk->get_and_clear_preempt_kind();
   }
 
 #if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
@@ -2370,7 +2376,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   if (retry_fast_path && can_thaw_fast(chunk)) {
     intptr_t* sp = thaw_fast(chunk);
     if (preempted_case) {
-      int preempt_kind = chunk->get_and_clear_preempt_kind();
       return handle_preempted_continuation(sp, preempt_kind, true /* fast_case */);
     }
     return sp;
@@ -2421,7 +2426,6 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   intptr_t* sp = caller.sp();
 
   if (preempted_case) {
-    int preempt_kind = chunk->get_and_clear_preempt_kind();
     return handle_preempted_continuation(sp, preempt_kind, false /* fast_case */);
   }
   return sp;
@@ -2555,6 +2559,7 @@ void ThawBase::clear_bitmap_bits(address start, address end) {
 }
 
 intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case) {
+  assert(preempt_kind == freeze_on_wait || preempt_kind == freeze_on_monitorenter, "");
   frame top(sp);
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
 
@@ -2573,6 +2578,15 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind
   }
 #endif
 
+  if (fast_case) {
+    // If we thawed in the slow path the runtime stub/native wrapper frame already
+    // has the correct fp (see ThawBase::new_stack_frame). On the fast path though,
+    // we copied the original fp at the time of freeze which now will have to be fixed.
+    assert(top.is_runtime_frame() || top.is_native_frame(), "");
+    int fsize = top.cb()->frame_size();
+    patch_pd(top, sp + fsize);
+  }
+
   if (preempt_kind == freeze_on_wait) {
     if (_thread->pending_interrupted_exception()) {
       throw_interrupted_exception(_thread, top);
@@ -2580,23 +2594,12 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind
     }
     // Possibly update return pc on the top native wrapper frame so
     // that we resume execution at the right instruction.
-    fix_native_return_pc_pd(top);
-  } else {
-    assert(preempt_kind == freeze_on_monitorenter, "");
-    if (top.is_runtime_frame()) {
-      if (fast_case) {
-        // If we thawed in the slow path the runtime stub frame already has the correct fp
-        // (see ThawBase::new_stack_frame). On the fast path though, we copied the original
-        // fp at the time of freeze which now will have to be fixed.
-        int fsize = ContinuationHelper::StubFrame::size(top);
-        patch_pd(top, sp + fsize);
-      }
-
-      // The continuation might now run on a different platform thread than the previous time so
-      // we need to adjust the current thread saved in the stub frame before restoring registers.
-      JavaThread** thread_addr = frame::saved_thread_address(top);
-      if (thread_addr != nullptr) *thread_addr = _thread;
-    }
+    fix_native_wrapper_return_pc_pd(top);
+  } else if (top.is_runtime_frame()) {
+    // The continuation might now run on a different platform thread than the previous time so
+    // we need to adjust the current thread saved in the stub frame before restoring registers.
+    JavaThread** thread_addr = frame::saved_thread_address(top);
+    if (thread_addr != nullptr) *thread_addr = _thread;
   }
   sp = push_resume_adapter(top);
   return sp;
@@ -3117,6 +3120,12 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
         CodeBlob* cb = CodeCache::find_blob(pc1);
         assert(cb->as_nmethod()->method()->is_object_wait0(), "");
         sp0 += cb->frame_size();
+        if (sp0 == cont.entrySP()) {
+          // sp0[-1] will be the return barrier pc. This is a stub, i.e. associated
+          // codeblob has _frame_size = 0. Force using cont.entryPC() to avoid
+          // asserts while trying to get the sender frame.
+          use_cont_entry = true;
+        }
       }
 #ifdef AARCH64
       else {

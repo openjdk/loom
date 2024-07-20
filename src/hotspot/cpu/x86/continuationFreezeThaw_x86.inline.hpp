@@ -281,7 +281,7 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   patch_callee_link(f, fp);
 }
 
-inline void ThawBase::fix_native_return_pc_pd(frame& top) {
+inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
   bool from_interpreted = top.is_interpreted_frame();
   address resume_address = from_interpreted ? Interpreter::native_frame_resume_entry() : SharedRuntime::native_frame_resume_entry();
   DEBUG_ONLY(Method* method = from_interpreted ? top.interpreter_frame_method() : CodeCache::find_blob(resume_address)->as_nmethod()->method();)

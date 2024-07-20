@@ -289,10 +289,11 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
 }
 
 inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-  Unimplemented();
+  intptr_t* fp = caller_sp - frame::sender_sp_offset;
+  patch_callee_link(f, fp);
 }
 
-inline void ThawBase::fix_native_return_pc_pd(frame& top) {
+inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
   // Nothing to do since the last pc saved before making the call to
   // JVM_MonitorWait() was already set to the correct resume pc. Just
   // do some sanity check.
