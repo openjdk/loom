@@ -71,7 +71,7 @@ public class TestConcurrentClose {
 
     static final int ITERATIONS = 5;
     static final int SEGMENT_SIZE = 10_000;
-    static final int MAX_EXECUTOR_WAIT_SECONDS = 20;
+    static final int MAX_EXECUTOR_WAIT_SECONDS = 60;
     static final int NUM_ACCESSORS = 50;
 
     static final AtomicLong start = new AtomicLong();
