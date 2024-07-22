@@ -988,11 +988,17 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Invoked by Object.wait to cancel wait timer.
      */
+    @ChangesCurrentThread
     void cancelWaitTimeout() {
         assert Thread.currentThread() == this;
         Future<?> timeoutTask = this.waitTimeoutTask;
         if (timeoutTask != null) {
-            timeoutTask.cancel(false);
+            switchToCarrierThread();
+            try {
+                timeoutTask.cancel(false);
+            } finally {
+                switchToVirtualThread(this);
+            }
         }
     }
 
