@@ -2334,6 +2334,14 @@ inline bool ThawBase::seen_by_gc() {
   return _barriers || _cont.tail()->is_gc_mode();
 }
 
+static inline void relativize_chunk_concurrently(stackChunkOop chunk) {
+#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
+  if (UseZGC || UseShenandoahGC) {
+    chunk->relativize_derived_pointers_concurrently();
+  }
+#endif
+}
+
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::thaw_kind kind) {
   int preempt_kind;
@@ -2346,14 +2354,13 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       return push_resume_monitor_operation(chunk);
     }
     retry_fast_path = true;
+    relativize_chunk_concurrently(chunk);
+    // Clear FLAGS_PREEMPTED after relativize_derived_pointers_concurrently()
+    // is called to avoid racing with GC threads while modifying the flags.
     preempt_kind = chunk->get_and_clear_preempt_kind();
+  } else {
+    relativize_chunk_concurrently(chunk);
   }
-
-#if INCLUDE_ZGC || INCLUDE_SHENANDOAHGC
-  if (UseZGC || UseShenandoahGC) {
-    _cont.tail()->relativize_derived_pointers_concurrently();
-  }
-#endif
 
   // First thaw after freeze. If there were oops in the stacklock
   // during freeze, restore them now.
