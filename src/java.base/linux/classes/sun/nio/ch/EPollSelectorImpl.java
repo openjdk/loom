@@ -26,7 +26,6 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
@@ -89,11 +88,6 @@ class EPollSelectorImpl extends SelectorImpl {
 
         // register the eventfd object for wakeups
         EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
-    }
-
-    private void ensureOpen() {
-        if (!isOpen())
-            throw new ClosedSelectorException();
     }
 
     @Override
@@ -277,7 +271,6 @@ class EPollSelectorImpl extends SelectorImpl {
 
     @Override
     public void setEventOps(SelectionKeyImpl ski) {
-        ensureOpen();
         synchronized (updateLock) {
             updateKeys.addLast(ski);
         }
