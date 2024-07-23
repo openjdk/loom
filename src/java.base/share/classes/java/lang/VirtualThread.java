@@ -265,6 +265,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM to
+     * emit event to avoid having a JFR event in Java with the same name (but different ID)
+     * to events emitted by the VM.
+     */
+    private static native void virtualThreadPinnedEvent(int reason, String reasonString);
+
+    /**
      * Runs or continues execution on the current thread. The virtual thread is mounted
      * on the current thread before the task runs or continues. It unmounts when the
      * task completes or yields.
@@ -867,14 +874,8 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM to
-     * emit event to avoid having a JFR event in Java with the same name (but different ID)
-     * to events emitted by the VM.
-     */
-    private static native void virtualThreadPinnedEvent(int reason, String reasonString);
-
-    /**
-     * Schedule this virtual thread to be unparked after a given delay.
+     * Invoked by parkNanos to schedule this virtual thread to be unparked after
+     * a given delay.
      */
     @ChangesCurrentThread
     private Future<?> scheduleUnpark(long nanos) {
@@ -889,7 +890,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Cancels a task if it has not completed.
+     * Invoked by parkNanos to cancel the unpark timer.
      */
     @ChangesCurrentThread
     private void cancel(Future<?> future) {
@@ -986,18 +987,21 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Invoked by Object.wait to cancel wait timer.
+     * Invoked by Object.wait to cancel the wait timer.
      */
-    @ChangesCurrentThread
     void cancelWaitTimeout() {
         assert Thread.currentThread() == this;
         Future<?> timeoutTask = this.waitTimeoutTask;
         if (timeoutTask != null) {
-            switchToCarrierThread();
+            // Pin the continuation to prevent the virtual thread from unmounting
+            // when there is contention removing the task. This avoids deadlock that
+            // could arise due to carriers and virtual threads contending for a
+            // lock on the delay queue.
+            Continuation.pin();
             try {
                 timeoutTask.cancel(false);
             } finally {
-                switchToVirtualThread(this);
+                Continuation.unpin();
             }
         }
     }
