@@ -39,6 +39,14 @@
  */
 
 /*
+ * @test id=Xcomp
+ * @library /test/lib
+ * @requires vm.continuations
+ * @modules java.base/java.lang:+open
+ * @run junit/othervm -Xcomp MonitorsTest
+ */
+
+/*
  * @test id=Xcomp-TieredStopAtLevel3
  * @library /test/lib
  * @requires vm.continuations
@@ -283,7 +291,7 @@ class MonitorsTest {
             batch[i] = VThreadScheduler.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO4);
         }
 
-        Thread.sleep(10000);
+        Thread.sleep(5000);
         finish = true;
 
         for (int i = 0; i < VT_COUNT; i++) {
@@ -361,7 +369,7 @@ class MonitorsTest {
             batch[i] = VThreadScheduler.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO5);
         }
 
-        Thread.sleep(10000);
+        Thread.sleep(5000);
 
         finish = true;
 
@@ -424,7 +432,7 @@ class MonitorsTest {
             batch[i] = VThreadScheduler.virtualThreadBuilder(scheduler).name("BatchVT-" + i).start(FOO6);
         }
 
-        Thread.sleep(10000);
+        Thread.sleep(5000);
 
         finish = true;
 
