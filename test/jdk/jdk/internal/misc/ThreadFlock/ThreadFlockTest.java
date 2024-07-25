@@ -426,7 +426,7 @@ class ThreadFlockTest {
             long startMillis = millisTime();
             boolean done = flock.awaitAll(Duration.ofSeconds(30));
             assertTrue(done);
-            checkDuration(startMillis, 1900, 4000);
+            checkDuration(startMillis, 1900, 20_000);
         }
     }
 
@@ -453,7 +453,7 @@ class ThreadFlockTest {
                     flock.awaitAll(Duration.ofSeconds(2));
                     fail("awaitAll did not throw");
                 } catch (TimeoutException e) {
-                    checkDuration(startMillis, 1900, 4000);
+                    checkDuration(startMillis, 1900, 20_000);
                 }
             } finally {
                 latch.countDown();

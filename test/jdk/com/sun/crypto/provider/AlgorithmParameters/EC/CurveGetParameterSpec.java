@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,29 +21,27 @@
  * questions.
  */
 
-/**
+/*
  * @test
- * @bug 8288976
- * @library /test/lib
- * @summary Check that the right message is displayed for NoClassDefFoundError exception.
- * @requires vm.flagless
- * @modules java.base/jdk.internal.misc
- *          java.management
- * @compile C.java
- * @run driver Bad_NCDFE_Msg
+ * @bug 8322133
+ * @summary Make sure getParameterSpec returns std name for EC AlgorithmParameters
+ * @modules java.base/sun.security.util
  */
 
-import java.io.File;
-import jdk.test.lib.process.ProcessTools;
-import jdk.test.lib.process.OutputAnalyzer;
+import java.security.AlgorithmParameters;
+import java.security.KeyPairGenerator;
+import java.security.spec.ECGenParameterSpec;
 
-public class Bad_NCDFE_Msg {
-
-    public static void main(String args[]) throws Throwable {
-        ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(
-            "-cp", System.getProperty("test.classes") + File.separator + "pkg", "C");
-        OutputAnalyzer output = new OutputAnalyzer(pb.start());
-        output.shouldContain("java.lang.NoClassDefFoundError: C (wrong name: pkg/C");
-        output.shouldHaveExitValue(1);
+public class CurveGetParameterSpec {
+    public static void main(String[] args) throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+        kpg.initialize(new ECGenParameterSpec("secp384r1"));
+        var k = kpg.generateKeyPair().getPublic();
+        var a = AlgorithmParameters.getInstance("EC");
+        a.init(k.getParams());
+        String name = a.getParameterSpec(ECGenParameterSpec.class).getName();
+        if (!name.equals("secp384r1")) {
+            throw new Exception("EC getParameterSpec does not return std name secp384r1. Instead returns: " + name);
+        }
     }
 }
