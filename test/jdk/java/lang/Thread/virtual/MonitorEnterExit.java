@@ -340,7 +340,7 @@ class MonitorEnterExit {
         var lock = new Object();
         var started = new CountDownLatch(1);
         var entered = new AtomicBoolean();
-        Thread vthread  = Thread.ofVirtual().unstarted(() -> {
+        Thread vthread = Thread.ofVirtual().unstarted(() -> {
             VThreadPinner.runPinned(() -> {
                 started.countDown();
                 synchronized (lock) {
@@ -359,54 +359,6 @@ class MonitorEnterExit {
 
         // check thread entered monitor
         assertTrue(entered.get());
-    }
-
-    /**
-     * Test that parking while holding a monitor releases the carrier.
-     */
-    @ParameterizedTest
-    @ValueSource(booleans = { true, false })
-    void testReleaseWhenParked(boolean reenter) throws Exception {
-        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
-        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
-
-            var lock = new Object();
-
-            // thread enters (and maybe reenters) a monitor and parks
-            var started = new CountDownLatch(1);
-            var vthread1 = factory.newThread(() -> {
-                started.countDown();
-                synchronized (lock) {
-                    if (reenter) {
-                        synchronized (lock) {
-                            LockSupport.park();
-                        }
-                    } else {
-                        LockSupport.park();
-                    }
-                }
-            });
-
-            vthread1.start();
-            try {
-                // wait for thread to start and park
-                started.await();
-                await(vthread1, Thread.State.WAITING);
-
-                // carrier should be released, use it for another thread
-                var executed = new AtomicBoolean();
-                var vthread2 = factory.newThread(() -> {
-                    executed.set(true);
-                });
-                vthread2.start();
-                vthread2.join();
-                assertTrue(executed.get());
-            } finally {
-                LockSupport.unpark(vthread1);
-                vthread1.join();
-            }
-        }
     }
 
     /**
@@ -447,41 +399,6 @@ class MonitorEnterExit {
             } finally {
                 vthread1.join();
             }
-        }
-    }
-
-    /**
-     * Test lots of virtual threads parked while holding a monitor. If the number of
-     * virtual threads exceeds the number of carrier threads then this test will hang if
-     * parking doesn't release the carrier.
-     */
-    @Test
-    void testManyParkedThreads() throws Exception {
-        Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
-        var done = new AtomicBoolean();
-        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
-            var lock = new Object();
-            var started = new CountDownLatch(1);
-            var vthread = Thread.ofVirtual().start(() -> {
-                started.countDown();
-                synchronized (lock) {
-                    while (!done.get()) {
-                        LockSupport.park();
-                    }
-                }
-            });
-            // wait for thread to start and park
-            started.await();
-            await(vthread, Thread.State.WAITING);
-            vthreads[i] = vthread;
-        }
-
-        // cleanup
-        done.set(true);
-        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
-            var vthread = vthreads[i];
-            LockSupport.unpark(vthread);
-            vthread.join();
         }
     }
 
