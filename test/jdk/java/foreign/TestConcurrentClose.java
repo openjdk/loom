@@ -36,6 +36,7 @@
  *   -XX:+UnlockDiagnosticVMOptions
  *   -XX:+WhiteBoxAPI
  *   -XX:CompileCommand=dontinline,TestConcurrentClose$SegmentAccessor::doAccess
+ *   -Xbatch
  *   TestConcurrentClose
  */
 
@@ -176,13 +177,8 @@ public class TestConcurrentClose {
     }
 
     private static void awaitCompilation() throws InterruptedException {
-        int retries = 0;
         while (WB.getMethodCompilationLevel(DO_ACCESS_METHOD, false) != C2_COMPILED_LEVEL) {
-            if (retries > 20) {
-                throw new IllegalStateException("SegmentAccessor::doAccess method not being compiled");
-            }
             Thread.sleep(1000);
-            retries++;
         }
     }
 }

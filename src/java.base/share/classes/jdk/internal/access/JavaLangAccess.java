@@ -460,8 +460,6 @@ public interface JavaLangAccess {
      */
     Object classData(Class<?> c);
 
-    int stringSize(long i);
-
     int getCharsLatin1(long i, int index, byte[] buf);
 
     int getCharsUTF16(long i, int index, byte[] buf);
