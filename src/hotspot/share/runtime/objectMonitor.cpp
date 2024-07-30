@@ -1109,7 +1109,7 @@ bool ObjectMonitor::VThreadMonitorEnter(JavaThread* current, ObjectWaiter* waite
     // after it recognizes that the async deflation was cancelled.
     assert(_succ != current, "invariant");
     assert(_Responsible != current, "invariant");
-    assert(waiter != nullptr, "monitor currently in used marked for deflation??");
+    assert(waiter == nullptr, "monitor currently in use marked for deflation??");
     return true;
   }
 
