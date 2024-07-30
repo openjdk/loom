@@ -453,9 +453,8 @@ bool ObjectMonitor::enter(JavaThread* current) {
       // ParkEvent associated with this ObjectMonitor.
     }
 
-#ifdef LOOM_MONITOR_SUPPORT
     ContinuationEntry* ce = current->last_continuation();
-    if (ce != nullptr && ce->is_virtual_thread() && current->is_on_monitorenter()) {
+    if (ce != nullptr && ce->is_virtual_thread()) {
       int result = Continuation::try_preempt(current, ce->cont_oop(current), freeze_on_monitorenter);
       if (result == freeze_ok) {
         bool acquired = VThreadMonitorEnter(current);
@@ -475,9 +474,10 @@ bool ObjectMonitor::enter(JavaThread* current) {
       }
       if (result == freeze_pinned_native) {
         post_virtual_thread_pinned_event(current, "Native frame or <clinit> on stack");
+      } else if (result == freeze_unsupported) {
+        post_virtual_thread_pinned_event(current, "Native frame or <clinit> or monitors on stack");
       }
     }
-#endif
 
     OSThreadContendState osts(current->osthread());
 
@@ -1744,7 +1744,6 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
   current->set_current_waiting_monitor(this);
 
-#ifdef LOOM_MONITOR_SUPPORT
   ContinuationEntry* ce = current->last_continuation();
   if (interruptible && ce != nullptr && ce->is_virtual_thread()) {
     int result = Continuation::try_preempt(current, ce->cont_oop(current), freeze_on_wait);
@@ -1753,14 +1752,17 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
       current->set_current_waiting_monitor(nullptr);
       return;
     }
-    if (result == freeze_pinned_native) {
+    if (result == freeze_pinned_native || result == freeze_unsupported) {
       const Klass* monitor_klass = object()->klass();
       if (!is_excluded(monitor_klass)) {
-        post_virtual_thread_pinned_event(current, "Native frame or <clinit> on stack");
+        if (result == freeze_pinned_native) {
+          post_virtual_thread_pinned_event(current,"Native frame or <clinit> on stack");
+        } else if (result == freeze_unsupported) {
+          post_virtual_thread_pinned_event(current, "Native frame or <clinit> or monitors on stack");
+        }
       }
     }
   }
-#endif
 
   // create a node to be put into the queue
   // Critically, after we reset() the event but prior to park(), we must check
@@ -1918,7 +1920,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   int relock_count = JvmtiDeferredUpdates::get_and_reset_relock_count_after_wait(current);
   _recursions =   save          // restore the old recursion count
                 + relock_count; //  increased by the deferred relock count
-  NOT_LOOM_MONITOR_SUPPORT(current->inc_held_monitor_count(relock_count);) // Deopt never entered these counts.
+  current->inc_held_monitor_count(relock_count); // Deopt never entered these counts.
   _waiters--;             // decrement the number of waiters
 
   // Verify a few postconditions

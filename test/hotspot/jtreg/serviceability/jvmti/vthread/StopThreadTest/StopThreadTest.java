@@ -46,6 +46,9 @@
 import jdk.test.lib.Platform;
 import java.lang.AssertionError;
 
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.lang.management.ManagementFactory;
+
 /*
  *     The test exercises the JVMTI function: StopThread(jthread).
  *     The test creates a new virtual or platform thread.
@@ -125,9 +128,8 @@ public class StopThreadTest {
             log("\nMain #A.2: suspended");
             suspendThread(testTaskThread);
             retCode = stopThread(testTaskThread);
-            int expectedRetCode = (is_virtual && !isBoundVThread && (Platform.isX64() || Platform.isAArch64())) ? JVMTI_ERROR_OPAQUE_FRAME : JVMTI_ERROR_NONE;
-            String expectedRetCodeName = (is_virtual && !isBoundVThread && (Platform.isX64() || Platform.isAArch64())) ?
-                "JVMTI_ERROR_OPAQUE_FRAME" : "JVMTI_ERROR_NONE";
+            int expectedRetCode = preemptableVirtualThread() ? JVMTI_ERROR_OPAQUE_FRAME : JVMTI_ERROR_NONE;
+            String expectedRetCodeName = preemptableVirtualThread() ? "JVMTI_ERROR_OPAQUE_FRAME" : "JVMTI_ERROR_NONE";
             if (retCode != expectedRetCode) {
                 throwFailed("Main #A.2: expected " + expectedRetCodeName + " instead of: " + retCode);
             } else {
@@ -213,10 +215,7 @@ public class StopThreadTest {
                 seenExceptionFromA = true;
             }
             Thread.interrupted();
-            if (!seenExceptionFromA
-                && !(is_virtual
-                     && !isBoundVThread
-                     && (Platform.isX64() || (Platform.isAArch64())) )) {
+            if (!seenExceptionFromA && !preemptableVirtualThread()) {
                 StopThreadTest.setFailed("TestTask.run: expected AssertionError from method A()");
             }
             sleep(1); // to cause yield
@@ -274,5 +273,11 @@ public class StopThreadTest {
             StopThreadTest.stopThread(Thread.currentThread());
             log("TestTask.C: finished");
         }
+    }
+
+    static boolean preemptableVirtualThread() {
+        boolean legacyLockingMode = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
+                                        .getVMOption("LockingMode").getValue().equals("1");
+        return is_virtual && !isBoundVThread && !legacyLockingMode && (Platform.isX64() || Platform.isAArch64());
     }
 }

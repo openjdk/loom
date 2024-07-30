@@ -25,7 +25,7 @@
  * @test id=default
  * @summary Test virtual threads using synchronized
  * @library /test/lib
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
  * @run junit/othervm MonitorsTest
  */
@@ -33,7 +33,7 @@
 /*
  * @test id=Xint
  * @library /test/lib
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xint MonitorsTest
  */
@@ -41,7 +41,7 @@
 /*
  * @test id=Xcomp
  * @library /test/lib
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp MonitorsTest
  */
@@ -49,7 +49,7 @@
 /*
  * @test id=Xcomp-TieredStopAtLevel3
  * @library /test/lib
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTest
  */
@@ -58,14 +58,14 @@
  * @test id=Xcomp-noTieredCompilation
  * @summary Test virtual threads using synchronized
  * @library /test/lib
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTest
  */
 
 /*
  * @test id=gc
- * @requires vm.debug == true & vm.continuations
+ * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1
  * @library /test/lib
  * @modules java.base/java.lang:+open
  * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTest

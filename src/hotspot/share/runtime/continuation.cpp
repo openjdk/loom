@@ -129,10 +129,9 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, int);
 
+#ifdef LOOM_MONITOR_SUPPORT
 int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_kind) {
   assert(target == JavaThread::current(), "no support for external preemption");
-  assert((preempt_kind == freeze_on_monitorenter && target->is_on_monitorenter()) ||
-         (preempt_kind == freeze_on_wait && target->current_waiting_monitor() != nullptr), "");
   assert(target->has_last_Java_frame(), "");
   assert(!target->preempting(), "");
   assert(target->last_continuation() != nullptr, "");
@@ -142,8 +141,12 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   assert(!target->has_pending_exception(), "");
   assert(!target->is_suspended() || target->is_disable_suspend(), "");
 
-  if (!VM_Version::supports_cont_preemption()) {
-    return unsupported;
+  if (LockingMode == LM_LEGACY) {
+    return freeze_unsupported;
+  }
+
+  if (preempt_kind == freeze_on_monitorenter && !target->is_on_monitorenter()) {
+    return freeze_pinned_native;
   }
 
   if (is_continuation_done(continuation)) {
@@ -165,6 +168,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   }
   return res;
 }
+#endif
 
 bool Continuation::is_continuation_preempted(oop cont) {
   return jdk_internal_vm_Continuation::is_preempted(cont);

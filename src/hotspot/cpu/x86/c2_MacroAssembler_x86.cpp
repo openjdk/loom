@@ -273,7 +273,7 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   //    -- by other
   //
 
-  Label IsInflated, DONE_LABEL, COUNT;
+  Label IsInflated, DONE_LABEL, NO_COUNT, COUNT;
 
   if (DiagnoseSyncOnValueBasedClasses != 0) {
     load_klass(tmpReg, objReg, scrReg);
@@ -282,15 +282,16 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
     jcc(Assembler::notZero, DONE_LABEL);
   }
 
-  movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));          // [FETCH]
-  testptr(tmpReg, markWord::monitor_value); // inflated vs stack-locked|neutral
-  jcc(Assembler::notZero, IsInflated);
-
   if (LockingMode == LM_MONITOR) {
     // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
     testptr(objReg, objReg);
   } else {
     assert(LockingMode == LM_LEGACY, "must be");
+
+    movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));          // [FETCH]
+    testptr(tmpReg, markWord::monitor_value); // inflated vs stack-locked|neutral
+    jcc(Assembler::notZero, IsInflated);
+
     // Attempt stack-locking ...
     orptr (tmpReg, markWord::unlocked_value);
     movptr(Address(boxReg, 0), tmpReg);          // Anticipate successful CAS
@@ -306,7 +307,6 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
     andptr(tmpReg, (int32_t) (NOT_LP64(0xFFFFF003) LP64_ONLY(7 - (int)os::vm_page_size())) );
     movptr(Address(boxReg, 0), tmpReg);
   }
-  // After recursive stack locking attempt case
   jmp(DONE_LABEL);
 
   bind(IsInflated);
@@ -342,13 +342,12 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   movptr(Address(scrReg, 0), 3);          // box->_displaced_header = 3
   // If we weren't able to swing _owner from null to the BasicLock
   // then take the slow path.
-  jccb  (Assembler::notZero, DONE_LABEL);
+  jccb  (Assembler::notZero, NO_COUNT);
   // update _owner from BasicLock to thread
   get_thread (scrReg);                    // beware: clobbers ICCs
   movptr(scrReg, Address(scrReg, JavaThread::lock_id_offset()));
   movptr(Address(boxReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), scrReg);
   xorptr(boxReg, boxReg);                 // set icc.ZFlag = 1 to indicate success
-  jmp(DONE_LABEL);
 
   // If the CAS fails we can either retry or pass control to the slow path.
   // We use the latter tactic.
@@ -370,23 +369,28 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   cmpxchgptr(boxReg, Address(scrReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
 
   // Propagate ICC.ZF from CAS above into DONE_LABEL.
-  jccb(Assembler::equal, DONE_LABEL);    // CAS above succeeded; propagate ZF = 1 (success)
+  jccb(Assembler::equal, COUNT);    // CAS above succeeded; propagate ZF = 1 (success)
 
   cmpptr(boxReg, rax);                // Check if we are already the owner (recursive lock)
-  jccb(Assembler::notEqual, DONE_LABEL);    // If not recursive, ZF = 0 at this point (fail)
+  jccb(Assembler::notEqual, NO_COUNT);    // If not recursive, ZF = 0 at this point (fail)
   incq(Address(scrReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
   xorq(rax, rax); // Set ZF = 1 (success) for recursive lock, denoting locking success
-  jmp(DONE_LABEL);
 #endif // _LP64
+  bind(DONE_LABEL);
+
+  // ZFlag == 1 count in fast path
+  // ZFlag == 0 count in slow path
+  jccb(Assembler::notZero, NO_COUNT); // jump if ZFlag == 0
 
   bind(COUNT);
   // Count monitors in fast path
   increment(Address(thread, JavaThread::held_monitor_count_offset()));
+
   xorl(tmpReg, tmpReg); // Set ZF == 1
 
-  bind(DONE_LABEL);
+  bind(NO_COUNT);
 
-  // At DONE_LABEL the icc ZFlag is set as follows ...
+  // At NO_COUNT the icc ZFlag is set as follows ...
   // fast_unlock uses the same protocol.
   // ZFlag == 1 -> Success
   // ZFlag == 0 -> Failure - force control through the slow path
@@ -429,11 +433,11 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   assert(boxReg == rax, "");
   assert_different_registers(objReg, boxReg, tmpReg);
 
-  Label DONE_LABEL, Stacked, COUNT;
+  Label DONE_LABEL, Stacked, COUNT, NO_COUNT;
 
   if (LockingMode == LM_LEGACY) {
     cmpptr(Address(boxReg, 0), NULL_WORD);                            // Examine the displaced header
-    jcc   (Assembler::zero, DONE_LABEL);                              // 0 indicates recursive stack-lock
+    jcc   (Assembler::zero, COUNT);                                   // 0 indicates recursive stack-lock
   }
   movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));   // Examine the object's markword
   if (LockingMode != LM_MONITOR) {
@@ -442,21 +446,6 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   }
 
   // It's inflated.
-  // If the owner is ANONYMOUS, we need to fix it -  in an outline stub.
-  cmpptr(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), (int32_t) ObjectMonitor::ANONYMOUS_OWNER);
-#ifdef _LP64
-  if (!Compile::current()->output()->in_scratch_emit_size()) {
-    C2HandleAnonOMOwnerStub* stub = new (Compile::current()->comp_arena()) C2HandleAnonOMOwnerStub(tmpReg, boxReg);
-    Compile::current()->output()->add_stub(stub);
-    jcc(Assembler::equal, stub->entry());
-    bind(stub->continuation());
-  } else
-#endif
-  {
-    // We can't easily implement this optimization on 32 bit because we don't have a thread register.
-    // Call the slow-path instead.
-    jcc(Assembler::notEqual, DONE_LABEL);
-  }
 
   // Despite our balanced locking property we still check that m->_owner == Self
   // as java routines or native JNI code called by this thread might
@@ -498,11 +487,9 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
 
   // Recursive inflated unlock
   decq(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
-  xorl(tmpReg, tmpReg); // Set ZF == 1
-  jmp(DONE_LABEL);
+  jmpb(LSuccess);
 
   bind(LNotRecursive);
-
   movptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(cxq)));
   orptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(EntryList)));
   jccb  (Assembler::notZero, CheckSucc);
@@ -573,7 +560,18 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
     movptr(tmpReg, Address (boxReg, 0));      // re-fetch
     lock();
     cmpxchgptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Uses RAX which is box
-    jccb(Assembler::notZero, DONE_LABEL);
+     // Intentional fall-thru into DONE_LABEL
+  }
+
+  bind(DONE_LABEL);
+
+  // ZFlag == 1 count in fast path
+  // ZFlag == 0 count in slow path
+  jccb(Assembler::notZero, NO_COUNT);
+
+  bind(COUNT);
+
+  if (LockingMode == LM_LEGACY) {
     // Count monitors in fast path
 #ifndef _LP64
     get_thread(tmpReg);
@@ -581,12 +579,11 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
 #else // _LP64
     decrementq(Address(r15_thread, JavaThread::held_monitor_count_offset()));
 #endif
-    xorl(tmpReg, tmpReg); // Set ZF == 1
   }
 
-  // ZFlag == 1 -> Success
-  // ZFlag == 0 -> Failure - force control through the slow path
-  bind(DONE_LABEL);
+  xorl(tmpReg, tmpReg); // Set ZF == 1
+
+  bind(NO_COUNT);
 }
 
 void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Register rax_reg,
@@ -597,7 +594,7 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Regist
 
   // Handle inflated monitor.
   Label inflated;
-  // Finish fast lock successfully.
+  // Finish fast lock successfully. ZF value is irrelevant.
   Label locked;
   // Finish fast lock unsuccessfully. MUST jump with ZF == 0
   Label slow_path;
@@ -646,7 +643,6 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Regist
     // After successful lock, push object on lock-stack.
     movptr(Address(thread, top), obj);
     addl(Address(thread, JavaThread::lock_stack_top_offset()), oopSize);
-    xorl(rax_reg, rax_reg);
     jmpb(locked);
   }
 
@@ -667,10 +663,12 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Regist
 
     // Recursive.
     increment(Address(tagged_monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(recursions)));
-    xorl(rax_reg, rax_reg);
   }
 
   bind(locked);
+  // Set ZF = 1
+  xorl(rax_reg, rax_reg);
+
 #ifdef ASSERT
   // Check that locked label is reached with ZF set.
   Label zf_correct;

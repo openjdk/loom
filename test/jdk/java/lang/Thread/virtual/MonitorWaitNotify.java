@@ -135,8 +135,12 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
+
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.lang.management.ManagementFactory;
 
 class MonitorWaitNotify {
 
@@ -305,6 +309,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @MethodSource("threadCounts")
+    @DisabledIf("legacyLockingMode")
     void testNotifyOneThread(int nPlatformThreads, int nVirtualThreads) throws Exception {
         int nThreads = nPlatformThreads + nVirtualThreads;
 
@@ -362,6 +367,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @MethodSource("threadCounts")
+    @DisabledIf("legacyLockingMode")
     void testNotifyAllThreads(int nPlatformThreads, int nVirtualThreads) throws Exception {
         int nThreads = nPlatformThreads + nVirtualThreads;
 
@@ -699,6 +705,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
+    @DisabledIf("legacyLockingMode")
     void testReleaseWhenWaiting1(int timeout) throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -755,6 +762,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 10, 20, 100, 500, 30000, Integer.MAX_VALUE })
+    @DisabledIf("legacyLockingMode")
     void testReleaseWhenWaiting2(int timeout) throws Exception {
         int VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
         CountDownLatch latch = new CountDownLatch(VTHREAD_COUNT);
@@ -852,5 +860,10 @@ class MonitorWaitNotify {
                 "Duration " + duration + "ms, expected >= " + min + "ms");
         assertTrue(duration <= max,
                 "Duration " + duration + "ms, expected <= " + max + "ms");
+    }
+
+    static boolean legacyLockingMode() {
+        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
+                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }

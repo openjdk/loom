@@ -1242,11 +1242,10 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
       // Save the test result, for recursive case, the result is zero
       movptr(Address(lock_reg, mark_offset), swap_reg);
       jcc(Assembler::notZero, slow_case);
-    }
-    jmp(done);
 
-    bind(count_locking);
-    inc_held_monitor_count();
+      bind(count_locking);
+      inc_held_monitor_count();
+    }
     jmp(done);
 
     bind(slow_case);
@@ -1287,7 +1286,7 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
   if (LockingMode == LM_MONITOR) {
     call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
   } else {
-    Label done, slow_case;
+    Label count_locking, done, slow_case;
 
     const Register swap_reg   = rax;  // Must use rax for cmpxchg instruction
     const Register header_reg = LP64_ONLY(c_rarg2) NOT_LP64(rbx);  // Will contain the old oopMark
@@ -1325,7 +1324,7 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
       testptr(header_reg, header_reg);
 
       // zero for recursive case
-      jcc(Assembler::zero, done);
+      jcc(Assembler::zero, count_locking);
 
       // Atomic swap back the old header
       lock();
@@ -1333,6 +1332,8 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg) {
 
       // zero for simple unlock of a stack-lock case
       jcc(Assembler::notZero, slow_case);
+
+      bind(count_locking);
       dec_held_monitor_count();
     }
     jmp(done);

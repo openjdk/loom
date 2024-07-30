@@ -530,8 +530,7 @@ void MacroAssembler::call_VM_leaf_base(address entry_point, int num_args) {
   addq(rsp, frame::arg_reg_save_area_bytes);
 #endif
 
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
-      entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
+  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
     Label not_preempted;
     movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
     cmpptr(rscratch1, NULL_WORD);

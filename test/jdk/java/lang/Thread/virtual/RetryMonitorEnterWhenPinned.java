@@ -29,6 +29,7 @@
  *   can't continue because there are no carriers available.
  * @modules java.base/java.lang:+open
  * @library /test/lib
+ * @requires vm.opt.LockingMode != 1
  * @run main/othervm --enable-native-access=ALL-UNNAMED RetryMonitorEnterWhenPinned
  */
 

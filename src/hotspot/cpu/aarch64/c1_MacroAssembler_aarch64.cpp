@@ -65,7 +65,6 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   const int hdr_offset = oopDesc::mark_offset_in_bytes();
   assert_different_registers(hdr, obj, disp_hdr, temp, rscratch2);
   int null_check_offset = -1;
-  Label count_locking, done;
 
   verify_oop(obj);
 
@@ -83,8 +82,8 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
 
   if (LockingMode == LM_LIGHTWEIGHT) {
     lightweight_lock(obj, hdr, temp, rscratch2, slow_case);
-    b(done);
   } else if (LockingMode == LM_LEGACY) {
+    Label done;
     // Load object header
     ldr(hdr, Address(obj, hdr_offset));
     // and mark it as unlocked
@@ -95,8 +94,7 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // displaced header address in the object header - if it is not the same, get the
     // object header instead
     lea(rscratch2, Address(obj, hdr_offset));
-    // if the object header was the same, we're done
-    cmpxchgptr(hdr, disp_hdr, rscratch2, rscratch1, count_locking, /*fallthough*/nullptr);
+    cmpxchgptr(hdr, disp_hdr, rscratch2, rscratch1, done, /*fallthough*/nullptr);
     // if the object header was the same, we're done
     // if the object header was not the same, it is now in the hdr register
     // => test if it is a stack pointer into the same stack (recursive locking), i.e.:
@@ -120,11 +118,9 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     // otherwise we don't care about the result and handle locking via runtime call
     cbnz(hdr, slow_case);
     // done
-    b(done);
+    bind(done);
+    inc_held_monitor_count();
   }
-  bind(count_locking);
-  inc_held_monitor_count();
-  bind(done);
   return null_check_offset;
 }
 
@@ -133,7 +129,7 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
   const int aligned_mask = BytesPerWord -1;
   const int hdr_offset = oopDesc::mark_offset_in_bytes();
   assert_different_registers(hdr, obj, disp_hdr, temp, rscratch2);
-  Label count_locking, done;
+  Label done;
 
   if (LockingMode != LM_LIGHTWEIGHT) {
     // load displaced header
@@ -149,7 +145,6 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
 
   if (LockingMode == LM_LIGHTWEIGHT) {
     lightweight_unlock(obj, hdr, temp, rscratch2, slow_case);
-    b(done);
   } else if (LockingMode == LM_LEGACY) {
     // test if object header is pointing to the displaced header, and if so, restore
     // the displaced header in the object - if the object header is not pointing to
@@ -158,15 +153,14 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
     // we do unlocking via runtime call
     if (hdr_offset) {
       lea(rscratch1, Address(obj, hdr_offset));
-      cmpxchgptr(disp_hdr, hdr, rscratch1, rscratch2, count_locking, &slow_case);
+      cmpxchgptr(disp_hdr, hdr, rscratch1, rscratch2, done, &slow_case);
     } else {
-      cmpxchgptr(disp_hdr, hdr, obj, rscratch2, count_locking, &slow_case);
+      cmpxchgptr(disp_hdr, hdr, obj, rscratch2, done, &slow_case);
     }
     // done
-    bind(count_locking);
+    bind(done);
     dec_held_monitor_count();
   }
-  bind(done);
 }
 
 

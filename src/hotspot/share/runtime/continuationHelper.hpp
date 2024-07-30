@@ -101,7 +101,9 @@ public:
   static int size(const frame& f);
   static inline int expression_stack_size(const frame &f, InterpreterOopMap* mask);
 
-  static int monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table, stackChunkOop chunk) NOT_DEBUG_RETURN0;
+#ifdef ASSERT
+  static bool is_owning_locks(const frame& f);
+#endif
 
   static bool is_instance(const frame& f);
 
@@ -127,8 +129,10 @@ class ContinuationHelper::CompiledFrame : public ContinuationHelper::NonInterpre
 public:
   static bool is_instance(const frame& f);
 
+#ifdef ASSERT
   template <typename RegisterMapT>
-  static int monitors_to_fix(JavaThread* thread, RegisterMapT* map, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
+  static bool is_owning_locks(JavaThread* thread, RegisterMapT* map, const frame& f);
+#endif
 };
 
 class ContinuationHelper::NativeFrame : public ContinuationHelper::NonInterpretedFrame {
@@ -137,7 +141,10 @@ public:
 
   static bool is_instance(const frame& f);
 
-  static int monitors_to_fix(JavaThread* thread, const frame& f, ResourceHashtable<oopDesc*, bool> &table) NOT_DEBUG_RETURN0;
+#ifdef ASSERT
+  static bool is_owning_locks(JavaThread* current, const frame& f);
+#endif
+
   static int stack_argsize(const frame& f) { return 0; }
 };
 

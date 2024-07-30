@@ -57,7 +57,7 @@ enum freeze_result {
   freeze_pinned_monitor = 4,
   freeze_exception = 5,
   freeze_not_mounted = 6,
-  unsupported = 7
+  freeze_unsupported = 7
 };
 
 enum freeze_kind {
@@ -92,7 +92,7 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
 
-  static int try_preempt(JavaThread* target, oop continuation, int preempt_kind);
+  static int try_preempt(JavaThread* target, oop continuation, int preempt_kind) NOT_LOOM_MONITOR_SUPPORT({ return freeze_unsupported; });
 
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);

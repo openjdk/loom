@@ -119,6 +119,8 @@ public class JNIMonitor {
             "-Xlog:jni=debug",
             // Enable thread termination logging as a visual cross-check
             "-Xlog:thread+os=info",
+            // We only count monitors in LM_LEGACY mode
+            "-XX:LockingMode=1",
             "JNIMonitor$" + test,
         };
         OutputAnalyzer oa = ProcessTools.executeTestJava(cmdArgs);

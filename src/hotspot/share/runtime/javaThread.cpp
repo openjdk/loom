@@ -2003,6 +2003,15 @@ void JavaThread::trace_stack() {
 // Slow-path increment of the held monitor counts. JNI locking is always
 // this slow-path.
 void JavaThread::inc_held_monitor_count(intx i, bool jni) {
+#ifdef LOOM_MONITOR_SUPPORT
+  if (LockingMode != LM_LEGACY) {
+    // Nothing to do. Just do some sanity check.
+    assert(_held_monitor_count == 0, "counter should not be used");
+    assert(_jni_monitor_count == 0, "counter should not be used");
+    return;
+  }
+#endif
+
 #ifdef SUPPORT_MONITOR_COUNT
   assert(_held_monitor_count >= 0, "Must always be non-negative: " INTX_FORMAT, _held_monitor_count);
   _held_monitor_count += i;
@@ -2018,6 +2027,15 @@ void JavaThread::inc_held_monitor_count(intx i, bool jni) {
 // Slow-path decrement of the held monitor counts. JNI unlocking is always
 // this slow-path.
 void JavaThread::dec_held_monitor_count(intx i, bool jni) {
+#ifdef LOOM_MONITOR_SUPPORT
+  if (LockingMode != LM_LEGACY) {
+    // Nothing to do. Just do some sanity check.
+    assert(_held_monitor_count == 0, "counter should not be used");
+    assert(_jni_monitor_count == 0, "counter should not be used");
+    return;
+  }
+#endif
+
 #ifdef SUPPORT_MONITOR_COUNT
   _held_monitor_count -= i;
   assert(_held_monitor_count >= 0, "Must always be non-negative: " INTX_FORMAT, _held_monitor_count);

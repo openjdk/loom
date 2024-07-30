@@ -1394,8 +1394,8 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // Set the last Java PC in the frame anchor to be the return address from
   // the call to the native method: this will allow the debugger to
   // generate an accurate stack trace.
-  Label resume_pc;
-  __ set_last_Java_frame(esp, rfp, resume_pc, rscratch1);
+  Label native_return;
+  __ set_last_Java_frame(esp, rfp, native_return, rscratch1);
 
   // change thread state
 #ifdef ASSERT
@@ -1485,17 +1485,22 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   __ lea(rscratch2, Address(rthread, JavaThread::thread_state_offset()));
   __ stlrw(rscratch1, rscratch2);
 
-  // Check preemption for Object.wait()
-  Label not_preempted;
-  __ ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-  __ cbz(rscratch1, not_preempted);
-  __ str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-  __ br(rscratch1);
-  __ bind(resume_pc);
-  // On resume we need to set up stack as expected
-  __ push(dtos);
-  __ push(ltos);
-  __ bind(not_preempted);
+  if (LockingMode != LM_LEGACY) {
+    // Check preemption for Object.wait()
+    Label not_preempted;
+    __ ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
+    __ cbz(rscratch1, not_preempted);
+    __ str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
+    __ br(rscratch1);
+    __ bind(native_return);
+    // On resume we need to set up stack as expected
+    __ push(dtos);
+    __ push(ltos);
+    __ bind(not_preempted);
+  } else {
+    // any pc will do so just use this one for LM_LEGACY to keep code together.
+    __ bind(native_return);
+  }
 
   // reset_last_Java_frame
   __ reset_last_Java_frame(true);

@@ -237,9 +237,7 @@ void stackChunkOopDesc::do_barriers(const StackChunkFrameStream<frame_kind>& f, 
 
 template <typename OopT, class StackChunkLockStackClosureType>
 inline void stackChunkOopDesc::iterate_lockstack(StackChunkLockStackClosureType* closure) {
-  if (LockingMode != LM_LIGHTWEIGHT) {
-    return;
-  }
+  assert(LockingMode == LM_LIGHTWEIGHT, "");
   int cnt = lockstack_size();
   intptr_t* lockstart_addr = start_address();
   for (int i = 0; i < cnt; i++) {

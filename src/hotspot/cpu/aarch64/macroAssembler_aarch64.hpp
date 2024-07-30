@@ -1092,7 +1092,6 @@ public:
 
   // prints msg, dumps registers and stops execution
   void stop(const char* msg);
-  void trace(const char* msg);
 
   static void debug64(char* msg, int64_t pc, int64_t regs[]);
 

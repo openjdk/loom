@@ -136,6 +136,9 @@ import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.lang.management.ManagementFactory;
+
 class MonitorEnterExit {
     static final int MAX_VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
     static final int MAX_ENTER_DEPTH = 256;
@@ -235,6 +238,7 @@ class MonitorEnterExit {
      * Test monitor reenter when there are other threads blocked trying to enter.
      */
     @Test
+    @DisabledIf("legacyLockingMode")
     void testReenterWithContention() throws Exception {
         var lock = new Object();
         VThreadRunner.run(() -> {
@@ -365,6 +369,7 @@ class MonitorEnterExit {
      * Test that blocking waiting to enter a monitor releases the carrier.
      */
     @Test
+    @DisabledIf("legacyLockingMode")
     void testReleaseWhenBlocked() throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -408,6 +413,7 @@ class MonitorEnterExit {
      * carriers aren't released.
      */
     @Test
+    @DisabledIf("legacyLockingMode")
     void testManyBlockedThreads() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var lock = new Object();
@@ -604,5 +610,10 @@ class MonitorEnterExit {
             Thread.sleep(10);
             state = thread.getState();
         }
+    }
+
+    static boolean legacyLockingMode() {
+        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
+                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }

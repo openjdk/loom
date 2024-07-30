@@ -71,8 +71,12 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
+
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.lang.management.ManagementFactory;
 
 class ThreadAPI {
     private static final Object lock = new Object();
@@ -1136,6 +1140,7 @@ class ThreadAPI {
      * Test Thread.yield releases carrier when virtual thread holds a monitor.
      */
     @Test
+    @DisabledIf("legacyLockingMode")
     void testYieldWhenHoldingMonitor() throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
@@ -2650,5 +2655,10 @@ class ThreadAPI {
      */
     private void scheduleInterrupt(Thread thread, long delayInMillis) {
         scheduler.schedule(thread::interrupt, delayInMillis, TimeUnit.MILLISECONDS);
+    }
+
+    static boolean legacyLockingMode() {
+        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
+                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }

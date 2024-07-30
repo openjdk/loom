@@ -169,7 +169,7 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg,
   Register disp_hdr = tmp1Reg;
   Register tmp = tmp2Reg;
   Label object_has_monitor;
-  // Finish fast lock successfully. MUST branch to vwith flag == 0
+  // Finish fast lock successfully. MUST branch to with flag == 0
   Label unlocked;
   // Finish fast lock unsuccessfully. slow_path MUST branch to with flag != 0
   Label slow_path;

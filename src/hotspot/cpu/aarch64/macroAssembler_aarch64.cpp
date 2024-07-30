@@ -1955,22 +1955,20 @@ void MacroAssembler::call_VM_leaf_base(address entry_point,
   Label not_preempted;
 
   stp(rscratch1, rmethod, Address(pre(sp, -2 * wordSize)));
-  str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
 
   mov(rscratch1, entry_point);
   blr(rscratch1);
   if (retaddr)
     bind(*retaddr);
 
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
-      entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
+  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
     ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
     cbz(rscratch1, not_preempted);
     str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
     br(rscratch1);
   }
-
   bind(not_preempted);
+
   ldp(rscratch1, rmethod, Address(post(sp, 2 * wordSize)));
 }
 

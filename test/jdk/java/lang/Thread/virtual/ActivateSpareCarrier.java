@@ -27,7 +27,7 @@
  * @summary Test the scenario where a blocking operation pins a virtual thread to its
  *   carrier thread (cT1) and doesn't activate a spare. Subsequent blocking operations
  *   that pin a virtual thread to cT1 should attempt to activate a spare.
- * @requires vm.continuations
+ * @requires vm.continuations & vm.opt.LockingMode != 1
  * @run main/othervm
  *     -Djdk.virtualThreadScheduler.parallelism=1
  *     -Djdk.virtualThreadScheduler.maxPoolSize=2 ActivateSpareCarrier 100

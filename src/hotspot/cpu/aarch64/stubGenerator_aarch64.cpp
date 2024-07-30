@@ -7063,9 +7063,7 @@ class StubGenerator: public StubCodeGenerator {
     // If we want, we can templatize thaw by kind, and have three different entries
     __ movw(c_rarg1, (uint32_t)kind);
 
-    __ set_last_Java_frame(sp, rfp, rscratch1, rscratch2);
     __ call_VM_leaf(Continuation::thaw_entry(), rthread, c_rarg1);
-    __ reset_last_Java_frame(true);
     __ mov(rscratch2, r0); // r0 is the sp of the yielding frame
 
     if (return_barrier) {

@@ -52,6 +52,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
   Register box = boxReg;
   Register disp_hdr = tmpReg;
   Register tmp = tmp2Reg;
+  Label cont;
   Label object_has_monitor;
   Label count, no_count;
 
@@ -65,17 +66,18 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
     load_klass(tmp, oop);
     ldrw(tmp, Address(tmp, Klass::access_flags_offset()));
     tstw(tmp, JVM_ACC_IS_VALUE_BASED_CLASS);
-    br(Assembler::NE, no_count);
+    br(Assembler::NE, cont);
   }
-
-  // Check for existing monitor
-  tbnz(disp_hdr, exact_log2(markWord::monitor_value), object_has_monitor);
 
   if (LockingMode == LM_MONITOR) {
     tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
-    b(no_count);
+    b(cont);
   } else {
     assert(LockingMode == LM_LEGACY, "must be");
+
+    // Check for existing monitor
+    tbnz(disp_hdr, exact_log2(markWord::monitor_value), object_has_monitor);
+
     // Set tmp to be (markWord of object | UNLOCK_VALUE).
     orr(tmp, disp_hdr, markWord::unlocked_value);
 
@@ -87,7 +89,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
     // On failure disp_hdr contains the possibly locked markWord.
     cmpxchg(oop, tmp, box, Assembler::xword, /*acquire*/ true,
             /*release*/ true, /*weak*/ false, disp_hdr);
-    br(Assembler::EQ, count);
+    br(Assembler::EQ, cont);
 
     assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
 
@@ -103,7 +105,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
     // displaced header in the box, which indicates that it is a recursive lock.
     ands(tmp/*==0?*/, disp_hdr, tmp);   // Sets flags for result
     str(tmp/*==0, perhaps*/, Address(box, BasicLock::displaced_header_offset_in_bytes()));
-    b(no_count);
+    b(cont);
   }
 
   // Handle existing monitor.
@@ -126,22 +128,24 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
   mov(tmp, (address)markWord::unused_mark().value());
   str(tmp, Address(box, BasicLock::displaced_header_offset_in_bytes()));
 
-  br(Assembler::EQ, no_count); // CAS success means locking succeeded
+  br(Assembler::EQ, cont); // CAS success means locking succeeded
 
   cmp(tmp3Reg, rscratch2);
-  br(Assembler::NE, no_count); // Check for recursive locking
+  br(Assembler::NE, cont); // Check for recursive locking
 
   // Recursive lock case
   increment(Address(disp_hdr, in_bytes(ObjectMonitor::recursions_offset()) - markWord::monitor_value), 1);
   // flag == EQ still from the cmp above, checking if this is a reentrant lock
-  b(no_count);
+
+  bind(cont);
+  // flag == EQ indicates success
+  // flag == NE indicates failure
+  br(Assembler::NE, no_count);
 
   bind(count);
   inc_held_monitor_count();
 
   bind(no_count);
-  // flag == EQ indicates success
-  // flag == NE indicates failure
 }
 
 void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Register tmpReg,
@@ -152,37 +156,35 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
   Register tmp = tmp2Reg;
   Label cont;
   Label object_has_monitor;
-  Label no_count;
+  Label count, no_count;
 
   assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_unlock_lightweight");
   assert_different_registers(oop, box, tmp, disp_hdr);
 
-  if (LockingMode == LM_LEGACY) {
-    // Find the lock address and load the displaced header from the stack.
-    ldr(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
-
-    // If the displaced header is 0, we have a recursive unlock.
-    cmp(disp_hdr, zr);
-    br(Assembler::EQ, no_count);
+  if (LockingMode == LM_MONITOR) {
+    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
+    b(cont);
+  } else {
+    assert(LockingMode == LM_LEGACY, "must be");
   }
+
+  // Find the lock address and load the displaced header from the stack.
+  ldr(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+  // If the displaced header is 0, we have a recursive unlock.
+  cmp(disp_hdr, zr);
+  br(Assembler::EQ, cont);
 
   // Handle existing monitor.
   ldr(tmp, Address(oop, oopDesc::mark_offset_in_bytes()));
   tbnz(tmp, exact_log2(markWord::monitor_value), object_has_monitor);
 
-  if (LockingMode == LM_MONITOR) {
-    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
-    b(no_count);
-  } else {
-    assert(LockingMode == LM_LEGACY, "must be");
-    // Check if it is still a light weight lock, this is is true if we
-    // see the stack address of the basicLock in the markWord of the
-    // object.
-
-    cmpxchg(oop, box, disp_hdr, Assembler::xword, /*acquire*/ false,
-            /*release*/ true, /*weak*/ false, tmp);
-    b(cont);
-  }
+  // Check if it is still a light weight lock, this is is true if we
+  // see the stack address of the basicLock in the markWord of the
+  // object.
+  cmpxchg(oop, box, disp_hdr, Assembler::xword, /*acquire*/ false,
+          /*release*/ true, /*weak*/ false, tmp);
+  b(cont);
 
   assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
 
@@ -190,18 +192,6 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
   bind(object_has_monitor);
   STATIC_ASSERT(markWord::monitor_value <= INT_MAX);
   add(tmp, tmp, -(int)markWord::monitor_value); // monitor
-
-  // If the owner is anonymous, we need to fix it -- in an outline stub.
-  Register tmp2 = disp_hdr;
-  ldr(tmp2, Address(tmp, ObjectMonitor::owner_offset()));
-  // We cannot use tbnz here, the target might be too far away and cannot
-  // be encoded.
-  mov(rscratch1, (uint64_t)ObjectMonitor::ANONYMOUS_OWNER);
-  cmp(tmp2, rscratch1);
-  C2HandleAnonOMOwnerStub* stub = new (Compile::current()->comp_arena()) C2HandleAnonOMOwnerStub(tmp, tmp2);
-  Compile::current()->output()->add_stub(stub);
-  br(Assembler::EQ, stub->entry());
-  bind(stub->continuation());
 
   ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset()));
 
@@ -212,24 +202,24 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
   sub(disp_hdr, disp_hdr, 1u);
   str(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset()));
   cmp(disp_hdr, disp_hdr); // Sets flags for result
-  b(no_count);
+  b(cont);
 
   bind(notRecursive);
   ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset()));
   ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset()));
   orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
   cmp(rscratch1, zr); // Sets flags for result
-  cbnz(rscratch1, no_count);
+  cbnz(rscratch1, cont);
   // need a release store here
   lea(tmp, Address(tmp, ObjectMonitor::owner_offset()));
   stlr(zr, tmp); // set unowned
-  b(no_count);
 
   bind(cont);
   // flag == EQ indicates success
   // flag == NE indicates failure
   br(Assembler::NE, no_count);
 
+  bind(count);
   dec_held_monitor_count();
 
   bind(no_count);

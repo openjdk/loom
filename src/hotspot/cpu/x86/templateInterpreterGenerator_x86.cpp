@@ -1178,18 +1178,20 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // change thread state
   __ movl(Address(thread, JavaThread::thread_state_offset()), _thread_in_Java);
 
-  // Check preemption for Object.wait()
-  Label not_preempted;
-  __ movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
-  __ cmpptr(rscratch1, NULL_WORD);
-  __ jccb(Assembler::equal, not_preempted);
-  __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
-  __ jmp(rscratch1);
-  Interpreter::_native_frame_resume_entry = __ pc();
-  // On resume we need to set up stack as expected
-  __ push(dtos);
-  __ push(ltos);
-  __ bind(not_preempted);
+  if (LockingMode != LM_LEGACY) {
+    // Check preemption for Object.wait()
+    Label not_preempted;
+    __ movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
+    __ cmpptr(rscratch1, NULL_WORD);
+    __ jccb(Assembler::equal, not_preempted);
+    __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
+    __ jmp(rscratch1);
+    Interpreter::_native_frame_resume_entry = __ pc();
+    // On resume we need to set up stack as expected
+    __ push(dtos);
+    __ push(ltos);
+    __ bind(not_preempted);
+  }
 
   // reset_last_Java_frame
   __ reset_last_Java_frame(thread, true);
