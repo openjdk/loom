@@ -2679,7 +2679,7 @@ void ThawBase::recurse_thaw_native_frame(const frame& hf, frame& caller, int num
   assert(_cont.is_preempted() && hf.cb()->as_nmethod()->method()->is_object_wait0(), "");
 
   if (UNLIKELY(seen_by_gc())) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
-    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance);
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance());
   }
 
   const bool is_bottom_frame = recurse_thaw_java_frame<ContinuationHelper::NativeFrame>(caller, num_frames);
@@ -2717,7 +2717,7 @@ void ThawBase::recurse_thaw_native_frame(const frame& hf, frame& caller, int num
   assert(!f.cb()->as_nmethod()->is_marked_for_deoptimization(), "");
 
   // can only fix caller once this frame is thawed (due to callee saved regs); this happens on the stack
-  _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance);
+  _cont.tail()->fix_thawed_frame(caller, SmallRegisterMap::instance());
 
   DEBUG_ONLY(after_thaw_java_frame(f, false /* bottom */);)
   caller = f;
