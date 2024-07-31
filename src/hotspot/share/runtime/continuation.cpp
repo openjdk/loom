@@ -139,7 +139,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   assert(!is_continuation_preempted(continuation), "");
   assert(Continuation::continuation_scope(continuation) == java_lang_VirtualThread::vthread_scope(), "");
   assert(!target->has_pending_exception(), "");
-  assert(!target->is_suspended() || target->is_disable_suspend(), "");
+  assert(!target->is_suspended() || target->is_disable_suspend() || target->obj_locker_count() > 0, "");
 
   if (LockingMode == LM_LEGACY) {
     return freeze_unsupported;
