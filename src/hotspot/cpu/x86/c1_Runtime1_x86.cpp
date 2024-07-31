@@ -221,6 +221,10 @@ void StubAssembler::prologue(const char* name, bool must_gc_arguments) {
 }
 
 void StubAssembler::epilogue(bool use_pop) {
+  // Avoid using a leave instruction when this frame may
+  // have been frozen, since the current value of rbp
+  // restored from the stub would be invalid. We still
+  // must restore the rbp value saved on enter though.
   use_pop ? pop(rbp) : leave();
   ret(0);
 }
