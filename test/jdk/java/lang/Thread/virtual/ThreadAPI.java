@@ -25,16 +25,18 @@
  * @test id=default
  * @bug 8284161 8286788 8321270
  * @summary Test Thread API with virtual threads
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm --enable-native-access=ALL-UNNAMED ThreadAPI
  */
 
 /*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations
  *     --enable-native-access=ALL-UNNAMED ThreadAPI
  */
@@ -74,9 +76,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
-
-import com.sun.management.HotSpotDiagnosticMXBean;
-import java.lang.management.ManagementFactory;
 
 class ThreadAPI {
     private static final Object lock = new Object();
@@ -1140,7 +1139,7 @@ class ThreadAPI {
      * Test Thread.yield releases carrier when virtual thread holds a monitor.
      */
     @Test
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testYieldWhenHoldingMonitor() throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
@@ -2655,10 +2654,5 @@ class ThreadAPI {
      */
     private void scheduleInterrupt(Thread thread, long delayInMillis) {
         scheduler.schedule(thread::interrupt, delayInMillis, TimeUnit.MILLISECONDS);
-    }
-
-    static boolean legacyLockingMode() {
-        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
-                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }

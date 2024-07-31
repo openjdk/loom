@@ -298,9 +298,7 @@ class MonitorsTest {
             batch[i].join();
         }
 
-        if (workerCount.get() != VT_COUNT) {
-            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
-        }
+        assertEquals(VT_COUNT, workerCount.get());
     }
 
 
@@ -377,9 +375,7 @@ class MonitorsTest {
             batch[i].join();
         }
 
-        if (workerCount.get() != VT_COUNT) {
-            throw new RuntimeException("testContentionMultipleMonitors2 failed. Expected " + VT_COUNT + "but found " + workerCount.get());
-        }
+        assertEquals(VT_COUNT, workerCount.get());
     }
 
     static synchronized void recursive6(int depth, Object myLock) {

@@ -25,87 +25,98 @@
  * @test id=default
  * @summary Test virtual threads using Object.wait/notifyAll
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=LM_LIGHTWEIGHT
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xint-LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xint -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xint-LM_LIGHTWEIGHT
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xint -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-LM_LIGHTWEIGHT
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-TieredStopAtLevel1-LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-TieredStopAtLevel1-LM_LIGHTWEIGHT
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-noTieredCompilation-LM_LEGACY
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=1 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
 /*
  * @test id=Xcomp-noTieredCompilation-LM_LIGHTWEIGHT
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:LockingMode=2 --enable-native-access=ALL-UNNAMED MonitorWaitNotify
  */
 
@@ -138,9 +149,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
-
-import com.sun.management.HotSpotDiagnosticMXBean;
-import java.lang.management.ManagementFactory;
 
 class MonitorWaitNotify {
 
@@ -309,7 +317,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @MethodSource("threadCounts")
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testNotifyOneThread(int nPlatformThreads, int nVirtualThreads) throws Exception {
         int nThreads = nPlatformThreads + nVirtualThreads;
 
@@ -367,7 +375,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @MethodSource("threadCounts")
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testNotifyAllThreads(int nPlatformThreads, int nVirtualThreads) throws Exception {
         int nThreads = nPlatformThreads + nVirtualThreads;
 
@@ -705,7 +713,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 30000, Integer.MAX_VALUE })
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testReleaseWhenWaiting1(int timeout) throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -762,7 +770,7 @@ class MonitorWaitNotify {
      */
     @ParameterizedTest
     @ValueSource(ints = { 0, 10, 20, 100, 500, 30000, Integer.MAX_VALUE })
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testReleaseWhenWaiting2(int timeout) throws Exception {
         int VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
         CountDownLatch latch = new CountDownLatch(VTHREAD_COUNT);
@@ -860,10 +868,5 @@ class MonitorWaitNotify {
                 "Duration " + duration + "ms, expected >= " + min + "ms");
         assertTrue(duration <= max,
                 "Duration " + duration + "ms, expected <= " + max + "ms");
-    }
-
-    static boolean legacyLockingMode() {
-        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
-                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }

@@ -25,32 +25,36 @@
  * @test id=default
  * @summary Test virtual threads using park/unpark
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit Parking
  */
 
 /*
  * @test id=Xint
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xint Parking
  */
 
 /*
  * @test id=Xcomp
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp Parking
  */
 
 /*
  * @test id=Xcomp-noTieredCompilation
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
+ * @build LockingMode
  * @run junit/othervm -Xcomp -XX:-TieredCompilation Parking
  */
 
@@ -71,9 +75,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.condition.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
-
-import com.sun.management.HotSpotDiagnosticMXBean;
-import java.lang.management.ManagementFactory;
 
 class Parking {
     static final int MAX_VTHREAD_COUNT = 4 * Runtime.getRuntime().availableProcessors();
@@ -388,7 +389,7 @@ class Parking {
      */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testParkWhenHoldingMonitor(boolean reenter) throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -438,7 +439,7 @@ class Parking {
      * parking doesn't release the carrier.
      */
     @Test
-    @DisabledIf("legacyLockingMode")
+    @DisabledIf("LockingMode#isLegacy")
     void testManyParkedWhenHoldingMonitor() throws Exception {
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         var done = new AtomicBoolean();
@@ -493,10 +494,5 @@ class Parking {
             Thread.sleep(10);
             state = thread.getState();
         }
-    }
-
-    static boolean legacyLockingMode() {
-        return ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class)
-                    .getVMOption("LockingMode").getValue().equals("1");
     }
 }
