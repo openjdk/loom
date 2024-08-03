@@ -1100,17 +1100,18 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             // owner has attempted to join
             needToJoin = false;
 
-            // wait for all threads, execution to be cancelled, or interrupt
+            // wait for all subtasks, execution to be cancelled, or interrupt
             flock.awaitAll();
+
+            // subtasks are done or execution is cancelled
+            joined = true;
 
             // throw if timeout expired while waiting
             if (timeoutExpired) {
                 throw new ExecutionException(new TimeoutException());
             }
 
-            // join completed successfully
             cancelTimeout();
-            joined = true;
         }
 
         // invoke joiner to get result
