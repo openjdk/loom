@@ -118,9 +118,11 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
   // The object's monitor m is unlocked iff m->owner == nullptr,
   // otherwise m->owner may contain a thread or a stack address.
   //
-  // Try to CAS m->owner from null to current thread.
+  // Try to CAS m->owner from null to current thread id.
+  Register tid = flag;
+  mv(tid, Address(xthread, JavaThread::lock_id_offset()));
   add(tmp, disp_hdr, (in_bytes(ObjectMonitor::owner_offset()) - markWord::monitor_value));
-  cmpxchg(/*memory address*/tmp, /*expected value*/zr, /*new value*/xthread, Assembler::int64,
+  cmpxchg(/*memory address*/tmp, /*expected value*/zr, /*new value*/tid, Assembler::int64,
           Assembler::aq, Assembler::rl, /*result*/tmp3Reg); // cas succeeds if tmp3Reg == zr(expected)
 
   // Store a non-null value into the box to avoid looking like a re-entrant
@@ -132,7 +134,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
 
   beqz(tmp3Reg, locked); // CAS success means locking succeeded
 
-  bne(tmp3Reg, xthread, slow_path); // Check for recursive locking
+  bne(tmp3Reg, tid, slow_path); // Check for recursive locking
 
   // Recursive lock case
   increment(Address(disp_hdr, in_bytes(ObjectMonitor::recursions_offset()) - markWord::monitor_value), 1, tmp2Reg, tmp3Reg);
@@ -332,13 +334,15 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register tmp1, Regis
     // Compute owner address.
     la(tmp2_owner_addr, Address(tmp1_tagged_monitor, (in_bytes(ObjectMonitor::owner_offset()) - monitor_tag)));
 
-    // CAS owner (null => current thread).
-    cmpxchg(/*addr*/ tmp2_owner_addr, /*expected*/ zr, /*new*/ xthread, Assembler::int64,
+    // CAS owner (null => current thread id).
+    Register tid = flag;
+    mv(tid, Address(xthread, JavaThread::lock_id_offset()));
+    cmpxchg(/*addr*/ tmp2_owner_addr, /*expected*/ zr, /*new*/ tid, Assembler::int64,
             /*acquire*/ Assembler::aq, /*release*/ Assembler::relaxed, /*result*/ tmp3_owner);
     beqz(tmp3_owner, locked);
 
     // Check if recursive.
-    bne(tmp3_owner, xthread, slow_path);
+    bne(tmp3_owner, tid, slow_path);
 
     // Recursive.
     increment(Address(tmp1_tagged_monitor, in_bytes(ObjectMonitor::recursions_offset()) - monitor_tag), 1, tmp2, tmp3);
@@ -489,7 +493,9 @@ void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register tmp1, Reg
     // The owner may be anonymous and we removed the last obj entry in
     // the lock-stack. This loses the information about the owner.
     // Write the thread to the owner field so the runtime knows the owner.
-    sd(xthread, Address(tmp2_owner_addr));
+    Register tid = flag;
+    mv(tid, Address(xthread, JavaThread::lock_id_offset()));
+    sd(tid, Address(tmp2_owner_addr));
     j(slow_path);
 
     bind(release);

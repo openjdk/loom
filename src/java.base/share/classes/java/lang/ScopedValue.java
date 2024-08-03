@@ -158,13 +158,18 @@ import sun.security.action.GetPropertyAction;
  *     private static final ScopedValue<String> NAME = ScopedValue.newInstance();
 
  *     ScopedValue.runWhere(NAME, "duke", () -> {
- *         try (var scope = new StructuredTaskScope<String>()) {
+ *         // @link substring="open" target="StructuredTaskScope#open(Policy)" :
+ *         try (var scope = StructuredTaskScope.open(policy)) {
  *
+ *             // @link substring="fork" target="StructuredTaskScope#fork(java.util.concurrent.Callable)" :
  *             scope.fork(() -> childTask1());
  *             scope.fork(() -> childTask2());
  *             scope.fork(() -> childTask3());
  *
  *             ...
+ *
+ *             // @link substring="join" target="StructuredTaskScope#join()" :
+ *             var result = scope.join();
  *          }
  *     });
  * }

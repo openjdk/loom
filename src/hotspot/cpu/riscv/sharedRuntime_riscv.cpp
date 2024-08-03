@@ -2441,6 +2441,11 @@ uint SharedRuntime::out_preserve_stack_slots() {
   return 0;
 }
 
+VMReg SharedRuntime::thread_register() {
+  Unimplemented();
+  return nullptr;
+}
+
 #ifdef COMPILER2
 //------------------------------generate_uncommon_trap_blob--------------------
 void SharedRuntime::generate_uncommon_trap_blob() {

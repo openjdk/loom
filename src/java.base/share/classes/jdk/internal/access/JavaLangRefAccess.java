@@ -50,11 +50,4 @@ public interface JavaLangRefAccess {
      * Invoked by Runtime.runFinalization()
      */
     void runFinalization();
-
-    /**
-     * Constructs a new NativeReferenceQueue.
-     *
-     * Invoked by jdk.internal.util.ReferencedKeyMap
-     */
-    <T> ReferenceQueue<T> newNativeReferenceQueue();
 }

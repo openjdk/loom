@@ -2048,6 +2048,11 @@ uint SharedRuntime::out_preserve_stack_slots() {
   return 0;
 }
 
+VMReg SharedRuntime::thread_register() {
+  Unimplemented();
+  return nullptr;
+}
+
 //------------------------------generate_deopt_blob----------------------------
 void SharedRuntime::generate_deopt_blob() {
   // allocate space for the code

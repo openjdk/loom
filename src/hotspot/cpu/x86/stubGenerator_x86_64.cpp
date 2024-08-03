@@ -34,6 +34,7 @@
 #include "prims/jvmtiExport.hpp"
 #include "prims/upcallLinker.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/javaThread.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
@@ -3778,6 +3779,133 @@ address StubGenerator::generate_cont_returnBarrier_exception() {
   return generate_cont_thaw("Cont thaw return barrier exception", Continuation::thaw_return_barrier_exception);
 }
 
+address StubGenerator::generate_cont_preempt_stub() {
+  if (!Continuations::enabled()) return nullptr;
+  StubCodeMark mark(this, "StubRoutines","Continuation preempt stub");
+  address start = __ pc();
+
+#ifdef ASSERT
+  __ push(rax);
+  { Label L;
+    __ get_thread(rax);
+    __ cmpptr(r15_thread, rax);
+    __ jcc(Assembler::equal, L);
+    __ stop("r15 should have been preserved across VM call");
+    __ bind(L);
+  }
+  __ pop(rax);
+#endif
+
+  __ reset_last_Java_frame(true);
+
+  // reset _preempting flag
+#ifdef ASSERT
+  { Label L;
+    __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
+    __ testbool(rscratch1);
+    __ jcc(Assembler::notZero, L);
+    __ stop("preempting flag should be set");
+    __ bind(L);
+  }
+#endif
+  __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
+
+  // Set rsp to enterSpecial frame
+  __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+
+  Label preemption_cancelled;
+  __ movbool(rscratch1, Address(r15_thread, JavaThread::preemption_cancelled_offset()));
+  __ testbool(rscratch1);
+  __ jcc(Assembler::notZero, preemption_cancelled);
+
+  // Remove enterSpecial frame from the stack and return to Continuation.run()
+  SharedRuntime::continuation_enter_cleanup(_masm);
+  __ pop(rbp);
+  __ ret(0);
+
+  __ bind(preemption_cancelled);
+  __ movbool(Address(r15_thread, JavaThread::preemption_cancelled_offset()), false);
+  __ lea(rbp, Address(rsp, checked_cast<int32_t>(ContinuationEntry::size())));
+  __ movptr(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
+  __ jmp(rscratch1);
+
+  return start;
+}
+
+address StubGenerator::generate_cont_resume_monitor_operation() {
+  if (!Continuations::enabled()) return nullptr;
+  StubCodeMark mark(this, "StubRoutines","Continuation resume monitor operation");
+  address start = __ pc();
+
+#ifdef ASSERT
+  __ push(rax);
+  { Label L;
+    __ get_thread(rax);
+    __ cmpptr(r15_thread, rax);
+    __ jcc(Assembler::equal, L);
+    __ stop("r15 should have been preserved across VM call");
+    __ bind(L);
+  }
+  __ pop(rax);
+#endif
+
+  const Register waiter_reg = c_rarg1;
+  __ pop(waiter_reg);
+  __ pop(waiter_reg);
+
+#ifdef ASSERT
+  { Label L;
+    __ testptr(waiter_reg, waiter_reg);
+    __ jcc(Assembler::notEqual, L);
+    __ stop("ObjectMonitor to use is null");
+    __ bind(L);
+  }
+#endif // ASSERT
+
+  __ mov(c_rarg0, r15_thread);
+  __ subptr(rsp, frame::arg_reg_save_area_bytes);
+  __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, SharedRuntime::resume_monitor_operation)));
+  __ addptr(rsp, frame::arg_reg_save_area_bytes);
+
+  Label failAcquire;
+  __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
+  __ testbool(rscratch1);
+  __ jcc(Assembler::notEqual, failAcquire);
+  // We have the lock now, just return to caller (we will actually hit the
+  // return barrier to thaw more frames)
+  __ pop(rbp);
+  __ ret(0);
+
+  __ bind(failAcquire);
+  __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
+  // Set rsp to enterSpecial frame
+  __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
+  // Remove enterSpecial frame from the stack and return to Continuation.run()
+  SharedRuntime::continuation_enter_cleanup(_masm);
+  __ pop(rbp);
+  __ ret(0);
+
+  return start;
+}
+
+address StubGenerator::generate_cont_resume_compiler_adapter() {
+  if (!Continuations::enabled()) return nullptr;
+  StubCodeMark mark(this, "StubRoutines", "Continuation resume compiler adapter");
+  address start = __ pc();
+
+  // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
+  // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
+  // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this
+  // additional value of rbx during freeze will complicate too much the code, so we just zero it here
+  // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
+  __ movptr(rbx, NULL_WORD);
+
+  __ pop(rbp);
+  __ ret(0);
+
+  return start;
+}
+
 #if INCLUDE_JFR
 
 // For c2: c_rarg0 is junk, call to runtime to write a checkpoint.
@@ -4131,6 +4259,9 @@ void StubGenerator::generate_continuation_stubs() {
   StubRoutines::_cont_thaw          = generate_cont_thaw();
   StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
   StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
+  StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
+  StubRoutines::_cont_resume_monitor_operation = generate_cont_resume_monitor_operation();
+  StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
 
   JFR_ONLY(generate_jfr_stubs();)
 }

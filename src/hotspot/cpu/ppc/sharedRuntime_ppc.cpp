@@ -2737,6 +2737,11 @@ uint SharedRuntime::out_preserve_stack_slots() {
 #endif
 }
 
+VMReg SharedRuntime::thread_register() {
+  Unimplemented();
+  return nullptr;
+}
+
 #if defined(COMPILER1) || defined(COMPILER2)
 // Frame generation for deopt and uncommon trap blobs.
 static void push_skeleton_frame(MacroAssembler* masm, bool deopt,

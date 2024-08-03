@@ -40,6 +40,10 @@ static inline intptr_t** link_address(const frame& f) {
             : (intptr_t**)(f.unextended_sp() + f.cb()->frame_size() - 2);
 }
 
+static inline void patch_return_pc_with_preempt_stub(frame& f) {
+  Unimplemented();
+}
+
 inline int ContinuationHelper::frame_align_words(int size) {
 #ifdef _LP64
   return size & 1;
@@ -72,12 +76,12 @@ inline void ContinuationHelper::set_anchor_to_entry_pd(JavaFrameAnchor* anchor, 
   anchor->set_last_Java_fp(entry->entry_fp());
 }
 
-#ifdef ASSERT
 inline void ContinuationHelper::set_anchor_pd(JavaFrameAnchor* anchor, intptr_t* sp) {
   intptr_t* fp = *(intptr_t**)(sp - 2);
   anchor->set_last_Java_fp(fp);
 }
 
+#ifdef ASSERT
 inline bool ContinuationHelper::Frame::assert_frame_laid_out(frame f) {
   intptr_t* sp = f.sp();
   address pc = *(address*)(sp - frame::sender_sp_ret_address_offset());

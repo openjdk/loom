@@ -169,6 +169,8 @@ class Runtime1: public AllStatic {
   static void initialize(BufferBlob* blob);
   static void initialize_pd();
 
+  static uint runtime_blob_current_thread_offset(frame f);
+
   // stubs
   static CodeBlob* blob_for (StubID id);
   static address   entry_for(StubID id)          { return blob_for(id)->code_begin(); }

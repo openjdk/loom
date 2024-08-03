@@ -666,9 +666,11 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 {
   assert(lock_reg == c_rarg1, "The argument is only for looks. It must be c_rarg1");
   if (LockingMode == LM_MONITOR) {
+    push_cont_fastpath();
     call_VM(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
             lock_reg);
+    pop_cont_fastpath();
   } else {
     Label count, done;
 
@@ -697,7 +699,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 
     if (LockingMode == LM_LIGHTWEIGHT) {
       lightweight_lock(obj_reg, tmp, tmp2, tmp3, slow_case);
-      b(count);
+      b(done);
     } else if (LockingMode == LM_LEGACY) {
       // Load (object->mark() | 1) into swap_reg
       ldr(rscratch1, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
@@ -747,11 +749,17 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
 
       // Save the test result, for recursive case, the result is zero
       str(swap_reg, Address(lock_reg, mark_offset));
-      br(Assembler::EQ, count);
+      br(Assembler::NE, slow_case);
+
+      bind(count);
+      inc_held_monitor_count();
+      b(done);
     }
+
     bind(slow_case);
 
     // Call the runtime routine for slow case
+    push_cont_fastpath();
     if (LockingMode == LM_LIGHTWEIGHT) {
       call_VM(noreg,
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj),
@@ -761,11 +769,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
               CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
               lock_reg);
     }
-    b(done);
-
-    bind(count);
-    increment(Address(rthread, JavaThread::held_monitor_count_offset()));
-
+    pop_cont_fastpath();
     bind(done);
   }
 }
@@ -810,11 +814,10 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg)
     // Free entry
     str(zr, Address(lock_reg, BasicObjectLock::obj_offset()));
 
+    Label slow_case;
     if (LockingMode == LM_LIGHTWEIGHT) {
-      Label slow_case;
       lightweight_unlock(obj_reg, header_reg, swap_reg, tmp_reg, slow_case);
-      b(count);
-      bind(slow_case);
+      b(done);
     } else if (LockingMode == LM_LEGACY) {
       // Load the old header from BasicLock structure
       ldr(header_reg, Address(swap_reg,
@@ -824,16 +827,17 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg)
       cbz(header_reg, count);
 
       // Atomic swap back the old header
-      cmpxchg_obj_header(swap_reg, header_reg, obj_reg, rscratch1, count, /*fallthrough*/nullptr);
+      cmpxchg_obj_header(swap_reg, header_reg, obj_reg, rscratch1, count, &slow_case);
+
+      bind(count);
+      dec_held_monitor_count();
+      b(done);
     }
+
+    bind(slow_case);
     // Call the runtime routine for slow case.
     str(obj_reg, Address(lock_reg, BasicObjectLock::obj_offset())); // restore obj
     call_VM_leaf(CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorexit), lock_reg);
-    b(done);
-
-    bind(count);
-    decrement(Address(rthread, JavaThread::held_monitor_count_offset()));
-
     bind(done);
     restore_bcp();
   }

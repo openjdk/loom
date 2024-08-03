@@ -35,6 +35,7 @@
 class AdapterHandlerEntry;
 class AdapterFingerPrint;
 class vframeStream;
+class ObjectWaiter;
 
 // Runtime is the base class for various runtime interfaces
 // (InterpreterRuntime, CompilerRuntime, etc.). It provides
@@ -55,6 +56,7 @@ class SharedRuntime: AllStatic {
   static RuntimeStub*        _resolve_virtual_call_blob;
   static RuntimeStub*        _resolve_static_call_blob;
   static address             _resolve_static_call_entry;
+  static address             _native_frame_resume_entry;
 
   static DeoptimizationBlob* _deopt_blob;
 
@@ -197,6 +199,12 @@ class SharedRuntime: AllStatic {
   static address continuation_for_implicit_exception(JavaThread* current,
                                                      address faulting_pc,
                                                      ImplicitExceptionKind exception_kind);
+
+  static address native_frame_resume_entry() { return _native_frame_resume_entry; }
+  static void set_native_frame_resume_entry(address val) {
+    assert(_native_frame_resume_entry == nullptr, "");
+    _native_frame_resume_entry = val;
+  }
 
   // Post-slow-path-allocation, pre-initializing-stores step for
   // implementing e.g. ReduceInitialCardMarks
@@ -464,6 +472,10 @@ class SharedRuntime: AllStatic {
   // On PowerPC it includes the 4 words holding the old TOC & LR glue.
   static uint in_preserve_stack_slots();
 
+  static VMReg thread_register();
+
+  static void continuation_enter_cleanup(MacroAssembler* masm);
+
   // Is vector's size (in bytes) bigger than a size saved by default?
   // For example, on x86 16 bytes XMM registers are saved by default.
   static bool is_wide_vector(int size);
@@ -495,6 +507,7 @@ class SharedRuntime: AllStatic {
   // Slow-path Locking and Unlocking
   static void complete_monitor_locking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
   static void complete_monitor_unlocking_C(oopDesc* obj, BasicLock* lock, JavaThread* current);
+  static void resume_monitor_operation(JavaThread* current, ObjectWaiter* node);
 
   // Resolving of calls
   static address get_resolved_entry        (JavaThread* current, methodHandle callee_method);

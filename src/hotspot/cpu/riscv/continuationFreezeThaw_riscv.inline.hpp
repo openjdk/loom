@@ -127,6 +127,10 @@ void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
   }
 }
 
+inline void FreezeBase::prepare_freeze_interpreted_top_frame(const frame& f) {
+  Unimplemented();
+}
+
 inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
   assert(hf.fp() == hf.unextended_sp() + (f.fp() - f.unextended_sp()), "");
   assert((f.at(frame::interpreter_frame_last_sp_offset) != 0)
@@ -277,6 +281,20 @@ inline intptr_t* ThawBase::align(const frame& hf, intptr_t* frame_sp, frame& cal
 
 inline void ThawBase::patch_pd(frame& f, const frame& caller) {
   patch_callee_link(caller, caller.fp());
+}
+
+inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
+  Unimplemented();
+}
+
+inline intptr_t* ThawBase::push_resume_adapter(frame& top, bool is_interpreted_frame) {
+  Unimplemented();
+  return nullptr;
+}
+
+inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
+  Unimplemented();
+  return nullptr;
 }
 
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@
 
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Subtask;
+import java.util.concurrent.StructuredTaskScope.Joiner;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -55,7 +56,8 @@ class WithScopedValue {
     void testForkInheritsScopedValue1(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope = new StructuredTaskScope<String>(null, factory)) {
+            try (var scope = StructuredTaskScope.open(Joiner.awaitAll(),
+                                                      cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask = scope.fork(() -> {
                     return name.get(); // child should read "x"
                 });
@@ -74,9 +76,11 @@ class WithScopedValue {
     void testForkInheritsScopedValue2(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope1 = new StructuredTaskScope<String>(null, factory)) {
+            try (var scope1 = StructuredTaskScope.open(Joiner.awaitAll(),
+                                                       cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask1 = scope1.fork(() -> {
-                    try (var scope2 = new StructuredTaskScope<String>(null, factory)) {
+                    try (var scope2 = StructuredTaskScope.open(Joiner.awaitAll(),
+                                                               cf -> cf.withThreadFactory(factory))) {
                         Subtask<String> subtask2 = scope2.fork(() -> {
                             return name.get(); // grandchild should read "x"
                         });
@@ -99,13 +103,15 @@ class WithScopedValue {
     void testForkInheritsScopedValue3(ThreadFactory factory) throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         String value = ScopedValue.callWhere(name, "x", () -> {
-            try (var scope1 = new StructuredTaskScope<String>(null, factory)) {
+            try (var scope1 = StructuredTaskScope.open(Joiner.awaitAll(),
+                                                       cf -> cf.withThreadFactory(factory))) {
                 Subtask<String> subtask1 = scope1.fork(() -> {
                     assertEquals(name.get(), "x");  // child should read "x"
 
                     // rebind name to "y"
                     String grandchildValue = ScopedValue.callWhere(name, "y", () -> {
-                        try (var scope2 = new StructuredTaskScope<String>(null, factory)) {
+                        try (var scope2 = StructuredTaskScope.open(Joiner.awaitAll(),
+                                                                   cf -> cf.withThreadFactory(factory))) {
                             Subtask<String> subtask2 = scope2.fork(() -> {
                                 return name.get(); // grandchild should read "y"
                             });
@@ -131,19 +137,19 @@ class WithScopedValue {
     void testStructureViolation1() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
         class Box {
-            StructuredTaskScope<Object> scope;
+            StructuredTaskScope<Object, Void> scope;
         }
         var box = new Box();
         try {
             try {
                 ScopedValue.runWhere(name, "x", () -> {
-                    box.scope = new StructuredTaskScope<Object>();
+                    box.scope = StructuredTaskScope.open(Joiner.awaitAll());
                 });
                 fail();
             } catch (StructureViolationException expected) { }
 
             // underlying flock should be closed and fork should fail to start a thread
-            StructuredTaskScope<Object> scope = box.scope;
+            StructuredTaskScope<Object, Void> scope = box.scope;
             AtomicBoolean ran = new AtomicBoolean();
             Subtask<Object> subtask = scope.fork(() -> {
                 ran.set(true);
@@ -153,7 +159,7 @@ class WithScopedValue {
             assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
             assertFalse(ran.get());
         } finally {
-            StructuredTaskScope<Object> scope = box.scope;
+            StructuredTaskScope<Object, Void> scope = box.scope;
             if (scope != null) {
                 scope.close();
             }
@@ -166,7 +172,7 @@ class WithScopedValue {
     @Test
     void testStructureViolation2() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
-        try (var scope = new StructuredTaskScope<String>()) {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
             ScopedValue.runWhere(name, "x", () -> {
                 assertThrows(StructureViolationException.class, scope::close);
             });
@@ -179,7 +185,7 @@ class WithScopedValue {
     @Test
     void testStructureViolation3() throws Exception {
         ScopedValue<String> name = ScopedValue.newInstance();
-        try (var scope = new StructuredTaskScope<String>()) {
+        try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
             ScopedValue.runWhere(name, "x", () -> {
                 assertThrows(StructureViolationException.class,
                         () -> scope.fork(() -> "foo"));
@@ -197,7 +203,7 @@ class WithScopedValue {
 
         // rebind
         ScopedValue.runWhere(name1, "x", () -> {
-            try (var scope = new StructuredTaskScope<String>()) {
+            try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
                 ScopedValue.runWhere(name1, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));
@@ -207,7 +213,7 @@ class WithScopedValue {
 
         // new binding
         ScopedValue.runWhere(name1, "x", () -> {
-            try (var scope = new StructuredTaskScope<String>()) {
+            try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
                 ScopedValue.runWhere(name2, "y", () -> {
                     assertThrows(StructureViolationException.class,
                             () -> scope.fork(() -> "foo"));

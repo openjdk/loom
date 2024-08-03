@@ -39,10 +39,10 @@ public class InternalLock {
     private static final boolean CAN_USE_INTERNAL_LOCK;
     static {
         String s = System.getProperty("jdk.io.useMonitors");
-        if (s != null && (s.isEmpty() || s.equals("true"))) {
-            CAN_USE_INTERNAL_LOCK = false;
-        } else {
+        if (s != null && s.equals("false")) {
             CAN_USE_INTERNAL_LOCK = true;
+        } else {
+            CAN_USE_INTERNAL_LOCK = false;
         }
     }
 

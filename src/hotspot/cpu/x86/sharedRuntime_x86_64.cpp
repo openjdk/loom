@@ -182,6 +182,7 @@ class RegisterSaver {
   static int rax_offset_in_bytes(void)    { return BytesPerInt * rax_off; }
   static int rdx_offset_in_bytes(void)    { return BytesPerInt * rdx_off; }
   static int rbx_offset_in_bytes(void)    { return BytesPerInt * rbx_off; }
+  static int r15_offset_in_bytes(void)    { return BytesPerInt * r15_off; }
   static int xmm0_offset_in_bytes(void)   { return BytesPerInt * xmm0_off; }
   static int return_offset_in_bytes(void) { return BytesPerInt * return_off; }
 
@@ -1431,7 +1432,7 @@ static void fill_continuation_entry(MacroAssembler* masm, Register reg_cont_obj,
 // Kills:
 //   rbx
 //
-void static continuation_enter_cleanup(MacroAssembler* masm) {
+static void continuation_enter_cleanup(MacroAssembler* masm) {
 #ifdef ASSERT
   Label L_good_sp;
   __ cmpptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
@@ -1621,6 +1622,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
 
   __ bind(L_thaw);
 
+  ContinuationEntry::_thaw_call_pc_offset = __ pc() - start;
   __ call(RuntimeAddress(StubRoutines::cont_thaw()));
 
   ContinuationEntry::_return_pc_offset = __ pc() - start;
@@ -1721,6 +1723,10 @@ static void gen_continuation_yield(MacroAssembler* masm,
 
   __ leave();
   __ ret(0);
+}
+
+void SharedRuntime::continuation_enter_cleanup(MacroAssembler* masm) {
+  ::continuation_enter_cleanup(masm);
 }
 
 static void gen_special_dispatch(MacroAssembler* masm,
@@ -2282,12 +2288,13 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       // Save the test result, for recursive case, the result is zero
       __ movptr(Address(lock_reg, mark_word_offset), swap_reg);
       __ jcc(Assembler::notEqual, slow_path_lock);
+
+      __ bind(count_mon);
+      __ inc_held_monitor_count();
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
       __ lightweight_lock(obj_reg, swap_reg, r15_thread, rscratch1, slow_path_lock);
     }
-    __ bind(count_mon);
-    __ inc_held_monitor_count();
 
     // Slow path will re-enter here
     __ bind(lock_done);
@@ -2378,6 +2385,19 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_Java);
   __ bind(after_transition);
 
+  int resume_wait_offset = 0;
+  if (LockingMode != LM_LEGACY && method->is_object_wait0()) {
+    // Check preemption for Object.wait()
+    Label not_preempted;
+    __ movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
+    __ cmpptr(rscratch1, NULL_WORD);
+    __ jccb(Assembler::equal, not_preempted);
+    __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
+    __ jmp(rscratch1);
+    __ bind(not_preempted);
+    resume_wait_offset = ((intptr_t)__ pc()) - start;
+  }
+
   Label reguard;
   Label reguard_done;
   __ cmpl(Address(r15_thread, JavaThread::stack_guard_state_offset()), StackOverflow::stack_guard_yellow_reserved_disabled);
@@ -2427,7 +2447,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
       __ lightweight_unlock(obj_reg, swap_reg, r15_thread, lock_reg, slow_path_unlock);
-      __ dec_held_monitor_count();
     }
 
     // slow path re-enters here
@@ -2502,7 +2521,11 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ mov(c_rarg2, r15_thread);
 
     // Not a leaf but we have last_Java_frame setup as we want
+    // Force freeze slow path in case we try to preempt. We will pin the
+    // vthread to the carrier (see FreezeBase::recurse_freeze_native_frame()).
+    __ push_cont_fastpath();
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::complete_monitor_locking_C), 3);
+    __ pop_cont_fastpath();
     restore_args(masm, total_c_args, c_arg, out_regs);
 
 #ifdef ASSERT
@@ -2594,6 +2617,10 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                             in_ByteSize(lock_slot_offset*VMRegImpl::stack_slot_size),
                                             oop_maps);
 
+  if (LockingMode != LM_LEGACY && nm != nullptr && method->is_object_wait0()) {
+    SharedRuntime::set_native_frame_resume_entry(nm->code_begin() + resume_wait_offset);
+  }
+
   return nm;
 }
 
@@ -2615,6 +2642,10 @@ uint SharedRuntime::out_preserve_stack_slots() {
 // return address.
 uint SharedRuntime::in_preserve_stack_slots() {
   return 4 + 2 * VerifyStackAtCalls;
+}
+
+VMReg SharedRuntime::thread_register() {
+  return r15_thread->as_VMReg();
 }
 
 //------------------------------generate_deopt_blob----------------------------

@@ -119,6 +119,10 @@ DeoptimizationScope::~DeoptimizationScope() {
 }
 
 void DeoptimizationScope::mark(nmethod* nm, bool inc_recompile_counts) {
+  if (!nm->can_be_deoptimized()) {
+    return;
+  }
+
   ConditionalMutexLocker ml(NMethodState_lock, !NMethodState_lock->owned_by_self(), Mutex::_no_safepoint_check_flag);
 
   // If it's already marked but we still need it to be deopted.
@@ -1647,7 +1651,7 @@ bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInf
           ObjectSynchronizer::enter_for(obj, nullptr, deoptee_thread);
           assert(mon_info->owner()->is_locked(), "object must be locked now");
           ObjectMonitor* mon = ObjectSynchronizer::inflate_for(deoptee_thread, obj(), ObjectSynchronizer::inflate_cause_vm_internal);
-          assert(mon->owner() == deoptee_thread, "must be");
+          assert(mon->is_owner(deoptee_thread), "must be");
         } else {
           BasicLock* lock = mon_info->lock();
           ObjectSynchronizer::enter_for(obj, lock, deoptee_thread);

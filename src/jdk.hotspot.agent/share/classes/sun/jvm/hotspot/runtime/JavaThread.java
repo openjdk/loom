@@ -55,6 +55,7 @@ public class JavaThread extends Thread {
   private static CIntegerField stackSizeField;
   private static CIntegerField terminatedField;
   private static AddressField activeHandlesField;
+  private static CIntegerField lockIdField;
   private static long oopPtrSize;
 
   private static JavaThreadPDAccess access;
@@ -101,6 +102,7 @@ public class JavaThread extends Thread {
     stackSizeField    = type.getCIntegerField("_stack_size");
     terminatedField   = type.getCIntegerField("_terminated");
     activeHandlesField = type.getAddressField("_active_handles");
+    lockIdField        = type.getCIntegerField("_lock_id");
 
     lockStackTopOffset = type.getField("_lock_stack").getOffset() + typeLockStack.getField("_top").getOffset();
     lockStackBaseOffset = type.getField("_lock_stack").getOffset() + typeLockStack.getField("_base[0]").getOffset();
@@ -374,6 +376,10 @@ public class JavaThread extends Thread {
         return "<null>";
     }
     return OopUtilities.threadOopGetName(threadObj);
+  }
+
+  public Address getLockId() {
+    return lockIdField.getAddress(addr);
   }
 
   //

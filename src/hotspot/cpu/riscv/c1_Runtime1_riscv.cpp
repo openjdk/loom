@@ -187,7 +187,7 @@ void StubAssembler::prologue(const char* name, bool must_gc_arguments) {
   enter();
 }
 
-void StubAssembler::epilogue() {
+void StubAssembler::epilogue(bool use_pop) {
   leave();
   ret();
 }
@@ -354,6 +354,11 @@ void Runtime1::initialize_pd() {
     cpu_reg_save_offsets[i] = sp_offset;
     sp_offset += step;
   }
+}
+
+uint Runtime1::runtime_blob_current_thread_offset(frame f) {
+  Unimplemented();
+  return 0;
 }
 
 // target: the entry point of the method that creates and posts the exception oop

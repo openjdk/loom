@@ -23,7 +23,6 @@
 
 package java.lang;
 
-import jdk.internal.misc.Blocker;
 import nsk.jvmti.scenarios.bcinstr.BI04.bi04t002a;
 
 /**
@@ -368,21 +367,24 @@ public class Object {
      * @see        java.lang.Object#notifyAll()
      */
     public final void wait(long timeoutMillis) throws InterruptedException {
-        if (!Thread.currentThread().isVirtual()) {
-            wait0(timeoutMillis);
-            return;
+        if (timeoutMillis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
         }
 
-        // virtual thread waiting
-        boolean attempted = Blocker.begin();
-        try {
+        if (Thread.currentThread() instanceof VirtualThread vthread) {
+            try {
+                wait0(timeoutMillis);
+            } catch (InterruptedException e) {
+                // virtual thread's interrupt status needs to be cleared
+                vthread.getAndClearInterrupt();
+                throw e;
+            } finally {
+                if (timeoutMillis > 0) {
+                    vthread.cancelWaitTimeout();
+                }
+            }
+        } else {
             wait0(timeoutMillis);
-        } catch (InterruptedException e) {
-            // virtual thread's interrupt status needs to be cleared
-            Thread.currentThread().getAndClearInterrupt();
-            throw e;
-        } finally {
-            Blocker.end(attempted);
         }
     }
 
@@ -461,11 +463,11 @@ public class Object {
                                 "nanosecond timeout value out of range");
         }
 
-            if (nanos >= 500000 || (nanos != 0 && timeout == 0)) {
-                timeout++;
-            }
+        if (nanos > 0 && timeout < Long.MAX_VALUE) {
+            timeout++;
+        }
 
-            wait(timeout);
+        wait(timeout);
     }
 
     // final modifier so method not in vtable

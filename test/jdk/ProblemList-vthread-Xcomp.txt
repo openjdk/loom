@@ -21,4 +21,9 @@
 # questions.
 #
 
-exclusiveAccess.dirs=.
+#############################################################################
+#
+# List of quarantined tests for testing in Xcomp mode with wrapper.
+#
+#############################################################################
+
