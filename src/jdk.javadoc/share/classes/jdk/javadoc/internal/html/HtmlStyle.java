@@ -22,40 +22,21 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package jdk.jfr.internal.util;
 
-import java.util.concurrent.TimeUnit;
+package jdk.javadoc.internal.html;
 
-public enum TimespanUnit {
-    NANOSECONDS ("ns",  TimeUnit.NANOSECONDS, 1000),
-    MICROSECONDS("us", TimeUnit.MICROSECONDS, 1000),
-    MILLISECONDS("ms", TimeUnit.MILLISECONDS, 1000),
-    SECONDS     ("s",       TimeUnit.SECONDS,   60),
-    MINUTES     ("m",       TimeUnit.MINUTES,   60),
-    HOURS       ("h",         TimeUnit.HOURS,   24),
-    DAYS        ("d",          TimeUnit.DAYS,    7);
-    public final String text;
-    public final long nanos;
-    public final int size;
-    private final TimeUnit timeUnit;
-    TimespanUnit(String text, TimeUnit tu, int size) {
-        this.text = text;
-        this.nanos = tu.toNanos(1);
-        this.size = size;
-        this.timeUnit = tu;
-    }
-
-    public long toNanos(long value) {
-        return timeUnit.toNanos(value);
-    }
-
-    public static TimespanUnit fromText(String text) {
-        for (TimespanUnit tu : values()) {
-            // Case-sensitive by design
-            if (tu.text.equals(text)) {
-                return tu;
-            }
-        }
-        return null;
-    }
+/**
+ * An abstraction for the type-safe representation and use of CSS class names.
+ *
+ * @apiNote
+ * Despite the name, implementations of this interface provide values for the HTML
+ * {@code class} attribute, and <strong>not</strong> the HTML {@code style} attribute.
+ * This is to avoid confusion with the widespread use of the word "class" in the Java ecosystem,
+ * and the potential for clashes with methods called {@code setClass} instead of {@code setStyle}.
+ *
+ * @see HtmlTree#addStyle(HtmlStyle)
+ * @see HtmlTree#setStyle(HtmlStyle)
+ */
+public interface HtmlStyle {
+    String cssName();
 }
