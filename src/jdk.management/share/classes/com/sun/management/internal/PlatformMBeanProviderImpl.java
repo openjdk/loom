@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,6 +41,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.DynamicMBean;
+import jdk.internal.vm.ContinuationSupport;
+import jdk.management.VirtualThreadSchedulerMXBean;
 import sun.management.ManagementFactoryHelper;
 import sun.management.spi.PlatformMBeanProvider;
 
@@ -162,6 +164,41 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
                         threadMBean);
             }
         });
+
+        /**
+         * VirtualThreadSchedulerMXBean.
+         */
+        if (ContinuationSupport.isSupported()) {
+            initMBeanList.add(new PlatformComponent<VirtualThreadSchedulerMXBean>() {
+                private final Set<String> virtualThreadSchedulerMXBeanInterfaceNames =
+                        Set.of("jdk.management.VirtualThreadSchedulerMXBean");
+                private VirtualThreadSchedulerImpl impl;
+
+                @Override
+                public Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces() {
+                    return Set.of(VirtualThreadSchedulerMXBean.class);
+                }
+
+                @Override
+                public Set<String> mbeanInterfaceNames() {
+                    return virtualThreadSchedulerMXBeanInterfaceNames;
+                }
+
+                @Override
+                public String getObjectNamePattern() {
+                    return "jdk.management:type=VirtualThreadScheduler";
+                }
+
+                @Override
+                public Map<String, VirtualThreadSchedulerMXBean> nameToMBeanMap() {
+                    VirtualThreadSchedulerImpl impl = this.impl;
+                    if (impl == null) {
+                        this.impl = impl = new VirtualThreadSchedulerImpl();
+                    }
+                    return Map.of("jdk.management:type=VirtualThreadScheduler", impl);
+                }
+            });
+        }
 
         /**
          * OperatingSystemMXBean

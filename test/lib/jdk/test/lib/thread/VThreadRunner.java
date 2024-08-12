@@ -23,10 +23,11 @@
 
 package jdk.test.lib.thread;
 
-import java.lang.reflect.Field;
+import java.lang.management.ManagementFactory;
 import java.time.Duration;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReference;
+
+import jdk.management.VirtualThreadSchedulerMXBean;
 
 /**
  * Helper class to support tests running tasks in a virtual thread.
@@ -134,25 +135,14 @@ public class VThreadRunner {
     }
 
     /**
-     * Returns the virtual thread scheduler.
-     */
-    private static ForkJoinPool defaultScheduler() {
-        try {
-            var clazz = Class.forName("java.lang.VirtualThread");
-            var field = clazz.getDeclaredField("DEFAULT_SCHEDULER");
-            field.setAccessible(true);
-            return (ForkJoinPool) field.get(null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * Sets the virtual thread scheduler's target parallelism.
      * @return the previous parallelism level
      */
     public static int setParallelism(int size) {
-        return defaultScheduler().setParallelism(size);
+        var bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
+        int parallelism = bean.getParallelism();
+        bean.setParallelism(size);
+        return parallelism;
     }
 
     /**
@@ -162,10 +152,10 @@ public class VThreadRunner {
      * @return the previous parallelism level
      */
     public static int ensureParallelism(int size) {
-        ForkJoinPool pool = defaultScheduler();
-        int parallelism = pool.getParallelism();
+        var bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
+        int parallelism = bean.getParallelism();
         if (size > parallelism) {
-            pool.setParallelism(size);
+            bean.setParallelism(size);
         }
         return parallelism;
     }
