@@ -152,7 +152,13 @@ public class VThreadRunner {
      * @return the previous parallelism level
      */
     public static int ensureParallelism(int size) {
-        var bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
+        VirtualThreadSchedulerMXBean bean;
+        try {
+            bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
+        } catch (IllegalArgumentException e) {
+            // not supported with -XX:-VMContinuations
+            return 16384;
+        }
         int parallelism = bean.getParallelism();
         if (size > parallelism) {
             bean.setParallelism(size);
