@@ -1324,8 +1324,9 @@ final class VirtualThread extends BaseVirtualThread {
                 yield parkPermit && compareAndSetState(initialState, UNPARKED);
             }
             case BLOCKED -> {
-                // resubmit if unblocked while suspended
-                yield unblocked && compareAndSetState(BLOCKED, UNBLOCKED);
+                // resubmit if unblocked while suspended or the responsible thread for a monitor
+                yield (unblocked || isResponsibleForMonitor())
+                        && compareAndSetState(BLOCKED, UNBLOCKED);
             }
             case WAIT, TIMED_WAIT -> {
                 // resubmit if notified or interrupted while waiting (Object.wait)
@@ -1540,7 +1541,7 @@ final class VirtualThread extends BaseVirtualThread {
                 var scheduler = (Executor) ctor.newInstance();
                 System.err.println("""
                     WARNING: Using custom scheduler, this is an experimental feature.""");
-                 return scheduler;
+                return scheduler;
             } catch (Exception ex) {
                 throw new Error(ex);
             }
