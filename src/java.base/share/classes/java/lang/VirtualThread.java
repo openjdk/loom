@@ -1537,7 +1537,10 @@ final class VirtualThread extends BaseVirtualThread {
                 Class<?> clazz = Class.forName(propValue, true,
                         ClassLoader.getSystemClassLoader());
                 Constructor<?> ctor = clazz.getConstructor();
-                return (Executor) ctor.newInstance();
+                var scheduler = (Executor) ctor.newInstance();
+                System.err.println("""
+                    WARNING: Using custom scheduler, this is an experimental feature.""");
+                 return scheduler;
             } catch (Exception ex) {
                 throw new Error(ex);
             }
