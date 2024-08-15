@@ -26,7 +26,6 @@ package jdk.test.lib.thread;
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
-
 import jdk.management.VirtualThreadSchedulerMXBean;
 
 /**
@@ -152,13 +151,7 @@ public class VThreadRunner {
      * @return the previous parallelism level
      */
     public static int ensureParallelism(int size) {
-        VirtualThreadSchedulerMXBean bean;
-        try {
-            bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
-        } catch (IllegalArgumentException e) {
-            // not supported with -XX:-VMContinuations
-            return 16384;
-        }
+        var bean = ManagementFactory.getPlatformMXBean(VirtualThreadSchedulerMXBean.class);
         int parallelism = bean.getParallelism();
         if (size > parallelism) {
             bean.setParallelism(size);
