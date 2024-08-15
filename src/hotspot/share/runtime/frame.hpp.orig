@@ -444,8 +444,12 @@ class frame {
 
 #ifndef PRODUCT
   // Add annotated descriptions of memory locations belonging to this frame to values
+<<<<<<< HEAD
   void describe(FrameValues& values, int frame_no, const RegisterMap* reg_map=nullptr, bool top = false);
+=======
+  void describe(FrameValues& values, int frame_no, const RegisterMap* reg_map=nullptr);
 #endif
+>>>>>>> master
 
   // Conversion from a VMReg to physical stack location
   template <typename RegisterMapT>
