@@ -26,11 +26,10 @@ package jdk.management;
 
 import java.lang.management.PlatformManagedObject;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool;
 
 /**
- * Management interface for the JDK's default virtual thread scheduler.
+ * Management interface for the JDK's default {@linkplain Thread##virtual-threads
+ * virtual thread} scheduler.
  *
  * @since 24
  */
@@ -53,7 +52,8 @@ public interface VirtualThreadSchedulerMXBean extends PlatformManagedObject {
     void setParallelism(int size);
 
     /**
-     * {@return the current number of platform threads in the scheduler's pool}
+     * {@return the current number of platform threads in the scheduler's pool;
+     * {@code -1} if not known}
      */
     int getThreadCount();
 
