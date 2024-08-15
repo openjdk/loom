@@ -789,7 +789,9 @@ final class VirtualThread extends BaseVirtualThread {
         boolean yielded = false;
         setState(PARKING);
         try {
-            yielded = yieldContinuation();  // may throw
+            yielded = yieldContinuation();
+        } catch (OutOfMemoryError e) {
+            // park on carrier
         } finally {
             assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
             if (!yielded) {
@@ -825,20 +827,29 @@ final class VirtualThread extends BaseVirtualThread {
             long startTime = System.nanoTime();
 
             boolean yielded = false;
-            Future<?> unparker = scheduleUnpark(nanos);  // may throw OOME
-            setState(TIMED_PARKING);
+            Future<?> unparker = null;
             try {
-                yielded = yieldContinuation();  // may throw
-            } finally {
-                assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
-                if (!yielded) {
-                    assert state() == TIMED_PARKING;
-                    setState(RUNNING);
+                 unparker = scheduleUnpark(nanos);
+            } catch (OutOfMemoryError e) {
+                // park on carrier
+            }
+            if (unparker != null) {
+                setState(TIMED_PARKING);
+                try {
+                    yielded = yieldContinuation();
+                } catch (OutOfMemoryError e) {
+                    // park on carrier
+                } finally {
+                    assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
+                    if (!yielded) {
+                        assert state() == TIMED_PARKING;
+                        setState(RUNNING);
+                    }
+                    cancel(unparker);
                 }
-                cancel(unparker);
             }
 
-            // park on carrier thread for remaining time when pinned
+            // park on carrier thread for remaining time when pinned (or OOME)
             if (!yielded) {
                 long remainingNanos = nanos - (System.nanoTime() - startTime);
                 parkOnCarrierThread(true, remainingNanos);
