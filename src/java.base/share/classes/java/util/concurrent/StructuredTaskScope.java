@@ -76,8 +76,8 @@ import jdk.internal.misc.ThreadFlock;
  * method always waits for threads executing subtasks to finish, even if execution is
  * cancelled, so it cannot continue beyond the {@code close} method until the interrupted
  * threads finish. Subtasks should be coded so that they finish as soon as possible when
- * interrupted. Subtasks that block on methods that are not interruptible may delay the
- * closing of a task scope.
+ * interrupted. Subtasks that do not respond to interrupt, e.g. block on methods that are
+ * not interruptible, may delay the closing of a task scope indefinitely.
  *
  * <p> Consider the example of a main task that splits into two subtasks to concurrently
  * fetch resources from two URL locations "left" and "right". Both subtasks may complete
