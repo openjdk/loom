@@ -448,6 +448,8 @@ public interface JavaLangAccess {
      */
     long stringConcatMix(long lengthCoder, char value);
 
+    Object stringConcat1(String[] constants);
+
     /**
      * Join strings
      */

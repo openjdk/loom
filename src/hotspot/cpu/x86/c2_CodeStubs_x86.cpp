@@ -80,8 +80,6 @@ int C2FastUnlockLightweightStub::max_size() const {
 void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
   assert(_t1 == rax, "must be");
 
-  Label slow_path;
-
   { // Restore lock-stack and handle the unlock in runtime.
 
     __ bind(_push_and_slow_path);
@@ -95,7 +93,7 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
 
   { // Handle the unlock in runtime
 
-    __ bind(slow_path);
+    __ bind(_slow_path);
     // set ZF=0 to indicate failure
     __ orl(_t1, 1);
     __ jmp(slow_path_continuation());
@@ -109,21 +107,25 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
     const Register monitor = _mark;
 
 #ifndef _LP64
-    __ jmpb(slow_path);
+    __ jmpb(_slow_path);
 #else // _LP64
+    const ByteSize monitor_tag = in_ByteSize(UseObjectMonitorTable ? 0 : checked_cast<int>(markWord::monitor_value));
+    const Address succ_address(monitor, ObjectMonitor::succ_offset() - monitor_tag);
+    const Address owner_address(monitor, ObjectMonitor::owner_offset() - monitor_tag);
+
     // successor null check.
-    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
-    __ jccb(Assembler::equal, slow_path);
+    __ cmpptr(succ_address, NULL_WORD);
+    __ jccb(Assembler::equal, _slow_path);
 
     // Release lock.
-    __ movptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), NULL_WORD);
+    __ movptr(owner_address, NULL_WORD);
 
     // Fence.
     // Instead of MFENCE we use a dummy locked add of 0 to the top-of-stack.
     __ lock(); __ addl(Address(rsp, 0), 0);
 
     // Recheck successor.
-    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    __ cmpptr(succ_address, NULL_WORD);
     // Observed a successor after the release -> fence we have handed off the monitor
     __ jccb(Assembler::notEqual, fix_zf_and_unlocked);
 
@@ -133,8 +135,8 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
     //       due to the responsible thread.
     __ xorptr(rax, rax);
     __ movptr(_t2, Address(_thread, JavaThread::lock_id_offset()));
-    __ lock(); __ cmpxchgptr(_t2, Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
-    __ jccb  (Assembler::equal, slow_path);
+    __ lock(); __ cmpxchgptr(_t2, owner_address);
+    __ jccb  (Assembler::equal, _slow_path);
 #endif
 
     __ bind(fix_zf_and_unlocked);
